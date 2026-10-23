@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import '../../CharSheet.css';
+import './RecklessAttackModal.css';
 
 const BRUTAL_STRIKE_DESCRIPTIONS = {
     'Forceful Blow': 'Push target 15 ft',
@@ -11,31 +12,39 @@ const BRUTAL_STRIKE_DESCRIPTIONS = {
 function BrutalStrikeOptionsPicker({ multiSelect, maxEffects, selectedEffects, brutalStrikeOptions, handleEffectToggle }) {
     if (!brutalStrikeOptions || brutalStrikeOptions.length === 0) return null;
     return (
-        <div style={{ marginTop: '8px', marginLeft: '16px' }}>
-            <p style={{ opacity: 0.7, fontSize: '0.85em', marginBottom: '8px' }}>
+        <div className="brutal-strike-picker">
+            <p className="brutal-strike-hint">
                 Choose {multiSelect ? `up to ${maxEffects}` : 'one'} effect{multiSelect ? 's' : ''}:
             </p>
             {brutalStrikeOptions.map((opt, i) => {
                 const isSelected = multiSelect ? selectedEffects.includes(opt.name) : selectedEffects[0] === opt.name;
                 const inputType = multiSelect ? 'checkbox' : 'radio';
                 return (
-                    <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                    <label
+                        key={i}
+                        className="brutal-strike-option"
+                        /* background/border are dynamic (derived from isSelected state) — dynamic-data exception, stays inline */
+                        style={{
+                            background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent',
+                            border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
+                        }}
+                    >
                         <input
                             type={inputType}
                             name={multiSelect ? `brutalOption_${i}` : 'brutalOption'}
                             checked={isSelected}
                             onChange={() => handleEffectToggle(opt.name)}
-                            style={{ marginRight: '8px' }}
+                            className="brutal-strike-input"
                         />
                         <strong>{opt.name}</strong>
                         {BRUTAL_STRIKE_DESCRIPTIONS[opt.name] && (
-                            <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {BRUTAL_STRIKE_DESCRIPTIONS[opt.name]}</span>
+                            <span className="brutal-strike-desc">— {BRUTAL_STRIKE_DESCRIPTIONS[opt.name]}</span>
                         )}
                     </label>
                 );
             })}
             {multiSelect && (
-                <p style={{ opacity: 0.7, fontSize: '0.85em', marginTop: '8px' }}>
+                <p className="brutal-strike-count">
                     {selectedEffects.length}/{maxEffects} selected
                 </p>
             )}
@@ -45,13 +54,20 @@ function BrutalStrikeOptionsPicker({ multiSelect, maxEffects, selectedEffects, b
 
 function BrutalStrikeToggle({ useBrutalStrike, onToggle, multiSelect, maxEffects, selectedEffects, brutalStrikeOptions, handleEffectToggle, labelExtra }) {
     return (
-        <div style={{ marginTop: '12px', textAlign: 'left' }}>
-            <label style={{ display: 'block', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', background: useBrutalStrike ? 'rgba(255,255,255,0.15)' : 'transparent', border: useBrutalStrike ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+        <div className="brutal-strike-toggle">
+            <label
+                className="brutal-strike-toggle-label"
+                /* background/border are dynamic (derived from useBrutalStrike state) — dynamic-data exception, stays inline */
+                style={{
+                    background: useBrutalStrike ? 'rgba(255,255,255,0.15)' : 'transparent',
+                    border: useBrutalStrike ? '1px solid var(--color-link)' : '1px solid transparent',
+                }}
+            >
                 <input
                     type="checkbox"
                     checked={useBrutalStrike}
                     onChange={onToggle}
-                    style={{ marginRight: '8px' }}
+                    className="brutal-strike-input"
                 />
                 <strong>Use Brutal Strike</strong>{labelExtra}
             </label>
@@ -112,7 +128,7 @@ function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaig
                     </div>
                     <div className="sp-body">
                         <p>Reckless Attack is already active. Use Brutal Strike on this attack?</p>
-                        <p style={{ opacity: 0.8, fontSize: '0.9em' }}>
+                        <p className="brutal-strike-note">
                             Forgo Advantage on this attack to deal extra {extraDice} damage and apply effects.
                         </p>
                         {hasBrutalStrike && (

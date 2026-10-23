@@ -60,7 +60,7 @@ vi.mock('../../../../automation/handlers/spells/imprisonmentHandler.js', () => (
   isImprisonmentBlocked: vi.fn(() => false),
 }));
 
-vi.mock('./spellResolution.js', () => ({
+vi.mock('../../../../combat/buffs/buffService.js', () => ({
   getActiveBuffs: vi.fn(() => []),
 }));
 
@@ -69,7 +69,7 @@ vi.mock('./spellResolution.js', () => ({
 /* ------------------------------------------------------------------ */
 
 const { addEntry } = await import('../../../../ui/logService.js');
-const { getActiveBuffs } = await import('./spellResolution.js');
+const { getActiveBuffs } = await import('../../../../combat/buffs/buffService.js');
 const { checkBlockedBySpellcastingBuff } = await import('./blockChecks.js');
 
 /* ------------------------------------------------------------------ */

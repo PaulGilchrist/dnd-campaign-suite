@@ -224,10 +224,6 @@ vi.mock('./damageCalculation.js', () => ({
   computeOverchannel: vi.fn(() => ({ overchannelFormula: null, overchannelActive: false, overchannelUseCount: 0 })),
 }));
 
-vi.mock('./spellResolution.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
-}));
-
 // Correct path: execution/index.js imports src/services/encounters/combatData.js
 // ('../../../../../services/encounters/...'); the old mock ('../../../../services/...')
 // resolved nowhere and was never applied — the real module loaded instead.

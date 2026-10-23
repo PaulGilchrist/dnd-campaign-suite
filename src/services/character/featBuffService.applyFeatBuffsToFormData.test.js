@@ -38,7 +38,9 @@
 // LIVENESS FLAG (verified by repo-wide grep, 2026-10-16): applyFeatBuffsToFormData has
 // ZERO production callers — live wizard lanes are computeAllFeatBuffs + useWizardFeatBuffs'
 // own clearBuffs/applyBuffs (useWizardFeatBuffs.js:83-87) and rules.js:255. Same for
-// clearAppliedFeatBuffs (#2017) and shared applyAbilityScoreIncreases. This lane pins the
+// clearAppliedFeatBuffs (#2017). #1534 RESOLVED: the writer lane no longer carries an inline
+// twin of applyAbilityScoreIncreases — it calls the shared buffApplier export (single source).
+// This lane pins the
 // legacy writer contract for whatever caller revives it; flagged to parent for trim decision.
 //
 // Anti-pattern hygiene: exact assertions only (no toBeDefined), no timers, no vacuous

@@ -6,7 +6,7 @@
 // layer — it extracts spell-granting sources (race/background/feat/class) and reports
 // "outside class spell list" warnings. spellLimits.js is the cap/limit computation layer
 // ('Cantrips: 4/3'-style violation strings live THERE, row-homed by #1509 — not regrown here).
-// spellValidation.js:450 explicitly disclaims limit checks ("Spell limit validation is handled
+// spellValidation.js:454 explicitly disclaims limit checks ("Spell limit validation is handled
 // in the UI"). Caller split (verbatim): WizardStepSpells.jsx:6 imports getSpellValidationInfo,
 // hasMagicalSecretsAccess, MAGICAL_SECRETS_CLASS_LISTS from THIS module; :382 calls
 // spellLimits.validateSpellSelection for caps. Distinct layers, no fold needed.
@@ -34,10 +34,14 @@
 //     titled 'Thaumaturgy', so Fighter+Tiefling 'Thaumaturgy' is allowed and the lowercase
 //     pseudo-name is refused (flip rows below). Substring junk ('Armor' vs 'Mage Armor')
 //     is impossible — the guard is Map.get on lowercased EXACT keys.
-//  Q6 :432-433 vacuous self-compute: _spellLevel is read then void-ed (dead line).
-//  Q7 :455 valid = warnings.filter(type==='warning') is vacuous — only 'warning' type exists.
-//  Q8 :468-469 getSpellValidationInfo loads sources twice (validateSpells + direct call):
-//     quantified by loadClassData call count 2 per invocation.
+//  Q6 FIXED #1530-leg-a: the vacuous self-compute is gone — `const _spellLevel = ...; void
+//     _spellLevel;` (read-then-void, never used by any check) was deleted, not renamed.
+//  Q7 FIXED #1530-leg-b: producer census (both pushes are the 'warning' literal, array is
+//     function-local) -> vacuous type-filter deleted; valid = warnings.length === 0
+//     (spellLimits.js:342 violations.length convention). 'warning'|'info' vocabulary stays
+//     alive app-wide in sibling validators + WarningList display; it was never produced here.
+//  Q8 FIXED #1530-leg-c: getSpellValidationInfo shares one getSpellSources load with the
+//     validation core (validateAgainstSources); quantified by loadClassData call count 1.
 //  Q9 :26 getClassSpellList echoes the INPUT case ([className]), not the canonical disk name.
 //  Q10 2024 disk backgrounds have no `features`/`traits` keys -> background extraction is
 //     disk-inert (all 16 rows extract nothing); extractor arms pinned via STRUCT fixtures.
@@ -58,10 +62,10 @@
 //  K15 monk name list -> P-monk allow+refuse; K16 magical-secrets line -> M rows; K17 each
 //  allowed-set add-loop -> V race/background/feat/granted/MI|FT|ST rows; K18 allSpells index
 //  arm -> V 'guidance' row; K19 not-found branch -> V-unknown; K20 consolidate count/plural ->
-//  V-grammar bytes; K21 valid computation -> every warn row; K22 info double-load/keys/
-//  spellCount -> S row. Disk-vacuous arms openly disclosed (not fabricated against): benefits
-//  type==='spell' parse adds nothing for any disk feat text (verified offline); Q6 void line is
-//  unkillable by construction.
+//  V-grammar bytes; K21 valid computation (warnings.length) -> every warn row; K22 info
+//  single-load census/keys/spellCount -> S row. Disk-vacuous arms openly disclosed (not
+//  fabricated against): benefits type==='spell' parse adds nothing for any disk feat text
+//  (verified offline).
 //
 // Fixture integrity: all rules data imported from public/data at load (drift throws); synthetic
 // inputs appear ONLY as clearly-labeled STRUCT* parser fixtures for arms disk cannot exercise
@@ -111,7 +115,7 @@ const backgrounds2024 = disk('data/2024/backgrounds.json');
 // 5e backgrounds.json does not exist; the real loader marks it optional (dataLoader.js:143-146)
 // and resolves [] — served honestly below.
 
-// Violation string literals, chokepointed once (module spellValidation.js:425/:446):
+// Violation string literals, chokepointed once (module spellValidation.js:431/:450):
 const notFound = (name) => `Spell "${name}" not found in spell database.`;
 const OUTSIDE_ONE = 'Spell (1) chosen outside of the class spell list.';
 const OUTSIDE_TWO = 'Spell(s) (2) chosen outside of the class spell list.';
@@ -570,7 +574,7 @@ describe('spellValidation', () => {
   });
 
   describe('getSpellValidationInfo (WizardStepSpells.jsx:6 consumer)', () => {
-    it('returns the exact key set, embedded validation, and re-loads sources twice (Q8)', async () => {
+    it('returns the exact key set, embedded validation, and loads sources exactly once (Q8 fixed)', async () => {
       const formData = { class: { name: 'Wizard' } };
 
       const result = await getSpellValidationInfo(formData, ['Fireball', 'Not A Spell'], spells5e, '5e');
@@ -594,14 +598,14 @@ describe('spellValidation', () => {
         background: { name: '', spells: [], cantrips: [] },
         feats: { grantedSpells: [], grantedCantrips: [], spellListAccess: [] },
       });
-      // Q8 quantified: validateSpells() and the wrapper each call getSpellSources -> 2 loads
-      expect(dataLoader.loadClassData).toHaveBeenCalledTimes(2);
+      // Q8 fixed quantification: one shared getSpellSources load feeds validation + info
+      expect(dataLoader.loadClassData).toHaveBeenCalledTimes(1);
 
       vi.clearAllMocks();
       const nullSelection = await getSpellValidationInfo(formData, null, [], '5e');
       expect(nullSelection.spellCount).toBe(0);
       expect(nullSelection.valid).toBe(true);
-      expect(dataLoader.loadClassData).toHaveBeenCalledTimes(1); // validation short-circuits; only wrapper loads
+      expect(dataLoader.loadClassData).toHaveBeenCalledTimes(1); // wrapper loads; core loop runs empty
     });
   });
 });

@@ -3,7 +3,8 @@
  * silenceService — zone-membership / targetEffects store accessor.
  * Lane map (verified 2026-10-22):
  *   - LIVE production surface: getSilenceSource + isCreatureInSilenceZone
- *     (Verbal gate: execution/index.js:136-137 + spellResolution.js:54-55;
+ *     (Verbal gate: execution/index.js:172-173; the twin gate at the retired
+ *     spellResolution.js:54-55 was excised with the barrel, fix#301;
  *     thunder side: applyDamage.js:294), addSilencedTarget
  *     (SilenceModal.jsx:115), removeSilencedTargets (silenceHandler.js:79).
  *   - DEAD in production — EXCISED by the #1413/#1420 dead-export census batch

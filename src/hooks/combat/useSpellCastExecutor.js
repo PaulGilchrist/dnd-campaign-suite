@@ -122,7 +122,9 @@ const MODAL_STATE_KEYS = {
     massHealingWordTarget: 'massHealingWordModal',
     saveAttackAoe: 'saveAttackAoeModal',
     aoeCondition: 'aoeConditionModal',
-    fear: 'fearModal',
+    // fix#308 orphan-retire: fear:'fearModal' consumer key DELETED — its sole producer
+    // (modalSpells.handleFear) retired census-dead; no emitter of modalName:'fear'
+    // survives repo-wide. Live fear route stays DIRECT: automation/index.js:530.
     sleep: 'sleepModal',
     hypnoticPattern: 'hypnoticPatternModal',
     calmEmotions: 'calmEmotionsModal',

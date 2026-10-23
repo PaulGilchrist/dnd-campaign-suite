@@ -3,6 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import PolymorphSelectionModal from './PolymorphSelectionModal.jsx';
+import {
+    WOLF, CROCODILE, EAGLE, RAT, GIANT_SPIDER, GHAST,
+    diskMonster, assertDiskRows, SHARED_MONSTER_PINS,
+    WALK_ONLY, WALK_OR_SWIM, WALK_SWIM_FLY,
+    speedTextOf,
+} from './PolymorphSelectionModal.test-utils.js';
 
 // Features lane: customization props (title/actionLabel), allowAnyCreature /
 // object_into_creature modes, excludeTypes, CR display, class-feature fallbacks,
@@ -12,44 +18,20 @@ import PolymorphSelectionModal from './PolymorphSelectionModal.jsx';
 //
 // Fixture note (ledger pass #150): the old mockMonsters here was a hand-copied,
 // drifted twin of the core lane fixture (numeric speeds instead of the disk's
-// "40 ft." strings). A shared fixture module was recommended but creating one
-// is outside this file's edit scope, so the rows are now derived directly from
-// REAL disk bytes via readFileSync with drift-throws — no hand copies left.
+// "40 ft." strings). Per the pass #150 rec the rows now live in the SHARED
+// fixture module PolymorphSelectionModal.test-utils.js (disk-derived with
+// drift-throws) that BOTH lanes import; only this lane's distinctive
+// ADULT_BLACK_DRAGON row and its pin stay local below.
 
-const diskMonsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-
-function diskMonster(name) {
-    const found = diskMonsters.find(m => m.name.toLowerCase() === name.toLowerCase());
-    if (!found) throw new Error(`Fixture drift: '${name}' no longer exists in public/data/monsters.json`);
-    return found;
-}
-
-const WOLF = diskMonster('Wolf');
-const EAGLE = diskMonster('Eagle');
-const RAT = diskMonster('Rat');
-const CROCODILE = diskMonster('Crocodile');
-const GIANT_SPIDER = diskMonster('Giant Spider');
-const GHAST = diskMonster('Ghast');
+// Lane-distinctive disk row (the shared six come from test-utils).
 const ADULT_BLACK_DRAGON = diskMonster('Adult Black Dragon');
 
-// Drift-throw: pin exact disk bytes the assertions below depend on.
-const EXPECTED_DISK_SPEEDS = {
-    wolf: { speed: { walk: '40 ft.' }, challenge_rating: '0.25', type: 'Beast' },
-    eagle: { speed: { walk: '10 ft.', fly: '60 ft.' }, challenge_rating: '0', type: 'beast' },
-    rat: { speed: { walk: '20 ft.', fly: '', swim: '', climb: '20 ft.', burrow: '', other: [] }, challenge_rating: '0', type: 'Beast' },
-    crocodile: { speed: { walk: '20 ft.', swim: '30 ft.' }, challenge_rating: '0.5', type: 'Beast' },
-    'giant spider': { speed: { walk: '30 ft.', climb: '30 ft.' }, challenge_rating: '1', type: 'Beast' },
-    ghast: { speed: { walk: '30 ft.' }, challenge_rating: '2', type: 'Undead' },
+// Drift-throw: pin the exact disk bytes the assertions below depend on —
+// shared rows via SHARED_MONSTER_PINS, lane-distinctive row here.
+assertDiskRows(SHARED_MONSTER_PINS);
+assertDiskRows({
     'adult black dragon': { speed: { walk: '40 ft.', fly: '80 ft.', swim: '40 ft.' }, challenge_rating: '14', type: 'Dragon' },
-};
-for (const [name, expected] of Object.entries(EXPECTED_DISK_SPEEDS)) {
-    const m = diskMonster(name);
-    if (JSON.stringify(m.speed) !== JSON.stringify(expected.speed)
-        || String(m.challenge_rating) !== expected.challenge_rating
-        || m.type !== expected.type) {
-        throw new Error(`Fixture drift: '${name}' disk row changed - ${JSON.stringify(m)} (expected speed ${JSON.stringify(expected.speed)}, cr ${expected.challenge_rating}, type ${expected.type})`);
-    }
-}
+});
 
 const mockMonsters = [WOLF, EAGLE, RAT, CROCODILE, GIANT_SPIDER, GHAST, ADULT_BLACK_DRAGON];
 
@@ -63,9 +45,6 @@ vi.mock('../../../services/ui/dataLoader.js', () => ({
 // if the source strings ever change underneath this parser contract.
 const classRulesSrc = readFileSync('src/services/character/classRules.js', 'utf8');
 const classRules2024Src = readFileSync('src/services/character/classRules2024.js', 'utf8');
-const WALK_ONLY = 'walk only (no swim or fly)';
-const WALK_OR_SWIM = 'walk or swim only (no fly)';
-const WALK_SWIM_FLY = 'walk, swim, or fly';
 for (const [src, label] of [[classRulesSrc, 'classRules.js'], [classRules2024Src, 'classRules2024.js']]) {
     if (!src.includes(WALK_OR_SWIM) || !src.includes(WALK_SWIM_FLY)) {
         throw new Error(`Limitation contract drift: ${label} no longer emits '${WALK_OR_SWIM}' / '${WALK_SWIM_FLY}'`);
@@ -97,17 +76,7 @@ function makeProps(overrides) {
     return { ...baseProps, ...(overrides || {}) };
 }
 
-function findBeastItem(beastName) {
-    return Array.from(document.querySelectorAll('.wild-shape-beast-item')).find(item =>
-        item.querySelector('.wild-shape-beast-name').textContent.includes(beastName)) || null;
-}
-
-function speedTextOf(beastName) {
-    const item = findBeastItem(beastName);
-    if (!item) throw new Error(`Beast row missing: ${beastName}`);
-    const spans = item.querySelectorAll('.wild-shape-beast-stats span');
-    return spans[spans.length - 1].textContent;
-}
+// findBeastItem/speedTextOf come from test-utils (shared with core lane).
 
 describe('PolymorphSelectionModal - Features', () => {
     beforeEach(() => {

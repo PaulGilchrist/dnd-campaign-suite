@@ -5,7 +5,6 @@ import SaveAttackHealModal from './modals/shared/SaveAttackHealModal.jsx';
 import SaveAttackAoeModal from './modals/shared/SaveAttackAoeModal.jsx';
 import WarpingImplosionModal from './modals/WarpingImplosionModal.jsx';
 import AOEConditionModal from './modals/shared/AOEConditionModal.jsx';
-import FearModal from './modals/shared/FearModal.jsx';
 import HypnoticPatternModal from './modals/shared/HypnoticPatternModal.jsx';
 import SleepModal from './modals/shared/SleepModal.jsx';
 import TashasLaughterModal from './modals/shared/TashasLaughterModal.jsx';
@@ -100,13 +99,9 @@ function SpellEffectModals({ mergedModalState, setModalState, setPopupHtml, char
                     onClose={() => setModalState({ aoeConditionModal: null })}
                 />
             )}
-            {mergedModalState.fearModal && (
-                <FearModal
-                    {...mergedModalState.fearModal}
-                    characters={characters}
-                    onClose={() => setModalState({ fearModal: null })}
-                />
-            )}
+            {/* fix#308 orphan-retire: fearModal mount lane DELETED — fearModal state had
+                zero setters left once the executor consumer key was retired (no emitter of
+                modalName:'fear' repo-wide); Fear fear rides the DIRECT fearHandler lane. */}
             {mergedModalState.sleepModal && (
                 <SleepModal
                     {...mergedModalState.sleepModal}

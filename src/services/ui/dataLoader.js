@@ -176,6 +176,13 @@ export async function loadValidationRules(version = '5e') {
   if (data && data[version]) {
     return data[version];
   }
+  // #1542 KEEP — honest network/shape guard, not a dead arm-vs-disk. Disk census: top keys are
+  // ['2024','5e'] (public/data/rules-validation.json) and ['2024'] (public/data/2024/rules-validation.json),
+  // so on healthy disk the unwrap arm above ALWAYS hits for valid versions. This arm fires only on
+  // loadData's swallowed failure (fetch reject at :86, non-JSON throw at :104 -> []) or an
+  // invalid-version wrapper miss, and must return the truthy raw value: consumers dereference
+  // rules unguarded (config/utils.js getPointBuyCosts rules.point_buy, validateLevel rules.level_range,
+  // featValidation.js getFeatLimits rules.feats) — `return data[version]` would leak undefined there.
   return data;
 }
 
@@ -559,42 +566,27 @@ export async function loadSpells(version = '5e') {
 export async function loadSkills() {
     if (sharedDataCache.skills) {
         return sharedDataCache.skills;
-     }
-    try {
-        const abilities = await loadAbilityScores();
-        const skills = [];
-        abilities.forEach(ability => {
-            ability.skills.forEach(skillName => {
-                skills.push({ name: skillName, ability: ability.full_name });
-             });
-            });
-        sharedDataCache.skills = skills;
-        return skills;
-     } catch (error) {
-        console.error('Error loading skills:', error);
-     }
-     // Fallback
-    return [
-         { name: 'Acrobatics', ability: 'Dexterity' },
-         { name: 'Animal Handling', ability: 'Wisdom' },
-         { name: 'Arcana', ability: 'Intelligence' },
-         { name: 'Athletics', ability: 'Strength' },
-         { name: 'Deception', ability: 'Charisma' },
-         { name: 'History', ability: 'Intelligence' },
-         { name: 'Insight', ability: 'Wisdom' },
-         { name: 'Intimidation', ability: 'Charisma' },
-         { name: 'Investigation', ability: 'Intelligence' },
-         { name: 'Medicine', ability: 'Wisdom' },
-         { name: 'Nature', ability: 'Intelligence' },
-         { name: 'Perception', ability: 'Wisdom' },
-         { name: 'Performance', ability: 'Charisma' },
-         { name: 'Persuasion', ability: 'Charisma' },
-         { name: 'Religion', ability: 'Intelligence' },
-         { name: 'Sleight of Hand', ability: 'Dexterity' },
-         { name: 'Stealth', ability: 'Dexterity' },
-         { name: 'Survival', ability: 'Wisdom' }
-     ];
- }
+    }
+    // #1542 FAKE-CATCH DELETED (with its unreachable 18-entry constant fallback): the old try
+    // body could not throw the caught type. loadSkills performs no fetch itself: its only await
+    // is loadAbilityScores, which is TOTAL (its own try/catch swallows fetch rejection AND
+    // response.json() parse errors, else returns disk bytes), and every source of `abilities`
+    // ships a skills array per row — disk census public/data/ability-scores.json: 6 rows, all
+    // skills:list (str 1, dex 3, con 0, int 5, wis 5, cha 4 = 18 pairs); the constant fallback
+    // at :303-309 likewise. The remaining body was pure local compute. The deleted constant was
+    // byte-equivalent output in different order, reachable only via the fake catch. Offline lanes
+    // derive normally through loadAbilityScores' fallback (dataLoader.test.js:462-470 pins head
+    // Athletics/Strength — the derived head, proving the constant never executed).
+    const abilities = await loadAbilityScores();
+    const skills = [];
+    abilities.forEach(ability => {
+        ability.skills.forEach(skillName => {
+            skills.push({ name: skillName, ability: ability.full_name });
+        });
+    });
+    sharedDataCache.skills = skills;
+    return skills;
+}
 
 let wildMagicSurgePromise = null;
 

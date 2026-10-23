@@ -73,7 +73,8 @@ import { collectAutomationFromFeatures } from '../../../../combat/automation/aut
 /* ------------------------------------------------------------------ */
 /*  Mock census — every entry maps to a live importer in the loaded    */
 /*  real graph (index.js / helpers.js / triggerSpells.js /             */
-/*  damageCalculation.js / blockChecks.js / spellResolution.js).       */
+/*  damageCalculation.js / blockChecks.js / buffService.js — the        */
+/*  spellResolution.js barrel retired fix#301).                         */
 /*  Deleted as DEAD (zero importers, grep-verified): foresightService, */
 /*  heroismService, sleepService, fearService. Deleted fabricated key: */
 /*  silenceService.triggerSilence (zero importers; symbol itself       */

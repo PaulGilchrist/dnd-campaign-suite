@@ -12,9 +12,9 @@
 // case-insensitive find). Language fixtures are REAL names from public/data/languages.json.
 // No targetEffects written here: outputs are ability.featIncrease:number and string[] only —
 // byte-identical to the inline twin at featBuffService.js:638-646 (shape cross-validated).
-// DEAD-EXPORT flag: applyAbilityScoreIncreases has ZERO production callers (grep-proven;
-// logic duplicated inline at featBuffService.js:638-646) — unit tests retained per canonical-home
-// mandate; report-only, source untouched (scoped edit).
+// #1534 RESOLVED (2026-10-23): this export was a DEAD-EXPORT with a drift-risk inline twin at
+// featBuffService.js:638-646; the twin was deleted and the LIVE writer now imports THIS canonical
+// home (no cycle: buffApplier.js imports nothing; featBuffService already depended on mergeDeduplicated).
 // No timers, no mocks: pure module, nothing to mock (never mock the unit under test).
 // Kill matrix (analytic; mutants of buffApplier.js vs tests below):
 //   drop !abilities||!increases guard -> T1 TypeError | &&-flip -> T1 TypeError

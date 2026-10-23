@@ -139,7 +139,7 @@ describe('SP-075 executeMagicMissile — dart count tracks the paid slot level',
 
     for (const lv of tiers) {
       vi.clearAllMocks();
-      const darts = lv + 2; // disk higher_level: three at 1st + one per slot above = lv + 2 (#1480 cites pure-unit proof to sibling :200)
+      const darts = lv + 2; // disk higher_level: three at 1st + one per slot above = lv + 2 (#1480; sibling :200 re-pinned LIVE-PATH via executeMagicMissile bytes, fix#304 export demotion)
       const naturals = Array.from({ length: darts }, (_, i) => (i % 4) + 1);
       const totals = naturals.map(n => n + 1); // modifier +1 off the parse of disk byte '1d4 + 1'
       const raw = totals.reduce((a, b) => a + b, 0);

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import TargetPopupBase from './TargetPopupBase';
+import './TargetWithTypePopup.css';
 
 export default function TargetWithTypePopup({
   spell, creatureTargets, damageTypes, onConfirm, onSkip,
@@ -40,18 +41,16 @@ export default function TargetWithTypePopup({
       <div className="metamagic-twin-target">
         <label>
           <strong>Target:</strong>
-          <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+          <div className="target-with-type-list">
             {creatureTargets.map(name => {
               const isSelected = selectedTarget === name;
               return (
                 <div
                   key={name}
                   onClick={() => handleSelect(name)}
+                  className="target-with-type-option"
+                  /* backgroundColor/border are dynamic (derived from isSelected state) — dynamic-data exception, stays inline */
                   style={{
-                    padding: '6px 10px',
-                    margin: '4px 0',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
                     backgroundColor: isSelected ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                     border: isSelected ? '1px solid #4CAF50' : '1px solid transparent',
                   }}
@@ -63,21 +62,19 @@ export default function TargetWithTypePopup({
           </div>
         </label>
       </div>
-      <div className="metamagic-twin-target" style={{ marginTop: '16px' }}>
+      <div className="metamagic-twin-target target-with-type-section-spaced">
         <label>
           <strong>Damage Type:</strong>
-          <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+          <div className="target-with-type-list">
             {damageTypes.map(type => {
               const isSelected = selectedDamageType === type;
               return (
                 <div
                   key={type}
                   onClick={() => handleSelectDamageType(type)}
+                  className="target-with-type-option"
+                  /* backgroundColor/border are dynamic (derived from isSelected state) — dynamic-data exception, stays inline */
                   style={{
-                    padding: '6px 10px',
-                    margin: '4px 0',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
                     backgroundColor: isSelected ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                     border: isSelected ? '1px solid #4CAF50' : '1px solid transparent',
                   }}

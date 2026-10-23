@@ -6,6 +6,15 @@ import { isMazeBlocked } from '../../../../automation/handlers/spells/mazeHandle
 import { isBanishmentBlocked } from '../../../../automation/handlers/spells/banishmentHandler.js';
 import { isImprisonmentBlocked } from '../../../../automation/handlers/spells/imprisonmentHandler.js';
 import { spellHasCostlyOrConsumedMaterial } from '../../materialComponents.js';
+// fix#301 collapse (census :1453): the ./spellResolution.js barrel's only surviving
+// face was a re-export of getActiveBuffs. Cycle trace (fix#233 KEEP-test, failed):
+// buffService.js imports only useRuntimeState.js → {react, campaignKeys.js} — no edge
+// back to blockChecks.js or the spellCastService family, and blockChecks.js:1 already
+// statically imports useRuntimeState.js — so the dynamic import was load-historical
+// (old barrel internals), not a decoupling seam. Static-import the CANONICAL home
+// (combat/buffs/buffService.js:3) directly; barrel retired with its last consumer
+// (fix#82 coordinated).
+import { getActiveBuffs } from '../../../../combat/buffs/buffService.js';
 
 // CLA-404: Beast Spells (Druid lv18 passive, both rulesets — the consumer reads
 // ruleset-agnostic automation.passives collected from classes.json).
@@ -32,7 +41,7 @@ function beastSpellsAllowsCast(spell, playerStats) {
 // proceeds unless the spell has a Material component with a cost specified or that
 // consumes its Material component — those refuse with material-specific reasoning.
 export async function checkBlockedBySpellcastingBuff(spell, playerStats, campaignName) {
-    const buffs = (await import('./spellResolution.js')).getActiveBuffs(playerStats.name, campaignName);
+    const buffs = getActiveBuffs(playerStats.name, campaignName);
     const blockingBuff = buffs.find(b => b.blocksSpellcasting);
     if (!blockingBuff) return null;
     const beastSpells = hasBeastSpellsPassive(playerStats);

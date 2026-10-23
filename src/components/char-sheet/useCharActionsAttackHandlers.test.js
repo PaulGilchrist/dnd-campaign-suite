@@ -17,6 +17,7 @@ import * as logService from '../../services/ui/logService.js';
 import * as friendsService from '../../services/rules/features/friendsService.js';
 import * as invisibilityService from '../../services/rules/features/invisibilityService.js';
 import * as fleetStepService from '../../services/rules/features/fleetStepService.js';
+import * as oncePerTurnService from '../../services/automation/common/oncePerTurn.js';
 
 vi.mock('../../services/encounters/combatData.js', () => ({
     getActiveCreatureName: vi.fn(() => 'TestFighter'),
@@ -333,15 +334,33 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
 
             handlers.handleAttackClick(attack);
 
-            expect(lastModal(deps)).toEqual(expect.objectContaining({
-                attack,
-                mode: 'brutalOnly',
-                hasBrutalStrike: true,
-                brutalStrikeOptions: ['Forceful Blow', 'Hamstring Blow'],
-                maxEffects: 2,
-                riderName: 'Brutal Strike',
-            }));
+            // Sharpened from objectContaining (fix#246 fold, fix#274 seam
+            // standard): exact envelope + zero-side-effect counts, but kept as
+            // the base lane's OWN route-level proof — this is the only lane that
+            // arms source :216 through the REAL selectBrutalStrikeRiders with a
+            // string-options rider (brutalGate mocks the selector; improvedBrutal
+            // Strike runs it real only on the 'full' route). Gate latch semantics
+            // belong to .brutalGate.test.js — not re-proved here.
+            expect(deps.setModalState).toHaveBeenCalledTimes(1);
+            expect(deps.setModalState).toHaveBeenCalledWith({
+                recklessAttackModal: {
+                    attack,
+                    mode: 'brutalOnly',
+                    hasBrutalStrike: true,
+                    brutalStrikeOptions: ['Forceful Blow', 'Hamstring Blow'],
+                    maxEffects: 2,
+                    riderName: 'Brutal Strike',
+                },
+            });
+            // The armed chooser consumes the click before any roll: no ctx build,
+            // no roll, no refusal log, no once-per-turn spend.
             expect(deps.buildCtx).not.toHaveBeenCalled();
+            expect(deps.rollAttack).not.toHaveBeenCalled();
+            expect(logService.addEntry).not.toHaveBeenCalled();
+            expect(oncePerTurnService.markOncePerTurn).not.toHaveBeenCalled();
+            // The one permitted write on this route is the CLA-143 round stamp.
+            expect(deps.setRuntimeValue).toHaveBeenCalledTimes(1);
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith(playerName, '_attackActionTakenRound', 1, campaignName);
         });
 
         it('rolls straight through when there is no reckless feature', async () => {

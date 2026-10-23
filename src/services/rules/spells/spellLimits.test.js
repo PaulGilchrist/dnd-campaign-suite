@@ -12,13 +12,15 @@
 // Still pinned as CURRENT behavior (📌 reported, not sanctioned):
 //   - spellLimits.js loadClassData — truthy malformed response poisons classDataCache
 //     (:34 lane, separate ledger line).
+// fix#304 (#1509/#1504 census): getAllSpellLimits export DELETED (orphan, zero production
+// importers — its last pin block removed here) and findSubclassFeatureSpellcasting DELETED
+// (disk-dead, fix#303 four-leg QED in spellLimits.js).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   getSpellLimits,
   validateSpellSelection,
-  getAllSpellLimits,
   resetClassDataCache,
 } from './spellLimits.js';
 
@@ -310,7 +312,6 @@ describe('getSpellLimits — REAL disk tables (5e + 2024)', () => {
     // runtime Function.length pins (destructured pattern = 1 param; counting stops at first default)
     expect(getSpellLimits.length).toBe(1);
     expect(validateSpellSelection.length).toBe(1);
-    expect(getAllSpellLimits.length).toBe(1); // (className, version='5e', majorName=null)
     expect(resetClassDataCache.length).toBe(0);
   });
 
@@ -482,16 +483,7 @@ describe('validateSpellSelection — selection legality (REAL rows)', () => {
   });
 });
 
-describe('getAllSpellLimits (orphan export — no production callers, last pin)', () => {
-  it('maps levels 1-20 from cache with one fetch, consistent with direct getSpellLimits', async () => {
-    const limits = await getAllSpellLimits('Wizard'); // version default '5e'
-    expect(Object.keys(limits)).toStrictEqual(Array.from({ length: 20 }, (_, i) => String(i + 1)));
-    expect(global.fetch).toHaveBeenCalledTimes(1); // cache serves all 20 levels
-
-    await expect(getAllSpellLimits('Wizard')).resolves.toEqual(limits);
-
-    // cross-export consistency: identical to direct single-level calls
-    expect(limits[1]).toStrictEqual(await getSpellLimits({ className: 'Wizard', level: 1 }));
-    expect(limits[20]).toStrictEqual(await getSpellLimits({ className: 'Wizard', level: 20 }));
-  });
-});
+// getAllSpellLimits orphan-export block REMOVED with the export (fix#304, #1509):
+// zero production importers; the module's live surface is getSpellLimits +
+// validateSpellSelection (+ resetClassDataCache test seam), both abilityScores-fed at
+// WizardStepSpells.jsx :203/:387 — no live consumer needed the never-passed arg.

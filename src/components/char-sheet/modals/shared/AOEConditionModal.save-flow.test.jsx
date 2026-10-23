@@ -164,6 +164,25 @@ describe('AOEConditionModal save flow', () => {
         getAllyList.mockReturnValue(null);
     });
 
+    it('selection wrapper flips to the dynamic display:none inline when the summary shows (dynamic-data exception)', async () => {
+        // fix#313 recipe pin, positive half: the one lawful inline style on the
+        // non-overlay wrapper (AOEConditionModal.jsx :644-era) is visibility
+        // derived from showResults. Selection phase inline is display-free; after
+        // every NPC target resolves it must read exactly display:none and still
+        // carry no static decoration (those live in the CSS files).
+        render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_FAIL_DC })} />);
+        const wrapper = document.querySelector('.sp-overlay').parentElement;
+        expect(wrapper.getAttribute('style') || '').not.toMatch(/margin|padding|background|color|cursor/i);
+
+        selectTarget('Goblin');
+        await flush(clickApply);
+
+        expect(summaryText()).toMatch(/0\s*targets saved,\s*1\s*target failed/);
+        const inline = wrapper.getAttribute('style') || '';
+        expect(inline).toMatch(/display:\s*none/);
+        expect(inline).not.toMatch(/margin|padding|background|color|cursor|font|opacity/i);
+    });
+
     it('logs the cast, stores the AoE attack, and applies blinded with both log entries on a failed NPC save', async () => {
         render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_FAIL_DC })} />);
         selectTarget('Goblin');

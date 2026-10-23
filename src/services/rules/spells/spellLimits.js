@@ -120,7 +120,7 @@ export async function getSpellLimits({ className, level, version = '5e', majorNa
 }
 
 /**
- * Finds spellcasting information in class levels or subclass features
+ * Finds spellcasting information in class levels or subclass class_levels rows
  */
 function findClassLevelSpellcasting(classData, level, version, majorName) {
   // Try to find spellcasting in current or previous levels
@@ -152,24 +152,20 @@ function findSubclassLevelSpellcasting(classData, level, majorName) {
   return levelEntry ? levelEntry.spellcasting : null;
 }
 
-function findSubclassFeatureSpellcasting(classData, version, majorName) {
-  // If not found, check subclass features (for 2024)
-  if (version !== '2024' || !classData.subclass || !classData.subclass.features) return null;
-  for (const feature of classData.subclass.features) {
-    if (!feature.spellcasting) continue;
-    // For 2024 classes, check if spellcasting requires a specific major
-    if (feature.spellcasting.required_major && feature.spellcasting.required_major !== majorName) {
-      continue; // Skip this feature's spellcasting if major doesn't match
-    }
-    return feature.spellcasting;
-  }
-  return null;
-}
-
+// findSubclassFeatureSpellcasting DELETED (fix#304, #1509 — disk-dead, fix#303 four-leg
+// QED): (1) public/data/classes.json — 12 classes, ZERO top-level `subclass` objects;
+// (2) public/data/2024/classes.json — 12 classes, ZERO `subclass` objects and ZERO
+// features[].spellcasting rows, so its :157-era guard `!classData.subclass` returned null
+// for every disk carrier and the interior-gap arms (required_major continue +
+// feature.spellcasting return) were unreachable-by-guard; (3) campaigns — the feeder is
+// input-locked: fetchClassData reads ONLY data/classes.json / data/2024/classes.json (:27)
+// and no campaign file path reaches this module; (4) builders — un-injectable by design:
+// every public entry (getSpellLimits/validateSpellSelection) takes className STRINGS and
+// fetches classData itself, and the function was module-private with its sole call site in
+// findSpellcastingInClass below.
 function findSpellcastingInClass(classData, level, version, majorName = null) {
   return findClassLevelSpellcasting(classData, level, version, majorName)
-    || findSubclassLevelSpellcasting(classData, level, majorName)
-    || findSubclassFeatureSpellcasting(classData, version, majorName);
+    || findSubclassLevelSpellcasting(classData, level, majorName);
 }
 
 function resolvePreparedSpells(spellcasting, isKnown, className, abilityScores, characterLevel) {
@@ -392,15 +388,8 @@ function countAllNonCantripSpells(counts) {
    return counts.level1 + counts.level2 + counts.level3 + counts.level4 + counts.level5 + counts.level6 + counts.level7 + counts.level8 + counts.level9;
 }
 
-/**
-  * Gets spell limits for all levels (1-20) for a class
-  */
-export async function getAllSpellLimits(className, version = '5e', majorName = null) {
-  const limits = {};
-  
-  for (let level = 1; level <= 20; level++) {
-    limits[level] = await getSpellLimits({ className, level, version, majorName });
-    }
-
-  return limits;
-}
+// getAllSpellLimits export DELETED (fix#304, #1509 census): ZERO production importers —
+// the module's only live consumer is WizardStepSpells.jsx :203/:387 via getSpellLimits /
+// validateSpellSelection, and BOTH pass abilityScores: formData.abilities. The flagged
+// no-abilityScores arg gap lived only inside this orphan's own :402 loop and died with
+// the export (coordinated lane fix#82: spellLimits.test.js orphan block removed).

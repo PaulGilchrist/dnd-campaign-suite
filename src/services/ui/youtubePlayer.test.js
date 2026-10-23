@@ -11,8 +11,9 @@
  * Stub-faithfulness law (#1545-sanitize-config-law analog): PlayerState
  * constant bytes mirror the documented YouTube IFrame API categories
  * verbatim (UNSTARTED -1, ENDED 0, PLAYING 1, PAUSED 2, BUFFERING 3,
- * CUED 5) — nothing invented; the module destructures only PLAYING /
- * PAUSED / ENDED, and non-terminal constants are probed inert (T10).
+ * CUED 5) — nothing invented; the module destructures PLAYING / ENDED
+ * (PAUSED falls inert since #1549) and non-terminal constants are probed
+ * inert (T10).
  * Stub methods are exact-of-6 vs the wrapper-call census:
  * loadVideoById, pauseVideo, playVideo, stopVideo, setVolume, destroy
  * (#1440 mock-completeness — every method the wrapper invokes is defined
@@ -47,8 +48,11 @@
  *   ensurePlayer           | :36   | dispose     | :37   | setVolume   | :41
  *   playTracks            | :51,:75,:118 | pause | :65  | resume       | :77
  *   stop                  | :84
- *   subscribe / isPlayingNow -> NO production callers (dead-export 📌
- *   report-only; retained logic still unit-tested compactly in T10/T11).
+ *   subscribe / isPlayingNow -> DELETED #1549: zero production callers; the
+ *   live music UI reads playback state from the runtime store
+ *   (MusicPlayer.jsx:21 useSyncedState 'campaign'/'music'), never from this
+ *   module's local pub/sub facade — its orphaned internals (listeners Set,
+ *   notify(), isPlaying bookkeeping) were removed in the same sweep.
  * MusicPlayer.test.jsx vi.mock's the whole youtubePlayer module, so this
  * file is the ONLY lane exercising the internal state machine — no overlap.
  */
@@ -248,27 +252,21 @@ describe('dispose and generation guard', () => {
     expect(lastPlayer.calls).toEqual([['loadVideoById', OUT_A]]); // generation guard LIVE
   });
 
-  it('state changes are inert when window.YT has vanished (unguarded-deref guard, youtubePlayer.js:43)', () => {
+  it('state changes are inert when window.YT has vanished (unguarded-deref guard, youtubePlayer.js:31)', () => {
     youtubePlayer.ensurePlayer('yt-music-frame');
     readyPlayer();
-    const seen = [];
-    youtubePlayer.subscribe((s) => seen.push(s));
     const events = lastPlayer.options.events;
     delete window.YT;
     events.onStateChange({ data: 1 }); // without the guard this TypeErrors on PlayerState destructure
-    events.onStateChange({ data: 0 });
-    expect(seen).toEqual([]); // no notify
-    expect(youtubePlayer.isPlayingNow()).toBe(false); // golden silent-return pinned
-    expect(lastPlayer.calls).toEqual([]);
+    events.onStateChange({ data: 0 }); // ENDED equally inert past the guard
+    expect(lastPlayer.calls).toEqual([]); // golden silent-return pinned: no throw, no dispatch
   });
 });
 
 describe('queue loop and transport (raw documented numeric state codes)', () => {
-  it('drives loop, wrap, transport and notify ledger from numeric bytes; pause does not disarm auto-advance; BUFFERING/UNSTARTED/CUED are inert; inbound arrays are copied', () => {
+  it('drives loop, wrap and transport from numeric bytes; pause does not disarm auto-advance; BUFFERING/UNSTARTED/CUED are inert; inbound arrays are copied', () => {
     youtubePlayer.ensurePlayer('yt-music-frame');
     readyPlayer();
-    const seen = [];
-    const off = youtubePlayer.subscribe((s) => seen.push(s));
 
     const town = [TOWN_A, TOWN_B];
     youtubePlayer.playTracks(town);
@@ -276,7 +274,7 @@ describe('queue loop and transport (raw documented numeric state codes)', () => 
     fireState(1); // PLAYING (documented 1)
     youtubePlayer.pause();
     youtubePlayer.resume();
-    fireState(2); // PAUSED (documented 2)
+    fireState(2); // PAUSED (documented 2) — inert branch since #1549 bookkeeping trim
     fireState(0); // ENDED advances even after PAUSED — intentStopped is set only by playTracks/stop (quirk pin)
     fireState(0); // ENDED wraps back to first — loop law
     fireState(3); fireState(-1); fireState(5); // BUFFERING/UNSTARTED/CUED inert
@@ -288,29 +286,18 @@ describe('queue loop and transport (raw documented numeric state codes)', () => 
       ['loadVideoById', TOWN_B], // real disk bytes, not the mutation
       ['loadVideoById', TOWN_A],
     ]);
-    expect(seen).toEqual([{ playing: true }, { playing: false }]);
-    expect(seen[0]).not.toBe(seen[1]); // fresh state object per notify
-    expect(youtubePlayer.isPlayingNow()).toBe(false);
-    off();
-    fireState(1);
-    expect(seen).toHaveLength(2); // unsubscribe honoured
-    expect(youtubePlayer.isPlayingNow()).toBe(true); // internal state still tracks after unsubscribe
   });
 
-  it('stop halts transport, notifies once, and late ENDED never resumes', () => {
+  it('stop halts transport and late ENDED never resumes', () => {
     youtubePlayer.ensurePlayer('yt-music-frame');
     readyPlayer();
-    const seen = [];
-    youtubePlayer.subscribe((s) => seen.push(s));
     youtubePlayer.playTracks([TOWN_A, TOWN_B]);
     fireState(1); // PLAYING
     youtubePlayer.stop();
     expect(lastPlayer.calls).toEqual([['loadVideoById', TOWN_A], ['stopVideo']]);
-    expect(seen).toEqual([{ playing: true }, { playing: false }]); // stop notifies {playing:false}
     fireState(0);
     fireState(0);
     expect(lastPlayer.calls.filter((c) => c[0] === 'loadVideoById')).toEqual([['loadVideoById', TOWN_A]]); // no post-stop advance
-    expect(youtubePlayer.isPlayingNow()).toBe(false);
   });
 
   it('onError logs exact message bytes and skips to the next track; post-stop errors log the undefined-slot quirk without advancing', () => {

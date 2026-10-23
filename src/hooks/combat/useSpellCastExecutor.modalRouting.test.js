@@ -30,7 +30,8 @@ const MODAL_ROUTE_MAP = [
   ['massHealingWordTarget', 'massHealingWordModal'],
   ['saveAttackAoe', 'saveAttackAoeModal'],
   ['aoeCondition', 'aoeConditionModal'],
-  ['fear', 'fearModal'],
+  // fix#308: ['fear','fearModal'] row REMOVED in lockstep with the retired
+  // useSpellCastExecutor consumer key + modalSpells.handleFear (census-dead).
   ['sleep', 'sleepModal'],
   ['hypnoticPattern', 'hypnoticPatternModal'],
   ['calmEmotions', 'calmEmotionsModal'],
@@ -109,8 +110,10 @@ describe('useSpellCastExecutor — modal key map routing', () => {
   });
 
   it('falls back to setPopupHtml when a bare modalName result arrives without setModalState', async () => {
-    const payload = { action: { name: 'Fear' } };
-    executeSpellCast.mockResolvedValue({ modalName: 'fear', payload });
+    // fix#308: sample modalName switched 'fear' (retired) -> live 'sleep'; the
+    // fallback seam is modalName-agnostic (:40-45 setPopupHtml without key lookup).
+    const payload = { action: { name: 'Sleep' } };
+    executeSpellCast.mockResolvedValue({ modalName: 'sleep', payload });
     const props = makeProps({ setModalState: undefined });
     const { result: hook } = renderHook(() => useSpellCastExecutor(props));
 

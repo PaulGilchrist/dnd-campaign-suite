@@ -31,7 +31,16 @@ function MoonlightStepResourceModal({ playerStats, campaignName, onClose }) {
   const maxUses = playerStats._trackedResources?.moonlightStepUses?.max || 0
   const currentUses = (() => {
     const stored = getRuntimeValue(name, 'moonlightStepUses')
-    return stored != null ? Number(stored) : maxUses
+    // Honest clamp at DISPLAY (house idiom: this file :26, ResourcePoolModal
+    // .jsx:152, WildCompanionModal.jsx:21, FontOfMagicModal.jsx:42). Writers
+    // census never exceed max at write time — this modal :52 Math.min(maxUses,
+    // currentUses + 1), tempTeleportHandler.js:239 decrements, long rest
+    // null-re-arms via LONG_REST_RESOURCES (restRules-constants.js:226),
+    // TrackedResourceInput clamps via HiddenInput.jsx:23 — but max is dynamic
+    // (wisGatedPool over the WIS modifier, trackedResources.js:332), so a WIS
+    // drop leaves a higher stored count transiently legal. Not writer
+    // corruption: silent clamp, no console.error.
+    return stored != null ? Math.min(maxUses, Number(stored)) : maxUses
   })()
 
   const [selectedLevel, setSelectedLevel] = React.useState(2)

@@ -26,7 +26,8 @@
  * Callers (evidence): triggerSpells.js:245 handleFriends re-gates the same name
  * upstream and spreads { ...metaCtx, spellSaveDc, targetName } — caller envelopes
  * are that lane's; ender is invoked from useCharActionsAttackHandlers.js:113,
- * spellResolution.js:170, execution/index.js:61 (spellResolution tests already pin
+ * spellResolution.js:170 caller gone with the barrel's fix#301 retirement; hub
+ * ender now at execution/index.js:71 (execution lanes already pin
  * the non-Friends gating — cited, not re-pinned). Nothing else exercises these
  * internals: every other test file vi.mock's this module.
  * Downstream owned by friendsHandler.test.js (save prompt, Charmed apply, latch

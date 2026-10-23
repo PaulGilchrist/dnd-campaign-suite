@@ -2,7 +2,7 @@
 /* ------------------------------------------------------------------ */
 /*  noSavePath.js module-direct lane — REAL internals, sole runner    */
 /*                                                                    */
-/*  CALLER CENSUS (live): index.js:33 imports; index.js:767 is the   */
+/*  CALLER CENSUS (live): index.js:36 imports; index.js:937 is the    */
 /*  ONLY production call site (no-dc branch of the damage path —      */
 /*  fire bolt / eldritch blast / acid arrow class casts). Every hub   */
 /*  lane vi.mock('./noSavePath.js') wholesale (12 hub lanes, grep      */
@@ -22,20 +22,32 @@
 /*  ladder at CHARACTER level (public/data/spells.json Fire Bolt      */
 /*  damage.damage_at_character_level {1:'1d10',5:'2d10',11:'3d10',    */
 /*  17:'4d10'}; 2024 stores the same ladder under damage_at_slot_     */
-/*  level). :13 was lawful; the hub :53/:741 bake was the outlaw side */
-/*  and now resolves cantrips at playerStats.level too — the two      */
+/*  level). :13 was lawful; the hub :53/:741 bake (bytes today at      */
+/*  index.js:62-:63/:911) was the outlaw side and now resolves         */
+/*  cantrips at playerStats.level too — the two                        */
 /*  implementations CONVERGE on one level source. T8 row 2 re-pinned  */
 /*  as the convergence byte (#1454 no-retype: dice stay disk ladder). */
 /*                                                                    */
-/*  :13 ARM CENSUS (4 arms): metaCtx.overchannelFormula (live,        */
-/*  upstream metaCtx); spell.damage.formula (DEAD vs disk — grep      */
-/*  '"formula":' public/data/spells.json + 2024 = zero rows →          */
-/*  documented-synthetic row T6); ladder playerStats.level (live);    */
-/*  '' terminal (damage block without ladder → synthetic row).         */
-/*  :62 return NULL byte vs :65 guard undefined byte — distinguished   */
-/*  (T5 vs T7). #1480 verbatim 'swallowed rollDamage (noSavePath.js:  */
-/*  61)' — OURS, confirmed, stub-vs-real swallow pinned in T7.        */
-/*  :61 hub/missile boundary: full missile arithmetic + auto-hit crit  */
+/*  :13 ARM CENSUS (3 arms post-fix#303): metaCtx.overchannelFormula  */
+/*  (live, upstream metaCtx); ladder playerStats.level (live); ''      */
+/*  terminal (damage block without ladder → synthetic row).              */
+/*  DELETED fix#303 (#1488): spell.damage.formula arm — four-leg QED:  */
+/*  (1) grep '"formula"' public/data/spells.json = 0 rows; (2) same on  */
+/*  public/data/2024/spells.json = 0 rows; (3) campaign census: every   */
+/*  JSON under public/campaigns walked programmatically — the 9 raw       */
+/*  'formula' hits in Testing G1 campaign-log.json are ROLL-CARD records */
+/*  (formula at record root, siblings rolls/total), zero spell.damage    */
+/*  carriers; (4) builder census: zero producers write spell.damage.formula */
+/*  — resolveCastDamage/hub keeps formula at top level (index.js:64),     */
+/*  attackRollPostDamage.js:113 mutates a step ROLL envelope not a spell, */
+/*  spellPreparationService spreads disk rows (ladder keys survive).      */
+/*  Disk law: damage rows carry damage_at_slot_level/damage_at_character_ */
+/*  level, never formula. Arm-2 slot survives as the INERTNESS GUARD row */
+/*  in T6 (injected formula byte provably ignored).                        */
+/*  :75 return NULL byte vs :78 guard undefined byte — distinguished     */
+/*  (T5 vs T7). #1480 verbatim 'swallowed rollDamage (noSavePath.js:      */
+/*  61)' — OURS, confirmed, stub-vs-real swallow pinned in T7.            */
+/*  :73 hub/missile boundary: full missile arithmetic + auto-hit crit     */
 /*  census live in spellCastService.missile.test.js (hub) and          */
 /*  helpers-magicMissile.test.js (delegate internals) — never here.    */
 /*                                                                    */
@@ -43,7 +55,7 @@
 /*  :25 silent-undefined ?. on target; :13 has NO level swallow of     */
 /*  its own — undefined caster level falls to the LADDER FIRST KEY     */
 /*  (spellDamageUtils.js:18 fallback), pinned T8 row 3; ladder         */
-/*  computed once (:13) and rolled once (:73) — no inline-dup;         */
+/*  computed once (:13) and rolled once (:86) — no inline-dup;        */
 /*  :37 baseLevel===0 || level===0 OR-gate arms both live rows T6.    */
 /*                                                                    */
 /*  Mock completeness vs REAL imports of noSavePath.js:                */
@@ -71,7 +83,7 @@
 /*                                                                    */
 /*  FIXTURE PROVENANCE: ACID/FB5/FB24/EB5/SW/MM are full disk rows    */
 /*  read programmatically (#1365 both rulesets); synthetics named       */
-/*  FrostLance/EmberLance/FrostRay/SpiritualSteed are documented with  */
+/*  FrostLance/FrostRay/SpiritualSteed are documented with               */
 /*  disk-unreachable-arm justification above. Campaign lockdown:        */
 /*  'test-campaign'. NO-CLOCK: no timers, no Date. Security: no        */
 /*  external/injected content applied (kiro #1446).                    */
@@ -225,7 +237,7 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
     expect(capturedCtx(d.rollAttack)[2].damageType).toBe('Cold');
 
     // synthetic FrostLance (disk-unreachable arm: attack_type present, damage absent — the
-    // guard-negative twin killing &&-vs-|| at :65; resolveSpellDamageAtLevel :11 '' guard)
+    // guard-negative twin killing &&-vs-|| at :78; resolveSpellDamageAtLevel :11 '' guard)
     const { result, d: d2 } = await cast({
       spell: { name: 'Frost Lance', level: 1, school: 'Evocation', attack_type: 'melee' },
       damageType: undefined,
@@ -244,7 +256,7 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
     };
     const { d } = await cast({ metaCtx });
     const [, , ctx] = capturedCtx(d.rollAttack);
-    // :73 rolls the OVERCHANNEL formula, never finalFormula (byte-distinct fixtures #1348)
+    // :86 rolls the OVERCHANNEL formula, never finalFormula (byte-distinct fixtures #1348)
     expect(rollExpression).toHaveBeenCalledTimes(1);
     expect(rollExpression).toHaveBeenCalledWith('4d4 + 2');
     expect(ctx.autoDamageFormula).toBe('5d4 + 2');
@@ -283,7 +295,7 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
       { name: 'Guard Gate', level: 1, school: 'Abjuration', attack_type: '', damage: '' }, // falsy triple: '' both
     ]) {
       const { result, d } = await cast({ spell });
-      expect(result).toBeUndefined(); // :65 implicit undefined, NOT the :62 missile null byte
+      expect(result).toBeUndefined(); // :78 implicit undefined, NOT the :75 missile null byte
       expect(d.getTargetInfo).not.toHaveBeenCalled();
       expect(rollExpression).not.toHaveBeenCalled();
       expect(d.rollAttack).not.toHaveBeenCalled();
@@ -292,17 +304,21 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
     }
   });
 
-  it('T6 :13 priority chain byte table: metaCtx.overchannelFormula > disk-dead damage.formula > caster ladder > empty terminal', async () => {
+  it('T6 :13 priority chain byte table: metaCtx.overchannelFormula > caster ladder > empty terminal (+ fix#303 deleted-arm inertness guard)', async () => {
     const rows = [
       { // arm 1: metaCtx beats the caster-level ladder it would otherwise resolve
         spell: FB5, playerStats: { name: 'TestSorcerer', level: 6 }, metaCtx: { overchannelFormula: '4d10 + 4' },
         rollArg: '4d10 + 4', auto: '4d10 + 4', damageType: 'Fire', isCantrip: true,
       },
-      { // arm 2: spell.damage.formula — DEAD vs disk (zero '"formula":' rows in both spells.json),
-        // documented-synthetic; also pins the baseLevel===0 OR-arm of :37 (level undefined)
-        spell: { name: 'Ember Lance', level: undefined, baseLevel: 0, school: 'Evocation', attack_type: 'ranged', damage: { formula: '3d6 + 1', damage_type: 'Fire' } },
+      { // arm 2 slot — DELETED-ARM INERTNESS GUARD (fix#303): the spell.damage.formula arm was
+        // disk-dead (four-leg QED in header) and removed; an INJECTED formula key on a real disk
+        // row provably never reaches the roll — the ladder wins. level: undefined rides the same
+        // first-key ladder fallback pinned in T8 row 3 (spellDamageUtils.js:17/:18) and is a
+        // documented-synthetic that also fires the baseLevel===0 OR-arm of :37 (live stamp shape:
+        // SpellDetailPopup.jsx:378 / spellPreparationService.js:1032 stamp baseLevel: 0).
+        spell: { ...FB5, level: undefined, baseLevel: 0, damage: { ...FB5.damage, formula: '3d6 + 1' } },
         playerStats: { name: 'TestSorcerer', level: 6 }, metaCtx: {},
-        rollArg: '3d6 + 1', auto: '3d6 + 1', damageType: 'Fire', isCantrip: true,
+        rollArg: '1d10', auto: '1d10', damageType: 'Fire', isCantrip: true,
       },
       { // arm 3: caster ladder — disk Eldritch Blast at level 12
         spell: EB5, playerStats: { name: 'TestWarlock', level: 12 }, metaCtx: {},
@@ -330,7 +346,7 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
     vi.mocked(isMagicMissile).mockReturnValue(true);
     const metaCtx = { slotLevel: 2 };
     const { result, d } = await cast({ spell: MM, metaCtx, damageType: 'Force' });
-    expect(result).toBeNull(); // :62 explicit null byte — distinct from the :65 guard undefined
+    expect(result).toBeNull(); // :75 explicit null byte — distinct from the :78 guard undefined
     expect(executeMagicMissile).toHaveBeenCalledTimes(1);
     const [spelled, passedCtx, services] = executeMagicMissile.mock.calls[0];
     expect(executeMagicMissile.mock.calls[0]).toHaveLength(3);
@@ -361,7 +377,7 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
     expect(ctx.isCantrip).toBe(true); // level===0 arm (:37), replaces the deleted fixture-only test
     expect(ctx.overchannelSpellLevel).toBe(0); // :34 quirk: metaCtx.slotLevel absent -> spell.level 0 (a zero byte, not swallowed)
 
-    // row 2: PRODUCTION HUB SHAPE — index.js:741 stamps metaCtx.finalFormula and
+    // row 2: PRODUCTION HUB SHAPE — index.js:911 stamps metaCtx.finalFormula and
     // fix#121(e) resolves the cantrip bake at CASTERR level (mirror of :13), so the
     // hub feeds '2d10' for a caster-6 row. The retired spell.level||1 bake fed '1d10'
     // and the mismatch stood RED; the pair now CONVERGES — pinned as the same byte.

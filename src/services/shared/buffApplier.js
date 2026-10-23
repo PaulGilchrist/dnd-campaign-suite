@@ -1,3 +1,6 @@
+// buffApplier.js — canonical single source for pure buff-application helpers.
+// applyAbilityScoreIncreases (#1534): LIVE — sole production caller is
+// featBuffService.applyFeatBuffsToFormData (its inline twin was deleted 2026-10-23).
 export function applyAbilityScoreIncreases(abilities, increases) {
   if (!abilities || !increases) return;
   increases.forEach(inc => {

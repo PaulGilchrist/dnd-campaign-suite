@@ -251,4 +251,28 @@ describe('AOEConditionModal Overlay', () => {
             vi.restoreAllMocks();
         }
     });
+
+    it('resolved note renders via scoped classes only — no inline style (no-inline-styles convention)', () => {
+        // fix#313 recipe pin: the former style={{ marginTop: '8px' }} static on
+        // renderBody's allResolved arm is now .aoe-condition-resolved-note in
+        // AOEConditionModal.css; the base reuses sp-* family tokens unchanged.
+        // Drives the arm through the harness-captured renderBody prop — the only
+        // executable route to it in this lane (the real base is stubbed here).
+        render(<AOEConditionModal {...overlayProps()} />);
+        const { renderBody } = overlayHarness.props;
+        const ctx = makeCtx([]);
+        Object.assign(ctx, {
+            processing: true,
+            allResolved: true,
+            selected: new Set(),
+            eligibleTargets: [],
+            toggleTarget: vi.fn(),
+        });
+        render(<div>{renderBody(ctx)}</div>);
+
+        const note = screen.getByText('All targets resolved.');
+        expect(note.classList.contains('sp-note')).toBe(true);
+        expect(note.classList.contains('aoe-condition-resolved-note')).toBe(true);
+        expect(note.getAttribute('style')).toBeNull();
+    });
 });

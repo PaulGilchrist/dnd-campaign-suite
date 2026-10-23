@@ -7,8 +7,10 @@
  * Sibling ownership (do not duplicate here):
  * - .saveResults.test.jsx — save resolution (conditions, damage routing, addExpiration, popups)
  * - .resultScreen.test.jsx — result-screen copy + Done-on-result contract
- * - -branches.test.jsx — byte-exact ledgers, needsPactSlot conjunct matrix, inline-style
- *   flag, promptId guard, listener lifecycle, roll-vs-prop fallbacks
+ * - -branches.test.jsx — byte-exact ledgers, needsPactSlot conjunct falsifier fixtures,
+ *   inline-style flag, promptId guard, listener lifecycle, roll-vs-prop fallbacks. The
+ *   exact arm-note bytes are pinned ONLY here (rec: the falsifier arms' note-presence
+ *   legs were trimmed to their inline-style flag + inert seam).
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';

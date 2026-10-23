@@ -13,9 +13,9 @@
  *
  * Exporter->caller census (production, excluding tests):
  *   get/set: live (rules/effects/automation/initiative lanes). App.jsx:295 set('combatSummary').
- *   getProperty/setProperty: ZERO production callers — dead exports kept only for the
- *   server-route error-text contract (server/routes/campaigns-changedata.js:59/102/114).
- *   Smoke-pinned here; do not expand without adding a caller.
+ *   getProperty/setProperty: DELETED (#1547) — zero production callers. Strings don't
+ *   call functions: the only remaining repo references are stale signposts inside
+ *   server/routes/campaigns-changedata.js error text (:59/:102/:114), queued there for refresh.
  *
  * Mock strategy: fetch is the ONLY boundary (vi.spyOn + manual deferreds);
  * storage.get/set are NEVER spied (never mock the unit under test). console.error
@@ -168,85 +168,6 @@ describe('storage — server-first fetch transport', () => {
             fetchCalls[3].resolve(jsonResponse({}));
             await Promise.all([pC, pD]);
             expect(fetchCalls[3].url).toBe('/api/campaigns/test-campaign-2/combatSummary');
-        });
-    });
-
-    // ── getProperty / setProperty — dead exports (zero production callers) ─
-    // Smoke-pinned through the REAL get/set below. See header census; do not
-    // expand coverage without adding a production caller.
-    describe('getProperty', () => {
-        it('GETs the getName-derived key URL and returns the property, surviving falsy values; null for missing obj/property', async () => {
-            const spy = vi.spyOn(globalThis, 'fetch');
-
-            spy.mockResolvedValue(jsonResponse({ value: { hp: 50, active: false } }));
-            expect(await storage.getProperty('PlayerOne', 'hp', 'test-campaign')).toBe(50);
-            expect(spy).toHaveBeenLastCalledWith('/api/campaigns/test-campaign/PlayerOne');
-            expect(await storage.getProperty('PlayerOne', 'active', 'test-campaign')).toBe(false); // falsy survives != null
-            expect(await storage.getProperty('PlayerOne', 'missing', 'test-campaign')).toBeNull();
-
-            spy.mockResolvedValue(jsonResponse({ value: null })); // key absent server-side
-            expect(await storage.getProperty('PlayerOne', 'hp', 'test-campaign')).toBeNull();
-
-            spy.mockResolvedValue(jsonResponse({ value: 'not-an-object' }));
-            expect(await storage.getProperty('PlayerOne', 'hp', 'test-campaign')).toBeNull();
-
-            spy.mockResolvedValue(jsonResponse({ value: { hp: 1 } }));
-            expect(await storage.getProperty(123, 'hp', 'test-campaign')).toBe(1);
-            expect(spy).toHaveBeenLastCalledWith('/api/campaigns/test-campaign/Unknown'); // utils.getName fallback byte
-        });
-
-        it('stores campaign-level keys at the top level (no "campaign" wrapper) in the URL', async () => {
-            const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ value: 'v1' }));
-
-            expect(await storage.getProperty('campaign', 'filters', 'test-campaign')).toBe('v1');
-            expect(spy).toHaveBeenCalledWith('/api/campaigns/test-campaign/filters');
-        });
-    });
-
-    describe('setProperty', () => {
-        it('read-modify-writes the whole object: GET before POST, preserving siblings, creating when absent', async () => {
-            const spy = vi.spyOn(globalThis, 'fetch');
-
-            spy.mockResolvedValueOnce(jsonResponse({ value: { name: 'Gandalf', hp: 10 } }));
-            await storage.setProperty('Gandalf', 'hp', 50, 'test-campaign');
-
-            expect(spy).toHaveBeenCalledTimes(2); // read-before-write invocationCallOrder
-            expect(spy.mock.calls[0][0]).toBe('/api/campaigns/test-campaign/Gandalf');
-            expect(spy.mock.calls[1]).toEqual([
-                '/api/campaigns/test-campaign/Gandalf',
-                {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: '{"value":{"name":"Gandalf","hp":50}}',
-                },
-            ]); // sibling preserved, exact merged bytes
-
-            spy.mockReset();
-            spy.mockResolvedValueOnce(jsonResponse({ value: null })); // fresh object arm
-            spy.mockResolvedValueOnce(jsonResponse({}));
-            await storage.setProperty('PlayerOne', 'hp', 50, 'test-campaign');
-            expect(JSON.parse(spy.mock.calls[1][1].body)).toEqual({ value: { hp: 50 } });
-        });
-
-        it('routes campaign-level writes to the top level and redirects deprecated combatSummary.lastAttack to the root lastAttack key with console bytes', async () => {
-            const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}));
-            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-            await storage.setProperty('campaign', 'filters', 'x', 'test-campaign');
-            expect(spy).toHaveBeenCalledTimes(1); // no read — direct top-level POST
-            expect(spy).toHaveBeenCalledWith(
-                '/api/campaigns/test-campaign/filters',
-                expect.objectContaining({ method: 'POST', body: '{"value":"x"}' })
-            );
-
-            await storage.setProperty('combatSummary', 'lastAttack', { dmg: 7 }, 'test-campaign');
-            expect(errorSpy.mock.calls[0][0]).toContain(
-                "[storage] Deprecated: storage.setProperty('combatSummary', 'lastAttack', ...) is no longer supported."
-            );
-            expect(spy).toHaveBeenCalledTimes(2);
-            expect(spy.mock.calls[1][0]).toBe('/api/campaigns/test-campaign/lastAttack'); // root-level, never under combatSummary
-            expect(JSON.parse(spy.mock.calls[1][1].body)).toEqual({ value: { dmg: 7 } });
         });
     });
 });

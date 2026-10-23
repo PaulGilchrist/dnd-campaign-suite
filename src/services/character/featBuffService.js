@@ -1,5 +1,5 @@
 import { findFeat } from '../shared/featFinder.js';
-import { mergeDeduplicated } from '../shared/buffApplier.js';
+import { applyAbilityScoreIncreases, mergeDeduplicated } from '../shared/buffApplier.js';
 import { resolveFeatChosenAbility } from '../shared/abilityLookup.js';
 
 /**
@@ -635,15 +635,15 @@ export function computeAllFeatBuffs(formData, allFeats) {
 export function applyFeatBuffsToFormData(formData, allFeats) {
   const buffs = computeAllFeatBuffs(formData, allFeats);
 
-  const nonChoiceIncreases = buffs.abilityScoreIncreases.filter(inc => inc.name && inc.name !== 'any');
-  nonChoiceIncreases.forEach(inc => {
-    const ability = formData.abilities?.find(
-      a => a.name.toLowerCase() === inc.name.toLowerCase()
-    );
-    if (ability) {
-      ability.featIncrease = (ability.featIncrease || 0) + inc.amount;
-    }
-  });
+  // #1534: inline twin of buffApplier.applyAbilityScoreIncreases deleted (drift-risk duplicate).
+  // Normalized-diff was identical: same 'any'-sentinel + case-insensitive match, same additive
+  // `featIncrease = (featIncrease || 0) + amount`. The only shape delta was guard placement —
+  // export `if (!abilities || !increases) return` vs inline `formData.abilities?.find` + a
+  // pre-filter (buffs.abilityScoreIncreases is always an array, computeAllFeatBuffs:588) —
+  // net behavior identical for every input, so calling with (formData.abilities, increases) is safe.
+  // No import cycle: featBuffService.js already imports mergeDeduplicated from
+  // ../shared/buffApplier.js (line 2); buffApplier.js imports nothing.
+  applyAbilityScoreIncreases(formData.abilities, buffs.abilityScoreIncreases);
 
   mergeDeduplicated(formData, 'resistances', buffs.resistances);
 

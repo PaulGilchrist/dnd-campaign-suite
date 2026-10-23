@@ -185,32 +185,16 @@ function handleShapechange({ fullSpell, metaCtx, playerStats, campaignName, mapN
     return { handled: false };
 }
 
-function handleFear({ spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive }) {
-    if (spell.name && spell.name.toLowerCase() === 'fear' && spell.dc) {
-        const fearInnateBonus = innateSorceryActive ? 1 : 0;
-        const fearModalPayload = {
-            action: { name: 'Fear', automation: { type: 'fear' } },
-            playerStats,
-            campaignName,
-            saveType: 'WIS',
-            saveDc: spellSaveDc + fearInnateBonus,
-            activeOverlay: null,
-            metamagicCareful: metaCtx?.metamagicCareful || false,
-            metamagicHeighten: metaCtx?.metamagicHeighten,
-        };
-        return {
-            handled: true,
-            result: {
-                automationPopup: {
-                    type: 'modal',
-                    modalName: 'fear',
-                    payload: fearModalPayload,
-                },
-            },
-        };
-    }
-    return { handled: false };
-}
+// fix#308 orphan-retire (fix#296 collateral, self-queued at test-maintain-bugs.md:1462):
+// handleFear RETIRED — zero production importers post-#296 (execution/index.js:31 omits
+// it; its :279-era hub arm was deleted double-dead). Fresh whole-repo census found NO
+// remaining emitter of modalName:'fear': the live fear route is disk automation.type
+// 'fear' (spells.json BOTH rulesets) -> :710 handleGenericAutomation -> DIRECT
+// fearHandler (automation/index.js:530; fearService deleted fix#294). Tombstone pins:
+// earlyReturns-noDamage.test.js :651-era zero-dispatch tripwire + noformula-modals
+// 'fear — direct generic route'. Coordinated cluster: executor consumer key
+// (useSpellCastExecutor.js fear:'fearModal'), SecondaryModals fearModal mount lane,
+// and FearModal.jsx retired in the same pass, all census-dead.
 
 function handleConjureVolley(spell, fullSpell) {
     if (spell.name && spell.name.toLowerCase() === 'conjure volley') {
@@ -320,7 +304,6 @@ export {
     handleHypnoticPatternEarly,
     handleConfusionEarly,
     handleShapechange,
-    handleFear,
     handleConjureVolley,
     handleSilence,
     handleSleep,

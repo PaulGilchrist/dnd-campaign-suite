@@ -23,7 +23,9 @@ import * as healRider from './postCastHealService.js'
 /*  useActionSpellMetamagic, useCharActionsAutomation) with the REAL  */
 /*  execution chain — blockChecks.js, damageCalculation.js,           */
 /*  savePath.js, noSavePath.js, triggerSpells.js, helpers.js,        */
-/*  spellResolution.js, castingTimeUtils.js, spellDamageUtils.js and */
+/*  castingTimeUtils.js, spellDamageUtils.js, combat/buffs/            */
+/*  buffService.js (canonical getActiveBuffs home since fix#301       */
+/*  retired the spellResolution.js barrel) and                        */
 /*  encounters/combatData.js all run real. Only external-edge        */
 /*  services (runtime store, dice, log, feature services, riders)    */
 /*  are mocked. Sibling lanes that mock these internals or own the   */
@@ -295,7 +297,7 @@ describe('executeSpellCast - execution lane (real chain via facade)', () => {
         },
       },
     })
-    // Real gate consumes (playerStats.name, campaignName) via spellResolution re-export.
+    // Real gate consumes (playerStats.name, campaignName) via blockChecks' direct buffService import (fix#301).
     expect(buffService.getActiveBuffs).toHaveBeenCalledTimes(1)
     expect(buffService.getActiveBuffs).toHaveBeenCalledWith('TestWizard', CAMPAIGN)
     // Refusal is logged exactly once (never silent, CLA-391) — full entry minus timestamp.

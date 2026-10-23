@@ -83,7 +83,8 @@ import classes2024 from '../../../../../../public/data/2024/classes.json';
 /*  checkCompelledDuelAttackExpiry key was a dead mock: index.js:6    */
 /*  imports it from the direct path, which stays unmocked here too.   */
 /*  './spellResolution.js' was a dead-MODULE mock (hub never imports  */
-/*  it) — removed (#1484 dead-module-mock hunt).                       */
+/*  it) — removed (#1484 dead-module-mock hunt; barrel retired        */
+/*  entirely fix#301).                                                  */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({

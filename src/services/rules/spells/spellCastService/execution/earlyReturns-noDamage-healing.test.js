@@ -133,6 +133,7 @@ vi.mock('../../../features/invisibilityService.js', () => ({
 
 vi.mock('../../../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
+  getActiveBuffs: vi.fn(() => []),
 }));
 
 // Null formula is the premise of the whole no-damage lane (:715) — set once,
@@ -256,10 +257,6 @@ vi.mock('./damageCalculation.js', () => ({
   computeBlessedStrikes: vi.fn((_, formula) => formula),
   computeRadiantSoul: vi.fn((_, __, ___, ____, formula) => formula),
   computeOverchannel: vi.fn(() => ({ overchannelFormula: null, overchannelActive: false, overchannelUseCount: 0 })),
-}));
-
-vi.mock('./spellResolution.js', () => ({
-  getActiveBuffs: vi.fn(() => [],),
 }));
 
 vi.mock('../../../../../services/encounters/combatData.js', () => ({

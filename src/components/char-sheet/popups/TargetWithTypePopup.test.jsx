@@ -122,4 +122,41 @@ describe('TargetWithTypePopup', () => {
     expect(props.onSkip).toHaveBeenCalledTimes(1);
     expect(props.onConfirm).not.toHaveBeenCalled();
   });
+
+  it('styles via scoped classes, keeping only dynamic selection colors inline (no-inline-styles convention)', () => {
+    const { container } = render(<TargetWithTypePopup {...makeProps()} />);
+
+    // Both sections keep the shared family token styled by MetamagicPopup.css
+    // (loaded via TargetPopupBase); the second section's static 16px gap is a
+    // class, not an inline style.
+    const sections = container.querySelectorAll('.metamagic-twin-target');
+    expect(sections).toHaveLength(2);
+    expect(sections[0].getAttribute('style')).toBeNull();
+    expect(sections[1].classList.contains('target-with-type-section-spaced')).toBe(true);
+    expect(sections[1].getAttribute('style')).toBeNull();
+
+    // Scrollable list containers are fully class-based.
+    const lists = container.querySelectorAll('.target-with-type-list');
+    expect(lists).toHaveLength(2);
+    for (const list of lists) expect(list.getAttribute('style')).toBeNull();
+
+    // Option rows: static decoration lives in the class; the inline style attr
+    // carries ONLY the two dynamic (isSelected-derived) declarations.
+    const rows = container.querySelectorAll('.target-with-type-option');
+    expect(rows).toHaveLength(creatureTargets.length + damageTypes.length);
+    for (const row of rows) {
+      const inline = row.getAttribute('style') || '';
+      expect(inline).toMatch(/background-color/i);
+      expect(inline).toMatch(/border/i);
+      expect(inline).not.toMatch(/padding|margin|cursor|border-radius|max-height|overflow/i);
+    }
+
+    // Selecting a row changes only its dynamic inline values (green highlight
+    // trio stays intact); statics never re-enter the attr.
+    fireEvent.click(screen.getByText('Ally1'));
+    const selectedStyle = screen.getByText('✓ Ally1').closest('.target-with-type-option').getAttribute('style') || '';
+    expect(selectedStyle).toMatch(/rgba\(76,\s*175,\s*80,\s*0\.3\)/);
+    // jsdom serializes #4CAF50 as rgb(76, 175, 80) — accept either canonical form.
+    expect(selectedStyle).toMatch(/border:\s*1px solid\s+(#4caf50|rgb\(76,\s*175,\s*80\))/i);
+  });
 });

@@ -8,12 +8,13 @@
  *   :232-245 — the old latch-only test in THIS file duplicated it and is trimmed).
  * - .saveResults.test.jsx — save-resolution flows with objectContaining subsets, fiend
  *   routing by monsterType, addExpiration payload (exact, :212 — never re-pinned here).
- * - .resultScreen.test.jsx — currently one loose info-screen pact-level note (/level 4/);
- *   the REAL result screen is vacuous there (cross-file rec below) — exact result copy is
- *   pinned here as each save arm's closer until that lane grows.
+ * - .resultScreen.test.jsx — result-screen exact copy (fail/success, incl. the fiend-target
+ *   interpolation) + the Done-on-result contract; this lane's save-arm ledger it.each kept a
+ *   result-copy closer + Done click until they moved there (rec) — trimmed.
  * This lane owns (each verified unreached by siblings): pact-slot consumption (:34-45 — no
- * sibling ever confirms with hasUse=false), needsPactSlot conjunct falsifiers (:17, incl.
- * the pactSlotLevel=0 misleading-copy arm), featureName || fallback + hardcoded-copy drift
+ * sibling ever confirms with hasUse=false), needsPactSlot conjunct falsifier FIXTURES at
+ * :17 incl. the misleading slotLevel=0 arm (exact note bytes owned by base — here the
+ * inline-style flag + inert seam only; rec), featureName || fallback + hardcoded-copy drift
  * (:15 vs :91/:97/:124/:133), the full byte-exact addEntry ledger + popup detail key
  * SHAPES per save arm (siblings spot-check fields), roll-vs-prop precedence and the ||/??
  * fallback matrix (:49/:72 — sibling rolls always equal damageTotal, so precedence was
@@ -63,8 +64,9 @@
  * fresh vi.fn onClose per makeProps; afterEach mockReset + re-arm (never
  * clearAllMocks/resetAllMocks); no bare setTimeout — microtask flushes only.
  *
- * Cross-file recommendations (not applied here): .resultScreen.test.jsx should own the
- * real result screen (its single test renders the info screen); .saveResults.test.jsx:112
+ * Cross-file recommendations (not applied here): .resultScreen.test.jsx now owns the real
+ * result screen (its lone info-screen note is gone and this lane's copy closer moved there);
+ * .saveResults.test.jsx:112
  * '4d10-custom' mock arm is dead (no test overrides damageExpression); base/resultScreen/
  * old-branch fixtures carry `{ type: 'fiend' }` — the component routes fiends via
  * monsterType, so those fixtures would never hit the fiend branch.
@@ -149,9 +151,6 @@ const STATS_LEDGER = Object.freeze({
   ...STATS,
   spellAbilities: Object.freeze({ spell_slots_level_3: 4 }),
 });
-
-const LONG_NOTE = 'No uses remaining. Recharges on a Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.';
-const SHORT_NOTE = 'No uses remaining. Recharges on a Long Rest.';
 
 function makeProps(overrides = {}) {
   return {
@@ -313,19 +312,21 @@ describe('HurlThroughHellModal — branch lane', () => {
 
   // ── needsPactSlot conjunct falsifiers (:17) ──
 
+  // NOTE copy is owned by the base it.each arm matrix (rec); these arms keep the
+  // falsifier fixtures at the :17 seam plus the inline-style flag + inert seam only.
   it.each([
-    { case: 'recharge=false', props: { pactMagicRecharge: false, pactSlotLevel: 2, pactSlotsAvailable: true }, note: SHORT_NOTE },
+    { case: 'recharge=false', props: { pactMagicRecharge: false, pactSlotLevel: 2, pactSlotsAvailable: true } },
     // FLAG (copy): slotLevel=0 falsifies needsPactSlot while slots are "available" — the
-    // long note then claims no Pact slots exist.
-    { case: 'slotLevel=0', props: { pactMagicRecharge: true, pactSlotLevel: 0, pactSlotsAvailable: true }, note: LONG_NOTE },
-    { case: 'slotsAvailable=false', props: { pactMagicRecharge: true, pactSlotLevel: 2, pactSlotsAvailable: false }, note: LONG_NOTE },
-  ])('no-uses arm ($case): exact note, Done-only buttons, inert seam, inline-style note (flag 1)', async ({ props: overrides, note }) => {
+    // long note then claims no Pact slots exist (its exact bytes are pinned in base).
+    { case: 'slotLevel=0', props: { pactMagicRecharge: true, pactSlotLevel: 0, pactSlotsAvailable: true } },
+    { case: 'slotsAvailable=false', props: { pactMagicRecharge: true, pactSlotLevel: 2, pactSlotsAvailable: false } },
+  ])('no-uses arm ($case): Done-only buttons, inert seam, inline-style note (flag 1)', async ({ props: overrides }) => {
     const props = makeProps({ currentUses: 3, maxUses: 3, ...overrides });
     const { container } = render(<HurlThroughHellModal {...props} />);
 
-    const noteEl = screen.getByText(note);
-    expect(noteEl).toBeInTheDocument();
     // FLAG 1: house-rule inline style rides the note element.
+    const noteEl = container.querySelector('.sp-note');
+    expect(noteEl).not.toBeNull();
     expect(noteEl).toHaveAttribute('style');
     expect(noteEl).toHaveStyle({ color: 'rgb(248, 113, 113)' });
     expect(screen.queryByRole('button', { name: /Hurl Through Hell/ })).not.toBeInTheDocument();
@@ -512,7 +513,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     });
   });
 
-  // ── Save-arm ledgers: exact rows, popup key shapes, result copy (:59-211) ──
+  // ── Save-arm ledgers: exact rows + popup key shapes per save arm (:59-211).
+  // Result-screen copy + Done-click are owned by .resultScreen.test.jsx (rec). ──
 
   it.each([
     {
@@ -521,7 +523,6 @@ describe('HurlThroughHellModal — branch lane', () => {
       core: FAIL_CORE,
       rows: (pid) => [[CAMPAIGN, triggerRow(pid)], [CAMPAIGN, saveFailRow()], [CAMPAIGN, rollRow(31, 'Goblin1 takes 31 Psychic damage from Hurl Through Hell.')]],
       popup: () => popupOf('Goblin1 failed WIS save — hurled through the lower planes and takes 31 Psychic damage.', { rolls: ROLL_OK.rolls, formula: '4d10' }),
-      resultText: 'Goblin1 failed WIS save — hurled through the lower planes.',
     },
     {
       case: 'fiend fail (no roll row, popup has no rolls/formula keys)',
@@ -546,7 +547,6 @@ describe('HurlThroughHellModal — branch lane', () => {
         popupText: 'Orc Warrior (Fiend) failed WIS save — hurled through the lower planes but takes no Psychic damage.',
         damageType: 'Psychic',
       }),
-      resultText: 'Orc Warrior failed WIS save — hurled through the lower planes.',
     },
     {
       case: 'success (two rows, no roll row, inert cells)',
@@ -565,7 +565,6 @@ describe('HurlThroughHellModal — branch lane', () => {
         timestamp: FROZEN_TS,
       }]],
       popup: () => popupOf('Goblin1 succeeded on WIS save — resists the effect and is not hurled through the lower planes.'),
-      resultText: 'Goblin1 succeeded on WIS save — resists the effect and is not hurled through the lower planes.',
     },
     {
       case: 'negative modifier fail renders "rolled 12 + -4 = 8" verbatim (flag 5)',
@@ -573,9 +572,8 @@ describe('HurlThroughHellModal — branch lane', () => {
       core: Object.freeze({ roll: 12, total: 8, success: false }),
       rows: (pid) => [[CAMPAIGN, triggerRow(pid)], [CAMPAIGN, saveFailRow('Goblin1 failed WIS save (rolled 12 + -4 = 8 vs DC 16) — hurled through the lower planes.', 12, 8)], [CAMPAIGN, rollRow(31, 'Goblin1 takes 31 Psychic damage from Hurl Through Hell.')]],
       popup: () => popupOf('Goblin1 failed WIS save — hurled through the lower planes and takes 31 Psychic damage.', { rolls: ROLL_OK.rolls, formula: '4d10' }),
-      resultText: 'Goblin1 failed WIS save — hurled through the lower planes.',
     },
-  ])('$case: full addEntry ledger byte-exact, popup detail strict-equal, exact result copy, Done closes once', async ({ props: overrides, core, rows, popup, resultText }) => {
+  ])('$case: full addEntry ledger byte-exact, popup detail strict-equal', async ({ props: overrides, core, rows, popup }) => {
     const props = makeProps(overrides);
     render(<HurlThroughHellModal {...props} />);
     const pid = await confirmModal();
@@ -586,10 +584,6 @@ describe('HurlThroughHellModal — branch lane', () => {
     });
     expect(popups).toHaveLength(1);
     expect(popups[0].detail).toStrictEqual(popup());
-    expect(screen.getByText(resultText)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
   // ── Roll-vs-prop precedence and the ||/?? fallback matrix (:48-49, :72) ──

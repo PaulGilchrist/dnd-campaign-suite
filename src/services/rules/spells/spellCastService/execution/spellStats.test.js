@@ -57,7 +57,8 @@ import spells2024 from '../../../../../../public/data/2024/spells.json';
 /*  Wounds→formula null → no-damage path; #1468 no canned '1d8').     */
 /*  Removed dead twins: ./spellResolution.js (no importer anywhere in  */
 /*  this graph — savePath/modalSpells/triggerSpells are factory-mocked */
-/*  so the real module never loads). psychicSpellsHandler,             */
+/*  so the real module never loads; barrel retired fix#301).            */
+/*  psychicSpellsHandler,                                               */
 /*  compelledDuelHandler and castingTimeUtils run REAL (tiny, pure —   */
 /*  same as the earlyReturns lanes).                                   */
 /* ------------------------------------------------------------------ */

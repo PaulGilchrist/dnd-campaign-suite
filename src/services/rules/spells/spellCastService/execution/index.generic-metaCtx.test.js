@@ -32,7 +32,8 @@
 /*  their own bytes), compelledDuelHandler (loaded, unreachable — cast returns at :712).       */
 /*  Dead twins DELETED (#1504): barrel key checkCompelledDuelAttackExpiry (direct-import edge   */
 /*  :6 owns it), helpers key executeMagicMissile, entire ./spellResolution.js mock (index.js    */
-/*  never imports it; spellResolution-log owns that module). No timers/clocks — forwarding is  */
+/*  never imports it; barrel + spellResolution-log lane retired fix#301 — buffs gate pinned     */
+/*  by blockChecks.test.js B-suite at the canonical buffService seam). No timers/clocks — forwarding is */
 /*  instantaneous; invocationCallOrder unnecessary (exactly-one forward pinned).                 */
 /*  Security (#1446 kiro scan): none found in lane or fixtures.                                */
 /*  Fixtures: REAL disk rows BOTH rulesets + load-drift-throw (#1503/04); synthetic           */

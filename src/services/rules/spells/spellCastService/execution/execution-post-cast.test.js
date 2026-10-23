@@ -40,8 +40,10 @@ import spells2024 from '../../../../../../public/data/2024/spells.json';
 /*  Barrel-only-mock defect form (#1475/#1476): index.js:6 imports    */
 /*  checkCompelledDuelAttackExpiry at its DIRECT path — mocked there,  */
 /*  barrel mock keeps only executeHandler. './spellResolution.js'      */
-/*  mock removed (index.js binds no live export from it). castingTime  */
-/*  Utils/psychicSpellsHandler/spellResolution stay REAL: inert on     */
+/*  mock removed (index.js binds no live export from it; barrel        */
+/*  retired entirely fix#301 — blockChecks.js now imports the          */
+/*  canonical combat/buffs/buffService.js directly). castingTimeUtils   */
+/*  and psychicSpellsHandler stay REAL: inert on                       */
 /*  passives:[] fixtures (getPsychicSpellsConfig → undefined, so no    */
 /*  component mutation — purity pinned in T1).                        */
 /*  NO-CLOCK POLICY: zero timers here; every rider stamps only at the */

@@ -2,10 +2,13 @@
 /* ------------------------------------------------------------------ */
 /*  helpers.js BASE lane — shared direct-unit residuals only.         */
 /*                                                                    */
-/*  Exporter -> owner census (ALL 12 exports of helpers.js):         */
+/*  Exporter -> owner census (ALL 10 exports of helpers.js — fix#304    */
+/*   demoted DIVINATION_SCHOOL + getMagicMissileCount to module-local):  */
 /*   DIVINATION_SCHOOL :15        #1479 helpers-expertDivination     */
-/*     (internal use :342; ZERO production importers of the export   */
-/*     — dead-export candidate, report-only 🗑, byte lives on disk).  */
+/*     (internal use :403; export DELETED fix#304 #1504 — zero          */
+/*     production importers; import-at-consumer NOT cheap: the inline    */
+/*     literal consumer expertDivinationHandler.js:4 sits under           */
+/*     automation/index.js which helpers.js:3 imports — cycle).          */
 /*   refundSpellBreakerSlot :102  #1502 helpers-spellBreaker          */
 /*   applyHexEffects :17-73       THIS lane — hexEffects.test.js:11  */
 /*     VERBATIM: 'helpers.test.js owns applyHexEffects DIRECT unit    */
@@ -29,11 +32,11 @@
 /*   triggerExpertDivination :336-379 #1479 helpers-expertDivination */
 /*   applyRegenerateSpell :381-491 (+privates :381/:390/:401/:423)   */
 /*     helpers-regenerate                                           */
-/*   isMagicMissile :493 / getMagicMissileCount :497 /                */
-/*     executeMagicMissile :566-618  #1480 helpers-magicMissile +   */
-/*     #1503 helpers.sp075-magicMissile-upcast. getMagicMissileCount */
-/*     has ZERO production importers (internal :568) — dead-export    */
-/*     candidate, report-only 🗑.                                     */
+/*   isMagicMissile :554 / getMagicMissileCount :558 (export DELETED   */
+/*     fix#304 #1504 — zero production importers, live-internal :654;  */
+/*     ladder re-pinned LIVE-PATH in helpers-magicMissile.test.js) /   */
+/*     executeMagicMissile :652-704  #1480 helpers-magicMissile +      */
+/*     #1503 helpers.sp075-magicMissile-upcast.                       */
 /*                                                                    */
 /*  MISSILE-REFS VERDICT: OLD base imported ONLY applyHexEffects +  */
 /*  triggerArcaneWard — #1503 :20 claim 'helpers base has zero       */

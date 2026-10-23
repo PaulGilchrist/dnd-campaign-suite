@@ -9,7 +9,8 @@ import { normalizeCastingTime } from './castingTimeUtils.js';
 // Consumers delegate canon here (automationRouter.js:306, classifyBucket.js:83,
 // featureCategorizationUtils.js:45/54/81, automationInfoBuilder/save.js:14,
 // class-feature-handlers.js:20, rules.js:194, spellPreparationService.js:890,
-// execution/index.js:67, spellResolution.js:174). Never mocked at this face;
+// execution/index.js:77; the spellResolution.js:174 consumer died with the barrel,
+// fix#301). Never mocked at this face;
 // full-REAL pure string util, exact-of-0 mock census.
 
 const listJsonFiles = (dir) => {

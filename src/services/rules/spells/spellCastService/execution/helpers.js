@@ -703,8 +703,18 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, ge
     }
 }
 
+// fix#304 (#1504 dead-export census): DIVINATION_SCHOOL and getMagicMissileCount
+// export-deleted. ZERO production importers of EITHER export — production importers are
+// execution/index.js:26 (8 names) and noSavePath.js:3 (isMagicMissile, executeMagicMissile)
+// only, and the barrel re-export surface (execution/index.js:951) never carried them.
+// Both stay LIVE MODULE-LOCAL: DIVINATION_SCHOOL at :15/:403 (triggerExpertDivination) and
+// getMagicMissileCount at :558/:654 (executeMagicMissile). Import-at-consumer was NOT
+// cheap (fix#294 shape): the inline-literal consumers expertDivinationHandler.js:4 and
+// warMagicSpellHandler.js:121 (getMagicMissileDartCount mirror, 'mirrors executeMagicMissile'
+// per its :120 cite) both live UNDER automation/index.js, which helpers.js:3 imports —
+// importing helpers.js back up would cycle the module graph. Two independent one-word
+// literals in sibling handler trees stay; a shared constants module is QUEUED, not this lane.
 export {
-    DIVINATION_SCHOOL,
     applyHexEffects,
     triggerArcaneWard,
     triggerDispelMagic,
@@ -713,6 +723,5 @@ export {
     triggerExpertDivination,
     applyRegenerateSpell,
     isMagicMissile,
-    getMagicMissileCount,
     executeMagicMissile,
 };

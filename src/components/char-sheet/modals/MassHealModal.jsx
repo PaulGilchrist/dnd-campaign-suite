@@ -18,8 +18,14 @@ export default function MassHealModal({
     const [selected, setSelected] = useState([]);
     const [allocations, setAllocations] = useState({});
 
-    const totalAllocated = Object.values(allocations).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    const remaining = Math.max(0, pool - totalAllocated);
+    // display-truth law: handleConfirm sends SELECTED targets only, so the
+    // header and remaining pool must count SELECTED allocations only. A
+    // deselected target keeps its allocation in state purely for re-selection
+    // convenience (toggleTarget never deletes allocations[name]), so summing
+    // Object.values(allocations) here — the old :21 shape — showed a number
+    // larger than the payload ever confirms.
+    const selectedAllocated = selected.reduce((sum, name) => sum + (Number(allocations[name]) || 0), 0);
+    const remaining = Math.max(0, pool - selectedAllocated);
 
     const toggleTarget = useCallback((name) => {
         setSelected(prev => {
@@ -86,7 +92,7 @@ export default function MassHealModal({
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '12px', fontSize: '0.9em', color: 'var(--color-header)' }}>
                         <span>Pool: {pool} HP</span>
                         <span style={{ color: '#999' }}>
-                            Allocated: {totalAllocated} / {pool}
+                            Allocated: {selectedAllocated} / {pool}
                         </span>
                         {remaining > 0 && (
                             <span style={{ color: '#f0ad4e', fontWeight: 'bold' }}>
@@ -175,7 +181,7 @@ export default function MassHealModal({
                                         <button
                                             className="sp-roll-btn"
                                             onClick={() => {
-                                                const maxMissing = hpInfo ? Math.min(hpInfo.maxHp - hpInfo.currentHp, pool - totalAllocated + amount) : pool;
+                                                const maxMissing = hpInfo ? Math.min(hpInfo.maxHp - hpInfo.currentHp, pool - selectedAllocated + amount) : pool;
                                                 setAllocations(prev => ({ ...prev, [name]: Math.max(0, maxMissing) }));
                                             }}
                                             type="button"
@@ -192,7 +198,7 @@ export default function MassHealModal({
                     {selectedTargets.length === 0 && (
                         <p style={{ fontStyle: 'italic', opacity: 0.7 }}>No targets available.</p>
                     )}
-                    {remaining > 0 && totalAllocated > 0 && (
+                    {remaining > 0 && selectedAllocated > 0 && (
                         <p style={{ fontSize: '0.85em', opacity: 0.7, fontStyle: 'italic', marginTop: '8px' }}>
                             {remaining} HP unallocated — you may leave HP unused.
                         </p>

@@ -6,8 +6,11 @@
 /*  (noSavePath.test.js:11, index/earlyReturns/blockChecks lanes)    */
 /*  mocks ./helpers.js wholesale, and helpers.test.js is shared-base  */
 /*  (zero missile refs — verified). This lane REAL-RUNS the missile   */
-/*  helper internals at helpers.js:493-618: isMagicMissile,            */
-/*  getMagicMissileCount, rollTargetMissiles (:501),                   */
+/*  helper internals at helpers.js:554-704: isMagicMissile,            */
+/*  rollTargetMissiles (:562),                                          */
+/*  getMagicMissileCount pinned LIVE-PATH only (:654 — its export was   */
+/*  DELETED fix#304, #1504 census, zero production importers; the        */
+/*  module still runs it REAL internally for every executeMagicMissile). */
 /*  resolveIgnoreResistance (:513), applyMissileDamage (:522),         */
 /*  logMagicMissileSpell (:539), executeMagicMissile (:566).          */
 /*                                                                    */
@@ -138,7 +141,7 @@ vi.mock('../../../features/invisibilityService.js', () => ({
 }))
 
 /* ---------------- SUT (never mocked) ---------------- */
-import { isMagicMissile, getMagicMissileCount, executeMagicMissile } from './helpers.js';
+import { isMagicMissile, executeMagicMissile } from './helpers.js';
 import { getCombatSummary } from '../../../../../services/encounters/combatData.js';
 import { getRuntimeValue } from '../../../../../hooks/runtime/useRuntimeState.js';
 import { applyDamageToTarget } from '../../../../rules/combat/applyDamage.js';
@@ -197,8 +200,8 @@ describe('helpers.js magic-missile chain — module-direct sole runner', () => {
     });
   });
 
-  describe('getMagicMissileCount (:497-499) — dart ladder vs disk', () => {
-    it('darts = 2 + slot level at EVERY disk damage_at_slot_level tier of BOTH rulesets, whose dart formula is byte-constant (scaling is count-only)', () => {
+  describe('Magic Missile dart ladder — LIVE-PATH pin (getMagicMissileCount export DELETED fix#304 #1504; module-local :558 stays live internal at :654)', () => {
+    it('darts = 2 + slot level at EVERY disk damage_at_slot_level tier of BOTH rulesets, whose dart formula is byte-constant (scaling is count-only) — proven through executeMagicMissile log bytes', async () => {
       const tiers5e = Object.keys(spell5e.damage.damage_at_slot_level);
       const tiers2024 = Object.keys(spell2024.damage.damage_at_slot_level);
       expect(tiers5e).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
@@ -206,11 +209,38 @@ describe('helpers.js magic-missile chain — module-direct sole runner', () => {
       // disk bytes prove the DART formula never scales...
       for (const lv of tiers5e) expect(spell5e.damage.damage_at_slot_level[lv]).toBe('1d4 + 1');
       for (const lv of tiers2024) expect(spell2024.damage.damage_at_slot_level[lv]).toBe('1d4 + 1');
-      // ...while the helper's dart count does, per disk higher_level bytes
+      // ...while the dart count does, per disk higher_level bytes. The ladder arithmetic
+      // (numMissiles = getMagicMissileCount(slotLevel), helpers.js:654) reaches TWO
+      // observable bytes on the live seam: the :628 decorative summary formula and the
+      // spell-log missileCount — pinned WITHOUT importing the demoted symbol (fix#304).
       expect(spell5e.description[0]).toContain('three glowing darts');
       expect(spell5e.higher_level[0]).toContain('one more dart for each slot level above 1st');
-      for (const lv of tiers5e) expect(getMagicMissileCount(Number(lv))).toBe(Number(lv) + 2);
-      expect(getMagicMissileCount(spell5e.level)).toBe(3); // base case straight off the disk level byte
+      const services = makeServices();
+      for (const lv of tiers5e) {
+        const darts = Number(lv) + 2;
+        rollExpression.mockClear();
+        addEntry.mockClear();
+        hoisted.queue.length = 0;
+        hoisted.order.length = 0;
+        hoisted.queue.push(...Array(darts).fill(1)); // totals 2/dart — never hits the :670 skip
+        hoisted.applyImpl = () => ({ finalDamage: 2 });
+
+        await executeMagicMissile(spell5e, { slotLevel: Number(lv), magicMissileDistribution: { 'Goblin A': darts } }, services);
+
+        expect(rollExpression.mock.calls).toEqual([...Array(darts).fill(['1d4 + 1']), [`${darts}× 1d4 + 1`]]);
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry.mock.calls[0][1].spellLevel).toBe(Number(lv)); // paid slot forwarded to the ladder
+        expect(addEntry.mock.calls[0][1].missileCount).toBe(darts);
+      }
+      // base case straight off the disk level byte: slotLevel absent -> :653 falls back to
+      // spell.level 1 -> 3 darts in the summary formula and the log.
+      rollExpression.mockClear();
+      addEntry.mockClear();
+      hoisted.queue.length = 0;
+      hoisted.queue.push(1, 1, 1);
+      await executeMagicMissile(spell5e, { magicMissileDistribution: { 'Goblin A': 3 } }, services);
+      expect(rollExpression.mock.calls).toEqual([...Array(3).fill(['1d4 + 1']), ['3× 1d4 + 1']]);
+      expect(addEntry.mock.calls[0][1].missileCount).toBe(3);
     });
   });
 

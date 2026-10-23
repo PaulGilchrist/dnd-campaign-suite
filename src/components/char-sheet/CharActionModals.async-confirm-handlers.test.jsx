@@ -119,9 +119,8 @@ vi.mock('./modals/shared/SaveAttackAoeModal.jsx', () => ({
 vi.mock('./modals/shared/AOEConditionModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="aoe-condition-modal">AOEConditionModal</div>; },
 }));
-vi.mock('./modals/shared/FearModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="fear-modal">FearModal</div>; },
-}));
+// fix#308: vi.mock('./modals/shared/FearModal.jsx') block removed — component retired
+// census-dead (zero importers after SecondaryModals fearModal lane deletion).
 vi.mock('./modals/shared/HypnoticPatternModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="hypnotic-pattern-modal">HypnoticPatternModal</div>; },
 }));

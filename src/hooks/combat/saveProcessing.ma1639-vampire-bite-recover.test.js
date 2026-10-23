@@ -13,6 +13,8 @@
 // canonical applyHealingToTarget choke point (§17 monster HP truth) with the
 // save_attacker_recover face log. Rows without the recover clause never heal.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import monsters from '../../../public/data/monsters.json';
+import { parseSaveHpMaxReduce, parseSaveAttackerRecover, extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 
 const campaignName = 'test-campaign';
 const VAMPIRE = 'Vampire 1';
@@ -120,20 +122,37 @@ vi.mock('../../services/rules/combat/applyHealing.js', () => ({
 
 import { processSaveRoll } from './saveProcessing.js';
 
-// Bite block-save context exactly as buildAbilitySaveRollContext stamps it
-// from the fixed row (dc_success:"half" + both structured riders + MA-0427
-// secondary transport).
-const biteContext = ({ saveHpMaxReduce, saveAttackerRecover, dcSuccess = 'half' } = {}) => ({
-    saveDc: 17,
-    saveType: 'CON',
+// Bite block-save context. fix#279(b) hand-mirror→disk conversion: fields now
+// derive BY-name from monsters.json, keyed as buildAbilitySaveRollContext
+// stamps them — saveDc :1818, saveType full word :1819 (the mirror's hand-typed
+// 'CON' was LIVE DRIFT vs disk "Constitution", the fix#279 disease class; the
+// consumer reads context.saveType only for log stamps + normalizeSaveType
+// evasion comparisons whose te fixtures carry no saveType key → inert across
+// the live branch), autoDamage primary + MA-0427 secondary transport via
+// resolveSaveLegDamageFields :1827/buildSecondaryDamageTransport :1224-1225
+// (autoDamageSecondaryName = row name), dcSuccess :1347 passthrough, riders via
+// parseSaveHpMaxReduce :1935 / parseSaveAttackerRecover :1943 (both disk
+// {equal_to:'damage'} → {equalTo:'damage'}). SYNTHETIC-BY-DESIGN: saveConditions
+// stays [] — disk save_effect prerequisite prose DOES arm grappled/
+// incapacitated/restrained via extractConditionsFromSaveEffect (:1829 production
+// stamp, pinned live in the clauseless-row test so this attribution cannot go
+// stale); this lane locks the drain+regain rider legs ONLY — condition legs
+// belong to saveProcessing.failed-save-conditions.test.js. The zero-face test
+// likewise overrides dcSuccess to synthetic 'none' (disk arms 'half' — labeled
+// by test title). fp byte-fingerprint + parse truth table: owner lane
+// MonsterCardHelpers.ma1639-vampire-bite-recover.test.js (never edited here).
+const BITE = monsters.find((m) => m.name === 'Vampire').actions.find((a) => a.name === 'Bite');
+const biteContext = ({ saveHpMaxReduce, saveAttackerRecover, dcSuccess = BITE.dc_success } = {}) => ({
+    saveDc: BITE.save_dc,
+    saveType: BITE.save_type,
     attackerName: VAMPIRE,
-    actionName: 'Bite',
+    actionName: BITE.name,
     dcSuccess,
-    autoDamageFormula: '1d4 + 4',
-    autoDamageDamageType: 'Piercing',
-    autoDamageSecondaryFormula: '3d8',
-    autoDamageSecondaryName: 'Bite',
-    autoDamageSecondaryDamageType: 'Necrotic',
+    autoDamageFormula: BITE.damage_dice_primary,
+    autoDamageDamageType: BITE.damage_type_primary,
+    autoDamageSecondaryFormula: BITE.damage_dice_secondary,
+    autoDamageSecondaryName: BITE.name,
+    autoDamageSecondaryDamageType: BITE.damage_type_secondary,
     saveConditions: [],
     saveHpMaxReduce,
     saveAttackerRecover,
@@ -174,7 +193,7 @@ beforeEach(() => {
 
 describe('MA-1639 regain: FAIL face heals the attacker the FULL necrotic amount (not the total, not half)', () => {
     it('nat 1 bonus −19 vs DC 17: riderDamage = secondary finalDamage 13 → heal 13, cs 150→163, drain rides necrotic too', async () => {
-        const out = await resolveSave(biteContext({ saveHpMaxReduce: { equalTo: 'damage' }, saveAttackerRecover: { equalTo: 'damage' } }), { d20: 1, bonus: -19 });
+        const out = await resolveSave(biteContext({ saveHpMaxReduce: parseSaveHpMaxReduce(BITE), saveAttackerRecover: parseSaveAttackerRecover(BITE) }), { d20: 1, bonus: -19 });
         expect(out.saveSuccess).toBe(false);
 
         // both damage legs land full
@@ -200,7 +219,7 @@ describe('MA-1639 regain: FAIL face heals the attacker the FULL necrotic amount 
 
 describe('MA-1639 regain: SUCCESS face pays HALF and heals HALF (floored)', () => {
     it('nat 20 ≥ DC 17: secondary floor(13/2)=6 → heal 6 → 150→156, max reduce 6', async () => {
-        const out = await resolveSave(biteContext({ saveHpMaxReduce: { equalTo: 'damage' }, saveAttackerRecover: { equalTo: 'damage' } }), { d20: 20, bonus: 0 });
+        const out = await resolveSave(biteContext({ saveHpMaxReduce: parseSaveHpMaxReduce(BITE), saveAttackerRecover: parseSaveAttackerRecover(BITE) }), { d20: 20, bonus: 0 });
         expect(out.saveSuccess).toBe(true);
 
         expect(saveDamageLogs()[1].finalDamage).toBe(6);
@@ -219,7 +238,8 @@ describe('MA-1639 regain: SUCCESS face pays HALF and heals HALF (floored)', () =
 
 describe('MA-1639 byte-inertness: rows without the recover clause never heal', () => {
     it('recover null + drain armed: damage+drain live, ZERO heal/logs', async () => {
-        const out = await resolveSave(biteContext({ saveHpMaxReduce: { equalTo: 'damage' }, saveAttackerRecover: null }), { d20: 1, bonus: -19 });
+        // saveAttackerRecover: null is a synthetic probe — disk arms {equal_to:"damage"}.
+        const out = await resolveSave(biteContext({ saveHpMaxReduce: parseSaveHpMaxReduce(BITE), saveAttackerRecover: null }), { d20: 1, bonus: -19 });
         expect(out.saveSuccess).toBe(false);
         expect(csB().maxHp).toBe(986);
         expect(healCalls.length).toBe(0);
@@ -228,6 +248,10 @@ describe('MA-1639 byte-inertness: rows without the recover clause never heal', (
     });
 
     it('fully clauseless dual-damage row: both damage legs byte-identical, no riders', async () => {
+        // synthetic-by-design pin (biteContext header): disk save_effect prose DOES arm
+        // three prerequisite conditions via the production extract — the fixture's
+        // saveConditions:[] is the documented rider-only trim, never disk fidelity.
+        expect(extractConditionsFromSaveEffect(BITE.save_effect)).toEqual(['grappled', 'incapacitated', 'restrained']);
         const out = await resolveSave(biteContext({}), { d20: 1, bonus: -19 });
         expect(out.saveSuccess).toBe(false);
         expect(saveDamageLogs().map(e => e.finalDamage)).toEqual([6, 13]);
@@ -240,7 +264,7 @@ describe('MA-1639 byte-inertness: rows without the recover clause never heal', (
 
 describe('MA-1639 zero face: dc_success "none" on success', () => {
     it('zero-damage save: recover logs the honest zero entry, no cs writes', async () => {
-        const out = await resolveSave(biteContext({ saveHpMaxReduce: { equalTo: 'damage' }, saveAttackerRecover: { equalTo: 'damage' }, dcSuccess: 'none' }), { d20: 20, bonus: 0 });
+        const out = await resolveSave(biteContext({ saveHpMaxReduce: parseSaveHpMaxReduce(BITE), saveAttackerRecover: parseSaveAttackerRecover(BITE), dcSuccess: 'none' }), { d20: 20, bonus: 0 });
         expect(out.saveSuccess).toBe(true);
         expect(healCalls.length).toBe(0);
         expect(csV().currentHp).toBe(150);

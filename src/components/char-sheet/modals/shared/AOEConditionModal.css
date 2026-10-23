@@ -1,0 +1,10 @@
+/* AOEConditionModal — scoped styles for AOEConditionModal.jsx.
+   Static declarations migrated verbatim from former inline styles (exact values);
+   the dynamic showResults visibility on the selection wrapper stays inline in JSX
+   per the dynamic-data exception (fix#313 precedent). Family tokens sp-* (.sp-note
+   etc.) are reused from ../../common/SavePromptModal.css — not duplicated here. */
+
+/* Resolved-count note spacing — was style={{ marginTop: '8px' }} on the sp-note */
+.aoe-condition-resolved-note {
+  margin-top: 8px;
+}

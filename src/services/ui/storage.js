@@ -1,5 +1,3 @@
-import utils from './utils.js'
-
 // Sequential write queue for combatSummary to prevent race conditions
 // when multiple applyDamageToTarget calls fire storage.set in quick succession.
 // Each campaign gets its own queue so writes for different campaigns can run in parallel.
@@ -59,41 +57,6 @@ const storage = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value })
           }).catch((e) => { console.error("[storage:error]", e); });
-      },
-    getProperty: async (name, propertyName, campaignName) => {
-        // Campaign-level keys are stored at the top level, not under a "campaign" wrapper.
-        if (name === 'campaign') {
-            return await storage.get(propertyName, campaignName);
-        }
-        const firstName = utils.getName(name);
-        const obj = await storage.get(firstName, campaignName);
-        if(obj && obj[propertyName] != null) {
-            return obj[propertyName];
-          }
-        return null;
-      },
-    setProperty: async (name, propertyName, value, campaignName) => {
-        // Campaign-level keys are stored at the top level, not under a "campaign" wrapper.
-        if (name === 'campaign') {
-            await storage.set(propertyName, value, campaignName);
-            return;
-        }
-        if (name === 'combatSummary' && propertyName === 'lastAttack') {
-            console.error(
-                "[storage] Deprecated: storage.setProperty('combatSummary', 'lastAttack', ...) is no longer supported. " +
-                `Campaign: "${campaignName}". Use storage.set('lastAttack', value, campaignName) instead. ` +
-                "lastAttack is now a root-level key."
-            );
-            await storage.set('lastAttack', value, campaignName);
-            return;
-        }
-        const firstName = utils.getName(name);
-        let obj = await storage.get(firstName, campaignName);
-        if(!obj) {
-            obj = {};
-          }
-        obj[propertyName] = value;
-        await storage.set(firstName, obj, campaignName);
       }
 }
 

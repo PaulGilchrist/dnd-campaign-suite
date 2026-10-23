@@ -14,6 +14,8 @@
 // (no key, saveHpMaxReduce null) stays byte-inert. saveProcessing.exhaustion
 // .test.js harness twin.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import monsters from '../../../public/data/monsters.json';
+import { parseSaveHpMaxReduce, extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 
 const runtimeStore = {};
 const addEntryLogs = [];
@@ -100,17 +102,32 @@ const campaignName = 'test-campaign';
 const SUCCUBUS = 'Succubus 1';
 const TARGET = 'Bandit';
 
-// Draining Kiss block-save context exactly as buildAbilitySaveRollContext
-// stamps it from the fixed row (dc_success:"half" + save_hp_max_reduce key).
+// Draining Kiss block-save context. fix#279(b) hand-mirror→disk conversion:
+// this context USED to hand-mirror the Succubus row; the diff found ONE live
+// drift — saveType was hand-typed 'CON' while disk carries "Constitution"
+// (the CON-vs-Constitution disease fix#279 caught live; the consumer reads
+// context.saveType only for log stamps + normalizeSaveType evasion/disadvantage
+// comparisons whose te fixtures carry no saveType key, so the fix is inert
+// across the live branch — yeti chilling-gaze precedent). Every disk-backed
+// field now derives BY-name from monsters.json, keyed exactly as the
+// production transport stamps: buildAbilitySaveRollContext saveDc :1818,
+// saveType full word :1819, autoDamage fields via resolveSaveLegDamageFields
+// :1827, saveConditions :1829 (extract = [] — no CONDITIONS word in this
+// row's save_effect, pinned live in the fail-face test), rider via
+// parseSaveHpMaxReduce (MonsterCardModal :1935). The saveHpMaxReduce PARAM
+// stays: armed callers pass the parsed disk truth; the byte-inert test passes
+// synthetic null (legacy-row probe — disk arms the key). attackerName/
+// _characters/_target are runtime scenario identities, not disk bytes.
+const KISS = monsters.find((m) => m.name === 'Succubus').actions.find((a) => a.name === 'Draining Kiss');
 const kissContext = (saveHpMaxReduce) => ({
-    saveDc: 15,
-    saveType: 'CON',
+    saveDc: KISS.save_dc,
+    saveType: KISS.save_type,
     attackerName: SUCCUBUS,
-    actionName: 'Draining Kiss',
-    dcSuccess: 'half',
-    autoDamageFormula: '3d8',
-    autoDamageDamageType: 'Psychic',
-    saveConditions: [],
+    actionName: KISS.name,
+    dcSuccess: KISS.dc_success,
+    autoDamageFormula: KISS.damage_dice_primary,
+    autoDamageDamageType: KISS.damage_type_primary,
+    saveConditions: extractConditionsFromSaveEffect(KISS.save_effect),
     saveHpMaxReduce,
     _characters: [{ name: TARGET, computedStats: { armorClass: 12 } }],
     _target: { name: TARGET, type: 'npc' },
@@ -146,9 +163,12 @@ beforeEach(() => {
 
 describe('MA-1547 save seam — both RAW faces, ledger accumulation, legacy inert', () => {
     it('fail face pays FULL: nat 5 vs DC 15 → finalDamage 20, maxHp 200→180, ledger + face log, no clock', async () => {
-        const out = await resolveSave(kissContext({ equalTo: 'damage' }), { d20: 5, bonus: 0 });
+        const out = await resolveSave(kissContext(parseSaveHpMaxReduce(KISS)), { d20: 5, bonus: 0 });
         expect(out.saveSuccess).toBe(false);
         expect(saveDamageLog().finalDamage).toBe(20);
+        // transport-derived saveConditions pin: disk save_effect carries no
+        // CONDITIONS word → extract [] (the header's inert-conditions claim, live).
+        expect(extractConditionsFromSaveEffect(KISS.save_effect)).toEqual([]);
 
         expect(csB().maxHp).toBe(180);
         expect(csB().maxHitPoints).toBe(180);
@@ -167,7 +187,7 @@ describe('MA-1547 save seam — both RAW faces, ledger accumulation, legacy iner
     });
 
     it('success face pays HALF: total 20 ≥ DC 15 → finalDamage floor(20/2)=10, maxHp drops by exactly 10', async () => {
-        const out = await resolveSave(kissContext({ equalTo: 'damage' }), { d20: 20, bonus: 0 });
+        const out = await resolveSave(kissContext(parseSaveHpMaxReduce(KISS)), { d20: 20, bonus: 0 });
         expect(out.saveSuccess).toBe(true);
         expect(saveDamageLog().finalDamage).toBe(10);
 
@@ -186,14 +206,14 @@ describe('MA-1547 save seam — both RAW faces, ledger accumulation, legacy iner
 
     it('odd raw halves floored: raw 21 on success → drain rides the halved 10, not the raw 21', async () => {
         rollExpression.mockReturnValue({ total: 21, rolls: [6, 8, 7], modifier: 0 });
-        await resolveSave(kissContext({ equalTo: 'damage' }), { d20: 20, bonus: 0 });
+        await resolveSave(kissContext(parseSaveHpMaxReduce(KISS)), { d20: 20, bonus: 0 });
         expect(saveDamageLog().finalDamage).toBe(10);
         expect(csB().maxHp).toBe(190);
     });
 
     it('standing ledger {baseMax:200,reduced:10,max:190} + failed full 20 → reduced 30, max 170', async () => {
         runtimeStore['campaign.targetEffects'] = [{ target: TARGET, effect: 'hp_max_reduce', source: SUCCUBUS, baseMax: 200, reduced: 10, max: 190 }];
-        await resolveSave(kissContext({ equalTo: 'damage' }), { d20: 5, bonus: 0 });
+        await resolveSave(kissContext(parseSaveHpMaxReduce(KISS)), { d20: 5, bonus: 0 });
         expect(csB().maxHp).toBe(170);
         expect(registerTargetEffect).toHaveBeenCalledWith(campaignName, TARGET, 'hp_max_reduce', SUCCUBUS, {
             baseMax: 200, reduced: 30, max: 170, duration: 'until_long_rest',

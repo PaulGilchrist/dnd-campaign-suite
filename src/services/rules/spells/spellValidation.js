@@ -341,14 +341,6 @@ export async function getSpellSources(formData, version = '5e') {
   return sources;
 }
 
-/**
- * Validates spell selections and returns warnings
- * @param {object} formData - The character form data
- * @param {array} selectedSpells - Array of selected spell names
- * @param {array} allSpells - All available spells data
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object>} - { warnings: array, valid: boolean }
- */
 // Allowed-spells set from every non-class source (race/background/feat grants,
 // explicitly granted spells, and feat-chosen spells — these never trigger the
 // "outside class list" warning).
@@ -409,16 +401,17 @@ function isSpellAllowedByClass(spellData, spellClasses, ctx) {
   return false;
 }
 
-export async function validateSpells(formData, selectedSpells, allSpells, version = '5e', grantedSpells = []) {
+// Loader-pure validation core shared by validateSpells and getSpellValidationInfo.
+// The caller supplies pre-loaded sources — #1530 leg c: getSpellValidationInfo used to
+// load sources twice (once inside validateSpells, once directly); one load now feeds both.
+// #1530 leg a: the dead `_spellLevel` self-compute (computed then `void`-ed, never read)
+// is removed. #1530 leg b: `valid` no longer filters by type — this function's `warnings`
+// array has exactly two producers and both push type 'warning', so the filter was vacuous.
+// The 'warning'|'info' type vocabulary belongs to the sibling character validators and the
+// WarningList display layer; here valid === zero warnings (spellLimits.js violations.length
+// convention).
+function validateAgainstSources({ sources, formData, selectedSpellNames, allSpells, version, grantedSpells }) {
   const warnings = [];
-  const selectedSpellNames = selectedSpells || [];
-
-  if (selectedSpellNames.length === 0) {
-    return { warnings, valid: true };
-   }
-
-  // Get all spell sources for this character
-  const sources = await getSpellSources(formData, version);
 
   // Allowed spells from all granted (non-class) sources; class spell-list membership
   // is checked per spell below (we don't add all class spells to the set).
@@ -442,8 +435,6 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
      }
 
     const spellClasses = spellData.classes || [];
-    const _spellLevel = spellData.level !== undefined ? spellData.level : 0;
-    void _spellLevel;
 
     // If not a class spell and not granted by another source and not a Magical Secrets spell, collect it
     if (!isSpellAllowedByClass(spellData, spellClasses, classCheckCtx) && !allowedSpells.has(spellName)) {
@@ -451,22 +442,43 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
      }
    }
 
-     // Add a single consolidated warning for all spells outside the class list
-   if (spellsOutsideClassList.length > 0) {
+  // Add a single consolidated warning for all spells outside the class list
+  if (spellsOutsideClassList.length > 0) {
     const count = spellsOutsideClassList.length;
     const spellText = count === 1 ? 'Spell' : 'Spell(s)';
-        warnings.push({
+    warnings.push({
       message: `${spellText} (${count}) chosen outside of the class spell list.`,
-          type: 'warning'
-         });
-    }
+      type: 'warning'
+     });
+  }
   // Note: Spell limit validation is handled in the UI by showing exceeded counts in red
   // We don't add redundant warnings here since the summary already shows this visually
 
   return {
     warnings,
-    valid: warnings.filter(w => w.type === 'warning').length === 0
+    valid: warnings.length === 0
    };
+}
+
+/**
+ * Validates spell selections and returns warnings
+ * @param {object} formData - The character form data
+ * @param {array} selectedSpells - Array of selected spell names
+ * @param {array} allSpells - All available spells data
+ * @param {string} version - '5e' or '2024'
+ * @returns {Promise<object>} - { warnings: array, valid: boolean }
+ */
+export async function validateSpells(formData, selectedSpells, allSpells, version = '5e', grantedSpells = []) {
+  const selectedSpellNames = selectedSpells || [];
+
+  if (selectedSpellNames.length === 0) {
+    return { warnings: [], valid: true };
+   }
+
+  // Get all spell sources for this character
+  const sources = await getSpellSources(formData, version);
+
+  return validateAgainstSources({ sources, formData, selectedSpellNames, allSpells, version, grantedSpells });
 }
 
 /**
@@ -478,9 +490,11 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
  * @returns {Promise<object>} - Object with validation info for UI display
  */
 export async function getSpellValidationInfo(formData, selectedSpells, allSpells, version = '5e', grantedSpells = []) {
-  const validation = await validateSpells(formData, selectedSpells, allSpells, version, grantedSpells);
+  // Single sources load feeding both the validation and the info block (#1530 leg c —
+  // was double-loaded: validateSpells + direct getSpellSources with identical args).
   const sources = await getSpellSources(formData, version);
-  
+  const validation = validateAgainstSources({ sources, formData, selectedSpellNames: selectedSpells || [], allSpells, version, grantedSpells });
+
   return {
     ...validation,
     sources,

@@ -156,6 +156,49 @@ describe('full mode', () => {
         fireEvent.click(brutalStrikeToggle());
         expect(optionInputs()).toHaveLength(0);
     });
+
+    it('styles via scoped classes, keeping only dynamic selection colors inline (no-inline-styles convention)', () => {
+        const { container } = render(<RecklessAttackModal {...makeProps({
+            hasBrutalStrike: true, brutalStrikeOptions, maxEffects: 2,
+        })} />);
+
+        // Untoggled census: the ONLY inline-styled element is the dynamic
+        // toggle label — every former static site is style-free at rest.
+        expect(container.querySelectorAll('.sp-body [style]')).toHaveLength(1);
+
+        fireEvent.click(brutalStrikeToggle());
+
+        // Static blocks/hints/inputs/descriptions: zero inline style attributes —
+        // the rules live in RecklessAttackModal.css (exact-value migration, fix#313 recipe).
+        for (const sel of ['.brutal-strike-picker', '.brutal-strike-hint', '.brutal-strike-input',
+            '.brutal-strike-desc', '.brutal-strike-count', '.brutal-strike-toggle']) {
+            const els = container.querySelectorAll(sel);
+            expect(els.length).toBeGreaterThan(0);
+            for (const el of els) expect(el.getAttribute('style')).toBeNull();
+        }
+
+        // Option rows and toggle label: static decoration lives in the classes;
+        // the inline style attr carries ONLY selection-derived background/border.
+        const rows = container.querySelectorAll('.brutal-strike-option');
+        expect(rows).toHaveLength(brutalStrikeOptions.length);
+        for (const row of [...rows, container.querySelector('.brutal-strike-toggle-label')]) {
+            const inline = row.getAttribute('style') || '';
+            expect(inline).toMatch(/background/i);
+            expect(inline).toMatch(/border/i);
+            expect(inline).not.toMatch(/display|padding|margin|cursor|border-radius|opacity|font-size/i);
+        }
+
+        // Census sweep with the picker open: option labels + toggle label only.
+        expect(container.querySelectorAll('.sp-body [style]')).toHaveLength(brutalStrikeOptions.length + 1);
+
+        // Selecting flips only dynamic inline values (link-colored border on the
+        // chosen row; untouched rows stay transparent).
+        fireEvent.click(screen.getAllByRole('checkbox')[1]); // first option checkbox (index 0 is the toggle)
+        const selectedStyle = screen.getByText('Forceful Blow').closest('.brutal-strike-option').getAttribute('style') || '';
+        expect(selectedStyle).toMatch(/var\(--color-link\)/);
+        const unselectedStyle = screen.getByText('Hamstring Blow').closest('.brutal-strike-option').getAttribute('style') || '';
+        expect(unselectedStyle).toMatch(/transparent/);
+    });
 });
 
 describe('brutalOnly mode', () => {
@@ -193,5 +236,26 @@ describe('brutalOnly mode', () => {
         render(<RecklessAttackModal {...makeProps({ mode: 'brutalOnly', onCancel })} />);
         fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
         expect(onCancel).toHaveBeenCalledWith({ useBrutalStrike: false, effectChoices: [] });
+    });
+
+    it('keeps the brutalOnly note static in CSS and only the toggle label dynamic (no-inline-styles convention)', () => {
+        const { container } = render(<RecklessAttackModal {...makeProps({
+            mode: 'brutalOnly', hasBrutalStrike: true, brutalStrikeOptions,
+        })} />);
+
+        // The former style={{ opacity: 0.8, fontSize: '0.9em' }} note p and the
+        // picker statics carry no inline style attr — they live in the .css file.
+        const note = container.querySelector('.brutal-strike-note');
+        expect(note).toBeInTheDocument();
+        expect(note.getAttribute('style')).toBeNull();
+        fireEvent.click(brutalStrikeToggle());
+        for (const sel of ['.brutal-strike-hint', '.brutal-strike-input']) {
+            const els = container.querySelectorAll(sel);
+            expect(els.length).toBeGreaterThan(0);
+            for (const el of els) expect(el.getAttribute('style')).toBeNull();
+        }
+
+        // Census sweep: only the option labels + toggle label keep inline attrs.
+        expect(container.querySelectorAll('.sp-body [style]')).toHaveLength(brutalStrikeOptions.length + 1);
     });
 });

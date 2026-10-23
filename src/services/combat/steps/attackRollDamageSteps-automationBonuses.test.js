@@ -45,6 +45,14 @@
 // brutalStrike old×5 → t18 (inactive guard) + t19 (Hamstring clock leg, added).
 // natural20 old×10 → t20 (Math.max default only). celestial old×10 → t21-t26
 // (5 guards + 1 exact app; duplicate app-name legs dropped, sibling-owned).
+// #1241-family silent-zero sweep (fix#241 census, this turn): +heavy proficiency-token
+//   eval-number leg, +heavy NaN-string loud gate, +melee Divine Smite spell_slot_level
+//   QUIET exemption (opt-in honest zero, disk classes.json bytes), df gain re-pointed
+//   to disk-canonical dice+flat '1d6 + barbarian_level / 2' (pre-fix flat-only fixture
+//   was mock-lenient green), df roll-null arm sharpened with the new loud pins,
+//   +missing-level loud pre-roll. Strict-grammar loud-vs-quiet CANON matrix →
+//   attackRollBonuses-silentZero-census.test.js (host fallback mock :63 fabricates
+//   rolls for junk and cannot falsify those arms — fix#241 lens law).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../dice/diceRoller.js', () => ({
@@ -214,6 +222,56 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         }));
         expect(r.data).toEqual({ formula: '1d8+3 + 1d6 [slashing] + 1d8 [slashing]', total: 20, rolls: [8, 3, 4, 5] });
       });
+
+      // ── #1241-family silent-zero sweep legs (fold-host mock specialization; the
+      //    canonical loud-vs-quiet matrix lives in attackRollBonuses-silentZero-
+      //    census.test.js — these three pin what ONLY this host's mocks can):
+      // disk-canonical Heavy Weapon Mastery token ('proficiency_bonus', 2024/
+      // feats.json): the eval→number leg pinned as numeric-string-safe.
+      it('heavy disk token proficiency_bonus → + 3 [Heavy Weapon Mastery] flat, total stays NUMBER', async () => {
+        rollExpression.mockReturnValueOnce(null); // defeat host lenient fallback mock :63 fabricating a roll for the token
+        const r = await steps[11].handler(makeCtx({
+          isMeleeOrUnarmed: true,
+          attack: { properties: ['Heavy'] },
+          playerStats: { name: 'TestChar', proficiency: 3, automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', name: 'Heavy Weapon Mastery', damageExpression: 'proficiency_bonus', damageType: 'same_as_weapon' }] } },
+          formula: '1d8+3', total: 11, rolls: [8, 3],
+        }));
+        expect(r.data).toEqual({ formula: '1d8+3 + 3 [Heavy Weapon Mastery]', total: 14, rolls: [8, 3] });
+        expect(typeof r.data.total).toBe('number');
+      });
+      // NaN-on-string gate: evaluateAutoExpression's documented STRING returns
+      // (automationExpressions :249/:259) must never reach acc.total — pre-fix the
+      // `if (!bonusValue) return` guard passed 'frost_bite' through to '+=' (NaN).
+      it('heavy unresolved eval string → console.error, zero bytes, total unpoisoned (NaN gate)', async () => {
+        const { evaluateAutoExpression } = await import('../../combat/automation/automationService.js');
+        rollExpression.mockReturnValue(null); // raw + eval-string legs BOTH null (lenient fallback mock :63 would fabricate)
+        vi.mocked(evaluateAutoExpression).mockReturnValueOnce('frost_bite');
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const r = await steps[11].handler(makeCtx({
+          isMeleeOrUnarmed: true,
+          attack: { properties: ['Heavy'] },
+          playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', name: 'Frost Bite', damageExpression: 'frost_bite' }] } },
+          formula: '1d8+3', total: 11, rolls: [8, 3],
+        }));
+        expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('did not resolve to a finite number'));
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('zero contribution'));
+      });
+      // Divine Smite opt-in exemption (disk classes.json verbatim bytes): the ONLY
+      // melee_weapon_hit passenger that can never roll — spell_slot_level keeps it
+      // inert QUIET; a blanket loud would scream every paladin melee hit.
+      it('melee Divine Smite spell_slot_level row → inert QUIET: no roll, no bytes, no console.error', async () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const r = await steps[11].handler(makeCtx({
+          isMeleeOrUnarmed: true,
+          attack: { weaponType: 'melee', properties: ['Versatile'] },
+          playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_weapon_hit', name: 'Divine Smite', damageExpression: '2d8 + (spell_slot_level - 1)d8', damageType: 'Radiant' }] } },
+          formula: '1d8+3', total: 11, rolls: [8, 3],
+        }));
+        expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+        expect(errSpy).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
       it('skips melee_heavy when weapon is not Heavy (exact bytes)', async () => {
         const r = await steps[11].handler(makeCtx({
           isMeleeOrUnarmed: true,
@@ -274,17 +332,41 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       });
 
       // Divine fury: level-halved expression resolves, appends, stamps; modal pauses
-      // before any write.
-      it('divine fury while raging: barbarian_level / 2 → +2 [radiant], stamps once', async () => {
+      // before any write. #1241-family re-point to DISK-CANONICAL bytes
+      // ('1d6 + barbarian_level / 2', 2024/classes.json Divine Fury): dice stay dice,
+      // the halving folds to a flat round-down constant — RAW "half your Barbarian
+      // level (round down)" MATCHES the Math.floor recipe (census-honest, unchanged).
+      // Pre-fix this arm baked flat 'barbarian_level / 2' → mock-lenient '+ 2' green;
+      // canonical shape is pinned here, strict-grammar loud arms live in the census lane.
+      it('divine fury while raging: disk-canonical 1d6 + barbarian_level / 2 → dice+flat [radiant], stamps once', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
         const r = await steps[11].handler(makeCtx({
           isMeleeOrUnarmed: true,
-          playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: 'barbarian_level / 2', damageType: 'radiant' }] } },
+          playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', name: 'Divine Fury', damageExpression: '1d6 + barbarian_level / 2', damageType: 'radiant' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
         }));
-        expect(r.data).toEqual({ formula: '1d8+3 + 2 [radiant]', total: 13, rolls: [8, 3, 2] });
+        // host lenient mock :63 fabricates {total:6} for the space-modifier bytes —
+        // exact-append + stamp pinned; deterministic single-die values live in the census lane.
+        expect(r.data.formula).toBe('1d8+3 + 1d6 + 2 [radiant]');
+        expect(r.data.total).toBe(17);
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_divineFuryUsedRound', 1, 'test-campaign');
+      });
+      // #1241-family: no finite level → the halving recipe would bake 'NaN' into the
+      // expression; declined LOUD pre-roll, latch untouched.
+      it('divine fury missing level → console.error pre-roll, zero bytes, latch untouched', async () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
+        const r = await steps[11].handler(makeCtx({
+          isMeleeOrUnarmed: true,
+          playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', name: 'Divine Fury', damageExpression: '1d6 + barbarian_level / 2', damageType: 'radiant' }] } },
+          formula: '1d8+3', total: 11, rolls: [8, 3],
+        }));
+        expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(errSpy).toHaveBeenCalledTimes(1);
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('no finite character level'));
       });
       it('divine fury: latch already used this round → no bonus, no stamp', async () => {
         gvImpl((_, p) => p === '_divineFuryUsedRound' ? 1 : p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
@@ -307,7 +389,9 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       });
       // #1026-fix same-shape arm: roll null (empty acc) ⇒ latch NOT burned. Pre-fix
       // fingerprint was the burned-round pair: byte-identical formula + stamp fired.
-      it('divine fury: roll null → zero rider bytes AND zero stamp (write-only-if-applied)', async () => {
+      // #1241-family sharpen: the null leg is now LOUD (was silent-zero).
+      it('divine fury: roll null → zero rider bytes AND zero stamp (write-only-if-applied), LOUD', async () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
         vi.mocked(rollExpression).mockReturnValueOnce(null);
         const r = await steps[11].handler(makeCtx({
@@ -318,6 +402,9 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(rollExpression).toHaveBeenCalledWith('0');
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(errSpy).toHaveBeenCalledTimes(1);
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('failed to roll expression "0"'));
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('zero contribution, latch untouched'));
       });
       it('divine fury: "radiant or necrotic" opens divineFury modal, pending data, zero writes', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);

@@ -200,4 +200,39 @@ describe('CombatStanceModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('styles via scoped classes, keeping only dynamic selection colors inline (no-inline-styles convention)', () => {
+    const { container } = render(<CombatStanceModal {...makeProps()} />);
+
+    // Static containers/inputs/descriptions: zero inline style attributes — the
+    // rules live in CombatStanceModal.css (exact-value migration, fix#313 recipe).
+    for (const sel of ['.combat-stance-options', '.combat-stance-input', '.combat-stance-desc']) {
+      const els = container.querySelectorAll(sel);
+      expect(els.length).toBeGreaterThan(0);
+      for (const el of els) expect(el.getAttribute('style')).toBeNull();
+    }
+
+    // Option rows: static decoration lives in the class; the inline style attr
+    // carries ONLY the isSelected-derived background/border (dynamic exception).
+    const rows = container.querySelectorAll('.combat-stance-option');
+    expect(rows).toHaveLength(RAGE_OPTIONS.length);
+    for (const row of rows) {
+      const inline = row.getAttribute('style') || '';
+      expect(inline).toMatch(/background/i);
+      expect(inline).toMatch(/border/i);
+      expect(inline).not.toMatch(/display|padding|margin|cursor|border-radius|opacity/i);
+    }
+
+    // Census sweep: the ONLY inline-styled elements in the body are the dynamic
+    // option labels — every former static site is now style-free.
+    expect(container.querySelectorAll('.sp-body [style]')).toHaveLength(RAGE_OPTIONS.length);
+
+    // Selecting a stance flips only its dynamic inline values (link-colored
+    // border on the chosen row; every other row stays transparent).
+    fireEvent.click(screen.getByText('Bear'));
+    const selectedStyle = screen.getByText('Bear').closest('.combat-stance-option').getAttribute('style') || '';
+    expect(selectedStyle).toMatch(/var\(--color-link\)/);
+    const unselectedStyle = screen.getByText('Wolf').closest('.combat-stance-option').getAttribute('style') || '';
+    expect(unselectedStyle).toMatch(/transparent/);
+  });
 });

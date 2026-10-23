@@ -109,6 +109,18 @@ describe('MoonlightStepResourceModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('clamps a stale over-max runtime uses count at display (stored 5 > max 2 renders 2/2, never 5/2)', () => {
+    // writers census: no writer exceeds max at write time, but max is dynamic
+    // (wisGatedPool over WIS) — a WIS drop can leave stored > max transiently.
+    // display must never render the nonsense uses>max shape (:28-31-era defect).
+    useRuntimeState.getRuntimeValue.mockImplementation((charKey, prop) =>
+      prop === 'moonlightStepUses' ? '5' : null
+    );
+    render(<MoonlightStepResourceModal {...makeProps()} />);
+    expect(screen.getByText(/Current uses: 2\/2/)).toBeInTheDocument();
+    expect(screen.queryByText(/Current uses: 5\/2/)).not.toBeInTheDocument();
+  });
+
   it('converting spends the level 2 slot, restores one use from runtime state, logs, and closes', () => {
     const onClose = vi.fn();
     // Runtime shows 1/2 uses consumed; converting restores it to the max of 2.

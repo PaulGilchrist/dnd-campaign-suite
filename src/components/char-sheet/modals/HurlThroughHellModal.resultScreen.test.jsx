@@ -9,10 +9,13 @@
  *   popup detail, addExpiration payload).
  * - -branches.test.jsx — branch/fallback matrix, byte-exact ledgers, promptId guard,
  *   listener lifecycle, null interim stage.
- * This lane owns ONLY the user-facing result screen: exact copy for both save arms and
- * the Done-button contract. The previous single test here asserted the INFO-screen pact
- * note (/level 4/) — misnamed and already covered by base (:117-126) and the branch
- * pact arms; trimmed. Microtask flushes only (no bare setTimeout); per-test onClose.
+ * This lane owns ONLY the user-facing result screen: exact copy for both save arms plus
+ * the fiend-target fail interpolation (jsx :274-278 keys off saveSuccess alone — the
+ * fiend-ness lives in the ledgers, not this screen) and the Done-button contract — the
+ * copy closer + Done-click trimmed out of -branches.test.jsx's save-arm ledger it.each
+ * (rec). The previous single test here asserted the INFO-screen pact note (/level 4/) —
+ * misnamed and already covered by base (:98-150) and the branch pact arms; trimmed.
+ * Microtask flushes only (no bare setTimeout); per-test onClose.
  */
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -93,18 +96,29 @@ describe('HurlThroughHellModal — result screen', () => {
   it.each([
     {
       arm: 'failed save',
+      props: {},
       detail: { roll: 8, total: 10, success: false },
       copy: 'Goblin1 failed WIS save — hurled through the lower planes.',
       notCopy: 'Goblin1 succeeded on WIS save — resists the effect and is not hurled through the lower planes.',
     },
     {
       arm: 'succeeded save',
+      props: {},
       detail: { roll: 15, total: 17, success: true },
       copy: 'Goblin1 succeeded on WIS save — resists the effect and is not hurled through the lower planes.',
       notCopy: 'Goblin1 failed WIS save — hurled through the lower planes.',
     },
-  ])('$arm: exact result copy, Done-only actions, Done closes once', async ({ detail, copy, notCopy }) => {
-    const props = makeProps();
+    {
+      // Home for the fiend-arm copy byte retired from -branches ledger test (:549):
+      // same fail copy, fiend target name interpolated — no fiend variant exists here.
+      arm: 'failed save (fiend target)',
+      props: { targetName: 'Orc Warrior' },
+      detail: { roll: 8, total: 10, success: false },
+      copy: 'Orc Warrior failed WIS save — hurled through the lower planes.',
+      notCopy: 'Orc Warrior succeeded on WIS save — resists the effect and is not hurled through the lower planes.',
+    },
+  ])('$arm: exact result copy, Done-only actions, Done closes once', async ({ props: overrides, detail, copy, notCopy }) => {
+    const props = makeProps(overrides);
     await resolveSave(props, detail);
 
     expect(screen.getByText(copy)).toBeInTheDocument();

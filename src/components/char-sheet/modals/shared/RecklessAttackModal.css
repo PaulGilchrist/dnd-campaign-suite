@@ -1,0 +1,70 @@
+/* RecklessAttackModal — scoped styles for RecklessAttackModal.jsx.
+   Static declarations migrated verbatim from former inline styles (exact values);
+   dynamic selection-state values (background/border on option and toggle labels) stay
+   inline in JSX per the dynamic-data exception (fix#313 precedent). Family tokens
+   sp-* are reused from ../../common/SavePromptModal.css and ../CharSheet.css — not
+   duplicated here. Cascade note: .sp-body p { margin: 8px 0 } (specificity 0-1-1)
+   beats these single-class p rules, but every migrated margin is exactly 8px, so
+   computed values are identical before and after the migration. */
+
+/* Effect options picker block — was style={{ marginTop: '8px', marginLeft: '16px' }} */
+.brutal-strike-picker {
+  margin-top: 8px;
+  margin-left: 16px;
+}
+
+/* Choose-one/up-to prompt line — was style={{ opacity: 0.7, fontSize: '0.85em', marginBottom: '8px' }} */
+.brutal-strike-hint {
+  opacity: 0.7;
+  font-size: 0.85em;
+  margin-bottom: 8px;
+}
+
+/* Effect option row — static part of the former inline label styles.
+   Selected-state background/border stay inline in JSX (dynamic-data exception). */
+.brutal-strike-option {
+  display: block;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Radio/checkbox input offset — was style={{ marginRight: '8px' }} on picker and toggle inputs */
+.brutal-strike-input {
+  margin-right: 8px;
+}
+
+/* Effect description text — was style={{ opacity: 0.8, marginLeft: '8px' }} */
+.brutal-strike-desc {
+  opacity: 0.8;
+  margin-left: 8px;
+}
+
+/* Selected-count line — was style={{ opacity: 0.7, fontSize: '0.85em', marginTop: '8px' }} */
+.brutal-strike-count {
+  opacity: 0.7;
+  font-size: 0.85em;
+  margin-top: 8px;
+}
+
+/* Use-Brutal-Strike toggle block — was style={{ marginTop: '12px', textAlign: 'left' }} */
+.brutal-strike-toggle {
+  margin-top: 12px;
+  text-align: left;
+}
+
+/* Toggle label row — static part of the former inline label styles.
+   Active-state background/border stay inline in JSX (dynamic-data exception). */
+.brutal-strike-toggle-label {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* brutalOnly mode explanatory note — was style={{ opacity: 0.8, fontSize: '0.9em' }} */
+.brutal-strike-note {
+  opacity: 0.8;
+  font-size: 0.9em;
+}

@@ -11,6 +11,7 @@ import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { ResultsSummaryModal, TargetListRenderer } from './AOEConditionModal.subcomponents.jsx';
+import './AOEConditionModal.css';
 
 const TRAP_BLOCKING_EFFECTS = ['forcecage', 'maze', 'banishment', 'imprisonment'];
 
@@ -282,6 +283,34 @@ async function handleSaveResultCore({ event, pendingPrompts, campaignName, caste
 }
 
 
+// Shared core for the two ability_use lanes (fix#227 clone-debt (b), step 2 of 2 —
+// consolidate AFTER drift-fix, per fix#269 degenerate-fold lesson inverted): the
+// selection-lane handleCreatureSelectionConfirm (:481-era) and overlay-lane
+// handleApplyOverride (:557-era) were ~90pct clones whose only real divergence was
+// the D4-await drift, already adjudicated and repaired in the override lane (see
+// comment there). Genuine ~10pct differences are parameterized, not collapsed
+// (fix#246 honest-split), mirroring the handleSaveResultCore two-homes idiom above:
+//   - setter homes differ: local useState on the selection lane vs base ctx on the
+//     overlay lane (base forwards ctx and ignores the handler's return,
+//     AreaEffectTargetModalBase.jsx:153);
+//   - only the selection lane gates ResultsSummaryModal via onAllSelectedResolved;
+//     the base renders resolution itself.
+async function abilityUseCore({ campaignName, casterName, abilityName, saveDc, saveType, selectedNames, resolveAllSaves, setResults, setPendingPrompts, onAllSelectedResolved }) {
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName,
+        description: `${abilityName}: Selecting ${selectedNames.length} target(s) for save (DC ${saveDc} ${saveType})`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[AOEConditionModal] Error logging feature use:', e); });
+
+    const { results: newResults, prompts } = await resolveAllSaves(selectedNames);
+    setResults(newResults);
+    setPendingPrompts(prompts);
+    if (onAllSelectedResolved) onAllSelectedResolved();
+}
+
+
 function AOEConditionModal({
     action,
     playerStats,
@@ -302,6 +331,11 @@ function AOEConditionModal({
     const [pendingPrompts, setPendingPrompts] = useState([]);
     const [showResults, setShowResults] = useState(false);
 
+    // fix#227 clone-debt (a): was TWO byte-identical unmount-reset useEffects (same
+    // empty-deps cleanup, so safe-merge not sequencing) plus a no-op shell between them
+    // whose if-branch body held only a comment — no state, no render, no subscription.
+    // One honest effect remains; fix#229's dead-cleanup-noop lane owns whether even
+    // this survivor is load-bearing.
     useEffect(() => {
         return () => {
             setResults([]);
@@ -309,25 +343,11 @@ function AOEConditionModal({
             setShowResults(false);
         };
     }, []);
-
-    useEffect(() => {
-        if (resultsState.length > 0 && pendingPrompts.length === 0) {
-            // Results are complete and ready for display
-        }
-    }, [resultsState, pendingPrompts]);
     const [heightenTarget, setHeightenTarget] = useState(null);
 
     const isCarefulSpell = metamagicCareful || false;
     const allyList = isCarefulSpell ? getAllyList(playerStats.name) : null;
     const isCarefulAlly = useCallback((name) => allyList ? allyList.includes(name) : false, [allyList]);
-
-    useEffect(() => {
-        return () => {
-            setResults([]);
-            setPendingPrompts([]);
-            setShowResults(false);
-        };
-    }, []);
 
     const applyConditionsToTarget = useCallback((targetName, conditionList, campaignName) => {
         const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
@@ -478,20 +498,21 @@ function AOEConditionModal({
         }));
     };
 
-    const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
-            abilityName: action.name,
-            description: `${action.name}: Selecting ${selectedNames.length} target(s) for save (DC ${saveDc} ${saveType})`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[AOEConditionModal] Error logging feature use:', e); });
-
-        const { results: newResults, prompts } = await resolveAllSaves(selectedNames);
-        setResults(newResults);
-        setPendingPrompts(prompts);
-        setShowResults(true);
-    }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSaves]);
+    // Selection lane wrapper: local useState setters + ResultsSummaryModal gate
+    // (showResults is already set by confirm; the gate here mirrors the ordering of
+    // the pre-consolidation handler exactly — results, prompts, then gate).
+    const handleCreatureSelectionConfirm = useCallback((selectedNames) => abilityUseCore({
+        campaignName,
+        casterName: playerStats.name,
+        abilityName: action.name,
+        saveDc,
+        saveType,
+        selectedNames,
+        resolveAllSaves,
+        setResults,
+        setPendingPrompts,
+        onAllSelectedResolved: () => setShowResults(true),
+    }), [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSaves]);
 
     const handleCreatureSelectionSkip = useCallback(() => {
         onClose();
@@ -531,7 +552,7 @@ function AOEConditionModal({
                         ))}
                     </div>
                     {ctx.allResolved && (
-                        <p className="sp-note" style={{ marginTop: '8px' }}>All targets resolved.</p>
+                        <p className="sp-note aoe-condition-resolved-note">All targets resolved.</p>
                     )}
                 </>
             );
@@ -554,21 +575,26 @@ function AOEConditionModal({
         return null;
     };
 
+    // Overlay lane wrapper (fix#227 clone-debt (b)): reads/writes the BASE ctx
+    // setters and passes no gate — the base renders resolution itself (two-homes note
+    // at handleSaveResultCore). The awaits the pre-consolidation lane silently dropped
+    // live in the shared core now, so both lanes log ability_use BEFORE resolveAllSaves'
+    // per-target save_result/condition writes. Base ignores the returned promise
+    // (AreaEffectTargetModalBase.jsx:153 discards the returned promise), so the
+    // async shape is contract-safe.
     const handleApplyOverride = useCallback((ctx) => {
         if (ctx.selected.size === 0) return;
         ctx.setProcessing(true);
-
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerStats.name,
+        return abilityUseCore({
+            campaignName,
+            casterName: playerStats.name,
             abilityName: action.name,
-            description: `${action.name}: Selecting ${ctx.selected.size} target(s) for save (DC ${saveDc} ${saveType})`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error('[AOEConditionModal] Error logging feature use:', e); });
-
-        resolveAllSaves(Array.from(ctx.selected)).then(({ results: newResults, prompts }) => {
-            ctx.setResults(newResults);
-            ctx.setPendingPrompts(prompts);
+            saveDc,
+            saveType,
+            selectedNames: Array.from(ctx.selected),
+            resolveAllSaves,
+            setResults: ctx.setResults,
+            setPendingPrompts: ctx.setPendingPrompts,
         });
     }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSaves]);
 
@@ -615,6 +641,7 @@ function AOEConditionModal({
 
     return (
         <>
+            {/* display is dynamic (derived from showResults state) — dynamic-data exception, stays inline */}
             <div style={{ display: showResults ? 'none' : undefined }}>
                 <CreatureSelectionModal
                     title={action.name}

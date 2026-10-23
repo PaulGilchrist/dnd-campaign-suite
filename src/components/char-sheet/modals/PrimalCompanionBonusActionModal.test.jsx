@@ -132,6 +132,44 @@ describe('PrimalCompanionBonusActionModal', () => {
     );
   });
 
+  it('styles via scoped classes, keeping only dynamic selection colors inline (no-inline-styles convention)', () => {
+    const { container } = render(<PrimalCompanionBonusActionModal {...withAutomation({ forceDamageOption: true })} />);
+
+    // Static containers/rows/labels: zero inline style attributes — the rules
+    // live in PrimalCompanionBonusActionModal.css (exact-value migration).
+    for (const sel of ['.primal-companion-bonus-commands', '.primal-companion-bonus-desc',
+      '.primal-companion-bonus-force', '.primal-companion-bonus-force-label',
+      '.primal-companion-bonus-input']) {
+      const els = container.querySelectorAll(sel);
+      expect(els.length).toBeGreaterThan(0);
+      for (const el of els) expect(el.getAttribute('style')).toBeNull();
+    }
+
+    // Option rows: static decoration lives in the class; the inline style attr
+    // carries ONLY the isSelected-derived background/border (dynamic exception).
+    const rows = container.querySelectorAll('.primal-companion-bonus-option');
+    expect(rows).toHaveLength(4);
+    for (const row of rows) {
+      const inline = row.getAttribute('style') || '';
+      expect(inline).toMatch(/background/i);
+      expect(inline).toMatch(/border/i);
+      expect(inline).not.toMatch(/display|padding|margin|cursor|border-radius|opacity/i);
+    }
+
+    // Census sweep: the ONLY inline-styled elements in the body are the four
+    // dynamic option labels — every former static site is now style-free.
+    const styledInBody = container.querySelectorAll('.sp-body [style]');
+    expect(styledInBody).toHaveLength(4);
+
+    // Selecting a command flips only its dynamic inline values (link-colored
+    // border on the chosen row; every other row stays transparent).
+    fireEvent.click(screen.getByText('Dash'));
+    const selectedStyle = screen.getByText('Dash').closest('.primal-companion-bonus-option').getAttribute('style') || '';
+    expect(selectedStyle).toMatch(/var\(--color-link\)/);
+    const unselectedStyle = screen.getByText('Help').closest('.primal-companion-bonus-option').getAttribute('style') || '';
+    expect(unselectedStyle).toMatch(/transparent/);
+  });
+
   it('shows the result screen with the HTML description after applying and closes on Done', async () => {
     const onClose = vi.fn();
     render(<PrimalCompanionBonusActionModal {...makeProps({ onClose })} />);

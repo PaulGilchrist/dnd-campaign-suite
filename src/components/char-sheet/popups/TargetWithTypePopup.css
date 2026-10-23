@@ -1,0 +1,25 @@
+/* TargetWithTypePopup — scoped styles for TargetWithTypePopup.jsx.
+   Static declarations migrated verbatim from former inline styles (exact values);
+   family tokens .metamagic-twin-target / .metamagic-twin-target label are reused
+   from MetamagicPopup.css, loaded via TargetPopupBase — not duplicated here. */
+
+/* Second section spacing — was style={{ marginTop: '16px' }} on the Damage Type block */
+.target-with-type-section-spaced {
+  margin-top: 16px;
+}
+
+/* Scrollable option list — was style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }} */
+.target-with-type-list {
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Clickable option row — static part of the former inline row styles.
+   Selected-state backgroundColor/border stay inline in JSX (dynamic-data exception). */
+.target-with-type-option {
+  padding: 6px 10px;
+  margin: 4px 0;
+  cursor: pointer;
+  border-radius: 4px;
+}

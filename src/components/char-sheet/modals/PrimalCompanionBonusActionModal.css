@@ -1,0 +1,44 @@
+/* PrimalCompanionBonusActionModal — scoped styles for PrimalCompanionBonusActionModal.jsx.
+   Static declarations migrated verbatim from former inline styles (exact values);
+   dynamic selection-state values (background/border on option labels) stay inline in
+   JSX per the dynamic-data exception (fix#313 precedent). Family tokens sp-* are
+   reused from ../../common/SavePromptModal.css and ../CharSheet.css — not duplicated here. */
+
+/* Command list container — was style={{ textAlign: 'left', marginTop: '12px' }} */
+.primal-companion-bonus-commands {
+  text-align: left;
+  margin-top: 12px;
+}
+
+/* Radio option row — static part of the former inline label styles.
+   Selected-state background/border stay inline in JSX (dynamic-data exception). */
+.primal-companion-bonus-option {
+  display: block;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Shared input offset — was style={{ marginRight: '8px' }} on radio and checkbox */
+.primal-companion-bonus-input {
+  margin-right: 8px;
+}
+
+/* Option description text — was style={{ opacity: 0.8, marginLeft: '8px' }} */
+.primal-companion-bonus-desc {
+  opacity: 0.8;
+  margin-left: 8px;
+}
+
+/* Force-damage option block — was style={{ marginTop: '16px' }} */
+.primal-companion-bonus-force {
+  margin-top: 16px;
+}
+
+/* Force-damage label row — was style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} */
+.primal-companion-bonus-force-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}

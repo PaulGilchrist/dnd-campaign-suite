@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { applyStanceOption } from '../../../../services/automation/handlers/combat/combatStanceHandler.js';
 import '../../CharSheet.css';
+import './CombatStanceModal.css';
 
 const STANCE_EFFECTS = {
     Bear: 'Resistance to all damage except Force, Necrotic, Psychic, Radiant',
@@ -67,21 +68,29 @@ function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
                 <div className="sp-body">
                     {error && <p>{error}</p>}
                     <p>Choose {action.name === 'Rage' ? 'a primal aspect of your Rage' : 'an elemental movement type'}:</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                    <div className="combat-stance-options">
                         {options.map((opt, i) => {
                             const effects = stanceEffects(opt);
                             const isSelected = selected === opt.name;
                             return (
-                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                                <label
+                                    key={i}
+                                    className="combat-stance-option"
+                                    /* background/border are dynamic (derived from isSelected state) — dynamic-data exception, stays inline */
+                                    style={{
+                                        background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent',
+                                        border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
+                                    }}
+                                >
                                     <input
                                         type="radio"
                                         name="stanceOption"
                                         checked={isSelected}
                                         onChange={() => setSelected(opt.name)}
-                                        style={{ marginRight: '8px' }}
+                                        className="combat-stance-input"
                                     />
                                     <strong>{opt.name}</strong>
-                                    {effects.length > 0 && <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {effects.join(', ')}</span>}
+                                    {effects.length > 0 && <span className="combat-stance-desc">— {effects.join(', ')}</span>}
                                 </label>
                             );
                         })}

@@ -45,7 +45,9 @@
 // (getRuntimeValue+setRuntimeValue — set needed by REAL materialComponents),
 // logService.addEntry, dataLoader.loadSpells (#1466 disk threshold read — stubbed
 // disk-faithfully with the real Globe row bytes), forcecage/maze/banishment/
-// imprisonment handlers, dynamic ./spellResolution.js getActiveBuffs. REAL always:
+// imprisonment handlers, buffService.js canonical getActiveBuffs (fix#301: static
+// import — ./spellResolution.js barrel retired with this last consumer, fix#82).
+// REAL always:
 // blockChecks.js itself and
 // ../../materialComponents.js (spellHasCostlyOrConsumedMaterial is pure
 // regex+registry; its fetch on :117 sits in consumeMaterial — never traversed
@@ -145,14 +147,14 @@ vi.mock('../../../../automation/handlers/spells/imprisonmentHandler.js', () => (
   isImprisonmentBlocked: vi.fn(() => false),
 }));
 
-vi.mock('./spellResolution.js', () => ({
+vi.mock('../../../../combat/buffs/buffService.js', () => ({
   getActiveBuffs: vi.fn(() => []),
 }));
 
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../../ui/logService.js');
 const { loadSpells } = await import('../../../../ui/dataLoader.js');
-const { getActiveBuffs } = await import('./spellResolution.js');
+const { getActiveBuffs } = await import('../../../../combat/buffs/buffService.js');
 const { isForcecageBlocked } = await import('../../../../automation/handlers/spells/forcecageHandler.js');
 const { isMazeBlocked } = await import('../../../../automation/handlers/spells/mazeHandler.js');
 const { isBanishmentBlocked } = await import('../../../../automation/handlers/spells/banishmentHandler.js');

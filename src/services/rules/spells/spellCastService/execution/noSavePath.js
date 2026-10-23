@@ -10,7 +10,7 @@ function innateSorceryRollContext(playerStats, metaCtx, campaignName) {
 }
 
 function resolveNoSaveFormulas(spell, metaCtx, playerStats) {
-    const overchannelFormula = metaCtx?.overchannelFormula || spell.damage?.formula || resolveSpellDamageAtLevel(spell, playerStats.level) || '';
+    const overchannelFormula = metaCtx?.overchannelFormula || resolveSpellDamageAtLevel(spell, playerStats.level) || ''; // fix#303 (#1488): disk-dead spell.damage.formula arm DELETED — four-leg QED census in noSavePath.test.js header
     return {
         overchannelFormula,
         overchannelActive: metaCtx?.overchannelActive || false,

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { applyBonusActionCommand } from '../../../services/automation/handlers/class-ranger/primalCompanionHandler.js';
 import '../CharSheet.css';
+import './PrimalCompanionBonusActionModal.css';
 
 const BONUS_ACTION_COMMANDS = [
     { name: 'Dash', description: 'Double movement speed this turn' },
@@ -49,32 +50,40 @@ function PrimalCompanionBonusActionModal({ action, playerStats, campaignName, co
                 </div>
                 <div className="sp-body">
                     <p>Command your <b>{companionType}</b> to take a Bonus Action:</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                    <div className="primal-companion-bonus-commands">
                         {BONUS_ACTION_COMMANDS.map((cmd, i) => {
                             const isSelected = selected === cmd.name;
                             return (
-                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                                <label
+                                    key={i}
+                                    className="primal-companion-bonus-option"
+                                    /* background/border are dynamic (derived from isSelected state) — dynamic-data exception, stays inline */
+                                    style={{
+                                        background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent',
+                                        border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
+                                    }}
+                                >
                                     <input
                                         type="radio"
                                         name="primalCompanionBonusAction"
                                         checked={isSelected}
                                         onChange={() => setSelected(cmd.name)}
-                                        style={{ marginRight: '8px' }}
+                                        className="primal-companion-bonus-input"
                                     />
                                     <strong>{cmd.name}</strong>
-                                    <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {cmd.description}</span>
+                                    <span className="primal-companion-bonus-desc">— {cmd.description}</span>
                                 </label>
                             );
                         })}
                     </div>
                     {canUseForceDamage && (
-                        <div style={{ marginTop: '16px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                        <div className="primal-companion-bonus-force">
+                            <label className="primal-companion-bonus-force-label">
                                 <input
                                     type="checkbox"
                                     checked={useForceDamage}
                                     onChange={() => setUseForceDamage(!useForceDamage)}
-                                    style={{ marginRight: '8px' }}
+                                    className="primal-companion-bonus-input"
                                 />
                                 <span>Deal Force damage instead of normal damage type</span>
                             </label>

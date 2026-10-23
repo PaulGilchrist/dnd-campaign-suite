@@ -11,6 +11,8 @@
 // fingerprint dropped: the disk row now carries the pool + save_effect).
 // saveProcessing.ma1639-vampire-bite-recover.test.js harness twin.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import monsters from '../../../public/data/monsters.json';
+import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 
 const campaignName = 'test-campaign';
 const VAMPIRE = 'Vampire Umbral Lord 1';
@@ -85,18 +87,30 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 
 import { processSaveRoll } from './saveProcessing.js';
 
-// Block-save context exactly as buildAbilitySaveRollContext stamps it from
-// the fixed row (chip formula 4d6 via damage_dice_primary, dc_success:"none"
-// authored — no half-default leak).
+// Block-save context. fix#279(b) hand-mirror→disk conversion, ZERO-DRIFT
+// confirm: byte-diff of the hand mirror vs the monsters.json BY-name row
+// (Vampire Umbral Lord → Hunger of Hadar) found NO drift — every field
+// already matched disk (save_dc 18, save_type full word "Dexterity", authored
+// dc_success:"none" — no half-default leak, damage_dice_primary '4d6' Acid,
+// save_effect arms exactly ['blinded']). The conversion is therefore inert-safe
+// by the consumer input-set fix#280 used: saveProcessing reads saveDc (the
+// comparator), saveType (log stamps + normalizeSaveType evasion comparisons —
+// no evasion/te fixtures here), dcSuccess, autoDamageFormula/DamageType and
+// saveConditions (:1240/:1652 fail-face grant — ['blinded'] live-proven below),
+// so re-sourcing identical bytes changes no outcome. Keyed as production
+// stamps them: buildAbilitySaveRollContext saveDc :1818, saveType :1819,
+// autoDamage fields :1827, saveConditions :1829 extractConditionsFromSaveEffect.
+// TARGET cs state + attacker instance name are runtime scenario fixtures.
+const HADAR = monsters.find((m) => m.name === 'Vampire Umbral Lord').actions.find((a) => a.name === 'Hunger of Hadar');
 const hungerContext = () => ({
-    saveDc: 18,
-    saveType: 'Dexterity',
+    saveDc: HADAR.save_dc,
+    saveType: HADAR.save_type,
     attackerName: VAMPIRE,
-    actionName: 'Hunger of Hadar',
-    dcSuccess: 'none',
-    autoDamageFormula: '4d6',
-    autoDamageDamageType: 'Acid',
-    saveConditions: ['blinded'],
+    actionName: HADAR.name,
+    dcSuccess: HADAR.dc_success,
+    autoDamageFormula: HADAR.damage_dice_primary,
+    autoDamageDamageType: HADAR.damage_type_primary,
+    saveConditions: extractConditionsFromSaveEffect(HADAR.save_effect),
     _characters: [{ name: TARGET, computedStats: { armorClass: 12 } }],
     _target: { name: TARGET, type: 'npc' },
 });

@@ -182,4 +182,17 @@ describe('AOEConditionModal', () => {
 
         expect(props.onClose).toHaveBeenCalledTimes(1);
     });
+
+    // no-inline-styles convention pin (fix#313 recipe): statics live in
+    // AOEConditionModal.css / reused sp-* family tokens; the ONLY lawful inline
+    // style left in this file's render is the dynamic showResults visibility.
+    it('selection wrapper carries only the dynamic display inline — no static inline styles', () => {
+        render(<AOEConditionModal {...makeProps()} />);
+
+        const wrapper = document.querySelector('.sp-overlay').parentElement;
+        const inline = wrapper.getAttribute('style') || '';
+        // At selection time showResults=false → display is undefined → attr empty.
+        expect(inline).toMatch(/^$|^display:\s*none;?$/);
+        expect(inline).not.toMatch(/margin|padding|background|color|font|cursor|border|opacity/i);
+    });
 });

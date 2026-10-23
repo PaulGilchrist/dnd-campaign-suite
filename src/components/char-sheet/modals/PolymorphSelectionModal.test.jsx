@@ -4,16 +4,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import PolymorphSelectionModal, { filterBeastSpeeds } from './PolymorphSelectionModal.jsx';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
+import {
+    WOLF, CROCODILE, EAGLE, RAT, GIANT_SPIDER, GHAST,
+    diskMonster, assertDiskRows, SHARED_MONSTER_PINS,
+    WALK_ONLY, WALK_OR_SWIM, WALK_SWIM_FLY,
+    findBeastItem, speedTextOf,
+} from './PolymorphSelectionModal.test-utils.js';
 
 // Core lane: loading, list filtering/sorting, search, selection, confirm/cancel,
 // CLA-391 load-effect dep stability, and the filterBeastSpeeds limitation contract.
 // Customization props (title/actionLabel), allowAnyCreature / object_into_creature
 // modes and CR display live in PolymorphSelectionModal.features.test.jsx.
 //
-// Fixtures are derived from REAL disk rows (public/data/monsters.json and the
-// druid rows of public/data/classes.json) with drift-throws — the previous
-// hand-copied mockMonsters had drifted speeds (numbers instead of the disk's
-// "40 ft." strings) per the bug ledger. classFeatures is NOT mocked here:
+// Fixtures are shared with the features lane via PolymorphSelectionModal.test-utils.js
+// (extraction per ledger pass #150 rec: mockMonsters copy-pasted and drifted):
+// REAL disk rows (public/data/monsters.json and the druid rows of
+// public/data/classes.json) with drift-throws — the previous hand-copied
+// mockMonsters had drifted speeds (numbers instead of the disk's "40 ft."
+// strings) per the bug ledger. Lane-distinctive rows (Panther/Brown Bear/
+// Badger) and their pins stay local below. classFeatures is NOT mocked here:
 // real getClassFeatures on disk-derived druid levels yields the authoritative
 // limitation strings (classRules.js:124-128; same vocabulary in
 // classRules2024.js:293). The strings are prose where the clause before "only"
@@ -21,44 +30,19 @@ import { getClassFeatures } from '../../../services/character/classFeatures.js';
 // 'walk only (no swim or fly)' must NOT surface swim/climb/burrow
 // (the old limitations.includes('fly'/'swim') gate did, pass #150).
 
-const diskMonsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-
-function diskMonster(name) {
-    const found = diskMonsters.find(m => m.name.toLowerCase() === name.toLowerCase());
-    if (!found) throw new Error(`Fixture drift: '${name}' no longer exists in public/data/monsters.json`);
-    return found;
-}
-
-const WOLF = diskMonster('Wolf');
+// Lane-distinctive disk rows (the shared six come from test-utils).
 const PANTHER = diskMonster('Panther');
-const CROCODILE = diskMonster('Crocodile');
-const EAGLE = diskMonster('Eagle');
-const RAT = diskMonster('Rat');
-const GIANT_SPIDER = diskMonster('Giant Spider');
 const BROWN_BEAR = diskMonster('Brown Bear');
 const BADGER = diskMonster('Badger');
-const GHAST = diskMonster('Ghast');
 
-// Drift-throw: pin the exact disk bytes the assertions below depend on.
-const EXPECTED_DISK_SPEEDS = {
-    wolf: { speed: { walk: '40 ft.' }, challenge_rating: '0.25', type: 'Beast' },
+// Drift-throw: pin the exact disk bytes the assertions below depend on —
+// shared rows via SHARED_MONSTER_PINS, lane-distinctive rows here.
+assertDiskRows(SHARED_MONSTER_PINS);
+assertDiskRows({
     panther: { speed: { walk: '50 ft.', fly: '', swim: '', climb: '40 ft.', burrow: '', other: [] }, challenge_rating: '0.25', type: 'Beast' },
-    crocodile: { speed: { walk: '20 ft.', swim: '30 ft.' }, challenge_rating: '0.5', type: 'Beast' },
-    eagle: { speed: { walk: '10 ft.', fly: '60 ft.' }, challenge_rating: '0', type: 'beast' },
-    rat: { speed: { walk: '20 ft.', fly: '', swim: '', climb: '20 ft.', burrow: '', other: [] }, challenge_rating: '0', type: 'Beast' },
-    'giant spider': { speed: { walk: '30 ft.', climb: '30 ft.' }, challenge_rating: '1', type: 'Beast' },
     'brown bear': { speed: { walk: '40 ft.', climb: '30 ft.' }, challenge_rating: '1', type: 'Beast' },
     badger: { speed: { walk: '20 ft.', burrow: '5 ft.' }, challenge_rating: '0', type: 'Beast' },
-    ghast: { speed: { walk: '30 ft.' }, challenge_rating: '2', type: 'Undead' },
-};
-for (const [name, expected] of Object.entries(EXPECTED_DISK_SPEEDS)) {
-    const m = diskMonster(name);
-    if (JSON.stringify(m.speed) !== JSON.stringify(expected.speed)
-        || String(m.challenge_rating) !== expected.challenge_rating
-        || m.type !== expected.type) {
-        throw new Error(`Fixture drift: '${name}' disk row changed - ${JSON.stringify(m)} (expected speed ${JSON.stringify(expected.speed)}, cr ${expected.challenge_rating}, type ${expected.type})`);
-    }
-}
+});
 
 const mockMonsters = [WOLF, PANTHER, CROCODILE, EAGLE, RAT, GIANT_SPIDER, BROWN_BEAR, BADGER, GHAST];
 
@@ -76,13 +60,12 @@ function diskLimitationsAt(level) {
     return getClassFeatures({ rules: '5e', level, class: { name: 'Druid', class_levels: diskDruid.class_levels } })?.wildShapeLimitations;
 }
 
-const WALK_ONLY = diskLimitationsAt(2);
-const WALK_OR_SWIM = diskLimitationsAt(4);
-const WALK_SWIM_FLY = diskLimitationsAt(8);
+// Drift-throw pinning of the imported limitation vocabulary: the real engine
+// must still emit exactly the shared literals at these druid levels.
 for (const [actual, expected] of [
-    [WALK_ONLY, 'walk only (no swim or fly)'],
-    [WALK_OR_SWIM, 'walk or swim only (no fly)'],
-    [WALK_SWIM_FLY, 'walk, swim, or fly'],
+    [diskLimitationsAt(2), WALK_ONLY],
+    [diskLimitationsAt(4), WALK_OR_SWIM],
+    [diskLimitationsAt(8), WALK_SWIM_FLY],
 ]) {
     if (actual !== expected) {
         throw new Error(`Limitation contract drift: expected '${expected}' from disk druid levels, got '${actual}' - re-verify classRules.js getDruidFeatures prose against the filterBeastSpeeds parser`);
@@ -120,17 +103,7 @@ function getBeastNames() {
     return getBeastItems().map(beastNameOf);
 }
 
-function findBeastItem(beastName) {
-    return getBeastItems().find(item =>
-        item.querySelector('.wild-shape-beast-name').textContent.includes(beastName)) || null;
-}
-
-function speedTextOf(beastName) {
-    const item = findBeastItem(beastName);
-    if (!item) throw new Error(`Beast row missing: ${beastName}`);
-    const spans = item.querySelectorAll('.wild-shape-beast-stats span');
-    return spans[spans.length - 1].textContent;
-}
+// findBeastItem/speedTextOf come from test-utils (shared with features lane).
 
 function getSelectedItemNames() {
     return Array.from(document.querySelectorAll('.wild-shape-beast-item.selected')).map(beastNameOf);

@@ -71,7 +71,7 @@
 /*                                                                    */
 /*  MOCK ROSTER (#1440 line-by-line vs REAL index.js import list +   */
 /*  graph-transitive of loaded REAL files helpers/modalSpells/         */
-/*  triggerSpells/blockChecks/spellResolution): every *Service mock    */
+/*  triggerSpells/blockChecks (buffService direct, fix#301): every       */
 /*  has a live consumer. DEAD-MODULE MOCKS REMOVED (#1484-97 hunt):   */
 /*  fearService, foresightService, heroismService, sleepService —      */
 /*  handleFear/handleSleep (modalSpells :122/:184) and handleHeroism   */

@@ -24,31 +24,14 @@ let queue = [];
 let queueIndex = 0;
 let pendingTrackIds = null;
 let pendingVolumePct = null;
-let isPlaying = false;
 let intentStopped = true; // true until playTracks/play is invoked
-
-const listeners = new Set();
-
-function notify() {
-  for (const fn of listeners) fn({ playing: isPlaying });
-}
-
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
 
 function handleStateChange(event) {
   const state = event.data;
   if (!window.YT) return;
-  const { PLAYING, PAUSED, ENDED } = window.YT.PlayerState;
+  const { PLAYING, ENDED } = window.YT.PlayerState;
   if (state === PLAYING) {
-    isPlaying = true;
     intentStopped = false;
-    notify();
-  } else if (state === PAUSED) {
-    isPlaying = false;
-    notify();
   } else if (state === ENDED && !intentStopped) {
     advanceQueue();
   }
@@ -162,9 +145,7 @@ export function stop() {
   queue = [];
   queueIndex = 0;
   pendingTrackIds = null;
-  isPlaying = false;
   if (player && ready) player.stopVideo();
-  notify();
 }
 
 export function setVolume(volume) {
@@ -176,16 +157,11 @@ export function setVolume(volume) {
   player.setVolume(pct);
 }
 
-export function isPlayingNow() {
-  return isPlaying;
-}
-
 function resetModuleState() {
   queue = [];
   queueIndex = 0;
   pendingTrackIds = null;
   pendingVolumePct = null;
-  isPlaying = false;
   intentStopped = true;
   ready = false;
   generation += 1;
@@ -204,5 +180,4 @@ export function _resetForTests() {
   player = null;
   apiLoading = false;
   resetModuleState();
-  listeners.clear();
 }

@@ -8,12 +8,38 @@ import { addEntry } from '../../ui/logService.js';
 import { selectBrutalStrikeRiders } from '../brutalStrikeSelection.js';
 import { addExpiration } from '../../rules/effects/expirations.js';
 
+// #1241-family silent-zero sweep (fix#241 census): generic dice-shape gate for
+// the passive rider lanes. Same byte-test as frenzyExprIsDice below (fix#241 —
+// its hunk is immutable, so this lane gate keeps its own name): bracket labels
+// stripped, '[count]d[sides>=1]' anywhere in the resolved bytes passes; flat
+// tokens and junk decline LOUD instead of vanishing at rollExpression-null.
+const riderExprIsDice = (expr) => /\d*d[1-9]\d*/i.test(String(expr ?? '').replace(/\s*\[.*?\]\s*/g, ''));
+
 function applyMeleeWeaponHitBonuses(ctx, acc) {
   const melee = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'melee_weapon_hit');
   if (melee.length === 0 || ctx.isMeleeOrUnarmed !== true) return acc;
   for (const a of melee) {
+    // OPT-IN EXEMPTION (honest zero — keep quiet, #1241-family census): the only
+    // disk passenger here that can NEVER roll is 5e Divine Smite — classes.json:
+    // damageExpression '2d8 + (spell_slot_level - 1)d8', resourceType 'spell_slot',
+    // casting_time '1 action'. Its bonus is paid by a spell slot the player selects
+    // on the rider-modal lane; auto-rolling it in this passive lane would fabricate
+    // free smite every melee hit, so the spell_slot_level token keeps it inert here
+    // BY DESIGN — loud would be false-positive spam on every paladin attack.
+    if (String(a.damageExpression ?? '').includes('spell_slot_level')) continue;
+    if (!riderExprIsDice(a.damageExpression)) {
+      console.error(`[attackRollBonuses] unrecognized melee weapon-hit rider "${a.name ?? a.damageExpression}" expression "${a.damageExpression}" — zero contribution`);
+      continue;
+    }
     const r = rollExpression(a.damageExpression);
-    if (r) { acc.formula += ` + ${a.damageExpression} [${a.damageType.toLowerCase()}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls]; }
+    if (!r) {
+      console.error(`[attackRollBonuses] melee weapon-hit rider "${a.name ?? a.damageExpression}" failed to roll dice expression "${a.damageExpression}" — zero contribution`);
+      continue;
+    }
+    // damageType chain mirrors applyHeavyWeaponHitBonusEntry :37 house bytes —
+    // a rolled-but-untyped row declines to the [slashing] fallback, never crashes.
+    const dt = (a.damageType || ctx.attack?.damageType || 'Slashing').toLowerCase();
+    acc.formula += ` + ${a.damageExpression} [${dt}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls];
   }
   return acc;
 }
@@ -21,25 +47,60 @@ function applyMeleeWeaponHitBonuses(ctx, acc) {
 function applyMonkWeaponHitBonuses(ctx, acc) {
   const monks = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'monk_weapon_or_unarmed_hit');
   for (const a of monks) {
+    // #1241-family: disk passenger is 2024 Elemental Strike '1d6' (dice, rolls);
+    // the old `if (!r) continue;` swallowed flat/junk tokens at zero — now LOUD.
+    if (!riderExprIsDice(a.damageExpression)) {
+      console.error(`[attackRollBonuses] unrecognized monk weapon-hit rider "${a.name ?? a.damageExpression}" expression "${a.damageExpression}" — zero contribution`);
+      continue;
+    }
     const r = rollExpression(a.damageExpression);
-    if (!r) continue;
+    if (!r) {
+      console.error(`[attackRollBonuses] monk weapon-hit rider "${a.name ?? a.damageExpression}" failed to roll dice expression "${a.damageExpression}" — zero contribution`);
+      continue;
+    }
     const dt = (getRuntimeValue(ctx.playerStats.name, '_Elemental_Attunement_option', ctx.campaignName) || 'fire').toLowerCase();
     acc.formula += ` + ${a.damageExpression} [${dt}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls];
   }
   return acc;
 }
 
+// NaN-on-string ledger leg (#1241-family): evaluateAutoExpression RETURNS STRINGS
+// for dice formulas (automationExpressions :249) and for unresolved tokens (:259) —
+// the old `if (!bonusValue) return` guard passed 'abc'/'0'-style strings straight
+// into `acc.total += bonusValue`, concatenating or poisoning the running total with
+// NaN. Unrolled strings are re-rolled first (token→'4d6' honest dice), else parsed
+// as a constant; only a Number.isFinite value may ever reach acc. Returns
+// { value, rolled, display } or null for "decline LOUD".
+function resolveHeavyBonus(r, evalResult) {
+  if (r) return { value: r.total, rolled: r, display: null };
+  if (typeof evalResult === 'string') {
+    const rerolled = rollExpression(evalResult);
+    if (rerolled) return { value: rerolled.total, rolled: rerolled, display: evalResult };
+    const flat = parseConstant(evalResult);
+    if (typeof flat === 'number' && Number.isFinite(flat)) return { value: flat, rolled: null, display: String(flat) };
+    return null;
+  }
+  if (typeof evalResult === 'number' && Number.isFinite(evalResult)) return { value: evalResult, rolled: null, display: String(evalResult) };
+  return null;
+}
+
 function applyHeavyWeaponHitBonusEntry(ctx, a, acc) {
   const r = rollExpression(a.damageExpression);
   const evalResult = evaluateAutoExpression(a.damageExpression, ctx.playerStats);
-  const bonusValue = r ? r.total : evalResult;
-  if (!bonusValue) return;
+  const resolved = resolveHeavyBonus(r, evalResult);
+  if (!resolved) {
+    console.error(`[attackRollBonuses] heavy weapon rider "${a.name ?? a.damageExpression}" expression "${a.damageExpression}" did not resolve to a finite number (evaluated: ${JSON.stringify(evalResult)}) — zero contribution`);
+    return;
+  }
+  const { value: bonusValue, rolled, display } = resolved;
+  // Honest zero (frenzy '0d6' legal-zero family, :81 cite): a finite 0 adds
+  // nothing and no formula bytes — silent by design, NOT the flagged fork.
+  if (bonusValue === 0) return;
   const dt = (a.damageType || ctx.attack?.damageType || 'Slashing').toLowerCase();
   const label = dt === 'same_as_weapon' ? (a.name || 'slashing') : dt;
-  const displayExpr = r ? a.damageExpression : String(bonusValue);
-  acc.formula += ` + ${displayExpr} [${label}]`;
+  acc.formula += ` + ${display ?? a.damageExpression} [${label}]`;
   acc.total += bonusValue;
-  if (r) acc.rolls = [...acc.rolls, ...r.rolls];
+  if (rolled) acc.rolls = [...acc.rolls, ...rolled.rolls];
 }
 
 function applyHeavyWeaponHitBonuses(ctx, acc) {
@@ -125,21 +186,33 @@ function applyDivineFuryBonuses(ctx, acc) {
   const isRaging = buffs.some(b => b.damageBonusExpression);
   if (!isRaging) return acc;
   const a = df[0];
+  // RAW census (#1241-family divine-fury check): 2024/classes.json Divine Fury
+  // damageExpression is '1d6 + barbarian_level / 2' and the feature text says
+  // "1d6 plus half your Barbarian level (round down)" — the halving is a FLAT
+  // round-down constant (dice stay dice), so Math.floor here MATCHES RAW and can
+  // never emit x.5 (census-honest, recipe unchanged). The live NaN fork was an
+  // absent/non-numeric level baking 'NaN' into the expression: gate it LOUD.
+  if (!Number.isFinite(ctx.playerStats.level)) {
+    console.error(`[attackRollBonuses] divine fury rider "${a.name ?? a.damageExpression}" has no finite character level (level: ${ctx.playerStats.level}) — cannot halve barbarian_level: zero contribution, latch untouched`);
+    return acc;
+  }
   let expr = a.damageExpression || '';
   expr = expr.replace(/barbarian_level\s*\/\s*2/gi, String(Math.floor(ctx.playerStats.level / 2)))
     .replace(/barbarian_level/gi, String(ctx.playerStats.level));
   const r = rollExpression(expr);
-  if (r) {
-    const dt = a.damageType || '';
-    if (dt.includes(' or ')) {
-      ctx.setDivineFuryChoice?.(dt);
-      return { modalResult: {
-        data: { _divineFuryPending: true, bonusExpr: expr, bonusTotal: r.total, bonusRolls: r.rolls },
-        modal: { type: 'divineFury', props: { damageType: dt } },
-      } };
-    }
-    acc.formula += ` + ${expr} [${dt}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls];
+  if (!r) {
+    console.error(`[attackRollBonuses] divine fury rider "${a.name ?? a.damageExpression}" failed to roll expression "${expr}" (authored "${a.damageExpression}") — zero contribution, latch untouched`);
+    return acc;
   }
+  const dt = a.damageType || '';
+  if (dt.includes(' or ')) {
+    ctx.setDivineFuryChoice?.(dt);
+    return { modalResult: {
+      data: { _divineFuryPending: true, bonusExpr: expr, bonusTotal: r.total, bonusRolls: r.rolls },
+      modal: { type: 'divineFury', props: { damageType: dt } },
+    } };
+  }
+  acc.formula += ` + ${expr} [${dt}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls];
   // #1026 same-shape guard: stamp only when the rider actually landed (r non-null).
   // Modal branch (:113) stamps on resolution in useModalHandlers.js:42 — landed only.
   if (r) setRuntimeValue(ctx.playerStats.name, '_divineFuryUsedRound', round, ctx.campaignName);
@@ -358,8 +431,20 @@ function applyWeaponHitBonus(ctx, bonus, round, acc) {
   const usedKey = `_${underscored(bonus.name)}_usedRound`;
   if (weaponHitBonusSpent(ctx, bonus, usedKey, round)) return null;
 
+  // #1241-family: disk riders (Blessed/Improved Blessed, Dreadful, Lunar) are all
+  // pure dice and roll cleanly — the old `if (!r) return null;` was a latent silent
+  // zero for any future flat/token misauthored row. Shape-gate + roll-fail LOUD,
+  // mirroring the frenzy gate:100/:105 vocabulary in this file; a declined rider
+  // touches no uses/consume lanes (return before consumeWeaponHitUses).
+  if (!riderExprIsDice(bonus.damageExpression)) {
+    console.error(`[attackRollBonuses] unrecognized weapon-hit rider "${bonus.name ?? bonus.damageExpression}" expression "${bonus.damageExpression}" — zero contribution, uses untouched`);
+    return null;
+  }
   const r = rollExpression(bonus.damageExpression);
-  if (!r) return null;
+  if (!r) {
+    console.error(`[attackRollBonuses] weapon-hit rider "${bonus.name ?? bonus.damageExpression}" failed to roll dice expression "${bonus.damageExpression}" — zero contribution, uses untouched`);
+    return null;
+  }
 
   const dt = bonus.damageType || '';
   if (dt.includes(' or ')) {
@@ -451,16 +536,23 @@ export function buildNatural20BonusesStep() {
           continue;
         }
         const expr = resolveNatural20Expression(a, ctx.playerStats);
-        if (expr || expr === 0) {
-          const r = rollExpression(String(expr));
-          if (r) {
-            formula += ` + ${expr} [${dt}]`;
-            total += r.total;
-            rolls = [...rolls, ...r.rolls];
-          } else if (typeof expr === 'number') {
-            formula += ` + ${expr} [${dt}]`;
-            total += expr;
-          }
+        if (!(expr || expr === 0)) {
+          console.error(`[natural20Bonuses] "${a.name}" missing extraDamageExpression — zero extra (#1241-family)`);
+          continue;
+        }
+        const r = rollExpression(String(expr));
+        if (r) {
+          formula += ` + ${expr} [${dt}]`;
+          total += r.total;
+          rolls = [...rolls, ...r.rolls];
+        } else if (Number.isFinite(Number(expr))) {
+          // Flat numeric leg kept (CANON 'increased_ability_score' → +5/+0, #1035):
+          // numeric strings honest-coerce; anything neither rollable nor finite
+          // declined LOUD instead of the old silent no-else zero.
+          formula += ` + ${expr} [${dt}]`;
+          total += Number(expr);
+        } else {
+          console.error(`[natural20Bonuses] "${a.name}" expression "${expr}" neither rolls nor resolves to a finite flat — zero extra`);
         }
       }
 

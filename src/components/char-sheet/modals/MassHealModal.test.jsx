@@ -240,7 +240,18 @@ describe('MassHealModal', () => {
     await setAllocation(0, 10);
     await setAllocation(1, 5);
 
-    await selectTarget(0); // deselect Ally1
+    // display-truth pin: with both selected the header counts both (15).
+    expect(screen.getByText(/Allocated: 15 \/ 20/)).toBeInTheDocument();
+
+    await selectTarget(0); // deselect Ally1 (its 10 HP stays in state for re-selection)
+
+    // Falsifiability arm: deselecting must MOVE the header — "Allocated"
+    // equals exactly what handleConfirm sends (Ally2's 5), never the stale
+    // 15 that summed all allocations incl. deselected (:21-era defect).
+    expect(screen.getByText(/Allocated: 5 \/ 20/)).toBeInTheDocument();
+    expect(screen.queryByText(/Allocated: 15 \/ 20/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Remaining: 15/)).toBeInTheDocument();
+    expect(screen.getByText(/15 HP unallocated/)).toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: /Heal \(1\)/ })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: /Heal \(1\)/ }));
@@ -248,5 +259,17 @@ describe('MassHealModal', () => {
     await waitFor(() => {
       expect(mockOnConfirm).toHaveBeenCalledWith({ Ally2: 5 });
     });
+  });
+
+  it('re-selecting a deselected target starts from 0 — stale kept allocation never resurfaces in the header', async () => {
+    render(<MassHealModal {...makeProps({ pool: 20 })} />);
+    await selectTarget(0);
+    await setAllocation(0, 10);
+    await selectTarget(0); // deselect: header drops to 0/20 (nothing selected)
+    expect(screen.getByText(/Allocated: 0 \/ 20/)).toBeInTheDocument();
+
+    await selectTarget(0); // re-select: toggleTarget re-initializes the allocation to 0
+    expect(numberInputs()[0].value).toBe('0');
+    expect(screen.getByText(/Allocated: 0 \/ 20/)).toBeInTheDocument();
   });
 });
