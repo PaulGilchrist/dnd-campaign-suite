@@ -23,6 +23,8 @@
 // (old #4,#7,#8,#9,#11) -> D3 sentinel-identity mega (npcToMonsterFormat shape is a
 // stub sentinel on purpose — shape accuracy owned by #1159, no fake `formatted:true`
 // shape theater); DATA bestiary/miss/fallback/fetch (old #2,#3,#10,#12) -> D4 table.
+// NEW #1177(b) (10th-11th tests): unified-cache-guard pins — empty monstersCache refetches
+// on BOTH lanes (was :35-refetch vs :66-permanent); behavior lives in findBestiaryMonster.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -183,5 +185,35 @@ describe('getMonsterData', () => {
     await expect(getMonsterData('   ')).resolves.toBeNull(); // passes guard, matches nothing
     expect(npcToMonsterFormat).not.toHaveBeenCalled(); // bestiary lane returns raw bytes
     expect(loadMonsters).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('unified cache guard (#1177(b))', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it('treats an empty bestiary cache as not-loaded on the data lane — refetch self-heals', async () => {
+    const { getMonsterData, loadMonsters } = await fresh();
+    // Simulate loadMonsters' sole failure exit (dataLoader.js:370): resolves [] once.
+    loadMonsters.mockResolvedValueOnce([]);
+    await expect(getMonsterData('Goblin')).resolves.toBeNull(); // poisoned-empty cached
+    expect(loadMonsters).toHaveBeenCalledTimes(1);
+    // Old :66 guard would stay cached-permanent and answer null forever; unified
+    // guard sees length 0, refetches, and resolves the real bestiary entry.
+    await expect(getMonsterData('Goblin')).resolves.toEqual({ index: 'goblin', name: 'Goblin' });
+    // Image lane shares the same guard (findBestiaryMonster) — proven in the
+    // sibling test below with its own fresh module/cache (fresh() without a
+    // resetModules re-returns the same healed-cache instance).
+    expect(loadMonsters).toHaveBeenCalledTimes(2);
+  });
+
+  it('empty-cache refetch self-heals the image lane through the same guard', async () => {
+    const { getMonsterImageUrl, loadMonsters } = await fresh();
+    loadMonsters.mockResolvedValueOnce([]); // dataLoader.js:370 failure shape
+    await expect(getMonsterImageUrl('Orc')).resolves.toBeNull(); // refetched [] cached
+    await expect(getMonsterImageUrl('Orc')).resolves.toBe(`${BESTIARY_URL}/orc.jpg`); // healed
+    expect(loadMonsters).toHaveBeenCalledTimes(2);
   });
 });

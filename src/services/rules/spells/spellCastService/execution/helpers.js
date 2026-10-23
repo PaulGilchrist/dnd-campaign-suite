@@ -110,6 +110,28 @@ async function triggerArcaneWard(spell, metaCtx, playerStats, campaignName) {
     }
 }
 
+// fix#300 (#1462 barrel-refund + refund-chain census): LIVENESS-QED — KEEP+DOCUMENT.
+// Production trigger chain (all links bytes-verified 2026-10-23):
+//   PRODUCER  public/data/2024/classes.json:13366-13383 'Spell Breaker' lv10 —
+//             automation.effect 'spell_breaker', slotRetentionSpells:
+//             ["Counterspell","Dispel Magic"]; collected verbatim by
+//             automationCollector.js:60 onto playerStats.automation.passives.
+//   GATE 1    hub execution/index.js:307 awaits triggerDispelMagic on every
+//             'Dispel Magic' cast (executeSpellCast is that chain's live route).
+//   GATE 2    helpers.js:214 checkFailed (d20+bonus < 10+slotLevel — dice vary,
+//             so the false branch is reachable, not constant).
+//   GATE 3    refundDispelSpellBreakerSlot :187 — includes('Dispel Magic') holds
+//             on the disk bytes above; usesSpellSlot holds for slot casts.
+//   WRITE     HERE :188→:135-:141 (+1 to spell_slots_level_<n>, negative/null
+//             boundary :138 refuses). Sign/order: refund lands AFTER the failed
+//             check log (:216) and never after a success — checkFailed gates :218.
+// NOT dead-by-construction. The barrel re-export surface (execution/index.js:951 →
+// spellCastService.js:4) has zero PRODUCTION importers of this symbol (sole named
+// consumers: master lane spellCastService.test.js:233-247 'barrel surface + zero
+// boundary' pin + module-direct execution/helpers-spellBreaker.test.js); per
+// run2#1462 precedent ('barrel refund no-prod-consumer liveness-proof-kept') the
+// surface stays documented-public and test-pinned, not deleted. counterSpellHandler
+// .js:89's same-named function is its OWN local — no edge to this symbol.
 export function refundSpellBreakerSlot(playerName, spellLevel, campaignName) {
     const slotKey = `spell_slots_level_${spellLevel}`;
     const currentSlots = getRuntimeValue(playerName, slotKey);
@@ -551,6 +573,19 @@ function rollTargetMissiles(missileDamage, missileCount) {
 
 function resolveIgnoreResistance(playerStats) {
     const passives = playerStats.automation?.passives;
+    // fix#300 (#1456 ':515-era dead-via-hub-ambush-chokepoint' census): KEEP-WITH-CITE
+    // — the #1456 verdict is STALE. Era bytes: hub resolveMagicalAmbushInvisible was
+    // called UNGUARDED on every executeSpellCast cast and threw first on passives==null
+    // (identical-lookup shadow, chokepoint-inline-dup #1357/58), so this guard was
+    // hub-unreachable. fix#126 (#1495) converted the hub call to
+    // resolveMagicalAmbushOrDegrade (execution/index.js:160-166/:811 — self-catch →
+    // hasInvisible:false → cast proceeds), un-shadowing this guard: on a hub missile
+    // cast with passives==null it is now the FIRST loud throw (:937 handleNoSavePath →
+    // noSavePath.js:74 → executeMagicMissile :672 → :613). Zero partial writes: the
+    // throw precedes applyDamageToTarget (:614). In-practice guard only — the disk
+    // collector stamps passives:[] unconditionally (automationCollector.js:111).
+    // Throw-vs-degrade tension (fix#126 law mirror damageCalculation.js:139) QUEUED,
+    // not silently re-litigated here — see fix#300 ledger row.
     if (passives == null) {
         console.error('[spellCast] executeMagicMissile: playerStats.automation.passives is missing');
         throw new Error('playerStats.automation.passives is required for ignore resistance check');

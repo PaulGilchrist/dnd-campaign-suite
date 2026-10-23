@@ -25,9 +25,9 @@
 // so its internals are covered ONLY here and must stay.
 // Re-arm after consume is the writer/reader pair of the stamp test (null latch →
 // stamps) plus the consume test (spend → writes null): same path, no duplicate test.
-// NOTE (source review): isStepOfTheWindTrigger is exported with zero external
-// callers (grep: only fleetStepService.js:32 def / :38 internal use) — dead export,
-// reported, its behavior pinned indirectly via the grant exclusion legs below.
+// NOTE (source review): isStepOfTheWindTrigger demoted to module-local (#1363 batch —
+// it was an exported dead symbol with zero external callers; only fleetStepService.js:32
+// def / :38 internal use) — behavior pinned indirectly via the grant exclusion legs below.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({

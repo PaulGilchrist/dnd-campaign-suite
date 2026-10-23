@@ -7,8 +7,9 @@
 // Pinned here, byte-exact: name gate (early-return BEFORE any lookup), concentration
 // stamp + DC formula, persisted grant flag write (literal 'expeditiousRetreatActive' —
 // consumers inline-duplicate this string: turnStartEffects.js:607, dashHandler.js:21,
-// concentrationService.js:168, CharBonusActions.jsx:731; the exported ER_* constants
-// have NO repo importer, so tests pin literals, not exports, as the wire contract),
+// concentrationService.js:168, CharBonusActions.jsx:731; the former exported ER_*
+// constants had NO repo importer and were excised/demoted to module-local mirrors in
+// the #1359 dead-export batch, so tests pin literals, not exports, as the wire contract),
 // turnStartEffects offer append (dedupe + non-array sanitize), spell log, popup envelope.
 // Writes are 4-arg cast-origin POSTs (no skipSync — by design, service.js:33-36: no te
 // marker; the persisted flag is authoritative). Disk canon: spells.json + 2024/spells.json
@@ -17,12 +18,7 @@
 // stamps the grant (#cs-null leg). Dash execution → dashHandler lane; re-offer seam →
 // turnStartEffects offer lane; purge → sp128-er-purge lane.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-    triggerExpeditiousRetreat,
-    ER_ACTIVE_FLAG,
-    ER_DASH_USED_ROUND_KEY,
-    ER_TURN_START_OFFER_TYPE,
-} from './expeditiousRetreatService.js';
+import { triggerExpeditiousRetreat } from './expeditiousRetreatService.js';
 
 vi.mock('../../ui/logService.js', () => ({
     addEntry: vi.fn(),
@@ -86,10 +82,8 @@ describe('expeditiousRetreatService.triggerExpeditiousRetreat', () => {
             { name: 'ExpEdItIoUs ReTrEaT' }, {}, { name: CASTER, proficiency: 2, abilities: { CON: { bonus: 0 } } }, CAMPAIGN, MAP,
         );
 
-        // exported constants are the same bytes consumers inline-duplicate
-        expect(ER_ACTIVE_FLAG).toBe('expeditiousRetreatActive');
-        expect(ER_DASH_USED_ROUND_KEY).toBe('_Expeditious_Retreat_dash_usedRound');
-        expect(ER_TURN_START_OFFER_TYPE).toBe('expeditious_retreat_dash_offer');
+        // Exact-bytes grant writes below pin the wire literals directly — the lane
+        // contract is literals, not symbols (see header).
 
         expect(addConcentration).toHaveBeenCalledWith(cs, CASTER, 'Expeditious Retreat', 10);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, CAMPAIGN);

@@ -42,7 +42,10 @@ function rollHealingWordExpression(healExpression, maximize, rerollOnes) {
 }
 
 // Current HP from the runtime store, falling back to maxHp when unset.
-export function resolveCurrentHp(targetName, maxHp, campaignName) {
+// Internal-only (#1371 export-keyword-drop): ZERO external importers — the
+// same-named functions in handlePlainDamage.js:396 and automation
+// healingHandler.js:170 are private twins, not imports of this one.
+function resolveCurrentHp(targetName, maxHp, campaignName) {
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
     return storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
 }
@@ -61,7 +64,10 @@ function buildHealingWordFormula(healExpression, bonusDetails) {
 }
 
 // Mark Fortified Health used once healing actually landed via it.
-export async function markFortifiedHealthIfApplied(playerStats, campaignName, anyHealed, bonusDetails) {
+// Internal-only (#1371 export-keyword-drop): ZERO external importers — the
+// same-named function in automation healingHandler.js:170 is a private twin;
+// this one is called only by triggerHealingWord below.
+async function markFortifiedHealthIfApplied(playerStats, campaignName, anyHealed, bonusDetails) {
     if (anyHealed && bonusDetails?.some(d => d.name === 'Fortified Health')) {
         await markFortifiedHealthUsed(playerStats, campaignName);
     }

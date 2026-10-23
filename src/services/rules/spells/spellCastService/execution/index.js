@@ -25,8 +25,11 @@ import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasR
 import { rollExpression, rollExpressionMaximized, applyHealingRerollOnes } from '../../../../dice/diceRoller.js';
 import { refundSpellBreakerSlot, applyHexEffects, applyPowerWordHealToTarget, applyPowerWordKillToTarget, triggerDispelMagic, triggerExpertDivination, triggerArcaneWard, applyRegenerateSpell } from './helpers.js';
 import { checkGlobeOfInvulnerability, checkForcecageBlocked, checkBlockedBySpellcastingBuff } from './blockChecks.js';
-import { handlePowerWordHeal, handlePowerWordKill, handleMassSuggestion, handleCalmEmotions, handleHypnoticPatternEarly, handleConfusionEarly, handleShapechange, handleFear, handleConjureVolley, handleSilence, handleSleep } from './modalSpells.js';
-import { handleRegenerate, handleSeeInvisibility, handleFleshToStone, handleHoldMonster, handleBanishment, handleConfusion, handleMaze, handlePowerWordStun, handleHypnoticPattern, handleSlow, handleBane, handleBless, handleBeaconOfHope, handleMassSuggestion as handleMassSuggestionTrigger, handleSuggestion, handleCommand, handleOttoDance, handleResilientSphere, handleBlur, handleExpeditiousRetreat, handleFriends, handleCrownOfMadness, handleAnimalFriendship, handleDominateBeast, handleDominateMonster, handleDominatePerson, handleRayOfEnfeeblement, handleCompelledDuel, handleGlobeOfInvulnerability, handleForcecage, handleStinkingCloud, handleSleetStorm, handleFaerieFire, handleTashasHideousLaughter, handleImprisonment, handleHeroism, handleLongstrider, handleSpareTheDying, handleEnhanceAbility, handleProtectionFromEnergy, handleProtectionFromPoison, handleResistance, handleGenericAutomation } from './triggerSpells.js';
+// fix#296 (#1473): handleFear import retired — its only dispatch site (the :279-era
+// no-damage arm) deleted below as double-dead; the route home modalSpells.handleFear
+// stays byte-stable (owner constraint) as exported surface.
+import { handlePowerWordHeal, handlePowerWordKill, handleMassSuggestion, handleCalmEmotions, handleHypnoticPatternEarly, handleConfusionEarly, handleShapechange, handleConjureVolley, handleSilence, handleSleep } from './modalSpells.js';
+import { handleRegenerate, handleSeeInvisibility, handleFleshToStone, handleHoldMonster, handleBanishment, handleMaze, handlePowerWordStun, handleSlow, handleBane, handleBless, handleBeaconOfHope, handleSuggestion, handleCommand, handleOttoDance, handleResilientSphere, handleBlur, handleExpeditiousRetreat, handleFriends, handleCrownOfMadness, handleAnimalFriendship, handleDominateBeast, handleDominateMonster, handleDominatePerson, handleRayOfEnfeeblement, handleCompelledDuel, handleGlobeOfInvulnerability, handleForcecage, handleStinkingCloud, handleSleetStorm, handleFaerieFire, handleTashasHideousLaughter, handleImprisonment, handleHeroism, handleLongstrider, handleSpareTheDying, handleEnhanceAbility, handleProtectionFromEnergy, handleProtectionFromPoison, handleResistance, handleGenericAutomation } from './triggerSpells.js';
 import { computeRange, computeEmpoweredEvocation, computeBlessedStrikes, computeRadiantSoul, computeOverchannel } from './damageCalculation.js';
 import { normalizeCastingTime } from '../../../../shared/castingTimeUtils.js';
 import { handleSavePath } from './savePath.js';
@@ -309,21 +312,55 @@ async function runDispelMagicFallback({ spell, metaCtx, playerStats, campaignNam
 async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage }) {
     const noDamageTriggers = [
         async () => passThrough(await handleRegenerate(spell, getTargetInfo, applyRegenerateSpell, playerStats, campaignName)),
-        () => passThrough(handleFear({ spell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive })),
+        // fix#296 (#1473): :279-era Fear arm DELETED — DOUBLE-DEAD, both legs vs REAL bytes.
+        // Leg 1 (route): disk Fear carries automation.type 'fear' on BOTH rulesets and 'fear'
+        // is ABSENT from SERVICE_HANDLED_SPELLS (triggerSpells.js:42), so every disk-byte Fear
+        // cast is consumed at :710 handleGenericAutomation -> DIRECT fearHandler route
+        // (automation/index.js:530 'fear: handleFear'; fearService deleted fix#294).
+        // Leg 2 (guard): the only shape surviving :710 is the lightweight :163 envelope
+        // ({name, level, baseLevel} — useActionSpellMetamagic.js:163) and it carries NO
+        // spell.dc, which modalSpells.handleFear's gate (name + spell.dc) requires -> DECLINE.
+        // No byte-honest production envelope reaches this arm (#1455 fabrication ban); the
+        // route home modalSpells.handleFear stays byte-stable (owner constraint).
         () => passThrough(handleConjureVolley(spell, fullSpell)),
         async () => swallow(await handleSeeInvisibility(spell, metaCtx, playerStats, campaignName, mapName)),
         async () => swallow(await handleFleshToStone({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => swallow(await handleHoldMonster({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => swallow(await handleBanishment({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
-        async () => swallow(await handleConfusion({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        // fix#296 (#1473): :285-era Confusion twin DELETED (COLLAPSE, no cross-gating to
+        // split): the early chain's name+fullSpell.dc gates consume EVERY 'confusion' cast.
+        // Disk-full: disk row carries dc (both rulesets; lookup skipped — aoe set, automation
+        // null) -> handleConfusionEarly (:707-era, index.js early chain) intercepts natively.
+        // Lightweight :163: lookupFullSpell (index.js:203-era) merges the disk dc in, and its
+        // merge is NAME-KEYED ({...spell, ...lookup, name: spell.name}) so confusion's dc can
+        // never ride a hypnotic-named envelope — the fix#166 two-carrier face is ABSENT by
+        // structure; both dc bytes share one identical shape {dc_type:'WIS',dc_success:'none'}
+        // -> the shared dc-check is correct-by-data -> twins deleted. Live owner:
+        // earlyReturns-modal.test.js :603-era + noformula-services 'early chain ... twins
+        // never fire' pin. Route home modalSpells.handleConfusionEarly stays byte-stable.
         async () => swallow(await handleMaze({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => passThrough(await handlePowerWordStun({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
-        async () => swallow(await handleHypnoticPattern({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        // fix#296 (#1473): :288-era Hypnotic Pattern twin DELETED — same merged-dc-gate
+        // collapse as :285 above: handleHypnoticPatternEarly (:706-era, name+fullSpell.dc)
+        // intercepts disk-byte casts on its own disk dc and lightweight casts on the
+        // name-keyed merged dc; no route lets a dc-less 'hypnotic pattern' envelope reach
+        // runNoDamagePath for disk-known names (a lookup miss console.errors LOUDLY first).
+        // Live owner lanes: earlyReturns-modal.test.js :561-era + spellCastService.special
+        // (REAL handleHypnoticPatternEarly producer bytes). Route home stays byte-stable.
         async () => swallow(await handleSlow({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => swallow(await handleBane({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => swallow(await handleBless({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => swallow(await handleBeaconOfHope({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
-        async () => swallow(await handleMassSuggestionTrigger({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
+        // fix#296 (#1473): :293-era Mass Suggestion twin DELETED — dead-by-direct-route:
+        // :704-era handleMassSuggestion (modalSpells.js:45) gates on name lowercase
+        // 'mass suggestion' + spellSaveDc, and computeSpellStats makes spellSaveDc ALWAYS
+        // numeric (#1473 census; spellStats.test.js:384 pin) -> EVERY mass-suggestion cast
+        // (disk AND lightweight :163) intercepts at :704 opening MassSuggestionModal BEFORE
+        // runNoDamagePath. The :293 twin dispatched only inside mock-gap worlds. #1458
+        // disposition EXECUTED at the host. 'Suggestion' (:294) below survives disk-byte-
+        // honest (:704 declines non-mass names; disk hijacked at :710; lightweight route
+        // live). Owner lanes: earlyReturns-modal.test.js :468-era + modalSpells
+        // .massSuggestion-pay-at-confirm. Route homes stay byte-stable (fix#109).
         async () => swallow(await handleSuggestion({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
         async () => passThrough(await handleCommand({ spell, metaCtx, spellSaveDc, getTargetInfo, playerStats, campaignName, mapName })),
         async () => swallow(await handleOttoDance({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName })),
@@ -904,4 +941,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     return await runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo });
 }
 
+// fix#300 (#1462): barrel keep-with-cite — refundSpellBreakerSlot has ZERO production
+// importers of THIS re-export; the refund path itself is live via the internal dispel
+// chain (index.js:307 → helpers.js:219→:186/:188→:135, disk producer
+// 2024/classes.json:13366 Spell Breaker — full QED in helpers.js:113 comment).
+// Surface pinned by spellCastService.test.js:233 'barrel surface + zero boundary';
+// kept per run2#1462 liveness-proof precedent. resolveMagicalAmbushInvisible twin
+// (:131) stays pure-throw for its exported contract — hub self-catches at :162 (fix#126).
 export { refundSpellBreakerSlot, resolveMagicalAmbushInvisible };

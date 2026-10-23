@@ -24,7 +24,12 @@ function lower(value) {
 }
 
 function targetOf(te) {
-    return Array.isArray(te?.target) ? te.target[0] : te?.target;
+    // #1390 array-branch deleted (writers census QED, fix#285 shape): sole te
+    // constructor is stageEffect below — `target: targetName` SCALAR, armed by
+    // stageParalysisTargets one name at a time (SaveAttackAoeModal.jsx:812
+    // passes [targetName] as a NAME list, each its own te). ZERO producers ever
+    // write an array-shaped target for paralyzing_staged te, in src or tests.
+    return te?.target;
 }
 
 function capitalize(word) {

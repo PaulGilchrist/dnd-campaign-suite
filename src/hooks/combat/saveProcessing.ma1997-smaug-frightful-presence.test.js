@@ -54,7 +54,12 @@ describe('MA-1997 disk fingerprint: Smaug Frightful Presence save_effect + FP se
     const immunityTe = { target: 'Bandit 2', effect: 'frightful_presence_immunity', source: 'Smaug the Golden 1' };
     expect(gazeImmunityActive({ action: FP, target: { name: 'Bandit 2' }, monsterName: 'Smaug the Golden 1', targetEffects: [immunityTe] })).toEqual(
       expect.objectContaining({ effect: 'frightful_presence_immunity', durationMinutes: 1440 }));
-    expect(gazeImmunityActive({ action: FP, target: { name: 'Bandit 2' }, monsterName: 'Smaug the Golden 1', targetEffects: [] })).toBeNull();
+    // absent-te (targetEffects:[])→null re-pin folded (pass #509 rec, fix#277
+    // echo-class): hand-fed [] is pure parser-input echo of the owner empty-arm
+    // truth-table MonsterCardHelpers.gaze-immunity.test.js:48 — same parse exit
+    // (find over [] finds nothing regardless of row), zero Smaug-specific signal.
+    // The armed leg above stays: distinct-cause consumer seam (this disk FP row's
+    // success_immunity bytes + source-name match against the granted te, §MA-1997).
   });
 });
 

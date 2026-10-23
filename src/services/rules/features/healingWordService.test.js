@@ -9,8 +9,9 @@
  *   flow routes through this trigger, so it stays live.
  * Secondary exports resolveCurrentHp / markFortifiedHealthIfApplied have ZERO
  * external importers (the same-named functions in handlePlainDamage.js:396 and
- * automation healingHandler.js:170 are private twins, not imports) — pinned here
- * only through the triggerHealingWord path; cross-file rec: drop `export`.
+ * automation healingHandler.js:170 are private twins, not imports) — export
+ * keyword DROPPED #1371 (demoted to module-locals, rec executed); they stay
+ * pinned here only through the triggerHealingWord path.
  *
  * MOVEMENT-INTERACTION DETERMINATION: the service writes NO movement key and has
  * NO runtime-store reads beyond 'currentHitPoints' (strict fake below throws on any

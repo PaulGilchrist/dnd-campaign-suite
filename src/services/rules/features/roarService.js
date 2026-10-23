@@ -27,7 +27,10 @@
 // success (the FP clock strips Frightened only) — GM sheds Deafened manually.
 import { abilitySaveMaxUses, abilitySaveUseKey } from '../../encounters/monsterAbilityUses.js';
 
-export const STAGED_ROAR_MAX_DEFAULT = 3;
+// demoted #1411 (dead-export batch): ZERO external importers (test lane mentions
+// this constant in prose only — roarService.test.js never imports it); sole caller
+// stagedRoarMaxUses :121 below, whose null-side default is pinned there.
+const STAGED_ROAR_MAX_DEFAULT = 3;
 
 // Stage-canonical description + machine save_effect per stage (the stage
 // sentences lifted verbatim from the canonical row prose). Both surfaces are

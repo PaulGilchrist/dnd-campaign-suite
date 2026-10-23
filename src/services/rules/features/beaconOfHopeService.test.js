@@ -9,12 +9,12 @@
 // Downstream own-lanes (NOT tested here): beaconOfHopeHandler.test.js (te stamp / apply /
 // log), useSpellMetamagicFlow/confirm-payloads.test.js (picker), SavePromptModal /
 // conditionEffects / restRules consumers of the written targetEffects.
-// NOTE: confirmBeaconOfHope currently has zero production callers (live picker lane goes
-// straight to applyBeaconOfHopeEffect via useSimpleSpellHandlers.js:299); it remains a
-// public API, pinned here as an exact five-arg forwarder until rewired or retired.
+// NOTE: confirmBeaconOfHope excised as a zero-caller dead export (#1338 dead-export batch) —
+// the live picker lane goes straight to applyBeaconOfHopeEffect (useSimpleSpellHandlers.js:299),
+// owned by the handler + confirm-payloads lanes cited above.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { triggerBeaconOfHope, confirmBeaconOfHope } from './beaconOfHopeService.js';
+import { triggerBeaconOfHope } from './beaconOfHopeService.js';
 
 // ── Mocks (1:1 with the service's real imports) ───────────────────────────
 
@@ -22,12 +22,7 @@ vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
-vi.mock('../../automation/handlers/spells/beaconOfHopeHandler.js', () => ({
-    applyBeaconOfHopeEffect: vi.fn(),
-}));
-
 import { executeHandler } from '../../automation/index.js';
-import { applyBeaconOfHopeEffect } from '../../automation/handlers/spells/beaconOfHopeHandler.js';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -49,7 +44,6 @@ beforeEach(() => {
     vi.clearAllMocks();
     // Re-seed explicitly: clearAllMocks retains prior mockResolvedValue impls.
     executeHandler.mockResolvedValue(HANDLER_RESULT);
-    applyBeaconOfHopeEffect.mockResolvedValue(HANDLER_RESULT);
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -125,39 +119,6 @@ describe('triggerBeaconOfHope', () => {
         expect(result).toBeNull();
         expect(consoleError).toHaveBeenCalledWith(
             '[beaconOfHope] Failed to execute Beacon of Hope handler:',
-            err,
-        );
-    });
-});
-
-// ── confirmBeaconOfHope ────────────────────────────────────────────────────
-
-describe('confirmBeaconOfHope', () => {
-    it('forwards the exact five-arg envelope and the handler result identity', async () => {
-        const action = { name: 'Beacon of Hope', automation: { type: 'beacon_of_hope' } };
-        const targetNames = ['Goblin', 'Orc'];
-
-        const result = await confirmBeaconOfHope(
-            action, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, targetNames,
-        );
-
-        expect(applyBeaconOfHopeEffect).toHaveBeenCalledWith(
-            action, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, targetNames,
-        );
-        expect(result).toBe(HANDLER_RESULT);
-    });
-
-    it('returns null and logs exact banner + identical Error when applyBeaconOfHopeEffect rejects', async () => {
-        const err = new Error('Apply failed');
-        applyBeaconOfHopeEffect.mockRejectedValue(err);
-
-        const result = await confirmBeaconOfHope(
-            { name: 'Beacon of Hope' }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin'],
-        );
-
-        expect(result).toBeNull();
-        expect(consoleError).toHaveBeenCalledWith(
-            '[beaconOfHope] Failed to apply Beacon of Hope effect:',
             err,
         );
     });

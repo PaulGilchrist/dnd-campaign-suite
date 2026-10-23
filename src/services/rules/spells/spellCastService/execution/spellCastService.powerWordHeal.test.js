@@ -154,7 +154,6 @@ vi.mock('../../../../rules/spells/postCastHealService.js', () => ({
 vi.mock('../../../../rules/features/silenceService.js', () => ({
   getSilenceSource: vi.fn(() => null),
   isCreatureInSilenceZone: vi.fn(() => false),
-  triggerSilence: vi.fn(),
 }))
 
 vi.mock('../../../../rules/features/invisibilityService.js', () => ({

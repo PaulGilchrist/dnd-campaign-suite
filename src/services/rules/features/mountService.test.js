@@ -12,11 +12,12 @@
 // size-order census lives in conditionEffectsInternal.test.js and is not
 // duplicated here).
 // Export map: getMountCandidates/mountRider/dismountRider — live (CharSummary).
-// MOUNTED_BY_KEY/MOUNT_NAME_KEY — zero external importers; consumers read the
-// raw literals ('mountedBy' hitResolution.js:90, 'mountName'
-// reactionBonusHandler.js:511/581 and CharSheet.jsx:451) — pinned as the
-// string contract; recommend folding the constants into the consumers or
-// consuming them (report only).
+// MOUNTED_BY_KEY/MOUNT_NAME_KEY — demoted to module-locals #1388 (export-keyword
+// drop, zero external importers); consumers read the raw literals ('mountedBy'
+// hitResolution.js:90, 'mountName' reactionBonusHandler.js:511/581 and
+// CharSheet.jsx:451) — the string contract is pinned BEHAVIORALLY below via the
+// exact store-write tuples (raw literals in every assertion), so the former
+// constant-identity pin block retires honest, not silently.
 // No-clock scan: CLEAN — mount state is a turn-based latch (booleans/nulls
 // cleared by the dismount seam); the only Date.now() bytes are log-entry
 // timestamps (allowlisted logging category), frozen here for determinism.
@@ -24,8 +25,6 @@
 // own row; grep 'HitPoints' this file: zero writes).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-    MOUNTED_BY_KEY,
-    MOUNT_NAME_KEY,
     getMountCandidates,
     mountRider,
     dismountRider,
@@ -143,12 +142,10 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('exported store-key contract', () => {
-    it('pins the key strings consumers read as raw literals', () => {
-        expect(MOUNTED_BY_KEY).toBe('mountedBy');
-        expect(MOUNT_NAME_KEY).toBe('mountName');
-    });
-});
+// #1388: 'exported store-key contract' pin retired — the two store-key
+// constants are module-local now. The literal byte contract 'mountedBy'/
+// 'mountName' is pinned by every behavior row below (setRuntimeObject/
+// setRuntimeValue tuples + runtimeStore peeks use the raw literals).
 
 describe('getMountCandidates', () => {
     it('filters players and mountedBy-latched combatants, coerces missing size/type to null, exact row shape', () => {

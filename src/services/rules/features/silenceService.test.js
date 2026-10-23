@@ -6,11 +6,16 @@
  *     (Verbal gate: execution/index.js:136-137 + spellResolution.js:54-55;
  *     thunder side: applyDamage.js:294), addSilencedTarget
  *     (SilenceModal.jsx:115), removeSilencedTargets (silenceHandler.js:79).
- *   - DEAD in production (grep-verified, zero callers outside test mocks):
- *     triggerSilence, getSilencedTargets. The live cast popup is built inline
- *     by modalSpells.js handleSilence — triggerSilence is pinned here as
- *     a DRIFT DETECTOR for that inline duplicate (#1357 class).
- *     RESIDUAL (REPORTED, not owned here): modalSpells.js:234-239 keeps the
+ *   - DEAD in production — EXCISED by the #1413/#1420 dead-export census batch
+ *     (2026-10-23, fix#82/fix#97 wholesale-excision precedent): triggerSilence
+ *     and getSilencedTargets no longer exist. triggerSilence had been pinned
+ *     here as a DRIFT DETECTOR for the inline modalSpells builder; the mirror
+ *     comment at modalSpells.js :235-:246 now states the parity-mirror bytes
+ *     are its SOLE home (the silenceService fixed parsers went with the
+ *     forwarder). getSilencedTargets (ZERO callers incl. internal) deleted;
+ *     its effect+source filter law stays pinned by the LIVE sibling lanes
+ *     below (addSilencedTarget / removeSilencedTargets / zone membership).
+ *   - RESIDUAL (REPORTED, not owned here): modalSpells.js:234-239 keeps the
  *     OLD defective regex pair — same numeric-.match crash + plural-feet
  *     silent-120 — its lane owns that twin fix.
  *   - Zone STORE WRITES (silenceCaster/silenceCenter/silenceRadius triple):
@@ -32,11 +37,13 @@
  *   This lane stamps no countdown, no minutes×N, no Date.now. CLEAN.
  * Zero dice — no RNG seam needed (RAW: Silence has no saving throw).
  * Quirks (#1413 FOUR-FIX, 2026-10-22):
- *   Q1 case-gate split vs modalSpells lowercase gate — STILL PINNED AS-IS.
- *   Q2 FIXED (a): numeric-.match crash — 5e disk size is NUMBER on all 89
- *      aoe rows (Silence size:20); typeof-number arm first, RAW rows dispatch.
- *   Q3 FIXED (b): plural 'feet' silent-drop -> 120 — feet/mile token set
- *      parses every lawful disk form; garbage LOUD-refuses (console.error).
+ *   Q1 case-gate split — RETIRED with the excised triggerSilence lane
+ *      (census batch 2026-10-23); the live gate is modalSpells handleSilence's
+ *      lowercase name==='silence' alone, pinned by the modalSpells lane.
+ *   Q2 FIXED (a) / Q3 FIXED (b): parser law (numeric-first size, feet/mile
+ *      token set, LOUD refuse) now lives SOLELY in the modalSpells parity
+ *      mirror (:247-:277, cited above) — the silenceService parser twins and
+ *      their #1348 range/size arm tables were excised with triggerSilence.
  *   Q4 FIXED (c): center JSON.parse guarded — corrupt string LOUD
  *      (console.error) then documented no-center arm (caster stands at center).
  *   Q5 FIXED (d): combatSummary rerouted to campaign-keyed
@@ -45,15 +52,6 @@
  *      TRIPWIRED in this fake — exact-arg campaign pin below. Underlying
  *      arity-2 store blindness stays deferred infra #1520.
  * #1348 ARM TABLES (coverage contract):
- *   range arm table:            absent->120 silent | '120 feet'->120 |
- *                               '60 feet'->60 | '5 feet'->5 | '25-foot radius'->25 |
- *                               '60 ft.'->60 | '1 mile'->5280 | 'Self'->LOUD+120 |
- *                               garbage->LOUD+120
- *   area size arm table:      absent->20 silent | number 20->20 | number 50->50
- *                               exact | number 0->LOUD+20 |
- *                               number NaN->LOUD+20 | '20-foot-radius'->20 |
- *                               '30-foot-radius'->30 | '10-foot radius'->10 |
- *                               'irregular'->LOUD+20
  *   center arm table:         null->caster-only | JSON string->geometry |
  *                               plain object->geometry | '{oops'->LOUD+caster-only |
  *                               JSON non-center string '{}'->caster-only
@@ -63,18 +61,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-    triggerSilence,
     isSilenceActive,
     getSilenceSource,
     isCreatureInSilenceZone,
-    getSilencedTargets,
     addSilencedTarget,
     removeSilencedTargets,
 } from './silenceService.js';
-
-vi.mock('../../automation/index.js', () => ({
-    executeHandler: vi.fn(),
-}));
 
 // STATEFUL argument-keyed runtime fake: unknown owner/key pair or arity THROWS.
 const CAMPAIGN = 'test-campaign';
@@ -141,7 +133,6 @@ vi.mock('../../encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
 }));
 
-const { executeHandler } = await import('../../automation/index.js');
 const { getDistanceFeet } = await import('../combat/rangeValidation.js');
 const { getCombatSummary } = await import('../../encounters/combatData.js');
 
@@ -149,34 +140,6 @@ let summaryCacheValue = null; // stands in for cachedCombatSummaries.get(campaig
 function seedSummary(value) {
     summaryCacheValue = value;
 }
-
-// RAW disk canon — verbatim bytes:
-// public/data/spells.json:8902ff  level 2, range "120 feet",
-//   area_of_effect { type:"sphere", size:20 }  <- NUMBER (5e disk law, 89 aoe rows)
-//   duration "Up to 10 minutes", concentration true
-// public/data/2024/spells.json:11724ff  same, duration
-//   "Concentration, up to 10 minutes", area_of_effect
-//   { shape:"sphere", size:"20-foot-radius" }  <- STRING (2024 disk law)
-const DISK_5E = {
-    index: 'silence',
-    name: 'Silence',
-    level: 2,
-    range: '120 feet',
-    area_of_effect: { type: 'sphere', size: 20 },
-    duration: 'Up to 10 minutes',
-    concentration: true,
-    components: ['V', 'S'],
-};
-const DISK_2024 = {
-    index: 'silence',
-    name: 'Silence',
-    level: 2,
-    range: '120 feet',
-    area_of_effect: { shape: 'sphere', size: '20-foot-radius' },
-    duration: 'Concentration, up to 10 minutes',
-    concentration: true,
-    components: ['V', 'S'],
-};
 
 beforeEach(() => {
     vi.resetAllMocks();
@@ -199,153 +162,6 @@ beforeEach(() => {
         runtimeState.set(`${owner}|${key}`, value);
     });
     makeStore([]);
-});
-
-describe('triggerSilence (dead export — drift pin vs modalSpells inline builder)', () => {
-    const playerStats = { name: 'Wizard' };
-
-    it('case-gate: forwards exact "Silence" with the full envelope; every near-miss name is inert (Q1)', async () => {
-        const sentinel = { ok: true };
-        executeHandler.mockResolvedValue(sentinel);
-
-        const result = await triggerSilence(DISK_2024, {}, playerStats, CAMPAIGN, 'battleMap');
-
-        // identity forwarding, exact 4-arg call
-        expect(result).toBe(sentinel);
-        expect(executeHandler).toHaveBeenCalledTimes(1);
-        const [action, statsArg, campaignArg, mapArg] = executeHandler.mock.calls[0];
-        expect(statsArg).toBe(playerStats);
-        expect(campaignArg).toBe(CAMPAIGN);
-        expect(mapArg).toBe('battleMap');
-
-        // envelope full set — if modalSpells.js:231 drifts from these bytes the
-        // two producers diverge; this pin is the detector.
-        expect(action).toEqual({
-            name: 'Silence',
-            automation: {
-                type: 'silence',
-                duration: 'Concentration, up to 10 minutes',
-                range: 120,
-                aoeRadius: 20,
-                slotLevel: 2,
-            },
-            spell: DISK_2024,
-            spellSlotLevel: 2,
-        });
-        expect(Object.keys(action)).toEqual(['name', 'automation', 'spell', 'spellSlotLevel']);
-        expect(Object.keys(action.automation)).toEqual(['type', 'duration', 'range', 'aoeRadius', 'slotLevel']);
-        expect(action.spell).toBe(DISK_2024);
-
-        // exact-match gate: modalSpells lowercases (name.toLowerCase()==='silence'),
-        // this lane does NOT — case-gate split, pinned as-is.
-        executeHandler.mockClear();
-        for (const name of ['silence', 'SILENCE', 'Silent Silence', 'Fire Bolt']) {
-            expect(await triggerSilence({ name }, {}, playerStats, CAMPAIGN, 'battleMap')).toBeNull();
-        }
-        expect(executeHandler).not.toHaveBeenCalled();
-    });
-
-    it('coercion arm table: slot precedence, feet/mile range parsing, numeric + string sizes (Q2/Q3 FIXED)', async () => {
-        executeHandler.mockResolvedValue({ success: true });
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        await triggerSilence({ name: 'Silence', level: 2 }, { slotLevel: 5 }, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[0][0].automation.slotLevel).toBe(5);
-        expect(executeHandler.mock.calls[0][0].spellSlotLevel).toBe(5);
-
-        // absent range/aoe: documented Silence RAW defaults, SILENT (120ft / 20ft sphere)
-        await triggerSilence({ name: 'Silence' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[1][0].automation.slotLevel).toBe(2);
-        expect(executeHandler.mock.calls[1][0].automation.range).toBe(120);
-        expect(executeHandler.mock.calls[1][0].automation.aoeRadius).toBe(20);
-
-        // Q3 FIXED: disk-canonical plural "feet" now parses — no more silent 120.
-        await triggerSilence({ name: 'Silence', range: '60 feet' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[2][0].automation.range).toBe(60);
-
-        await triggerSilence({ name: 'Silence', range: '5 feet' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[3][0].automation.range).toBe(5);
-
-        // string arms intact
-        await triggerSilence({ name: 'Silence', range: '25-foot radius' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[4][0].automation.range).toBe(25);
-
-        // abbreviation + mile arms from the disk token census
-        await triggerSilence({ name: 'Silence', range: '60 ft.' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[5][0].automation.range).toBe(60);
-        await triggerSilence({ name: 'Silence', range: '1 mile' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[6][0].automation.range).toBe(5280);
-
-        // loud-drop arm: lawful NON-feet word 'Self' (x68/x94 on disk, impossible
-        // for real Silence rows) must be HEARD, not silently 120'd.
-        consoleError.mockClear();
-        await triggerSilence({ name: 'Silence', range: 'Self' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[7][0].automation.range).toBe(120);
-        expect(consoleError).toHaveBeenCalledWith(
-            '[silence] Unrecognized range token "Self" — not a foot/mile count; Silence RAW default 120ft applies.',
-        );
-        consoleError.mockClear();
-        await triggerSilence({ name: 'Silence', range: 'nonsense' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[8][0].automation.range).toBe(120);
-        expect(consoleError).toHaveBeenCalledWith(
-            '[silence] Unrecognized range token "nonsense" — not a foot/mile count; Silence RAW default 120ft applies.',
-        );
-
-        // 2024 canonical string sizes
-        await triggerSilence({ name: 'Silence', area_of_effect: { size: '30-foot-radius' } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[9][0].automation.aoeRadius).toBe(30);
-        await triggerSilence({ name: 'Silence', area_of_effect: { size: '10-foot radius' } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[10][0].automation.aoeRadius).toBe(10);
-
-        // garbage string size: LOUD + 20ft default
-        consoleError.mockClear();
-        await triggerSilence({ name: 'Silence', area_of_effect: { size: 'irregular' } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[11][0].automation.aoeRadius).toBe(20);
-        expect(consoleError).toHaveBeenCalledWith(
-            '[silence] Unrecognized area_of_effect.size "irregular" — not a feet count; 20ft sphere default.',
-        );
-
-        // Q2 FIXED: RAW 5e disk canon size is NUMBER — numeric arm accepts the
-        // exact radius, lane DISPATCHES instead of TypeError-rejecting real rows.
-        consoleError.mockClear();
-        const raw5e = await triggerSilence(DISK_5E, {}, playerStats, CAMPAIGN, 'm');
-        expect(raw5e).toEqual({ success: true });
-        expect(executeHandler.mock.calls[12][0].automation.aoeRadius).toBe(20);
-        expect(executeHandler.mock.calls[12][0].automation.range).toBe(120);
-        expect(consoleError).not.toHaveBeenCalled(); // honest RAW shape: silent-OK arm
-
-        await triggerSilence({ name: 'Silence', area_of_effect: { size: 50 } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[13][0].automation.aoeRadius).toBe(50); // numeric arm EXACT radius
-
-        // numeric garbage arms: LOUD + 20ft sphere default
-        consoleError.mockClear();
-        await triggerSilence({ name: 'Silence', area_of_effect: { size: 0 } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[14][0].automation.aoeRadius).toBe(20);
-        expect(consoleError).toHaveBeenCalledWith(
-            '[silence] Non-positive/non-finite numeric area_of_effect.size 0 — 20ft sphere default.',
-        );
-        consoleError.mockClear();
-        await triggerSilence({ name: 'Silence', area_of_effect: { size: NaN } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[15][0].automation.aoeRadius).toBe(20);
-        expect(consoleError).toHaveBeenCalledWith(
-            '[silence] Non-positive/non-finite numeric area_of_effect.size NaN — 20ft sphere default.',
-        );
-
-        consoleError.mockRestore();
-        expect(executeHandler).toHaveBeenCalledTimes(16); // every arm dispatches — zero lane-rejects
-    });
-
-    it('handler rejection: exact console.error bytes, swallows to null (survives)', async () => {
-        const err = new Error('Handler failed');
-        executeHandler.mockRejectedValue(err);
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        const result = await triggerSilence(DISK_2024, {}, playerStats, CAMPAIGN, 'm');
-
-        expect(result).toBeNull();
-        expect(consoleError).toHaveBeenCalledWith('[silence] Failed to execute handler:', err);
-        consoleError.mockRestore();
-    });
 });
 
 describe('isSilenceActive / getSilenceSource (VERBAL-gate identity reads)', () => {
@@ -644,23 +460,6 @@ describe('removeSilencedTargets (clear lane, silenceHandler.js:79)', () => {
 
         seed('campaign', 'targetEffects', null);
         expect(removeSilencedTargets('ClericBoy', CAMPAIGN)).toEqual([]);
-        expect(setRuntimeValueSpy).not.toHaveBeenCalled();
-    });
-});
-
-describe('getSilencedTargets (zero-production caller — read-sibling spec pin)', () => {
-    it('exact effect+source filter returns target names; store stays untouched', () => {
-        seed('campaign', 'targetEffects', [
-            { target: 'Goblin', effect: 'silenced', source: 'ClericBoy' },
-            { target: 'Orc', effect: 'silenced', source: 'ClericBoy' },
-            { target: 'Dragon', effect: 'silenced', source: 'WizardGirl' },
-            { target: 'Rat', effect: 'frightened', source: 'ClericBoy' },
-        ]);
-
-        expect(getSilencedTargets('ClericBoy', CAMPAIGN)).toEqual(['Goblin', 'Orc']);
-
-        seed('campaign', 'targetEffects', null);
-        expect(getSilencedTargets('ClericBoy', CAMPAIGN)).toEqual([]);
         expect(setRuntimeValueSpy).not.toHaveBeenCalled();
     });
 });

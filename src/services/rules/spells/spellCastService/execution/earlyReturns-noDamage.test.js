@@ -4,14 +4,18 @@
 /*  split; noDamage-healing.test.js owns :316/:318-:320, :328-:332,   */
 /*  :345-:359 — never re-owned here).                                 */
 /*                                                                     */
-/*  Arm census REAL bytes (index.js :278-:315, 38 arms):               */
-/*   passThrough (:74): :278 Regenerate, :279 Fear, :280 Conjure      */
+/*  Arm census REAL bytes post-fix#296 (#1473) (index.js :278-:315    */
+/*  era span, 34 arms — :279/:285/:288/:293 twins DELETED at host):   */
+/*   passThrough (:74): :278 Regenerate, :280 Conjure                 */
 /*   Volley, :287 Power Word Stun, :295 Command, :300 Friends,        */
 /*   :301 Crown of Madness, :302 Animal Friendship, :303-:305         */
 /*   Dominate Beast/Monster/Person, :307 Compelled Duel, :308 Globe,  */
 /*   :309 Forcecage, :310 Silence, :313 Faerie Fire, :314 Tasha's,    */
-/*   :315 Imprisonment.  swallow (:75): :281-:286, :288-:294,         */
-/*   :296-:299, :306, :311-:312.  sync thunks: :279/:280/:310.       */
+/*   :315 Imprisonment.  swallow (:75): :281-:284, :286, :289-:292,   */
+/*   :294-:299, :306, :311-:312.  sync thunks: :280/:310.              */
+/*   DELETED arms (fix#296): :279 Fear (double-dead), :285 Confusion  */
+/*   + :288 Hypnotic (merged-dc-gate collapse), :293 Mass Suggestion  */
+/*   (dead-by-direct-route) — zero-dispatch tripwires below.           */
 /*                                                                     */
 /*  DISPOSITION #1 (#1458) EXECUTED: the old 'Mass Suggestion'/       */
 /*  'Suggestion' rows pinned triggerSpells :293/:294 with handled:    */
@@ -28,18 +32,21 @@
 /*  the lightweight payload mirroring useActionSpellMetamagic.js:163  */
 /*  {name, level, baseLevel} (row below).                             */
 /*                                                                     */
-/*  Dead-twin scan (headline class, #1458/:72): CONFUSION (:285) and  */
-/*  HYPNOTIC PATTERN (:288) rows deleted too — modalSpells.js:150/:96*/
-/*  gate on fullSpell, and lookupFullSpell (:170-:189) merges the     */
-/*  disk dc into EVERY lightweight cast of those names, so :707/:706  */
-/*  intercept both disk-full and lightweight routes; owners:            */
-/*  earlyReturns-modal.test.js :603/:561 (#1471). FEAR (:279) row    */
-/*  deleted: disk-full hijacked at :710 (REAL automation 'fear',      */
-/*  census #1470) AND lightweight declined by modalSpells.js:185      */
-/*  (gate requires spell.dc, absent on :163 payload) -> no byte-      */
-/*  honest row exists; fabrication banned (#1455 precedent). The      */
-/*  declined handleFear mock stays in the per-cast before-census so   */
-/*  no phantom intercept can hide.                                    */
+/*  Dead-twin scan (headline class, #1458/:72) CLOSED-BY-FIX fix#296: */
+/*  CONFUSION (:285) and HYPNOTIC PATTERN (:288) twins DELETED at the  */
+/*  host — modalSpells.js:150/:96-era gate on fullSpell, and            */
+/*  lookupFullSpell (:170-:189) merges the disk dc into EVERY           */
+/*  lightweight cast of those names, so :707/:706 intercept both       */
+/*  disk-full and lightweight routes; the merged gate is NAME-KEYED    */
+/*  (merge sets name: spell.name) so one spell's dc can never satisfy  */
+/*  the other's check — no fix#166 cross-gating to split -> COLLAPSE. */
+/*  Owners: earlyReturns-modal.test.js :603/:561 (#1471). FEAR (:279)  */
+/*  arm DELETED: disk-full hijacked at :710 (REAL automation 'fear',   */
+/*  census #1470) AND lightweight declined by modalSpells.js:185        */
+/*  (gate requires spell.dc, absent on :163 payload) -> no byte-       */
+/*  honest row ever existed; fabrication banned (#1455 precedent). The  */
+/*  handleFear mock stays in the vi.mock factories as a ZERO-dispatch   */
+/*  tripwire: any resurrection of a hub fear dispatch flips red.        */
 /*  DISPOSITION #2 (#1472) EXECUTED: :308-:315 arms now carry compact */
 /*  rows (previously mock-through-only). Globe/Forcecage are owned by */
 /*  blockChecks (:658/:659, lane #1466) for the INBOUND-block face;  */
@@ -364,28 +371,27 @@ const stampedMeta = (metaCtx) => ({ ...metaCtx, metamagicHeighten: false });
 
 const LANE_POPUP = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'lane-base' } } };
 
-/* Chain census: index.js :278-:315 in EXACT order.
+/* Chain census: index.js :278-:315 era span in EXACT order, post-fix#296
+ * 34 arms (:279 Fear / :285 Confusion / :288 Hypnotic Pattern /
+ * :293 Mass Suggestion twins DELETED at the host — zero-dispatch
+ * tripwires live in the flipped describe below).
  * shape keys: posRegen(:278) pos4(spell,metaCtx,playerStats,campaign,mapName)
  * obj({spell,metaCtx,spellSaveDc,playerStats,campaign,mapName})
  * objG(obj + getTargetInfo) cv(:280 (spell,fullSpell)) sil(:310 special).
  * 'pass' = passThrough (:74), 'sw' = swallow (:75). sync = non-Promise thunk. */
 const CHAIN = [
   /* :278 */ { mock: ts.handleRegenerate, lane: 'pass', shape: 'posRegen' },
-  /* :279 */ { mock: mockFear, lane: 'pass', shape: 'obj', sync: true, dead: 'double-dead twin (see header)' },
   /* :280 */ { mock: mockConjureVolley, lane: 'pass', shape: 'cv', sync: true },
   /* :281 */ { mock: ts.handleSeeInvisibility, lane: 'sw', shape: 'pos4' },
   /* :282 */ { mock: ts.handleFleshToStone, lane: 'sw', shape: 'obj' },
   /* :283 */ { mock: ts.handleHoldMonster, lane: 'sw', shape: 'obj' },
   /* :284 */ { mock: ts.handleBanishment, lane: 'sw', shape: 'obj' },
-  /* :285 */ { mock: ts.handleConfusion, lane: 'sw', shape: 'obj', dead: ':707 intercepts disk AND lightweight (fullSpell.dc merged)' },
   /* :286 */ { mock: ts.handleMaze, lane: 'sw', shape: 'obj' },
   /* :287 */ { mock: ts.handlePowerWordStun, lane: 'pass', shape: 'obj' },
-  /* :288 */ { mock: ts.handleHypnoticPattern, lane: 'sw', shape: 'obj', dead: ':706 intercepts disk AND lightweight (fullSpell.dc merged)' },
   /* :289 */ { mock: ts.handleSlow, lane: 'sw', shape: 'obj' },
   /* :290 */ { mock: ts.handleBane, lane: 'sw', shape: 'obj' },
   /* :291 */ { mock: ts.handleBless, lane: 'sw', shape: 'obj' },
   /* :292 */ { mock: ts.handleBeaconOfHope, lane: 'sw', shape: 'obj' },
-  /* :293 */ { mock: ts.handleMassSuggestion, lane: 'sw', shape: 'obj', dead: ':704 intercepts every mass-suggestion name + numeric spellSaveDc (modalSpells.js:42)' },
   /* :294 */ { mock: ts.handleSuggestion, lane: 'sw', shape: 'obj' },
   /* :295 */ { mock: ts.handleCommand, lane: 'pass', shape: 'objG' },
   /* :296 */ { mock: ts.handleOttoDance, lane: 'sw', shape: 'obj' },
@@ -534,13 +540,18 @@ async function runCast(row) {
 }
 
 // Lightweight 'Suggestion': proves the :704 hijack runs-and-declines the
-// non-mass name (the Mass Suggestion disposition, #1458) while :293 stays
-// short-circuited behind :294 is FALSE — :293 is BEFORE :294, so it must
-// appear in the declined census (CHAIN idx 15 ran once declined).
+// non-mass name (the Mass Suggestion disposition, #1458) AND the fix#296
+// (#1473) host deletions: the :293-era handleMassSuggestion twin and the
+// :279-era handleFear arm no longer exist in the chain — ZERO dispatch,
+// and the :285/:288 twins are gone too. Arming their mocks can no longer
+// make them fire: the host no longer imports or dispatches them. Any
+// resurrection of a hub dispatch for these names flips these ZERO pins red.
 const suggestionVerify = () => {
-  expect(mockMassSuggestionEarly).toHaveBeenCalledTimes(1);
-  expect(ts.handleMassSuggestion).toHaveBeenCalledTimes(1); // :293 ran declined
-  expect(mockFear).toHaveBeenCalledTimes(1); // :279 real-shape declined, never phantom-intercepts
+  expect(mockMassSuggestionEarly).toHaveBeenCalledTimes(1); // :704 ran declined (non-mass name)
+  expect(ts.handleMassSuggestion).toHaveBeenCalledTimes(0); // :293 twin DELETED (fix#296)
+  expect(mockFear).toHaveBeenCalledTimes(0); // :279 arm DELETED (fix#296, double-dead)
+  expect(ts.handleConfusion).toHaveBeenCalledTimes(0); // :285 twin DELETED (fix#296)
+  expect(ts.handleHypnoticPattern).toHaveBeenCalledTimes(0); // :288 twin DELETED (fix#296)
 };
 
 /* ------------------------------------------------------------------ */
@@ -562,12 +573,12 @@ describe('executeSpellCast noDamage base chain (:278-:315) — hijacked disk nam
 
   const lightRows = [
     { i: 0, name: 'Regenerate', kind: 'light', label: 'first arm :278 passThrough, :710-hijacked disk route (#1455 dead-route face)' },
-    { i: 3, name: 'See Invisibility', kind: 'light', label: ':281 swallow (cited-by seeInvisibilityService.test.js:20)' },
-    { i: 4, name: 'Flesh to Stone', kind: 'light', label: ':282 swallow' },
-    { i: 14, name: 'Beacon of Hope', kind: 'light', label: ':292 swallow' },
-    { i: 16, name: 'Suggestion', kind: 'light', label: ':294 swallow, :704 declined for non-mass name (#1458 disposition)', verify: suggestionVerify },
-    { i: 30, name: 'Globe of Invulnerability', kind: 'light', label: ':308 passThrough (blockChecks owns the inbound block face, #1466)' },
-    { i: 31, name: 'Forcecage', kind: 'light', label: ':309 passThrough (blockChecks owns the inbound block face, #1466)' },
+    { i: 2, name: 'See Invisibility', kind: 'light', label: ':281 swallow (cited-by seeInvisibilityService.test.js:20)' },
+    { i: 3, name: 'Flesh to Stone', kind: 'light', label: ':282 swallow' },
+    { i: 11, name: 'Beacon of Hope', kind: 'light', label: ':292 swallow' },
+    { i: 12, name: 'Suggestion', kind: 'light', label: ':294 swallow, :704 declined for non-mass name (#1458 disposition; :293 twin deleted fix#296)', verify: suggestionVerify },
+    { i: 26, name: 'Globe of Invulnerability', kind: 'light', label: ':308 passThrough (blockChecks owns the inbound block face, #1466)' },
+    { i: 27, name: 'Forcecage', kind: 'light', label: ':309 passThrough (blockChecks owns the inbound block face, #1466)' },
   ];
 
   for (const r of lightRows) {
@@ -591,33 +602,33 @@ describe('executeSpellCast noDamage base chain — LIVE disk-byte intercepts (au
   });
 
   const diskRows = [
-    { i: 2, name: 'Conjure Volley', rules: '2024', kind: 'disk', label: ':280 SYNC arm, (spell, fullSpell SAME-identity) tuple (no lookup: aoe set + automation null)' },
-    { i: 5, name: 'Hold Monster', kind: 'disk', label: ':283 swallow' },
-    { i: 5, name: 'Hold Person', kind: 'disk', label: ':283 swallow — dual-name arm (triggerSpells.js:87)' },
-    { i: 6, name: 'Banishment', kind: 'disk', label: ':284 swallow' },
-    { i: 8, name: 'Maze', kind: 'disk', label: ':286 swallow' },
-    { i: 9, name: 'Power Word Stun', kind: 'disk', label: ':287 passThrough' },
-    { i: 12, name: 'Bane', kind: 'disk', label: ':290 swallow' },
-    { i: 13, name: 'Bless', kind: 'disk', label: ':291 swallow' },
-    { i: 17, name: 'Command', kind: 'disk', label: ':295 passThrough command-choice modal envelope' },
-    { i: 18, name: "Otto's Irresistible Dance", rules: '2024', kind: 'disk', label: ':296 swallow (SERVICE-declined at :710)' },
-    { i: 19, name: "Otiluke's Resilient Sphere", rules: '2024', kind: 'disk', label: ':297 swallow (SERVICE-declined at :710)' },
-    { i: 20, name: 'Blur', kind: 'disk', label: ':298 swallow pos4' },
-    { i: 21, name: 'Expeditious Retreat', kind: 'disk', label: ':299 swallow pos4' },
-    { i: 22, name: 'Friends', kind: 'disk', label: ':300 passThrough' },
-    { i: 23, name: 'Crown of Madness', rules: '2024', kind: 'disk', label: ':301 passThrough (5e disk has no row — reported)' },
-    { i: 24, name: 'Animal Friendship', kind: 'disk', label: ':302 passThrough' },
-    { i: 25, name: 'Dominate Beast', kind: 'disk', label: ':303 passThrough' },
-    { i: 26, name: 'Dominate Monster', kind: 'disk', label: ':304 passThrough (save_only automation declined at :710 by effects.fail/success)' },
-    { i: 27, name: 'Dominate Person', kind: 'disk', label: ':305 passThrough' },
-    { i: 28, name: 'Ray of Enfeeblement', kind: 'disk', label: ':306 swallow (only swallow among the S6 dominate-family arms)' },
-    { i: 29, name: 'Compelled Duel', kind: 'disk', label: ':307 passThrough' },
-    { i: 32, name: 'Silence', kind: 'disk', label: ':310 SYNC arm with injected getCombatSummary wrapper — delegation verified' },
-    { i: 33, name: 'Stinking Cloud', kind: 'disk', label: ':311 swallow' },
-    { i: 34, name: 'Sleet Storm', kind: 'disk', label: ':312 swallow' },
-    { i: 35, name: 'Faerie Fire', kind: 'disk', label: ':313 passThrough' },
-    { i: 36, name: "Tasha's Hideous Laughter", rules: '2024', kind: 'disk', label: ':314 passThrough forwards handler result VERBATIM (:389 unwrapped result, no automationPopup wrap)' },
-    { i: 37, name: 'Imprisonment', kind: 'disk', label: ':315 passThrough (2024 disk hijacked at :710 — reported)' },
+    { i: 1, name: 'Conjure Volley', rules: '2024', kind: 'disk', label: ':280 SYNC arm, (spell, fullSpell SAME-identity) tuple (no lookup: aoe set + automation null)' },
+    { i: 4, name: 'Hold Monster', kind: 'disk', label: ':283 swallow' },
+    { i: 4, name: 'Hold Person', kind: 'disk', label: ':283 swallow — dual-name arm (triggerSpells.js:87)' },
+    { i: 5, name: 'Banishment', kind: 'disk', label: ':284 swallow' },
+    { i: 6, name: 'Maze', kind: 'disk', label: ':286 swallow' },
+    { i: 7, name: 'Power Word Stun', kind: 'disk', label: ':287 passThrough' },
+    { i: 9, name: 'Bane', kind: 'disk', label: ':290 swallow' },
+    { i: 10, name: 'Bless', kind: 'disk', label: ':291 swallow' },
+    { i: 13, name: 'Command', kind: 'disk', label: ':295 passThrough command-choice modal envelope' },
+    { i: 14, name: "Otto's Irresistible Dance", rules: '2024', kind: 'disk', label: ':296 swallow (SERVICE-declined at :710)' },
+    { i: 15, name: "Otiluke's Resilient Sphere", rules: '2024', kind: 'disk', label: ':297 swallow (SERVICE-declined at :710)' },
+    { i: 16, name: 'Blur', kind: 'disk', label: ':298 swallow pos4' },
+    { i: 17, name: 'Expeditious Retreat', kind: 'disk', label: ':299 swallow pos4' },
+    { i: 18, name: 'Friends', kind: 'disk', label: ':300 passThrough' },
+    { i: 19, name: 'Crown of Madness', rules: '2024', kind: 'disk', label: ':301 passThrough (5e disk has no row — reported)' },
+    { i: 20, name: 'Animal Friendship', kind: 'disk', label: ':302 passThrough' },
+    { i: 21, name: 'Dominate Beast', kind: 'disk', label: ':303 passThrough' },
+    { i: 22, name: 'Dominate Monster', kind: 'disk', label: ':304 passThrough (save_only automation declined at :710 by effects.fail/success)' },
+    { i: 23, name: 'Dominate Person', kind: 'disk', label: ':305 passThrough' },
+    { i: 24, name: 'Ray of Enfeeblement', kind: 'disk', label: ':306 swallow (only swallow among the S6 dominate-family arms)' },
+    { i: 25, name: 'Compelled Duel', kind: 'disk', label: ':307 passThrough' },
+    { i: 28, name: 'Silence', kind: 'disk', label: ':310 SYNC arm with injected getCombatSummary wrapper — delegation verified' },
+    { i: 29, name: 'Stinking Cloud', kind: 'disk', label: ':311 swallow' },
+    { i: 30, name: 'Sleet Storm', kind: 'disk', label: ':312 swallow' },
+    { i: 31, name: 'Faerie Fire', kind: 'disk', label: ':313 passThrough' },
+    { i: 32, name: "Tasha's Hideous Laughter", rules: '2024', kind: 'disk', label: ':314 passThrough forwards handler result VERBATIM (:389 unwrapped result, no automationPopup wrap)' },
+    { i: 33, name: 'Imprisonment', kind: 'disk', label: ':315 passThrough (2024 disk hijacked at :710 — reported)' },
   ];
 
   for (const r of diskRows) {
@@ -627,7 +638,7 @@ describe('executeSpellCast noDamage base chain — LIVE disk-byte intercepts (au
   }
 });
 
-describe('executeSpellCast noDamage base chain — dead twins stay dead (pin the declined dispatch so a resurrection or silent removal fails loudly)', () => {
+describe('executeSpellCast noDamage base chain — fix#296 (#1473) twin deletions are PERMANENT: zero-dispatch tripwires (the #1473-era pinned-not-fixed pins flipped to real behavior)', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (url) => ({
       ok: true,
@@ -640,25 +651,32 @@ describe('executeSpellCast noDamage base chain — dead twins stay dead (pin the
     consoleError.mockRestore();
   });
 
-  it('Fear: lightweight declined by the real dc-gate route (:279 double-dead), disk-full hijacked at :710 — hub pins the declined dispatch and the fall-through', async () => {
-    // Lightweight Fear ({name, level, baseLevel}) cannot trip modalSpells.js:185
-    // (needs spell.dc) and disk-full Fear is consumed at :710 by REAL generic
-    // automation (census #1470). Both production routes decline :279, so the
-    // cast falls through the whole :278-:315 census unhandled and reaches the
-    // :326 status-effects fallback / damage lane. Pinned: every arm ran once
-    // declined, chain returned unhandled, and the :754 save lane seam (merged
-    // fullSpell.dc) dispatched instead of any dedicated arm.
+  it('Fear arm (:279-era) DELETED double-dead — lightweight declines (no spell.dc), disk hijacks at :710 — hub dispatches ZERO, cast falls through to the merged-dc save lane', async () => {
+    // fix#296 (#1473) FLIPPED pin (formerly pinned-not-fixed 'declined once'):
+    // the :279-era handleFear hub arm is DELETED from the chain — the host no
+    // longer imports or dispatches handleFear. Lightweight Fear ({name, level,
+    // baseLevel}) still cannot trip modalSpells.js:185 (requires spell.dc) and
+    // disk-full Fear is consumed at :710 by REAL generic automation (census
+    // #1470 — fear's live route is DIRECT fearHandler, automation/index.js:530;
+    // fearService deleted fix#294), so the cast falls through the whole
+    // :278-:315 SURVIVOR census unhandled and reaches the :326 status-effects
+    // fallback / damage lane. Pinned: every survivor arm ran once declined,
+    // handleFear dispatches ZERO (any resurrection flips this red), the chain
+    // returned unhandled, and the :754 save lane seam (merged fullSpell.dc)
+    // dispatched instead of any dedicated arm.
     resetAllMocks();
     const spell = lightweight(diskRow(spells5e, 'Fear'));
     const stats = makePlayerStats();
     const metaCtx = { targetName: 'Goblin' };
     const services = { rollAttack: vi.fn(), rollDamage: vi.fn(), playerStats: stats, getTargetInfo: async () => ({ name: 'Goblin' }), campaignName: CAMPAIGN };
 
+    mockFear.mockReturnValue({ handled: true, result: LANE_POPUP }); // armed resurrection probe
+
     const result = await executeSpellCast(spell, metaCtx, services);
 
     expect(result).toBeNull(); // unhandled: falls to :771 runPostCastTriggers (surge null)
     for (const c of CHAIN) expect(c.mock).toHaveBeenCalledTimes(1);
-    expect(mockFear).toHaveBeenCalledTimes(1);
+    expect(mockFear).toHaveBeenCalledTimes(0); // DELETED arm — never dispatched (fix#296)
     // :341 fire-and-forget runs ONLY on unhandled fall-through — the exact
     // inverse of every handled row above (healing-lane wordBefore boundary).
     expect(triggerHealingWord).toHaveBeenCalledTimes(1);
@@ -668,33 +686,61 @@ describe('executeSpellCast noDamage base chain — dead twins stay dead (pin the
     expect(consoleError).toHaveBeenCalledTimes(0);
   });
 
-  it('Confusion/Hypnotic Pattern lightweight casts intercept at :707/:706 (merged fullSpell.dc), so :285/:288 never dispatch — zero calls pin the dead twins', async () => {
-    // lookupFullSpell merges the disk dc into a lightweight cast, so the REAL
-    // early gates (modalSpells.js:96/:150) consume 'Hypnotic Pattern'/'Confusion'
-    // BEFORE the noDamage chain. With the early producers mocked-declined here
-    // (dispatch envelopes owned by earlyReturns-modal #1471), the noDamage
-    // :285/:288 twins are reachable ONLY through the mock gap this pin
-    // documents — the honest hub fact asserted is: whenever they DO run, they
-    // run declined and a later arm (Bane/Bless) owns nothing of them.
+  it('Confusion/Hypnotic Pattern twins (:285/:288-era) DELETED — merged-dc-gate collapse: armed twins stay UNDISPATCHED for lightweight AND disk shapes; merged hub falls through to the save lane', async () => {
+    // fix#296 (#1473) FLIPPED pin (formerly pinned-not-fixed 'intercepts in the
+    // mocked world'): lookupFullSpell merges the disk dc NAME-KEYED into every
+    // lightweight cast, so the REAL early gates (modalSpells.js:96/:150) consume
+    // 'Hypnotic Pattern'/'Confusion' before the noDamage chain (REAL bytes owned
+    // by earlyReturns-modal :603/:561, #1471) — the twins were dead on every
+    // production route. The merged gate is correct-by-data — identical dc shapes
+    // ({dc_type:'WIS',dc_success:'none'}), distinct name keys, no fix#166-style
+    // cross-gating to split — so the STRUCTURAL fix COLLAPSED them: arms deleted
+    // at the host. Even armed with handled:true they cannot fire.
     resetAllMocks();
-    const spell = lightweight(diskRow(spells5e, 'Confusion'));
     const stats = makePlayerStats();
     const metaCtx = { targetName: 'Goblin' };
     const services = { rollAttack: vi.fn(), rollDamage: vi.fn(), playerStats: stats, getTargetInfo: async () => ({ name: 'Goblin' }), campaignName: CAMPAIGN };
 
-    ts.handleConfusion.mockResolvedValueOnce({ handled: true });
-    const result = await executeSpellCast(spell, metaCtx, services);
+    ts.handleConfusion.mockResolvedValue({ handled: true });
+    ts.handleHypnoticPattern.mockResolvedValue({ handled: true });
 
-    // :707 declines only because its producer is MOCKED here; the real bytes
-    // intercept (earlyReturns-modal.test.js:603 pins that). In the mocked
-    // world the :285 twin intercepts and swallows — pinned so a future removal
-    // of :285 shifts the census loudly (later arms all zero, heal lanes inert).
-    expect(result).toBeUndefined();
-    expect(ts.handleConfusion).toHaveBeenCalledTimes(1);
-    expect(ts.handleConfusion).toHaveBeenCalledWith({ spell, metaCtx: stampedMeta(metaCtx), spellSaveDc: SAVE_DC, playerStats: stats, campaignName: CAMPAIGN, mapName: undefined });
-    CHAIN.forEach((c, j) => expect(c.mock).toHaveBeenCalledTimes(j <= 7 ? 1 : 0));
-    for (const m of INERT) expect(m).toHaveBeenCalledTimes(0);
-    expect(handleSavePath).toHaveBeenCalledTimes(0);
+    const conf = await executeSpellCast(lightweight(diskRow(spells5e, 'Confusion')), metaCtx, services);
+    expect(ts.handleConfusion).toHaveBeenCalledTimes(0); // twin DELETED — never dispatched
+    expect(ts.handleHypnoticPattern).toHaveBeenCalledTimes(0);
+    expect(conf).toBeNull(); // unhandled here (early gate mock-declined): merged-dc save lane seam
+    expect(handleSavePath).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledTimes(0);
+
+    resetAllMocks();
+    const hyp = await executeSpellCast({ ...diskRow(spells5e, 'Hypnotic Pattern') }, metaCtx, services);
+    expect(ts.handleHypnoticPattern).toHaveBeenCalledTimes(0); // disk shape too (generic :710 mocked-declined in this lane)
+    expect(ts.handleConfusion).toHaveBeenCalledTimes(0);
+    expect(hyp).toBeNull();
+    expect(consoleError).toHaveBeenCalledTimes(0);
+  });
+
+  it('Mass Suggestion twin (:293-era) DELETED — :704-era early arm is the sole dispatcher (spellSaveDc always numeric, #1473); armed ts twin stays silent', async () => {
+    // fix#296 (#1473): #1458 disposition EXECUTED at the host. handleMassSuggestion
+    // (:704-era, modalSpells.js:45 — lowercase-name + spellSaveDc gate) intercepts
+    // EVERY 'mass suggestion' cast — computeSpellStats makes spellSaveDc ALWAYS
+    // numeric (spellStats.test.js:384 pin) — so the :293 triggerSpells forwarder was
+    // dead-by-direct-route: REMOVED from the chain. Route home triggerSpells
+    // .handleMassSuggestion stays byte-stable for other callers (fix#109); live
+    // dispatch envelopes: earlyReturns-modal :468-era + modalSpells.massSuggestion-
+    // pay-at-confirm (producer bytes) + noformula-services 'twins never fire' pin.
+    resetAllMocks();
+    const stats = makePlayerStats();
+    const metaCtx = { targetName: 'Goblin' };
+    const services = { rollAttack: vi.fn(), rollDamage: vi.fn(), playerStats: stats, getTargetInfo: async () => ({ name: 'Goblin' }), campaignName: CAMPAIGN };
+
+    ts.handleMassSuggestion.mockResolvedValue({ handled: true }); // armed resurrection probe
+
+    const result = await executeSpellCast(lightweight(diskRow(spells5e, 'Mass Suggestion')), metaCtx, services);
+
+    expect(ts.handleMassSuggestion).toHaveBeenCalledTimes(0); // twin DELETED — never dispatched
+    expect(mockMassSuggestionEarly).toHaveBeenCalledTimes(1); // :704 ran (mock-declined in this lane)
+    expect(result).toBeNull(); // merged-dc save-lane seam owns the fall-through here
+    expect(handleSavePath).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalledTimes(0);
   });
 });

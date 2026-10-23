@@ -76,7 +76,9 @@ import { collectAutomationFromFeatures } from '../../../../combat/automation/aut
 /*  damageCalculation.js / blockChecks.js / spellResolution.js).       */
 /*  Deleted as DEAD (zero importers, grep-verified): foresightService, */
 /*  heroismService, sleepService, fearService. Deleted fabricated key: */
-/*  silenceService.triggerSilence (zero importers). triggerSoulstitch  */
+/*  silenceService.triggerSilence (zero importers; symbol itself       */
+/*  EXCISED repo-wide by the #1413/#1420 dead-export census batch).   */
+/*  triggerSoulstitch  */
 /*  dropped — sole importer savePath.js is lane-mocked.                 */
 /* ------------------------------------------------------------------ */
 

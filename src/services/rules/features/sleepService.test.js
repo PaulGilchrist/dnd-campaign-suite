@@ -79,7 +79,6 @@ import {
     wakeSleepTarget,
     wakeSleepOnDamage,
     SLEEP_TE_EFFECT,
-    sleepStageSpec,
 } from './sleepService.js';
 import { executeHandler } from '../../automation/index.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -588,14 +587,38 @@ describe('sleepService — SP-107 Sleep spell face (base lane)', () => {
         expect(consoleSpy.mock.calls[0][1]).toBe(err); // identical instance (#1385)
     });
 
-    it('sleepStageSpec() (ZERO external importers — internal default producer kept as drift detector, rec #1413) returns the exact SP-107 spell default envelope in key order, and saveType coercion walks word→abbrev→WIS with garbage falling back to WIS while concentrate:false only ever rides the breath face (cited)', () => {
-        expect(sleepStageSpec()).toEqual({
-            concentrate: true, label: 'Sleep', logLabel: 'Sleep spell',
+    it('demoted sleepStageSpec (#1420 census — export keyword dropped, ZERO external importers) rides the PUBLIC stageSleepTargets surface: saveType coercion walks word→abbrev→WIS with garbage falling back to the :82 silent WIS default inside the byte-exact spell te, concentrate:false only ever flips duration→staged_until_repeat_save and skips concentration registration (breath face), and the default 4-arg call equals an explicit saveType:"WIS" call (the old pure-envelope pin retired with the demotion — default spell te already byte-pinned at :396 incl. key order)', async () => {
+        cs.creatures = [{ name: CASTER, type: 'player', concentration: null }];
+
+        const stageOnce = async (options) => {
+            store.campaign.targetEffects = [];
+            delete store[T1];
+            await stageSleepTargets(campaignName, CASTER, [T1], DC, options);
+            return store.campaign.targetEffects[0];
+        };
+
+        const wordTe = await stageOnce({ saveType: 'Wisdom' }); // word→abbrev live branch
+        expect(wordTe.saveType).toBe('WIS');
+        const garbageTe = await stageOnce({ saveType: 'garbage' }); // :82 silent-default, both sides
+        expect(garbageTe.saveType).toBe('WIS');
+        const defaultTe = await stageOnce();
+        const explicitTe = await stageOnce({ saveType: 'WIS' });
+        expect(explicitTe).toEqual(defaultTe); // coercion is identity on the spell byte
+
+        // Spell-face defaults observable through the same te (drift detector for the
+        // former pure pin): label/logLabel/unconsciousRounds/duration concentration.
+        expect(defaultTe).toMatchObject({
+            label: 'Sleep', logLabel: 'Sleep spell',
             unconsciousRounds: 10, saveType: 'WIS', duration: 'concentration',
         });
-        expect(Object.keys(sleepStageSpec())).toEqual(['concentrate', 'label', 'logLabel', 'unconsciousRounds', 'saveType', 'duration']);
-        expect(sleepStageSpec({ saveType: 'Wisdom' }).saveType).toBe('WIS'); // word→abbrev→upper live branch
-        expect(sleepStageSpec({ saveType: 'garbage' }).saveType).toBe('WIS'); // :82 silent-default, both sides
-        expect(sleepStageSpec({ saveType: 'WIS' })).toEqual(sleepStageSpec());
+
+        // concentrate:false rides ONLY the breath face: duration flips to the staged
+        // sentinel and the concentration block is skipped entirely (:139 early return).
+        const addC0 = addConcentration.mock.calls.length;
+        const breathTe = await stageOnce({ concentrate: false, saveType: 'CON', unconsciousRounds: 100 });
+        expect(breathTe.duration).toBe('staged_until_repeat_save');
+        expect(breathTe.saveType).toBe('CON');
+        expect(breathTe.unconsciousRounds).toBe(100);
+        expect(addConcentration).toHaveBeenCalledTimes(addC0); // no caster concentration on the non-concentrating face
     });
 });

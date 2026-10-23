@@ -21,7 +21,7 @@ import * as rider from './postCastRiderService.js'
 /*  Identity: hub routing (executeSpellCast → runTriggerChain /       */
 /*  runNoDamagePath) for the popup-returning rows of the no-damage    */
 /*  chain that have NO damage formula and adjudicate via MODAL:       */
-/*   - fear modal ................. index.js:279 → modalSpells.js:184 */
+/*   - fear modal ................. DELETED fix#296 (#1473) — see fear describe */
 /*   - conjure volley popup ....... index.js:280 → modalSpells.js:211 */
 /*   - silence target-selection ... index.js:310 → modalSpells.js:231 */
 /*   - silence verbal gate (SP-106) popup + log .. index.js:682-687   */
@@ -39,14 +39,15 @@ import * as rider from './postCastRiderService.js'
 /*  envelope honesty: handleGenericAutomation (index.js:710) hijacks  */
 /*  any cast payload that still carries automation.type unless the    */
 /*  name is in SERVICE_HANDLED_SPELLS (triggerSpells.js:42 — 'fear'  */
-/*  'silence' 'conjure volley' are NOT). So the fear modal branch     */
-/*  is reachable ONLY with automation-free cast envelopes; the         */
-/*  disk-fear fixture below strips the disk `automation` key on        */
-/*  purpose and pins executeHandler never being called.                */
-/*  Case-gate split (fresh family data point): modalSpells normalizes */
-/*  with toLowerCase() (modalSpells.js:185/212/232) while the disk    */
-/*  lookup is EXACT-case (index.js:179) — 'FEAR' opens the fear modal */
-/*  but console.errors a lookup miss.                                  */
+/*  'silence' 'conjure volley' are NOT). fix#296 (#1473): the fear    */
+/*  modal branch was reachable ONLY with FABRICATED automation-free    */
+/*  envelopes — the hub arm is DELETED double-dead, the stripping      */
+/*  fixture retired with it, and fear pins now feed REAL disk bytes    */
+/*  to the :710 DIRECT-fearHandler hijack (#1455 fabrication ban).     */
+/*  Case-gate split (historical on the retired fear row): modalSpells  */
+/*  lowercases (survivors modalSpells.js:212/232 volley/silence) while */
+/*  the disk lookup stays EXACT-case (index.js:179) — the volley lane   */
+/*  below keeps that split observable on REAL producers.                  */
 /*  Quirk (non-defect): handleSilence reads spell.area_of_effect,     */
 /*  never fullSpell (modalSpells.js:237) — the merged disk AoE never  */
 /*  reaches the modal; the fallback constants (range 120 / radius 20) */
@@ -101,7 +102,6 @@ vi.mock('../../combat/buffs/buffService.js', () => ({
 vi.mock('../features/silenceService.js', () => ({
   getSilenceSource: vi.fn(() => null),
   isCreatureInSilenceZone: vi.fn(() => false),
-  triggerSilence: vi.fn(),
 }))
 
 vi.mock('../features/invisibilityService.js', () => ({
@@ -202,14 +202,12 @@ function minimalPayload(name, ruleset = '5e') {
   }
 }
 
-// Disk-fear row minus its `automation` key — the documented discriminator
-// that keeps the cast out of handleGenericAutomation (index.js:710) and
-// routes it to modalSpells.handleFear (:279). Keeps dc + AoE + description.
-function fearDiskEnvelope(overrides = {}) {
-  const row = { ...diskRow('Fear') }
-  delete row.automation // discriminator: keeps the cast out of handleGenericAutomation (:710)
-  return { ...row, ...overrides }
-}
+// fix#296 (#1473): fixture retired. The disk Fear row minus its `automation`
+// key was a FABRICATED shape (real disk bytes ship automation.type 'fear' on
+// BOTH rulesets) whose only purpose was dodging the :710 hijack to reach the
+// :279-era hub modal arm — that arm is now deleted double-dead, so the
+// envelope is banned evidence (#1455 precedent). Real-bytes fear lanes
+// replace it in the describe below.
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -270,6 +268,12 @@ describe('executeSpellCast - no-formula modal routing (fear / volley / silence)'
       fetchCalls.push(url)
       if (url === '/data/spells.json') return Promise.resolve(jsonResponse(spells5e))
       if (url === '/data/2024/spells.json') return Promise.resolve(jsonResponse(spells2024))
+      // fix#296 (#1473): the lightweight-fear fall-through now rides the
+      // REAL save lane (handleAoE reads the combat-context change-data
+      // feed). Serve an EMPTY summary (no combat) honestly instead of
+      // tripping the strict-stub noise; the save adjudication itself is
+      // savePath-lane-owned and not re-pinned here.
+      if (url === '/api/campaigns/test-campaign/change-data') return Promise.resolve(jsonResponse({}))
       return Promise.reject(new Error(`unexpected fetch in noformula-modals lane: ${url}`))
     }))
   })
@@ -281,96 +285,84 @@ describe('executeSpellCast - no-formula modal routing (fear / volley / silence)'
   })
 
   // ------------------------------------------------------------------
-  // Fear — automation-free disk envelope → fear save modal (#1454)
-  // CLA-219 coerced metamagicHeighten:false rides the payload
-  // (index.js:680); CLA-389 post-cast merge keeps the lane popup
-  // even when Wild Magic Surge answers with its own popup (:583-599).
+  // Fear — fix#296 (#1473): the :279-era hub arm is DELETED, double-dead
+  // vs REAL bytes (leg 1: disk Fear carries automation.type 'fear' BOTH
+  // rulesets -> consumed at :710 handleGenericAutomation -> DIRECT
+  // fearHandler route, automation/index.js:530; fearService deleted
+  // fix#294. leg 2: the only shape surviving :710 — the lightweight :163
+  // envelope — carries NO spell.dc, which is exactly what modalSpells
+  // .handleFear's gate requires -> declined). The two its that previously
+  // lived here fed an automation-STRIPPED / dc-INJECTED disk envelope —
+  // a fabricated shape (real disk Fear ships automation) existing only to
+  // reach the dead arm; retired per the #1455 fabrication ban, pins
+  // FLIPPED to real production bytes below. REPORTED orphan: after this
+  // deletion no hub producer emits modalName 'fear' — the route home
+  // modalSpells.handleFear and the FearModal consumer key
+  // (useSpellCastExecutor.js:125 fear:'fearModal') stay byte-stable per
+  // owner constraint, flagged for component-owner retirement.
   // ------------------------------------------------------------------
-  describe('fear modal', () => {
-    it('routes the automation-stripped disk Fear row to the exact fear modal payload, logs the merged disk cast once, keeps the lane popup over a Wild Magic Surge popup, and never reaches the pipeline generic handler', async () => {
+  describe('fear — direct generic route (hub arm deleted fix#296, #1473 flip)', () => {
+    for (const rules of ['5e', '2024']) {
+      it(`${rules} disk bytes Fear is consumed at :710 and dispatched DIRECT to fearHandler via executeHandler — the hub emits NO fear modal ever`, async () => {
+        const services = makeServices({ playerStats: makePlayerStats({ rules }) })
+        const disk = { ...diskRow('Fear', rules) }
+
+        const result = await executeSpellCast(disk, { slotLevel: 3 }, services)
+
+        // :710 hijack census — the live fear route (fix#294 direct law).
+        expect(automation.executeHandler).toHaveBeenCalledTimes(1)
+        const [action, statsArg, campArg, mapArg] = automation.executeHandler.mock.calls[0]
+        expect(action.name).toBe('Fear')
+        expect(action.automation).toStrictEqual(diskRow('Fear', rules).automation)
+        expect(action.spell).toBe(disk)
+        expect(statsArg).toBe(services.playerStats)
+        expect(campArg).toBe(CAMPAIGN)
+        expect(mapArg).toBe(MAP)
+        // Consumed-and-merged: executeHandler mocked inert => lane value
+        // undefined; surge mocked inert => merged result undefined. The
+        // deleted arm's 'fear' modal NEVER appears.
+        expect(result).toBeUndefined()
+        expect(result?.automationPopup?.modalName).not.toBe('fear')
+        // Cast log ran once BEFORE the hijack, carrying the disk bytes.
+        expect(log.addEntry).toHaveBeenCalledTimes(1)
+        const entry = { ...log.addEntry.mock.calls[0][1], timestamp: undefined }
+        expect(entry.type).toBe('spell')
+        expect(entry.characterName).toBe('TestWizard')
+        expect(entry.targetName).toBe('Goblin1')
+        expect(entry.spellName).toBe('Fear')
+        expect(entry.saveDC).toBe(17)
+        // CLA-389 merge: post-payment riders run exactly once on the
+        // generic-consumed cast (the rider-save seam the old lane pinned
+        // on the dead modal — ownership survives on the live route).
+        expect(rider.triggerPostCastRiderSaves).toHaveBeenCalledTimes(1)
+        // automation.type set + effects absent -> lookup ran (needsLookup).
+        expect(fetchCalls).toStrictEqual([rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json'])
+        expect(services.rollDamage).not.toHaveBeenCalled()
+        expect(services.rollAttack).not.toHaveBeenCalled()
+        expect(consoleError).toHaveBeenCalledTimes(0)
+      })
+    }
+
+    it('a Wild Magic Surge popup SURFACES on the generic-consumed Fear cast — with the fear arm gone there is no lane popup competing (CLA-389 precedence on the :710 route)', async () => {
+      const SURGE = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Wild Magic Surge', description: 'surge' } } }
+      wms.triggerWildMagicSurge.mockResolvedValueOnce(SURGE)
       const services = makeServices()
-      wms.triggerWildMagicSurge.mockResolvedValueOnce({
-        automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Wild Magic Surge', description: 'surge' } },
-      })
 
-      const result = await executeSpellCast(fearDiskEnvelope(), { slotLevel: 3 }, services)
+      const result = await executeSpellCast({ ...diskRow('Fear') }, { slotLevel: 3 }, services)
 
-      expect(result).toStrictEqual({
-        automationPopup: {
-          type: 'modal',
-          modalName: 'fear',
-          payload: {
-            action: { name: 'Fear', automation: { type: 'fear' } },
-            playerStats: services.playerStats,
-            campaignName: CAMPAIGN,
-            saveType: 'WIS',
-            saveDc: 17,
-            activeOverlay: null,
-            metamagicCareful: false,
-            metamagicHeighten: false,
-          },
-        },
-      })
-      expect(result.automationPopup.payload.playerStats).toBe(services.playerStats)
-      // Cast log ran before the modal return, carrying the merged disk bytes.
-      expect(log.addEntry).toHaveBeenCalledTimes(1)
-      const [logCampaign, entry] = log.addEntry.mock.calls[0]
-      expect(logCampaign).toBe(CAMPAIGN)
-      expect({ ...entry, timestamp: undefined }).toStrictEqual({
-        type: 'spell',
-        characterName: 'TestWizard',
-        targetName: 'Goblin1',
-        spellName: 'Fear',
-        spellLevel: 3,
-        castingTime: '1 action',
-        damageType: null,
-        damageFormula: null,
-        saveDC: 17,
-        concentration: true,
-        description: diskRow('Fear').description.join(' '),
-        timestamp: undefined,
-      })
-      expect(typeof entry.timestamp).toBe('number')
-      // CLA-389 precedence + post-payment riders reached the modal lane.
-      expect(automation.executeHandler).not.toHaveBeenCalled()
-      expect(rider.triggerPostCastRiderSaves).toHaveBeenCalledTimes(1)
-      // Full disk row → lookup skipped (index.js:172 needsLookup false).
-      expect(fetchCalls).toStrictEqual([])
-      expect(services.rollDamage).not.toHaveBeenCalled()
-      expect(services.rollAttack).not.toHaveBeenCalled()
-      expect(dice.rollExpression).not.toHaveBeenCalled()
+      expect(automation.executeHandler).toHaveBeenCalledTimes(1)
+      expect(result).toStrictEqual(SURGE)
     })
 
-    it('adds the innate sorcery +1 to the modal saveDc while the cast log keeps the unbonused saveDC, and a misspelled-cased FEAR still opens the modal despite the exact-case disk lookup miss', async () => {
-      buff.isInnateSorceryActive.mockReturnValue(true)
+    it('lightweight :163 Fear ({name, level, baseLevel}) — no spell.dc, no automation: :710 declines, the deleted arm never dispatches, adjudication rides the merged-dc lane, never a fear modal', async () => {
       const services = makeServices()
 
-      const innate = await executeSpellCast(fearDiskEnvelope(), { slotLevel: 3 }, services)
-      expect(innate.automationPopup.payload.saveDc).toBe(18)
-      const innateLog = { ...log.addEntry.mock.calls[0][1], timestamp: undefined }
-      expect(innateLog.saveDC).toBe(17)
+      const result = await executeSpellCast({ name: 'Fear', level: 3, baseLevel: 0 }, {}, services)
 
-      buff.isInnateSorceryActive.mockReturnValue(false)
-      const upper = await executeSpellCast({ ...minimalPayload('Fear'), dc: diskRow('Fear').dc, name: 'FEAR' }, { slotLevel: 3 }, services)
-      expect(upper.automationPopup).toStrictEqual({
-        type: 'modal',
-        modalName: 'fear',
-        payload: {
-          action: { name: 'Fear', automation: { type: 'fear' } },
-          playerStats: services.playerStats,
-          campaignName: CAMPAIGN,
-          saveType: 'WIS',
-          saveDc: 17,
-          activeOverlay: null,
-          metamagicCareful: false,
-          metamagicHeighten: false,
-        },
-      })
-      // Case-gate split: modalSpells lowercases (modalSpells.js:185) but
-      // lookupFullSpell matches exact case (index.js:179). The dc must ride
-      // the cast envelope — handleFear gates on spell.dc, never fullSpell.dc.
-      expect(consoleError).toHaveBeenCalledWith('[spellCast] Spell not found in spells.json:', 'FEAR')
-      expect(fetchCalls).toStrictEqual(['/data/spells.json'])
+      expect(automation.executeHandler).not.toHaveBeenCalled() // envelope carries no automation
+      const popup = result?.automationPopup || result
+      expect(popup?.modalName).not.toBe('fear') // the deleted arm is the ONLY former 'fear'-modal producer
+      expect(consoleError).toHaveBeenCalledTimes(0) // exact-case disk hit; merged bytes stay silent
     })
   })
 

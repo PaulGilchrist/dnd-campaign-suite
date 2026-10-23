@@ -70,12 +70,12 @@ function puddingRow() {
 }
 
 describe('MA-0399/MA-1249 split registry + disk fingerprints (BY-name #387)', () => {
-  it('black-pudding + ochre-jelly disk rows arm split identically; unregistered rows stay byte-inert', () => {
+  it('black-pudding + ochre-jelly disk rows arm split identically', () => {
     const pudding = puddingRow();
     const ochre = ochreRow();
     expect(getGatedMonsterReaction(pudding)?.effect).toBe('split');
     expect(getGatedMonsterReaction(ochre)?.effect).toBe('split');
-    expect(getGatedMonsterReaction({ name: 'Mace', description: 'Hit: 1d6+2 bludgeoning.' })).toBeNull();
+    // Plain-row null-negative owned ONCE file-wide at owner gated-reaction.test.js:66 (#417/#508) — not re-pinned.
     // MA-1249: ochre armed with the Black Pudding block VERBATIM (zero-affordance fix)
     expect(pudding.automation).toEqual({ type: 'reaction', trigger: 'bloodied_or_lightning_slashing', effect: 'split', minHp: 10, damageTypes: ['Lightning', 'Slashing'] });
     expect(ochre.automation).toEqual(pudding.automation);

@@ -8,9 +8,13 @@
 //   psychicVeilService.js:3-19    REAL service (deliberately NOT mocked): Psychic Veil buff hit →
 //                                 filter 'invisible' from activeConditions THEN strip buff from
 //                                 activeBuffs (deterministic write order :12 → :16)
-//   applyDamage.js:563-567        preserveInvisibleOnStealthAttack — documented NO-OP stub;
-//                                 Supreme Sneak preservation is structural (no attacker-condition
-//                                 write path exists), so no behavioral test can discriminate it (#1035)
+//   applyDamage.js (was :563-567)  preserveInvisibleOnStealthAttack — NO-OP doc-stub DELETED
+//                                 (#1184 owner verdict): Supreme Sneak preservation is structural —
+//                                 no lane ends Hide-based invisible on attack (endInvisibilityOnHostileAction
+//                                 is spell-tracked-gated, invisibilityService.js:12-15) and the
+//                                 turn-boundary ledger is owned by applySupremeSneakTurnStart
+//                                 (turnStartEffects.js, pinned turnStartEffects_additional.test.js:179-181),
+//                                 so no behavioral test could ever discriminate the stub (#1035)
 //
 // Generic arithmetic (resistance/immunity halving truth-tables) is owned by
 // applyDamage.helpers.test.js:52-84 (#1182 cla023 disk-driven B/P/S) — NOT re-driven here;
@@ -30,8 +34,8 @@
 //   old 2 'does not remove ... (immune)'                          → new 2 (rider census widened)
 //   old 3 'does not remove ... lacks the buff'                    → new 3 (rider census widened)
 //   old 4 'Supreme Sneak — preserve Invisible...'                 → DELETED vacuous (preserveInvisible
-//       OnStealthAttack is a no-op stub; assertion passed for any stealthAttackCost value —
-//       never reached an observable labeled branch #1035/#1160)
+//       OnStealthAttack was a no-op stub; assertion passed for any stealthAttackCost value —
+//       never reached an observable labeled branch #1035/#1160; stub + call-site deleted #1184)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';

@@ -2,7 +2,7 @@ import { executeHandler } from '../../automation/index.js';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isDivineSmite } from './spellUtils.js';
 
-export function getInspiringSmitePassives(playerStats) {
+function getInspiringSmitePassives(playerStats) { // demoted #1381: ZERO external importers — sole caller triggerInspiringSmite below; test pins now ride the public trigger surface (#82-class)
     const passives = (() => {
         // Apex guard (#204-class): `?.` on playerStats routes a nullish apex into the file's
         // OWN loud arm below — decline is throw, never a fabricated pool (fix#179 refuse-

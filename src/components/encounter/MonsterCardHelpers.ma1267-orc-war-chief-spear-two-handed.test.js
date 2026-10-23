@@ -1,10 +1,12 @@
-// @maintained-by-ai — trimmed 7→3 tests (#523): disk lock folds key-placement +
+// @maintained-by-ai — trimmed 7→3 tests (#523); rec #523 re-run 2026-10-23: generic
+// offer-shape + two/one select-log fork ritual folded to canon (two-handed.test.js:25-36
+// ,47-61) per fold twin ma1661:42-49; lane keeps BY-name disk lock + distinct plus-rider
+// DEFAULT select-leg (below). disk lock folds key-placement +
 // no-double-charge guard (damage_dice_secondary ABSENT); ONE parser press derives
 // both formulas FROM disk (+ row-distinct "'1d6 + 4 + 1d8'" grammar guard — grep:
-// these bytes live only here, vs ma1264 "+3" / ma1266 "1d12 + 4"); offer+select
-// fork kept as this row's press because its unpicked default carries the distinct
-// plus-rider baseFormula (#535 precedent — absent from generic owners:
-// two-handed.test.js:23-34,44-55,133-143; Modal.two-handed.test.jsx:213-223;
+// these bytes live only here, vs ma1264 "+3" / ma1266 "1d12 + 4"); unpicked default
+// keeps the distinct plus-rider baseFormula (#535 precedent — absent from generic owners;
+// Modal.two-handed.test.jsx:213-223;
 // null-triple transport cite-skipped to cultist-flat-secondary.test.js:36-39,
 // plus-split parser behavior to diceRoller.test.js:228-357). Row literals
 // "1d6 + 4 plus 1d8" / "2d8 + 4" BY-name disk-lock stays (#387).
@@ -68,18 +70,14 @@ describe('MA-1267 data lock (monsters.json Orc War Chief Spear)', () => {
     expect(canRollExpression('1d6 + 4 + 1d8')).toBe(false);
   });
 
-  it('chooser fork wired from disk: offer arms both formulas; select logs ride two-handed, unpicked default keeps the plus-rider base', () => {
-    const { damage_dice_primary: baseFormula, damage_dice_two_handed: formula, damage_type_primary: damageType } = spearRow();
-    const offer = buildTwoHandedVariantOffer(spearRow(), 'Spear');
-    expect(offer).toMatchObject({ formula, baseFormula, damageType, attackName: 'Spear' });
-    expect(offer.label).toContain(formula);
-    const two = buildTwoHandedVariantSelectLog({ monsterName: 'Orc War Chief 1', offer, hands: 'two-handed' });
-    expect(two.automationType).toBe('two_handed_variant_selected');
-    expect(two.description).toContain('TWO-HANDED');
-    expect(two.description).toContain(formula);
+  it('chooser wired from disk; unpicked default keeps the plus-rider base in the log (distinctive leg per #535; generic offer-shape + two/one fork canon-folded to two-handed.test.js:25-36,47-61)', () => {
+    const spear = spearRow();
+    const offer = buildTwoHandedVariantOffer(spear, 'Spear');
+    expect(offer).not.toBeNull();
+    expect(offer).toMatchObject({ attackName: 'Spear' });
+    expect(offer.formula).toBe(spear.damage_dice_two_handed);
+    expect(offer.baseFormula).toBe(spear.damage_dice_primary);
     const one = buildTwoHandedVariantSelectLog({ monsterName: 'Orc War Chief 1', offer, hands: 'one-handed', defaulted: true });
-    expect(one.automationType).toBe('one_handed_variant_selected');
-    expect(one.description).toContain('default');
-    expect(one.description).toContain(baseFormula);
+    expect(one.description).toContain(spear.damage_dice_primary);
   });
 });

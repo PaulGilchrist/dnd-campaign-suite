@@ -1,6 +1,9 @@
 import { executeHandler } from '../../automation/index.js';
-import { applyBeaconOfHopeEffect } from '../../automation/handlers/spells/beaconOfHopeHandler.js';
 
+// Gate + envelope forwarder ONLY. Apply lives on the picker lane: the
+// pendingBeaconOfHope confirm route runs beaconOfHopeHandler.applyBeaconOfHopeEffect
+// DIRECT (useSimpleSpellHandlers.js:299) — the former confirmBeaconOfHope
+// forwarder export had zero production callers and was excised (#1338 dead-export batch).
 export async function triggerBeaconOfHope(spell, metaCtx, playerStats, campaignName, mapName) {
     const isBeacon = (spell.name || '').toLowerCase() === 'beacon of hope';
     if (!isBeacon) return null;
@@ -22,16 +25,6 @@ export async function triggerBeaconOfHope(spell, metaCtx, playerStats, campaignN
         return result;
     } catch (e) {
         console.error('[beaconOfHope] Failed to execute Beacon of Hope handler:', e);
-        return null;
-    }
-}
-
-export async function confirmBeaconOfHope(action, playerStats, campaignName, mapName, targetNames) {
-    try {
-        const result = await applyBeaconOfHopeEffect(action, playerStats, campaignName, mapName, targetNames);
-        return result;
-    } catch (e) {
-        console.error('[beaconOfHope] Failed to apply Beacon of Hope effect:', e);
         return null;
     }
 }

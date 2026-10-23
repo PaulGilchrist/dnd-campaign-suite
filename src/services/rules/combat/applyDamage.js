@@ -574,15 +574,6 @@ function removeCombatConditionsOnDamage(creature, domination, isPlayer, campaign
   }
 }
 
-// Supreme Sneak: while Stealth Attack is active, an attacker that hits while Invisible
-// KEEPS the Invisible condition (no removal happens here; the stealthAttackCost is
-// cleared at the start of the attacker's next turn).
-function preserveInvisibleOnStealthAttack(attackerName, campaignName) {
-  const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
-  if (!stealthAttackCost || stealthAttackCost <= 0) return;
-  // Preserve Invisible condition — don't remove it
-}
-
 // Compelled Duel: the effect ends if the target takes damage from anyone other than the caster
 function endDuelIfDamagedByOther(creature, attackerName, campaignName) {
   if (!attackerName || attackerName === creature.name) return;
@@ -830,7 +821,6 @@ async function handleWardedDamageEvents({ creature, combatSummary, characters, i
   removeCombatConditionsOnDamage(creature, domination, isPlayer, campaignName);
   if (attackerName && attackerName !== creature.name) {
     checkPsychicVeil(attackerName, campaignName);
-    preserveInvisibleOnStealthAttack(attackerName, campaignName);
   }
 
   const holyAuraSaveResult = await checkHolyAuraDamage(creature, attackerName, combatSummary, campaignName, wardDamage);
@@ -1221,6 +1211,16 @@ function handleDominateRepeatSave({ creature, isPlayer, domination, combatSummar
   return false;
 }
 
+// Damage-lane threshold crossings ONLY (#1207): the 'recovering' arm
+// (wasBloodied && !isBloodied && newHp > 0) demanded newHp > floor(maxHp/2) >= oldHp,
+// i.e. HP RISING mid-damage — structurally unreachable at this helper's single caller
+// chain (applyDamageToTarget :1082 -> persistAndLogDamageOutcome -> logDamageApplication):
+// isUsableRawDamage (:980, fix#113) admits rawDamage >= 0 only, every resistance/
+// reduction/absorb step clamps nonneg (:403/:423/:434), and newHp = max(0, oldHp - d)
+// (:473/:491) never rises except (a) negative-oldHp floor to 0, killed by the arm's
+// own newHp > 0 guard, and (b) the RE-sequence clamp to 1 (:476/:493), which needs
+// wasBloodied oldHp <= floor(maxHp/2) < 1 — contradicting oldHp > 0. Recovery stamps
+// are healing-lane vocabulary (LogHpHealingEntry.jsx); no heal producer reaches here.
 function resolveHpThreshold(oldHp, newHp, maxHp) {
   const isDead = newHp <= 0;
   const wasDead = oldHp <= 0;
@@ -1228,7 +1228,6 @@ function resolveHpThreshold(oldHp, newHp, maxHp) {
   const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
   if (!wasDead && isDead) return 'dead';
   if (!wasBloodied && isBloodied) return 'bloodied';
-  if (wasBloodied && !isBloodied && newHp > 0) return 'recovering';
   return null;
 }
 

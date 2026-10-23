@@ -29,7 +29,10 @@ export function isFleetStepEligible(playerStats) {
     return lists.some(k => (Array.isArray(playerStats[k]) ? playerStats[k] : []).some(f => f?.name === 'Fleet Step'));
 }
 
-export function isStepOfTheWindTrigger(actionName, auto) {
+// Module-local helper (was a zero-external-caller dead export, demoted #1363 batch):
+// behavior stays pinned at consumer level via grantFleetStep's Step-of-the-Wind
+// exclusion legs (auto-type OR-leg + name-only OR-leg) in the co-located lane.
+function isStepOfTheWindTrigger(actionName, auto) {
     return auto?.type === 'step_of_the_wind' || /Step of the Wind/.test(String(actionName || ''));
 }
 

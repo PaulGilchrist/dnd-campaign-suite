@@ -45,7 +45,6 @@ vi.mock('../../ui/logService.js', () => ({
 vi.mock('../features/silenceService.js', () => ({
   getSilenceSource: vi.fn(() => null),
   isCreatureInSilenceZone: vi.fn(() => false),
-  triggerSilence: vi.fn(),
 }))
 
 vi.mock('../features/invisibilityService.js', () => ({

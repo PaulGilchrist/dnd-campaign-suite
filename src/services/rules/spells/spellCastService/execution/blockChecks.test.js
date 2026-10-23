@@ -34,11 +34,12 @@
 //     each handler's own lane (handler tests, cf. imprisonmentHandler.helpers
 //     .test.js:11); this lane mocks the four and pins wiring: tuple
 //     (caster, target, campaign), branch message bytes, chain order, log-once.
-//   beastSpellsAllowsCast — externally DEAD export (only internal caller
-//     blockChecks.js:31; grep src+server finds no other importer; #1465 finding
-//     re-confirmed). Full truth table owned by sibling blockChecks.beast-spells
-//     .test.js — zero rows here (no re-grow); removal is a source edit:
-//     report-only, out of scope.
+//   beastSpellsAllowsCast — DEMOTED module-local fix#300 (#1465 external-dead
+//     census; sibling lane's report closed the loop): whole-repo grep confirmed zero
+//     live external importers (internal caller blockChecks.js:32 stays LIVE), and the
+//     direct-import truth table in blockChecks.beast-spells.test.js was retargeted
+//     onto the public seam in the same pass (fix#82 coordinated). Zero rows here
+//     (no re-grow); the symbol no longer exists on the export surface.
 //
 // MOCK COMPLETENESS vs blockChecks.js imports, line-by-line: useRuntimeState
 // (getRuntimeValue+setRuntimeValue — set needed by REAL materialComponents),

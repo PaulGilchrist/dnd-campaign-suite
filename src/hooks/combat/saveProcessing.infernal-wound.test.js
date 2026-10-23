@@ -1,5 +1,9 @@
-// @maintained-by-ai: 2026-10-14
-// MA-0367 inline-save seam (unique lane): processSaveRoll with the REAL
+// @maintained-by-ai: 2026-10-23
+// MA-0367 inline-save seam (unique lane): fixture converted to helper-built
+// per #505 — context fields derive BY-name from the authored Bearded Devil/
+// Infernal Glaive disk row and the wound arm is BUILT via the PRODUCER
+// parseInfernalWoundClause (parser-owned shape, never hand-transcribed).
+// processSaveRoll with the REAL
 // infernalWoundService — failed save wires context.infernalWound → te + ONE
 // rounds:10 clock + grant log; dc_success:'full' keeps auto-damage unhalved
 // on BOTH outcomes; success grants ZERO wound. Service internals (te shape,
@@ -75,21 +79,30 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 import { processSaveRoll } from './saveProcessing.js';
+import { parseInfernalWoundClause } from '../../components/encounter/MonsterCardHelpers.js';
+import monstersData from '../../../public/data/monsters.json';
 
 const CAMPAIGN = 'test-campaign';
 const DEVIL = 'Bearded Devil 1';
 const TARGET = 'AberrantSorcerer';
 
+// BY-name disk row (monsters.json:8897 'Bearded Devil' / 'Infernal Glaive') —
+// every authored save/damage key maps straight onto the context the upstream
+// save-rolls builder forwards; the wound arm rides parseInfernalWoundClause
+// output verbatim (useLoggedDiceRollAttack.js:154).
+const GLAIVE_ROW = monstersData.find(m => m.name === 'Bearded Devil')
+    .actions.find(a => a.name === 'Infernal Glaive');
+
 const glaiveContext = {
-    saveDc: 12,
-    saveType: 'Constitution',
+    saveDc: GLAIVE_ROW.save_dc,
+    saveType: GLAIVE_ROW.save_type,
     attackerName: DEVIL,
-    actionName: 'Infernal Glaive',
-    dcSuccess: 'full',
-    autoDamageFormula: '1d10 + 3',
-    autoDamageDamageType: 'Slashing',
+    actionName: GLAIVE_ROW.name,
+    dcSuccess: GLAIVE_ROW.dc_success,
+    autoDamageFormula: GLAIVE_ROW.damage_dice_primary,
+    autoDamageDamageType: GLAIVE_ROW.damage_type_primary,
     saveConditions: [],
-    infernalWound: { effect: 'infernal_wound', bleedDie: '1d10', expiresMinutes: 1, medicineDc: 12 },
+    infernalWound: parseInfernalWoundClause(GLAIVE_ROW),
 };
 
 async function resolveSave(context, success, roll) {

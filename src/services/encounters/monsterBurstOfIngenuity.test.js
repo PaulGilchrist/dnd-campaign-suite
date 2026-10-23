@@ -50,6 +50,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isMonsterBurstOfIngenuityRow,
+  burstOfIngenuityBonus,
   burstRollerGate,
   burstOfIngenuityGate,
   buildBurstOfIngenuityBuff,
@@ -333,5 +334,47 @@ describe('MA-1510 roll-seam consume', () => {
     expect(consumeBurstOfIngenuityBuff(null, CAMPAIGN, { rollType: 'save' })).toEqual({ bonus: 0, applied: false });
     expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
+  });
+});
+
+// #1091 (fix class #90/#195 zero-is-data + #223 dead-text): the resolver lane's
+// gate-precedence pins above already prove round/uses refusals surface the GATE's
+// own bytes (the round-first-unarmed-card leg and the uses long-rest-suffix leg —
+// suffix text that never existed anywhere else), so the deleted REFUSAL_MESSAGES
+// round/uses entries stay structurally unreachable. These legs pin the BONUS side:
+// authored numerics (INCLUDING 0) pass through burstOfIngenuityBonus untouched;
+// only missing/null/unparseable fall back to the documented RAW +2 default.
+describe('#1091 bonus fallback honesty (zero-is-data, Number.isFinite gate)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    { name: 'authored bonus:2 passes through', bonus: 2, expected: 2 },
+    { name: 'authored bonus:0 stays 0 — never silently upgraded to 2', bonus: 0, expected: 0 },
+    { name: 'missing bonus falls back to the documented RAW +2 default', bonus: undefined, expected: 2 },
+    { name: 'null bonus is missing-not-zero: documented RAW +2 default', bonus: null, expected: 2 },
+    { name: 'MA-1502 unparseable bonus string falls back to the documented RAW +2 default', bonus: 'two', expected: 2 },
+  ])('burstOfIngenuityBonus: $name', ({ bonus, expected }) => {
+    expect(burstOfIngenuityBonus({ automation: { bonus } })).toBe(expected);
+  });
+
+  it('bonus:0 is honest end to end: stamp carries saveBonus:0, the applied log reads "+0", consume returns bonus 0', () => {
+    const zeroRow = { ...BURST_ROW, automation: { ...BURST_ROW.automation, bonus: 0 } };
+    const buff = buildBurstOfIngenuityBuff(zeroRow, SPHINX, 3);
+    expect(buff.saveBonus).toBe(0);
+    let buffs = [buff];
+    getRuntimeValue.mockReturnValue(buffs);
+    setRuntimeValue.mockImplementation((key, prop, value) => { buffs = value; return Promise.resolve(); });
+    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'save', rollName: 'DEX' })).toEqual({ bonus: 0, applied: true });
+    expect(addEntry.mock.calls[0][1].description).toBe(`Burst of Ingenuity: +0 folded into ${ROLLER}'s save (DEX) — buff consumed.`);
+  });
+
+  it('producer-inconsistent legacy stamp missing saveBonus: fold and log both honestly 0 (+2 bytes unchanged)', () => {
+    let buffs = [{ effect: 'burst_of_ingenuity', grantedBy: SPHINX }];
+    getRuntimeValue.mockReturnValue(buffs);
+    setRuntimeValue.mockImplementation((key, prop, value) => { buffs = value; return Promise.resolve(); });
+    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'check' })).toEqual({ bonus: 0, applied: true });
+    expect(addEntry.mock.calls[0][1].description).toBe(`Burst of Ingenuity: +0 folded into ${ROLLER}'s check — buff consumed.`);
   });
 });

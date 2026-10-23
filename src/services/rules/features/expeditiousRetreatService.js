@@ -11,9 +11,13 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 // so the Dash grant is re-offered at EVERY caster turn. Both are cleared on
 // concentration break by the 'Expeditious Retreat' branch in
 // concentrationService cleanupConcentrationEffects (verified consumer).
-export const ER_ACTIVE_FLAG = 'expeditiousRetreatActive';
-export const ER_DASH_USED_ROUND_KEY = '_Expeditious_Retreat_dash_usedRound';
-export const ER_TURN_START_OFFER_TYPE = 'expeditious_retreat_dash_offer';
+// Module-local mirrors of the wire strings (#1359 batch — the ER_* exports had zero
+// importers: every consumer inline-duplicates the literals). ER_DASH_USED_ROUND_KEY
+// was excised outright (no reader/writer here; the latch key lives with its owners:
+// turnStartEffects.js applyExpeditiousRetreatDashOffer, expeditiousRetreatDashHandler,
+// Initiative.jsx + navigationHandlers.js PLAYER_ROUND_LATCH_KEYS clears).
+const ER_ACTIVE_FLAG = 'expeditiousRetreatActive';
+const ER_TURN_START_OFFER_TYPE = 'expeditious_retreat_dash_offer';
 
 export async function triggerExpeditiousRetreat(spell, metaCtx, playerStats, campaignName, _mapName) {
     const isExpeditiousRetreat = (spell.name || '').toLowerCase() === 'expeditious retreat';

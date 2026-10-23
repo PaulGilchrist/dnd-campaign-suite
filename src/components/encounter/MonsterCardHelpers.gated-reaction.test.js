@@ -586,3 +586,26 @@ describe('MA-0681 resolveMonsterElementalAbsorption press → arm + spend + THP'
     }
   });
 });
+
+// MA-0013 usage-less-row default seam — RELOCATED here from the ma0305
+// arch-hag helper lane per pass #517 rec / #518 carry (fabrication legs
+// live at the owner where the default is implemented: reactionMaxUses
+// MonsterCardHelpers.js:2226-2229 returns 1 when uses/maxUses are absent,
+// and counterspellGate :1553-1556 renders that default into the
+// '1/Day uses already spent' refusal). Appended at end-of-file so every
+// existing cross-file line citation into this lane stays byte-exact.
+// Authored-row ADMITS (limit 999, used < 999) are owned once by the
+// shared-gate limit-999 arm :330-334 (same reactionMaxUses limit) plus the
+// live counterspell press via resolveMonsterCounterspell :2672 →
+// counterspellGate in ma0300 helper :77-101 — never re-simulated per
+// monster (arch-hag/arcanaloth rows are gate-input twins: byte-identical
+// maxUses:999/effect:counterspell fields; the gate reads neither name).
+describe('MA-0013 usage-less-row seam — fabricated 1/Day cap (relocated from ma0305)', () => {
+  it('usage-less counterspell row defaults limit 1 and refuses after one spend; owners At-Will rows carry honest 999 instead', () => {
+    const usageless = { name: 'Generic Counterspell', automation: { type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' } };
+    const g = counterspellGate({ lastAttack: pcSpellAttack(), attackerIsPC: true, monsterName: CULTIST, currentRound: 1, storedUses: { counterspell: 1 }, usedRound: 0, action: usageless });
+    expect(g.ok).toBe(false);
+    expect(g.reason).toBe('uses');
+    expect(g.message).toMatch(/1\/Day uses already spent/);
+  });
+});

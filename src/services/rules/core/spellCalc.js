@@ -107,11 +107,33 @@ function applyClassSpellListAndSubclassBonus(spellAbilities, playerStats) {
 }
 
 // Fallback: if no spellcasting from class/subclass but character has spells from feats/races/etc
+// (e.g. Magic Initiate / racial caster rows on the sheet carrier). #1348 flip of the honest
+// #1263 drop-pin: the feat/race caster rows LAND in the container exactly like the class
+// path (:92) and the 2024 twin's post-container rebuild (spellCalc2024.js:853-857) — names
+// come from playerStats.spells (persisted by the feat/race selection modals, fix#120 loader
+// idioms) and finalizeSpellList (:330) expands them by name against the disk catalog.
+// Nothing invented (fix#209). Known-counters count only catalog-resolved rows; a catalog-less
+// name lands name-only, LOUD, uncounted (no-fallback law, #1268 loud-skip precedent).
 function buildFallbackSpellAbilities(playerStats, allSpells) {
-    const highestSpellLevel = Math.max(...playerStats.spells.map(spellName => {
+    let highestSpellLevel = 0;
+    let cantripsKnown = 0;
+    let spellsKnown = 0;
+    const spells = playerStats.spells.map(spellName => {
         const spellDetail = allSpells.find(s => s.name === spellName);
-        return spellDetail ? spellDetail.level : 0;
-    }));
+        if (!spellDetail) {
+            console.error(`[spellCalc] fallback spell '${spellName}' absent from catalog — row lands name-only, uncounted`);
+        } else {
+            if (spellDetail.level === 0) {
+                cantripsKnown += 1;
+            } else {
+                spellsKnown += 1;
+            }
+            if (spellDetail.level > highestSpellLevel) {
+                highestSpellLevel = spellDetail.level;
+            }
+        }
+        return { name: spellName, prepared: '' };
+    });
 
     const baseSlots = HALF_CASTER_SLOTS[playerStats.level] || {};
     const cappedSlots = {};
@@ -122,9 +144,9 @@ function buildFallbackSpellAbilities(playerStats, allSpells) {
     }
 
     const spellAbilities = {
-        cantrips_known: 0,
-        spells_known: 0,
-        spells: [],
+        cantrips_known: cantripsKnown,
+        spells_known: spellsKnown,
+        spells,
     };
     if (playerStats.class.spell_casting_ability) {
         spellAbilities.spellCastingAbility = playerStats.class.spell_casting_ability;

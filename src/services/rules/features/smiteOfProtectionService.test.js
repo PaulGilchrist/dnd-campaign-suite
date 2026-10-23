@@ -44,7 +44,6 @@ vi.mock('../../automation/index.js', () => ({ executeHandler: vi.fn() }));
 
 import { executeHandler } from '../../automation/index.js';
 import {
-    getSmiteOfProtectionPassives,
     triggerSmiteOfProtection,
 } from './smiteOfProtectionService.js';
 
@@ -83,10 +82,13 @@ afterEach(() => {
 });
 
 describe('smiteOfProtectionService', () => {
-    describe('getSmiteOfProtectionPassives', () => {
-        it('selects exactly the post_cast_smite_cover entries in order, by identity', () => {
+    describe('getSmiteOfProtectionPassives (demoted #1420 census — export keyword dropped, ZERO external importers; every pin rides the PUBLIC triggerSmiteOfProtection surface, #82-class twin of fix#297 inspireSmite)', () => {
+        it('filter selects exactly the post_cast_smite_cover entries in order — non-cover passives never dispatch; input array unpolluted', async () => {
             const coverA = cover('Smite of Protection', 'passive');
             const coverB = cover('Second Cover', '1 reaction');
+            const A = { seq: 'a' };
+            const B = { seq: 'b' };
+            budget.push({ value: A }, { value: B });
             const passives = [
                 { type: 'passive_buff', name: 'Aura of Protection' },
                 coverA,
@@ -95,58 +97,61 @@ describe('smiteOfProtectionService', () => {
             ];
             const playerStats = { name: 'Paladin', automation: { passives } };
 
-            const result = getSmiteOfProtectionPassives(playerStats);
-            expect(result).toHaveLength(2);
-            expect(result[0]).toBe(coverA);
-            expect(result[1]).toBe(coverB);
-            expect(passives).toHaveLength(4);
+            const result = await triggerSmiteOfProtection(
+                { name: 'Divine Smite', level: 1 }, { slotLevel: 1 }, playerStats, CAMPAIGN, MAP,
+            );
+
+            expect(calls).toHaveLength(2); // the two covers ONLY, in array order
+            expect(calls.map(c => [c[0].name, c[0].automation.type, c[0].automation.casting_time])).toEqual([
+                ['Smite of Protection', 'post_cast_smite_cover', 'passive'],
+                ['Second Cover', 'post_cast_smite_cover', '1 reaction'],
+            ]);
+            expect(result).toEqual([A, B]);
+            expect(passives).toHaveLength(4); // filter never mutates the caller's array
             expect(playerStats.automation.passives[0]).toEqual({ type: 'passive_buff', name: 'Aura of Protection' });
 
+            // no-cover roster: null collapse with ZERO dispatch (budget stays empty)
             const noCovers = { name: 'Cleric', automation: { passives: [{ type: 'passive_buff', name: 'Bless' }] } };
-            expect(getSmiteOfProtectionPassives(noCovers)).toEqual([]);
+            expect(await triggerSmiteOfProtection({ name: 'Divine Smite', level: 1 }, { slotLevel: 1 }, noCovers, CAMPAIGN, MAP)).toBeNull();
+            expect(calls).toHaveLength(2);
         });
 
         it('nullish passives throw with exact bytes after console.error; object passives hit the golden unguarded TypeError; trigger propagates', async () => {
-            expect(() => getSmiteOfProtectionPassives({ automation: { passives: null } }))
-                .toThrow('Expected array, got null');
-            expect(() => getSmiteOfProtectionPassives({ automation: {} }))
-                .toThrow('Expected array, got undefined');
-            expect(() => getSmiteOfProtectionPassives({}))
-                .toThrow('Expected array, got undefined');
+            const spell = { name: 'Divine Smite', level: 1 };
+
+            await expect(triggerSmiteOfProtection(spell, { slotLevel: 1 }, { automation: { passives: null } }, CAMPAIGN, MAP))
+                .rejects.toThrow('Expected array, got null');
+            await expect(triggerSmiteOfProtection(spell, { slotLevel: 1 }, { automation: {} }, CAMPAIGN, MAP))
+                .rejects.toThrow('Expected array, got undefined');
+            await expect(triggerSmiteOfProtection(spell, { slotLevel: 1 }, {}, CAMPAIGN, MAP))
+                .rejects.toThrow('Expected array, got undefined');
             expect(consoleError.mock.calls).toEqual([
                 ['[smiteOfProtectionService] Missing array:', null],
                 ['[smiteOfProtectionService] Missing array:', undefined],
                 ['[smiteOfProtectionService] Missing array:', undefined],
             ]);
+            expect(calls).toHaveLength(0); // the getPassives call is OUTSIDE any try — throw precedes dispatch
 
             // Guard is nullish-only: {} slips past it to the native .filter TypeError, console untouched.
             consoleError.mockClear();
-            expect(() => getSmiteOfProtectionPassives({ automation: { passives: {} } })).toThrow(TypeError);
+            await expect(triggerSmiteOfProtection(spell, { slotLevel: 1 }, { automation: { passives: {} } }, CAMPAIGN, MAP))
+                .rejects.toThrow(TypeError);
             expect(consoleError).not.toHaveBeenCalled();
-
-            // The throw propagates through trigger (call at :22 is outside any try).
-            const spell = { name: 'Divine Smite', level: 1 };
-            await expect(triggerSmiteOfProtection(spell, { slotLevel: 1 }, {}, CAMPAIGN, MAP))
-                .rejects.toThrow('Expected array, got undefined');
-            expect(calls).toHaveLength(0);
-            expect(consoleError.mock.calls).toEqual([
-                ['[smiteOfProtectionService] Missing array:', undefined],
-            ]);
         });
 
         it('nullish playerStats apex routes into the SAME loud arm — exact console bytes, throw not fabricated [] (#204-class)', async () => {
             // fix#179 refuse-no-fabricated-values twin of inspiringSmiteService: the file-owned
-            // loud arm catches the nullish apex via `playerStats?.`; trigger propagates (:25 is
-            // outside any try), and zero dispatch happens before the throw.
-            expect(() => getSmiteOfProtectionPassives(undefined)).toThrow('Expected array, got undefined');
-            expect(() => getSmiteOfProtectionPassives(null)).toThrow('Expected array, got undefined');
+            // loud arm catches the nullish apex via `playerStats?.`; trigger propagates (the
+            // getPassives call is outside any try), and zero dispatch happens before the throw.
+            const spell = { name: 'Divine Smite', level: 1 };
+            await expect(triggerSmiteOfProtection(spell, { slotLevel: 1 }, undefined, CAMPAIGN, MAP))
+                .rejects.toThrow('Expected array, got undefined');
+            await expect(triggerSmiteOfProtection(spell, { slotLevel: 1 }, null, CAMPAIGN, MAP))
+                .rejects.toThrow('Expected array, got undefined');
             expect(consoleError.mock.calls).toEqual([
                 ['[smiteOfProtectionService] Missing array:', undefined],
                 ['[smiteOfProtectionService] Missing array:', undefined],
             ]);
-            await expect(triggerSmiteOfProtection({ name: 'Divine Smite', level: 1 }, { slotLevel: 1 }, undefined, CAMPAIGN, MAP))
-                .rejects.toThrow('Expected array, got undefined');
-            expect(consoleError).toHaveBeenCalledTimes(3);
             expect(calls).toHaveLength(0);
         });
     });

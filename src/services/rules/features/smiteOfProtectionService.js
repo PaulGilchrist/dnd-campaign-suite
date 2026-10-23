@@ -1,7 +1,7 @@
 import { executeHandler } from '../../automation/index.js';
 import { isDivineSmite } from './spellUtils.js';
 
-export function getSmiteOfProtectionPassives(playerStats) {
+function getSmiteOfProtectionPassives(playerStats) { // demoted #1420 census: ZERO external importers — sole caller triggerSmiteOfProtection :25 below; test pins ride the public trigger surface (#82-class twin of fix#297's getInspiringSmitePassives)
     const passives = (() => {
         // Apex guard (#204-class): `?.` on playerStats routes a nullish apex into the file's
         // OWN loud arm below — decline is throw, never a fabricated [] read as eligibility

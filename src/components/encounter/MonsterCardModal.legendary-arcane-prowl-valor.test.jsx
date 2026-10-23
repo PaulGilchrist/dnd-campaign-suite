@@ -171,6 +171,10 @@ describe('MA-1507 monsters.json data: sphinx-of-valor legendary block header + c
     expect(row.damage_dice_primary).toBeUndefined();
     expect(row.description).toBe('Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can\'t take this action again until the start of its next turn.');
     expect(row.save_effect).toBe('The target gains 1 Exhaustion level and appears 3d10 years older while it has any Exhaustion levels. The sphinx can\'t take this action again until the start of its next turn.');
+    // KEPT distinctive (rec #501 ghost-check): the both-outcomes guardrail scan
+    // (MonsterCardHelpers.both-outcomes.test.js:60) sweeps save_effect fields ONLY —
+    // valor's WoY "Failure or Success:" marker lives in `description`, invisible to
+    // that sweep, and these prose bytes are byte-locked ONLY here (MA-1058 tail).
     expect(parseBothOutcomesClause(row.description)).toBeNull();
     // Once-per-turn owner-latch clause verbatim (slug weight_of_years stamps live).
     expect(hasLegendaryCooldownClause(row)).toBe(true);

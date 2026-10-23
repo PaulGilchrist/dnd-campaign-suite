@@ -2,9 +2,9 @@
 // MA-0268 BASE lane: the generic staged-roar engine in roarService.js on the
 // Androsphinx-canonical path — hardcoded ROAR_STAGES default-table bytes
 // (DC 18 ladder), the stage parser (roarStageNumber), stage swap/escalation,
-// the isStagedRoarAction gate, STAGED_ROAR_MAX_DEFAULT (export has
-// NO external importer — pinned live only via stagedRoarMaxUses' ?? arm;
-// recommendation to source owner: drop the `export` keyword, #1370/81 method)
+// the isStagedRoarAction gate, STAGED_ROAR_MAX_DEFAULT (demoted #1411 census
+// batch 2026-10-23 — export keyword dropped; had NO external importer, pinned
+// live only via stagedRoarMaxUses' ?? arm; former rec executed, #1370/81 method)
 // and the LOUD console.error arm of resolveRoarStageAction (exact bytes).
 // PRESERVED-CITED-BY MonsterCardModal.staged-roar.test.jsx ("stage leg table
 // bytes + exhausted→null owned by roarService.test.js") — kept: the per-stage

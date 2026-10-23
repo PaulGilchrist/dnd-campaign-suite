@@ -14,7 +14,14 @@ function hasBeastSpellsPassive(playerStats) {
     return passives.some(p => p.type === 'passive_rule' && p.effect === 'beast_spells');
 }
 
-export function beastSpellsAllowsCast(spell, playerStats) {
+// fix#300 (#1465 external-dead census): DEMOTE-keyword (fix#294 shape).
+// Whole-repo grep (src + server + public, 2026-10-23): zero live external importers
+// of this name — sole callers were (1) checkBlockedBySpellcastingBuff :39 below
+// (INTERNAL, LIVE — hub imports that gate only, index.js:27) and (2) the co-located
+// truth-table lane blockChecks.beast-spells.test.js (TEST-only), retargeted onto the
+// public seam in the same pass (fix#82 coordinated). Barrel spellCastService.js:5
+// never re-exported this symbol. Internally live => demote, not delete.
+function beastSpellsAllowsCast(spell, playerStats) {
     return hasBeastSpellsPassive(playerStats) && !spellHasCostlyOrConsumedMaterial(spell);
 }
 

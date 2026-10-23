@@ -7,6 +7,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSpellAbilities } from './spellCalc.js';
 import { getStore } from '../../../hooks/runtime/useRuntimeState.js';
 import classes from '../../../../public/data/classes.json';
+import spellsDisk from '../../../../public/data/spells.json';
+
+// Disk catalog rows by name (fix#120: load by name, never hand-transcribe).
+const diskSpell = (name) => {
+  const row = spellsDisk.find(s => s.name === name);
+  if (!row) throw new Error(`test fixture names a spell absent from disk spells.json: ${name}`);
+  return row;
+};
 
 const ABILITIES = [
   { name: 'Intelligence', bonus: 4 },
@@ -387,31 +395,111 @@ describe('spellCalc', () => {
       ]);
     });
 
-    it('feat/race fallback builds half-caster slots capped to highest known spell level', () => {
-      // Honest pin of current behavior (spellCalc.js:90-117): the fallback honors
-      // playerStats.spells for slot sizing but DROPS the spell rows themselves.
-      // Reported as a source defect; update this pin when fixed.
-      const allSpells = [
-        { name: 'Detect Magic', level: 1, classes: [] },
-        { name: 'Fire Bolt', level: 0, classes: [] },
-      ];
+    it('feat/race fallback lands sheet-carrier rows beside half-caster slots capped to highest known spell level', () => {
+      // #1348 FLIP of the honest #1263 drop-pin: the fallback used to honor
+      // playerStats.spells for slot sizing but DROPP the spell rows (spells:[]).
+      // Rows now land exactly like the class path (spellCalc.js:92) and the 2024
+      // twin's post-container rebuild (spellCalc2024.js:853-857): names from the
+      // sheet, expanded by name against the disk catalog, sorted, counters tracked.
+      const allSpells = [diskSpell('Detect Magic'), diskSpell('Fire Bolt')];
       const fallbackFighter = (spells) => getSpellAbilities(allSpells, makePlayerStats({
         class: { name: 'Fighter', spell_casting_ability: null },
         spells,
       }));
 
       const leveled = fallbackFighter(['Detect Magic']);
-      expect(leveled.spells).toEqual([]); // KNOWN DEFECT: input spells dropped
+      expect(names(leveled)).toEqual(['Detect Magic']);
+      expect(leveled.spells[0].level).toBe(1);
+      expect(leveled.spells[0].prepared).toBe('Always'); // Fighter default: all prepared (:291 branch)
+      expect(leveled.spells_known).toBe(1);
       expect(leveled.spell_slots_level_1).toBe(3); // half-caster level 5, uncapped
       expect(leveled.cantrips_known).toBe(0);
       expect(leveled.spellCastingAbility).toBeUndefined();
       // No casting ability: DC comes from proficiency alone (8 + 3).
       expect(leveled).toMatchObject({ modifier: 0, toHit: 3, saveDc: 11 });
 
-      // Cantrip-only input: highest spell level 0 caps every slot away.
+      // Cantrip-only input: highest spell level 0 caps every slot away, row still lands.
       const cantripOnly = fallbackFighter(['Fire Bolt']);
       expect(cantripOnly.spell_slots_level_1).toBeUndefined();
-      expect(cantripOnly.spells).toEqual([]);
+      expect(names(cantripOnly)).toEqual(['Fire Bolt']);
+      expect(cantripOnly.cantrips_known).toBe(1);
+      expect(cantripOnly.spells_known).toBe(0);
+
+      // Slot sizing math is byte-preserved from the drop era: level 7 half-caster with
+      // a persisted lv2 spell keeps lv1+lv2 slots; lv1-persisted caps lv2 away.
+      const caster = (spells) => getSpellAbilities(
+        [diskSpell('Magic Missile'), diskSpell('Misty Step')],
+        makePlayerStats({ level: 7, class: { name: 'Fighter', spell_casting_ability: null }, spells })
+      );
+      expect(caster(['Magic Missile']).spell_slots_level_2).toBeUndefined();
+      expect(caster(['Magic Missile']).spell_slots_level_1).toBe(4);
+      const both = caster(['Magic Missile', 'Misty Step']);
+      expect(both.spell_slots_level_1).toBe(4);
+      expect(both.spell_slots_level_2).toBe(2);
+    });
+
+    it('#1348 feat-caster rows land: Magic Initiate cantrip + level-1 rows on a no-table Fighter', () => {
+      // Sheet shape: spells persisted by the Magic Initiate modals (rules.js:269
+      // addMagicInitiateFreeCasts consumes the same instances; the spell LIST lanes
+      // consume these spellAbilities rows — previously empty for this character).
+      const allSpells = [diskSpell('Fire Bolt'), diskSpell('Magic Missile'), diskSpell('Shield')];
+      const result = getSpellAbilities(allSpells, makePlayerStats({
+        level: 1,
+        class: { name: 'Fighter', spell_casting_ability: 'Intelligence' },
+        spells: ['Shield', 'Fire Bolt', 'Magic Missile'],
+      }));
+      expect(names(result)).toEqual(['Fire Bolt', 'Magic Missile', 'Shield']);
+      expect(result.spells.map(s => s.level)).toEqual([0, 1, 1]);
+      expect(result.spells.map(s => s.prepared)).toEqual(['Always', 'Always', 'Always']);
+      expect(result.cantrips_known).toBe(1);
+      expect(result.spells_known).toBe(2);
+      expect(result.spell_slots_level_1).toBe(2); // HALF_CASTER_SLOTS[1]
+      // Rows carry real disk detail through the finalize remap (loaded-by-name):
+      expect(result.spells.find(s => s.name === 'Shield').casting_time).toBe('1 reaction');
+    });
+
+    it('#1348 multi-source caster: feat rows and race trait rows union without duplicates', () => {
+      // Tiefling Fighter at level 5 with two feat-persisted spells: race stamps
+      // Thaumaturgy/Hellish Rebuke on top of the fallback rows (stampAlwaysPrepared
+      // dedupes by name); the union sorts level-then-name with unique names.
+      const allSpells = [diskSpell('Fire Bolt'), diskSpell('Magic Missile'), diskSpell('Thaumaturgy'), diskSpell('Hellish Rebuke')];
+      const result = getSpellAbilities(allSpells, makePlayerStats({
+        class: { name: 'Fighter', spell_casting_ability: null },
+        race: { name: 'Tiefling', subrace: null },
+        spells: ['Magic Missile', 'Fire Bolt'],
+      }));
+      expect(names(result)).toEqual(['Fire Bolt', 'Thaumaturgy', 'Hellish Rebuke', 'Magic Missile']);
+      expect(new Set(names(result)).size).toBe(4);
+      expect(result.cantrips_known).toBe(2); // 1 feat cantrip + 1 Tiefling grant
+      expect(result.spells_known).toBe(2); // 1 feat spell + 1 Tiefling lv3 grant
+      expect(result.spell_slots_level_1).toBe(3); // persisted highest is lv1
+
+      // Overlapping name across sources: a single stamped row, never a second push.
+      const overlap = getSpellAbilities([diskSpell('Thaumaturgy'), diskSpell('Hellish Rebuke')], makePlayerStats({
+        class: { name: 'Fighter', spell_casting_ability: null },
+        race: { name: 'Tiefling', subrace: null },
+        spells: ['Thaumaturgy'],
+      }));
+      expect(names(overlap)).toEqual(['Thaumaturgy', 'Hellish Rebuke']);
+      expect(new Set(names(overlap)).size).toBe(2);
+      expect(overlap.spells[0].prepared).toBe('Always');
+    });
+
+    it('catalog-less fallback spell lands name-only, LOUD, uncounted, and invents no slot tier', () => {
+      // fix#209 nothing-invented law: an unresolvable name never becomes a counted
+      // or leveled row — it lands name-only with a console.error (no-fallback law).
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const result = getSpellAbilities([], makePlayerStats({
+        class: { name: 'Fighter', spell_casting_ability: null },
+        spells: ['Not A Real Spell'],
+      }));
+      expect(names(result)).toEqual(['Not A Real Spell']);
+      expect(result.spells[0].level).toBeUndefined();
+      expect(result.cantrips_known).toBe(0);
+      expect(result.spells_known).toBe(0);
+      expect(result.spell_slots_level_1).toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Not A Real Spell'));
+      errorSpy.mockRestore();
     });
   });
 });

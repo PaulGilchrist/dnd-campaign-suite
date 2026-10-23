@@ -22,8 +22,13 @@ import { addEntry } from '../../ui/logService.js';
 
 const SIZE_ORDER = ['Fine', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
 
-export const MOUNTED_BY_KEY = 'mountedBy';
-export const MOUNT_NAME_KEY = 'mountName';
+// #1388 export-dead-literals demoted to module-locals: ZERO external importers
+// of these constants — every consumer reads the RAW literals instead
+// ('mountedBy' hitResolution.js:90, 'mountName' reactionBonusHandler.js:512/
+// :582, CharSummary.jsx:493, CharSheet.jsx:451). String contract stays pinned
+// behaviorally in mountService.test.js via the exact store-write tuples.
+const MOUNTED_BY_KEY = 'mountedBy';
+const MOUNT_NAME_KEY = 'mountName';
 
 function findCreature(campaignName, name) {
     const cs = getCombatSummary(campaignName);

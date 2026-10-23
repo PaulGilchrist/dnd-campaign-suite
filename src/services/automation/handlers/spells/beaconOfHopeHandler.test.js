@@ -4,9 +4,9 @@
 // executeHandler → handle(). handle() side effects: one resolveMapPositions + one getCombatContext read;
 // ZERO state writes here — the concentration 'beacon_of_hope' targetEffect is written by
 // applyBeaconOfHopeEffect on the confirm lane (duration is a concentration latch, never a clock).
-// Live apply callers: beaconOfHopeService.confirmBeaconOfHope + useSimpleSpellHandlers.js:299 via the
+// Live apply caller: useSimpleSpellHandlers.js:299 via the
 // pendingBeaconOfHope picker gate (spellGates.js:426 → CreatureTargetPopups.jsx:59 →
-// handleBeaconOfHopeConfirm). Metamagic confirm-payload delegation is pinned in
+// handleBeaconOfHopeConfirm). (confirmBeaconOfHope forwarder excised #1338 — zero callers.) Metamagic confirm-payload delegation is pinned in
 // useSpellMetamagicFlow/confirm-payloads.test.js — not re-pinned here.
 // VESTIGIAL OUTPUT FLAG (bane/enhanceAbility SP-039 precedent): 'beacon_of_hope_target_selection'
 // currently has ZERO renderer consumers — the live picker is the pendingBeaconOfHope gate above.

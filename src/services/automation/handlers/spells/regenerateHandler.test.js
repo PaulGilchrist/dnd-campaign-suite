@@ -34,15 +34,20 @@
 //   · spellCastService/execution: triggerSpells.handleRegenerate L59 +
 //     helpers.applyRegenerateSpell L447 — parallel cast lane with its own impl
 //     (#1946 header's remove_regenerate_buff legacy-recipe flag stands).
-//   · The ONLY dispatch edge into handle() is regenerateService.triggerRegenerate
-//     L17 → executeHandler — and triggerRegenerate has ZERO prod callers repo-wide.
+//   · The former ONLY dispatch edge into handle() — regenerateService.triggerRegenerate
+//     → executeHandler — was EXCISED by the #1398 dead-export census batch (2026-10-23):
+//     triggerRegenerate had ZERO prod callers repo-wide, and fix#211 (#1483/#1472) wired
+//     the LIVE lane WITHOUT it (shield 'regenerate' triggerSpells.js:64 → handleRegenerate
+//     arm → helpers.applyRegenerateSpell; modal lane via confirmRegenerate — route homes,
+//     cited never edited).
 //   · Popup type 'regenerate_target_selection' has ZERO component consumers.
 //   VERDICT: handle is registered-but-currently-undispatched — legacy callable
-//   surface. Owner decision needed: retire handle + index.js L614 +
-//   triggerRegenerate, or rewire the gate lane through handle. A test lane cannot
-//   settle that; this file pins the EXACT popup contract that triggerRegenerate
-//   and the registry entry still compose against, so either direction is safe and
-//   any accidental contract drift while the lane sleeps fails loudly here.
+//   surface kept as fix#211's registry shield (index.js L614, owner constraint).
+//   Owner decision still needed: retire handle + index.js L614 together, or rewire
+//   the gate lane through handle. A test lane cannot settle that; this file pins the
+//   EXACT popup contract that the registry entry still composes against, so either
+//   direction is safe and any accidental contract drift while the lane sleeps fails
+//   loudly here.
 //
 // makeAction merge shape: fix #14 pattern — spell/automation shallow-merged into
 // defaults; remaining overrides spread exactly once (no whole-spell clobber).

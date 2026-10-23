@@ -23,33 +23,10 @@ export function applyGreatWeaponFighting(rolls) {
     return rolls.map(roll => (roll <= 2 ? 3 : roll));
 }
 
-/**
- * Check if Great Weapon Fighting applies to a given weapon and character.
- *
- * @param {Object} weapon - Weapon object with properties array
- * @param {Object} playerStats - PlayerStats object with automation data
- * @returns {boolean} True if GWF applies
- *
- * Posture (#1246): tolerant-quiet at every absence level — this file never
- * logs and never throws. Missing weapon (:34), missing/absent automation
- * (`?.` + `|| []` below) and now missing playerStats all resolve to
- * `false` = "does not apply", which keeps RAW damage unmodified downstream.
- * Mirrors hasPassiveEffect's guarded apex (automationPassives.js:19), the
- * live parallel path for this exact check.
- */
-export function greatWeaponFightingApplies(weapon, playerStats) {
-    if (!weapon) return false;
-    if (!playerStats) return false;
-
-    const hasGWF = (playerStats.automation?.passives || []).some(
-        p => p.type === 'passive_rule' && p.effect === 'great_weapon_fighting'
-    );
-    if (!hasGWF) return false;
-
-    const properties = weapon.properties || [];
-    const hasTwoHandedOrVersatile = properties.some(
-        prop => prop === 'Two-Handed' || prop === 'Versatile'
-    );
-
-    return hasTwoHandedOrVersatile;
-}
+// greatWeaponFightingApplies deleted (#1246 dead-export lane): zero production
+// importers tree-wide (fresh census, src/server/public). The LIVE path for this
+// exact check is automationPassives.js hasGreatWeaponFighting (:398) driving
+// applyGreatWeaponFightingToDamage (:430), re-exported via automationService.js
+// and consumed by useLoggedDiceRollDamage.js / damageHandlerUtils.js. This export
+// was its superseded shadow sibling; fix#204's tolerant-apex guard and posture
+// JSDoc retire with it (guard-commits stay in git history — deletion is not revert).

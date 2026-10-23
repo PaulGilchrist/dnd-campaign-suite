@@ -57,6 +57,19 @@ async function activateSpiritualWeaponIfNeeded(spell, metaCtx, playerStats, camp
 
 async function handleNoSavePath({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, rollAttack, spellToHit, damageType }) {
 
+    // fix#300 (#1456 magicMissile-roll-discard census): DOCUMENT — deliberate, NOT
+    // a silent-zero live bug. executeMagicMissile owns the full dart pipeline and the
+    // ORDER proves no damage is lost: per-target darts are rolled (:669
+    // rollTargetMissiles) and APPLIED TO HP (:672 applyMissileDamage → :614
+    // applyDamageToTarget, Shield-immunity gate :608-:612) BEFORE this callback fires
+    // at :676 — the stub swallows only the generic per-volley roll CARD, whose
+    // numbers the spell already re-publishes in its own structured log entry
+    // (logMagicMissileSpell :625-:650: per-target rolls/rawDamage/finalDamage/
+    // shieldImmune + totals). Suppressing the duplicate card is the documented intent
+    // (zero-is-data law satisfied: the discard carries nothing unfinalized).
+    // Roll-cards side of the face is owned module-direct by
+    // helpers.sp075-magicMissile-upcast.test.js (REAL rollDamage); the hub no-op
+    // swap itself is pinned by spellCastService.missile.test.js.
     if (isMagicMissile(spell)) {
         await executeMagicMissile(spell, metaCtx, { rollDamage: () => {}, playerStats, getTargetInfo, campaignName, mapName, characters });
         return null;

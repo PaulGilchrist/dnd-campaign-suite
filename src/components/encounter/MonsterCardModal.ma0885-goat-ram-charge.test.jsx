@@ -31,7 +31,9 @@
 // buildHitConditionClause / extractDamageDiceFromDescription (#662-#667
 // precedent — all fire inside the ctx press above) and the roller re-reads
 // canRollExpression/parseConstant/rollExpressionDoubled("1") (flat crit
-// invariance owned by ma0747-composite-damage.test.jsx:52-57, transport "1"
+// invariance folded to the diceRoller owner per pass #507 rec: constant-null
+// arms diceRoller.test.js:222/:256, real-parseConstant cla048:107/:124, CLA-281
+// consumer seam handlePlainDamage.secondaryDamage.test.js:334; transport "1"
 // pinned on ctx here). Dead-mock purge empirical per-lane (#667/#669 map):
 // diceRoller mock gone (rollAttack mocked, no roller fires on this lane),
 // AttackResultPopup mock gone (popupHtml null → never rendered; grant/decline

@@ -89,7 +89,7 @@ function saveTypeWord(saveType) {
 // MA-0068: options parameterize monster Sleep Breath staging (CON save, no
 // caster concentration, 10-minute Unconscious = 100 rounds CLA-334). Every
 // default reproduces the Sleep spell shape byte-identically.
-export function sleepStageSpec(options = {}) {
+function sleepStageSpec(options = {}) { // demoted #1420 census: ZERO external importers — callers stageSleepTargets :121 / applySleepTurnEnd :204 only; test pins ride the public stageSleepTargets surface (#82-class twin of fix#297's getInspiringSmitePassives)
     const concentrate = options.concentrate !== false;
     return {
         concentrate,

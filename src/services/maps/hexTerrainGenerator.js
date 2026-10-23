@@ -147,8 +147,15 @@ function elevationMoistureToTerrain(elevation, moisture) {
     return 'tundra';
   }
 
+  // High ground is mountains regardless of moisture (#1171: the old
+  // moisture>0.4 branch returned 'mountains' both ways — dead condition,
+  // collapsed honestly, not a feature gap: the elevation-only tiers here
+  // mirror the >0.85 tundra ice-cap tier, and outdoorConfig ships no
+  // dry-alpine biome id to distinguish the dry arm. The moisture axis
+  // re-enters below at elevation <= 0.70; the 0.70 threshold itself still
+  // gates mountains-vs-hills/forest/plains and is byte-pinned by the
+  // seed-42 golden grid in hexTerrainGenerator.test.js T1.)
   if (elevation > 0.70) {
-    if (moisture > 0.4) return 'mountains';
     return 'mountains';
   }
 

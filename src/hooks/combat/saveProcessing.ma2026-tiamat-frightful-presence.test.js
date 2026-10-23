@@ -190,11 +190,15 @@ describe('MA-2026 live-lane: Frightened now lands on the failed save (was FAIL(a
     expect(addEntryLogs.some(e => e.automationType === 'frightful_presence_tracked')).toBe(false);
   });
 
-  it('refused-on-immune gate (MA-0030 lane): re-fire vs Tiamat-named immunity te refuses, absent te fires', () => {
+  it('refused-on-immune gate (MA-0030 lane): re-fire vs Tiamat-named immunity te refuses', () => {
     const immunityTe = { target: TARGET, effect: 'frightful_presence_immunity', source: TIAMAT_NAME };
     // chip press short-circuits via this gate before processSaveRoll on the live lane
     expect(gazeImmunityActive({ action: FP, target: { name: TARGET }, monsterName: TIAMAT_NAME, targetEffects: [immunityTe] })).toEqual(
       expect.objectContaining({ effect: 'frightful_presence_immunity', durationMinutes: 1440 }));
-    expect(gazeImmunityActive({ action: FP, target: { name: TARGET }, monsterName: TIAMAT_NAME, targetEffects: [] })).toBeNull();
+    // absent-te fires arm folded (pass #509 rec, fix#277 echo-class): the old
+    // targetEffects:[]→null re-pin is pure parser-input echo of the owner empty-arm
+    // truth-table MonsterCardHelpers.gaze-immunity.test.js:48 — same parse exit
+    // regardless of row. Live gate-open coverage is this lane's own success-face
+    // press above (no immunity seeded, immunity te granted at :184).
   });
 });

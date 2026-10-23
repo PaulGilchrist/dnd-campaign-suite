@@ -1,5 +1,7 @@
 // @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import monsters from '../../../public/data/monsters.json';
+import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 
 const runtimeStore = {};
 const addEntryLogs = [];
@@ -69,19 +71,26 @@ const campaignName = 'test-campaign';
 const YETI = 'Abominable Yeti 1';
 const TARGET = 'AberrantSorcerer';
 
-// Mirrors the authored Abominable Yeti Chilling Gaze row (monsters.json:
-// DC 18 CON, dc_success:none, 6d6 Cold, Paralyzed on fail, 1h gaze_immunity
-// on success).
+// fix#1362 disk-is-authority applied to fixtures (pass #509 rec): this lane used to
+// HAND-MIRROR the Abominable Yeti Chilling Gaze row (DC 18 CON, dc_success:none,
+// 6d6 Cold, Paralyzed on fail, 1h gaze_immunity on success) — a hand-typed duplicate
+// goes stale silently when disk edits; this read-only IMPORT cannot. Every forwarded
+// field now derives from the real row bytes, keyed exactly as the production
+// transport stamps them (buildAbilitySaveRollContext: saveDc :1818, saveType full
+// word :1819, autoDamage fields via resolveSaveLegDamageFields :1827, saveConditions
+// save_effect-scoped :1829 via extractConditionsFromSaveEffect, successImmunity
+// verbatim passthrough :1846). The mapping lines are this lane's consumer seam.
+const gazeRow = monsters.find((m) => m.name === 'Abominable Yeti').actions.find((a) => a.name === 'Chilling Gaze');
 const gazeContext = {
-    saveDc: 18,
-    saveType: 'CON',
+    saveDc: gazeRow.save_dc,
+    saveType: gazeRow.save_type,
     attackerName: YETI,
-    actionName: 'Chilling Gaze',
-    dcSuccess: 'none',
-    autoDamageFormula: '6d6',
-    autoDamageDamageType: 'Cold',
-    saveConditions: ['paralyzed'],
-    successImmunity: { effect: 'gaze_immunity', duration: '1_hour', duration_minutes: 60 },
+    actionName: gazeRow.name,
+    dcSuccess: gazeRow.dc_success,
+    autoDamageFormula: gazeRow.damage_dice_primary,
+    autoDamageDamageType: gazeRow.damage_type_primary,
+    saveConditions: extractConditionsFromSaveEffect(gazeRow.save_effect),
+    successImmunity: gazeRow.success_immunity,
 };
 
 async function resolveSave(context, success, roll) {

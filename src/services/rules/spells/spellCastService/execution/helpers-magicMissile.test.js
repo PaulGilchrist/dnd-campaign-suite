@@ -338,7 +338,7 @@ describe('helpers.js magic-missile chain — module-direct sole runner', () => {
       expect(addEntry.mock.calls[0][1].totalFinalDamage).toBe(7);
     });
 
-    it('resolveIgnoreResistance (:513-520): only the auto_effect+ignore_resistance pair flips the forwarded flag — full tuple otherwise identical; missing passives THROWS with console.error after dice were already spent (alive direct, DEAD-VIA-HUB cited missile.test.js header)', async () => {
+    it('resolveIgnoreResistance (:513-520): only the auto_effect+ignore_resistance pair flips the forwarded flag — full tuple otherwise identical; missing passives THROWS with console.error after dice were already spent (alive direct; hub face REVISED fix#300 — fix#126 degrade un-shadowed the guard, see missile.test.js header)', async () => {
       const services = makeServices({ name: CASTER, automation: { passives: [{ type: 'auto_effect', effect: 'ignore_immunity' }, { type: 'feat', effect: 'ignore_resistance' }] } });
       hoisted.queue.push(2);
       applyDamageToTarget.mockReturnValue({ finalDamage: 3, damageReduced: false });

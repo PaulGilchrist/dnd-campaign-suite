@@ -2536,3 +2536,6 @@ run2#1549: ui/youtubePlayer -> maintained (13->14) SDK stub-completeness exact-o
 
 ## Fix-pass MILESTONE: ⚠ SECTION EMPTY (fix#221, 2026-10-23)
 - All 84 original ⚠ items + ~30 mid-pass class-queue items dispositioned across lanes #145-#221 (fixed / disproven-bytes / closed-by-verification / owner-queued residuals documented adjacent). Unfixed-warns census: 0. Flakes: 3 root-caused (152/171/212), 2 seeds stabilized (214 + register). Two fabricated-tool-result integrity catches handled honestly. fixcheck221 stamp running; then 🗑 (108 dead-code) -> 📌 (309 tidy) sections, BLANKET-APPROVED.
+
+## Fix-pass MILESTONE: 🗑 section ~cleared pending adjudication (fix#295, 2026-10-23)
+- 108 originals -> deep tail (~5-8 lines incl self-generated class-queues): 20 productive lanes, 19 verified-discharges, 3 refuted-with-bytes (#290b import-allegations, #261 gameplay-flows salvage, #279 seam-keeps), 3 live-bugs-found-under-dead-code-rubble (fix#255 D4-await-drift, fix#288 zero-3-layer, fix#295 fallback-spell-gap). CANON discipline held throughout: zero-red baseline since fix#50; every discharge verified by lineage+bytes, never by trust.

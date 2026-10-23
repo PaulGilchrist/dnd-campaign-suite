@@ -7,11 +7,14 @@
 // IDENTITY / OWNERSHIP (READ bytes, not assumed):
 // - triggerWildMagicSurge is the ONLY live export: sole production caller is
 //   spellCastService/execution/index.js:538 (awaited post-cast seam).
-// - The four getters have ZERO importers outside this service (grep
-//   caller-evidence): test-only exports. No dedicated suites — every finder
-//   predicate (type/effect/condition keys, first-match pick) is pinned
-//   through the live seam below via near-miss passives + full-set write
-//   censuses, so finder drift flips a lane here.
+// - #1433 export-surface-shrink DONE: the four finders are demoted to
+//   MODULE-LOCAL (were test-only exports, zero external importers ever).
+//   No dedicated getter suites — every finder predicate (type/effect/
+//   condition keys, first-match pick) is pinned through the live seam below
+//   via near-miss passives + full-set write censuses, so finder drift flips
+//   a lane here. The disk census restructure (fix#297 row-9 seam pattern)
+//   rides triggerWildMagicSurge: disk rows are pinned by what the seam
+//   DISPATCHES/WRITES and by chaos-only-near-miss zero-IO refusal.
 // - NO dice live in this service: the d20 gate (2014 roll-a-1 / 2024
 //   roll-a-20, public/data/classes.json:11353, public/data/2024/classes.json
 //   :11391) and d100→row table mapping are owned by
@@ -62,7 +65,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import { coreHandlers } from '../../combat/automation/automationInfoBuilder/core-handlers.js';
-import { triggerWildMagicSurge, getWildMagicSurgeFeatures, getControlledChaosFeature, getTamedSurgeFeature } from './wildMagicSurgeService.js';
+import { triggerWildMagicSurge } from './wildMagicSurgeService.js';
 
 const H = vi.hoisted(() => {
     const CAMPAIGN = 'TestCampaign';
@@ -352,20 +355,23 @@ describe('wildMagicSurgeService.triggerWildMagicSurge', () => {
 // #1433(a): DISK TRIGGER-VOCABULARY CENSUS — reads the REAL bytes of both
 // ruleset classes.json files, pushes every Sorcerer wild-magic feature
 // through the REAL collector producer (automationInfoBuilder/core-handlers.js
-// auto_effect :17) and pins which disk rows the service finders see. Any
-// future disk format drift or finder narrowing flips here.
+// auto_effect :17) and RIDES THE PUBLIC SEAM triggerWildMagicSurge
+// (#1433 export-surface-shrink: the finders are module-local now, so disk
+// rows are pinned by what the seam DISPATCHES and WRITES — fix#297 row-9
+// restructure-pins pattern). A row the finders stop seeing flips this lane:
+// ZERO dispatch / no envelope name / no double-roll stamp.
 // Paths are cwd-relative: vitest's jsdom rewrites import.meta.url to an
 // http URL (non-file scheme), so URL-based resolution is unavailable.
-describe('wildMagicSurgeService #1433 disk trigger census (real disk bytes → real finders)', () => {
+describe('wildMagicSurgeService #1433 disk trigger census (real disk bytes → public seam)', () => {
     const DISK = {
         legacy: {
             file: 'public/data/classes.json',
-            surgeTuples: [{ type: 'auto_effect', trigger: 'roll_1_on_wild_magic_d20', effect: 'wild_magic_surge_table' }],
+            surgeTuple: { type: 'auto_effect', trigger: 'roll_1_on_wild_magic_d20', effect: 'wild_magic_surge_table' },
             rawQuote: 'immediately after you cast a sorcerer spell of 1st level or higher',
         },
         current: {
             file: 'public/data/2024/classes.json',
-            surgeTuples: [{ type: 'wild_magic_surge', trigger: 'after_sorcerer_spell_slot' }],
+            surgeTuple: { type: 'wild_magic_surge', trigger: 'after_sorcerer_spell_slot' },
             rawQuote: 'immediately after you cast a Sorcerer spell with a spell slot',
         },
     };
@@ -391,26 +397,97 @@ describe('wildMagicSurgeService #1433 disk trigger census (real disk bytes → r
         };
     }
 
+    // One public-seam run: fresh store, one queued executeHandler result.
+    async function runSeam(stats, seeds = []) {
+        H.reset();
+        seeds.forEach(([k, v]) => H.seed(k, v));
+        const expected = { type: 'popup', payload: {} };
+        H.state.results.push(expected);
+        const result = await triggerWildMagicSurge(SPELL, SLOT, stats, H.CAMPAIGN, H.MAP);
+        expect(result).toBe(expected); // result identity passthrough
+        return expected;
+    }
+
+    let diskErrSpy;
+    beforeEach(() => { diskErrSpy = vi.spyOn(console, 'error').mockImplementation(() => {}); });
+    afterEach(() => { vi.restoreAllMocks(); });
+
     for (const [ruleset, spec] of Object.entries(DISK)) {
-        it(`${ruleset}: every disk wild-magic surge row matches the finder; near-miss rows stay out; RAW 'you cast' quote present`, () => {
+        it(`${ruleset}: disk surge row rides the roll-lane seam — exact envelope + full read/write census; RAW 'you cast' quote present`, async () => {
             const { passives, features } = sorcererWildMagicPassives(spec.file);
             expect(passives.length).toBeGreaterThan(0);
-            const surgeRows = getWildMagicSurgeFeatures({ automation: { passives } });
-            expect(surgeRows.map(p => ({ type: p.type, trigger: p.trigger, effect: p.effect })))
-                .toEqual(spec.surgeTuples);
+            // Collector-fidelity byte census (disk bytes, not memory): names
+            // and the surge type/trigger/effect triple ride every passive.
+            const surgeRow = passives.find(p => p.name === 'Wild Magic Surge');
+            const chaosRow = passives.find(p => p.effect === 'wild_magic_double_roll');
+            expect(surgeRow).toBeDefined();
+            expect(chaosRow).toBeDefined();
+            expect({ type: surgeRow.type, trigger: surgeRow.trigger, effect: surgeRow.effect })
+                .toEqual(spec.surgeTuple);
             // RAW law byte-check: the surge feature text is second-person,
             // living INSIDE the Sorcerer class block — 'you' is the Sorcerer.
             const surgeFeature = features.find(f => /wild_magic_surge|roll_1_on_wild_magic/.test(JSON.stringify(f.automation)) && !/double_roll/.test(JSON.stringify(f.automation)));
             expect(surgeFeature.description).toContain(spec.rawQuote);
-            if (ruleset === 'current') {
-                expect(getTamedSurgeFeature({ automation: { passives } })).toMatchObject({ type: 'wild_magic_tamed' });
-            } else {
-                expect(getTamedSurgeFeature({ automation: { passives } })).toBeUndefined();
-            }
-            // Controlled Chaos (auto_effect + wild_magic_double_roll) is found
-            // by its own effect-fingerprint finder in BOTH rulesets and is
-            // never swept into the surge finder's result set above.
-            expect(getControlledChaosFeature({ automation: { passives } })).toMatchObject({ type: 'auto_effect', effect: 'wild_magic_double_roll' });
+
+            // Roll-lane run on the FULL disk passive set. legacy: no tamed
+            // row → the tamed clause short-circuits BEFORE any store read.
+            // current: tamedSurgeUses=0 seed defuses the chooser so BOTH
+            // rulesets ride the same surge+chaos finder seam. oncePerTurn is
+            // derived from the disk passive byte, never hardcoded.
+            await runSeam(mkStats(passives), ruleset === 'current' ? [['Sorcerer.tamedSurgeUses', 0]] : []);
+            expect(H.state.actions).toHaveLength(1);
+            expect(H.state.actions[0]).toEqual({
+                name: 'Wild Magic Surge',
+                automation: rollAutomation(surgeRow.oncePerTurn || false),
+                wildMagicSurgeTable: SURGE_TABLE,
+            });
+            // Controlled Chaos rides its own finder → wildMagicDoubleRoll
+            // (skipSync=true) stamped BEFORE the latch write; the chaos row is
+            // NEVER the dispatched feature (envelope name pin above).
+            expect(H.state.reads).toEqual([...(ruleset === 'current' ? [TAMED_READ] : []), ...ROLL_READS]);
+            expect(H.state.writes).toEqual([featWrite('wildMagicDoubleRoll', true), rollWrite()]);
+            expect(diskErrSpy).not.toHaveBeenCalled();
+        });
+
+        it(`${ruleset}: near-miss keep-out — Controlled Chaos alone NEVER fires the surge lane (zero dispatch, zero IO)`, async () => {
+            const { passives } = sorcererWildMagicPassives(spec.file);
+            const chaosRow = passives.find(p => p.effect === 'wild_magic_double_roll');
+            // Were the surge finder ever widened to swallow auto_effect
+            // double_roll rows, this seam would dispatch here.
+            H.reset();
+            const result = await triggerWildMagicSurge(SPELL, SLOT, mkStats([chaosRow]), H.CAMPAIGN, H.MAP);
+            expect(result).toBeNull();
+            expect(H.state.actions).toHaveLength(0);
+            expect(H.state.reads).toEqual([]);
+            expect(H.state.writes).toEqual([]);
+            expect(diskErrSpy).not.toHaveBeenCalled();
         });
     }
+
+    it('current: disk Tamed Surge row rides the chooser lane with its full disk bytes spread into the envelope', async () => {
+        const { passives } = sorcererWildMagicPassives(DISK.current.file);
+        const tamedRow = passives.find(p => p.type === 'wild_magic_tamed');
+        expect(tamedRow).toBeDefined(); // 2024-only row: disk bytes verbatim
+        // Default store: tamedSurgeUses unset → null normalized 1 (CLA-354).
+        await runSeam(mkStats(passives));
+        expect(H.state.actions).toHaveLength(1);
+        expect(H.state.actions[0].name).toBe('Tamed Surge');
+        expect(H.state.actions[0].automation).toMatchObject({
+            type: 'wild_magic_tamed',
+            trigger: 'after_sorcerer_spell_slot',
+            recharge: 'long_rest',
+            uses: 1,
+        });
+        expect(H.state.reads).toEqual([TAMED_READ]);
+        expect(H.state.writes).toEqual([]); // chooser short-circuits before chaos/latch
+        expect(diskErrSpy).not.toHaveBeenCalled();
+    });
+
+    it('legacy: no Tamed Surge row on 2014 disk — finder-miss short-circuits before any tamedSurgeUses read', async () => {
+        const { passives } = sorcererWildMagicPassives(DISK.legacy.file);
+        expect(passives.some(p => p.type === 'wild_magic_tamed')).toBe(false);
+        await runSeam(mkStats(passives));
+        expect(H.state.reads).not.toContain(TAMED_READ); // byte-order proof
+        expect(H.state.actions).toHaveLength(1); // roll lane took the seam
+    });
 });

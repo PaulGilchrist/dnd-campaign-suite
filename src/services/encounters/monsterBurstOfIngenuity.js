@@ -51,7 +51,17 @@ export function isMonsterBurstOfIngenuityRow(row) {
 }
 
 export function burstOfIngenuityBonus(action) {
-  return Number(action?.automation?.bonus) || 2;
+  // #1091 (fix class #90/#195 zero-is-data): the old `Number(bonus) || 2`
+  // silently UPGRADED an authored bonus:0 row to +2. Authored numerics —
+  // including 0 — pass through untouched; only missing/null/unparseable
+  // (MA-1502 string) bonuses fall back to the documented RAW default of +2
+  // (the sphinx "adds 2 to the roll"), matching reactionMaxUses' honest
+  // numeric-default posture. Disk census 2026-10-23: the only authored
+  // burst_of_ingenuity row (monsters.json sphinx-of-wonder reactions[0])
+  // carries bonus:2 — the zero-upgrade was latent, now structurally dead.
+  if (action?.automation?.bonus == null) return 2;
+  const bonus = Number(action.automation.bonus);
+  return Number.isFinite(bonus) ? bonus : 2;
 }
 
 function reactionMaxUses(action) {
@@ -100,9 +110,14 @@ export function buildBurstOfIngenuityBuff(action, monsterName, currentRound) {
   };
 }
 
+// Roller-gate refusals ONLY (#1091 dead-text delete, fix class #223): the sole
+// reader indexes with burstRollerGate's reason, which is structurally
+// no_target|already_armed. Economy refusals short-circuit earlier with the
+// GATE's own inline messages (burstOfIngenuityGate → refuseBurst(gate.message)),
+// so a round/uses entry here could never surface — the deleted twins had
+// already drifted from the live gate copy (the uses arm lacked the long-rest
+// suffix). Do NOT re-add round/uses keys here.
 const REFUSAL_MESSAGES = {
-  round: () => 'Burst of Ingenuity: Reaction already used this round — refused.',
-  uses: (limit) => `Burst of Ingenuity: ${limit}/Day uses already spent today — refused.`,
   no_target: (m) => `Burst of Ingenuity: ${m} has no roller armed on the card — arm the creature about to make the ability check or saving throw first (gridless proxy for the RAW 30-ft proximity).`,
   already_armed: (r) => `Burst of Ingenuity: ${r} is already carrying an armed +2 — one buff instance per roller; refused.`,
 };
@@ -139,16 +154,22 @@ export function consumeBurstOfIngenuityBuff(rollerName, campaignName, { rollType
   const buff = buffs.find(b => b && b.effect === 'burst_of_ingenuity');
   if (!buff) return zero;
   setRuntimeValue(rollerName, 'activeBuffs', buffs.filter(b => b !== buff), campaignName);
+  // #1091 honest stamp read: the applied log reports EXACTLY the bonus folded
+  // below. A stamped saveBonus:0 logs "+0" — the old Number(0) || 2 template
+  // would have silently re-upgraded it to +2. Producer-inconsistent stamps
+  // (missing saveBonus) fold 0 and now honestly log +0; well-formed +2 bytes
+  // are unchanged.
+  const stampBonus = Number(buff.saveBonus);
   addEntry(campaignName, {
     type: 'automation',
     automationType: 'burst_of_ingenuity_applied',
     characterName: buff.grantedBy || rollerName,
     targetName: rollerName,
     abilityName: BURST_OF_INGENUITY_BUFF_NAME,
-    description: `Burst of Ingenuity: +${Number(buff.saveBonus) || 2} folded into ${rollerName}'s ${rollType}${rollName ? ` (${rollName})` : ''} — buff consumed.`,
+    description: `Burst of Ingenuity: +${Number.isFinite(stampBonus) ? stampBonus : 0} folded into ${rollerName}'s ${rollType}${rollName ? ` (${rollName})` : ''} — buff consumed.`,
     timestamp: Date.now(),
   }).catch(e => console.error('[MA-1510 burst_of_ingenuity_applied] log error:', e));
-  return { bonus: Number(buff.saveBonus) || 0, applied: true };
+  return { bonus: Number.isFinite(stampBonus) ? stampBonus : 0, applied: true };
 }
 
 // One chip click: round latch → uses gate → roller gate (every refusal

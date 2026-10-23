@@ -364,7 +364,7 @@ export async function generateLootSuggestions(selectedMonsters) {
 }
 
 function getTreasureFrequency(cr) {
-  if (cr < 0.5) return 0;
+  // cr < 0.5 unreachable: tier 'none' covers cr <= 1.5 and caller continues before this roll (#1166)
   if (cr <= 2) return 0.30;
   if (cr <= 4) return 0.50;
   return 1;

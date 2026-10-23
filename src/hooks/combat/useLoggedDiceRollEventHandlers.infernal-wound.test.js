@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai: 2026-10-23
 // MA-0367 (PC-target combo save-result seam): Bearded Devil Infernal Glaive —
 // a failed DC 12 CON save inflicts the wound via infernalWoundService; the
 // dc_success:"full" arm keeps the attack damage FULL on BOTH outcomes (the save
@@ -70,35 +70,43 @@ vi.mock('./handlers/damageHandlerUtils.js', () => ({
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
+import { parseInfernalWoundClause } from '../../components/encounter/MonsterCardHelpers.js';
+import monstersData from '../../../public/data/monsters.json';
 
 const CAMPAIGN = 'test-campaign';
 const TARGET = 'Wild_Sage_Druid';
+const DEVIL = 'Bearded Devil 1';
+
+// BY-name disk row (monsters.json:8897 'Bearded Devil' / 'Infernal Glaive'):
+// 1d10+3 Slashing, DC 12 CON, dc_success 'full', wound 1d10. #505 build-via-
+// producer: the wound arm is BUILT by parseInfernalWoundClause and rides the
+// pending payload VERBATIM (useLoggedDiceRollAttack.js:154 copies
+// context.infernalWound), so this lane consumes the parser's real output.
+const GLAIVE_ROW = monstersData.find(m => m.name === 'Bearded Devil')
+    .actions.find(a => a.name === 'Infernal Glaive');
 
 // Install the window listeners ONCE per file — window persists across tests, so
 // re-installing every beforeEach would stack duplicate save-result processors.
 window.__pendingResultHandlersInstalled = false;
 setupEventListeners({ characterName: TARGET, campaignName: CAMPAIGN, logEntry: vi.fn(), charactersRef: { current: [{ name: TARGET }] } });
 
-// Authored Bearded Devil Infernal Glaive row (monsters.json): 1d10+3 Slashing,
-// DC 12 CON, dc_success 'full', wound 1d10 — pending shape mirrors
-// parseInfernalWoundClause output.
 function glaivePending() {
     return {
         targetName: TARGET,
         rawDamage: 7,
-        saveDc: 12,
-        saveType: 'CON',
-        dcSuccess: 'full',
-        damageType: 'Slashing',
-        attackerName: 'Bearded Devil 1',
-        name: 'Infernal Glaive',
-        formula: '1d10 + 3',
+        saveDc: GLAIVE_ROW.save_dc,
+        saveType: 'CON', // upstream pending prompt carries the abbreviated ability
+        dcSuccess: GLAIVE_ROW.dc_success,
+        damageType: GLAIVE_ROW.damage_type_primary,
+        attackerName: DEVIL,
+        name: GLAIVE_ROW.name,
+        formula: GLAIVE_ROW.damage_dice_primary,
         modifier: 3,
         rolls: [4],
         campaignName: CAMPAIGN,
         statusEffects: null,
         isAutoCrit: false,
-        infernalWound: { effect: 'infernal_wound', bleedDie: '1d10', expiresMinutes: 1, medicineDc: 12 },
+        infernalWound: parseInfernalWoundClause(GLAIVE_ROW),
     };
 }
 
@@ -120,7 +128,7 @@ describe('MA-0367 save-result seam — full damage both legs + wound grant', () 
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), TARGET, 7, ['Slashing'], expect.anything());
         expect(grantInfernalWound).toHaveBeenCalledWith(expect.objectContaining({
             campaignName: CAMPAIGN,
-            attackerName: 'Bearded Devil 1',
+            attackerName: DEVIL,
             targetName: TARGET,
             bleedDie: '1d10',
         }));

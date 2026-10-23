@@ -17,7 +17,10 @@
 // vs DC via resolveCounterspellCheck :198-208 — old d20+INT leg was
 // self-ref, test injected its own spellAbilityMod) and zero-spend
 // latch/trigger refusals :252-268; RAW-unlimited never-caps press →
-// ma0300 helper #517 At-Will-spend ladder.
+// ma0300 helper #517 At-Will-spend ladder. VERIFIED this pass (rec #517
+// fold-target check): :76-79/:125-131-era sentinel twins absent on disk —
+// 38-line lane, folded legs unchanged since #517; family fabrication leg
+// now relocated to counterspell owner gated-reaction MA-0013:603-611.
 import { describe, it, expect } from 'vitest';
 import { getGatedMonsterReaction } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';

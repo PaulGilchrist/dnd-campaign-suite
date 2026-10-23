@@ -5,8 +5,8 @@
 // aggregation, and XP enrichment against the REAL /data/monsters.json bytes BY NAME
 // (#1086/#1094/#977 — disk bytes via the exact transport, #1010).
 // Generation internals (currency, CR tiers, RNG entries) are owned by
-// lootSuggestions.test.js; pure helpers by lootGenerator.test.js + lootGenerator-private
-// .test.js; the Clear-Combat gate/refusals/award by autoRewardService.test.js
+// lootSuggestions.test.js; pure helpers by lootGenerator.test.js ALONE (#1163 deleted its
+// lootGenerator-private twin as redundant); the Clear-Combat gate/refusals/award by autoRewardService.test.js
 // (#1161 family map — cited here, never re-driven).
 // Determinism: every full-result pin uses CR ≤ 1.5 survivors ⇒ tier 'none' consumes no
 // RNG, so the exact 'No loot' sentinel is stable; XP pins are RNG-free BY NAME literals

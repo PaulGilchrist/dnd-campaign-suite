@@ -92,11 +92,17 @@ import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js'
 /*  slotLevel (:567) -> T2 log; forwarding tuple (:528) -> exact        */
 /*  tuples T1/T2/T5; auto-hit stance -> rollAttack/rollD20/maximized    */
 /*  never called (T1 + landmines); '1d4 + 1' constant -> every dice      */
-/*  call arg-pinned (T1/T2). DEAD-VIA-HUB declared: the passives==null   */
-/*  guard at helpers.js:515-518 is shadowed by the identical-lookup      */
-/*  magical-ambush chokepoint at index.js:115-119, which throws first on */
-/*  EVERY hub cast (chokepoint-inline-dup #1357/58); its hub-reachable   */
-/*  twin is pinned in execution/spellCastService.healingEdgeCases.       */
+/*  call arg-pinned (T1/T2). DEAD-VIA-HUB REVISED fix#300 (#1456):     */
+/*  the passives==null guard (era helpers.js:515-518, today :574-:592   */
+/*  resolveIgnoreResistance) was hub-unreachable ONLY because the        */
+/*  identical-lookup magical-ambush chokepoint threw FIRST unguarded on  */
+/*  every hub cast (chokepoint-inline-dup #1357/58). fix#126 (#1495)    */
+/*  self-caught that hub call (execution/index.js:160-166/:811 degrade), */
+/*  so the guard is now the FIRST loud hub throw on a passives==null     */
+/*  missile cast (pre-applyDamageToTarget — zero partial writes; in-      */
+/*  practice guard, automationCollector.js:111 stamps passives:[]).      */
+/*  KEEP-with-cite at helpers.js:578; direct-face throw pin lives in     */
+/*  execution/helpers-magicMissile.test.js:341-366 (:513-era cites).     */
 /*                                                                    */
 /*  No-clock (mandatory): instantaneous spell; Date.now() appears only  */
 /*  as log timestamps (benign). No HP-key writes this lane — the        */
@@ -177,7 +183,6 @@ vi.mock('../../combat/buffs/buffService.js', () => ({
 vi.mock('../features/silenceService.js', () => ({
   getSilenceSource: vi.fn(() => null),
   isCreatureInSilenceZone: vi.fn(() => false),
-  triggerSilence: vi.fn(),
 }))
 
 vi.mock('../features/invisibilityService.js', () => ({

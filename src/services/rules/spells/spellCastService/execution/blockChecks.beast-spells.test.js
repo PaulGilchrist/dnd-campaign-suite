@@ -22,6 +22,10 @@
 //   non-holder × any  → blanket form refusal (CLA-391)       [gate: no-passive]
 // Hub gate ORDER of this seam vs other blockers lives at execution/index.js:652
 // REAL-chain (#1454 lane) + modals refusal pins (#1457) — module-direct only here.
+// fix#300 (#1465 external-dead census): beastSpellsAllowsCast demoted module-local
+// in blockChecks.js (zero external production importers; fix#294 shape) — the former
+// direct-import truth table now runs through the PUBLIC seam checkBlockedBySpellcastingBuff
+// (fix#82 coordinated, same pass).
 // NO-CLOCK: blocking here is instantaneous — no timers, no game clock (#mandatory).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -66,7 +70,7 @@ vi.mock('./spellResolution.js', () => ({
 
 const { addEntry } = await import('../../../../ui/logService.js');
 const { getActiveBuffs } = await import('./spellResolution.js');
-const { checkBlockedBySpellcastingBuff, beastSpellsAllowsCast } = await import('./blockChecks.js');
+const { checkBlockedBySpellcastingBuff } = await import('./blockChecks.js');
 
 /* ------------------------------------------------------------------ */
 /*  Fixtures — disk-faithful bytes (fabricated-shape ban #1455/57/  */
@@ -186,18 +190,23 @@ describe('checkBlockedBySpellcastingBuff — Beast Spells gate quadrants (CLA-40
   });
 });
 
-describe('beastSpellsAllowsCast — full truth table (CLA-404)', () => {
-  it('holder×free allow; holder×costly and non-holder×any deny; missing automation denies without throwing; null spell silently allows', () => {
+describe('CLA-404 truth table — PUBLIC SEAM (fix#300/#1465: beastSpellsAllowsCast demoted module-local, fix#82 coordinated retarget)', () => {
+  // Every row flows through checkBlockedBySpellcastingBuff with the blocking
+  // WILD_SHAPE_BUFF active (beforeEach): allow-side verdict === null, deny-side
+  // verdict === automationPopup — the demoted helper's boolean maps 1:1 onto the
+  // public gate's observable shape (fix#297 row-9 public-surface pattern).
+  it('holder×free allow; holder×costly and non-holder×any deny; missing automation denies without throwing; null spell silently allows', async () => {
     // Quadrant rows (disk-faithful fixtures above).
-    expect(beastSpellsAllowsCast(GUIDANCE, lv18Druid())).toBe(true);
-    expect(beastSpellsAllowsCast(SUMMON_BEAST, lv18Druid())).toBe(false);
-    expect(beastSpellsAllowsCast(GUIDANCE, noPassiveDruid())).toBe(false);
-    expect(beastSpellsAllowsCast(SUMMON_BEAST, noPassiveDruid())).toBe(false);
-    // Golden non-throw guard (#1360 family): automation key absent.
-    expect(beastSpellsAllowsCast(GUIDANCE, { name: 'Wild_Sage_Druid' })).toBe(false);
-    // Quirk pin (silent-null, caller never traversed on REAL chain): null spell
-    // → detector false → ALLOW for holders. materialComponents #1450 pins its
-    // own detector(false) side; the gate-side consequence is owned here.
-    expect(beastSpellsAllowsCast(null, lv18Druid())).toBe(true);
+    await expect(checkBlockedBySpellcastingBuff(GUIDANCE, lv18Druid(), 'test-campaign')).resolves.toBeNull();
+    await expect(checkBlockedBySpellcastingBuff(SUMMON_BEAST, lv18Druid(), 'test-campaign')).resolves.toMatchObject({ automationPopup: { type: 'popup' } });
+    await expect(checkBlockedBySpellcastingBuff(GUIDANCE, noPassiveDruid(), 'test-campaign')).resolves.toMatchObject({ automationPopup: { type: 'popup' } });
+    await expect(checkBlockedBySpellcastingBuff(SUMMON_BEAST, noPassiveDruid(), 'test-campaign')).resolves.toMatchObject({ automationPopup: { type: 'popup' } });
+    // Golden non-throw guard (#1360 family): automation key absent → deny popup, no throw.
+    await expect(checkBlockedBySpellcastingBuff(GUIDANCE, { name: 'Wild_Sage_Druid' }, 'test-campaign')).resolves.toMatchObject({ automationPopup: { type: 'popup' } });
+    // Quirk pin (silent-null): null spell → detector false → ALLOW for passive holders;
+    // the public gate returns null at the allow branch BEFORE any spell deref, so the
+    // call completes silently (materialComponents #1450 pins its own detector(false)
+    // side; the gate-side consequence is owned here).
+    await expect(checkBlockedBySpellcastingBuff(null, lv18Druid(), 'test-campaign')).resolves.toBeNull();
   });
 });

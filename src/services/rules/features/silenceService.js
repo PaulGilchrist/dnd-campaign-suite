@@ -1,104 +1,25 @@
-import { executeHandler } from '../../automation/index.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
 import { isDistanceInRange } from '../combat/rangeCheck.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 
-const SILENCE_NAME = 'Silence';
 const SILENCE_EFFECT = 'silence';
 const SILENCE_TARGET_EFFECT = 'silenced';
 const SILENCE_KEY = 'silenceCaster';
 const SILENCE_CENTER_KEY = 'silenceCenter';
 const SILENCE_RADIUS_KEY = 'silenceRadius';
 
-// #1413(b) fix: plural-'feet' silent-drop -> 120. DISK TOKEN CENSUS of the
-// 'range' field this parser can receive (public/data/spells.json 331 rows /
-// public/data/2024/spells.json 393 rows):
-//   numeric feet tokens  : '5 feet'..'500 feet' plurals (x500+ across both
-//                          disks; Silence itself '120 feet' x32/x36),
-//                          'N-foot' hyphenated, '60 ft.' abbreviation (x1)
-//   lawful non-feet      : 'Self' x68/x94, 'Touch' x68/x70, 'Sight' x2/x1,
-//                          'Special' x1/x1, 'Unlimited' x1/x2,
-//                          '1 mile' x2/x4, '500 miles' x1/x1
-// The old /(\d+)-?foot/ matched NONE of the plural forms (space, not hyphen)
-// — every real plural range silently coerced to 120. Extended set parses all
-// numeric feet + mile forms honestly; non-numeric words and garbage
-// LOUD-refuse (console.error, no-fallbacks law) to the documented Silence
-// RAW default 120ft. This lane's live gate is name === 'Silence', whose
-// range is '120 feet' on BOTH disks, so every unmatched token reaching here
-// is out-of-contract input and must be heard, not swallowed.
-const FEET_TOKEN_RE = /^(\d+)\s*-?\s*(?:feet|foot|ft\.?)(?![a-z])/i;
-const MILE_TOKEN_RE = /^(\d+)\s*-?\s*(?:miles|mile|mi\.?)(?![a-z])/i;
-
-function rangeToFeet(rangeStr) {
-    if (!rangeStr) return 120; // documented default: Silence RAW range = 120 feet (both disks)
-    const token = String(rangeStr).trim();
-    const feet = token.match(FEET_TOKEN_RE);
-    if (feet) return parseInt(feet[1], 10);
-    const miles = token.match(MILE_TOKEN_RE);
-    if (miles) return parseInt(miles[1], 10) * 5280;
-    console.error(`[silence] Unrecognized range token "${rangeStr}" — not a foot/mile count; Silence RAW default 120ft applies.`);
-    return 120;
-}
-
-// #1413(a) fix: numeric-.match crash on RAW 5e disk. SIZE CENSUS:
-// public/data/spells.json — area_of_effect.size is NUMBER on ALL 89 aoe rows
-// (grep '"size": [0-9]' = 89; distinct values [5,10,15,20,30,40,50,60,90,
-// 100,150,200,360,2500,5280,40000]; Silence spells.json:8902 is size:20);
-// public/data/2024/spells.json — size is STRING on all 118 aoe rows
-// ('20-foot-radius', '10-foot Emanation', ...). The old
-// aoeSize.match(/(\d+)-foot-radius/) threw TypeError on the RAW numeric
-// shape, lane-rejecting genuine 5e disk rows BEFORE dispatch. Fixed arm
-// order: typeof number first (honest numeric radius), feet-string second,
-// loud-drop everything else to the documented 20-ft sphere default.
-const RADIUS_TOKEN_RE = /^(\d+)\s*-?\s*(?:feet|foot|ft\.?)(?![a-z])/i;
-
-function aoeRadiusFromSize(size) {
-    if (size == null) return 20; // documented default: Silence is a 20-ft sphere
-    if (typeof size === 'number') {
-        if (Number.isFinite(size) && size > 0) return size;
-        console.error(`[silence] Non-positive/non-finite numeric area_of_effect.size ${size} — 20ft sphere default.`);
-        return 20;
-    }
-    if (typeof size === 'string') {
-        const m = size.trim().match(RADIUS_TOKEN_RE);
-        if (m) return parseInt(m[1], 10);
-        console.error(`[silence] Unrecognized area_of_effect.size "${size}" — not a feet count; 20ft sphere default.`);
-        return 20;
-    }
-    console.error(`[silence] Unexpected area_of_effect.size type ${typeof size} — 20ft sphere default.`);
-    return 20;
-}
-
-export async function triggerSilence(spell, metaCtx, playerStats, campaignName, mapName) {
-    const isSilence = (spell.name || '') === SILENCE_NAME;
-    if (!isSilence) return null;
-
-    const slotLevel = metaCtx?.slotLevel || spell.level || 2;
-    const rangeFeet = rangeToFeet(spell.range || '120 feet');
-    const aoeRadius = aoeRadiusFromSize(spell.area_of_effect?.size);
-
-    const action = {
-        name: SILENCE_NAME,
-        automation: {
-            type: 'silence',
-            duration: 'Concentration, up to 10 minutes',
-            range: rangeFeet,
-            aoeRadius: aoeRadius,
-            slotLevel: slotLevel,
-        },
-        spell,
-        spellSlotLevel: slotLevel,
-    };
-
-    try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        return result;
-    } catch (e) {
-        console.error('[silence] Failed to execute handler:', e);
-        return null;
-    }
-}
+// DEAD-EXPORT CENSUS #1413 (dead-export batch, excised wholesale per fix#82/fix#97
+// precedent — fresh census 2026-10-23: triggerSilence had ZERO production importers;
+// the live cast popup is built inline by modalSpells.js handleSilence :279, which
+// carries its own fix#107-parity-mirror parsers (modalSpells.js :247-:277). The
+// dead triggerSilence forwarder (:73-:101), its private parsers rangeToFeet/
+// aoeRadiusFromSize + FEET/MILE/RADIUS token set (the #1413(a)/(b) fixed bytes —
+// law now owned solely by the modalSpells mirror), and SILENCE_NAME are DELETED.
+// getSilencedTargets (:187-:193) is likewise ZERO-caller (read-sibling of the LIVE
+// addSilencedTarget (SilenceModal.jsx) / removeSilencedTargets (silenceHandler.js);
+// its filter predicate stays covered through hasSilenceZoneTargetEffect below,
+// addSilencedTarget and removeSilencedTargets lanes).
 
 export function isSilenceActive(playerName, campaignName) {
     return getRuntimeValue(playerName, SILENCE_KEY, campaignName) === true;
@@ -182,14 +103,6 @@ export function isCreatureInSilenceZone(targetName, casterName, campaignName) {
 
     const dist = getDistanceFeet(center, { gridX: targetCreature.gridX, gridY: targetCreature.gridY });
     return isDistanceInRange(dist, radiusNum);
-}
-
-export function getSilencedTargets(casterName, campaignName) {
-    const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    if (!Array.isArray(targetEffects)) return [];
-    return targetEffects
-        .filter(te => te.effect === SILENCE_TARGET_EFFECT && te.source === casterName)
-        .map(te => te.target);
 }
 
 export function addSilencedTarget(casterName, targetName, campaignName) {

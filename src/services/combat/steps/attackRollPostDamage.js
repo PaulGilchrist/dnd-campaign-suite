@@ -417,13 +417,11 @@ export function buildStalkersFlurryPostDamageStep() {
   };
 }
 
-function resolveCleaveCreatureHp(creature, ps) {
+// Ledger #1031 dead-code audit: the former `creature.type === 'player'` branch
+// (runtime-store HP lookup) was unreachable — every caller routes through
+// cleaveCandidateEligible, which byte-excludes players before this runs.
+function resolveCleaveCreatureHp(creature) {
   if (!creature) return { currentHp: 0, maxHp: 0 };
-  if (creature.type === 'player') {
-    const currentHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? getRuntimeValue(creature.name, 'hitPoints') ?? 0;
-    const maxHp = getRuntimeValue(creature.name, 'hitPoints') ?? ps?.hitPoints ?? 0;
-    return { currentHp, maxHp };
-  }
   return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
 }
 
@@ -445,7 +443,7 @@ async function collectCleaveSecondTargets(ctx, cs, lastAttack, firstTarget) {
   if (!hasMapPositions) {
     return cs.creatures
       .filter(c => cleaveCandidateEligible(c, attackerName, firstTargetName))
-      .map(c => ({ ...c, ...resolveCleaveCreatureHp(c, ctx.playerStats) }))
+      .map(c => ({ ...c, ...resolveCleaveCreatureHp(c) }))
       .filter(c => c.currentHp > 0);
   }
   const reach = 8;
@@ -455,7 +453,7 @@ async function collectCleaveSecondTargets(ctx, cs, lastAttack, firstTarget) {
     const nearFirst = await isWithinRange(firstTarget.name, c.name, 5);
     const nearAttacker = await isWithinRange(attackerName, c.name, reach);
     if (!nearFirst || !nearAttacker) continue;
-    const resolved = { ...c, ...resolveCleaveCreatureHp(c, ctx.playerStats) };
+    const resolved = { ...c, ...resolveCleaveCreatureHp(c) };
     if (!(resolved.currentHp > 0)) continue;
     secondTargets.push(resolved);
   }

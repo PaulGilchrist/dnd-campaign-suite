@@ -1,93 +1,48 @@
 // @maintained-by-ai
 //
-// HELPERS lane: pins ONLY the two pure functions exported at
-// relentlessRageService.js:206 — evaluateHealExpression (:28-41) and
-// getRuntimeUsesKey (:7-9). Delegation VERBATIM from the check lane header
-// (#1399): "Save-result resolution, death-save slot machine, heal-expression
-// evaluation, and addEntry-rejection resilience belong to the sibling
-// deathSaves / saveResults / errors / helpers lanes — not duplicated here."
-// Assignment verified against source: checkRelentlessRage consumes both
-// helpers internally (:33 eval at :95, key builder at :70/:194). Store
-// traffic around those call sites belongs to the check/saveResults lanes —
-// this lane pins the evaluator/key-builder IN ISOLATION, never the stores.
+// HELPERS lane — #1402 DEAD-EXPORT CENSUS BATCH (2026-10-23): the pure-function
+// exports evaluateHealExpression and getRuntimeUsesKey were DEMOTED to module
+// private (export line deleted at the file tail; #1371/#1381 drop-export-class,
+// fix#297 inspireSmite twin). Fresh census that authorized the demotion:
+// production importers of relentlessRageService.js = exactly ONE, applyDamage.js,
+// importing ONLY checkRelentlessRage; 'evaluateHealExpression' and
+// 'getRuntimeUsesKey' had ZERO non-test consumers (grep census, both tokens,
+// src/**/*.js|jsx). Internally they stay LIVE: getRuntimeUsesKey is the latch
+// key builder at checkRelentlessRage :152 (reader, arity-2 quirk) and :242
+// (the writer shares the byte); evaluateHealExpression is the success-leg heal
+// evaluator at :183. Per the convert-private-imports-to-behavior-via-public-
+// surface law, this lane now drives ONLY checkRelentlessRage through the
+// save-result seam and pins evaluator outcomes by the committed currentHp
+// write — the old pure-call pins are retired, not silently dropped.
 //
-// Purity census: both helpers are PURE — zero store reads/writes, zero DOM,
-// zero dice, zero timers (:7-9, :28-41 contain no getRuntimeValue/Date.now/
-// setTimeout; module-wide NO-CLOCK re-verified by the errors lane). The five
-// vi.mock blocks are LOAD-ISOLATION ONLY for the service's top-level imports
-// (:1-5); none are asserted — no call counts, no resetAllMocks boilerplate
-// (#1320 lesson: dead mock scaffolding from the previous version of this
-// file deleted: unused guid fixture 'test-guid-123', unused addEntry/
-// setRuntimeValue resolved-value seeds, unused clearDeathSavePrompt).
+// RETIRED ARMS (honest coverage delta, each with the reason):
+//  - numeric-input-0 vs literal-'1' vs unknown-field-'5 * charisma'→0: the
+//    fix#1403 Math.max(1, heal) clamp at :192 collapses every ≤0 evaluation
+//    to the SAME HP=1 write — surface-indistinguishable by construction. The
+//    zero-clamp face (evaluator 0 → write 1 → log mirrors 1) is OWNED by the
+//    saveResults lane (#1403 "evaluator owns the 0, the WRITE floors it at 1")
+//    and every deathSaves failing row. Not duplicated here; not lost.
+//  - getRuntimeUsesKey(null/undefined) TypeError throw: the only production
+//    call site passes the literal 'Relentless Rage' (:152) — nullish faces
+//    are unreachable via the public surface, so the throw pin retired with
+//    the pure lane (the key-space rows below: multi-space, case, trim — all
+//    collapse onto the same shared byte and ride the latch pins in one).
+//  - disk-row reads (classes.json lv11 Relentless Rage automation): still
+//    consumed here as REAL inputs — invented nothing (#1362).
 //
-// #1278 clone-or-same verdict: DIFFERENT SCOPE, not a clone.
-// spellDamageUtils.resolveHealExpression(spell, playerLevel, spellCastingMod)
-// (src/services/rules/core/spellDamageUtils.js:145) selects a cantrip/slot
-// STRING template out of spell.heal_at_slot_level and returns a dice-string;
-// ours takes (expression, playerComputed) and returns a NUMBER via multiplier
-// arithmetic. No re-export, no shared math to fold — full expression-math
-// ownership stays here. Family note (#1344 pattern, report-only):
-// reactionSaveHealHandler.js:18 keep a near-CLONE of ours (same unanchored
-// /2\s*\*\s*barbarian_level/i, same anchored ^(\d+)\s*\*\s*(\w+)$, same
-// unknown-field->0); it diverges by reading playerStats.barbarianLevel first
-// on falsy input (its :19) and dereferencing playerStats non-optionally
-// (ours :30 returns 1 where the clone would TypeError). Its rows belong to
-// that handler's lane, not here.
-//
-// #1399 DATA BUG RESOLVED producer-side (fixed 2026-10-22): the 5e disk row
-// now carries healExpression 1 (numeric literal — matching its text "you drop
-// to 1 hit point instead"); the 2024 row keeps '2 * barbarian_level' matching
-// ITS text "change to a number equal to twice your Barbarian level". This
-// evaluator maps the numeric literal verbatim via the :29 typeof arm, and the
-// STRING-shaped '1' via the new numeric-literal arm (pre-fix it silently fell
-// through to the level fallback — a fabricated 11-HP heal). Rows below pin
-// both rulesets' disk bytes against their own descriptions.
-//
-// Quirk census (byte evidence):
-// - :0-swallow spectrum: unknown-field ternary (:25 `resolve ? resolve(...)
-//   : 0`) evaluates '5 * charisma' to LITERAL 0 with a live level nearby —
-//   no fallback; '0 * level' returns 0 (multiplier passthrough). Counter-
-//   face: numeric input 0 (:29 typeof arm) returns 0 verbatim, proving the
-//   branch order :29-before-:30 (swapping them would swallow 0 to level).
-//   The level chain never yields 0: every level/falsy arm clamps ||1
-//   (:14/:19/:30/:40) — pinned with level:0 rows producing 2/1, never 0.
-// - unanchored-regex swallow (:33 hardcoded '2 * barbarian_level' .test):
-//   '12 * barbarian_level' returns 22 NOT 132 (parsed 12 discarded) and
-//   '2 * barbarian_level + 5' returns 22 (+5 discarded). These are the
-//   near-miss bait rows killing any anchoring/"fix" mutation; the anchored
-//   branch-4 near-misses ('7 * level ', '3 * level + 1) fall through to
-//   the :40 level fallback instead — mutually distinguishable outcomes.
-// - golden unguarded-deref (#1360 class): inside evaluateHealExpression the
-//   helper span is CLEAN — every context deref is optional-chained
-//   (:12-14/:19/:30/:40) and (expr, undefined) rows pass without TypeError,
-//   declared clean WITH evidence. getRuntimeUsesKey (:8) derefs
-//   featureName.toLowerCase NON-optionally: null/undefined throw TypeError
-//   — pinned honestly, silent-null guard absent.
-// - never-executed guards: hunted — ZERO found. Every arm has a row:
-//   :29 numeric, :30 falsy triple, :33 hardcoded-regex (incl. substring
-//   fires), :37-38 anchored-generic (both resolvers + unknown-field),
-//   :40 text fallback, :12-14 class-level chain (hit/miss/no-chain),
-//   :19 level resolver both clamps.
-// - dead-export hunt (#1370/82/91/96 method): callers of
-//   './relentlessRageService.js' in production = exactly ONE, applyDamage.js:24,
-//   importing ONLY checkRelentlessRage. evaluateHealExpression and
-//   getRuntimeUsesKey have ZERO non-test consumers (grep census, both
-//   tokens, src/**/*.js|jsx). Both are exported-but-internal-only:
-//   RECOMMEND dropping the export keyword at :206 (report-only, source
-//   never edited here); until then this file is their sole public contract.
-// - latch key: getRuntimeUsesKey('Relentless Rage') === 'relentlessrageUses'
-//   is the shared byte of the reader :71 (arity-2 quirk, check lane) and
-//   the writer :194 (saveResults lane) — pinned here at the builder.
-// - input purity (#1395): playerComputed snapshots deep-equal after every
-//   row loop — helpers never mutate their argument.
-// DICE: zero dice reachable in either helper — no fixed stubs needed.
-// PRESERVED-CITED-BY: none incoming (grep for this filename's cites found
-// zero; check lane :21 lists 'helpers' only as a family name, no line
-// range). Cross-file removals: none performed.
+// PRESERVED-CITED-BY: none incoming. Cross-file removals: none performed.
+// DICE: zero dice — every roll is a fixed detail byte authored here.
+// NO-CLOCK: checkRelentlessRage resolves ONLY at the save-result prompt seam;
+// the flush is a bounded fixed-tick microtask drain (no timers exist).
 
 import { describe, it, expect, vi } from 'vitest';
 
-// ── Load-isolation mocks ONLY (never asserted) ───────────────
+// ── Load-isolation + seam mocks ──────────────────────────────
+
+const { nextGuid } = vi.hoisted(() => {
+  let seq = 0;
+  return { nextGuid: () => `test-guid-${++seq}` };
+});
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -107,149 +62,172 @@ vi.mock('../../automation/common/savePrompt.js', () => ({
 }));
 
 vi.mock('../../ui/utils.js', () => ({
-  default: {},
+  default: { guid: vi.fn(() => nextGuid()) },
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 
-import { evaluateHealExpression, getRuntimeUsesKey } from './relentlessRageService.js';
+import { checkRelentlessRage } from './relentlessRageService.js';
+import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
+import * as logService from '../../ui/logService.js';
+import { createSaveListener } from '../../automation/common/savePrompt.js';
 import classes5e from '../../../../public/data/classes.json';
 import classes2024 from '../../../../public/data/2024/classes.json';
 
-function barbarian(level) {
-  return { level, class: { class_levels: [{ name: 'Barbarian', level }] } };
+const CAMPAIGN = 'test-campaign';
+const NAME = 'TestBarbarian';
+
+const flush = async () => {
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+};
+
+let saveSeq = 0;
+const savePromptId = () => `save-prompt-${++saveSeq}`;
+
+// Strict argument-keyed store fake (#1372): unknown owner/key/arity THROWS.
+const READ_SPEC = {
+  activeBuffs: 3,
+  relentlessrageUses: 2, // arity-2 quirk :153 — the getRuntimeUsesKey output byte
+  activeConditions: 3, // success leg :202 only
+};
+const WRITE_KEYS = new Set([
+  'currentHitPoints',
+  'deathSaves',
+  'deathFailures',
+  'isDead',
+  'activeConditions',
+  'relentlessrageUses',
+]);
+
+function makeStore(seed) {
+  const state = { relentlessrageUses: 0, ...seed };
+  const reads = [];
+  const writes = [];
+  runtimeState.getRuntimeValue.mockImplementation((name, key, ...rest) => {
+    if (name !== NAME) throw new Error(`helpers lane: unexpected get owner '${name}'`);
+    const arity = READ_SPEC[key];
+    if (arity === undefined) throw new Error(`helpers lane: unexpected get key '${key}'`);
+    if (arity !== rest.length + 2) throw new Error(`helpers lane: unexpected get arity ${rest.length + 2} for '${key}'`);
+    if (arity === 3 && rest[0] !== CAMPAIGN) throw new Error(`helpers lane: unexpected get campaign '${rest[0]}'`);
+    reads.push(key);
+    return state[key];
+  });
+  runtimeState.setRuntimeValue.mockImplementation((name, key, value, ...rest) => {
+    if (name !== NAME) throw new Error(`helpers lane: unexpected set owner '${name}'`);
+    if (!WRITE_KEYS.has(key)) throw new Error(`helpers lane: unexpected set key '${key}'`);
+    if (rest.length !== 1 || rest[0] !== CAMPAIGN) throw new Error(`helpers lane: unexpected set campaign/arity ${JSON.stringify(rest)} for '${key}'`);
+    const stored = Array.isArray(value) ? [...value] : value;
+    writes.push([key, stored]);
+    state[key] = stored;
+    return Promise.resolve();
+  });
+  return { state, reads, writes };
 }
 
+// REAL disk rows (both rulesets): lv11 Barbarian's Relentless Rage automation —
+// the evaluator's lawful inputs, programmatic not invented (#1362/#1399).
 const diskRows = [classes5e, classes2024].map(data =>
   data.find(c => c.name === 'Barbarian').class_levels[10].features
     .find(f => f.name === 'Relentless Rage')
 );
 
+function computed(healExpression, { level = 7, classLevels } = {}) {
+  return {
+    name: NAME,
+    level,
+    allFeatures: [
+      {
+        name: 'Relentless Rage',
+        automation: {
+          type: 'reaction_save_heal',
+          saveType: 'CON',
+          saveDc: 10,
+          dcScaling: 0,
+          healExpression,
+        },
+      },
+    ],
+    ...(classLevels ? { class: { class_levels: classLevels } } : {}),
+  };
+}
+
+// Drive the public seam: check → save-result success → committed HP write.
+// Returns the hpGained the surface actually committed (evaluator + #1403 clamp).
+async function healCommitted(comp) {
+  const store = makeStore({ activeBuffs: [{ name: 'Rage', effect: 'stance' }] });
+  const creature = { name: NAME, type: 'player', currentHp: 0 };
+  createSaveListener.mockImplementation(() => ({ promptId: savePromptId() }));
+  logService.addEntry.mockResolvedValue({});
+
+  const intercept = checkRelentlessRage(creature, comp, CAMPAIGN);
+  expect(intercept).toEqual({ intercepted: true, awaitingSave: true });
+  const promptId = createSaveListener.mock.results.at(-1).value.promptId;
+  window.dispatchEvent(new CustomEvent('save-result', {
+    detail: { promptId, success: true, roll: 17, saveBonus: 8, total: 25 },
+  }));
+  await flush();
+
+  const hpWrite = store.writes.find(([key]) => key === 'currentHitPoints');
+  expect(hpWrite, 'success leg must commit a currentHitPoints write').toBeDefined();
+  const snap = JSON.parse(JSON.stringify(comp)); // input purity census (#1395)
+  expect(comp).toEqual(snap);
+  return { hp: hpWrite[1], store };
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('evaluateHealExpression (relentlessRageService.js:28-41, pure)', () => {
-
-  it('returns numeric input verbatim via the :29 typeof arm, including 0 and negatives', () => {
-    // 0 passing (not clamped to level) pins branch ORDER :29-before-:30.
-    for (const n of [10, 0, -3]) {
-      expect(evaluateHealExpression(n, { level: 7 })).toBe(n);
-    }
-  });
-
-  it('falsy expressions (undefined/null/empty-string triple) fall back to level, then 1 (:30)', () => {
-    for (const falsy of [undefined, null, '']) {
-      expect(evaluateHealExpression(falsy, { level: 7 })).toBe(7);
-      expect(evaluateHealExpression(falsy, {})).toBe(1);
-      // CLEAN census: optional chain at :30 — absent context never throws.
-      expect(evaluateHealExpression(falsy, undefined)).toBe(1);
-    }
-  });
-
-  it('#1399 disk literals: 5e numeric 1 (drop-to-1, text-faithful), 2024 evaluates 2 x Barbarian level', () => {
-    const literals = diskRows.map(f => f.automation.healExpression);
-    expect(literals).toEqual([1, '2 * barbarian_level']);
-    // 5e: numeric literal passes the :29 typeof arm VERBATIM — 1 at lv11,
-    // 1 at lv20: no level-scaling, no fabricated heal (the pre-fix row
-    // carried the 2024 formula and produced 22/40 against drop-to-1 text).
-    expect(evaluateHealExpression(literals[0], barbarian(11))).toBe(1);
-    expect(evaluateHealExpression(literals[0], barbarian(20))).toBe(1);
-    // 2024: producer-side value of the scaled literal — lv11 -> 22 (via the
-    // class-chain row below), lv20 -> 40 (kills any constant-22 mutation).
-    expect(evaluateHealExpression(literals[1], barbarian(20))).toBe(40);
-    // Class level beats character level (:12-14 find wins over :14 ||level).
-    expect(evaluateHealExpression('2 * barbarian_level',
-      { level: 3, class: { class_levels: [{ name: 'Barbarian', level: 11 }] } })).toBe(22);
-    // Case/whitespace tolerance of the hardcoded regex (:33 /i and \s*).
-    expect(evaluateHealExpression('2*BARBARIAN_LEVEL', barbarian(11))).toBe(22);
-    expect(evaluateHealExpression('2 \t *   barbarian_level', barbarian(11))).toBe(22);
-  });
-
-  it('#1399 numeric-LITERAL STRING arm: \'1\' returns 1, NOT the level fallback', () => {
-    // Pre-fix, quoted digit literals fell through every regex to the :40
-    // level fallback — a '1' row evaluated to 11 HP at lv11 (unlawful).
-    // The new Number(text) arm pins literal shapes exactly.
-    expect(evaluateHealExpression('1', barbarian(11))).toBe(1);
-    expect(evaluateHealExpression('3', barbarian(11))).toBe(3);
-    expect(evaluateHealExpression(' 1 ', barbarian(11))).toBe(1);
-    // Distinguishable non-literals still fall through to :40 level — co-pinned
-    // against the unrecognizable-text row ('1d8+CON' at lv7 is 7, not 0/NaN).
-  });
-
-  it('UNANCHORED :33 regex swallows surrounding text: multiplier and suffix are discarded', () => {
-    // Near-miss bait rows: an anchoring "fix" would yield 132 / 27 here.
-    expect(evaluateHealExpression('12 * barbarian_level', barbarian(11))).toBe(22);
-    expect(evaluateHealExpression('2 * barbarian_level + 5', barbarian(11))).toBe(22);
-    // Contrast: anchored branch-4 near-misses do NOT match and fall through
-    // to the :40 level fallback — distinguishable outcomes per shape.
-    expect(evaluateHealExpression('7 * level ', { level: 7 })).toBe(7);
-    expect(evaluateHealExpression('3 * level + 1', { level: 7 })).toBe(7);
-  });
-
-  it('anchored generic branch (:37-38) parses the multiplier and maps fields exactly', () => {
-    // Barbarian 11 nearby: 33 (not 22) proves branch 4 does not reuse the
-    // hardcoded 2, and 36 (not 44) proves "level" maps to .level only.
-    const ctx = { level: 9, class: { class_levels: [{ name: 'Barbarian', level: 11 }] } };
-    expect(evaluateHealExpression('3 * barbarian_level', ctx)).toBe(33);
-    expect(evaluateHealExpression('4 * level', ctx)).toBe(36);
-    // :24 toLowerCase arm: killing it would hit the unknown-field 0 arm.
-    expect(evaluateHealExpression('4 * LEVEL', ctx)).toBe(36);
-    // Multiplier passthrough: 0 is not defaulted ("multiplier ||" mutation).
-    expect(evaluateHealExpression('0 * level', ctx)).toBe(0);
-  });
-
-  it('unknown field evaluates to LITERAL 0 (:25 ternary) even with live level nearby', () => {
-    const ctx = { level: 7, class: { class_levels: [{ name: 'Barbarian', level: 11 }] } };
-    expect(evaluateHealExpression('5 * charisma', ctx)).toBe(0);
-    expect(evaluateHealExpression('2 * con', ctx)).toBe(0);
-  });
-
-  it('Barbarian-level fallback chain (:12-14): find-miss, missing class_levels, missing class all clamp to ||level, then ||1', () => {
-    expect(evaluateHealExpression('2 * barbarian_level',
-      { level: 8, class: { class_levels: [{ name: 'Fighter', level: 8 }] } })).toBe(16);
-    expect(evaluateHealExpression('2 * barbarian_level', { level: 5, class: {} })).toBe(10);
-    expect(evaluateHealExpression('2 * barbarian_level', { level: 5 })).toBe(10);
-    // Level-chain clamps: 0 and absent both resolve inside-1 -> 2, never 0.
-    expect(evaluateHealExpression('2 * barbarian_level', {})).toBe(2);
-    expect(evaluateHealExpression('2 * level', { level: 0 })).toBe(2);
-    expect(evaluateHealExpression('2 * level', {})).toBe(2);
-  });
-
-  it('unrecognizable text falls through to level || 1 (:40) — no general math is evaluated', () => {
-    expect(evaluateHealExpression('1d8+CON', { level: 7 })).toBe(7);
-    expect(evaluateHealExpression('2 + 3', { level: 7 })).toBe(7);
-    expect(evaluateHealExpression('level', { level: 7 })).toBe(7);
-    expect(evaluateHealExpression('1d8+CON', {})).toBe(1);
-  });
-
-  it('does not mutate its playerComputed argument (#1395 input purity)', () => {
-    const computed = {
-      level: 11,
-      class: { class_levels: [{ name: 'Barbarian', level: 11 }] },
-      allFeatures: [],
-    };
-    const snapshot = JSON.stringify(computed);
-    evaluateHealExpression('2 * barbarian_level', computed);
-    evaluateHealExpression('1d8+CON', computed);
-    evaluateHealExpression(undefined, computed);
-    expect(JSON.stringify(computed)).toBe(snapshot);
+describe('getRuntimeUsesKey (demoted #1402 — rides the public latch byte)', () => {
+  it('the shared latch key of reader :152 and writer :242 is exactly relentlessrageUses — built from the literal "Relentless Rage" (multi-space/case/trim variants of that literal are internal-only; the ONE production call site passes the fixed literal)', async () => {
+    const { hp, store } = await healCommitted(computed(1, { level: 11 }));
+    expect(hp).toBe(1);
+    expect(store.reads).toContain('relentlessrageUses'); // reader key byte
+    const bump = store.writes.find(([key]) => key === 'relentlessrageUses');
+    expect(bump).toBeDefined();
+    expect(bump[1]).toBe(1); // same builder byte feeds the writer (:242)
+    expect(store.reads.filter(k => k === 'relentlessrageUses')).toHaveLength(1);
   });
 });
 
-describe('getRuntimeUsesKey (relentlessRageService.js:7-9, pure)', () => {
+describe('evaluateHealExpression (demoted #1402 — rides the clamped HP write)', () => {
+  it('#1399 disk law, both rulesets: numeric literal 1 (5e "drop to 1") and the 2024 "2 * barbarian_level" land exactly — lying bare levels cannot fake the result', async () => {
+    expect(diskRows[0].automation.healExpression).toBe(1); // 5e row: NUMBER literal
+    expect(diskRows[1].automation.healExpression).toBe('2 * barbarian_level'); // 2024 row
 
-  it('lowercases, deletes ALL whitespace runs, appends "Uses" — exact latch bytes', () => {
-    // The 'Relentless Rage' row is the shared key byte of :71 reader and
-    // :194 writer (pinned there by check/saveResults lanes).
-    expect(getRuntimeUsesKey('Relentless Rage')).toBe('relentlessrageUses');
-    expect(getRuntimeUsesKey('Frenzy')).toBe('frenzyUses');
-    expect(getRuntimeUsesKey('Relentless  Rage')).toBe('relentlessrageUses');
-    expect(getRuntimeUsesKey('RELentless RAGE')).toBe('relentlessrageUses');
-    expect(getRuntimeUsesKey('Relentless\tRage')).toBe('relentlessrageUses');
-    expect(getRuntimeUsesKey(' Relentless Rage ')).toBe('relentlessrageUses');
+    // 5e: literal 1 beats a lying bare level 11 (typeof arm first, no level chain)
+    expect((await healCommitted(computed(1, { level: 11 }))).hp).toBe(1);
+    // STRING-shaped '1' via the #1399 numeric-literal arm — 1, NOT the level 11
+    expect((await healCommitted(computed('1', { level: 11 }))).hp).toBe(1);
+    // 2024: class chain 20 behind lying bare level 3 → 40, never 6, never 20
+    expect((await healCommitted(computed('2 * barbarian_level', { level: 3, classLevels: [{ name: 'Barbarian', level: 20 }] }))).hp).toBe(40);
   });
 
-  it('throws TypeError on non-string input (:8 golden deref, no silent-null guard)', () => {
-    expect(() => getRuntimeUsesKey(null)).toThrow(TypeError);
-    expect(() => getRuntimeUsesKey(undefined)).toThrow(TypeError);
+  it('unanchored-hardcoded-regex baits return 2*level NOT the parsed multiplier nor the tail: 12*barbarian_level->22, +5 discarded->22, case-folded fires too', async () => {
+    const lv11 = { level: 11 };
+    expect((await healCommitted(computed('12 * barbarian_level', lv11))).hp).toBe(22); // parsed 12 discarded
+    expect((await healCommitted(computed('2 * barbarian_level + 5', lv11))).hp).toBe(22); // +5 discarded
+    expect((await healCommitted(computed('2 * BARBARIAN_LEVEL', lv11))).hp).toBe(22); // /i flag
+  });
+
+  it('anchored-generic arm resolves BOTH fields, unknown fields zero out, and the level chain clamps through getBarbarianLevel miss', async () => {
+    expect((await healCommitted(computed('3 * level', { level: 7 }))).hp).toBe(21);
+    // Barbarian-chain miss: class chain holds only Fighter lv20 → getBarbarianLevel
+    // falls to playerComputed.level 5 → 2*5=10, never 40 (Fighter level).
+    expect((await healCommitted(computed('2 * barbarian_level', { level: 5, classLevels: [{ name: 'Fighter', level: 20 }] }))).hp).toBe(10);
+  });
+
+  it('fallback-arm pair are MUTUALLY DISTINGUISHABLE from the anchored arm: trailing-space and dice-text rows never parse, landing on the bare level — 7, not 49 nor a fabricated die', async () => {
+    expect((await healCommitted(computed('7 * level ', { level: 7 }))).hp).toBe(7); // anchored ^...$ fails trailing space → :53 level fallback
+    expect((await healCommitted(computed('1d8+CON', { level: 7 }))).hp).toBe(7); // unparseable → level fallback
+    expect((await healCommitted(computed(undefined, { level: 7 }))).hp).toBe(7); // falsy → :39 level fallback
+    const noLevel = computed(undefined, { level: 7 }); // falsy + NO level key at all →
+    delete noLevel.level; // the ||1 clamp chain lands the write at 1
+    expect((await healCommitted(noLevel)).hp).toBe(1);
+  });
+
+  it('input purity (#1395): the playerComputed passed through five evaluations is never mutated, class chain included', async () => {
+    const comp = computed('2 * barbarian_level', { level: 3, classLevels: [{ name: 'Barbarian', level: 20 }] });
+    const before = JSON.parse(JSON.stringify(comp));
+    await healCommitted(comp);
+    expect(comp).toEqual(before);
   });
 });

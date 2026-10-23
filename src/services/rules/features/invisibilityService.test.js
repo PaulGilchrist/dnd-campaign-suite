@@ -5,10 +5,13 @@
 // family; blur has no removal export, so no overlap." Reciprocated: blur triggers
 // only; removal bytes (buff/condition/campaign-key/log row) are pinned HERE.
 // Entry-point split (#1335 PRODUCER-vs-forwarder): endInvisibilityOnHostileAction
-// and endGreaterInvisibilityOnHostileAction are PURE FORWARDERS (fixed hostile
-// reason, verbatim from source). Forwarders are pinned only via that reason in
-// the golden path; internals are pinned once per family via describe.each — no
-// tripled matrix. Base exports are called directly by useInitiativeEffects.js:229
+// is a PURE FORWARDER (fixed hostile reason, verbatim from source) and stays the
+// Invisibility family's lane entry; endGreaterInvisibilityOnHostileAction was a
+// DEAD, anti-RAW forwarder — DELETED #1382 (Greater Invisibility never breaks on
+// hostile action). The greater-family lane is now driven through its LIVE direct
+// entry endGreaterInvisibility with the real rest-lane reason. Forwarders are
+// pinned only via their reason in the golden path; internals are pinned once per
+// family via describe.each — no tripled matrix. Base exports are called directly by useInitiativeEffects.js:229
 // /:238 ('target rolled initiative') and restRules-shortRest.js:413/:420 +
 // restRules-longRest.js:334/:341 ('target finished a rest') — direct-call lane
 // pinned in the throw/compose test below.
@@ -36,9 +39,9 @@
 // invisibilityService.js (grep clean) — seam clears owned by #1285/#1294 lanes
 // (initiative-roll / rest clears, cited above). Disk durations are concentration
 // ('Up to 1 hour' / 'Up to 1 minute', both rulesets) — combat-scoped, no clock HERE.
-// Dead-export hunt #1370: endGreaterInvisibilityOnHostileAction has ZERO callers
-// outside this module — pinned forwarder-only so a future consumer lands on tested
-// bytes; removal of the export itself is a cross-file change (report only).
+// Dead-export hunt #1370/#1382: endGreaterInvisibilityOnHostileAction had ZERO
+// callers and is DELETED at source #1382 — the greater-family removal surface is
+// endGreaterInvisibility alone.
 // Latch pair #1358: arm byte = caster-name string (invisibilityShared:24,
 // cloakOfShadows:89, naturesVeil:41); clear byte = null (this module :33/:76);
 // reader guard = truthy `if (!casterName) return` — content of the caster value is
@@ -117,12 +120,14 @@ import {
     endInvisibility,
     endInvisibilityOnHostileAction,
     endGreaterInvisibility,
-    endGreaterInvisibilityOnHostileAction,
 } from './invisibilityService.js';
 
 const CAMPAIGN = 'test-campaign';
 const TARGET = 'GnomeWizard';
 const HOSTILE_REASON = 'target made a hostile action (attack roll, dealt damage, or cast a spell)';
+// Real direct-call reason of the LIVE greater lane (restRules-shortRest.js:420,
+// restRules-longRest.js; initiative twin useInitiativeEffects.js).
+const REST_REASON = 'target finished a rest';
 
 // Real disk/code names (#1352 near-misses): Invisibility lv2 / Greater
 // Invisibility lv4, both concentration; buff names are the exact filter tokens
@@ -130,7 +135,8 @@ const HOSTILE_REASON = 'target made a hostile action (attack roll, dealt damage,
 const FAMILIES = [
     {
         label: 'Invisibility',
-        hostileAction: endInvisibilityOnHostileAction,
+        invoke: (target, campaign) => endInvisibilityOnHostileAction(target, campaign),
+        reason: HOSTILE_REASON,
         remove: endInvisibility,
         buff: { name: 'Invisibility', effect: 'invisible', duration: 'Concentration, up to 1 hour' },
         buffName: 'Invisibility',
@@ -142,7 +148,10 @@ const FAMILIES = [
     },
     {
         label: 'GreaterInvisibility',
-        hostileAction: endGreaterInvisibilityOnHostileAction, // dead export #1370 — forwarder bytes pinned anyway
+        // #1382: hostile-action forwarder deleted (anti-RAW); lane drives the
+        // LIVE direct entry with its real rest-lane reason.
+        invoke: (target, campaign) => endGreaterInvisibility(target, campaign, REST_REASON),
+        reason: REST_REASON,
         remove: endGreaterInvisibility,
         buff: { name: 'GreaterInvisibility', effect: 'invisible', duration: 'Concentration, up to 1 minute' },
         buffName: 'GreaterInvisibility',
@@ -174,7 +183,8 @@ afterEach(() => {
 });
 
 describe.each(FAMILIES)('$label removal ($buffName)', ({
-    hostileAction,
+    invoke,
+    reason,
     remove,
     buff,
     buffName,
@@ -196,7 +206,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
         state.arm(CAMPAIGN, TARGET, 'activeConditions', ['invisible', 'blinded']);
         const before = JSON.parse(JSON.stringify(state.peek(CAMPAIGN, TARGET, 'activeBuffs')));
 
-        expect(hostileAction(TARGET, CAMPAIGN)).toBeUndefined();
+        expect(invoke(TARGET, CAMPAIGN)).toBeUndefined();
 
         expect(getActiveBuffs).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -205,13 +215,13 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
         expect(state.peek(CAMPAIGN, TARGET, 'activeConditions')).toEqual(['invisible', 'blinded']);
     });
 
-    it('hostile action strips buff + condition + latch in one exact write budget; foreign family and foreign target survive byte-identical', () => {
+    it('lane entry strips buff + condition + latch in one exact write budget; foreign family and foreign target survive byte-identical', () => {
         seedFull();
         state.arm(CAMPAIGN, 'ElfRanger', 'activeBuffs', [buff, foreignBuff]);
         state.arm(CAMPAIGN, 'ElfRanger', 'activeConditions', ['invisible']);
         state.arm(CAMPAIGN, 'campaign', latchKey('ElfRanger'), 'Alchemist');
 
-        hostileAction(TARGET, CAMPAIGN);
+        invoke(TARGET, CAMPAIGN);
 
         // exact read sequence through the service (peek bypasses the spies)
         expect(getRuntimeValue.mock.calls).toEqual([
@@ -239,7 +249,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
             type: 'ability_use',
             characterName: TARGET,
             abilityName,
-            description: `${abilityName} ends for ${TARGET}: ${HOSTILE_REASON}.`,
+            description: `${abilityName} ends for ${TARGET}: ${reason}.`,
         });
     });
 
@@ -248,7 +258,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
         state.arm(CAMPAIGN, TARGET, 'activeBuffs', [SURVIVING_BUFF]);
         state.arm(CAMPAIGN, TARGET, 'activeConditions', ['invisible', 'blinded']);
 
-        hostileAction(TARGET, CAMPAIGN);
+        invoke(TARGET, CAMPAIGN);
 
         expect(setRuntimeValue.mock.calls).toEqual([
             [TARGET, 'activeConditions', ['blinded'], CAMPAIGN],
@@ -262,7 +272,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
         state.arm(CAMPAIGN, TARGET, 'activeBuffs', [buff, SURVIVING_BUFF]);
         state.arm(CAMPAIGN, TARGET, 'activeConditions', ['blinded']);
 
-        hostileAction(TARGET, CAMPAIGN);
+        invoke(TARGET, CAMPAIGN);
 
         expect(setRuntimeValue.mock.calls).toEqual([
             [TARGET, 'activeBuffs', [SURVIVING_BUFF], CAMPAIGN],
@@ -278,7 +288,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
         ]);
         state.arm(CAMPAIGN, TARGET, 'activeConditions', ['INVISIBLE', 'Invisible', 'blinded']);
 
-        hostileAction(TARGET, CAMPAIGN);
+        invoke(TARGET, CAMPAIGN);
 
         expect(setRuntimeValue.mock.calls).toEqual([
             [TARGET, 'activeBuffs', [{ name: buffName.toLowerCase(), effect: 'invisible' }], CAMPAIGN],
@@ -295,7 +305,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
             if (badValue === null) state.arm(CAMPAIGN, TARGET, 'activeConditions', null);
             // undefined case: key simply unset in the strict stateful store
 
-            expect(() => hostileAction(TARGET, CAMPAIGN)).toThrow(new Error(`Expected array, got ${badValue}`));
+            expect(() => invoke(TARGET, CAMPAIGN)).toThrow(new Error(`Expected array, got ${badValue}`));
             expect(consoleSpy).toHaveBeenCalledWith('[invisibilityService] Missing array:', badValue);
             // partial-write byte pin (#1360 class): buff strip already landed, latch STILL armed
             expect(setRuntimeValue.mock.calls).toEqual([
@@ -324,7 +334,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
 
             // latch truthy reader: second call is inert (null is falsy, zero new writes)
             const budgetAfter = setRuntimeValue.mock.calls.length;
-            hostileAction(TARGET, CAMPAIGN);
+            invoke(TARGET, CAMPAIGN);
             expect(setRuntimeValue.mock.calls).toHaveLength(budgetAfter);
             expect(getActiveBuffs).toHaveBeenCalledTimes(2); // failed attempt + composed retry only
         },
@@ -337,7 +347,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
         const logError = new Error('log write failed');
         addEntry.mockRejectedValueOnce(logError);
 
-        expect(hostileAction(TARGET, CAMPAIGN)).toBeUndefined();
+        expect(invoke(TARGET, CAMPAIGN)).toBeUndefined();
         await Promise.resolve(); // flush the service's .catch microtask
 
         expect(consoleSpy).toHaveBeenCalledWith('[invisibilityService:log-error]', logError);

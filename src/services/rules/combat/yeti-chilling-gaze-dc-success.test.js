@@ -20,7 +20,6 @@
 // applyDamage.helpers.test.js (:88-104 save half/none, :184-196 evasion).
 import { describe, it, expect } from 'vitest';
 import { computeDamageAfterEvasion, computeDamageAfterSave } from './applyDamage.js';
-import { parseSuccessImmunity } from '../../../components/encounter/MonsterCardHelpers.js';
 import monsters from '../../../../public/data/monsters.json';
 
 const yeti = () => monsters.find(m => m.index === 'yeti');
@@ -52,11 +51,14 @@ describe('MA-1739 Yeti Chilling Gaze: honest dc_success canon on disk (#1086)', 
       duration: '1_hour',
       duration_minutes: 60
     });
-    expect(parseSuccessImmunity(row)).toEqual({
-      effect: 'gaze_immunity',
-      duration: '1_hour',
-      durationMinutes: 60
-    });
+    // parseSuccessImmunity(row) round-trip re-pin dropped (pass #509 rec,
+    // fix#277 echo-class): with all clause bytes explicit it re-states the
+    // literal above through the parser's sole no-default exit — zero
+    // production signal. Parse exits owner-pinned once at
+    // MonsterCardHelpers.gaze-immunity.test.js:34-37 (explicit-bytes twin
+    // row + duration/default + null arms); the bytes are live-consumed at
+    // the grant seam by saveProcessing.chilling-gaze-immunity.test.js,
+    // which now imports real disk rows (fix#1362) through processSaveRoll.
   });
 });
 

@@ -33,6 +33,9 @@
 // usesSpellSlot chokepoint (golden dup — OR-gate both faces exercised below); the :8
 // guard is nullish-only, so a non-array passives object falls through to the golden
 // native TypeError on .filter (:11), outside any try — pinned per #1379 discipline.
+// getInspiringSmitePassives demoted to module-local #1381 (export keyword dropped,
+// ZERO external importers): its filter/guard behavior is pinned THROUGH the public
+// triggerInspiringSmite entry (#82-class restructure — no private-symbol imports).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const CAMPAIGN = 'test-campaign';
@@ -50,7 +53,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({ setRuntimeValue: v
 
 import { executeHandler } from '../../automation/index.js';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { triggerInspiringSmite, getInspiringSmitePassives } from './inspiringSmiteService.js';
+import { triggerInspiringSmite } from './inspiringSmiteService.js';
 
 function strictSetRuntimeValue(name, key, value, campaign) {
     if (arguments.length !== 4) throw new Error(`setRuntimeValue arity: expected 4, got ${arguments.length}`);
@@ -102,8 +105,8 @@ afterEach(() => {
 });
 
 describe('inspiringSmiteService', () => {
-    describe('getInspiringSmitePassives', () => {
-        it('filters exactly to post_cast_inspiring_smite, order-preserved; empty when none', () => {
+    describe('passive-pool filter (getInspiringSmitePassives demoted to module-local #1381 — behavior pinned via the public trigger)', () => {
+        it('filters exactly to post_cast_inspiring_smite, order-preserved; near-miss types never dispatched', async () => {
             const keep1 = passive('Inspire 1');
             const keep2 = passive('Inspire 2');
             const stats = makeStats('Astra', [
@@ -113,41 +116,52 @@ describe('inspiringSmiteService', () => {
                 { type: 'post_cast_inspiring_smite_extended', name: 'Near Miss Suffix' },
                 keep2,
             ]);
-            expect(getInspiringSmitePassives(stats)).toEqual([keep1, keep2]);
-            expect(getInspiringSmitePassives(makeStats('Astra', []))).toEqual([]);
+            results.push({ value: { pool: 9 } }, { value: { pool: 11 } });
+
+            await expect(triggerInspiringSmite(SMITE, { slotLevel: 1 }, stats, CAMPAIGN, MAP))
+                .resolves.toEqual([{ pool: 9 }, { pool: 11 }]);
+
+            // Only keep1/keep2 survive the filter: exact dispatch order, exact bytes.
+            expect(seq).toEqual(['stamp', 'handle:Inspire 1', 'handle:Inspire 2']);
+            expect(envelopes).toEqual([
+                [{ name: 'Inspire 1', automation: { type: 'post_cast_inspiring_smite', casting_time: 'passive' } }, stats, CAMPAIGN, MAP],
+                [{ name: 'Inspire 2', automation: { type: 'post_cast_inspiring_smite', casting_time: 'passive' } }, stats, CAMPAIGN, MAP],
+            ]);
+            expect(envelopes[0][0].name).toBe(keep1.name);
+            expect(envelopes[1][0].name).toBe(keep2.name);
         });
 
-        it('nullish passives throw the guarded error with exact console.error; non-array falls through to golden native TypeError', () => {
-            expect(() => getInspiringSmitePassives({ automation: {} }))
-                .toThrow('Expected array, got undefined');
-            expect(() => getInspiringSmitePassives({ automation: { passives: null } }))
-                .toThrow('Expected array, got null');
-            expect(consoleSpy.mock.calls).toEqual([
-                ['[inspiringSmiteService] Missing array:', undefined],
-                ['[inspiringSmiteService] Missing array:', null],
-            ]);
-            // Guard is nullish-only (:8): an object passes it and dies natively on
-            // .filter (:11) — outside any try, with NO further console.error (the
-            // guard did not fire), per golden-TypeError discipline.
-            expect(() => getInspiringSmitePassives({ automation: { passives: {} } }))
-                .toThrow(TypeError);
-            expect(consoleSpy).toHaveBeenCalledTimes(2);
+        // Empty pool → null with ZERO writes/dispatches is already pinned by the
+        // passive-gate row of the trigger gate test below (same makeStats shape).
+
+        it.each([
+            ['missing passives', () => ({ automation: {} }), 'Expected array, got undefined', undefined],
+            ['null passives', () => ({ automation: { passives: null } }), 'Expected array, got null', null],
+        ])('%s: guarded loud throw rides the trigger — exact console bytes, zero stamp, zero dispatch', async (_label, makeBroken, message, logged) => {
+            await expect(triggerInspiringSmite(SMITE, { slotLevel: 1 }, makeBroken(), CAMPAIGN, MAP))
+                .rejects.toThrow(message);
+            expect(consoleSpy.mock.calls).toEqual([['[inspiringSmiteService] Missing array:', logged]]);
+            expect(stamps).toEqual([]);
+            expect(envelopes).toEqual([]);
+        });
+
+        it('non-array passives object falls through the nullish-only guard to the golden native TypeError on .filter, outside any try, no extra console.error', async () => {
+            await expect(triggerInspiringSmite(
+                SMITE, { slotLevel: 1 }, { automation: { passives: {} } }, CAMPAIGN, MAP
+            )).rejects.toThrow(TypeError);
+            expect(consoleSpy).not.toHaveBeenCalled();
+            expect(stamps).toEqual([]);
+            expect(envelopes).toEqual([]);
         });
 
         it('nullish playerStats apex routes into the SAME loud arm — exact console bytes, throw not fabricated pool (#204-class)', async () => {
             // fix#179 refuse-no-fabricated-values: a nullish apex must not return [] that a
-            // consumer could misread as eligibility-checked; the file-owned loud throw at :11
-            // catches it via `playerStats?.` and trigger (call at :26, outside any try) propagates.
-            expect(() => getInspiringSmitePassives(undefined)).toThrow('Expected array, got undefined');
-            expect(() => getInspiringSmitePassives(null)).toThrow('Expected array, got undefined');
-            expect(consoleSpy.mock.calls).toEqual([
-                ['[inspiringSmiteService] Missing array:', undefined],
-                ['[inspiringSmiteService] Missing array:', undefined],
-            ]);
+            // consumer could misread as eligibility-checked; the file-owned loud throw propagates
+            // from the passive read (trigger call site, outside any try).
             await expect(triggerInspiringSmite(
                 SMITE, { slotLevel: 1 }, undefined, CAMPAIGN, MAP
             )).rejects.toThrow('Expected array, got undefined');
-            expect(consoleSpy).toHaveBeenCalledTimes(3); // no stamp, no dispatch before the throw
+            expect(consoleSpy).toHaveBeenCalledTimes(1); // no stamp, no dispatch before the throw
             expect(stamps).toEqual([]);
             expect(envelopes).toEqual([]);
         });

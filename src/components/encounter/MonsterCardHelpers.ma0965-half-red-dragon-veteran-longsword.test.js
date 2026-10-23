@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-18 — MA-0965 OWNER: Half-Red Dragon Veteran Longsword two-handed versatile disk lock + row wiring (trimmed 5→2, rec #523)
+// @maintained-by-ai: 2026-10-23 — MA-0965 OWNER: Half-Red Dragon Veteran Longsword two-handed versatile disk lock + row wiring (rec #523 applied: offer-shape + select-log fork presses folded to canon; wiring = disk-derived chooser pin per fold twin ma1661:42-49)
 // MA-0965: Half-Red Dragon Veteran Longsword versatile clause was inert-by-
 // construction — prose-only "or 8 (1d10 + 3) ... if used with two hands" with
 // no authored damage_dice_two_handed (buildTwoHandedVariantOffer returned null
@@ -6,9 +6,10 @@
 // One-field DATA fix, mirroring the MA-0636/MA-0652/MA-0959 twin placement
 // (damage_dice_two_handed after damage_dice_primary, before damage_type_primary;
 // two-handed leg rides damage_type_primary slashing). Description untouched.
-// Press legs cite-skipped to owners: offer/select-log branch truth-tables live
-// in MonsterCardHelpers.two-handed.test.js:23-53 (literal offer-shape + two/one
-// fork) and :39-41/:46-53 (byte-inert null offers + select-log twin); modal
+// Press legs cite-skipped to owners (rec #523 applied): literal offer-shape +
+// two/one select-log fork truth-tables canon at MonsterCardHelpers.two-handed
+// .test.js:25-36 and :47-61; byte-inert null offers at :38-44; this lane's
+// wiring is the disk-derived chooser pin only (fold twin ma1661:42-49). Modal
 // offer branches (missing key / variant===base / undefined action) in
 // MonsterCardModal.two-handed.test.jsx:213-223; the transport null-triplet in
 // MonsterCardModal.cultist-flat-secondary.test.js:38.
@@ -20,7 +21,7 @@
 // lock (#387), so no #422 fold.
 import { describe, it, expect } from 'vitest';
 import monstersJson from '../../../public/data/monsters.json';
-import { buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog } from './MonsterCardHelpers.js';
+import { buildTwoHandedVariantOffer } from './MonsterCardHelpers.js';
 
 describe('MA-0965 Half-Red Dragon Veteran Longsword two-handed versatile (disk lock + row wiring)', () => {
   const veteran = () => {
@@ -48,24 +49,14 @@ describe('MA-0965 Half-Red Dragon Veteran Longsword two-handed versatile (disk l
     expect(shortsword.damage_dice_two_handed).toBeUndefined();
   });
 
-  it('row wired: chooser arms with the disk formulas, select-log fork pays ONE pool (no double-charge)', () => {
+  it('row wired: chooser arms from THIS disk row (offer-shape + two/one select-log fork canon-folded to two-handed.test.js:25-36,47-61)', () => {
     const row = longsword();
     const offer = buildTwoHandedVariantOffer(row, 'Longsword');
-    expect(offer).toMatchObject({
-      formula: row.damage_dice_two_handed,
-      baseFormula: row.damage_dice_primary,
-      damageType: row.damage_type_primary,
-      attackName: 'Longsword',
-    });
+    expect(offer).not.toBeNull();
+    expect(offer).toMatchObject({ attackName: 'Longsword' });
+    expect(offer.formula).toBe(row.damage_dice_two_handed);
+    expect(offer.baseFormula).toBe(row.damage_dice_primary);
+    expect(offer.damageType).toBe(row.damage_type_primary);
     expect(offer.label).toContain(row.damage_dice_two_handed);
-    const two = buildTwoHandedVariantSelectLog({ monsterName: 'Half-Red Dragon Veteran 1', offer, hands: 'two-handed' });
-    expect(two.automationType).toBe('two_handed_variant_selected');
-    expect(two.description).toContain('TWO-HANDED');
-    expect(two.description).toContain(row.damage_dice_two_handed);
-    const one = buildTwoHandedVariantSelectLog({ monsterName: 'Half-Red Dragon Veteran 1', offer, hands: 'one-handed', defaulted: true });
-    expect(one.automationType).toBe('one_handed_variant_selected');
-    expect(one.description).toContain('default');
-    expect(one.description).toContain(row.damage_dice_primary);
-    expect(one.description).not.toContain(row.damage_dice_two_handed);
   });
 });

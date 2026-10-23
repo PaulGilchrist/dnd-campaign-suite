@@ -87,18 +87,19 @@ import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import { registerTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
+import monsters from '../../../../public/data/monsters.json';
 
-// Mirrors Apep Constrict in public/data/monsters.json byte-shape.
-const APEP_CONSTRICT_ACTION = {
-    name: 'Constrict',
-    attack_bonus: 18,
-    reach: '15 ft.',
-    damage_dice_primary: '4d8 + 9',
-    damage_type_primary: 'Bludgeoning',
-    hit_conditions: ['grappled'],
-    escape_dc: 26,
-    grapple_ongoing_damage: { dice: '4d8', damage_type: 'Bludgeoning' },
-};
+// rec #511 / fix#279(b) import-disk recipe: disk BY-name lookup replaces the
+// hand-transcribed Apep Constrict mirror — the lane now drives the REAL
+// public/data/monsters.json bytes (owner lane MonsterCardHelpers.grapple-
+// ongoing-damage.test.js:14 + chilling-gaze :83 same BY-name shape).
+// Drift check 2026-10-23: all eight former mirror fields byte-identical vs
+// disk (fix#279 CON-vs-Constitution class — none found); disk-only keys
+// description/save_effect are not buildHitConditionClause inputs, so the
+// clause bytes the consumer reads are unchanged; conversion inert.
+const APEP_CONSTRICT_ACTION = monsters
+    .find((m) => m.name === 'Apep')
+    .actions.find((a) => a.name === 'Constrict');
 
 const deps = {
     characterName: 'Apep 1',

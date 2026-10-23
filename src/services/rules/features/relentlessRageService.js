@@ -13,7 +13,7 @@ import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.j
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import utils from '../../ui/utils.js';
 
-function getRuntimeUsesKey(featureName) {
+function getRuntimeUsesKey(featureName) { // demoted #1402 (dead-export batch): ZERO external importers — sole caller checkRelentlessRage :152 (latch reader) + :242 (writer share the byte); test pins ride the public checkRelentlessRage surface (helpers lane, #82-class)
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
@@ -34,7 +34,7 @@ function evaluateMultiplierExpression(numericMatch, playerComputed) {
     return multiplier * (resolve ? resolve(playerComputed) : 0);
 }
 
-function evaluateHealExpression(expression, playerComputed) {
+function evaluateHealExpression(expression, playerComputed) { // demoted #1402 (dead-export batch): ZERO external importers — sole caller checkRelentlessRage's handleSaveResult :183; fix#105/#1403 clamp + write-budget pins ride the public saveResults/helpers surfaces
     if (typeof expression === 'number') return expression;
     if (!expression) return playerComputed?.level || 1;
 
@@ -256,4 +256,7 @@ export function checkRelentlessRage(creature, playerComputed, campaignName) {
     };
 }
 
-export { evaluateHealExpression, getRuntimeUsesKey };
+// #1402 (dead-export batch): the former `export { evaluateHealExpression,
+// getRuntimeUsesKey }` re-export line is DELETED — both symbols demoted to
+// module-private above (ZERO non-test consumers; checkRelentlessRage is the
+// module's sole production surface, imported by applyDamage.js alone).

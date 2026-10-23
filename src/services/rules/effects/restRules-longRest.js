@@ -747,7 +747,6 @@ export async function applyLongRest(playerStats, campaignName) {
     ['stormsThunderUses', null],
     ['Overchannel_useCount', 0],
     ["_Hunter's_Prey_choice", null],
-    ["_Hunter's_Prey_choice", null],
   ])
 
   const { hasBolsteringTreats, hasReplenishingMeal } = resetChefFeatures(name, playerStats, campaignName)

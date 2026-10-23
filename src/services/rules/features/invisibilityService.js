@@ -83,9 +83,12 @@ export function endGreaterInvisibility(targetName, campaignName, reason) {
     }).catch((e) => { console.error("[invisibilityService:log-error]", e); });
 }
 
-/**
- * End Greater Invisibility early for the invisible creature if they take a hostile action.
- */
-export function endGreaterInvisibilityOnHostileAction(invisibleName, campaignName) {
-    endGreaterInvisibility(invisibleName, campaignName, 'target made a hostile action (attack roll, dealt damage, or cast a spell)');
-}
+// #1382 dead-export delete: endGreaterInvisibilityOnHostileAction removed —
+// ZERO callers repo-wide AND anti-RAW: Greater Invisibility (concentration,
+// up to 1 minute) does NOT end on a hostile action — only Invisibility does
+// (endInvisibilityOnHostileAction above serves that rule). The LIVE greater
+// removal lane is endGreaterInvisibility called DIRECT with its own reasons:
+// rests (restRules-shortRest.js:420, restRules-longRest.js) and initiative
+// rolls (useInitiativeEffects.js). Wiring the forwarder in would wrongly break
+// the buff on attack — reported-gap verdict: NO unmet live need, already
+// correct elsewhere (#1184 keep-vs-stub law: delete, not queue).

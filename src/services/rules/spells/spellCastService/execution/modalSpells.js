@@ -233,10 +233,12 @@ function handleConjureVolley(spell, fullSpell) {
 }
 
 // fix#107 parity mirror (#1471 twin closure, ledger residual 'modalSpells:234-239
-// old-regex-pair twin QUEUED'): silenceService.js :30-:71 owns the fixed law
-// (FEET_TOKEN_RE/MILE_TOKEN_RE + numeric-first aoeRadiusFromSize) but those
-// consts/helpers are module-private THERE (not exported), so these bytes
-// MIRROR the source verbatim: numeric-first size (RAW 5e disk spells.json
+// old-regex-pair twin QUEUED'): these bytes MIRROR the silenceService fixed law
+// VERBATIM — as of the #1413/#1420 dead-export census batch (2026-10-23) that
+// excised the dead triggerSilence forwarder and its module-private parsers
+// (FEET_TOKEN_RE/MILE_TOKEN_RE + aoeRadiusFromSize) from silenceService.js,
+// THIS mirror is the SOLE home of the fixed parser law (handleSilence :279 is
+// the live cast route home). numeric-first size (RAW 5e disk spells.json
 // area_of_effect.size is NUMBER on ALL 89 aoe rows — the retired
 // aoeSize.match(/(\d+)-foot-radius/) threw TypeError on it), plural feet/mile
 // token set (retired /(\d+)-?foot/ matched ZERO plural forms), and LOUD

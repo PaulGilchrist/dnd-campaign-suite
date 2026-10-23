@@ -15,7 +15,14 @@ function isSorcererCaster(playerStats) {
     return playerStats?.class?.name === 'Sorcerer';
 }
 
-export function getWildMagicSurgeFeatures(playerStats) {
+// #1433 export-surface-shrink: the four finders below are MODULE-LOCAL.
+// They never had an importer outside this service except its own test file
+// (test-only-export disease); triggerWildMagicSurge is the sole public
+// surface (spellCastService/execution/index.js:538) and the test's disk
+// census now rides that seam (fix#297 row-9 restructure-pins pattern).
+// Demoted-not-deleted: each finder has a live internal consumer below
+// (:124/:129/:132/:137 pre-fix numbering).
+function getWildMagicSurgeFeatures(playerStats) {
     const passives = playerStats?.automation?.passives;
     if (passives == null) {
         console.error('[wildMagicSurgeService] Missing array:', passives);
@@ -33,7 +40,7 @@ export function getWildMagicSurgeFeatures(playerStats) {
         (p.type === 'auto_effect' && p.effect === 'wild_magic_surge_table'));
 }
 
-export function getControlledChaosFeature(playerStats) {
+function getControlledChaosFeature(playerStats) {
     const passives = playerStats?.automation?.passives;
     if (passives == null) {
         console.error('[wildMagicSurgeService] Missing array:', passives);
@@ -42,7 +49,7 @@ export function getControlledChaosFeature(playerStats) {
     return passives.find(p => p.type === 'auto_effect' && p.effect === 'wild_magic_double_roll');
 }
 
-export function getTamedSurgeFeature(playerStats) {
+function getTamedSurgeFeature(playerStats) {
     const passives = playerStats?.automation?.passives;
     if (passives == null) {
         console.error('[wildMagicSurgeService] Missing array:', passives);
@@ -51,7 +58,7 @@ export function getTamedSurgeFeature(playerStats) {
     return passives.find(p => p.type === 'wild_magic_tamed');
 }
 
-export function getFeatsOfChaosFeature(playerStats) {
+function getFeatsOfChaosFeature(playerStats) {
     const passives = playerStats?.automation?.passives;
     if (passives == null) {
         console.error('[wildMagicSurgeService] Missing array:', passives);
