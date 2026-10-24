@@ -5,6 +5,9 @@ import AvatarImage from '../common/AvatarImage.jsx';
 function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
   const hasStats = npcHasStatBlock(npc);
   const hasAttacks = npcHasAttacks(npc);
+  const initButtonLabel = hasStats
+    ? `Add ${npc.name} to Initiative`
+    : `Fill in ${npc.name}'s AC and HP (Stats tab) before adding to Initiative`;
   return (
     <li
       className="ct-list-item"
@@ -71,9 +74,8 @@ function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
               e.stopPropagation();
               onAddToInitiative(npc);
             }}
-            title={hasStats
-              ? `Add ${npc.name} to Initiative`
-              : `Fill in ${npc.name}'s AC and HP (Stats tab) before adding to Initiative`}
+            title={initButtonLabel}
+            aria-label={initButtonLabel}
           >
             <i className="fa-solid fa-shield-alt" /> Add {npc.name} to Initiative
           </button>

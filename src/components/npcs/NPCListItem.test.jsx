@@ -45,8 +45,13 @@ describe('NPCListItem', () => {
   const listItemFor = (name = 'Gandalf') =>
     screen.getByRole('button', { name: `Edit NPC: ${name}` });
 
-  const initButton = () =>
-    screen.getByRole('button', { name: /Add .* to Initiative/ });
+  const enabledChip = (name = 'Gandalf') =>
+    screen.getByRole('button', { name: `Add ${name} to Initiative` });
+
+  const gatedChip = (name = 'Gandalf') =>
+    screen.getByRole('button', {
+      name: `Fill in ${name}'s AC and HP (Stats tab) before adding to Initiative`,
+    });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,8 +83,10 @@ describe('NPCListItem', () => {
     it('disables the button with a hint and shows no badge while combat stats are missing', () => {
       renderListItem();
       expect(screen.queryByTitle('Has stat block')).not.toBeInTheDocument();
-      const button = initButton();
+      const button = gatedChip();
       expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('aria-label',
+        "Fill in Gandalf's AC and HP (Stats tab) before adding to Initiative");
       expect(button.title).toMatch(/Fill in Gandalf.*AC and HP/);
       expect(screen.queryByText('No attacks')).not.toBeInTheDocument();
     });
@@ -89,6 +96,20 @@ describe('NPCListItem', () => {
       expect(screen.getByTitle('Has stat block')).toBeInTheDocument();
       expect(screen.getByTitle('Add Gandalf to Initiative')).toBeEnabled();
       expect(screen.queryByText('No attacks')).not.toBeInTheDocument();
+    });
+
+    it('pins the init chip accessible name to its title, dynamically per NPC name', () => {
+      const { unmount } = renderListItem(combatReady);
+      const chip = enabledChip();
+      expect(chip).toHaveAttribute('aria-label', 'Add Gandalf to Initiative');
+      expect(chip.getAttribute('aria-label')).toBe(chip.getAttribute('title'));
+      expect(screen.getAllByRole('button', { name: 'Add Gandalf to Initiative' })).toHaveLength(1);
+
+      unmount();
+      renderListItem({ ...combatReady, name: 'Marta Copperkettle' });
+      const marta = enabledChip('Marta Copperkettle');
+      expect(marta).toHaveAttribute('aria-label', 'Add Marta Copperkettle to Initiative');
+      expect(marta).toBeEnabled();
     });
 
     it('warns with a no-attacks badge when stats are ready but no usable attack exists', () => {
