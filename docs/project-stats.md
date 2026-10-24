@@ -1,18 +1,18 @@
 # Project Statistics
 
-> Auto-generated on Fri, Oct 23, 2026 (UTC) — deterministic project-stats scan.
+> Auto-generated on Sat, Oct 24, 2026 (UTC) — deterministic project-stats scan.
 
 ## Summary
 
 | Metric | Production | Test | Total |
 |---|---|---|---|
-| Source files | 1,306 | 2,763 | 4,069 |
-| Source lines | 228,091 | 676,340 | 904,431 |
+| Source files | 1,304 | 2,769 | 4,073 |
+| Source lines | 228,862 | 679,350 | 908,212 |
 
 | Test-to-code ratio | Value |
 |---|---|
-| Test files / production files | 211.6% |
-| Test lines / production lines | 296.5% |
+| Test files / production files | 212.3% |
+| Test lines / production lines | 296.8% |
 
 ## Language Breakdown
 
@@ -20,15 +20,15 @@ Code files only (JSON excluded). `.jsx`/`.tsx` grouped into their parent languag
 
 | Language | Files | Lines |
 |---|---|---|
-| JavaScript | 4,068 | 904,392 |
+| JavaScript | 4,072 | 908,173 |
 | Python | 1 | 39 |
-| **Total** | **4,069** | **904,431** |
+| **Total** | **4,073** | **908,212** |
 
 ## JSON
 
 | Category | Files | Lines |
 |---|---|---|
-| Config JSON (all .json except public/data) | 9 | 58,739 |
+| Config JSON (all .json except public/data) | 10 | 59,389 |
 | Data JSON (public/data/**) | 32 | 159,483 |
 
 Data JSON: **32** files, avg **4,984** lines/file, median **459** lines/file.
@@ -51,14 +51,14 @@ Data JSON: **32** files, avg **4,984** lines/file, median **459** lines/file.
 
 ## File Size Distribution (src/ production code)
 
-Non-test source files under `src/`: **1,258** files, avg **176** lines/file, median **107** lines/file.
+Non-test source files under `src/`: **1,256** files, avg **177** lines/file, median **108** lines/file.
 
 | Bucket (lines/file) | Files |
 |---|---|
 | <50 | 268 |
-| 50-200 | 658 |
-| 200-500 | 246 |
-| 500+ | 86 |
+| 50-200 | 659 |
+| 200-500 | 242 |
+| 500+ | 87 |
 
 ## Largest Production Files (Top 10)
 
@@ -66,15 +66,15 @@ From `src/` and subfolders, excluding JSON and test files.
 
 | # | File | Lines |
 |---|---|---|
-| 1 | `src/components/encounter/MonsterCardHelpers.js` | 3,476 |
+| 1 | `src/components/encounter/MonsterCardHelpers.js` | 3,479 |
 | 2 | `src/components/encounter/MonsterCardModal.jsx` | 2,949 |
-| 3 | `src/components/char-sheet/modals/shared/SaveAttackAoeModal.jsx` | 2,048 |
+| 3 | `src/components/char-sheet/modals/shared/SaveAttackAoeModal.jsx` | 2,052 |
 | 4 | `src/hooks/combat/saveProcessing.js` | 1,754 |
 | 5 | `src/services/combat/conditions/targetEffectDefinitions.js` | 1,552 |
 | 6 | `src/hooks/combat/handlers/handlePlainDamage.js` | 1,272 |
 | 7 | `src/services/rules/combat/applyDamage.js` | 1,265 |
-| 8 | `src/components/char-sheet/DiceRollResult.jsx` | 1,125 |
-| 9 | `src/services/rules/spells/spellPreparationService.js` | 1,092 |
+| 8 | `src/services/rules/spells/spellPreparationService.js` | 1,148 |
+| 9 | `src/components/char-sheet/DiceRollResult.jsx` | 1,125 |
 | 10 | `src/components/char-sheet/CharBonusActions.jsx` | 1,087 |
 
 ## Largest Test Files (Top 10)
@@ -83,14 +83,14 @@ All test source files (repo-wide), excluding JSON.
 
 | # | File | Lines |
 |---|---|---|
-| 1 | `src/components/encounter/MonsterCardModal.legendary-uses.test.jsx` | 1,900 |
+| 1 | `src/components/encounter/MonsterCardModal.legendary-uses.test.jsx` | 1,892 |
 | 2 | `server/routes/notes.test.js` | 1,267 |
 | 3 | `src/services/combat/automation/automationInfoBuilder/core-handlers.test.js` | 1,237 |
 | 4 | `server/routes/spell-overlay.test.js` | 1,143 |
-| 5 | `src/services/automation/handlers/reactions/reactionBonusHandler.test.js` | 1,088 |
-| 6 | `server/utils/changeData.test.js` | 1,039 |
-| 7 | `src/services/automation/handlers/spells/summonSpiritHandler.test.js` | 1,003 |
-| 8 | `server/routes/maps.test.js` | 996 |
+| 5 | `server/routes/maps.test.js` | 1,116 |
+| 6 | `src/services/automation/handlers/reactions/reactionBonusHandler.test.js` | 1,088 |
+| 7 | `server/utils/changeData.test.js` | 1,039 |
+| 8 | `src/services/automation/handlers/spells/summonSpiritHandler.test.js` | 1,003 |
 | 9 | `server/routes/npcs.test.js` | 939 |
 | 10 | `src/services/automation/handlers/class-ranger/primalCompanionHandler.test.js` | 914 |
 
@@ -117,7 +117,7 @@ All test source files (repo-wide), excluding JSON.
 | FIXME | 11 |
 | HACK | 5 |
 
-Comment density: **87,903** comment lines / **816,528** code lines = **0.108** (comment:code, using // and # line markers).
+Comment density: **90,228** comment lines / **817,984** code lines = **0.110** (comment:code, using // and # line markers).
 
 Total dependencies (package.json): **31** (13 runtime + 18 dev).
 
@@ -128,15 +128,15 @@ Most-frequently-modified files, excluding generated/binary/runtime dirs (include
 | # | File | Commits |
 |---|---|---|
 | 1 | `docs/monster-actions-manifest.json` | 779 |
-| 2 | `docs/test-setup-playbook.md` | 695 |
+| 2 | `docs/test-setup-playbook.md` | 704 |
 | 3 | `public/data/monsters.json` | 665 |
 | 4 | `docs/automations-manifest.json` | 467 |
 | 5 | `src/components/encounter/MonsterCardModal.jsx` | 138 |
 | 6 | `src/services/combat/conditions/targetEffectDefinitions.js` | 105 |
-| 7 | `src/components/encounter/MonsterCardHelpers.js` | 86 |
+| 7 | `src/components/encounter/MonsterCardHelpers.js` | 87 |
 | 8 | `src/services/encounters/monsterLairActions.test.js` | 85 |
-| 9 | `src/components/initiative/initiative.jsx` | 78 |
-| 10 | `src/components/char-sheet/char-spells/CharSpells.jsx` | 77 |
+| 9 | `src/components/char-sheet/char-spells/CharSpells.jsx` | 77 |
+| 10 | `src/components/initiative/initiative.jsx` | 77 |
 
 ## Methodology & Notes
 
