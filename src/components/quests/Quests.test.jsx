@@ -351,7 +351,7 @@ describe('Quests', () => {
       expectFormValues(DEFAULT_FORM);
     });
 
-    it('disables the delete button while a delete is in progress and re-enables it after', async () => {
+    it('disables the delete button while a delete is in progress and closes the modal after', async () => {
       vi.spyOn(window, 'confirm').mockReturnValue(true);
       let deleteResolve;
       renderWithQuests([quest({ name: 'Delete Test Quest' })], {
@@ -364,7 +364,8 @@ describe('Quests', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: /Deleting/ })).toHaveAttribute('disabled'));
 
       await act(async () => deleteResolve());
-      expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveAttribute('disabled');
+      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+      expect(document.querySelector('.ct-modal-overlay')).toBeNull();
     });
 
     it('saves edited quest data while leaving other quests untouched', async () => {

@@ -199,8 +199,12 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     setDeleting(quest.id);
     try {
       await deleteQuestAction(quest.id);
+      setError(null);
+      // Close the modal on success — mirrors NPCs/Notes/Factions/Sessions deletes.
+      handleCloseModal();
     } catch (error) {
       console.error('Failed to delete quest:', error);
+      setError(error.message || 'Failed to delete quest');
     } finally {
       setDeleting(null);
     }
