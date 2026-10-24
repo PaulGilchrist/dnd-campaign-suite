@@ -7,11 +7,24 @@
  * no delegation channel, so no referee key/client-id plumbing exists).
  * All writes flow through useSyncedState → the server-validated chokepoint
  * (server/validation/keyValidators.js). Default OFF ⇒ Levels 1–4 unchanged.
+ *
+ * Checkbox writes sit behind a trailing debounce on the WRITE lane only
+ * (mirror of the currency-chip fix 97165afc2) — see the component below.
  */
-import React from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js'
 import './EnforcementSection.css'
+
+// Trailing debounce for enforcement checkbox writes (backlog 2026-10-24): every click
+// used to POST the whole enforcement blob immediately — master-on → turnLock → master-off
+// was 3 POSTs, two of which were intermediate churn nobody ever read. Each click now
+// flips an optimistic local draft instantly (checkboxes and fieldset gating stay
+// immediate); the network flush waits for a short quiet window, so a burst coalesces
+// into ONE POST carrying the final blob, well inside the ~1–1.5s settle the GM panel
+// needs. Writes are deferred, never dropped or rate-limited: the timer, or the unmount
+// flush, always fires them. Benign network/save debounce (no-timers guard).
+const ENFORCEMENT_PERSIST_DEBOUNCE_MS = 600
 
 const FLAGS = [
     { key: 'turnLock', label: 'Turn lock', hint: 'Only the active creature may take Actions or Bonus Actions (Reactions stay allowed off-turn).' },
@@ -35,16 +48,51 @@ const FLAGS = [
 export default function EnforcementSection({ campaignName }) {
     const [enforcement, setEnforcement] = useSyncedState('campaign', 'enforcement', { ...ENFORCEMENT_DEFAULTS }, campaignName)
 
-    const flags = { ...ENFORCEMENT_DEFAULTS, ...(enforcement || {}) }
+    // Optimistic write lane (backlog 2026-10-24, mirrors PartyInventory 97165afc2):
+    // `draft` is the blob the UI renders while a burst is pending; the debounced flush
+    // POSTs it via setEnforcement once the clicks stop. The synced value stays the
+    // server truth and renders unchanged when idle. Never drop writes — the unmount
+    // effect flushes a stranded draft.
+    const [draft, setDraft] = useState(null)
+    const draftRef = useRef(null)
+    const flushTimerRef = useRef(null)
+    const writeRef = useRef(setEnforcement)
+    writeRef.current = setEnforcement
 
-    const setFlag = (key, value) => setEnforcement({ ...flags, [key]: value })
+    const flushDraft = useCallback(() => {
+        if (flushTimerRef.current) {
+            clearTimeout(flushTimerRef.current)
+            flushTimerRef.current = null
+        }
+        const pending = draftRef.current
+        if (!pending) return
+        draftRef.current = null
+        setDraft(null)
+        writeRef.current(pending)
+    }, [])
+
+    const writeDebounced = useCallback((blob) => {
+        draftRef.current = blob
+        setDraft(blob)
+        if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
+        flushTimerRef.current = setTimeout(flushDraft, ENFORCEMENT_PERSIST_DEBOUNCE_MS)
+    }, [flushDraft])
+
+    // Flush a pending burst if the section unmounts (navigation away) before the timer lands.
+    // flushDraft is identity-stable (ref-only deps), so this cleanup runs on unmount only.
+    useEffect(() => flushDraft, [flushDraft])
+
+    const flags = { ...ENFORCEMENT_DEFAULTS, ...(draft || enforcement || {}) }
+
+    const setFlag = (key, value) => writeDebounced({ ...flags, [key]: value })
 
     // Master-off zeroes EVERY sub-flag in the written blob:
     // with the mode off nothing is gated, so a stale `true` riding along is
     // functionally inert but a confusing disk shape for harnesses. Flipping
     // back ON therefore starts from all-false — sub-flags never re-arm
-    // themselves without an individual click.
-    const setMaster = (on) => setEnforcement(on
+    // themselves without an individual click. The zeroed blob is what rides
+    // the coalesced POST when master-off is the last click of a burst.
+    const setMaster = (on) => writeDebounced(on
         ? { ...flags, mode: 'on' }
         : { ...ENFORCEMENT_DEFAULTS, mode: 'off' })
 
