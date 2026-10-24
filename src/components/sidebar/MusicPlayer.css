@@ -112,6 +112,16 @@
   font-family: monospace;
 }
 
+/* Inline error message (mirrors .quests-form-error / .npcs-form-error) */
+.music-editor-error {
+  padding: 4px 8px;
+  border: 1px solid var(--color-error-border);
+  border-radius: 4px;
+  background-color: var(--background-color-error);
+  color: var(--color-error-light);
+  font-size: 0.8em;
+}
+
 .music-editor-actions {
   display: flex;
   gap: 4px;

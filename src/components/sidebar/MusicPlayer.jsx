@@ -29,6 +29,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   const [playerMounted, setPlayerMounted] = useState(false);
   const [editMood, setEditMood] = useState(MOODS[0].key);
   const [trackText, setTrackText] = useState('');
+  const [editorError, setEditorError] = useState(null);
   const { addEntry } = useLog(campaignName);
 
   useEffect(() => {
@@ -95,6 +96,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   const openEditor = useCallback(() => {
     const tracks = getTracksForMood(editMood, music.overrides);
     setTrackText(tracks.map(t => t.videoId).join('\n'));
+    setEditorError(null);
     setEditing(true);
   }, [editMood, music.overrides]);
 
@@ -103,12 +105,14 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     setEditMood(moodKey);
     const tracks = getTracksForMood(moodKey, music.overrides);
     setTrackText(tracks.map(t => t.videoId).join('\n'));
+    setEditorError(null);
   }, [music.overrides]);
 
   const saveTracks = useCallback(() => {
     const tracks = parseTrackList(trackText);
     if (tracks.length === 0) {
       console.error('No valid YouTube URLs or video ids entered');
+      setEditorError('No valid YouTube URLs or video ids entered');
       return;
     }
     const overrides = { ...music.overrides, [editMood]: tracks };
@@ -117,6 +121,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       setPlayerMounted(true);
       youtubePlayer.playTracks(tracks.map(t => t.videoId));
     }
+    setEditorError(null);
     setEditing(false);
   }, [trackText, editMood, music, setMusic]);
 
@@ -126,6 +131,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     setMusic({ ...music, overrides });
     const tracks = getTracksForMood(editMood, overrides);
     setTrackText(tracks.map(t => t.videoId).join('\n'));
+    setEditorError(null);
   }, [editMood, music, setMusic]);
 
   if (!isLocalhost) return null;
@@ -182,9 +188,13 @@ function MusicPlayer({ campaignName, isLocalhost }) {
             className="music-editor-urls"
             rows={3}
             value={trackText}
-            onChange={(event) => setTrackText(event.target.value)}
+            onChange={(event) => {
+              setTrackText(event.target.value);
+              setEditorError(null);
+            }}
             placeholder="One YouTube URL or video ID per line"
           />
+          {editorError && <div className="music-editor-error">{editorError}</div>}
           <div className="music-editor-actions">
             <button className="music-btn" onClick={saveTracks}>Save</button>
             <button className="music-btn" onClick={resetMood} title="Restore starter tracks">Reset</button>
