@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
 import MusicPlayer from './MusicPlayer.jsx';
 import { addEntry } from '../../services/ui/logService.js';
@@ -21,6 +21,10 @@ const VIEW_LABELS = {
 };
 
 const RULES_URL = 'https://paulgilchrist.github.io/dnd-tools/rules/general';
+
+// Dice popup is pure UI feedback — auto-hide so its full-page overlay never
+// intercepts clicks (mirrors the .music-toast auto-hide idiom).
+const DICE_POPUP_AUTO_HIDE_MS = 4000;
 
 const NAV_ITEMS = [
     { view: 'encounter', onClick: 'onEncounterClick', localhostOnly: true },
@@ -100,6 +104,15 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
 
 function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView }) {
     const [diceResult, setDiceResult] = useState(null);
+
+    // Auto-hide timer (display only, no game state). A re-roll replaces
+    // diceResult, restarting the countdown on the new result; early close
+    // (× / Escape) and unmount run the cleanup and clear the timer.
+    useEffect(() => {
+        if (!diceResult) return undefined;
+        const timer = setTimeout(() => setDiceResult(null), DICE_POPUP_AUTO_HIDE_MS);
+        return () => clearTimeout(timer);
+    }, [diceResult]);
 
     const handleDiceRoll = (result) => {
         setDiceResult(result);

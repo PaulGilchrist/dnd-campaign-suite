@@ -68,7 +68,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **[2026-10-24] Dice-tray popup blocks the whole page until dismissed** — `.dice-tray-popup-overlay` stays indefinitely, intercepting all clicks (GM rolls d20, navigates → EB clicks die). Auto-hide after N seconds (benign UI timer category) or non-blocking placement. *(UX friction)*
 - **[2026-10-24] Item Move legs have no confirm** — party→player and →party transfers execute silently while currency `Give` confirms named sums. Add matching "Move N ×item to <player>?" confirms (PartyInventory modals). *(consistency)*
 - **[2026-10-24] Notes row aria-label carries raw markdown** — `Edit note: ## Session hook\nThe **baron**…` is noisy for a11y and automation; use partyLocation (or rendered-text plain title) as the label. *(minor)*
 - **[2026-10-24] EB Load-modal stays open after in-modal Delete** — row disappears but modal persists (quest-edit-modal delete was fixed 752a00c43; this surface missed). Close or show "deleted" inline state. *(minor)*

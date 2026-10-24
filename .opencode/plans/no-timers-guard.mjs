@@ -31,6 +31,7 @@ const BENIGN = [
     { why: 'popup-visibility DOM poll (state is event-driven)', re: /checkPopupVisible|checkAndHandlePending/ },
     { why: 'network fetch timeout (failed request, not a game decision)', re: /loadMapData timeout|fetch timeout/i },
     { why: 'deferred popup render (adjudication already decided; display only)', re: /setPopupHtml/ },
+    { why: 'dice tray result popup auto-hide, UI feedback only', re: /setDiceResult/ },
     { why: 'focus/blur UI nicety', re: /focus|blur/i },
 ]
 
