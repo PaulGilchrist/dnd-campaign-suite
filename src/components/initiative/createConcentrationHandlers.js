@@ -7,6 +7,7 @@ import { logConcentrationSave } from '../../services/encounters/combatLoggingSer
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js'
 import { addEntry } from '../../services/ui/logService.js'
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 
 function findCharacterByName(characters, name) {
     return characters.find(c => c.name === name || c.name.startsWith(name + ' ')) || null
@@ -59,8 +60,7 @@ export function createConcentrationHandlers({
 
         const concentration = creature.concentration
 
-        const { getRuntimeValue: grv } = await import('../../hooks/runtime/useRuntimeState.js')
-        const lastAttack = await grv('campaign', 'lastAttack', campaignName)
+        const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName)
         const attackerName = lastAttack?.attackerName
         const attacker = attackerName ? findCharacterByName(characters, attackerName) : null
         // MA-0038: static concentration_breaker OR the live failed-save te

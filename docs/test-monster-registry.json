@@ -1598,7 +1598,7 @@
   },
   "Death Knight Aspirant": {
     "monsterIndex": "death-knight-aspirant",
-    "placedIn": "test-campaign initiative via EB Join Encounter",
+    "placedIn": "test-campaign initiative via EB Join Encounter | EXPLORE 2026-10-24: joined x4+x4 via EB Generate-modal suggestion (MEDIUM 29,200 XP) Apply+Join; cs names quantity-suffixed, real stats (Aspirant HP178 ac-key=20), loot awarded xp2433/PC; REMOVED via admin clear-change-data (cs null). Re-joinable same path.",
     "config": {
       "name": "Death Knight Aspirant 1",
       "csIndex": 2,
@@ -7212,7 +7212,7 @@
   },
   "Warhorse": {
     "monsterIndex": "warhorse",
-    "placedIn": "EB Join Warhorse 1 + Bandit cs POST rig. Board CLEARED after MA-1676",
+    "placedIn": "EB Join Warhorse 1 + Bandit cs POST rig. Board CLEARED after MA-1676 | EXPLORE 2026-10-24: joined x4+x4 via EB Generate-modal suggestion (MEDIUM 29,200 XP) Apply+Join; cs names quantity-suffixed, real stats (Aspirant HP178 ac-key=20), loot awarded xp2433/PC; REMOVED via admin clear-change-data (cs null). Re-joinable same path.",
     "verifiedRow": "MA-1676 (FAIL(a)/DATA Hooves charge rider inert MA-1610 twin, fix conditional_damage MA-0885 shape)"
   },
   "Warhorse Skeleton": {
