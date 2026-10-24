@@ -694,7 +694,7 @@ function App() {
         <BardicInspirationReactionModal campaignName={campaignName} characters={computedCharacters} />
         <ConditionChoiceModal />
         <Subscriber campaignName={campaignName} handleEvent={handleRuntimeEvent} />
-        <MapContextSync campaignName={campaignName} activeMapName={activeMapName} />
+        <MapContextSync campaignName={campaignName} activeMapName={activeMapName} isLocalhost={isLocalhost} />
         {processingCharacters && <div className="loading-overlay"><div className="loading-spinner">Loading party stats...</div></div>}
       </div>
     </div>

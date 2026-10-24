@@ -118,7 +118,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [viewMode, setViewMode] = useState('2d');
 
     const { mapData, setMapData, placedItems, setPlacedItems, flushSave } = useMapLoader({
-        campaignName, characters, mapName, gridSize, setGridSize,
+        campaignName, characters, mapName, gridSize, setGridSize, isLocalhost,
     });
 
     const {
@@ -221,22 +221,29 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     });
 
     // Exploration memory: merge newly revealed cells into the persisted set so
-    // uncovered areas stay uncovered. Runs on every client (any player may move
-    // a character); the write is idempotent and synced across clients via SSE.
+    // uncovered areas stay uncovered. GM (localhost) only — the write PUTs the
+    // whole map document (useMapLoader autosave) and is idempotent ONLY when the
+    // client is the single author. A read-only (network) client that merges its
+    // own line-of-sight back in resurrects cells the GM just fogged: live
+    // 2026-10-24 a LAN player tab PUT revealed=400 seconds after a GM fog reset
+    // (bug-player-clients-clobber-fog-reset). Players still mirror every map
+    // change they DO receive via SSE (useSSESync); they just never author it.
     const revealed = mapData?.revealed;
     const { fog, visible } = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize, revealed);
     useEffect(() => {
+        if (!isLocalhost) return;
         const next = mergeNewlyRevealed(visible, revealed);
         if (next) {
             setMapData(prev => ({ ...prev, revealed: next }));
         }
-    }, [visible, revealed, setMapData]);
+    }, [isLocalhost, visible, revealed, setMapData]);
 
     // GM: wipe exploration memory, leaving only the current line of sight
     // uncovered (the map's starting state).
     const resetFog = useCallback(() => {
+        if (!isLocalhost) return;
         setMapData(prev => ({ ...prev, revealed: Array.from(visible) }));
-    }, [visible, setMapData]);
+    }, [isLocalhost, visible, setMapData]);
 
     const { npcImages, setNpcImages } = useNpcImageCache(placedItems, campaignName);
 

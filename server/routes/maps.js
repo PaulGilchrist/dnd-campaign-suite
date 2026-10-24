@@ -13,6 +13,34 @@ const router = express.Router();
 export const toKebabCase = (name) => name.toLowerCase().replace(/\.json$/i, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 const sanitizeMapName = (name) => toKebabCase(name) + '.json';
 
+// Authority (mirrors quests.js / campaigns-admin.js and the npcs bestiary guard):
+// map documents are GM-authored — network clients get a read-only view
+// (AGENTS.md). Live-clobber, 2026-10-24: a LAN player tab auto-PUT its stale
+// fully-revealed copy seconds after a GM fog reset, silently undoing it
+// (bug-player-clients-clobber-fog-reset). The client gates the same rule
+// (Map.jsx / useMapLoader isLocalhost) so honest read-only tabs never attempt
+// these writes; this route guard is the server seam that makes it structural.
+// Outdoor hex documents stay writable from any tab: their whole-document PUT
+// is the existing party-travel persistence lane (hex useMapLoader), which this
+// bug does not touch — the disk document's type decides, deny-safe on unknown.
+const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+function refuseUnlessGm(req, res) {
+  if (isLocalhost(req)) return true;
+  console.log(`[maps] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
+  res.status(403).json({ error: 'Access denied: GM-only feature' });
+  return false;
+}
+
+function isOutdoorMapDocument(filePath, body) {
+  try {
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8')).type === 'outdoor';
+    }
+  } catch (_e) { /* unreadable disk bytes — fall back to the claimed type */ }
+  return body?.type === 'outdoor';
+}
+
 // Mirror the authoritative active map into the '__map__' runtime key so range
 // gates (rangeCheck.js) and every client see the same map the /maps list reports.
 function stampActiveMapContext(campaign, mapKey) {
@@ -185,15 +213,17 @@ router.get('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
 // PUT /api/campaigns/:campaign/maps/:mapname - Save map data
 router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
-  const mapData = pruneRevealedToGrid(req.body);
   const mapsDir = campaignMapsDir(campaign);
+  const fileName = normalizeMapFile(mapname);
+  const filePath = path.join(mapsDir, fileName);
+
+  if (!isOutdoorMapDocument(filePath, req.body) && !refuseUnlessGm(req, res)) return;
+
+  const mapData = pruneRevealedToGrid(req.body);
 
   if (!fs.existsSync(mapsDir)) {
     fs.mkdirSync(mapsDir, { recursive: true });
   }
-
-  const fileName = normalizeMapFile(mapname);
-  const filePath = path.join(mapsDir, fileName);
 
   fs.writeFileSync(filePath, JSON.stringify(mapData, null, 2));
 
@@ -207,6 +237,7 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
 // DELETE /api/campaigns/:campaign/maps/:mapname - Delete a map
 router.delete('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
+  if (!refuseUnlessGm(req, res)) return;
   const mapsDir = campaignMapsDir(campaign);
   const fileName = normalizeMapFile(mapname);
   const filePath = path.join(mapsDir, fileName);
@@ -234,6 +265,7 @@ router.delete('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) 
 router.put('/api/campaigns/:campaign/maps/:mapname/rename', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
   const { newName } = req.body;
+  if (!refuseUnlessGm(req, res)) return;
 
   if (!newName || newName.trim() === '') {
     return res.status(400).json({ error: 'New map name is required' });
@@ -289,6 +321,7 @@ router.put('/api/campaigns/:campaign/maps/:mapname/rename', asyncHandler((req, r
 // PUT /api/campaigns/:campaign/maps/:mapname/activate - Activate a map
 router.put('/api/campaigns/:campaign/maps/:mapname/activate', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
+  if (!refuseUnlessGm(req, res)) return;
   const mapsDir = campaignMapsDir(campaign);
   const fileName = normalizeMapFile(mapname);
   const filePath = path.join(mapsDir, fileName);
@@ -319,6 +352,7 @@ router.get('/api/campaigns/:campaign/active-map', asyncHandler((req, res) => {
 router.put('/api/campaigns/:campaign/maps/:mapname/description', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
   const { description } = req.body;
+  if (!refuseUnlessGm(req, res)) return;
   const mapsDir = campaignMapsDir(campaign);
   const fileName = normalizeMapFile(mapname);
   const filePath = path.join(mapsDir, fileName);

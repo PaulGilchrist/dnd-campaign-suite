@@ -208,6 +208,21 @@ function validateSessionState(value) {
     return { ok: true };
 }
 
+// '__map__' is the active-map pointer every range gate consults. The server owns
+// it (the activate route stamps it, campaigns routes clear it with the map); the
+// client-side stamp in MapContextSync is a GM-tab heal-after-admin-wipe — every
+// read-only tab force-posting it is the auto-write lane family of
+// bug-player-clients-clobber-fog-reset. Always engaged: there is no state of the
+// campaign in which a non-GM client legitimately moves the pointer.
+function validateMapContext(value) {
+    if (value === null) return { ok: true }; // honest clear (no active map)
+    if (!isPlainObject(value)) return { ok: false, reason: '__map__ must be null or { activeMapName }' };
+    if (value.activeMapName !== undefined && value.activeMapName !== null && typeof value.activeMapName !== 'string') {
+        return { ok: false, reason: '__map__.activeMapName must be a string or null' };
+    }
+    return { ok: true };
+}
+
 /**
  * H1 hardening (§17): monster-side economy shape validation inside creature
  * store writes (POST /:campaign/:storeName posts the full store). The MA
@@ -255,6 +270,9 @@ export const keyValidators = {
     aiConfig: chain(validateAiConfig, (v, ctx) => validateAuthority('aiConfig', ctx,
         (isPlainObject(v) && v.mode && v.mode !== 'off')
         || (isPlainObject(ctx.current?.aiConfig) && ctx.current.aiConfig.mode !== 'off'))),
+    // '__map__' is GM-owned (engaged always true): read-only clients must not
+    // move the active-map pointer (auto-write lane of bug-player-clients-clobber-fog-reset).
+    '__map__': chain(validateMapContext, (v, ctx) => validateAuthority('__map__', ctx, true)),
 };
 
 /**

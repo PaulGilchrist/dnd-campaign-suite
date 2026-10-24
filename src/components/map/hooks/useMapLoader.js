@@ -13,7 +13,7 @@ function buildSavePayload(mapData, gridSize, placedItems) {
     };
 }
 
-function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize }) {
+function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize, isLocalhost = true }) {
     const [mapData, setMapData] = useState(null);
     const [placedItems, setPlacedItems] = useState([]);
     const svgLoadInProgressRef = useRef(false);
@@ -22,6 +22,21 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
     const saveTimerRef = useRef(null);
 
     const flushSave = useCallback(() => {
+        // Read-only (network) clients never author the map document — flushSave
+        // is the sole save chokepoint (autosave debounce + pointer-up/leave +
+        // unmount flush all route here). Live in the repro a LAN player tab PUT
+        // the whole document seconds after a GM fog reset, resurrecting fogged
+        // cells (bug-player-clients-clobber-fog-reset). Players still RECEIVE every
+        // change via SSE (useSSESync); they just never WRITE. The server route now
+        // 403s indoor-map writes from non-localhost as defense-in-depth.
+        if (!isLocalhost) {
+            pendingSaveRef.current = null;
+            if (saveTimerRef.current) {
+                clearTimeout(saveTimerRef.current);
+                saveTimerRef.current = null;
+            }
+            return;
+        }
         if (saveTimerRef.current) {
             clearTimeout(saveTimerRef.current);
             saveTimerRef.current = null;
@@ -31,7 +46,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
         pendingSaveRef.current = null;
         mapsService.saveMapData(pending.campaignName, pending.mapName, pending.dataToSave)
             .catch(err => console.error('Failed to save map data:', err));
-    }, []);
+    }, [isLocalhost]);
 
     useEffect(() => {
         if (loadedMapNameRef.current === mapName) return;
@@ -65,13 +80,18 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
 
             const newData = { players: [], walls: new Set() };
             setMapData(newData);
-            const dataToSave = {
-                ...newData,
-                gridSize,
-                walls: [],
-                placedItems: [],
-            };
-            mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
+            // A read-only client that can't find the map renders an empty grid
+            // locally but must not create/overwrite the document (that authorship
+            // belongs to the GM). See bug-player-clients-clobber-fog-reset.
+            if (isLocalhost) {
+                const dataToSave = {
+                    ...newData,
+                    gridSize,
+                    walls: [],
+                    placedItems: [],
+                };
+                mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
+            }
         };
 
         loadMap().finally(() => { svgLoadInProgressRef.current = false; });
