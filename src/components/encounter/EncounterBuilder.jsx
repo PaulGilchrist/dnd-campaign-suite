@@ -697,6 +697,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
           monsters={monsters}
           playerLevels={filter.playerLevels}
           difficulty={filter.difficulty}
+          targetXP={totalThreshold}
           onApply={handleApplySuggestion}
           onClose={() => setShowGenerator(false)}
         />

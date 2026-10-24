@@ -18,12 +18,76 @@ const QUICK_PICKS = [
   { label: 'Wilderness', environments: ['forest', 'grassland', 'hill', 'mountain'] },
 ];
 
-function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, onClose }) {
+// Budget indicator vs the EB panel's live Target XP (same totalThreshold the
+// filter panel displays — never re-derived here).
+function formatBudget(totalXP, targetXP) {
+  if (!targetXP || targetXP <= 0) return null;
+  const pct = Math.round((totalXP / targetXP) * 100);
+  const over = totalXP > targetXP;
+  const base = `${pct}% of target ${targetXP.toLocaleString()}`;
+  return {
+    over,
+    text: over ? `${base} · +${(totalXP - targetXP).toLocaleString()} over` : base,
+  };
+}
+
+function diffClass(label) {
+  if (label === 'Easy') return 'gen-suggestion-diff-easy';
+  if (label === 'Medium') return 'gen-suggestion-diff-medium';
+  if (label === 'Hard') return 'gen-suggestion-diff-hard';
+  return 'gen-suggestion-diff-deadly';
+}
+
+function GenSuggestionCard({ suggestion, targetXP, onApply }) {
+  const budget = formatBudget(suggestion.totalXP, targetXP);
+  return (
+    <div className={`gen-suggestion${budget && budget.over ? ' gen-suggestion-over' : ''}`}>
+      <div className="gen-suggestion-header">
+        <span className={`gen-suggestion-diff ${diffClass(suggestion.difficultyLabel)}`}>
+          {suggestion.difficultyLabel}
+        </span>
+        <span className="gen-suggestion-meta">
+          <span className="gen-suggestion-xp">
+            {suggestion.totalXP.toLocaleString()} XP &middot; {suggestion.monsterCount} monster{suggestion.monsterCount !== 1 ? 's' : ''}
+          </span>
+          {budget && (
+            <span className={`gen-suggestion-budget ${budget.over ? 'gen-budget-over' : 'gen-budget-within'}`}>
+              {budget.text}
+            </span>
+          )}
+        </span>
+      </div>
+      <ul className="gen-suggestion-list">
+        {suggestion.monsters.map(m => (
+          <li key={m.index} className="gen-suggestion-item">
+            <span className="gen-suggestion-mname">{m.name}</span>
+            <span className="gen-suggestion-mcr">CR {m.challenge_rating}</span>
+            <span className="gen-suggestion-mqty">&times;{m.qty}</span>
+            <span className="gen-suggestion-mxp">{m.xp.toLocaleString()} XP</span>
+          </li>
+        ))}
+      </ul>
+      <button
+        className="encounter-btn gen-apply-btn"
+        onClick={() => onApply(suggestion)}
+      >
+        <i className="fa-solid fa-check"></i> Apply
+      </button>
+    </div>
+  );
+}
+
+function EncounterGeneratorModal({ monsters, playerLevels, difficulty, targetXP, onApply, onClose }) {
   const [selectedEnvs, setSelectedEnvs] = useState(() => {
     const all = ENVIRONMENT_GROUPS.flatMap(g => g.environments);
     return new Set(all);
   });
   const [suggestions, setSuggestions] = useState([]);
+  // Last-roll persistence within this modal session: a re-roll parks the
+  // previous set in a collapsed "Previous roll" block so the GM can still
+  // compare/Apply it. The modal unmounts on close, so a fresh open is clean.
+  const [prevSuggestions, setPrevSuggestions] = useState([]);
+  const [showPrevious, setShowPrevious] = useState(false);
 
   const toggleEnv = (env) => {
     setSelectedEnvs(prev => {
@@ -56,19 +120,16 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
       count: 3,
     });
 
+    if (suggestions.length > 0) {
+      setPrevSuggestions(suggestions);
+      setShowPrevious(false);
+    }
     setSuggestions(results);
   };
 
   const handleApply = (suggestion) => {
     onApply(suggestion.monsters);
     onClose();
-  };
-
-  const diffClass = (label) => {
-    if (label === 'Easy') return 'gen-suggestion-diff-easy';
-    if (label === 'Medium') return 'gen-suggestion-diff-medium';
-    if (label === 'Hard') return 'gen-suggestion-diff-hard';
-    return 'gen-suggestion-diff-deadly';
   };
 
   return (
@@ -134,32 +195,33 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
                 Max {playerLevels.length} monster{playerLevels.length !== 1 ? 's' : ''} (one per PC)
               </div>
               {suggestions.map((s, i) => (
-                <div key={i} className="gen-suggestion">
-                  <div className="gen-suggestion-header">
-                    <span className={`gen-suggestion-diff ${diffClass(s.difficultyLabel)}`}>
-                      {s.difficultyLabel}
-                    </span>
-                    <span className="gen-suggestion-xp">
-                      {s.totalXP.toLocaleString()} XP &middot; {s.monsterCount} monster{s.monsterCount !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <ul className="gen-suggestion-list">
-                    {s.monsters.map(m => (
-                      <li key={m.index} className="gen-suggestion-item">
-                        <span className="gen-suggestion-mname">{m.name}</span>
-                        <span className="gen-suggestion-mcr">CR {m.challenge_rating}</span>
-                        <span className="gen-suggestion-mqty">&times;{m.qty}</span>
-                        <span className="gen-suggestion-mxp">{m.xp.toLocaleString()} XP</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    className="encounter-btn gen-apply-btn"
-                    onClick={() => handleApply(s)}
-                  >
-                    <i className="fa-solid fa-check"></i> Apply
-                  </button>
-                </div>
+                <GenSuggestionCard
+                  key={i}
+                  suggestion={s}
+                  targetXP={targetXP}
+                  onApply={handleApply}
+                />
+              ))}
+            </div>
+          )}
+
+          {prevSuggestions.length > 0 && (
+            <div className="gen-previous-roll">
+              <button
+                type="button"
+                className="gen-quick-btn gen-previous-toggle"
+                aria-expanded={showPrevious}
+                onClick={() => setShowPrevious(prev => !prev)}
+              >
+                <i className={`fa-solid ${showPrevious ? 'fa-chevron-down' : 'fa-chevron-right'}`}></i> Previous roll ({prevSuggestions.length} suggestion{prevSuggestions.length !== 1 ? 's' : ''})
+              </button>
+              {showPrevious && prevSuggestions.map((s, i) => (
+                <GenSuggestionCard
+                  key={`prev-${i}`}
+                  suggestion={s}
+                  targetXP={targetXP}
+                  onApply={handleApply}
+                />
               ))}
             </div>
           )}

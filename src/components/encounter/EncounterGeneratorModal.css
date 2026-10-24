@@ -172,6 +172,54 @@
   font-family: monospace;
 }
 
+/* Row XP + budget indicator (vs the EB panel's live Target XP) */
+.encounter-builder .gen-suggestion-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.encounter-builder .gen-suggestion-budget {
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.encounter-builder .gen-budget-within {
+  color: var(--color-success);
+}
+
+.encounter-builder .gen-budget-over {
+  color: var(--color-error);
+}
+
+/* Over-target suggestion rows are outlined in the error token */
+.encounter-builder .gen-suggestion-over {
+  border-color: var(--color-error);
+}
+
+/* Previous roll (last-roll persistence within the modal session) */
+.encounter-builder .gen-previous-roll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.encounter-builder .gen-previous-toggle {
+  align-self: flex-start;
+}
+
+.encounter-builder .gen-previous-roll .gen-suggestion {
+  background: var(--background-color-surface);
+  opacity: 0.75;
+}
+
+.encounter-builder .gen-previous-roll .gen-suggestion:hover {
+  opacity: 1;
+}
+
 .encounter-builder .gen-suggestion-list {
   list-style: none;
   margin: 0;
