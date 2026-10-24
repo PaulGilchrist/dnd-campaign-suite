@@ -292,16 +292,16 @@ describe('helpers.js applyPowerWordKillToTarget — module-direct PWK span (:277
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('QUIRK :296 `-(currentHp || creature.maxHp)`: an already-dead (currentHp 0) NPC logs delta -maxHp while forwarding damage 0 — log/write divergence; a rejected fire-and-forget addEntry swallows to console "[spellCast] Error:" and the kill proceeds', async () => {
-    // :296 `||` fallback on currentHp=0 (the death state itself) logs
-    // delta:-80 though :305 forwards 0 damage (#1481 fallback-chain form).
+  it('fix#337S #1482 flipped the :296 `||` quirk: an already-dead (currentHp 0) NPC now logs delta 0 matching the 0 damage forwarded — log/write convergence; a rejected fire-and-forget addEntry swallows to console "[spellCast] Error:" and the kill proceeds', async () => {
+    // :341 `-(currentHp)` truth: currentHp 0 logs delta 0 while :350 forwards
+    // 0 damage — the old `-maxHp` phantom is gone (#1482, M6/T5 planned flip).
     const dead = makeSummary({ name: 'Goblin', maxHp: 80, currentHp: 0 });
     getCombatContext.mockResolvedValue(dead);
 
     await applyPowerWordKillToTarget('Goblin', caster, CAMPAIGN);
 
     expect(hpChangeTuples()).toEqual([[CAMPAIGN, {
-      type: 'hp_change', targetName: 'Goblin', delta: -80, currentHp: 0, maxHp: 80,
+      type: 'hp_change', targetName: 'Goblin', delta: 0, currentHp: 0, maxHp: 80,
       isHealing: false, isUnconscious: false, threshold: 'dead', note: 'Power Word Kill',
     }]]);
     expect(vi.mocked(applyDamageToTarget).mock.calls[0][2]).toBe(0);

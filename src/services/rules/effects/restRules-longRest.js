@@ -285,6 +285,10 @@ function endWildShapesOnLongRest(campaignName) {
       }
       cs.creatures = cs.creatures.filter(c => !(c.wildShapeSource === wsSource && c.type !== 'player'))
       storageService.default.set('combatSummary', cs, campaignName)
+      // fix#337S #1312: keep the in-memory cache in lockstep with disk —
+      // siblings :102/:121/:270 all pair the set with setCombatSummaryCache;
+      // without it the stale beast-form summary serves until page reload.
+      setCombatSummaryCache(cs, campaignName)
     }
     const te = getRuntimeValue('campaign', 'targetEffects') || []
     const filtered = te.filter(e => !(e.effect === 'wild_shape' && e.source === wsSource))

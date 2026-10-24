@@ -158,6 +158,11 @@
   gap: 10px;
 }
 
+/* Clear-Monsters actions row (was inline textAlign — no-inline-styles law) */
+.encounter-builder .encounter-summary-actions-centered {
+  text-align: center;
+}
+
 .encounter-builder .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

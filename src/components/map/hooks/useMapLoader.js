@@ -57,8 +57,10 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                     }
                     return;
                 }
-            } catch (_err) {
-                // ignore, fall through to empty map creation
+            } catch (err) {
+                // No-silent-fallback law (fix#337S #798): fall through to empty-map
+                // creation, but LOUD — swallowed load errors were invisible before.
+                console.error('Failed to load map data (falling through to fresh map):', err);
             }
 
             const newData = { players: [], walls: new Set() };

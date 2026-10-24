@@ -31,6 +31,13 @@ async function loadClassData(version = '5e') {
       throw new Error(`Failed to load ${version} classes.json from ${path}`);
      }
     const data = await response.json();
+    // fix#337S #1509: cache only contract-shaped payloads — a truthy malformed
+    // response ({} / string) used to poison classDataCache forever, repeating
+    // TypeErrors without refetch (dataLoader.js contentType-law mirror).
+    if (!Array.isArray(data)) {
+      console.error(`spellLimits: malformed ${version} classes.json payload (expected array, got ${typeof data}) — not cached, next call refetches`);
+      return [];
+    }
     classDataCache[version] = data;
     return data;
   } catch (error) {

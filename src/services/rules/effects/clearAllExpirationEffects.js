@@ -115,7 +115,11 @@ function cleanFleshToStoneTracking(characterName, campaignName) {
         }
         const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
         const ftsCleanedEffects = allTargetEffects.filter(te => !(te.target === ftsTargetName && te.effect === 'flesh_to_stone' && te.source === characterName));
-        setRuntimeValue('campaign', 'targetEffects', ftsCleanedEffects, campaignName);
+        // fix#337S #1285: write only when the filter actually removed a row —
+        // same length-diff guard shape as revertObjectTransforms below (:196).
+        if (ftsCleanedEffects.length !== allTargetEffects.length) {
+            setRuntimeValue('campaign', 'targetEffects', ftsCleanedEffects, campaignName);
+        }
         setRuntimeValue('campaign', ftsKey, null, campaignName);
         cleanedTracking = true;
     }
@@ -143,6 +147,7 @@ function cleanPrismaticSprayTarget(psTargetName, isIndigo, characterName, campai
 
 // Clean up Prismatic Spray recurring save tracking on rest.
 function cleanPrismaticSprayTracking(characterName, campaignName) {
+    let cleaned = false; // fix#337S #1285/#1286: log only when a purge actually lands (SP-012 no-name-no-log principle)
     const psAllKeys = getAllStoreKeys();
     for (const psKey of psAllKeys) {
         if (typeof psKey !== 'string') continue;
@@ -152,6 +157,7 @@ function cleanPrismaticSprayTracking(characterName, campaignName) {
         const isViolet = psKey.startsWith('_prismaticSprayViolet_');
         if (!isIndigo && !isViolet) continue;
         if (psValue.casterName !== characterName) continue;
+        cleaned = true;
         const psTargetName = psKey.replace(/^_prismaticSpray(?:Indigo|Violet)_/, '').replace(/_/g, ' ');
         if (isIndigo) {
             cleanPrismaticSprayTarget(psTargetName, true, characterName, campaignName);
@@ -161,6 +167,7 @@ function cleanPrismaticSprayTracking(characterName, campaignName) {
         }
         setRuntimeValue('campaign', psKey, null, campaignName);
     }
+    if (!cleaned) return;
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: characterName,

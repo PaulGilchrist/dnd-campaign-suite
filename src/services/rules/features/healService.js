@@ -29,17 +29,19 @@ function removeConditionsOnTarget(targetName, campaignName, spell, reason) {
 
     if (newConditions.length !== conditions.length) {
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
-        for (const removed of conditionsToRemove) {
-            if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                addEntry(campaignName, {
-                    type: 'condition',
-                    action: 'removed',
-                    characterName: targetName,
-                    condition: removed.charAt(0).toUpperCase() + removed.slice(1),
-                    reason,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[heal] Error removing condition:", e); });
-            }
+        // fix#337S #1372: log ONLY conditions the target actually had —
+        // the old loop over conditionsToRemove phantom-logged names that
+        // were never stored (popup lane at triggerHeal already told the truth).
+        const actuallyRemoved = conditionsToRemove.filter(r => conditions.some(c => String(c).toLowerCase() === r));
+        for (const removed of actuallyRemoved) {
+            addEntry(campaignName, {
+                type: 'condition',
+                action: 'removed',
+                characterName: targetName,
+                condition: removed.charAt(0).toUpperCase() + removed.slice(1),
+                reason,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[heal] Error removing condition:", e); });
         }
     }
 

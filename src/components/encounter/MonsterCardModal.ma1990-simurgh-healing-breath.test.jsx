@@ -30,7 +30,7 @@
 // :238-242); own-turn refusal → MonsterCardModal.pounce-shadow-dragon.test.jsx
 // :300-305. Simurgh header economy (uses:3) + Talon-delegate + Soothing-Cry
 // sibling fingerprints → MonsterCardModal.ma1991-simurgh-soothing-cry.test.jsx
-// :138-148 — not re-pinned here.
+// :136-147 — not re-pinned here. (cite-drift refresh #336T: was :138-148 pre-retag)
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';

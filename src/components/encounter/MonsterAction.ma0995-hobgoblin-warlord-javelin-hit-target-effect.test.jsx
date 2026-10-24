@@ -16,7 +16,8 @@
 // - registry te (label/group/fields/defaults.value 10 = RAW −10 ft):
 //   targetEffectDefinitions.test.js:296-302 (MA-0995 whitelist pin); consumer
 //   te.value||10 default: conditionEffectsCompute.test.js:155-158 (MA-0995).
-// - javelin "before damage_dice_primary" byte twin: ma1680 test :58-63.
+// - javelin "before damage_dice_primary" byte twin: ma1680 :47-59 slot-lock
+//   (rec #487's ":58-63" twin-block retired; refresh #336S-p3 — ma1680 header :25 concurs).
 // - attackRowMissingToHit truth table: MA-0286 census :89.
 // Duration stays attacker-anchored until_start_of_next_turn via
 // applyHitClauseTargetEffect — no invented clock (§37).

@@ -67,9 +67,6 @@ async function resolveThrustChain(action, playerStats, campaignName, targetName)
     if (thrustAutomation.oncePerTurn && thrustUsedRound != null && Number(thrustUsedRound) === currentRound) {
         return null;
     }
-    if (thrustAutomation.oncePerTurn) {
-        setRuntimeValue(playerStats.name, 'telekineticThrustUsedRound', currentRound, campaignName);
-    }
 
     // CLA-355: once per Short or Long Rest uses gate (null = re-armed by rest).
     const thrustMax = playerStats._trackedResources?.telekineticThrustUses?.max ?? 1;
@@ -84,6 +81,12 @@ async function resolveThrustChain(action, playerStats, campaignName, targetName)
             timestamp: Date.now(),
         }).catch((e) => { console.error("[psionicStrikeHandler:log-error]", e); });
         return null;
+    }
+    // #1026-class latch honesty (fix#337S): the once-per-turn stamp lands only on a
+    // strike that passes the uses gate — a refused (zero-uses) strike must NOT burn
+    // the round latch (old bytes stamped at :71 BEFORE this refusal).
+    if (thrustAutomation.oncePerTurn) {
+        setRuntimeValue(playerStats.name, 'telekineticThrustUsedRound', currentRound, campaignName);
     }
     await setRuntimeValue(playerStats.name, 'telekineticThrustUses', thrustUses - 1, campaignName);
 

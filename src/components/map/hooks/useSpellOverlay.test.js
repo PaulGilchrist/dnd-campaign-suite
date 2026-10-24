@@ -167,6 +167,22 @@ describe('useSpellOverlay', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('debounce timer is cleared on unmount — a pending update never POSTs post-unmount (fix#337S #914)', () => {
+    const { result, unmount } = getHook();
+    act(() => {
+      result.current.addOverlay(o1);
+    });
+    fetchSpy.mockClear();
+    act(() => {
+      result.current.updateOverlay({ id: 'o1', name: 'Fireball', radius: 30 });
+    });
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('updateOverlayImmediate POSTs at once and cancels the pending debounce', () => {
     const { result } = getHook();
     act(() => {

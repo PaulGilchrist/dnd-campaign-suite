@@ -237,7 +237,10 @@ function handleRemoveHeroismBuff(effect, targetName, _attackerName, campaignName
     setRuntimeValue(
         'campaign',
         'targetEffects',
-        storedEffects.filter(te => !(te.effect === 'heroism' && te.source === effect.buffName)),
+        // fix#337S #1373-consumer: Heroism arms BOTH tes (heroismService.js:29
+        // producer law) — the old heroism-only filter leaked wisdom_save_advantage
+        // for the whole campaign. Source-scoped, so foreign wis-save riders survive.
+        storedEffects.filter(te => !((te.effect === 'heroism' || te.effect === 'wisdom_save_advantage') && te.source === effect.buffName)),
         campaignName
     );
 }

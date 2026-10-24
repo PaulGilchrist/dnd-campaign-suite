@@ -42,7 +42,9 @@ function logConcentrationSave({ campaignName, creatureName, roll, bonus, bonusDe
         total: roll,
         bonus,
         bonusDetail,
-        condition: `Concentration: ${spellName}`,
+        // fix#337S #1075: no literal 'Concentration: undefined' when a caller
+        // omits spellName — honest bare label, never a fake name.
+        condition: spellName ? `Concentration: ${spellName}` : 'Concentration',
         dc,
         success,
         timestamp: Date.now(),

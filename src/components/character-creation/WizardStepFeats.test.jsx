@@ -163,7 +163,7 @@ describe('WizardStepFeats', () => {
 
     const asiRow = featRow('Ability Score Improvement');
     fireEvent.click(asiRow.querySelector('.list-item-body'));
-    expect(asiRow.querySelector('.feat-prerequisites').textContent).toBe('Prerequisites: {"level":4}'); // disk shape: { level: 4 }
+    expect(asiRow.querySelector('.feat-prerequisites').textContent).toBe('Prerequisites: Level 4'); // disk shape { level: 4 } rendered readable (dict no longer raw JSON)
     expect(asiRow.querySelector('.feat-description').textContent).toContain('increase two ability scores of your choice by 1');
     expect(within(asiRow).getByRole('button', { name: 'Show Less' })).toBeInTheDocument();
 

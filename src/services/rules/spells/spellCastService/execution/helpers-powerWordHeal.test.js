@@ -219,7 +219,7 @@ describe('helpers.js applyPowerWordHealToTarget — module-direct PWH span (:190
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('case-insensitive strip leaves PRONE; exact full addEntry census exposes QUIRK: all five removal candidates are logged whenever any strip occurs; heal precedes condition writes', async () => {
+  it('case-insensitive strip leaves PRONE; exact full addEntry census (fix#337S flipped the phantom-over-log quirk — all five were stored, so all five are named truthfully); heal precedes condition writes', async () => {
     stubRuntime({ activeConditions: ['CHARMED', 'Frightened', 'PARALYZED', 'Poisoned', 'Stunned', 'PRONE'] });
 
     await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
@@ -229,9 +229,9 @@ describe('helpers.js applyPowerWordHealToTarget — module-direct PWH span (:190
       ['Goblin', 'activeConditions', ['PRONE'], CAMPAIGN],
       ['Goblin', 'powerWordHealStandPermission', true, CAMPAIGN],
     ]);
-    // QUIRK pin (reported as source bug): :233-:243 logs every removal
-    // candidate absent from newConditions — here all five, even though all
-    // five were present in mixed case; the census is exact and ordered.
+    // QUIRK pin FLIPPED (fix#337S #1481): :273-:286 now logs ONLY actually-stored
+    // removals in candidate order — here all five WERE stored (mixed case), so the
+    // census is byte-identical; the anti-phantom arm is pinned in the next test.
     expect(addEntryLogConditionNames()).toEqual(['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned']);
     expect(logTuples('condition')).toEqual([
       condTuple('Charmed'), condTuple('Frightened'), condTuple('Paralyzed'),
@@ -251,9 +251,9 @@ describe('helpers.js applyPowerWordHealToTarget — module-direct PWH span (:190
     await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
     expect(vi.mocked(getRuntimeValue).mock.calls.filter(([, key]) => key === 'powerWordHealStandPermission')).toEqual([]);
     expect(vi.mocked(setRuntimeValue).mock.calls.filter(([, key]) => key === 'powerWordHealStandPermission')).toEqual([]);
-    // Ghost census (QUIRK mutant-killer): only charmed was present yet all
-    // five candidates are logged — exact ordered set.
-    expect(addEntryLogConditionNames()).toEqual(['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned']);
+    // Truth census (fix#337S #1481 flipped the ghost-phantom quirk): only
+    // charmed was present, so ONLY Charmed is logged — four ghosts never land.
+    expect(addEntryLogConditionNames()).toEqual(['Charmed']);
     expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([['Goblin', 'activeConditions', [], CAMPAIGN]]);
 
     // Arm B — prone already permitted: read once; prone survives the strip at
@@ -324,7 +324,7 @@ describe('helpers.js applyPowerWordHealToTarget — module-direct PWH span (:190
     expect(ledger.indexOf('popup')).toBeGreaterThan(1);
     // Valid-path dispatch bytes unchanged: strip write + removal log still land.
     expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([['Goblin', 'activeConditions', [], CAMPAIGN]]);
-    expect(addEntryLogConditionNames()).toEqual(['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned']);
+    expect(addEntryLogConditionNames()).toEqual(['Charmed']); // fix#337S #1481: only the stored condition is logged
   });
 
   it('abort guards: null combat context or missing target row produce an identical full no-op (zero reads, writes, logs, popups)', async () => {

@@ -26,7 +26,9 @@ function WizardStepSpecial({ stepNumber, formData, onArrayFieldChange }) {
         details: newActionDetails.trim() || null
       };
       
-      // Check if action with same name already exists
+      // Append the new action to the list (name presence is the only gate
+      // above); there is intentionally NO duplicate-name check here —
+      // records the unimplemented intent honestly (was a lying comment).
       const existingActions = formData.specialActions || [];
       const updatedActions = [...existingActions, newAction];
       

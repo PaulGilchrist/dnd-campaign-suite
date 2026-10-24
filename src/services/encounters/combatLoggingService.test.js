@@ -173,9 +173,10 @@ describe('entry production', () => {
             },
         },
         {
-            // Defect pin (#1065 class): source interpolates `Concentration: ${spellName}` with no
-            // fallback, so a missing spellName ships literal 'undefined' prose into the log.
-            title: 'logConcentrationSave (missing spellName -> "Concentration: undefined")',
+            // Defect pin FLIPPED (fix#337S #1075): combatLoggingService.js:45 now emits the
+            // honest bare 'Concentration' label when spellName is omitted — never the literal
+            // 'Concentration: undefined' prose.
+            title: 'logConcentrationSave (missing spellName -> honest "Concentration")',
             invoke: () => logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 10, bonus: 2, bonusDetail: '+2 CON', dc: 15, success: true }),
             expected: {
                 type: 'roll',
@@ -187,7 +188,7 @@ describe('entry production', () => {
                 total: 10,
                 bonus: 2,
                 bonusDetail: '+2 CON',
-                condition: 'Concentration: undefined',
+                condition: 'Concentration',
                 dc: 15,
                 success: true,
                 timestamp: expect.any(Number),

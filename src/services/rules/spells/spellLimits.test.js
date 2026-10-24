@@ -328,15 +328,16 @@ describe('getSpellLimits — REAL disk tables (5e + 2024)', () => {
     expect(await getSpellLimits({ className: 'Wizard', level: 1 })).toStrictEqual(NON_CASTER_DEFAULT);
     expect(errorSpy).toHaveBeenCalledTimes(2);
 
-    // lane 3: 2024 path 404s while a bare object poisons the 5e cache — the {} IS cached
-    // (truthy), so the TypeError from .find is re-thrown from cache WITHOUT a new fetch. 📌
+    // lane 3 (fix#337S #1509 flipped the poison-cache quirk): 2024 path 404s while a
+    // bare object arrives on the 5e path — malformed payloads are NOT cached anymore;
+    // every call LOUD-logs and refetches (dataLoader contentType-law mirror).
     resetClassDataCache();
     global.fetch = vi.fn(async (path) =>
       path === PATH_2024 ? { ok: false } : { ok: true, json: async () => ({}) });
     expect(await getSpellLimits({ className: 'Wizard', level: 1 })).toStrictEqual(NON_CASTER_DEFAULT);
     expect(await getSpellLimits({ className: 'Wizard', level: 1 })).toStrictEqual(NON_CASTER_DEFAULT);
-    expect(global.fetch).toHaveBeenCalledTimes(1); // corrupted body poisoned the cache — one fetch, two errors
-    expect(errorSpy).toHaveBeenCalledTimes(4);
+    expect(global.fetch).toHaveBeenCalledTimes(2); // no cache poisoning — each call refetches
+    expect(errorSpy).toHaveBeenCalledTimes(4); // one LOUD refusal log per call (malformed payload, not cached)
   });
 });
 

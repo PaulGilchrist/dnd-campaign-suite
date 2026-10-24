@@ -270,17 +270,18 @@ function powerWordHealConditions(targetName, campaignName, conditions) {
     const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
     if (newConditions.length !== conditions.length) {
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
-        for (const removed of conditionsToRemove) {
-            if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
-                addEntry(campaignName, {
-                    type: 'condition',
-                    action: 'removed',
-                    characterName: targetName,
-                    condition: removed.charAt(0).toUpperCase() + removed.slice(1),
-                    reason: 'Power Word Heal',
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error("[spellCast] Error:", e); });
-            }
+        // fix#337S #1481: log ONLY conditions the target actually had — the old
+        // loop phantom-logged all five candidates whenever any strip occurred.
+        const actuallyRemoved = conditionsToRemove.filter(r => conditions.some(c => String(c).toLowerCase() === r));
+        for (const removed of actuallyRemoved) {
+            addEntry(campaignName, {
+                type: 'condition',
+                action: 'removed',
+                characterName: targetName,
+                condition: removed.charAt(0).toUpperCase() + removed.slice(1),
+                reason: 'Power Word Heal',
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[spellCast] Error:", e); });
         }
     }
 
@@ -335,10 +336,12 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName,
         : (creature.currentHp ?? creature.maxHp);
 
     if (currentHp <= 100) {
+        // fix#337S #1482: log delta must match what :350 actually forwards —
+        // a dead (hp 0) target had '-maxHp' logged while 0 damage was dealt.
         addEntry(campaignName, {
             type: 'hp_change',
             targetName: targetName,
-            delta: -(currentHp || creature.maxHp),
+            delta: currentHp === 0 ? 0 : -currentHp, // normalize -0 (fix#337S #1482)
             currentHp: 0,
             maxHp: creature.maxHp,
             isHealing: false,

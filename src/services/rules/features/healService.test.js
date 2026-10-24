@@ -27,9 +27,9 @@
  * SOURCE BUGS REPORTED (not fixed here):
  *  - healService.js:8 hardcoded remove-list has 'poisoned' but the 5e disk
  *    ends DISEASES (2024 semantics): 5e casts clear Poisoned and never Disease.
- *  - healService.js:32-33 over-log: once anything is cleared it logs EVERY
- *    name in the remove-list that is absent from the remainder — including
- *    conditions never stored. Quirk pinned in condition table row A.
+ *  - healService.js:32-41 over-log (FIXED fix#337S #1372): the log loop now
+*    names ONLY conditions the target actually had (candidate-order canonical
+*    names); phantom never-stored names can no longer land. Rows A/B/D flipped.
  *  - no undead/construct exclusion gate anywhere despite the 5e disk text —
  *    undead get healed; current behavior pinned in the undead row.
  *  - healService.js:52 vs :148 asymmetry: unknown slot heals at the
@@ -295,14 +295,14 @@ describe('healService.triggerHeal', () => {
 
     it.each([
         // label, spell, stored conditions, creature HP, expectWrite (null = no write), expectLogged, expectApply
-        ['A: 5e default hardcoded list + over-log quirk — only Blinded stored yet all three names are logged (healService.js:32-33)',
-            heal5e, ['Blinded', 'Prone'], [30, 100], ['Prone'], ['Blinded', 'Deafened', 'Poisoned'], 70],
-        ['B: 2024 disk status_effects drive the removal list',
-            heal2024, ['Deafened', 'Charmed'], [30, 100], ['Charmed'], ['Blinded', 'Deafened', 'Poisoned'], 70],
+        ['A: 5e default hardcoded list — only Blinded stored, only Blinded logged (fix#337S flipped the over-log quirk; Deafened/Poisoned phantom names never land)',
+            heal5e, ['Blinded', 'Prone'], [30, 100], ['Prone'], ['Blinded'], 70],
+        ['B: 2024 disk status_effects drive the removal list — stored Deafened logged; never-stored Blinded/Poisoned omitted',
+            heal2024, ['Deafened', 'Charmed'], [30, 100], ['Charmed'], ['Deafened'], 70],
         ['C: no matching conditions — zero writes, zero condition logs',
             heal5e, ['Prone', 'Restrained'], [30, 100], null, [], 70],
-        ['D: target at full HP — no healing applied yet Blinded is still cleared (condition removal is outside the actualHeal>0 gate) and the over-log fires even with zero HP healed',
-            heal5e, ['Blinded'], [100, 100], [], ['Blinded', 'Deafened', 'Poisoned'], null],
+        ['D: target at full HP — no healing applied yet Blinded is still cleared (condition removal is outside the actualHeal>0 gate) and the log names only the real removal',
+            heal5e, ['Blinded'], [100, 100], [], ['Blinded'], null],
     ])('condition removal — %s', async (_label, spell, stored, [currentHp, maxHp], expectWrite, expectLogged, expectApply) => {
         combatCtx.creatures = [{ name: 'Target', type: 'npc', currentHp, maxHp }];
         seed('Target', 'activeConditions', stored);
@@ -325,11 +325,21 @@ describe('healService.triggerHeal', () => {
         })));
         if (expectApply === null) {
             expect(applyHealingToTarget).not.toHaveBeenCalled();
-            // popup is honest (names only ACTUALLY-stored removals) even while the log over-reports
+            // popup and log now agree — both name only ACTUALLY-stored removals (fix#337S)
             expect(popupCall().detail.popupText).toBe('Heal on Target: Already at full HP Also removed: Blinded.');
         } else {
             expect(applyHealingToTarget).toHaveBeenCalledWith(combatCtx, 'Target', expectApply, CAMPAIGN);
         }
+    });
+
+    it('anti-phantom pin (fix#337S #1372): stored-only removal logs — Prone-only target produces zero condition logs', async () => {
+        combatCtx.creatures = [{ name: 'Target', type: 'npc', currentHp: 30, maxHp: 100 }];
+        seed('Target', 'activeConditions', ['Prone']);
+
+        await triggerHeal(heal5e, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(logsOfType('condition')).toEqual([]);
     });
 
     it.each([

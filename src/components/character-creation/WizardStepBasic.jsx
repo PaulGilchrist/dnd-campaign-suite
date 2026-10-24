@@ -5,7 +5,10 @@ function WizardStepBasic({ stepNumber, formData, errors, campaignName, onInputCh
 
   useEffect(() => {
     fetch('/data/alignments.json')
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText} for /data/alignments.json`);
+        return response.json();
+      })
       .then(data => setAlignments(data))
       .catch(error => console.error('Error loading alignments:', error));
   }, []);

@@ -10,7 +10,17 @@ const renderPrerequisites = (feat) => {
       .map(p => typeof p === 'string' ? p : (p.name || JSON.stringify(p)))
       .join(', ');
   }
-  return typeof feat.prerequisites === 'string' ? feat.prerequisites : JSON.stringify(feat.prerequisites);
+  if (typeof feat.prerequisites === 'string') return feat.prerequisites;
+  // Dict shapes on disk 2024/feats.json: {level}, {level, ability_scores:[{name,minimum}]},
+  // {feature}, {armor_training} — derive readable text instead of raw JSON bytes.
+  const parts = [];
+  if (feat.prerequisites.level != null) parts.push(`Level ${feat.prerequisites.level}`);
+  if (Array.isArray(feat.prerequisites.ability_scores)) {
+    feat.prerequisites.ability_scores.forEach(a => parts.push(`${a.name} ${a.minimum}+`));
+  }
+  if (feat.prerequisites.feature) parts.push(feat.prerequisites.feature);
+  if (feat.prerequisites.armor_training) parts.push(feat.prerequisites.armor_training);
+  return parts.length ? parts.join(', ') : JSON.stringify(feat.prerequisites);
 };
 
 function FeatItemDetails({ feat, isSelected, isExpanded, onToggleExpand, ruleset }) {

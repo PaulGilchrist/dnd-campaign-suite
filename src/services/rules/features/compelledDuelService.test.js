@@ -6,7 +6,8 @@ import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.j
 import { addEntry } from '../../ui/logService.js';
 
 // Producer-vs-forwarder: the spell lane (triggerSpells.js:325-335, pinned by
-// spellCastService.special.test.js:186-204) composes {spellSaveDc, targetName} upstream;
+// spellCastService.special.test.js:316/:355 — cite-redirect executed fix#336S/#1459-family,
+// old :186-204 drifted with the special-lane rewrite) composes {spellSaveDc, targetName} upstream;
 // this lane owns the exact executeHandler envelope: automation {type:'compelled_duel',
 // saveDc passthrough, saveType:'WIS', targetName} (registry-read key
 // targetEffectDefinitions.js:744). te stamp bytes + duration live in

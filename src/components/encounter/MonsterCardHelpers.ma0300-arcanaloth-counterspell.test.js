@@ -11,8 +11,8 @@
 // chip render + counter echo never restated here). Uses arithmetic + the
 // plain-row null-negative are owned ONCE by gated-reaction.test.js:62-69;
 // the gate limit-999 arm lives there too (:330-340). The usage-less
-// "fabricates a 1/Day cap" seam leg lives once in the MA-0305 twin lane
-// (:79-91). CLA-322 dispel-check arithmetic is owned by
+// "fabricates a 1/Day cap" seam leg was RELOCATED from ma0305 :79-91 to
+// the gated-reaction owner lane (:603-611). CLA-322 dispel-check arithmetic is owned by
 // resolveCounterspellCheck (:198-208) — the old d20+INT(+5) leg here was
 // self-ref (the test injected its own spellAbilityMod). Counterspell-
 // specific arms that stay: disk lock + the RAW-unlimited press ladder
@@ -88,7 +88,8 @@ describe('MA-0300 arcanaloth Counterspell — disk lock + RAW-unlimited sentinel
     expect(press1.deps.rollD20).not.toHaveBeenCalled();
 
     // Fresh round, fresh cast, 1 already spent: a usage-less row would refuse
-    // at the default 1/Day cap (MA-0305 lane :79-91); the authored sentinel
+    // at the default 1/Day cap (owner: gated-reaction.test.js:603-611, relocated from ma0305 :79-91);
+    // the authored sentinel
     // holds open and counts the ladder up to 2.
     const press2 = makeCounterDeps({
       lastAttack: pcSpellAttack({ spellLevel: 0 }),

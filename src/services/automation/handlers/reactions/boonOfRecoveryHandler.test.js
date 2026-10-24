@@ -4,8 +4,8 @@
 // direct currentHitPoints write (no applyHealing / no shared heal util), latch key
 // boonOfRecoveryLastStandUsed, unconscious-filter + death-save clears + isDead reset,
 // hp_change + ability_use logs, and the combat-summary-updated dispatch event.
-// NOTE: isLastStandAvailable/getLastStandUsed are dead exports (grep-zero production callers;
-// only index.js imports `handle`) — deliberately untested here; remove them from the source.
+// NOTE: isLastStandAvailable/getLastStandUsed were dead exports (grep-zero production
+// callers) — removed from the source; `handle` is the only live export surface.
 // Distinct from boonOfRecoveryService.test coverage in applyDamage.lastStand.test.js (that
 // module intercepts applyDamage and logs type 'healing'; this handler logs 'hp_change').
 

@@ -57,11 +57,20 @@ function useSpellOverlay(campaignName, _mapName) {
         pendingRef.current = overlay;
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = setTimeout(() => {
-            if (pendingRef.current) {
-                sendAction('update', { overlays: [pendingRef.current] });
-            }
+            pendingRef.current = null;
+            sendAction('update', { overlays: [overlay] });
         }, UPDATE_DEBOUNCE_MS);
     }, [sendAction]);
+
+    // Benign UI-category timer cleanup (fix#337S #914): a pending debounce must
+    // never POST after unmount — clear the timer and drop the pending payload.
+    useEffect(() => () => {
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+        pendingRef.current = null;
+    }, []);
 
     const updateOverlayImmediate = useCallback((overlay) => {
         setOverlays(prev => prev.map(o => o.id === overlay.id ? overlay : o));

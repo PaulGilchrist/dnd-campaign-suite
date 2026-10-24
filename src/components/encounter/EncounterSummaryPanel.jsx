@@ -48,7 +48,7 @@ function EncounterSummaryPanel({
        </div>
 
       {selectedMonsters && selectedMonsters.length > 0 && (
-        <div style={{ textAlign: 'center' }}>
+        <div className="encounter-summary-actions-centered">
           <button
             type="button"
             className="encounter-btn encounter-btn-danger"

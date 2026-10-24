@@ -178,7 +178,8 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             if (outcomes.immune.length > 0) logImmunity(targetName, outcomes.immune);
         }
 
-        logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total: detail.total ?? 0, rolls: [detail.roll ?? 0], bonus: detail.saveBonus ?? 0, formula: `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}` });
+        const playerSaveBonus = detail.saveBonus ?? 0;
+        logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total: detail.total ?? 0, rolls: [detail.roll ?? 0], bonus: playerSaveBonus, formula: `1d20${playerSaveBonus !== 0 ? '+' + playerSaveBonus : ''}` });
 
         persistAndNotify(ctx.combatSummary, campaignName);
 

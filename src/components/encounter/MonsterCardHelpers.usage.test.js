@@ -8,11 +8,11 @@
 // label); flat strings (incl. "At Will" sentinel) verbatim; "per day" →
 // "N/Day"; unknown shapes console.error → null, never silent. Plus the
 // no-target save-row refusal builders (sole pins suite-wide; the only
-// consumer is MonsterCardModal.jsx). Known cosmetic 📌 open bug:
-// buildCounterspellMessage renders "999/Day" on At-Will sentinels
-// (MonsterCardHelpers.js:3022-3027) — deliberately NOT codified here.
+// consumer is MonsterCardModal.jsx). FIXED pass#336T: buildCounterspellMessage
+// now prints "At Will" on 999-sentinels (finite limits keep "N/Day") —
+// codified by the direct-call pin below.
 import { describe, it, expect, vi } from 'vitest';
-import { formatActionUsage, buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from './MonsterCardHelpers.js';
+import { formatActionUsage, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, buildCounterspellMessage } from './MonsterCardHelpers.js';
 
 describe('MA-0049 formatActionUsage — owner truth table', () => {
   it.each([
@@ -62,5 +62,16 @@ describe('MA-0049 no-target refusal builders', () => {
     ['missing actionName defaults to "action"', undefined, 'action_refused'],
   ])('slug normalization: %s', (_label, actionName, expectedSlug) => {
     expect(buildNoTargetRefusalLog({ monsterName: 'Hag 1', actionName }).automationType).toBe(expectedSlug);
+  });
+});
+
+describe('buildCounterspellMessage — At-Will sentinel label (#517 discharge)', () => {
+  const outcome = { auto: true, spellLevel: 2, countered: true, d20: 12, mod: 5, total: 17, targetDC: 15 };
+  it('999 sentinel prints "At Will", never "999/Day"; finite limit keeps N/Day byte', () => {
+    const atWill = buildCounterspellMessage({ monsterName: 'Hag 1', spellName: 'Magic Missile', outcome, limit: 999, remaining: 999 });
+    expect(atWill).toContain('At Will · 999 left today.');
+    expect(atWill).not.toContain('999/Day');
+    const finite = buildCounterspellMessage({ monsterName: 'Archmage 1', spellName: 'Magic Missile', outcome, limit: 3, remaining: 0 });
+    expect(finite).toContain('3/Day · 0 left today.');
   });
 });

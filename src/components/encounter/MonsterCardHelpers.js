@@ -3030,8 +3030,11 @@ async function resolveMonsterReflexiveAntennae({ action, monsterName, campaignNa
   return { ok: true, message: entry.description, remaining, saveSuccess: success };
 }
 
-function buildCounterspellMessage({ monsterName, spellName, outcome, limit, remaining }) {
-  const tail = `${limit}/Day · ${remaining} left today.`;
+export function buildCounterspellMessage({ monsterName, spellName, outcome, limit, remaining }) {
+  // At-Will sentinel rows carry uses:999 — print "At Will", never "999/Day"
+  // (cosmetic defect ledger pass #517; finite-limits keep the N/Day byte).
+  const limitLabel = limit === 999 ? 'At Will' : `${limit}/Day`;
+  const tail = `${limitLabel} · ${remaining} left today.`;
   if (outcome.auto) return `${monsterName} Counterspells ${spellName} (spell level ${outcome.spellLevel} < 3) — auto-countered. ${tail}`;
   const verdict = outcome.countered ? 'countered' : 'failed — spell resolves';
   return `${monsterName} Counterspells ${spellName}: ability check d20 (${outcome.d20}) + ${outcome.mod} = ${outcome.total} vs DC ${outcome.targetDC} — ${verdict}. ${tail}`;

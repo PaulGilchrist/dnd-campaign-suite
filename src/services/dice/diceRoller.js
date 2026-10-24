@@ -82,15 +82,18 @@ function rollExpression(formula, options = {}) {
   if (!formula) return null;
   const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
   if (!baseFormula) return null;
-  if (baseFormula.includes(' or ')) {
+  // Case-insensitive gates mirror canRollExpression's /\s+or\s+/i + /\s+plus\s+/i
+  // (fix#337S #1072): canRoll('1d8 PLUS 2d6') was true while rollExpression returned
+  // null — the case-sensitive includes() split the can/roll contract in two.
+  if (/\s+or\s+/i.test(baseFormula)) {
     const parts = baseFormula.split(/\s+or\s+/i);
     for (const part of parts) {
       const result = rollExpression(part, options);
       if (result) return result;
     }
   }
-  if (baseFormula.includes(' plus ')) {
-    const parts = baseFormula.split(/\s+plus\s+/);
+  if (/\s+plus\s+/i.test(baseFormula)) {
+    const parts = baseFormula.split(/\s+plus\s+/i);
     let total = 0;
     let rolls = [];
     let modifier = 0;

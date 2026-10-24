@@ -68,12 +68,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export function isLastStandAvailable(playerStats, campaignName) {
-    const playerName = playerStats.name;
-    const lastStandUsed = getRuntimeValue(playerName, LAST_STAND_KEY, campaignName);
-    return !lastStandUsed;
-}
-
-export function getLastStandUsed(playerStats, campaignName) {
-    return getRuntimeValue(playerStats.name, LAST_STAND_KEY, campaignName);
-}
+// isLastStandAvailable / getLastStandUsed removed: dead exports (grep-zero
+// production callers; index.js imports only `handle`). Latch reads live in
+// boonOfRecoveryService via the canonical runtime-store accessors.

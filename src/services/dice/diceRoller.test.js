@@ -172,6 +172,8 @@ describe('canRollExpression', () => {
     ['d20', true],
     ['1d8+3[damage]', true],
     ['1d8 plus 2', true],
+    ['1d8 PLUS 2d6', true], // case-insensitive can/roll parity (fix#337S #1072)
+    ['1d8+3 OR junk', true],
     ['2d6 or junk', true],
     [' 2d6 ', true],
     ['0d6', true], // zero-count is rollable — contributes nothing (#1072)
@@ -204,6 +206,8 @@ describe('rollExpression', () => {
     { formula: '1d8+7 plus 4', seq: [0.5], rolls: [5], modifier: 11, total: 16, echo: '1d8+7 plus 4' },
     { formula: '1d8+7 plus 4 [bludgeoning]', seq: [0.5], rolls: [5], modifier: 11, total: 16, echo: '1d8+7 plus 4 [bludgeoning]' },
     { formula: '1d8 plus 2d6', seq: [0.5, 0.5, 0.5], rolls: [5, 4, 4], modifier: 0, total: 13, echo: '1d8 plus 2d6' },
+    { formula: '1d8 PLUS 2d6', seq: [0.5, 0.5, 0.5], rolls: [5, 4, 4], modifier: 0, total: 13, echo: '1d8 PLUS 2d6' }, // uppercase word parity (fix#337S #1072)
+    { formula: '1d8+3 OR 2d6', seq: [0.5], rolls: [5], modifier: 3, total: 8, echo: '1d8+3' },
     { formula: '1d8+3 or 2d6', seq: [0.5], rolls: [5], modifier: 3, total: 8, echo: '1d8+3' },
     { formula: 'invalid or 2d6', seq: [0.5, 0.5], rolls: [4, 4], modifier: 0, total: 8, echo: '2d6' },
     { formula: '4 plus 3', seq: [], rolls: [], modifier: 7, total: 7, echo: '4 plus 3' },

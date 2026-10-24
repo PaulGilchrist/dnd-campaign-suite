@@ -205,8 +205,10 @@ function useMapLoader(campaignName, mapName, characters) {
                     applyExistingMap(existing, mapName, characters, ctx);
                     return;
                 }
-            } catch (_err) {
-                // ignore, fall through to empty map creation
+            } catch (err) {
+                // No-silent-fallback law (fix#337S #798): fall through to empty-map
+                // creation, but LOUD — swallowed load errors were invisible before.
+                console.error('Failed to load hex map data (falling through to fresh map):', err);
             }
 
             await createAndSaveNewMap(campaignName, mapName, characters, ctx);
