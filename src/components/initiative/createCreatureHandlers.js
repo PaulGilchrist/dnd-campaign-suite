@@ -37,7 +37,7 @@ export function createCreatureHandlers({
     setActiveCreatureName,
     characters,
     numOfNpc,
-    _isLocalhost,
+    isLocalhost,
 }) {
     const handleCreatureHpChange = function handleCreatureHpChange(creatureName, newValue, newMaxHp) {
         if (!combatSummary) return
@@ -112,6 +112,9 @@ export function createCreatureHandlers({
 
     const handleInitiativeChange = function handleInitiativeChange(creatureName, value) {
         if (!combatSummary) return
+        // GM-only: initiative stamping is turn-admin (bug-player-clients-can-hijack-initiative) —
+        // the card input is disabled for LAN clients; this guard closes the handler lane too.
+        if (!isLocalhost) return
         setInitiative(combatSummary, creatureName, value)
         // L5 §10.1: initiative being stamped is the table entering combat —
         // the encounter phase engages here (action-driven; §10.2 makes it
@@ -127,6 +130,10 @@ export function createCreatureHandlers({
 
     const handleNameChange = function handleNameChange(oldName, newName) {
         if (!combatSummary) return
+        // GM-only: renameNpc + full combatSummary POSTs are tracker authorship —
+        // LAN clients render a plain name span (CardName), this guard closes the
+        // handler lane (bug-player-clients-can-hijack-initiative).
+        if (!isLocalhost) return
         renameNpc({ combatSummary, oldName, newName, campaignNpcs, setNpcImages, campaignName })
             .then(() => {
                 storage.set('combatSummary', combatSummary, campaignName)

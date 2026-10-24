@@ -115,13 +115,17 @@ function CardAvatar({ creature, isLocalhost, isPlayerSummoned, npcImage, campaig
     )
 }
 
-function CardName({ creature, campaignNpcs, onNameChange }) {
+function CardName({ creature, campaignNpcs, onNameChange, isLocalhost }) {
     const formName = creature.beastName || creature.formName
     return (
         <div className='creature-name'>
             {creature.polymorphObject ? (
                 <span>{creature.polymorphObject.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-            ) : creature.type === 'npc' ? (
+            ) : creature.type === 'npc' && isLocalhost ? (
+                // GM-only rename: MonsterNameAutocomplete posts every keystroke through
+                // handleNameChange → renameNpc + full combatSummary writes (the spawn/
+                // rename half of bug-player-clients-can-hijack-initiative). Read-only
+                // tabs render the plain name, mirroring NpcRemoveButton's strip above.
                 <MonsterNameAutocomplete
                     value={creature.name}
                     onChange={(newVal) => onNameChange(creature.name, newVal)}
@@ -147,12 +151,17 @@ function TempHpDisplay({ creature, campaignName }) {
     )
 }
 
-function InitiativeControl({ creature, onInitiativeChange }) {
+function InitiativeControl({ creature, onInitiativeChange, isLocalhost }) {
     return (
         <div className='creature-initiative'>Initiative&nbsp;
             <input
                 data-testid="initiative-input"
                 min="0"
+                // GM-only bookkeeping: blur-stamps initiative into combatSummary and
+                // flips the session phase (bug-player-clients-can-hijack-initiative).
+                // Disabled keeps the read value visible with the card's own styling,
+                // mirroring TargetSelect's disabled gate.
+                disabled={!isLocalhost}
                 onBlur={(event) => onInitiativeChange(creature.name, event.target.value)}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter') {
@@ -626,7 +635,7 @@ function CreatureCard({
         <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
             <NpcRemoveButton creature={creature} isLocalhost={isLocalhost} onRemoveNpc={onRemoveNpc} />
             <CardAvatar creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} npcImage={npcImage} campaignName={campaignName} characters={characters} onViewCharacter={onViewCharacter} onNpcClick={onNpcClick} />
-            <CardName creature={creature} campaignNpcs={campaignNpcs} onNameChange={onNameChange} />
+            <CardName creature={creature} campaignNpcs={campaignNpcs} onNameChange={onNameChange} isLocalhost={isLocalhost} />
             {creature.type === 'npc' && /^NPC \d+$/.test(creature.name) && creature.currentHp === 10 && creature.maxHp === 10 && (
                 <div className='npc-statless-hint text-muted'>
                     <i className='fa-solid fa-circle-info'></i> Statless default · 10 HP (AC 10)
@@ -639,7 +648,7 @@ function CreatureCard({
                 isPlayerSummoned={isPlayerSummoned}
             />
             <TempHpDisplay creature={creature} campaignName={campaignName} />
-            <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} />
+            <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} isLocalhost={isLocalhost} />
             <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} allCreatures={allCreatures} overlays={overlays} onTargetChange={onTargetChange} />
             <ConditionsSection
                 creature={creature}

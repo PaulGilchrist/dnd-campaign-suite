@@ -168,7 +168,7 @@ function makeHandlers(creatures, overrides = {}) {
         setActiveCreatureName,
         characters,
         numOfNpc: creatures.filter((c) => c.type === 'npc').length,
-        _isLocalhost: true,
+        isLocalhost: true,
         ...overrides,
     });
     return { handlers, combatSummary, setCombatSummary, setActiveCreatureName, characters };
@@ -313,6 +313,38 @@ describe('handleNameChange', () => {
         await vi.waitFor(() => expect(storage.set).toHaveBeenCalledTimes(2));
         expect(setCombatSummary).toHaveBeenCalledTimes(2);
     });
+
+    // bug-player-clients-can-hijack-initiative: tracker authorship is GM-only.
+    // isLocalhost:false (the LAN player lane) keeps the card target-select product
+    // lane open but must never stamp initiative or rename combatants.
+    describe('LAN client (isLocalhost:false)', () => {
+        it('initiative stamp and rename stay inert — zero persistence', () => {
+            const { handlers, setCombatSummary } = makeHandlers(
+                [{ name: 'Goblin', type: 'npc', currentHp: 10 }],
+                { isLocalhost: false },
+            );
+
+            handlers.handleInitiativeChange('Goblin', '18');
+            handlers.handleNameChange('Goblin', 'Kobold');
+
+            expect(setInitiative).not.toHaveBeenCalled();
+            expect(renameNpc).not.toHaveBeenCalled();
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(setCombatSummary).not.toHaveBeenCalled();
+        });
+
+        it('target select — the player interaction lane — still persists', () => {
+            const { handlers, combatSummary } = makeHandlers(
+                [{ name: 'Alice', type: 'player', currentHp: 20 }],
+                { isLocalhost: false },
+            );
+
+            handlers.handleTargetChange('Alice', 'Goblin');
+
+            expect(setTarget).toHaveBeenCalledWith(combatSummary, 'Alice', 'Goblin');
+            expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
+        });
+    });
 });
 
 describe('handleTargetChange', () => {
@@ -452,7 +484,7 @@ describe('no-combat guards', () => {
             setActiveCreatureName: vi.fn(),
             characters: [],
             numOfNpc: 0,
-            _isLocalhost: true,
+            isLocalhost: true,
         });
 
         handlers.handleCreatureHpChange('Goblin', 5);

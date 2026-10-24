@@ -273,6 +273,14 @@ export const keyValidators = {
     // '__map__' is GM-owned (engaged always true): read-only clients must not
     // move the active-map pointer (auto-write lane of bug-player-clients-clobber-fog-reset).
     '__map__': chain(validateMapContext, (v, ctx) => validateAuthority('__map__', ctx, true)),
+    // Turn-admin truth is GM-owned (engaged always true): the initiative pointer
+    // and its turn-start stamp advance ONLY through the GM's Prev/Next/Clear/
+    // End-Turn lane — no honest player tab ever posts these keys (the card lanes
+    // ride combatSummary target writes instead). Server backstop of
+    // bug-player-clients-can-hijack-initiative: a LAN client forging a turn
+    // turnover is refused with the standard 400 + enforcement_denied audit log.
+    'activeCreatureName': (v, ctx) => validateAuthority('activeCreatureName', ctx, true),
+    'lastAppliedTurnStartCreature': (v, ctx) => validateAuthority('lastAppliedTurnStartCreature', ctx, true),
 };
 
 /**

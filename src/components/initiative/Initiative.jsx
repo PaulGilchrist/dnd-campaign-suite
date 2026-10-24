@@ -557,6 +557,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     React.useEffect(() => {
         if (!combatSummary) return
         const handleKeyDown = (event) => {
+            // Turn-admin hotkeys are GM-only (mirrors the button gate below and
+            // the write guards above): a LAN client may not advance/rewind the
+            // shared tracker or spawn NPCs (bug-player-clients-can-hijack-initiative).
+            if (!isLocalhost) return
             if (event.key === 'ArrowRight') {
                 event.preventDefault()
                 handleNextCreature()
@@ -572,7 +576,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [combatSummary, activeCreatureName])
+    }, [combatSummary, activeCreatureName, isLocalhost])
 
     React.useEffect(() => {
         if (!carouselRef.current || !activeCreatureName) return
@@ -583,6 +587,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }
     }, [activeCreatureName])
 
+    // GM (localhost) only — mirrors the fog-write gate in Map.jsx:234. A
+    // read-only (network) client must never AUTHOR the tracker: the mount
+    // merge POSTs the whole combatSummary and is idempotent ONLY when the GM
+    // tab is the single author (a player tab resurrects combatants/turn state
+    // the GM just changed — same clobber family as bug-player-clients-clobber-
+    // fog-reset, and the auto-write half of bug-player-clients-can-hijack-
+    // initiative). Players still mirror every change via SSE; they just never
+    // seed or stamp it. Local setState stays unconditional for the read view.
     React.useEffect(() => {
         let cancelled = false
         ;(async () => {
@@ -593,7 +605,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
                 if (cancelled) return
 
-                storage.set('combatSummary', merged, campaignName)
+                if (isLocalhost) storage.set('combatSummary', merged, campaignName)
                 setCombatSummary(merged)
                 combatSummaryRef.current = merged
 
@@ -613,16 +625,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 const creatures = setupCreatures(characters, 0, utils.getName)
                 const newSummary = { round: 1, creatures }
                 const firstName = creatures[0]?.name
-                storage.set('combatSummary', newSummary, campaignName)
+                if (isLocalhost) {
+                    storage.set('combatSummary', newSummary, campaignName)
+                    storage.set('activeCreatureName', firstName, campaignName)
+                }
                 setCombatSummary(newSummary)
                 combatSummaryRef.current = newSummary
-                storage.set('activeCreatureName', firstName, campaignName)
                 setActiveCreatureName(firstName)
                 activeCreatureNameRef.current = firstName
             }
         })()
         return () => { cancelled = true }
-    }, [campaignName]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [campaignName, isLocalhost]) // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <div className='initiative'>
@@ -699,6 +713,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     )
                 })}
             </div>
+              {/* GM (localhost) only — the initiative control row mutates shared
+                  turn state (Clear/+NPC/Prev/Next/End Turn all cascade through the
+                  same write lane the fog-write gate in Map.jsx:234 protects on the
+                  map). Network clients get the read-only board; their own
+                  interaction lanes stay on the cards (target select etc.).
+                  bug-player-clients-can-hijack-initiative. */}
+              {isLocalhost && (
               <div className='combat-controls'>
                   <button className='clear-button' onClick={handleClear}>Clear</button>
                   <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats'>+ NPC</button>
@@ -718,6 +739,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                       round={combatSummary.round}
                   />
               </div>
+              )}
+              {/* Loot generate/award is GM-only (XP + party-inventory writes, and the
+                  panel state never reaches player tabs anyway). */}
+              {isLocalhost && (
               <InitiativeLoot
                 lootData={lootData}
                 generatingLoot={generatingLoot}
@@ -731,6 +756,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 handleClearLoot={handleClearLoot}
                 characters={characters}
               />
+              )}
             {viewingMonster && (
                 <MonsterCardModal
                     monster={viewingMonster}

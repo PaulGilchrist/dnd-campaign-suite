@@ -55,7 +55,7 @@ function makeHandlers(creatures) {
         setActiveCreatureName: vi.fn(),
         characters: [],
         numOfNpc: 0,
-        _isLocalhost: true,
+        isLocalhost: true,
     });
     return { handlers, combatSummary, setCombatSummary };
 }

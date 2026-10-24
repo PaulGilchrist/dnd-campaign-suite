@@ -383,3 +383,58 @@ describe('D1/D2 turnState extensions (§18)', () => {
         expect((await post({ companionOf: '   ' })).status).toBe(400);
     });
 });
+
+// bug-player-clients-can-hijack-initiative: turn-admin truth is GM-owned
+// (engaged ALWAYS — there is no campaign state in which a read-only client
+// legitimately moves the initiative pointer), mirroring the '__map__' lane.
+// Server backstop only — honest player tabs never POST these keys (their card
+// lanes ride combatSummary target writes; the client UI strips the controls).
+describe('turn-admin GM authority (initiative hijack gate)', () => {
+    const post = (key, value) => request(createTestApp())
+        .post(`/api/campaigns/test-campaign/${key}`)
+        .send({ value });
+    const postFromLan = (key, value) => post(key, value).set('Host', '10.0.0.5');
+
+    beforeEach(() => {
+        characterChangeData.get('test-campaign').activeCreatureName = 'Alice';
+        characterChangeData.get('test-campaign').lastAppliedTurnStartCreature = '1:Alice';
+    });
+
+    it('LAN client cannot move the turn: activeCreatureName ⇒ 400, prior truth stands', async () => {
+        const res = await postFromLan('activeCreatureName', 'Bob');
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/localhost \(the GM\)/);
+        expect(characterChangeData.get('test-campaign').activeCreatureName).toBe('Alice');
+        expect(publish).toHaveBeenCalledWith(
+            'denied-test-campaign-activeCreatureName',
+            expect.objectContaining({ key: 'activeCreatureName' }),
+            'test-campaign',
+        );
+    });
+
+    it('LAN client cannot forge the turn-start stamp: lastAppliedTurnStartCreature ⇒ 400', async () => {
+        const res = await postFromLan('lastAppliedTurnStartCreature', '2:Bob');
+        expect(res.status).toBe(400);
+        expect(characterChangeData.get('test-campaign').lastAppliedTurnStartCreature).toBe('1:Alice');
+    });
+
+    it('authority is unconditional — no enforcement flag needed to refuse a hijack', async () => {
+        // enforcement stays OFF (default): the __map__-style engaged=true gate
+        // still bites, unlike the enforcement-scoped authority lane above.
+        expect(characterChangeData.get('test-campaign').enforcement).toBeUndefined();
+        expect((await postFromLan('activeCreatureName', 'Mallory')).status).toBe(400);
+    });
+
+    it('localhost GM keeps full turn authority (both keys, byte pass-through)', async () => {
+        expect((await post('activeCreatureName', 'Bob')).status).toBe(200);
+        expect(characterChangeData.get('test-campaign').activeCreatureName).toBe('Bob');
+        expect((await post('lastAppliedTurnStartCreature', '1:Bob')).status).toBe(200);
+        expect(characterChangeData.get('test-campaign').lastAppliedTurnStartCreature).toBe('1:Bob');
+    });
+
+    it('combatSummary stays open to LAN clients (target-select lane) — unregistered key byte pass-through', async () => {
+        const res = await postFromLan('combatSummary', { round: 1, creatures: [{ name: 'Alice', targetName: 'Goblin' }] });
+        expect(res.status).toBe(200);
+        expect(characterChangeData.get('test-campaign').combatSummary.creatures[0].targetName).toBe('Goblin');
+    });
+});
