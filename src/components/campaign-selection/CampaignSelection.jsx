@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 import './CampaignSelection.css';
 
-function CampaignSelection({ onCampaignSelect, autoSelectCampaign }) {
+function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost = true }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -139,7 +139,9 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign }) {
              <p>Reloading...</p>
            </div>
          )}
-         <button className="new-campaign-button" onClick={openNewCampaignModal}><i className="fas fa-plus"></i> Add</button>
+         {isLocalhost && (
+           <button className="new-campaign-button" onClick={openNewCampaignModal}><i className="fas fa-plus"></i> Add</button>
+         )}
          {campaigns.length === 0 ? (
            <p className="no-campaigns">
            No campaigns found. Please create folders under ./public/campaigns to get started.
@@ -159,7 +161,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign }) {
            </div>
          )}
        
-         {showNewCampaignModal && (
+         {isLocalhost && showNewCampaignModal && (
            <div className="modal-overlay">
              <div className="modal-content">
                <h2>Create New Campaign</h2>

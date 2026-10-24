@@ -75,8 +75,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **[2026-10-24] Read-only (LAN) player view exposes an ENABLED "+ Add" → "Create New Campaign" modal.** `CampaignSelection.jsx` has no `isLocalhost` awareness; the Add button (:142) and modal render for every client. A network player can open the modal, type a name, click Create, and dead-end at the server (POST `/api/campaigns` → 403, and the error screen renders correctly naming the lock). Under this run's `CAMPAIGN_LOCK` it is safely denied **with proper feedback** (not a bug), but in a production run with NO lock it is unclear whether a player could actually create campaigns — GM features are supposed to be localhost-only. Consider hiding the Add button for non-localhost clients like the nav strip already does, or confirm with owner whether open campaign creation is intended. `src/components/campaign-selection/CampaignSelection.jsx`, server `POST /api/campaigns`.
-
 ## Coverage
 
 | Feature/Flow | Depth | Notes |
