@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
+import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 import useLog from '../../hooks/runtime/useLog.js';
 import { MOODS, DEFAULT_VOLUME, getMood, getTracksForMood, extractVideoId } from '../../services/ui/musicConfig.js';
+import { saveMusicOverrides } from '../../services/ui/musicService.js';
 import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
 import './MusicPlayer.css';
 
 const YT_FRAME_ID = 'yt-music-frame';
 
 const DEFAULT_MUSIC = { mood: null, playing: false, volume: DEFAULT_VOLUME, overrides: {} };
+
+const moodLabel = (moodKey) => (getMood(moodKey) || {}).label || moodKey;
 
 function parseTrackList(text) {
   return text
@@ -30,7 +34,15 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   const [editMood, setEditMood] = useState(MOODS[0].key);
   const [trackText, setTrackText] = useState('');
   const [editorError, setEditorError] = useState(null);
+  // Display-only save/reset confirmation toast (mirrors .sessions-toast /
+  // .encounter-toast): names the mood so a closed editor still leaves a trace.
+  const [toast, setToast] = useState(null);
   const { addEntry } = useLog(campaignName);
+
+  const showToast = useCallback((message, isError = false) => {
+    setToast({ message, isError });
+    setTimeout(() => setToast(null), 2500); // toast auto-hide (display only, no game state)
+  }, []);
 
   useEffect(() => {
     if (!isLocalhost || !playerMounted) return;
@@ -108,7 +120,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     setEditorError(null);
   }, [music.overrides]);
 
-  const saveTracks = useCallback(() => {
+  const saveTracks = useCallback(async () => {
     const tracks = parseTrackList(trackText);
     if (tracks.length === 0) {
       console.error('No valid YouTube URLs or video ids entered');
@@ -116,23 +128,38 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       return;
     }
     const overrides = { ...music.overrides, [editMood]: tracks };
-    setMusic({ ...music, overrides });
-    if (music.mood === editMood && music.playing) {
+    // PATCH { overrides } only — playing/mood are never sent here, so a save while
+    // stopped cannot flip server playing:true (surprise-autoplay guard, server merge).
+    const saved = await saveMusicOverrides(campaignName, overrides);
+    if (!saved) {
+      showToast(`Failed to save ${moodLabel(editMood)} tracks`, true);
+      return;
+    }
+    // Pin the local store to server truth, skipSync: the server already holds it.
+    setRuntimeObject('campaign', { music: saved }, campaignName, true);
+    if (saved.mood === editMood && saved.playing) {
       setPlayerMounted(true);
       youtubePlayer.playTracks(tracks.map(t => t.videoId));
     }
     setEditorError(null);
     setEditing(false);
-  }, [trackText, editMood, music, setMusic]);
+    showToast(`${moodLabel(editMood)} tracks saved`);
+  }, [trackText, editMood, music, campaignName, showToast]);
 
-  const resetMood = useCallback(() => {
+  const resetMood = useCallback(async () => {
     const overrides = { ...music.overrides };
     delete overrides[editMood];
-    setMusic({ ...music, overrides });
-    const tracks = getTracksForMood(editMood, overrides);
+    const saved = await saveMusicOverrides(campaignName, overrides);
+    if (!saved) {
+      showToast(`Failed to reset ${moodLabel(editMood)} overrides`, true);
+      return;
+    }
+    setRuntimeObject('campaign', { music: saved }, campaignName, true);
+    const tracks = getTracksForMood(editMood, saved.overrides);
     setTrackText(tracks.map(t => t.videoId).join('\n'));
     setEditorError(null);
-  }, [editMood, music, setMusic]);
+    showToast(`${moodLabel(editMood)} overrides reset to defaults`);
+  }, [editMood, music, campaignName, showToast]);
 
   if (!isLocalhost) return null;
 
@@ -200,6 +227,11 @@ function MusicPlayer({ campaignName, isLocalhost }) {
             <button className="music-btn" onClick={resetMood} title="Restore starter tracks">Reset</button>
             <button className="music-btn" onClick={() => setEditing(false)}>Cancel</button>
           </div>
+        </div>
+      )}
+      {toast && (
+        <div className={`music-toast${toast.isError ? ' music-toast-error' : ''}`} role="status">
+          {toast.message}
         </div>
       )}
       {playerMounted && (

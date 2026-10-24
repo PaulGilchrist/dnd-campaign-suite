@@ -1,5 +1,5 @@
 // @maintained-by-ai: 2026-10-14
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
@@ -133,7 +133,16 @@ describe('MusicPlayer', () => {
     expect(musicState().volume).toBeCloseTo(0.4);
   });
 
-  it('lets the GM override a mood with pasted YouTube URLs', () => {
+  it('lets the GM override a mood with pasted YouTube URLs', async () => {
+    // Editor save PATCHes { overrides } only; stub mirrors the server music route merge.
+    let serverMusic = { mood: null, playing: false, volume: 0.6, overrides: {} };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts = {}) => {
+      if (opts.method === 'POST' && String(url).endsWith('/music')) {
+        const body = JSON.parse(opts.body);
+        serverMusic = { ...serverMusic, ...('value' in body ? body.value : body) };
+      }
+      return { ok: true, status: 200, json: async () => ({ music: serverMusic, message: 'ok' }), text: async () => '' };
+    });
     renderPlayer();
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
     fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), {
@@ -141,10 +150,11 @@ describe('MusicPlayer', () => {
     });
     fireEvent.click(screen.getByText('Save'));
 
-    expect(musicState().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+    await waitFor(() => expect(musicState().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']));
 
     fireEvent.click(screen.getByTitle('Play Town ambience'));
     expect(youtubePlayer.playTracks).toHaveBeenCalledWith(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+    globalThis.fetch.mockRestore();
   });
 
   it('ignores unparseable editor input', () => {

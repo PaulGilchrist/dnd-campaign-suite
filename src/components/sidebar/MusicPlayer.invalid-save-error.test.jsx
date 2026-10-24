@@ -2,7 +2,7 @@
 // Regression: saving the track editor with unparseable input must show a visible
 // inline error (previously a console-only silent no-op), and that error must
 // clear on the next keystroke / mood switch / successful save.
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
@@ -94,7 +94,16 @@ describe('MusicPlayer invalid-save inline error', () => {
     expect(container.querySelector('.music-editor-error')).toBeNull();
   });
 
-  it('successful save after a rejected one closes the editor with no error and persists tracks', () => {
+  it('successful save after a rejected one closes the editor with no error and persists tracks', async () => {
+    // Editor save PATCHes { overrides } only; stub mirrors the server music route merge.
+    let serverMusic = { mood: null, playing: false, volume: 0.6, overrides: {} };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts = {}) => {
+      if (opts.method === 'POST' && String(url).endsWith('/music')) {
+        const body = JSON.parse(opts.body);
+        serverMusic = { ...serverMusic, ...('value' in body ? body.value : body) };
+      }
+      return { ok: true, status: 200, json: async () => ({ music: serverMusic, message: 'ok' }), text: async () => '' };
+    });
     const { container } = renderPlayer();
     const textarea = openEditor(container);
 
@@ -109,7 +118,8 @@ describe('MusicPlayer invalid-save inline error', () => {
     });
     fireEvent.click(screen.getByText('Save'));
 
-    expect(container.querySelector('.music-editor')).toBeNull();
+    await waitFor(() => expect(container.querySelector('.music-editor')).toBeNull());
     expect(musicState().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+    globalThis.fetch.mockRestore();
   });
 });

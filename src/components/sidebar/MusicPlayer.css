@@ -133,6 +133,24 @@
   font-size: 0.8em;
 }
 
+/* Save/Reset confirmation toast — display-only (mirrors .encounter-toast /
+   .sessions-toast tokens; survives the editor closing so the mood lingers) */
+.music-player .music-toast {
+  align-self: flex-start;
+  background: var(--color-primary-lighter);
+  border: 1px solid var(--color-success);
+  color: var(--color-success);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.music-player .music-toast-error {
+  background: rgba(244, 67, 54, 0.15);
+  border-color: var(--color-error-border);
+  color: var(--color-error-light);
+}
+
 /* Hidden YouTube iframe — kept tiny but rendered so playback works */
 .yt-music-frame {
   position: fixed;

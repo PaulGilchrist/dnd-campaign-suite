@@ -71,7 +71,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- (2026-10-24) Music Save/Reset give no toast/confirmation and editor close leaves no trace which mood was saved; `Save` while stopped also flips server `playing:true` (surprise-autoplay risk on other tabs). Add `.music-toast` per shared pattern + keep playing-state untouched by editor saves.
 - (2026-10-24) Music override tracks store `title` = raw video ID ("dQw4w9WgXcQ") — resolve real titles via YouTube oEmbed at save time for readable lists.
 - (2026-10-24) Generate Settlement silently overwrites a half-typed custom form (name/tags/population/description all replaced by the generator roll). Cache user edits or confirm before overwrite.
 - (2026-10-24) Max-HP input on initiative cards clips 3-digit values at `width:38px` (displayed "171" for 178) — widen or size to content.
