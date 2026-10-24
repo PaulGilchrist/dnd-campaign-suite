@@ -28,7 +28,7 @@
       "ac": 12,
       "dex": 14,
       "pb": 6,
-      "_recheck": "undefined | FT-030 2026-10-04: confirmed lv20 DEX14 PB+6 AC12 Shortsword(finesse); wizard feat-add ENABLED here (not over-cap) — GOOD reaction-feat rig host; feats restored [Magic Initiate]. | EXPLORE 2026-10-24: lv20 RESTORED (wizard destructive test 20<->19 disk-verified); gold restored 10; party xp runtime keys (award-loot 2433) cleared via admin; map token 6,10 restored; change-data {} log [] verified clean.",
+      "_recheck": "undefined | FT-030 2026-10-04: confirmed lv20 DEX14 PB+6 AC12 Shortsword(finesse); wizard feat-add ENABLED here (not over-cap) — GOOD reaction-feat rig host; feats restored [Magic Initiate]. | EXPLORE 2026-10-24: lv20 RESTORED (wizard destructive test 20<->19 disk-verified); gold restored 10; party xp runtime keys (award-loot 2433) cleared via admin; map token 6,10 restored; change-data {} log [] verified clean. | EXPLORE-FOG 2026-10-24: char token dropped via Items-panel DragEvent ('character:AasimarTest') onto throwaway BSP map fog-dungeon for fog LoS/reveal testing — that map DELETED post-run (maps back to Battle Arena/Test Map); NO char JSON mutation; admin clear-change-data+log GET-verified {} [] quiet.",
       "spells": "[Command, Charm Monster, Color Spray, Phantasmal Killer, Invisibility] PERMANENT lv0-4"
     },
     "1": {
