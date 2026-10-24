@@ -9,7 +9,9 @@
  * end-to-end), submit dispatches encountersService.renameEncounter('test-campaign',
  * old, new) with EXACT raw bytes at the deepest seam, the list refreshes (second
  * loadEncounters call) and shows the new formatted name with fresh action buttons,
- * the modal stays open per handleRename bytes (no onClose), and rename NEVER
+ * and (2026-10-24 QA backlog) rename SUCCESS now CLOSES the modal — delete-lane
+ * parity (d4da4ebc1), proven by overlay unmount through the REAL hook's closeModal —
+ * and rename NEVER
  * confirms (fix#36 leaf-ownership sibling parity: delete confirms once at :58,
  * rename does not confirm at all).
  * Boundary mocks only: useMonstersData fixture, heavy modals closed at the seam,
@@ -142,9 +144,9 @@ describe('EncounterBuilder + REAL EncounterModal — rename reachable end-to-end
     expect(screen.queryByText('New name is required')).not.toBeInTheDocument();
   });
 
-  it('rename click-through dispatches renameEncounter("test-campaign", old, new) exact raw bytes, refreshes the list once, keeps the modal open', async () => {
+  it('rename click-through dispatches renameEncounter("test-campaign", old, new) exact raw bytes, refreshes the list once, and CLOSES the modal (delete-lane parity)', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    mountBuilder();
+    const { container } = mountBuilder();
     await openLoadModal();
     const loadsAtOpen = h.loadEncounters.mock.calls.length; // openLoadModal's fetch
 
@@ -161,17 +163,19 @@ describe('EncounterBuilder + REAL EncounterModal — rename reachable end-to-end
     expect(confirmSpy).not.toHaveBeenCalled();
     // List refreshed by the hook's loadEncounterList exactly once after the rename.
     expect(h.loadEncounters).toHaveBeenCalledTimes(loadsAtOpen + 1);
-    // Refreshed list rendered with formatted new name and fresh per-row actions;
-    // the renamed row's Load/pen targets the NEW raw name.
-    expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
-    expect(screen.getByText('Goblin Remix')).toBeInTheDocument();
-    expect(screen.queryByText('Goblin Ambush')).not.toBeInTheDocument();
+    // 2026-10-24 QA backlog: rename success now mirrors the delete lane (d4da4ebc1) —
+    // closeModal() unmounts the overlay, so no stale modal intercepts page clicks.
+    expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+
+    // Re-opening Load lists the encounter under its NEW name with fresh row actions.
+    fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Rename Goblin Remix' })).toBeInTheDocument();
+    });
     expect(screen.getByRole('button', { name: 'Load Goblin Remix' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Rename Goblin Remix' })).toBeInTheDocument();
-    // Per handleRename bytes the modal stays open (close is onClose-only): the load
-    // list surface is still mounted with BOTH rows' fresh action targets.
-    expect(screen.getByRole('button', { name: 'Load dragon-lair' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete Goblin Remix' })).toBeInTheDocument();
+    expect(screen.queryByText('Goblin Ambush')).not.toBeInTheDocument();
+    expect(screen.getByText('Dragon Lair')).toBeInTheDocument();
   });
 
   it('blank rename never reaches the service seam — form stays open with inline error', async () => {

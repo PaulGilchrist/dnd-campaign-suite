@@ -12,8 +12,9 @@
  * here genuinely means server-confirmed success.
  * A controlled Host owns isOpen so onClose-driven UNMOUNT of the overlay is proven,
  * not just spy-called. Owned here: close-on-success, stay-open-on-refuse with zero
- * onDelete dispatch, stay-open-with-error-on-failure, save/rename legs byte-identical
- * (save still closes, rename still never closes). Confirm-text/sorting/single-confirm
+ * onDelete dispatch, stay-open-with-error-on-failure, save leg byte-identical, and
+ * (updated 2026-10-24 QA backlog) the rename leg now mirrors delete: close-on-success
+ * with stay-open-with-error on failure. Confirm-text/sorting/single-confirm
  * ownership stays in EncounterModal.test.jsx + delete-confirmation.test.jsx. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState } from 'react';
@@ -147,9 +148,9 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
     });
 
-    it('rename leg unchanged: commit dispatches onRename, restores the list, and never closes the modal', async () => {
+    it('rename leg now mirrors delete: commit dispatches onRename and CLOSES the modal (unmounts the overlay)', async () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-        render(<Host />);
+        const { container } = render(<Host />);
         fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
         fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'Goblin Remix' } });
         await act(async () => {
@@ -157,7 +158,28 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         });
         expect(mockOnRename).toHaveBeenCalledWith('goblin-ambush', 'Goblin Remix');
         expect(confirmSpy).not.toHaveBeenCalled();
+        // Close-on-success parity with the delete lane (d4da4ebc1): onClose fires and
+        // the controlled host unmounts the overlay — no stale modal intercepting clicks.
+        expect(mockOnClose).toHaveBeenCalledTimes(1);
+        expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
+    });
+
+    it('a FAILED rename (onRename rejects) keeps the modal open showing .encounter-modal-error with the form intact', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockOnRename.mockRejectedValueOnce(new Error('Server said no'));
+        const { container } = render(<Host />);
+        fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+        fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'Goblin Remix' } });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+        });
+        expect(mockOnRename).toHaveBeenCalledTimes(1);
         expect(mockOnClose).not.toHaveBeenCalled();
-        expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
+        expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
+        const err = container.querySelector('.encounter-modal-error');
+        expect(err).toBeInTheDocument();
+        expect(err).toHaveTextContent('Server said no');
+        // Rename form still mounted for a retry (renameTarget untouched on failure).
+        expect(screen.getByLabelText('New Name')).toBeInTheDocument();
     });
 });

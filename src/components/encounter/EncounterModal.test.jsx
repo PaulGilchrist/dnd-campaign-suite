@@ -217,7 +217,7 @@ describe('EncounterModal', () => {
             expect(mockOnRename).not.toHaveBeenCalled();
         });
 
-        it('submit dispatches onRename(old, new.trim()) exactly once, closes the form, restores the list, closes nothing, confirms nothing', async () => {
+        it('submit dispatches onRename(old, new.trim()) exactly once, closes the modal, confirms nothing', async () => {
             const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
             render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
             fireEvent.click(screen.getByRole('button', { name: 'Rename dragon-lair' }));
@@ -229,12 +229,9 @@ describe('EncounterModal', () => {
             expect(mockOnRename).toHaveBeenCalledWith('dragon-lair', 'Goblin Remix');
             // Rename lane is no-confirm: straight dispatch (fix#36 delete-ownership sibling parity).
             expect(confirmSpy).not.toHaveBeenCalled();
-            // Honest post-commit shape per handleRename bytes: form gone, load list
-            // restored, modal itself stays open (only onClose callers close it).
-            expect(screen.queryByLabelText('New Name')).not.toBeInTheDocument();
-            expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Load goblin-ambush' })).toBeInTheDocument();
-            expect(mockOnClose).not.toHaveBeenCalled();
+            // 2026-10-24 QA backlog: rename now mirrors the delete lane (d4da4ebc1) —
+            // once the parent's awaited rename resolves, the modal fires onClose once.
+            expect(mockOnClose).toHaveBeenCalledTimes(1);
             expect(mockOnDelete).not.toHaveBeenCalled();
         });
 

@@ -53,7 +53,7 @@ Twelve fix/improve commits landed after the pm pass; every affected row re-deriv
 
 - Save-disabled-until-required on all `.ct-*` forms; **live duplicate-name inline errors (factions+quests) clear while typing**.
 - Native confirms: generic "Delete this X?" = Factions+Notes; named-object = Quests+Sessions+Settlements+Admin (06efbfe2a verified).
-- Modal persistence leak family: ~~EB autocomplete + dice-tray popups survive across views~~ **both FIXED efd16d01d/7e70ec23b (eve-re-verified)**; in-modal Rename still leaves Load modal open (delete now closes it — minor inconsistency in same modal).
+- Modal persistence leak family: ~~EB autocomplete + dice-tray popups survive across views~~ **both FIXED efd16d01d/7e70ec23b (eve-re-verified)**; ~~in-modal Rename still leaves Load modal open~~ **FIXED same day (improve run): rename now closes the Load modal on success too — both mutation lanes consistent**.
 - Sessions links auto-generate checklist items; auto-items are clickable.
 - Wizard = destructive-op confirm naming entity + old-diff; EB Save = name-modal + toast.
 - Music editor: inline errors on invalid, mood-named toasts on save/reset; editor closes on save.
@@ -90,7 +90,6 @@ Twelve fix/improve commits landed after the pm pass; every affected row re-deriv
 ## Improvement Backlog
 
 - *(2026-10-24 pm run — prior "leave music editor no-toast", "wizard no inline error", "generate-settlement destructive", "oembed cosmetic", "campaign-add 403 screen" items all RESOLVED by today's improve commits and were removed at fold.)*
-- *(2026-10-24 eve run —)* **EB in-modal Rename leaves Load modal open** on the refreshed list (delete now closes it — d4da4ebc1). Slight inconsistency in the same modal's two mutation lanes; consider closing both or refreshing in place without the extra click to re-find the row.
 - *(2026-10-24 eve run —)* **Enforcement toggles are chatty**: every checkbox click POSTs the whole enforcement blob immediately (×3 POSTs for a master-on→turnLock→master-off sequence observed in netlog). Debounce or merge-batch like the currency-chip fix (97165afc2).
 - *(2026-10-24 eve run —)* **NPC row init-chip has title but no aria-label** (`button[title="Add X to Initiative"]`) while sibling rows use aria-labels — add matching aria-label for testability/a11y parity.
 - *(2026-10-24 eve run —)* **Party-item row action buttons are icon-only with title** (`button[title="Edit item|Move to player|Delete item"]`, text is empty) — add aria-labels so `getByRole(name)` matches (parity with `Decrease/Increase quantity` which DO have aria-labels).

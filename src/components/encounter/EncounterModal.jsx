@@ -49,9 +49,19 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
     }
     setError('');
     const targetName = renameTargetProp ? renameTargetProp.name : renameTarget?.name;
-    await onRename(targetName, newName.trim());
-    setRenameTarget(null);
-    setNewName('');
+    try {
+      // Parent reloads the encounter list before resolving and throws on
+      // non-2xx/network failure, so a resolved await here is a true success.
+      await onRename(targetName, newName.trim());
+      setRenameTarget(null);
+      setNewName('');
+      setError('');
+      // Close the modal on success — mirrors the delete lane (d4da4ebc1).
+      onClose();
+    } catch (err) {
+      console.error('Failed to rename encounter:', err);
+      setError(err.message || 'Failed to rename encounter');
+    }
   };
 
   const handleDelete = async (encounterName) => {
