@@ -25,8 +25,8 @@
 // | addEntry                  | :37 / :13       | SYNCHRONOUS throw      | native throw through applyWardingBond; console UNTOUCHED (#1360 golden) |
 // | getRuntimeValue           | :57/:7/:10/:32/:34/:79 | sync throw | native throw; nothing logged, nothing written |
 // | getDistanceFeet           | :67             | sync throw             | native throw (real rangeCheck.js is unmocked — true-table guard) |
-// | setRuntimeValue           | :9/:12/:27      | sync throw           | native throw; write ATTEMPT recorded, no rollback, no console |
-// | setRuntimeValue           | :27             | rejection (fire-and-forget, result NEVER consumed — no .catch in service) | SOURCE HOLE (report-only): unhandled-rejection hazard. Pinned reject-free: the test fake attaches its own noop .catch so the suite stays green while proving the service never inspects the result — console census stays empty and the store stays on the OLD HP while the log reports the NEW one (stranded optimistic state #1382). |
+// | setRuntimeValue           | :18/:22/:63/:111  | sync throw           | native throw; write ATTEMPT recorded, no rollback, no console — the Promise.resolve WRAP is placed AROUND the call, so a synchronous throw from the fake still escapes before any arm exists (arm shape verified live: row 4) |
+// | setRuntimeValue           | :18/:22/:63/:111    | rejection (fire-and-forget) | fix#352(e) LOUD-CATCH arms — Promise.resolve(setRuntimeValue(...)).catch -> console '[wardingBond] <key> store reject:' (microtask). The SOURCE HOLE this row once reported ('result NEVER consumed — no .catch in service') is CLOSED; fire-and-forget REMAINS (fix#349(d) RETAIN ruling — no awaits). Stranded-store optimism (#1382) stays pinned: the failure is named, never rolled back. |
 //
 // FALSIFYING PAIRS #1297 (rejection does NOT abort the mirror):
 // - hp_change rejects -> caster HP already mutated (:29 in-place) / already written
@@ -86,6 +86,14 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
 const CAMPAIGN = 'TestCampaign';
 const HP_PREFIX = '[wardingBond] Error:';
 const BREAK_PREFIX = '[wardingBond] Break log error:';
+// fix#352(e) loud-CATCH prefixes, copied byte-exact from source:
+//   '[wardingBond] target activeBuffs store reject:'         -> wardingBondService.js:19
+//   '[wardingBond] caster activeBuffs store reject:'         -> wardingBondService.js:23
+//   '[wardingBond] caster currentHitPoints store reject:'    -> wardingBondService.js:64
+//   '[wardingBond] caster concentration store reject:'       -> wardingBondService.js:112
+const HP_STORE_PREFIX = '[wardingBond] caster currentHitPoints store reject:';
+const TARGET_STRIP_PREFIX = '[wardingBond] target activeBuffs store reject:';
+const CASTER_STRIP_PREFIX = '[wardingBond] caster activeBuffs store reject:';
 
 // Exact key-sets copied from source literal order (:37-46 / :13-18). Values are the
 // damage/log lanes' face; key census here only identifies WHICH entry each arm saw.
@@ -358,11 +366,11 @@ describe('wardingBondService errors lane — addEntry rejection console arms and
         expect(consoleError.mock.calls).toEqual([]); // zero console bytes across ALL four native arms
     });
 
-    it('fire-and-forget setRuntimeValue rejection is invisible: service never consumes the result, logs optimistic HP over a stranded old store byte', async () => {
-        // SOURCE HOLE (report-only, #1401 class): setRuntimeValue at :27 is
-        // fire-and-forget with NO .catch — a rejection is unhandled in production.
-        // The fake attaches its own noop .catch so this suite stays rejection-free
-        // while pinning that the service itself never observes the failure.
+    it('store-reject FLIPPED (fix#352(e)): the loud-CATCH arm surfaces the rejected HP write; stranded-store honesty stays', async () => {
+        // Pre-fix quirk flipped (#1348): the HP write was fire-and-forget with
+        // NO .catch (SOURCE HOLE, report-only) — a rejection was unhandled and
+        // silent. fix#352(e) armed it (service :63-64); fire-and-forget stays
+        // RETAINED (fix#349(d) ruling — no await added).
         const errS = new Error('hp write rejected');
         const caster = { name: 'Paladin', type: 'player', position: { x: 0, y: 0 } };
         const goblin = { name: 'Goblin', position: { x: 1, y: 0 } };
@@ -374,11 +382,7 @@ describe('wardingBondService errors lane — addEntry rejection console arms and
                 'Paladin|concentration': null,
             },
             {
-                'Paladin|currentHitPoints': () => {
-                    const p = Promise.reject(errS);
-                    p.catch(() => { }); // test-side suppressant; production has none
-                    return p;
-                },
+                'Paladin|currentHitPoints': () => Promise.reject(errS),
             },
         );
         fakeAddEntry({});
@@ -391,9 +395,62 @@ describe('wardingBondService errors lane — addEntry rejection console arms and
         expect(logAttempts()).toEqual([[CAMPAIGN, 'hp_change', HP_KEYS]]);
         expect(addEntry.mock.calls[0][1]).toMatchObject({ currentHp: 7, delta: -3 });
         expect(store.data.get('Paladin|currentHitPoints')).toBe(10);
+        expect(consoleError.mock.calls).toEqual([]); // REAL Promise: the arm is a microtask
 
         await flush();
-        expect(consoleError.mock.calls).toEqual([]); // error never surfaces — silent by source shape
+        expect(consoleError.mock.calls).toEqual([[HP_STORE_PREFIX, errS]]); // LOUD now, never silent
+        expect(consoleError.mock.calls[0][1]).toBe(errS); // identical instance #1385
+    });
+
+    // fix#352(e) arms for the endWardingBond strips (:18/:22): fire-and-forget
+    // RETAINED (fix#349(d)); each store-reject now names ITS key. Zero-rollback
+    // law #1382 stands — the optimistic break log lands while both strips stay
+    // stranded, but the failure is LOUD, never silent-unhandled.
+    it('lethal player caster with BOTH activeBuffs strips rejecting: [target, caster] arms fire in write order; strips stay stranded, log optimistic', async () => {
+        const caster = { name: 'Paladin', type: 'player', position: { x: 0, y: 0 } };
+        const goblin = { name: 'Goblin', position: { x: 1, y: 0 } };
+        const errT = new Error('target strip rejected');
+        const errC = new Error('caster strip rejected');
+        const store = seedStore(
+            {
+                'Goblin|activeBuffs': bondBuff('Paladin'),
+                'Paladin|currentHitPoints': 4,
+                'Paladin|maxHitPoints': 12,
+                'Paladin|concentration': null,
+                'Paladin|activeBuffs': [{ effect: 'warding_bond', sourceCharacter: 'Goblin' }, { effect: 'bless' }],
+            },
+            {
+                'Goblin|activeBuffs': () => Promise.reject(errT),
+                'Paladin|activeBuffs': () => Promise.reject(errC),
+            },
+        );
+        fakeAddEntry({});
+        getDistanceFeet.mockReturnValue(30);
+
+        applyWardingBond(goblin, { creatures: [caster, goblin] }, CAMPAIGN, 4);
+
+        // Sync: HP write resolves and lands; the two strip attempts reject in microtasks.
+        expect(store.writes).toEqual([
+            ['Paladin', 'currentHitPoints', 0],
+            ['Goblin', 'activeBuffs', []],
+            ['Paladin', 'activeBuffs', [{ effect: 'bless' }]],
+        ]);
+        expect(consoleError.mock.calls).toEqual([]);
+        expect(logAttempts()).toEqual([
+            [CAMPAIGN, 'hp_change', HP_KEYS],
+            [CAMPAIGN, 'ability_use', BREAK_KEYS],
+        ]);
+
+        await flush();
+        expect(consoleError.mock.calls).toEqual([
+            [TARGET_STRIP_PREFIX, errT],
+            [CASTER_STRIP_PREFIX, errC],
+        ]);
+        expect(consoleError.mock.calls[0][1]).toBe(errT);
+        expect(consoleError.mock.calls[1][1]).toBe(errC);
+        expect(store.data.get('Goblin|activeBuffs')).toEqual(bondBuff('Paladin')); // stranded — zero rollback law stands
+        expect(store.data.get('Paladin|activeBuffs')).toEqual([{ effect: 'warding_bond', sourceCharacter: 'Goblin' }, { effect: 'bless' }]);
+        expect(store.data.get('Paladin|currentHitPoints')).toBe(0); // the successful write DID land
     });
 
     it('reject-then-succeed compose: a rejected addEntry poisons no latch — the bond survives and the second call mirrors again (#1307)', async () => {

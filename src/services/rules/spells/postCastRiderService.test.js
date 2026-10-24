@@ -10,7 +10,9 @@
 // handlePostCastRider, automation/index.js:363; this service stamps NO te.repeatSave),
 // soulstitch/bewitching gates + envelopes + modal bridges, spell_thief discovery
 // (deferred to here by spellThiefHandler.test.js:7) + CLA-325 inertness, and the
-// multi_target_spread disk-shape mismatch quirk.
+// multi_target_spread disk-shape mismatch quirk — RESOLVED fix#356(c): the
+// selector is dual-shape now (flat type OR passive_rule nesting); flat-shape
+// control + nested-fires + discriminating-miss arms below.
 // Disk provenance (2024/classes.json): riderSave producer = Bard "Beguiling Magic"
 // (riderSave byte-faithful below); bewitching = Warlock automation[0]; soulstitch /
 // empowered_evocation = Wizard; spell_thief = Rogue automation (INT save — never
@@ -120,10 +122,13 @@ describe('postCastRiderService', () => {
       expect(getMultiTargetSpreadForSpell(stats, 'Iceball')).toBeNull()
     })
 
-    it('quirk pin: disk passive_rule.multi_target_spread nested shape never matches the type filter', () => {
-      // Real 2024 Bard "Words of Creation" row nests spellFilter under a
-      // multi_target_spread KEY of a passive_rule — no shipped disk class produces a
-      // top-level type 'multi_target_spread' passive, so this lane is custom-data-only.
+    it('fix#356(c) WoC-nested-rider-fires: passive_rule.multi_target_spread nested disk shape reaches the rider', () => {
+      // Real 2024 Bard "Words of Creation" row (public/data/2024/classes.json,
+      // BY-name) nests spellFilter under a multi_target_spread KEY of a
+      // passive_rule automation. Pre-fix the flat type filter never matched
+      // disk-byte casts (quirk pin retired honestly - #1348 flip discipline);
+      // the traversal now digs the nested envelope, reusing the riderSave idiom
+      // at :32 of the service.
       const diskRow = {
         type: 'passive_rule',
         name: 'Words of Creation',
@@ -132,8 +137,26 @@ describe('postCastRiderService', () => {
         multi_target_spread: { spellFilter: ['Power Word Heal', 'Power Word Kill'], range: '10 ft' },
         casting_time: 'passive',
       }
-      expect(getMultiTargetSpreads({ automation: { passives: [diskRow] } })).toEqual([])
-      expect(getMultiTargetSpreadForSpell({ automation: { passives: [diskRow] } }, 'Power Word Kill')).toBeNull()
+      const stats = { automation: { passives: [diskRow] } }
+      expect(getMultiTargetSpreads(stats)).toEqual([diskRow])
+      // Fires with the disk nested envelope (range byte drives the consumer).
+      expect(getMultiTargetSpreadForSpell(stats, 'Power Word Kill')).toBe(diskRow.multi_target_spread)
+      expect(getMultiTargetSpreadForSpell(stats, 'Power Word Heal').range).toBe('10 ft')
+      // Discriminating miss arms: off-filter and lowercase near-miss stay null.
+      expect(getMultiTargetSpreadForSpell(stats, 'Fireball')).toBeNull()
+      expect(getMultiTargetSpreadForSpell(stats, 'power word kill')).toBeNull()
+    })
+
+    it('fix#356(c) flat-shape-still-fires control: top-level type rows keep identity + loud-missing-filter posture', () => {
+      // Control arm - the pre-existing flat lane (custom data, builder
+      // core-handlers.js:425) is byte-neutral under the dual-shape traversal.
+      const spread = { type: 'multi_target_spread', name: 'Flat', spellFilter: ['Power Word Heal'], range: '5 ft' }
+      const stats = { automation: { passives: [spread] } }
+      expect(getMultiTargetSpreads(stats)).toEqual([spread])
+      expect(getMultiTargetSpreadForSpell(stats, 'Power Word Heal')).toBe(spread)
+      // Nested row whose nested envelope lacks spellFilter -> same loud throw.
+      const badNested = { type: 'passive_rule', name: 'Bad', multi_target_spread: { range: '10 ft' } }
+      expect(() => getMultiTargetSpreadForSpell({ automation: { passives: [badNested] } }, 'Power Word Heal')).toThrow('Expected array, got undefined')
     })
 
     it('throws with console.error when a matching-passive lacks spellFilter', () => {

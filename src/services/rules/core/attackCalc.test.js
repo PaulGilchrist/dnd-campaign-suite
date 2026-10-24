@@ -266,9 +266,45 @@ describe('attackCalc', () => {
       expect(result[0].hitBonus).toBe(5);
       expect(result[0].range).toBe(80);
       expect(result[0].type).toBe('Action');
-      // Quirk pinned as-is: ranged main-hand builder does not tag weaponType
-      // (only light-ranged off-hand entries get 'ranged').
-      expect(result[0].weaponType).toBe('');
+      // fix#348(d) FLIP of the honest #1231 quirk pin: the main-hand ranged builder now
+      // stamps weaponType:'ranged', mirroring the off-hand sibling byte (attackCalc.js:298).
+      expect(result[0].weaponType).toBe('ranged');
+    });
+
+    // fix#348(d) consumer-behavior arms: the filters below are copied byte-for-byte from
+    // the live consumers of the sheet row's weaponType — contextBuilder-sync.js:547
+    // (isSneakAttackWeapon: `hasFinesse || attack.weaponType === 'ranged'`),
+    // combatSuperiorityQueries.js:20 (isWeaponAttack), bonusActionAttackHandler.js:24-26
+    // (War Priest pick), executeActionManeuvers.js:471 (Riposte ranged refusal).
+    // Pre-fix the main-hand bow row carried weaponType:'' — sneak dice and weapon-attack
+    // maneuvers failed CLOSED on bows; the Riposte ranged refusal failed OPEN.
+    it('main-hand ranged row satisfies the ranged consumers that previously saw empty weaponType', () => {
+      const playerStats = makePlayerStats({ equipped: ['Shortbow'] });
+      const row = getAttacks(allEquipment, [], playerStats)[0];
+
+      // contextBuilder-sync.js:547 shape — Shortbow is not finesse, so eligibility rides
+      // entirely on the weaponType stamp.
+      const weaponProperties = row.properties || [];
+      const hasFinesse = weaponProperties.some(p => p.toLowerCase() === 'finesse');
+      expect(hasFinesse).toBe(false);
+      expect(hasFinesse || row.weaponType === 'ranged').toBe(true);
+
+      // combatSuperiorityQueries.js:20 shape — maneuver context sees a weapon attack.
+      const isWeaponAttack = row.weaponType === 'melee' || row.weaponType === 'ranged' || row.isUnarmedStrike;
+      expect(isWeaponAttack).toBe(true);
+
+      // bonusActionAttackHandler.js:24-26 shape — War Priest can pick the loaded bow
+      // (no 'melee' row equipped, so the ranged branch must match).
+      const isLoadedRanged = a => a.weaponType === 'ranged' && !(a.properties || []).some(p => /loading/i.test(String(p)));
+      expect(row.weaponType === 'melee' || isLoadedRanged(row)).toBe(true);
+
+      // executeActionManeuvers.js:471 / reactionDamageHandler.js:151 shape — a bow
+      // attackEvent now trips the melee-only-reaction refusal instead of slipping past it.
+      expect(row.weaponType === 'ranged').toBe(true);
+
+      // Melee sibling untouched: the Longsword row still reports 'melee'.
+      const meleeRow = getAttacks(allEquipment, [], makePlayerStats({ equipped: ['Longsword'] }))[0];
+      expect(meleeRow.weaponType).toBe('melee');
     });
 
     it('threads magic prefix through findEquippedWeapons into damage and to-hit', () => {

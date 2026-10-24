@@ -30,7 +30,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { resolveTeleportCell, applyTeleportTokenMove } from './teleportService.js';
 import { loadMapData, saveMapData } from '../maps/mapsService.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { getDistanceFeet } from '../rules/combat/rangeValidation.js';
+// getDistanceFeet import dropped fix#363 #1224 — it existed only for the old
+// :180 self-compare; the helper is CITED-not-driven (rangeValidation.test.js).
 
 vi.mock('../maps/mapsService.js', () => ({
     loadMapData: vi.fn(),
@@ -177,7 +178,14 @@ describe('applyTeleportTokenMove — execution seam (exact save tuple, honest de
         expect(r.moved).toBe(true);
         expect(r.from).toEqual({ gridX: 2, gridY: 3 }); // fromCell stamp, byte-exact
         expect(Math.abs(r.to.gridX - gob.gridX) + Math.abs(r.to.gridY - gob.gridY)).toBe(1); // never on the target
-        expect(r.distanceFeet).toBe(getDistanceFeet({ gridX: 2, gridY: 3 }, r.to));
+        // fix#363 #1224: self-compare (same getDistanceFeet call the production
+        // :142 makes) replaced by LITERAL expected, derived from the law:
+        // findNearestValid BFS dequeues anchor (5,3) — occupied by gob — then its
+        // FIRST neighbor [x+1,y] = (6,3) (reachability.js neighbor order), unoccupied
+        // and in-bounds (no walls/placedItems in this fixture). |6-2| = 4 cells x
+        // FEET_PER_CELL 5 (rangeValidation.js:3) = 20 ft.
+        expect(r.to).toEqual({ gridX: 6, gridY: 3 });
+        expect(r.distanceFeet).toBe(20);
 
         expect(saveMapData).toHaveBeenCalledTimes(1);
         const [campaign, mapName, patched] = saveMapData.mock.calls[0];

@@ -273,8 +273,9 @@ describe('FT-070 Shadow Touched — prepareSpellCast consumption', () => {
     expect([r1.freeCastUsed, r1.slotConsumed, r2.freeCastUsed, r2.slotConsumed]).toEqual([true, false, true, false]);
     // Full write ledger, in-cast-order (invocationCallOrder): spend each spell's OWN latch exactly once.
     expect(setRuntimeValue.mock.calls).toEqual([W(LATCH_INVIS, 0), W(LATCH_CHOSEN, 0)]); // arity-4, spent byte 0
-    // Reads: auth + consume of invis, then auth + consume of chosen — no cross-channel bytes, ever:
-    expect(shadowReads()).toEqual([R(LATCH_INVIS), R(LATCH_INVIS), R(LATCH_CHOSEN), R(LATCH_CHOSEN)]);
+    // Reads: auth-gate + in-lane LIST re-query (#341(a)) + consume of invis, then the
+    // same triple of chosen — no cross-channel bytes, ever:
+    expect(shadowReads()).toEqual([R(LATCH_INVIS), R(LATCH_INVIS), R(LATCH_INVIS), R(LATCH_CHOSEN), R(LATCH_CHOSEN), R(LATCH_CHOSEN)]);
     expect(setRuntimeValue.mock.calls.filter(c => OFF_LANE.test(String(c[1])))).toEqual([]);
     expect(addEntry.mock.calls).toEqual([
       [CAMPAIGN, { type: 'ability_use', characterName: PLAYER, abilityName: 'Shadow Magic', spellName: 'Invisibility', note: 'Shadow Magic free cast of Invisibility — no spell slot consumed. Invisibility is spent this way until your next Long Rest.', timestamp: expect.any(Number) }],
@@ -294,7 +295,7 @@ describe('FT-070 Shadow Touched — prepareSpellCast consumption', () => {
     });
     expect([result.freeCastUsed, result.slotConsumed]).toEqual([false, true]);
     expect(setRuntimeValue.mock.calls).toEqual([W('spell_slots_level_2', 2)]); // exact-of-1, full ledger
-    expect(shadowReads()).toHaveLength(1); // the PAID cast never re-touches the latch
+    expect(shadowReads()).toHaveLength(2); // caller gate + the #341(a) in-lane LIST re-query — the PAID cast still verifies, writes stay slot-only
   });
 });
 

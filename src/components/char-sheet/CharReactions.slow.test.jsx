@@ -9,6 +9,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
 
 const mockSetPopupHtml = vi.fn();
+const mockGateMetamagic = vi.fn();
 
 vi.mock('../common/popup.jsx', () => ({
     default: ({ children }) => React.createElement('div', { 'data-testid': 'popup' }, children),
@@ -34,6 +35,7 @@ vi.mock('./modals/StepsOfTheFeyTauntModal.jsx', () => ({ default: () => null }))
 vi.mock('./modals/SearingVengeanceModal.jsx', () => ({ default: () => null }));
 vi.mock('../../services/ui/spellSectionUtils.js', () => ({
     getReactionSpellNames: vi.fn(() => new Set()),
+    applyPotentSpellcasting: vi.fn((resolved) => resolved),
 }));
 vi.mock('../../services/character/featureCategories.js', () => ({
     getCategories: vi.fn(() => ({ featuresToIgnore: [] })),
@@ -93,7 +95,7 @@ vi.mock('./useAttackDamageResolution.js', () => ({
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     useSpellMetamagicFlow: vi.fn(() => ({
         pendingMetamagic: null,
-        gateMetamagic: vi.fn(),
+        gateMetamagic: mockGateMetamagic,
         handleConfirm: vi.fn(),
         handleSkip: vi.fn(),
     })),
@@ -123,6 +125,7 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { resolveSpellDamageAtLevel } from '../../services/rules/core/spellDamageUtils.js';
 
 const campaignName = 'test-campaign';
 
@@ -201,6 +204,81 @@ describe('CharReactions — SP-109 slow reaction gate', () => {
         fireEvent.click(screen.getByText('Opportunity Attack:'));
 
         await waitFor(() => expect(rollAttack).toHaveBeenCalledWith('Mace', 3, expect.objectContaining({ isOpportunityAttack: true })));
+        expect(mockSetPopupHtml).not.toHaveBeenCalledWith(expect.stringContaining('Slowed'));
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    // fix#344(a): the reaction-spell HIT chip (rollAttack) and DAMAGE chip
+    // (gateMetamagic) previously dispatched past the SP-109 gate — only the name
+    // cell and feature rows were guarded. Both chips now route through the SAME
+    // canonical isSlowed/refuseSlowedReaction (CharReactions.jsx:456-469):
+    // slowed clicks refuse loudly, unslowed clicks proceed (falsifiability pair).
+    const REBUKE_ATK = { name: 'Hellish Rebuke', level: 1, range: '60 ft.', attack_type: 'Ranged Spell Attack', damage: '2d12', damage_type: 'fire' };
+
+    function renderRebukeRow() {
+        getReactionSpellNames.mockReturnValue(new Set([REBUKE_ATK.name]));
+        resolveSpellDamageAtLevel.mockReturnValue('2d12');
+        return renderReactions({ ...playerStats, spellAbilities: { ...playerStats.spellAbilities, spells: [REBUKE_ATK] } });
+    }
+
+    it('slowed: hit-chip click refused loudly — block popup + Slow log, rollAttack never fires', () => {
+        setConditions(['slow']);
+        const rollAttack = vi.fn();
+        vi.mocked(useLoggedDiceRoll).mockReturnValue({ rollAttack, rollDamage: vi.fn() });
+        renderRebukeRow();
+
+        fireEvent.click(screen.getByText('+9'));
+
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Reaction Blocked'));
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Slowed'));
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'automation',
+            creatureName: 'AberrantSorcerer',
+            name: 'Slow',
+            description: expect.stringContaining('Hellish Rebuke'),
+        }));
+        expect(rollAttack).not.toHaveBeenCalled();
+    });
+
+    it('slowed: damage-chip click refused loudly — block popup + Slow log, gateMetamagic never fires', () => {
+        setConditions(['slow']);
+        renderRebukeRow();
+
+        fireEvent.click(screen.getByText('2d12'));
+
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Reaction Blocked'));
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Slowed'));
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'automation',
+            creatureName: 'AberrantSorcerer',
+            name: 'Slow',
+            description: expect.stringContaining('Hellish Rebuke'),
+        }));
+        expect(mockGateMetamagic).not.toHaveBeenCalled();
+    });
+
+    it('control: unslowed, the same hit-chip click rolls the spell attack — no block popup, no log', () => {
+        setConditions([]);
+        const rollAttack = vi.fn();
+        vi.mocked(useLoggedDiceRoll).mockReturnValue({ rollAttack, rollDamage: vi.fn() });
+        renderRebukeRow();
+
+        fireEvent.click(screen.getByText('+9'));
+
+        expect(rollAttack).toHaveBeenCalledWith('Hellish Rebuke', 9, { forcedMode: undefined });
+        expect(mockSetPopupHtml).not.toHaveBeenCalledWith(expect.stringContaining('Slowed'));
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('control: unslowed, the same damage-chip click casts via gateMetamagic — no block popup, no log', () => {
+        setConditions([]);
+        renderRebukeRow();
+
+        fireEvent.click(screen.getByText('2d12'));
+
+        expect(mockGateMetamagic).toHaveBeenCalledWith(REBUKE_ATK, {});
         expect(mockSetPopupHtml).not.toHaveBeenCalledWith(expect.stringContaining('Slowed'));
         expect(addEntry).not.toHaveBeenCalled();
     });

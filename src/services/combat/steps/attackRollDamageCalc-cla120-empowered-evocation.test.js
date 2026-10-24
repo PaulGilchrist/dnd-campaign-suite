@@ -18,6 +18,13 @@
 //   'does NOT re-append via autoFormulaOverride'                   ┘ legs, folded (two-call shape, exact bytes)
 //   'appends the INT term exactly once (PASS control)'               strengthened: exact total + rolled-bytes pin
 //   'mod 0 -> zero [EE] terms'                                       removed — owner: damageRolling skip tests (same handler)
+//
+// fix#350(b) owner-pin STATUS (QUEUED-OWNER, re-verified at current bytes 2026-10-24):
+// the `empEvocMod > 0` re-floor at attackRollDamageCalc.js:77 is PINNED-BY-OWNER (#1027)
+// — owner arbitration owed, NOT a silent flip. Negative-INT floor truth is honestly
+// pinned in the owner lane attackRollDamageSteps-damageRolling.test.js:169-185
+// ('skips the [Empowered Evocation] append when modifier is 0 or negative'). No edit
+// made here or in production; this header is the queue pointer only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Deterministic roller seam: exact bytes in, exact totals out (derived once, never a

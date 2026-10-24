@@ -244,14 +244,23 @@ function computeSpellStats(playerStats, cantripSpellAbility) {
         }
     }
 
-    let spellCastingMod = 0;
+    // fix#355(b) (#1496): the retired if/else-if shape silently shipped 0 when
+    // cantripSpellAbility was TRUTHY but ABSENT from abilities (the else-if never
+    // ran). Lawful default mirrors this function's OWN tolerant DC twin above
+    // (:230-:238 keeps the spellAbilities-derived byte when the named row is
+    // absent) plus the 5e-twin sibling massHealUtils.js getSpellCastingMod
+    // (:10-:22): named row wins, else spellAbilities.modifier || 0 (:18-:21).
+    // The data hole is LOUD (attackCalc2024.js:28-:33 findAbility law: absent
+    // row = data hole, log loudly, never fabricate). Never silently 0.
+    const cachedCastingMod = playerStats.spellAbilities?.modifier || 0;
+    let spellCastingMod = cachedCastingMod;
     if (cantripSpellAbility && playerStats.abilities) {
         const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
         if (ability) {
             spellCastingMod = ability.bonus;
+        } else {
+            console.error(`[spellCast] computeSpellStats: cantripSpellAbility '${cantripSpellAbility}' is absent from playerStats.abilities — defaulting to spellAbilities.modifier per the massHealUtils getSpellCastingMod twin (never a silent 0).`);
         }
-    } else if (playerStats.spellAbilities) {
-        spellCastingMod = playerStats.spellAbilities.modifier || 0;
     }
 
     return { spellToHit, spellSaveDc, spellCastingMod };
@@ -436,7 +445,16 @@ async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaig
     const removeCurseResult = await handleRemoveCurseTrigger(spell, metaCtx, playerStats, campaignName, mapName);
     if (removeCurseResult.handled) {
         await runDispelMagicFallback({ spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo });
-        return { handled: true };
+        // fix#358 (#1459/#1404 :447 — the one-key hub completion fix#353 flagged at
+        // triggerSpells.removeCurse.test.js:17-21): the retired bare { handled:true }
+        // here was the SECOND half of the DOUBLE-DISCARD — the host now returns
+        // { handled:true, result:{ automationPopup } } (triggerSpells.js:473-477) and
+        // this leg FORWARDS it, mirroring this file's propagation law passThrough :84
+        // (`(r) => (r.handled ? { value: r.result } : null)`) and the sibling direct
+        // returns :443 (`{ handled: true, value: protectionOutcome.value }`) / :402.
+        // Bare-handled host legs yield value:undefined — hasVisibleCastPayload (:727)
+        // declines it and the surge precedence is byte-identical to the retired shape.
+        return { handled: true, value: removeCurseResult.result };
     }
 
     await runDispelMagicFallback({ spell, metaCtx, playerStats, campaignName, mapName, getTargetInfo });

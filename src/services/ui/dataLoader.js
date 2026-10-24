@@ -112,9 +112,29 @@ async function loadData(dataType, version = '5e', optional = false) {
       return [];
     }
   })();
-  const result = dataPromises[promiseKey];
-  dataPromises[promiseKey] = null;
-  return result;
+  // fix#352(d): null the slot on PROMISE SETTLE, not synchronously after
+  // creation. Pre-fix bytes were:
+  //   const result = dataPromises[promiseKey];
+  //   dataPromises[promiseKey] = null;
+  //   return result;
+  // — the synchronous null meant the in-flight dedupe read at :79-81 could
+  // NEVER hit, so concurrent loadData callers each re-fetched the same JSON
+  // (double network + double-parse). Now concurrent callers await the ONE
+  // stored promise; the slot frees when it settles. No unhandled rejection
+  // is introduced: the loader body's own catch (:110-113) converts every
+  // failure into a loud console.error + resolved [], so the stored promise
+  // never rejects — the second .then arm is a fail-loud tripwire (no-
+  // fallbacks) that HANDLES (never swallows) should that invariant break,
+  // and callers still await the ORIGINAL promise (identity preserved).
+  const promise = dataPromises[promiseKey];
+  // Identity guard: if clearDataCache() swapped in a fresh promise for this key
+  // mid-flight, the OLD promise settling must not null the NEW in-flight slot.
+  const releaseSlot = () => { if (dataPromises[promiseKey] === promise) dataPromises[promiseKey] = null; };
+  promise.then(releaseSlot, (error) => {
+    releaseSlot();
+    console.error(`[dataLoader] in-flight promise rejection for ${promiseKey} (loader-body catch bypassed):`, error);
+  });
+  return promise;
 }
 
 /**

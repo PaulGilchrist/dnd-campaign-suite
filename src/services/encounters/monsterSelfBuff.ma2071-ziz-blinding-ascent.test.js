@@ -28,7 +28,7 @@
 // screech bytes); epic roster sweep → monsterEpicCohort.test.js :88-98
 // (legendary header/child economy generics); Blinding Ascent self-buff =
 // THIS lane. selfBuff family: owner monsterSelfBuff.test.js (duergar
-// enlarged/invisible, ender consumer :371-417); ghost #1138; green-hag
+// enlarged/invisible, ender consumer :327-405); ghost #1138; green-hag
 // #1139; imp #1140 (at-will 600-round twin) — their bytes never absorbed.
 //
 // Maintainer trim (#1138/#1139/#1140 recs applied):
@@ -41,7 +41,7 @@
 //   read honestly: invisibility else-copy in selfBuffPopupBody/buildSelfBuff-
 //   GrantLog + selfBuffDurationNote rounds<10 branch → exact toBe stamps below.
 // - ender mirrors stay OUT: attack/cast/enlarge consumer bytes for te
-//   `invisible` owned by monsterSelfBuff.test.js:371-417 (#1138/#1139/#1140).
+//   `invisible` owned by monsterSelfBuff.test.js:327-405 (#1138/#1139/#1140).
 // - Wing/Screech sibling absence FOLDED into the ONE exactly-once
 //   isMonsterSelfBuffRow discriminator filter (#1035 reach-branch, #829);
 //   their full bytes owned by ma2068/ma2072 above.
@@ -171,7 +171,7 @@ describe('MA-2071 honest triple press — legendary child spend-free, real te la
     // Ziz renders the family invisibility else-copy verbatim — the
     // "or uses its Enlarge" clause is honest residual (Ziz has no Enlarge;
     // the real enders are attack/cast, §70 advisory, consumer owned by
-    // monsterSelfBuff.test.js:371-417 — enders never re-driven here).
+    // monsterSelfBuff.test.js:327-405 — enders never re-driven here).
     expect(logs[0].description).toBe('Ziz 1 Blinding Ascent: te `invisible` armed on itself for 2 rounds — ends when it attacks, casts a spell, or uses its Enlarge (attack/cast/enlarge enders drop the te with an `invisible_ended` log), or when its clock runs out. Concentration-break ender and invisibility advantage/disadvantage adjudication are GM-enforced (§70 advisory).');
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Ziz 1 is Invisible'));
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('turns invisible via Blinding Ascent'));
@@ -201,7 +201,7 @@ describe('MA-2071 honest triple press — legendary child spend-free, real te la
     expect(setPopupHtml).toHaveBeenLastCalledWith(expect.stringContaining('Already Invisible'));
 
     // The te drops when its rounds:2 clock (or an attack/cast ender) clears
-    // it — consumer bytes owned by monsterSelfBuff.test.js:371-417 and the
+    // it — consumer bytes owned by monsterSelfBuff.test.js:327-405 and the
     // expirationQueue lane. Simulated here by clearing the harness store,
     // honest to this lane's next press.
     store[TE_KEY] = [{ target: 'PC 1', effect: 'invisible', source: 'Archmage 1' }];

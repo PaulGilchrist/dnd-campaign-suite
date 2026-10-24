@@ -355,15 +355,34 @@ function applySummonDuration({ noConcentration, createThrall, casterName, action
         addExpiration({ attackerName: casterName, targetName: casterName, effects, campaignName, rounds: summonDurationRounds(action.spell?.duration || auto.duration) });
         return;
     }
-    // CLA-138: any no-Concentration summon carries a hard expiry clock — the
-    // no-Concentration option shortens duration to 1 minute, and an unclocked
-    // summon never despawns (§38: ONE addExpiration).
+    // CLA-138: any no-Concentration summon with a FINITE duration carries a
+    // hard expiry clock (§38: ONE addExpiration) — the no-Concentration option
+    // shortens duration to 1 minute, and an unclocked finite summon never
+    // despawns. Create Thrall stamps its feature-law 1 minute (rounds:10,
+    // CLA-334 recipe); every other lane honors the stamped/disk duration value.
+    // fix#351(b) RAW adjudication — the `|| 10` fallback is deleted: an
+    // INSTANTaneous-duration summon carries NO expiry clock. Disk BY-name law:
+    // public/data/spells.json 'Find Steed' duration: "Instantaneous" AND
+    // public/data/2024/spells.json 'Find Steed' duration: "Instantaneous" —
+    // Instantaneous means the spell resolves as it is cast and ENDS; the steed
+    // persists until dismissed (RAW 'until dismissed', no duration buff to
+    // clock). Fabricating a 10-round despawn clock on it violated RAW
+    // (fix#337S stamp / #951 FLAGGED pin). An unparseable, NON-instantaneous
+    // duration is LOUD-refused with no clock rather than given a fabricated
+    // default (no-fallback law).
+    const durationText = String(action.spell?.duration || '');
+    if (/instantaneous/i.test(durationText)) return;
+    const rounds = createThrall ? 10 : summonDurationRounds(action.spell?.duration);
+    if (rounds === undefined) {
+        console.error(`[summonSpiritHandler] Unparseable no-Concentration summon duration "${durationText}" for ${action.name} — expiry clock refused, no fabricated default`);
+        return;
+    }
     addExpiration({
         attackerName: casterName,
         targetName: casterName,
         effects,
         campaignName,
-        rounds: createThrall ? 10 : (summonDurationRounds(action.spell?.duration) || 10),
+        rounds,
     });
 }
 

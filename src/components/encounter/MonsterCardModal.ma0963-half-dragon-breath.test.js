@@ -12,7 +12,7 @@
 // the exact-lowercase resistance compare = full-damage cosmetic pass-through).
 // dc_success stays UNAUTHORED = half (§63/MA-0618 prose). OWNED ELSEWHERE, not
 // re-pinned: secondary-null triple #589 (cultist :36-39)+#673, Cone shape parse
-// save-variant-shape:20/#640, save math applyDamage.save-full:19 (#597 rec), Claw BY-name #674, usage #571.
+// save-variant-shape:55-57/#640, save math applyDamage.save-full:19 (#597 rec), Claw BY-name #674, usage #571.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

@@ -28,7 +28,9 @@
 // cf. ma1357:17-22) no local buildHitConditionClause/attackRowMissingToHit
 // re-derivation here — exact-bytes + live chip are the tighter pin. Needle
 // Sword twin's rider absence is a foreign row: its inert-bytes belong to
-// MA-1522 sprite-invisibility.test.js:127, not re-derived here.
+// MA-1522 monsterSelfBuff.sprite-invisibility.test.js disk[1]-discriminator
+// :114-117 (old :127 cite drifted; header map :43 records disk[4]->disk[1]),
+// not re-derived here. (fix#366 cite-retarget #1144)
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';

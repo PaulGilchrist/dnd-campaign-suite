@@ -12,7 +12,7 @@
 // :184/:275 (MA-0003/MA-0012) + ability-save-uses.test.jsx:127 (MA-0020
 // pins chip bytes '(2/Day · 2 left)') + ma0543:213 (2/Day Each + 1/Day
 // counters, twin of this row's tiers); gated spend/refusal wording
-// spellcasting.test.jsx:281/:317/:518 (2/Day spend + 3rd-cast refusal,
+// spellcasting.test.jsx:282/:318/:508 (2/Day spend + 3rd-cast refusal,
 // MA-0276) + usage.test.js:16-38 (#571 usage-text owner); advisory cast-log
 // with row DC class ma0524:222 (Sleep — damageless gated advisory, no bogus
 // save roll); Hold Person spell shape (damageless, dc WIS/none,

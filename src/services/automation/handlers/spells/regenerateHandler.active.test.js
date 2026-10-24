@@ -49,7 +49,7 @@
 //   • #1949: handle() never READS the flag (write side lives in apply); do not
 //     re-add predicate or turn-tick pins there. The 1 HP/turn turn-start tick is
 //     turnStartEffects.js territory, already pinned in
-//     applyTurnStartEffects.test.js L250-264, expirations_additional.test.js
+//     applyTurnStartEffects.test.js L250-272, expirations_additional.test.js
 //     L247/L268 — cites refreshed fix#336S/#1297 (old L241/L271/L293 + the
 //     retired expirations_applyAuraDamage.test.js L524 pin died with #1137); no duplication.
 // ──────────────────────────────────────────────────────────────────────────────

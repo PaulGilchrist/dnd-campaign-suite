@@ -237,7 +237,6 @@ describe('massHealingWordService.triggerMassHealingWord', () => {
         ['real-disk family twin Mass Cure Wounds', diskRow(spells5e, 'Mass Cure Wounds')],
         ['real-disk near-miss Healing Word (same 1d4 ladder family)', diskRow(spells5e, 'Healing Word')],
         ['real-disk near-miss Mass Heal', diskRow(spells5e, 'Mass Heal')],
-        ['case-drift name (caller gates lowercase, service does not)', { name: 'mass healing word', level: 3, heal_at_slot_level: mhw5e.heal_at_slot_level }],
         ['missing name', { level: 3, heal_at_slot_level: mhw5e.heal_at_slot_level }],
         ['null name', { name: null, level: 3 }],
     ])('name gate rejects %s before any engine work', async (_label, spell) => {
@@ -253,6 +252,26 @@ describe('massHealingWordService.triggerMassHealingWord', () => {
         expect(dispatchSpy).not.toHaveBeenCalled();
         expect(consoleSpy).not.toHaveBeenCalled();
     });
+
+    // fix#349 #1385 mixed-case-name-caller-lands-service arm (flips the old
+    // 'case-drift ... service does not [gate]' reject row): the gate now folds
+    // case on BOTH sides with the exact triggerSpells.js:430 dispatcher idiom
+    // (`spell.name.toLowerCase() === 'mass healing word'`), so every casing the
+    // dispatcher admits must land the service, not silently null.
+    it.each(['mass healing word', 'MASS HEALING WORD', 'Mass healing word', 'Mass Healing Word'])(
+        'name %s reaches the engine and heals (folded gate parity with dispatcher)', async (name) => {
+            getCombatContext.mockResolvedValue(cs([{ name: 'Ally', maxHp: 100 }]));
+            seedHp('Ally', 50);
+            roll('normal', 20, [4, 4, 4, 4, 4]);
+
+            const result = await trigger({ ...mhw5e, name });
+
+            expect(result).not.toBeNull();
+            expect(result.formula).toBe(mhw5e.heal_at_slot_level[3].replace('MOD', '4'));
+            expect(result.targets).toEqual([{ targetName: 'Ally', healAmount: 20, rolls: [4, 4, 4, 4, 4], rawTotal: 20 }]);
+            expect(applyHealingToTarget).toHaveBeenLastCalledWith(expect.anything(), 'Ally', 20, CAMPAIGN);
+            expect(rollExpression).toHaveBeenCalledTimes(1);
+        });
 
     it('short-circuits combat context: null context, missing creatures array (exact throw + log), empty creatures', async () => {
         getCombatContext.mockResolvedValueOnce(null);

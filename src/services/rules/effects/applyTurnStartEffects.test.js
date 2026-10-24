@@ -264,6 +264,10 @@ describe('applyTurnStartEffects', () => {
         11,
         'TestCampaign'
       );
+      // fix#356(a) count pin: exactly ONE currentHitPoints write — fallback
+      // tick is the sole writer when no typed row exists (no double-tick).
+      const hpWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'currentHitPoints');
+      expect(hpWrites).toHaveLength(1);
     });
   });
 

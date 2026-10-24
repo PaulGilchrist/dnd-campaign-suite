@@ -105,14 +105,11 @@ describe('MA-1952 disk fingerprint: Nidhogg Grave Gale self-resolves DC 24 STR 4
       .filter((a) => a.delegates_to && !numericSelfResolve(a))
       .map((a) => a.name);
     expect(pureDelegates).toEqual(['Bite', 'Claw']);
-    // hijack-source decoy row: Corpse Wind's master bytes untouched (MA-1948 pin)
-    // — 12d10 CON half-default must stay in the attack lane, ~3.7× overkill if
-    // it ever adjudicated the legendary press again.
-    expect(WIND.recharge).toBe('5-6');
-    expect(WIND.save_dc).toBe(24);
-    expect(WIND.save_type).toBe('Constitution');
-    expect(WIND.damage_dice_primary).toBe('12d10');
-    expect(WIND.damage_type_primary).toBe('Necrotic');
-    expect(WIND.dc_success).toBeUndefined(); // half-default RAW-correct for the master
+    // hijack-source decoy row: Corpse Wind master bytes OWNED verbatim by
+    // ma1948 :59-71 (rec #1121 trim): save_dc/save_type/dice/dc_success-
+    // absence/recharge quartet+decoy dropped — same disk bytes, same values,
+    // pinned stronger there. This lane keeps only the name-presence leg that
+    // proves the pure-delegate census above is non-vacuous.
+    expect(WIND.name).toBe('Corpse Wind (Recharge 5-6)');
   });
 });

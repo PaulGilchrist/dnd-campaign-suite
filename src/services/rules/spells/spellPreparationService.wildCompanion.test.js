@@ -299,14 +299,19 @@ describe('CLA-388 Wild Companion — paid-grant shared-key auth + consume in spe
     // freeCastAuthorized:true cast cannot re-stamp, re-log, or drain anything.
     mem.set(GRANT, null);
     expect(auth('Find Familiar', 1, druidStats()).verdict).toBe(false);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const forced = await prepareSpellCast(ff2024, {}, {
       playerName: CASTER, playerStats: druidStats(), campaignName: CAMPAIGN,
       isUpcast: false, freeCastAuthorized: true,
     });
-    expect(setRuntimeValue).not.toHaveBeenCalled(); // :475 Array.isArray(null) guard — write-silent
+    expect(setRuntimeValue.mock.calls).toEqual([[CASTER, 'spell_slots_level_1', 3, CAMPAIGN]]); // fix#341(a) FLIP: spent-null denies the LIST -> the forced flag is REFUTED and the lv1 bank pays (max face 4->3) — write-silent only ever held on the param's word
     expect(addEntry).not.toHaveBeenCalled();
-    expect(forced.freeCastUsed).toBe(true); // the unpaid cast runs free of grants; nothing re-arms (#1515 read-vs-write distinction)
-    expect(mem.get(GRANT)).toBe(null);
+    expect(forced.freeCastUsed).toBe(false); // was true on the caller's word alone — FLIPPED
+    expect(forced.slotConsumed).toBe(true); // fails SAFE toward consumption
+    expect(mem.get(GRANT)).toBe(null); // nothing re-arms (#1515 read-vs-write distinction holds)
+    const refutedA = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refutedA.length).toBe(1); // exact-of-1, never silent
+    errSpy.mockRestore();
 
     // (b) STRUCT probe (mutation of the disk bytes, NOT a disk row): rename the
     // resourceCost. Auth never reads :471 — still TRUE; consume never fires — the
@@ -314,6 +319,7 @@ describe('CLA-388 Wild Companion — paid-grant shared-key auth + consume in spe
     // resourceCost is the consume channel's identity byte.
     const renamed = { ...druidStats(), automation: { actions: [{ ...wcEntry(), resourceCost: 'wild_shape' }], bonusActions: [], specialActions: [], passives: [] } };
     mem.set(GRANT, ['Find Familiar']);
+    vi.clearAllMocks(); // isolate the (a)-arm paid write from this row's zero-write oracle census
     expect(auth('Find Familiar', 1, renamed).verdict).toBe(true);
     await prepareSpellCast(ff2024, {}, {
       playerName: CASTER, playerStats: renamed, campaignName: CAMPAIGN,
@@ -328,13 +334,21 @@ describe('CLA-388 Wild Companion — paid-grant shared-key auth + consume in spe
     mem.set(GRANT, ['Find Familiar']);
     expect(auth('Speak with Animals', 1, druidStats()).verdict).toBe(false);
     expect(auth('Speak with Plants', 3, druidStats()).verdict).toBe(false); // lv3 sibling, disk-absent from the entry
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await prepareSpellCast(swa2024, {}, {
       playerName: CASTER, playerStats: druidStats(), campaignName: CAMPAIGN,
       isUpcast: false, freeCastAuthorized: true,
     });
-    expect(setRuntimeValue).not.toHaveBeenCalled(); // :471-:472 some() spell-name gate — sibling steals nothing
+    // fix#341(a) FLIP: the off-name sibling hits NO list -> the forced flag is REFUTED
+    // LOUD and the lv1 bank pays (max face 4->3). Isolation still the rule: the shared
+    // grant is untouched by the refusal — the paid cast steals nothing either.
+    expect(setRuntimeValue.mock.calls).toEqual([[CASTER, 'spell_slots_level_1', 3, CAMPAIGN]]);
     expect(addEntry).not.toHaveBeenCalled();
     expect(mem.get(GRANT)).toEqual(['Find Familiar']);
+    const refutedB = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refutedB.length).toBe(1); // exact-of-1, never silent
+    errSpy.mockRestore();
+    vi.clearAllMocks(); // isolate the oracle census from the paid-write above (auth() pins ZERO writes)
     expect(auth('Find Familiar', 1, druidStats()).verdict).toBe(true); // latch survived the refusal, still spendable
   });
 });

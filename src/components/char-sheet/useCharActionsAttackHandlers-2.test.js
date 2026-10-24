@@ -368,6 +368,35 @@ describe('useCharActionsAttackHandlers — chooser terminal handlers', () => {
         });
     });
 
+    // fix#362 (ledger :494 rec #326): the `effectChoices.join(' + ') || 'no
+    // effect'` empty-choice branch was unpinned anywhere — both production sites
+    // (useCharActionsAttackHandlers.js :255 reckless-confirm, :310 brutalOnly
+    // confirm) are pinned here with the exact logged bytes.
+    describe.each([
+        ['handleRecklessAttackConfirm (:255)', (handlers, attack, choice) => handlers.handleRecklessAttackConfirm(attack, choice)],
+        ['handleBrutalStrikeConfirm (:310)', (handlers, attack, choice) => handlers.handleBrutalStrikeConfirm(choice, attack)],
+    ])('%s with empty effectChoices', (_label, invoke) => {
+        it('logs the literal "no effect" tail and stamps the empty array verbatim', async () => {
+            const deps = createDeps();
+            const handlers = useCharActionsAttackHandlers(deps);
+            const attack = makeAttack();
+
+            invoke(handlers, attack, { useBrutalStrike: true, effectChoices: [] });
+
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Brutal Strike',
+                description: `${playerName} uses Brutal Strike on Longsword — no effect`,
+            });
+            expect(writesTo(deps, '_brutalStrikeEffects')).toEqual([
+                [playerName, '_brutalStrikeEffects', [], campaignName],
+            ]);
+
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith(attack.name, 6, { hitBonus: 8 }));
+        });
+    });
+
     describe('handleBrutalStrikeCancel', () => {
         it('clears the sticky, closes the chooser, and rolls the plain attack without arming anything', async () => {
             const ctx = { hitBonus: 8 };

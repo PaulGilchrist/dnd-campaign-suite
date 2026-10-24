@@ -10,6 +10,7 @@
 // - Nick / Dual Wielder off-hand lanes → attackCalc2024*.nick / -nick-dual-wielder.test.js
 import { describe, it, expect, vi } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
+import DISK_EQUIPMENT from '../../../../public/data/equipment.json';
 
 // Only combatData is stubbed — buildWeaponAttack / buildMonkAttacks /
 // buildFallbackUnarmedAttacks / classRules2024 run REAL (cla225-lane pattern),
@@ -153,6 +154,76 @@ describe('attackCalc2024 - class features', () => {
       expect(result.filter(a => a.isPsychicBlade)).toHaveLength(0);
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Unarmed Strike');
+    });
+  });
+
+  // #1240 DISCHARGED fix#340 — WEAPON-row byte pin for 2024
+  // buildMeleeMainHandAttack extraHit/extraDamage (attackCalc2024.js:141-158).
+  // Gap: prior coverage pinned Blessed Warrior only on FALLBACK/UNARMED rows
+  // (:41 Tavern Brawler lane, :159 fallback lane); the equipped-weapon row that
+  // folds the style bonuses through buildWeaponAttack was never pinned.
+  // Disk law public/data/fighting-styles.json (read BY-name 2026-10-23):
+  //   "Blessed Warrior":  "You gain a +2 bonus to attack rolls you make with melee weapons."
+  //   "Druidic Warrior":  "You gain a +2 bonus to damage rolls you make with melee weapons."
+  // Granted 2024 by public/data/2024/classes.json Cleric lv1 [6]: "Alternatively,
+  // you can choose Blessed Warrior..." and Druid lv1 [7]: "...choose Druidic
+  // Warrior...". Dagger row is the REAL disk object (index dagger: 1d4
+  // Piercing, Simple Melee, Light), never transcribed. 5e twin comparison is
+  // already pinned in attackCalc.test.js:296-305 (Longsword weapon rows) —
+  // not repeated here.
+  describe('Blessed Warrior / Druidic Warrior on WEAPON rows (#1240)', () => {
+    const DAGGER = DISK_EQUIPMENT.find(it => it.name === 'Dagger');
+    const armedChar = (cls, level = 5) => ({
+      ...char({ level, str: 3, dex: 1, cls }),
+      inventory: { equipped: ['Dagger'] },
+    });
+
+    it('falsifier — no style: plain Dagger 1d4+3, to-hit 6, neither label', () => {
+      const result = getAttacks([DAGGER], [], armedChar({ name: 'Fighter' }));
+
+      expect(result).toHaveLength(1);
+      const row = result[0];
+      expect(row).toMatchObject({
+        name: 'Dagger', type: 'Action', weaponType: 'melee',
+        damage: '1d4+3', hitBonus: 6,
+        damageFormula: 'Damage Formula = Weapon (1d4) + Strength Bonus (3)',
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (3)',
+      });
+      expect(row.damageFormula).not.toContain('Druidic Warrior');
+      expect(row.hitBonusFormula).not.toContain('Blessed Warrior');
+    });
+
+    it('Blessed Warrior: +2 to the attack roll ONLY (disk) — hit 6 to 8, damage stays 1d4+3', () => {
+      const result = getAttacks([DAGGER], [], armedChar({ name: 'Cleric', fightingStyles: ['Blessed Warrior'] }));
+
+      expect(result).toHaveLength(1);
+      const row = result[0];
+      expect(row.hitBonus).toBe(8); // str(3) + PB(3) + BW(2)
+      expect(row.hitBonusFormula).toBe('To Hit Bonus Formula = Strength Bonus (3) + Proficiency (3) + Blessed Warrior (2)');
+      expect(row.damage).toBe('1d4+3');
+      expect(row.damageFormula).not.toContain('Druidic Warrior');
+    });
+
+    it('Druidic Warrior: +2 to the damage roll ONLY (disk) — damage 1d4+5, hit stays 6', () => {
+      const result = getAttacks([DAGGER], [], armedChar({ name: 'Druid', fightingStyles: ['Druidic Warrior'] }));
+
+      expect(result).toHaveLength(1);
+      const row = result[0];
+      expect(row.damage).toBe('1d4+5'); // str(3) + DW(2)
+      expect(row.damageFormula).toBe('Damage Formula = Weapon (1d4) + Strength Bonus (3) + Druidic Warrior (2)');
+      expect(row.hitBonus).toBe(6);
+      expect(row.hitBonusFormula).not.toContain('Blessed Warrior');
+    });
+
+    it('BW + DW stack by their own terms (attack +2, damage +2) — acquisition legality not asserted', () => {
+      const result = getAttacks([DAGGER], [], armedChar({ name: 'Fighter', fightingStyles: ['Blessed Warrior', 'Druidic Warrior'] }));
+
+      expect(result).toHaveLength(1);
+      const row = result[0];
+      expect(row.hitBonus).toBe(8);
+      expect(row.hitBonusFormula).toContain('Blessed Warrior (2)');
+      expect(row.damage).toBe('1d4+5');
+      expect(row.damageFormula).toContain('Druidic Warrior (2)');
     });
   });
 

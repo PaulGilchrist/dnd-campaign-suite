@@ -635,10 +635,11 @@ describe('executeSpellCast heal-slot ladder edges (index.js :365-:446) — the a
     ]);
   });
 
-  it('QUIRK spellCastingMod (:212/:217): cantripSpellAbility truthy-but-absent-from-abilities skips the else-if — REAL disk Cure Wounds rolls "1d8 + 0", never "1d8 + 3" (K5/K6)', async () => {
-    // spellAbilities.modifier 3 is UNREACHABLE here: :212 is truthy
-    // ('Strength') so the :217 else-if that would read it never runs.
-    // The old suite name claimed the opposite; this is the true byte.
+  it('FLIPPED #1496 (fix#355(b)) spellCastingMod (:212/:217): cantripSpellAbility truthy-but-absent-from-abilities is LOUD and coalesces to spellAbilities.modifier per the massHealUtils getSpellCastingMod twin — REAL disk Cure Wounds rolls "1d8 + 3", never the pre-fix silent "1d8 + 0" (K5/K6)', async () => {
+    // fix#355(b) landed the loud third arm: :212 truthy ('Strength') with NO
+    // Strength row console.errors and defaults to spellAbilities.modifier 3
+    // (massHealUtils.js:18-:19 twin), so the cached modifier is NO LONGER
+    // unreachable — the old QUIRK byte ('1d8 + 0', zero noise) is retired.
     const spell = { ...DISK_CURE, spellCastingAbility: 'Strength' };
     const services = makeServices(casterStats());
     rollExpression.mockReturnValue({ total: 6, rolls: [6] });
@@ -646,13 +647,15 @@ describe('executeSpellCast heal-slot ladder edges (index.js :365-:446) — the a
     const result = await executeSpellCast(spell, { slotLevel: 1, targetName: TARGET }, services);
 
     expect(rollExpression).toHaveBeenCalledTimes(1);
-    expect(rollExpression).toHaveBeenCalledWith('1d8 + 0');
-    expect(result).toStrictEqual(diceEnvelope('1d8 + 0', [6], 6, 6));
+    expect(rollExpression).toHaveBeenCalledWith('1d8 + 3');
+    expect(result).toStrictEqual(diceEnvelope('1d8 + 3', [6], 6, 6));
     expect(applyHealingToTarget).toHaveBeenCalledWith(COMBAT_CTX, TARGET, 6, CAMPAIGN);
     expect(loggedEntries()).toEqual([
       castLogOf(spell, 1),
-      hpLogOf(spell, { delta: 6, currentHp: 26, maxHp: 100, formula: '1d8 + 0' }),
+      hpLogOf(spell, { delta: 6, currentHp: 26, maxHp: 100, formula: '1d8 + 3' }),
     ]);
-    expect(consoleError).not.toHaveBeenCalled();
+    expect(consoleError.mock.calls.map(c => c[0])).toEqual([
+      "[spellCast] computeSpellStats: cantripSpellAbility 'Strength' is absent from playerStats.abilities — defaulting to spellAbilities.modifier per the massHealUtils getSpellCastingMod twin (never a silent 0).",
+    ]);
   });
 });

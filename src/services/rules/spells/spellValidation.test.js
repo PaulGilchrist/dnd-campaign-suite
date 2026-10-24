@@ -21,12 +21,18 @@
 // Wizard" — pinned against MAGICAL_SECRETS_CLASS_LISTS bytes.
 //
 // Quirks pinned as CURRENT behavior (reported, not sanctioned; file:line of spellValidation.js):
-//  Q1 :276 applyClassSpellSource sets isSpellcaster=true unconditionally for ANY class name,
-//     even one absent from disk ('Artificer' row proves it); false only when no class is named.
+//  Q1 FIXED #342: applyClassSpellSource's isSpellcaster now reads the disk class
+//     spellcasting table (spellLimits.js mirror: requiresOtherMajor :85 +
+//     findSpellcastingInClass :173) — Barbarian/Fighter/Monk/Rogue and off-disk
+//     'Artificer' refuse; caster classes pass on their lv1 rows; 5e Eldritch
+//     Knight/Arcane Trickster pass only via subclass rows at lv>=3.
 //  Q2 FIXED #1530: the Magic Initiate capture 'two' is now catalog-refused + console.error'd;
 //     grantedCantrips stays [] (guard row below).
-//  Q3 :216 ALL 5e feats.json descriptions are arrays, and the gate `desc.includes('cantrip')`
-//     on an array is an element check -> false -> 5e feat description parsing is inert.
+//  Q3 FIXED #342: feat descriptions are coerced (Array.isArray ? join(' ') : raw) BEFORE
+//     the includes-gate, so 5e ARRAY descriptions (all 42 disk feats) parse through the
+//     same catalog-validated path 2024 strings always used. Over-grant audit: zero disk
+//     grants change (no 5e feat text has <em> markup or a catalog-matched capture;
+//     Magic Initiate's 'two' is now refused LOUDLY — the audible proof the parser runs).
 //  Q4 FIXED #1530: 'Mending and Prestidigitation' now SPLITS on the conjunction and both
 //     parts catalog-match (deduped against the em-arm hits); no multi-word junk token survives.
 //  Q5 FIXED #1530: pattern-arm captures are canonicalized through the spell catalog with a
@@ -55,7 +61,7 @@
 //  G-gnome duplicate Minor Illusion dedup; K7 catalog filter + conjunction split + loud-drop ->
 //  #1530 guard rows ('two' dropped+errored, 'Mending and Prestidigitation' splits to two valid
 //  titled spells, lowercase 'thaumaturgy' canonicalized, 'Armor' substring junk refused); K8 desc
-//  includes-gate -> G-feats 5e bypass row; K9 feat-name hardcodes -> G-feats 2024 exact block;
+//  coercion+includes-gate -> G-feats 5e live-parse rows (fix#342: loud-drop + STRUCT array feat); K9 feat-name hardcodes -> G-feats 2024 exact block;
 //  K10 features||traits fallback -> B-rows; K11 5e join vs 2024 coercion (version branch) ->
 //  E-struct row (identical fixture, divergent output); K12 sourceName ?. -> '' names in G-guard;
 //  K13 loader gates -> G-guard call census; K14 Fighter/Rogue proxy line -> P-row allow+refuse;
@@ -206,17 +212,45 @@ describe('spellValidation', () => {
       [
         '5e',
         ['Magic Initiate'],
-        // Q3: 5e feats.json descriptions are arrays -> desc-parse arm inert; only the
-        // name-hardcoded block contributes. 'Not A Feat' is silently skipped (:261 find-miss).
+        // Q3 FIXED #342: array desc is coerced to joined text before the gate, so the
+        // parse arm now RUNS on 5e disk prose. Over-grant audit: granted lists unchanged —
+        // 'You learn two cantrips' hits the #1530 catalog filter and 'two' is refused;
+        // the loud-drop assertion below is the proof of live parsing (was: inert, Q3).
+        // 'Not A Feat' is silently skipped (find-miss).
         { grantedSpells: [], grantedCantrips: [], spellListAccess: ['Any class (chosen by player)'] },
       ],
     ])('%s feats %j aggregate exactly', async (version, feats, expected) => {
       const result = await getSpellSources({ class: { name: 'Wizard' }, feats }, version);
 
       expect(result.feats).toStrictEqual(expected);
+      if (version === '5e') {
+        // fix#342(b) falsifier: the array-shaped description reaches the parser,
+        // which drops 'two' via the catalog (console.error was NEVER fired pre-fix).
+        expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('"two"'));
+      }
     });
 
-    it('guards absent sources and pins the unconditional-isSpellcaster quirk (Q1)', async () => {
+    it('fix#342(b): a 5e ARRAY feat description parses through the same catalog-validated path (STRUCT fixture)', async () => {
+      vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
+        {
+          name: 'STRUCT Feat',
+          description: [
+            'You gain spellcasting. You know the <em>Light</em> cantrip,',
+            'and you learn the Guidance cantrip.',
+          ],
+        },
+      ]);
+      const sources = await getSpellSources(
+        { class: { name: 'Wizard' }, feats: ['STRUCT Feat'] },
+        '5e',
+      );
+      // em-arm (known-cantrip list) + catalog pattern-arm both fire on the joined text;
+      // pre-fix this row extracted NOTHING (element-check gate -> false -> early bypass).
+      expect(sources.feats.grantedCantrips).toStrictEqual(['Light', 'Guidance']);
+      expect(sources.feats.grantedSpells).toStrictEqual([]);
+    });
+
+    it('guards absent sources and refuses off-disk/non-caster classes (Q1 FIXED #342)', async () => {
       const empty = await getSpellSources({}, '5e');
       expect(empty).toStrictEqual({
         class: { name: '', spellList: [], isSpellcaster: false },
@@ -229,19 +263,41 @@ describe('spellValidation', () => {
       expect(dataLoader.loadBackgroundData).not.toHaveBeenCalled();
       expect(dataLoader.loadFeatData).not.toHaveBeenCalled();
 
-      // Named-but-off-disk class + anonymous race/background entries: only the class loader
-      // runs, spellList is empty, yet isSpellcaster stays true (Q1). Anonymous entries carry
-      // '' names and never reach their loaders.
+      // Named-but-off-disk class + anonymous race/background entries: only the class
+      // loader runs, spellList is empty, and since fix#342 isSpellcaster is FALSE —
+      // the disk table has no rows to admit the name (was: unconditional true, Q1).
+      // Anonymous entries carry '' names and never reach their loaders.
       const offDisk = await getSpellSources(
         { class: { name: 'Artificer' }, race: {}, background: {}, feats: [] },
         '5e',
       );
-      expect(offDisk.class).toStrictEqual({ name: 'Artificer', spellList: [], isSpellcaster: true });
+      expect(offDisk.class).toStrictEqual({ name: 'Artificer', spellList: [], isSpellcaster: false });
       expect(offDisk.race).toStrictEqual({ name: '', spells: [], cantrips: [] });
       expect(dataLoader.loadClassData).toHaveBeenCalledTimes(1);
       expect(dataLoader.loadRaceData).not.toHaveBeenCalled();
       expect(dataLoader.loadBackgroundData).not.toHaveBeenCalled();
       expect(dataLoader.loadFeatData).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      // non-casters-now-rejected (disk classes with no ungated spellcasting row):
+      ['5e Fighter lv1 — disk: zero spellcasting rows at every level', 'Fighter', '5e', null, 1, false],
+      ['5e Barbarian lv1', 'Barbarian', '5e', null, 1, false],
+      ['5e Monk lv1', 'Monk', '5e', null, 1, false],
+      ['2024 Rogue lv3 no major — rows required_major-gated, major mismatch', 'Rogue', '2024', null, 3, false],
+      ['2024 Fighter lv2 no major', 'Fighter', '2024', null, 2, false],
+      // subclass-caster seams (disk subclass rows BY-name, lv>=3):
+      ['5e Fighter lv2 + Eldritch Knight — EK spellcasting rows start lv3', 'Fighter', '5e', 'Eldritch Knight', 2, false],
+      // caster-legit-pass (no regression — disk lv1 spellcasting rows, ungated):
+      ['5e Wizard lv1 — disk lv1 spellcasting row', 'Wizard', '5e', null, 1, true],
+      ['5e Cleric lv1', 'Cleric', '5e', null, 1, true],
+      ['2024 Warlock lv1', 'Warlock', '2024', null, 1, true],
+      ['2024 Rogue lv3 + Arcane Trickster — required_major row matches major', 'Rogue', '2024', 'Arcane Trickster', 3, true],
+      ['5e Fighter lv3 + Eldritch Knight — subclass class_levels row lv3', 'Fighter', '5e', 'Eldritch Knight', 3, true],
+    ])('fix#342(a) disk-table oracle: %s', async (_label, name, version, major, level, expected) => {
+      const formData = { class: { name, major: major ? { name: major } : undefined }, level };
+      const sources = await getSpellSources(formData, version);
+      expect(sources.class.isSpellcaster).toBe(expected);
     });
 
     it('branches on version: 5e joins array descriptions, 2024 does not (STRUCT fixture)', async () => {
@@ -589,7 +645,7 @@ describe('spellValidation', () => {
       ]);
       expect(result.spellCount).toBe(2);
       expect(result.classSpellList).toEqual(['Wizard']);
-      expect(result.isSpellcaster).toBe(true); // Q1: unconditional true for any named class
+      expect(result.isSpellcaster).toBe(true); // fix#342(a): disk lv1 spellcasting row admits Wizard
       expect(result.valid).toBe(false);
       expect(result.warnings).toStrictEqual([{ message: notFound('Not A Spell'), type: 'warning' }]);
       expect(result.sources).toStrictEqual({

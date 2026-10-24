@@ -262,23 +262,10 @@ describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
             expect(popups[0][0].formula).toBe(folded);
         });
 
-        it.each([
-            ['a non-evocation school', 'Conjuration', 2],
-            ['a zero INT modifier', 'Evocation', 0],
-        ])('does not fold Empowered Evocation for %s', async (_label, school, intMod) => {
-            hasPotentCantrip.mockReturnValue(true);
-            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(intMod);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            await createFn()('Fire Bolt', 3, 'attack', {
-                ...baseOpts,
-                autoDamageSchool: school,
-                isAutoMiss: true,
-            });
-            const missLogs = findCantripMissHalfDamageLogs();
-            expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0].formula).toBe('1d10');
-        });
+        // REC #931 folded (fix#364): the school-gate and zero-INT non-fold legs
+        // owned by attackPostProcessing-cla120-potent-cantrip.test.js t3 (same
+        // production gate, buildPotentMissFormula). Full-lane unfolded pass-through
+        // stays pinned here above (:226 rolls '1d10' byte-exact) — zero coverage loss.
     });
 
     describe('soulknife psychic blades homing strikes', () => {

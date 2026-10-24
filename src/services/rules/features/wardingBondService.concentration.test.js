@@ -1,7 +1,9 @@
 // @maintained-by-ai
 // LANE: this file owns ONLY the concentration-DC stamp in shareWardingBondDamage —
-// wardingBondService.js:47-49 (`if (concentration && sharedDamage > 0)
-// concentration.dc = Math.max(10, Math.floor(sharedDamage / 2))`) — plus WHERE the
+// wardingBondService.js:78-98 (`if (concentration && sharedDamage > 0)` → player leg
+// clone-write setRuntimeValue(casterName,'concentration',{...concentration,dc},campaign)
+// fix#349 #1425; NPC leg in-place casterCreature.concentration.dc = ...,
+// combatSummary-persisted like applyDamage.js:910) — plus WHERE the
 // concentration object comes from on each caster path (non-player: `casterCreature.concentration`
 // :36; player: live store object at getRuntimeValue(casterName, 'concentration', campaign) :34-35).
 // Sibling lanes (verified by header scan, never duplicated here):
@@ -45,7 +47,7 @@ const campaignName = 'TestCampaign';
 // getRuntimeValue returns the LIVE stored reference — production useRuntimeState.js:74
 // (`store.get(propertyName)`) does the same, which is what lets :48 mutate concentration
 // in place without a write-back.
-function seedStore(initial) {
+function seedStore(initial, writeOverrides = {}) {
     const data = new Map(Object.entries(initial));
     const reads = [];
     const writes = [];
@@ -71,6 +73,8 @@ function seedStore(initial) {
             throw new Error(`setRuntimeValue wrong campaign: ${campaign}`);
         }
         writes.push([owner, key, value]);
+        const override = writeOverrides[`${owner}|${key}`];
+        if (override) return override(); // REAL-PROMISE inject: awaited by the service's fix#352(e) loud-CATCH arm
         data.set(`${owner}|${key}`, value);
     });
     return { reads, writes, data };
@@ -84,7 +88,7 @@ function withinRange30() {
     getDistanceFeet.mockReturnValue(30);
 }
 
-describe('wardingBondService concentration DC stamp (service :47-49)', () => {
+describe('wardingBondService concentration DC stamp (service :78-98, fix#349 store-first)', () => {
     let consoleError;
 
     beforeEach(() => {
@@ -145,7 +149,13 @@ describe('wardingBondService concentration DC stamp (service :47-49)', () => {
         }
     });
 
-    it('player caster: stamps dc on the LIVE store concentration object and never writes the key back', () => {
+    // fix#349 #1425 dc-write-goes-through-store arm — RETIRES the old QUIRK
+    // PIN ('stamps dc on the LIVE store concentration object and never writes
+    // the key back'): the player leg now clone-writes { ...concentration, dc }
+    // through setRuntimeValue (store-first law, sleetStormHandler.js:219-224
+    // idiom), so the dc PERSISTS and BROADCASTS. The live seeded object is now
+    // untouched — raw in-place store mutation alone must never land.
+    it('player caster: dc write goes through the store as a clone — setRuntimeValue(concentration) carries the new dc, live object untouched', () => {
         withinRange30();
         const goblin = { name: 'Goblin' };
         const conc = { dc: 15 };
@@ -160,16 +170,62 @@ describe('wardingBondService concentration DC stamp (service :47-49)', () => {
 
         applyWardingBond(goblin, { creatures: [goblin] }, campaignName, 45);
 
-        expect(conc.dc).toBe(22); // floor(45/2) — :48 mutates the object the store holds
+        expect(conc.dc).toBe(15); // LIVE store object NEVER mutated in place
         expect(reads).toEqual([
             'Goblin|activeBuffs',
             'Paladin|currentHitPoints',
             'Paladin|maxHitPoints',
             'Paladin|concentration',
         ]);
-        // QUIRK PIN: currentHitPoints gets a setRuntimeValue write (:27) but the mutated
-        // concentration dc does NOT — in-place store mutation, no write-back, no SSE broadcast.
-        expect(writes.map(w => [w[1], w[2]])).toEqual([['currentHitPoints', 55]]);
+        // Writes: currentHitPoints (:51) then the concentration clone carrying
+        // dc = floor(45/2) = 22 — the pre-fix silent-drift byte (no write-back)
+        // is dead; the key now persists with the full concentration shape.
+        expect(writes).toEqual([
+            ['Paladin', 'currentHitPoints', 55],
+            ['Paladin', 'concentration', { dc: 22 }],
+        ]);
+        // store truth: the key now HOLDS the new dc (write-back landed)
+        expect(reads.length).toBe(4);
+    });
+
+    // fix#352(e) arm: the player-leg concentration write (service :111) is
+    // fire-and-forget RETAINED (fix#349(d)) but now carries a loud-CATCH —
+    // a rejected store write surfaces in a microtask, silent strands die.
+    it('store-reject arm: rejected concentration write logs loudly, never strands silent (fix#352(e))', async () => {
+        withinRange30();
+        const conc = { dc: 15 };
+        const errC = new Error('concentration store down');
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            const goblin = { name: 'Goblin' };
+            const { writes, data } = seedStore(
+                {
+                    'Goblin|activeBuffs': bondBuff('Paladin'),
+                    'Paladin|currentHitPoints': 100,
+                    'Paladin|maxHitPoints': 200,
+                    'Paladin|concentration': conc,
+                },
+                { 'Paladin|concentration': () => Promise.reject(errC) },
+            );
+            addEntry.mockResolvedValue(undefined);
+
+            applyWardingBond(goblin, { creatures: [goblin] }, campaignName, 45);
+
+            // Sync census: both write ATTEMPTS recorded; a REAL Promise rejects
+            // only in a microtask, so console is still clean here.
+            expect(writes).toEqual([
+                ['Paladin', 'currentHitPoints', 55],
+                ['Paladin', 'concentration', { dc: 22 }],
+            ]);
+            expect(consoleError.mock.calls).toEqual([]);
+
+            for (let i = 0; i < 10; i++) await Promise.resolve(); // bounded flush (#1401 form)
+            expect(consoleError.mock.calls).toEqual([['[wardingBond] caster concentration store reject:', errC]]);
+            expect(consoleError.mock.calls[0][1]).toBe(errC); // identical instance #1385
+            expect(data.get('Paladin|concentration')).toBe(conc); // stranded honesty: dc lives only in the refused copy
+        } finally {
+            consoleError.mockRestore();
+        }
     });
 
     it('lethal mirror damage still stamps dc before the bond ends, and ending leaves the concentration object intact', () => {

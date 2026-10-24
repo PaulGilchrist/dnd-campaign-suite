@@ -624,7 +624,7 @@ describe('executeSpellCast noDamage base chain — LIVE disk-byte intercepts (au
     { i: 29, name: 'Stinking Cloud', kind: 'disk', label: ':311 swallow' },
     { i: 30, name: 'Sleet Storm', kind: 'disk', label: ':312 swallow' },
     { i: 31, name: 'Faerie Fire', kind: 'disk', label: ':313 passThrough' },
-    { i: 32, name: "Tasha's Hideous Laughter", rules: '2024', kind: 'disk', label: ':314 passThrough forwards handler result VERBATIM (:389 unwrapped result, no automationPopup wrap)' },
+    { i: 32, name: "Tasha's Hideous Laughter", rules: '2024', kind: 'disk', label: ':314 passThrough forwards handler result VERBATIM (fix#358: host now hands the WRAPPED { automationPopup } per faerie guard :385-389 — hub flattening unchanged)' },
     { i: 33, name: 'Imprisonment', kind: 'disk', label: ':315 passThrough (2024 disk hijacked at :710 — reported)' },
   ];
 

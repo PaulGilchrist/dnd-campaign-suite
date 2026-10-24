@@ -5,7 +5,16 @@ export async function triggerBlur(spell, metaCtx, playerStats, campaignName, _ma
     const isBlur = (spell.name || '').toLowerCase() === 'blur';
     if (!isBlur) return null;
 
-    const targetName = metaCtx?.targetName || playerStats.name;
+    // fix#353 (#1341): disk BYTES read range 'Self' on BOTH rulesets
+    // (public/data/spells.json Blur row {level:2, range:'Self', concentration:true};
+    // 2024/spells.json identical) — RAW Blur targets only the caster, so a
+    // pipeline-carried metaCtx.targetName is CLAMPED here; non-caster landing is
+    // structurally impossible.
+    const targetName = playerStats.name;
+    // fix#353: canonical upcast-level idiom BY-cite baneService.js:10
+    // (`metaCtx?.slotLevel || spell.level || 1`) — log the ACTUAL cast level;
+    // base fallback 2 is Blur's disk level (row cited above).
+    const slotLevel = metaCtx?.slotLevel || spell.level || 2;
 
     // Add activeBuffs entry on the target for UI display.
     // Also clear Blur from any previous target (spell ends early if cast again).
@@ -43,8 +52,8 @@ export async function triggerBlur(spell, metaCtx, playerStats, campaignName, _ma
         characterName: playerStats.name,
         targetName,
         spellName: 'Blur',
-        spellLevel: 2,
-        description: `${playerStats.name} casts Blur on ${targetName === playerStats.name ? 'themself' : targetName}. Creatures without Blindsight or Truesight have Disadvantage on attack rolls against them for 1 minute.`,
+        spellLevel: slotLevel,
+        description: `${playerStats.name} casts Blur on themself. Creatures without Blindsight or Truesight have Disadvantage on attack rolls against them for 1 minute.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[blur] Error logging:', e); });
 

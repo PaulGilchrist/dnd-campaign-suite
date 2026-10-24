@@ -22,8 +22,8 @@
 //                                        mid-round steps, each a repeat of test 1 through a
 //                                        fresh handler instance with no shared state.
 //   "guards: round-wrap housekeeping...keep firing"        → REDUNDANT: every assertion is
-//                                        owned by navigationHandlers.test.jsx (majesty :203,
-//                                        gate key :235, turn-start :163) — different seam.
+//                                        owned by navigationHandlers.test.jsx (majesty :191,
+//                                        gate key :211, turn-start :163) — different seam.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createNextCreatureHandler, createPreviousCreatureHandler } from './navigationHandlers.js';
 import * as initiativeService from '../../services/encounters/initiativeService.js';

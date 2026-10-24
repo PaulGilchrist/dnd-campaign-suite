@@ -1,7 +1,10 @@
 // @maintained-by-ai
-// Owned contract: Initiative.jsx's two INLINE window-event listeners —
-//   concentration-result (Initiative.jsx:457-474) and death-save-result
-//   (Initiative.jsx:476-494). These listeners are not factory-owned: no lane
+// Owned contract: Initiative.jsx's INLINE window-event listeners —
+//   concentration-result (Initiative.jsx:457-474), death-save-result
+//   (Initiative.jsx:476-494), and the keydown navigation block
+//   (Initiative.jsx:557-575, fix#362 — re-homed here per the
+//   navigationHandlers.test.jsx:16-20 ruling; factory lanes have no DOM).
+//   These listeners are not factory-owned: no lane
 //   in createConcentrationHandlers (#833-#835), createCreatureHandlers
 //   (#836-#837), createEffectAdderHandlers (#838-#839), createNpcClickHandler
 //   (#840-#846) or createRollConditionSaveHandler (#847) dispatches or handles
@@ -11,11 +14,13 @@
 //   what the listeners DO with a dispatched event: name matching (exact and
 //   "Name " prefix), runtime-store vs combatSummary persistence split,
 //   concentration teardown, and no-op honesty on every guard branch.
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './Initiative.jsx';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getNextCreatureName, getPreviousCreatureName, addNpc, isPreviousDisabled } from '../../services/encounters/initiativeService.js';
+import { expireStaleEffects } from '../../services/rules/effects/expirations.js';
 import storage from '../../services/ui/storage.js';
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js';
 
@@ -238,6 +243,74 @@ describe('Initiative window-event listeners', () => {
 
             expect(storage.set).toHaveBeenCalledTimes(before.storage);
             expect(cleanupConcentrationEffects).toHaveBeenCalledTimes(before.cleanup);
+        });
+    });
+
+    // fix#362 (ledger :860 rec #868): keydown→Prev/Next wiring, re-homed here
+    // per the navigationHandlers.test.jsx:16-20 ruling — the listener lives on
+    // window inside the container (Initiative.jsx:572), unreachable from the
+    // factory-level lanes. Pins each of the three branches at :560-569.
+    describe('window keydown navigation (Initiative.jsx:557-575)', () => {
+        const pressKey = async (key) => {
+            await act(async () => {
+                fireEvent.keyDown(window, { key });
+            });
+        };
+        const activeNameWrites = () =>
+            storage.set.mock.calls.filter(([key]) => key === 'activeCreatureName');
+        const twoCreatures = () => ({
+            round: 1,
+            creatures: [
+                { name: 'Alice', type: 'player' },
+                { name: 'Bob', type: 'player' },
+            ],
+        });
+
+        it('ArrowRight routes to handleNextCreature: persists the new active creature stamp', async () => {
+            vi.mocked(getNextCreatureName).mockReturnValue({ newActiveName: 'Bob', roundIncrement: false });
+            await renderWithSummary(twoCreatures(), 'Alice', 'Bob');
+            const before = activeNameWrites().length;
+
+            await pressKey('ArrowRight');
+
+            expect(getNextCreatureName).toHaveBeenCalledWith(expect.objectContaining({ round: 1 }), 'Alice');
+            expect(expireStaleEffects).toHaveBeenCalledWith('test-campaign', 'Bob');
+            expect(activeNameWrites().slice(before)).toEqual([['activeCreatureName', 'Bob', 'test-campaign']]);
+            expect(latestStoredSummary().activeCreatureName).toBe('Bob');
+        });
+
+        it('ArrowLeft while enabled routes to handlePreviousCreature and stamps the rewind target', async () => {
+            vi.mocked(isPreviousDisabled).mockReturnValue(false);
+            vi.mocked(getPreviousCreatureName).mockReturnValue({ newActiveName: 'Alice', roundDecrement: false });
+            await renderWithSummary(twoCreatures(), 'Alice', 'Bob');
+            const before = activeNameWrites().length;
+
+            await pressKey('ArrowLeft');
+
+            expect(getPreviousCreatureName).toHaveBeenCalledWith(expect.objectContaining({ round: 1 }), 'Alice');
+            expect(activeNameWrites().slice(before)).toEqual([['activeCreatureName', 'Alice', 'test-campaign']]);
+        });
+
+        it('ArrowLeft at the :563 disabled gate stays silent — getPreviousCreatureName never runs, zero activeCreature writes', async () => {
+            vi.mocked(isPreviousDisabled).mockReturnValue(true);
+            await renderWithSummary(twoCreatures(), 'Alice', 'Bob');
+            const before = activeNameWrites().length;
+
+            await pressKey('ArrowLeft');
+
+            expect(getPreviousCreatureName).not.toHaveBeenCalled();
+            expect(activeNameWrites()).toHaveLength(before);
+        });
+
+        it('"+" routes to handleAddNpc: the mutated summary persists verbatim with NPC 1', async () => {
+            await renderWithSummary({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] }, 'Alice');
+
+            await pressKey('+');
+
+            expect(addNpc).toHaveBeenCalledTimes(1);
+            // Bob rides in via mergeCombatSummaryWithCharacters on adopt; the
+            // '+' press then appends NPC 1 and the mutated summary persists verbatim.
+            expect(latestStoredSummary().creatures.map(c => c.name)).toEqual(['Alice', 'Bob', 'NPC 1']);
         });
     });
 });

@@ -27,7 +27,7 @@
 //   owner, #1136; cross-lane mirrors live at imp:105/quasit:111/sprite:113).
 // - endSelfBuffOnTrigger attack/cast/inert ender tests deleted: generic
 //   consumer bytes for te `invisible` are owned by
-//   monsterSelfBuff.test.js:371-417 (attack + cast + inert, same key);
+//   monsterSelfBuff.test.js:327-405 (attack + cast + inert, same key; fix#363 refresh)
 //   ghost #1138 removed the same mirrors with this cite.
 // old->new: disk[3]→disk[1]; grant[3 fixture]-→flow[1 honest triple-press];
 // enders[3]→0 (owner-cited above); registry te bytes→golden
@@ -148,7 +148,7 @@ describe('MA-0919 honest triple press — spend FIRST, real te latch, exhausted 
     expect(setPopupHtml).toHaveBeenLastCalledWith(expect.stringContaining('Already Invisible'));
 
     // The te drops early via an attack/cast ender (consumer bytes owned by
-    // monsterSelfBuff.test.js:371 — #1138 ghost precedent). Simulated here
+    // monsterSelfBuff.test.js:327-405 — #1138 ghost precedent, fix#363 refresh). Simulated here
     // by clearing the harness store, honest to this lane's next press.
     store[TE_KEY] = [{ target: 'PC 1', effect: 'invisible', source: 'Archmage 1' }];
 

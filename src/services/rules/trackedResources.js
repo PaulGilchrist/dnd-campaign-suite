@@ -76,6 +76,14 @@ const SPELL_SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 // Technique fighting style → exactly 1.
 function battleMasterDiceMax(playerStats, classLevel, is2024) {
   if (is2024) return classLevel?.superiority_dice || 0
+  // fix#346 (#1318) DISCHARGED-STALE-BY-DISK: tiers unchanged. The 5e disk
+  // BY-name row classes.json Fighter > subclass 'Battle Master' lv3 'Combat
+  // Superiority': "You have four superiority dice, which are d8s... You gain
+  // another superiority die at 7th level and one more at 15th level." The
+  // rec's 'PHB 11->5/17->6' ladder appears NOWHERE in the 5e disk (no
+  // superiority_dice field; the only count text is the lv3 row above). The
+  // 2024 disk superiority_dice column (lv7:5, lv15:6, byte-verified) agrees
+  // with the same 7/15 law and supplies the 2024 lane via :78.
   if (playerStats.level >= 15) return 6
   if (playerStats.level >= 7) return 5
   return 4
@@ -196,9 +204,16 @@ function matchesPatron(playerStats, names) {
   return names.includes(playerStats.class?.major?.name) || names.includes(playerStats.class?.subclass?.name)
 }
 
-function addFiendBlessing(resources, { playerStats, isWarlock, charisma }) {
+function addFiendBlessing(resources, { playerStats, isWarlock, charisma, is2024 }) {
   const isFiendPatron = isWarlock && matchesPatron(playerStats, ['Fiend', 'Fiend Patron'])
-  const maxDOL = isFiendPatron ? Math.max(1, charisma?.bonus || 0) : 0
+  // fix#346 (#1532): seed per the disk BY-name rows, ruleset-split.
+  // 5e/classes.json Warlock > subclass 'Fiend' lv6 'Dark One's Own Luck':
+  // "Once you use this feature, you can't use it again until you finish a
+  // short or long rest." -> EXACTLY ONE use, no CHA-scaled pool.
+  // 2024/classes.json Warlock > major 'Fiend Patron' lv6 'Dark One's Own
+  // Luck': "Uses = Charisma modifier (minimum once). Regain on Long Rest."
+  // -> CHA-scaling seed belongs to the 2024 ruleset ONLY.
+  const maxDOL = isFiendPatron ? (is2024 ? Math.max(charisma?.bonus || 0, 1) : 1) : 0
   resources.darkOnesLuckUses = { current: maxDOL, max: maxDOL }
 }
 
@@ -222,7 +237,7 @@ function addPactAndArcanum(resources, { features, classLevel, is2024, isWarlock 
   }
 }
 
-function addPatronPoolResources(resources, { playerStats, isWarlock, charisma }) {
+function addPatronPoolResources(resources, { playerStats, isWarlock, charisma, is2024 }) {
   // Healing Light: Celestial Patron dice pool (1 + warlock level dice)
   const isCelestialPatron = isWarlock && matchesPatron(playerStats, ['Celestial Patron'])
   const maxHealingLight = isCelestialPatron ? (1 + (playerStats.level || 0)) : 0
@@ -230,7 +245,17 @@ function addPatronPoolResources(resources, { playerStats, isWarlock, charisma })
 
   const isWarlockArchfey = isWarlock && matchesPatron(playerStats, ['Archfey Patron'])
   const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey')
-  const maxStepsOfTheFey = isWarlockArchfey && hasStepsOfTheFey ? Math.max(charisma?.bonus || 0, 1) : 0
+  // fix#346 (#1533): explicit disk floor. 2024/classes.json Warlock > major
+  // 'Archfey Patron' lv3 'Steps of the Fey': "You can cast Misty Step
+  // without expending a spell slot a number of times equal to your Charisma
+  // modifier (minimum of once), and you regain all expended uses when you
+  // finish a Long Rest" (automation.uses_expression 'CHA modifier_min_1').
+  // The rec's lv6 floor is REFUTED by the disk BY-name row: the grant sits
+  // at lv3 (2024 majors grant at lv3). 5e/classes.json carries NO 'Steps of
+  // the Fey' row at ANY level (grep: sole file hit is 2024/classes.json) ->
+  // 5e seeds 0, the tireless/naturesVeil version-guard idiom (fix#134).
+  const stepsAllowed = isWarlockArchfey && is2024 && playerStats.level >= 3 && hasStepsOfTheFey
+  const maxStepsOfTheFey = stepsAllowed ? Math.max(charisma?.bonus || 0, 1) : 0
   resources._Steps_of_the_Fey_freeCastCount = { current: maxStepsOfTheFey, max: maxStepsOfTheFey }
 }
 
@@ -297,7 +322,13 @@ function addRangerPrimalResources(resources, { playerStats, wis, is2024 }) {
   resources.naturesVeilUses = wisGatedPool(naturesVeilAllowed, wis)
 
   const favoredEnemyValue = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0
-  const favoredEnemyMax = Math.max(1, favoredEnemyValue)
+  // fix#346 (#1532): Favored Enemy is a ranger resource — gate like the
+  // warPriest sibling above (:276, fix#336S idiom: `gate ? formula : 0`).
+  // Disk: 2024/classes.json Ranger class_levels carry the count BY-level
+  // (lv1 favored_enemy:2 ... lv17:6, byte-verified); 5e/classes.json Ranger
+  // has no favored_enemy field (class_specific.favored_enemies is TYPES
+  // known, not uses). Non-Rangers must seed 0, never a phantom >=1 pool.
+  const favoredEnemyMax = isRanger ? Math.max(1, favoredEnemyValue) : 0
   resources.favoredEnemyUses = { current: favoredEnemyMax, max: favoredEnemyMax }
 
   const tirelessAllowed = isRanger && is2024 && playerStats.level >= 10

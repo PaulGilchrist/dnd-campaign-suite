@@ -34,8 +34,9 @@
 //   saveModifiers block (adv/dis counts, ability tracking, attack_roll,
 //     fiend_undead, replacement, specialEffects ×15, reroll, lucky_point,
 //     wis_replacement, modify_d20_roll, pass_without_trace)
-//     → folded to a 6-row census of faces NOT pinned in compute; every
-//       other row duplicated conditionEffectsCompute.test.js :39-659 or
+//     → folded to a 3-row census of faces NOT pinned in compute (fix#363 #1000:
+//       plain-count rows + dup fiend_undead fixture + dodge fold cut with cites);
+//       every other row duplicated conditionEffectsCompute.test.js :39-659 or
 //       conditionEffectsInternal.test.js (dropped, not weakened)
 //   targetEffects blocks → registry dispatch census (#820) + 2 dispatch-order
 //     tests (early-before-generic crusher row with both generic channels
@@ -127,13 +128,15 @@ describe('conditionEffects', () => {
   });
 
   describe('computeConditionEffects — saveModifiers channels not pinned in compute', () => {
+    // fix#363 #1000 trims: 'plain save advantage/disadvantage bumps count' rows cut
+    // byte-identical to compute census :69/:70 (same folded() idiom, same expectations);
+    // second byte-identical fiend_undead fixture cut (same input bytes, same expected).
     it.each([
-      ['plain save advantage bumps count only', [{ target: 'saving_throw', effect: 'advantage' }], { saveAdvantageCount: 1 }],
-      ['plain save disadvantage bumps count only', [{ target: 'saving_throw', effect: 'disadvantage' }], { saveDisadvantageCount: 1 }],
       ['ability-tagged advantage without abilityName tracks abilities, not count', [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR', 'DEX'] }], { saveAdvantageAbilities: ['STR', 'DEX'] }],
       ['attack_roll (singular gate target) folds attack advantage', [{ target: 'attack_roll', effect: 'advantage' }], { attackAdvantageCount: 1 }],
-      ['fiend_undead applies without the condition active', [{ target: 'saving_throw', effect: 'advantage', condition: 'fiend_undead' }], { saveAdvantageCount: 1 }],
-      ['fiend_undead applies with the condition active', [{ target: 'saving_throw', effect: 'advantage', condition: 'fiend_undead' }], { saveAdvantageCount: 1 }],
+      // 'fiend_undead' is not in SAVE_CONDITION_LABELS — ungated by construction:
+      // the plain advantage fold lands regardless of the condition being active.
+      ['unmapped condition fiend_undead never gates — plain advantage folds', [{ target: 'saving_throw', effect: 'advantage', condition: 'fiend_undead' }], { saveAdvantageCount: 1 }],
     ])('%s', (_name, saveModifiers, expected) => {
       expect(folded({ saveModifiers })).toEqual(expected);
     });
@@ -189,12 +192,9 @@ describe('conditionEffects', () => {
       });
     });
 
-    it('dodge folds target Disadvantage + dex save advantage', () => {
-      expect(folded({ targetEffects: [{ effect: 'dodge' }] })).toEqual({
-        targetDisadvantageCount: 1,
-        saveAdvantage: ['dex'],
-      });
-    });
+    // fix#363 #1000: dodge fold test cut — exact bytes (targetDisadvantageCount:1 +
+    // saveAdvantage:['dex'], same bare-{effect} input) pinned by the compute registry
+    // census OVERRIDE dodge row :136. Consumer net-mode row stays at :259 below.
 
     it('#996 foresight APPENDS abilityCheckAdvantageReasons via addUniqueReason — co-existing bolster reason survives', () => {
       // FIXED (was a wholesale assign clobbering the ledger): foresight :483 now

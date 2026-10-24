@@ -3,12 +3,12 @@
 // buildWeaponHitBonusesStep's guard weaponHitChoiceSkips (attackRollBonuses.js:273-278) —
 // the repo's only falsifiers of "chosen option contains 'strike' → bonus applies".
 // Fold (attackRollDamageSteps-automationBonuses.test.js, CANON #1029; its steps[12]
-// block :352-416) owns every other face of this step: condition arms :353-357,
-// no-match unchanged :361-364, weapon_attack_hit app :366-369,
-// weapon_or_beast_form_attack_hit app :370-373, option-SKIP (negative only,
-// chosen 'poison') :378-382, upgraded-suppress :374-377, oncePerTurn-skip :383-388,
-// oncePerTurn-stamp :409-414, uses-depleted skip :389-394, recharge consume 2→1
-// :402-408, ' or ' modal CANON :396-401 (cited by spellDiscriminator #1025,
+// block :468-540, ranges refreshed fix#363) owns every other face of this step:
+// condition arms :473-474, no-match unchanged :479, weapon_attack_hit app :484,
+// weapon_or_beast_form_attack_hit app :488, option-SKIP (negative only,
+// chosen 'poison') :496, upgraded-suppress :492, oncePerTurn-skip :501,
+// oncePerTurn-stamp :527, uses-depleted skip :507, recharge consume 2→1
+// :520, ' or ' modal CANON :514 (cited by spellDiscriminator #1025,
 // lunarForm #1024/#1028). Spell gate isSpellAttackContext (:359) CANON in
 // attackRollBonuses-spellDiscriminator.test.js; round plumbing CANON in the lunarForm
 // lane (#1024). Old 13 arms here byte-matched or were weaker copies of those legs

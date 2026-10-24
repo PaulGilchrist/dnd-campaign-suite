@@ -349,6 +349,7 @@ describe('applyShortRest', () => {
       await applyShortRest(makeStats(), CAMPAIGN)
 
       // Target-side write is arity-4 (no skipSync) and keeps the other buffs.
+      // fix#354(b) site 1/4 valid-arm: validate-first keeps filter+write VERBATIM.
       expect(setRuntimeValue).toHaveBeenCalledWith('Enemy1', 'activeBuffs', [{ effect: 'haste' }], CAMPAIGN)
       // Self-side latches null in the batch.
       const updates = batchUpdates()
@@ -361,6 +362,34 @@ describe('applyShortRest', () => {
       await applyShortRest(makeStats(), CAMPAIGN)
       expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Enemy1')).toHaveLength(enemyWritesBefore)
       expect(batchUpdates().vowOfEnmityTarget).toBeNull()
+    })
+
+    // fix#354(b) site 1/4 non-array-store arms (unguarded-filtered-activeBuffs-
+    // rewrite class, fix#337S stamp ledger :1817): invalid store -> LOUD
+    // console.error + ZERO activeBuffs writes to the target; the self-side
+    // batch latches stay nulled (unrelated key, unchanged behavior). Pre-fix
+    // `|| []` wrote [] over a missing store and TypeError'd mid-rewrite on
+    // non-array truthy.
+    it.each([
+      ['missing (undefined) store', undefined],
+      ['non-array truthy store', { nope: true }],
+    ])('vow target with %s: LOUD console.error + ZERO Enemy1 writes, self latches still null', async (_desc, stored) => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(getRuntimeValue).mockImplementation((n, key) => {
+        if (key === 'vowOfEnmityTarget') return 'Enemy1'
+        if (key === 'activeBuffs') return n === 'Enemy1' ? stored : []
+        return undefined
+      })
+      await applyShortRest(makeStats(), CAMPAIGN)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[restRules] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
+        'Enemy1', stored,
+      )
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Enemy1')).toHaveLength(0)
+      const updates = batchUpdates()
+      expect(updates.vowOfEnmityTarget).toBeNull()
+      expect(updates.vowOfEnmityCostPaid).toBeNull()
+      consoleSpy.mockRestore()
     })
   })
 
@@ -540,6 +569,33 @@ describe('applyShortRest', () => {
       } else {
         expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'replenishingMeals', want, CAMPAIGN, true)
       }
+    })
+
+    // fix#354(a) REFUTED-VERIFIED preservation arm (fix#337S stamp ledger :1813
+    // adjudicated by disk law): public/data/2024/feats.json:832 — "As part of a
+    // Short Rest, you can cook special food ... 4 plus your Proficiency Bonus."
+    // The refill rides EVERY short rest; skipAutoRecovery (:453) gates ONLY the
+    // automatic pool recovery (Arcane Recovery). Gating the :447-era call would
+    // violate the disk text — this pin fails if the call is ever moved behind
+    // the gate, while the same rest keeps its gated slots spent.
+    it('modal lane (skipAutoRecovery:true) STILL replenishes meals — disk ties the refill to the REST, not auto-recovery (fix#354(a) refute-preservation)', async () => {
+      const chefWizard = arcaneBard({
+        automation: {
+          passives: [
+            { type: 'font_of_inspiration' },
+            { type: 'resource_restoration', resourceKey: 'arcaneRecoveryLevels' },
+            { type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' },
+          ],
+        },
+      })
+      stubRuntime({ spell_slots_level_1: 0, replenishingMeals: 0 })
+      await applyShortRest(chefWizard, CAMPAIGN, { skipAutoRecovery: true })
+      // Ungated meal pool re-armed: 4 + proficiency 3 = 7, fresh post-rest batch
+      // for the modal sole spender (fix#165).
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'replenishingMeals', 7, CAMPAIGN, true)
+      // Gate discipline intact on the SAME rest: gated auto-recovery stays spent.
+      expect(batchUpdates()).not.toHaveProperty('spell_slots_level_1')
+      expect(arcaneLogs()).toHaveLength(0)
     })
   })
 

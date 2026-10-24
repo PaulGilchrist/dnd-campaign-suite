@@ -15,7 +15,13 @@ const MASS_HEALING_WORD_NAME = 'Mass Healing Word';
 const DEFAULT_MAX_TARGETS = 6;
 
 function isMassHealingWord(spell) {
-    return (spell.name || '') === MASS_HEALING_WORD_NAME;
+    // fix#349 #1385: same case-normalization fold the dispatcher uses —
+    // triggerSpells.js:430 `spell.name && spell.name.toLowerCase() ===
+    // 'mass healing word'` lets a case-drift name THROUGH to this gate, which
+    // pre-fix was strict-equality and silently nulled the cast. Fold BOTH
+    // sides (fix#109 dual-literal-case-fold precedent): constant stays the
+    // disk-canonical PascalCase, the comparison is case-insensitive.
+    return (spell.name || '').toLowerCase() === MASS_HEALING_WORD_NAME.toLowerCase();
 }
 
 function getSpellCastingMod(playerStats, spell) {

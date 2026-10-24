@@ -225,7 +225,7 @@ describe('MA-1830 MonsterCardModal Yuan-ti Malison (Type 2) Spellcasting chips',
     expect(context.saveType).toBe('WIS');
     expect(context.dcSuccess).toBe('none');
     expect(refusals()).toHaveLength(0);
-    // null monsterSpellUses store is owned by spellcasting.test.jsx:327/:561.
+    // null monsterSpellUses store is owned by spellcasting.test.jsx:328/:551.
   });
 
   it('Suggestion spends 2→0 over two casts (each logs a 2/Day remaining-today record carrying THIS type-2 name + DC 13 WIS), refuses the 3rd zero-spend', async () => {
@@ -245,7 +245,7 @@ describe('MA-1830 MonsterCardModal Yuan-ti Malison (Type 2) Spellcasting chips',
     expect(spends).toMatch(/2\/Day use spent — 1 remaining today/);
     expect(spends).toMatch(/2\/Day use spent — 0 remaining today/);
 
-    // Exhausted-refuse shape owned by spellcasting.test.jsx:288-302; this
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:289-303; this
     // pins only the 2/Day-specific refusal bytes + gate holding the record.
     await act(async () => { fireEvent.click(linkByText('Suggestion')); });
     await waitFor(() => expect(refusals('Suggestion').length).toBe(1));

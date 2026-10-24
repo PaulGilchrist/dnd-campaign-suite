@@ -253,14 +253,10 @@ describe('MA-0081 monsters.json data: adult bronze dragon legendary economy auth
     expect(bronze().actions.find(a => a.name === 'Rend')?.attack_bonus).toBe(12);
   });
 
-  it('Thunderclap authors its own save numbers, no effect on success', () => {
-    const row = bronze().legendary_actions.find(a => a.name === 'Thunderclap');
-    expect(row.save_dc).toBe(17);
-    expect(row.save_type).toBe('Constitution');
-    expect(row.dc_success).toBe('none');
-    expect(row.damage_dice_primary).toBe('3d6');
-    expect(row.damage_type_primary).toBe('Thunder');
-  });
+  // Thunderclap field slice :256-263 dropped per rec #792: subsumed by the
+  // full-row toEqual lock in MonsterCardModal.thunderclap-sphere.test.jsx:169-181
+  // (save_dc/save_type/dc_success/damage dice+type all locked there, verbatim).
+
 });
 
 // MA-0081: with the header authored, the bronze dragon card renders the
@@ -744,14 +740,10 @@ describe('MA-0124 MonsterCardModal red dragon legendary gated rows', () => {
     expect(row.querySelector('.mc-dice-link').textContent).toContain('+12');
   });
 
-  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
-    renderRed({ max: 3, used: 0 });
-    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    fireEvent.click(redRow('Fiery Rays').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-  });
+  // 'turn latch: same-boundary second click' red-clone of canonical :309 folded
+  // to cite per rec #753: gate is monster-agnostic (MA-0021); same four
+  // assertions with the name swapped, no red-unique bytes. Red's own lanes
+  // above still own chip routing + spend for this monster.
 
   it('per-action cooldown: Commanding Presence save-chip re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
     renderRed({ max: 3, used: 0 });

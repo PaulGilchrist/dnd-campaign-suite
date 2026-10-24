@@ -19,14 +19,14 @@
 // byte-untouched, verified by the bystander survivor in the press flow).
 //
 // selfBuff family map: owner monsterSelfBuff.test.js (duergar enlarged +
-// invisible, ender consumer :371-417, twin copy :419); ghost #1138 (ethereal
+// invisible, ender consumer :327-405, twin copy :168-177); ghost #1138 (ethereal
 // 8h at-will, copy :115); green-hag #1139 (invisible 1/Day); imp #1140 /
 // quasit #1142 (invisible, at will); sea-hag = THIS lane (disguised,
 // at will, save-less); sprite/wisp queued behind — their bytes never
 // absorbed here.
 //
 // Maintainer trim (#1138 rec APPLIED verbatim / #1139 #1142 family
-// template): :196-216 enlarge/invis/ethereal twin mirrors of owner :419 +
+// template): :196-216 enlarge/invis/ethereal twin mirrors of owner :168-177 +
 // golden registry + ghost lane TRIMMED to the not.toContain('Disguise Self')
 // bleed checks only — positive twin bytes stay with their owners.
 // - Injected deps/activeTe fixtures PURGED — real registerTargetEffect/
@@ -37,12 +37,12 @@
 // - registry te bytes → golden targetEffectDefinitions.test.js:109 (#1012);
 //   only this ticket's save-less truth phrase pinned here.
 // - ender mirror deleted: endSelfBuffOnTrigger consumer bytes owned by
-//   monsterSelfBuff.test.js:371-417; the disguised lane's no-early-drop
+//   monsterSelfBuff.test.js:327-405; the disguised lane's no-early-drop
 //   truth rides press-1's zero-write census + bystander `invisible` survivor.
 // old->new: disk[1 positional]→disk[1 by-name verbatim + full-keyset +
 // filter]; registry[1]→golden #1012 (+save-less phrase folded into disk);
 // grant-flow[4: first-click/grant-prose/popup-prose/refusal]→flow[1 honest
-// triple-press]; enders[1]→0 (owner :371-417); twins[1]→anti-bleed[1
+// triple-press]; enders[1]→0 (owner :327-405); twins[1]→anti-bleed[1
 // not.toContain('Disguise Self') only, #1138 rec].
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
@@ -206,7 +206,7 @@ describe('MA-1449 honest triple press — save-less AT WILL zero-spend, real te 
 
     // The te drops at its 14400-round clock expiry (consumer bytes owned by
     // the expirationQueue lane; the invisible-only endSelfBuffOnTrigger
-    // consumer is owned by monsterSelfBuff.test.js:371-417 — #1138/#1139
+    // consumer is owned by monsterSelfBuff.test.js:327-405 — #1138/#1139
     // precedent, and disguised is NOT one of their keys). Simulated here by
     // clearing this lane's self te, honest to the next press.
     store[TE_KEY] = [
@@ -231,7 +231,7 @@ describe('MA-1449 anti-bleed — the new `disguised` branch never contaminates t
     ['enlarged', 'duergar', 'Enlarge'],
     ['invisible', 'duergar', 'Invisibility'],
     ['ethereal', 'ghost', 'Ethereality'],
-  ])('%s twin grant + popup copy never contain "Disguise Self" (positive twin bytes owned by owner :419 / ghost #1138 :115 / golden #1012)', (effectKey, monsterIndex, actionName) => {
+  ])('%s twin grant + popup copy never contain "Disguise Self" (positive twin bytes owned by owner :168-177/:195-282 / ghost #1138 :115 / golden #1012)', (effectKey, monsterIndex, actionName) => {
     const monster = monstersData.find(m => m.index === monsterIndex);
     const row = monster.actions.find(a => a.name === actionName);
     expect(row).toBeTruthy();

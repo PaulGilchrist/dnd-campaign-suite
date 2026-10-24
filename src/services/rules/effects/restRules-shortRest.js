@@ -269,7 +269,18 @@ async function clearVowOfEnmity(name, updates, campaignName) {
   updates.vowOfEnmityTarget = null;
   updates.vowOfEnmityCostPaid = null;
   if (!vowTarget) return
-  const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName) || [];
+  // fix#354(b) site 1/4 (unguarded-filtered-activeBuffs-rewrite class, fix#170
+  // census / fix#337S stamp ledger :1817): validate-first idiom per
+  // invisibilityService.js:20-35 (fix#349(a): "validation gates precede every
+  // write ... ZERO write/log/state on BOTH legs") + fix#352 (loud console.error
+  // naming the data defect, zero-write refusal). Pre-fix `|| []` normalized a
+  // missing store by CLOBBERING it with [] and threw mid-rewrite on non-array
+  // truthy. Valid store -> filter+write verbatim.
+  const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName);
+  if (!Array.isArray(targetBuffs)) {
+    console.error('[restRules] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:', vowTarget, targetBuffs);
+    return;
+  }
   const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
   await setRuntimeValue(vowTarget, 'activeBuffs', filteredTargetBuffs, campaignName);
 }
@@ -444,6 +455,19 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
     updates.wardingflareUses = null
   }
 
+  // fix#354(a) REFUTED-VERIFIED (fix#337S stamp ledger :1813 adjudicated by
+  // disk law): public/data/2024/feats.json:832 Chef / Replenishing Meal —
+  // "As part of a Short Rest, you can cook special food if you have
+  // ingredients and Cook's Utensils on hand. You can prepare enough of this
+  // food for a number of creatures equal to 4 plus your Proficiency Bonus."
+  // The refill is tied to the REST itself, never to auto-recovery; the
+  // :453 skipAutoRecovery gate wraps ONLY automatic pool recovery (Arcane
+  // Recovery) — an engine UI choice with no RAW analogue — and the meal's
+  // extra healing even requires the eater to actively spend Hit Dice.
+  // The ungated call is CORRECT per disk text: it re-arms the pool the
+  // modal sole spender charges (fix#165; ShortRestModal.jsx:695-704).
+  // Do NOT move inside the :453 gate. Pin: restRules-shortRest.test.js
+  // 'Chef Replenishing Meal' skipAutoRecovery refute-preservation arm.
   resetReplenishingMeals(name, playerStats, campaignName)
 
   // CLA-145: Font of Inspiration restores on EVERY short rest (modal lane

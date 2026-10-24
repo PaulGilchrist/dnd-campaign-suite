@@ -38,8 +38,23 @@ export function modifyHitPoints(combatSummary, targetName, delta, campaignName) 
     }
     setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
   } else {
-    oldHp = creature.currentHp;
-    newHp = Math.min(maxHp, Math.max(0, oldHp + delta));
+    // fix#352(a): mirror the player-leg guard idiom EXACTLY — twin byte :34
+    // '?? 0' (absent HP is a zero: this file's zero-is-data stance, the
+    // pin at hpModifier.test.js 'currentHitPoints null defaults oldHp to 0')
+    // and twin bytes :36-38 'if (maxHp != null)' (upper clamp only on a
+    // known max; Math.min(undefined, n) === NaN poisoned the summary).
+    // Non-finite HP (NaN delta, non-numeric currentHp on the entry) is
+    // LOUD-refused with ZERO write and ZERO dispatch — NaN never lands on
+    // combatSummary.currentHp and never rides the event (fix#337S stamp).
+    oldHp = creature.currentHp ?? 0;
+    newHp = Math.max(0, oldHp + delta);
+    if (maxHp != null) {
+      newHp = Math.min(maxHp, newHp);
+    }
+    if (!Number.isFinite(oldHp) || !Number.isFinite(newHp)) {
+      console.error(`modifyHitPoints: non-finite HP for ${creature.name} (currentHp=${String(creature.currentHp)}, delta=${String(delta)}, maxHp=${String(maxHp)}) — refused, no write, no dispatch`);
+      return null;
+    }
     creature.currentHp = newHp;
   }
 

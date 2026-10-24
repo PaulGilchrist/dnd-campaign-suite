@@ -91,11 +91,11 @@ describe('MA-1931 disk fingerprint: King Kong Grab save half armed (DATA fix)', 
     expect(buildHitConditionClause(slam)).toBeNull();
     expect(multi.save_dc).toBeUndefined();
     expect(multi.hit_conditions).toBeUndefined();
-    // Thunder Roar keeps its OWN save core (DC 23 Wis frightened lane, MA-1932
-    // fingerprint cited there) with ZERO grapple bytes leaking onto it.
+    // Thunder Roar DC 23/Wisdom core OWNED verbatim by ma1932 :71 (rec #1119
+    // trim): this lane keeps only the grapple-free leg — the grab lane's
+    // distinctive fingerprint is that NO grappled byte leaks onto roar.
     const roar = KONG.actions.find((a) => a.name.startsWith('Thunder Roar'));
-    expect(roar.save_dc).toBe(23);
-    expect(roar.save_type).toBe('Wisdom');
+    expect(roar.name).toBeDefined();
     expect(extractConditionsFromSaveEffect(roar.save_effect)).not.toContain('grappled');
   });
 });

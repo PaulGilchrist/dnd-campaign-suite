@@ -1,5 +1,6 @@
 // @maintained-by-ai
 import { describe, it, expect } from 'vitest';
+import classes2024 from '../../../../public/data/2024/classes.json' with { type: 'json' };
 import { buildStarryFormLuminousArrow } from './starryFormDamage.js';
 
 // Starry Form Archer (2024 Circle of Stars, public/data/2024/classes.json):
@@ -33,9 +34,12 @@ describe('buildStarryFormLuminousArrow', () => {
     expect(result.hitBonusFormula).toBe('To Hit Bonus = Wisdom Modifier (3) + Proficiency (4)');
     expect(result.damageType).toBe('Radiant');
     expect(result.actionType).toBe('Bonus Action');
-    // Disk canon (classes.json Archer) says "within 60 feet"; the module emits
-    // 120_ft. Honest pin of current behavior — mismatch reported, not silently fixed.
-    expect(result.range).toBe('120_ft');
+    // fix#351(a)(ii) disk-law range pin (#1348 flip of the old honest 120_ft
+    // mismatch pin): disk canon public/data/2024/classes.json 'Starry Form'
+    // BY-name — "targets one creature within 60 feet of yourself" — is now the
+    // emitted constant. The twin pin in
+    // attackCalc2024-special-attacks.test.js flipped the same pass.
+    expect(result.range).toBe('60_ft');
   });
 
   it('scales the die at Twinkling Constellations: 1d8 below lv10, 2d8 at lv10+', () => {
@@ -82,5 +86,44 @@ describe('buildStarryFormLuminousArrow', () => {
     const result = buildStarryFormLuminousArrow(makePlayerStats({ activeBuffs: ARCHER_BUFF }));
     expect(result).not.toBeNull();
     expect(result.damage).toBe('2d8+3');
+  });
+
+  it('fix#351(a)(ii) 60ft disk-law arm: range token is DERIVED from the disk Starry Form row BY-name, not transcribed', () => {
+    // Read the disk feature, do not trust this lane's memory of it: locate the
+    // 2024 Druid 'Circle of Stars' major BY-name (classes.json shape:
+    // classes[Druid].majors[Circle of Stars].features), then extract the feet
+    // number from the 'Starry Form' prose and require the module token to match.
+    const druid = classes2024.find(c => c.name === 'Druid');
+    expect(druid, '2024 classes.json missing the Druid').toBeTruthy();
+    const starsMajor = (druid.majors || []).find(m => m.name === 'Circle of the Stars');
+    expect(starsMajor, '2024 Druid majors missing Circle of the Stars').toBeTruthy();
+    const feature = (starsMajor.features || []).find(f => f.name === 'Starry Form');
+    expect(feature, 'Circle of the Stars features missing Starry Form').toBeTruthy();
+    const diskFeet = Number(/targets one creature within (\d+) feet of yourself/.exec(feature.description)?.[1]);
+    expect(Number.isFinite(diskFeet)).toBe(true); // disk prose really says "within N feet"
+    expect(diskFeet).toBe(60);                     // ... and N is 60 (the disk law)
+
+    const result = buildStarryFormLuminousArrow(makePlayerStats(), ARCHER_BUFF);
+    expect(result.range).toBe(`${diskFeet}_ft`);   // module range follows disk, token-folded
+  });
+
+  it('fix#351(a)(i) abilities-absent degrades to +0 instead of throwing (Archer buff active, abilities key missing)', () => {
+    // The defect shape: Starry-Form-Archer is active AND the stats object has
+    // NO abilities key at all — the old bare playerStats.abilities.find threw a
+    // TypeError mid-attack-build. The ?? [] degrade (file sibling :2 idiom)
+    // must produce a lawful plain-damage arrow instead.
+    const { abilities, ...noAbilities } = makePlayerStats();
+    expect(abilities).toBeTruthy(); // fixture sanity: the key existed before deletion
+
+    let result;
+    expect(() => { result = buildStarryFormLuminousArrow(noAbilities, ARCHER_BUFF); }).not.toThrow();
+    expect(result).not.toBeNull();
+    expect(result.damage).toBe('2d8+0');           // wisMod degrades to 0
+    expect(result.autoDamageFormula).toBe('2d8+0');
+    expect(result.damageFormula).toBe('Damage Formula = 2d8 + Wisdom Modifier (0)');
+    expect(result.range).toBe('60_ft');
+
+    // A missing key and an empty array behave identically (both ?? []-degrade).
+    expect(buildStarryFormLuminousArrow({ ...noAbilities, abilities: [] }, ARCHER_BUFF).damage).toBe('2d8+0');
   });
 });

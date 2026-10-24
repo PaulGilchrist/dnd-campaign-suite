@@ -22,8 +22,8 @@
 // advisory log → spellcasting-barlgura.test.jsx:261 (Entangle STR beats the
 // row's authored Wisdom — same buildMonsterSpellCastLog short-circuit, a
 // superset of the empty-save_type fallback); Elementalism 2024-only advisory
-// lookup → spellcasting.test.jsx:212; 1/Day spend wording + exhausted-refire
-// "already cast today (1/Day)" refusal → spellcasting.test.jsx:281;
+// lookup → spellcasting.test.jsx:213; 1/Day spend wording + exhausted-refire
+// "already cast today (1/Day)" refusal → spellcasting.test.jsx:282;
 // no-target refusal popup/log byte shape → MonsterCardHelpers.usage.test.js:48.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';

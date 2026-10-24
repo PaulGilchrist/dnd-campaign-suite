@@ -13,7 +13,7 @@
 // shape_shift lane (#1020 owner) — invisibility lives only at actions[1].
 //
 // selfBuff family map: owner monsterSelfBuff.test.js (duergar enlarged +
-// invisible, ender consumer :371-417); ghost #1138 (ethereal 8h at-will);
+// invisible, ender consumer :327-405); ghost #1138 (ethereal 8h at-will);
 // green-hag #1139 (invisible 1/Day); imp = THIS lane (invisible, at will);
 // quasit/sprite/wisp twins queued behind — their bytes never absorbed here.
 //
@@ -22,7 +22,7 @@
 //   by owner monsterSelfBuff.test.js:216 + hag by green-hag lane :90 —
 //   identity follows transitively (delete-citing owner, rec #1139).
 // - endSelfBuffOnTrigger attack/inert ender tests deleted: generic consumer
-//   bytes for te `invisible` owned by monsterSelfBuff.test.js:371-417
+//   bytes for te `invisible` owned by monsterSelfBuff.test.js:327-405
 //   (same key; #1138/#1139 precedent, rec applied).
 // - registry te bytes → golden targetEffectDefinitions.test.js:110/#1012;
 //   description clauses additionally owned by monsterSelfBuff.test.js:226.
@@ -176,7 +176,7 @@ describe('MA-1019 honest triple press — AT WILL zero-spend, real te latch, re-
     expect(setPopupHtml).toHaveBeenLastCalledWith(expect.stringContaining('Already Invisible'));
 
     // The te drops early via an attack/cast ender (consumer bytes owned by
-    // monsterSelfBuff.test.js:371-417 — #1138/#1139 precedent). Simulated
+    // monsterSelfBuff.test.js:327-405 — #1138/#1139 precedent). Simulated
     // here by clearing the harness store, honest to this lane's next press.
     store[TE_KEY] = [{ target: 'PC 1', effect: 'invisible', source: 'Archmage 1' }];
 

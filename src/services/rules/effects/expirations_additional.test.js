@@ -244,25 +244,41 @@ describe('applyTurnStartEffects — additional effect types', () => {
   });
 
   describe('regenerate_turn_start_heal effect', () => {
-    it('heals via the effect healExpression, not the fixed 1 HP buff tick', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'regenerateActive') return true;
-        if (prop === 'hitPoints') return 20;
-        if (prop === 'currentHitPoints') return 10;
-        return null;
+    it('fix#356(a) one-authoritative-writer exact-HP arithmetic: healExpression pays EXACTLY once per turn', async () => {
+      // Pre-fix double-write (flat-1 buff tick after the typed row) made the
+      // old flat-mock arm indistinguishable (+1 tick invisible, #1296 harvest).
+      // Stateful store: the tick's 13+1=14 add-on is now visible.
+      const store = { regenerateActive: true, hitPoints: 20, currentHitPoints: 10 };
+      getRuntimeValue.mockImplementation((name, prop) => store[prop] ?? null);
+      const hpWrites = [];
+      setRuntimeValue.mockImplementation(async (name, prop, value) => {
+        if (prop === 'currentHitPoints') { hpWrites.push(value); store[prop] = value; }
       });
 
       await applyTurnStartEffects('TestCharacter', {
         turnStartEffects: [{ type: 'regenerate_turn_start_heal', healExpression: '3' }],
       }, 'TestCampaign');
 
-      // Only the effect-type handler can produce 13 (buff heal is always +1 → 11).
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'currentHitPoints',
-        13,
-        'TestCampaign',
-      );
+      // Exactly ONE currentHitPoints write, landing 10+3=13 — the disk
+      // expression owner (healExpression) wins; the spell-buff sibling tick
+      // skips via the turn-seam latch. Pre-fix this arm was RED [13, 14].
+      expect(hpWrites).toEqual([13]);
+    });
+
+    it('fix#356(a) fallback control: regenerateActive WITHOUT a typed row pays exactly one +1 tick', async () => {
+      // Cast lanes stamp regenerateActive without a row
+      // (spellCastService/execution/helpers.js:538, regenerateHandler.js:154) -
+      // the flat tick stays alive for those, healing 10+1=11 once.
+      const store = { regenerateActive: true, hitPoints: 20, currentHitPoints: 10 };
+      getRuntimeValue.mockImplementation((name, prop) => store[prop] ?? null);
+      const hpWrites = [];
+      setRuntimeValue.mockImplementation(async (name, prop, value) => {
+        if (prop === 'currentHitPoints') { hpWrites.push(value); store[prop] = value; }
+      });
+
+      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+
+      expect(hpWrites).toEqual([11]);
     });
 
     it('does not heal currentHitPoints when regenerateActive is false', async () => {

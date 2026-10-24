@@ -50,6 +50,22 @@ function buildRangedActionAttack(weapon, weaponName, ctx) {
         abilityName: 'Dexterity',
         proficiency: ctx.proficiency,
         actionType: 'Action',
+        // fix#350(c) (twin of fix#348(d), attackCalc.js:220-232): stamp 'ranged' —
+        // mirrors the light-ranged off-hand sibling call in buildRangedAttacks :123
+        // (`weaponType: 'ranged',`) and the melee twins :152/:225/:348
+        // (`weaponType: 'melee',`). Pre-fix this builder omitted the key and took the
+        // '' default (attackCalc.js:102), so all three main-hand ranged legs (:87/:96/
+        // :103) shipped bow/dart rows that six consumers misread: sneak eligibility
+        // (contextBuilder-sync.js:547 `hasFinesse || attack.weaponType === 'ranged'` —
+        // a non-finesse bow failed CLOSED, no sneak dice ever), superiority maneuver
+        // context (combatSuperiorityQueries.js:20 isWeaponAttack — maneuvers never
+        // offered on 2024 bow attacks), War Priest weapon pick
+        // (bonusActionAttackHandler.js:24-26 — bow-only characters fell through to the
+        // Unarmed Strike row), ranged-hit reduction trigger (damageReductionHandler.js:68
+        // — trigger never fired on 2024 bow hits), and the Riposte / adjacent-reaction
+        // ranged refusals (executeActionManeuvers.js:471, reactionDamageHandler.js:151 —
+        // those two failed OPEN on '', accepting ranged into melee-only reactions).
+        weaponType: 'ranged',
         extraHitBonus: archeryBonus,
         extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
         extraDamage: thrownDamage,
@@ -479,9 +495,19 @@ function findSwiftQuiverBow(allEquipment, equippedWeapons) {
         const { baseName, weapon } = resolveWeapon(allEquipment, equippedName);
         if (!weapon) continue;
         const props = weapon?.properties ?? [];
-        const isBow = weapon.weapon_category === 'Ranged' && (props.includes('Ammunition') || props.includes('Heavy') || props.includes('Light'));
-        const isBoltWeapon = ['Longbow', 'Light Crossbow', 'Hand Crossbow', 'Crossbow, Heavy', 'Crossbow, Light'].includes(weapon.name);
-        if (isBow || isBoltWeapon) {
+        // fix#340 (#ledger:1257, #595 category-never-match class): disk
+        // equipment.json weapon_category carries ONLY Simple/Martial —
+        // 'Ranged' never matched. Disk truth is weapon_range 'Ranged' +
+        // 'Ammunition' (canonical findEquippedWeapons shape, attackCalc.js:30),
+        // scoped by the disk spell row public/data/2024/spells.json
+        // 'Swift Quiver': "two attacks with a weapon that fires Arrows or
+        // Bolts, such as a Longbow or a Light Crossbow" — bows + crossbows by
+        // their EXACT disk names (adds Shortbow, revives the dead comma-form
+        // 'Crossbow, Heavy' entry as disk 'Heavy Crossbow'); Blowgun (darts),
+        // Sling (bullets), Dart and Net never qualify.
+        const isRangedAmmunition = weapon.weapon_range === 'Ranged' && props.includes('Ammunition');
+        const firesArrowsOrBolts = ['Longbow', 'Shortbow', 'Light Crossbow', 'Hand Crossbow', 'Heavy Crossbow'].includes(weapon.name);
+        if (isRangedAmmunition && firesArrowsOrBolts) {
             return { weapon, baseName, equippedName };
         }
     }

@@ -29,7 +29,8 @@ import { abilitySaveMaxUses, abilitySaveUseKey } from '../../encounters/monsterA
 
 // demoted #1411 (dead-export batch): ZERO external importers (test lane mentions
 // this constant in prose only — roarService.test.js never imports it); sole caller
-// stagedRoarMaxUses :121 below, whose null-side default is pinned there.
+// sole caller stagedRoarMaxUses below, whose null-side default AND fix#347
+// Number.isFinite NaN-side default are pinned there.
 const STAGED_ROAR_MAX_DEFAULT = 3;
 
 // Stage-canonical description + machine save_effect per stage (the stage
@@ -121,7 +122,20 @@ function resolveStageMechanic(action, stage) {
 }
 
 export function stagedRoarMaxUses(action) {
-    return abilitySaveMaxUses(action) ?? STAGED_ROAR_MAX_DEFAULT;
+    const maxUses = abilitySaveMaxUses(action);
+    if (maxUses == null) return STAGED_ROAR_MAX_DEFAULT;
+    // fix#347 (#1411 class): ?? passed NaN THROUGH — a string-uses row
+    // (monsters.json BY-name shape 'Darkness Aura' "uses": "1/Day";
+    // Number('1/Day') = NaN, monsterAbilityUses.js:21) reached the label
+    // and stage readers as 'Roar N of NaN', and every `used >= NaN`
+    // compare is false → NEVER exhausted. Class idiom mirrored at
+    // monsterAbilityUses.js:26 (Number.isFinite): loud, then fail-SAFE to
+    // the exhaustion-capable default 3 — never toward infinite uses.
+    if (!Number.isFinite(maxUses)) {
+        console.error(`[roarService] MA-1411 fix#347: unparseable uses ${JSON.stringify(action?.maxUses ?? action?.uses)} on '${action?.name}' → NaN maxUses would never exhaust — falling back to STAGED_ROAR_MAX_DEFAULT ${STAGED_ROAR_MAX_DEFAULT}.`);
+        return STAGED_ROAR_MAX_DEFAULT;
+    }
+    return maxUses;
 }
 
 // Stage number for the NEXT click, derived from the persisted per-day spend

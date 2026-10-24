@@ -10,7 +10,7 @@
 // "(level 6 version)" → spellDamageFormulaAtLevel 6d10 (MA-0087), frightened via
 // MA-0362 spellDamageLegFailCondition, dc_success 'none' MA-0003.
 // Trimmed #647: spell-shape nulls owned by ma1959-orcus, chip/counter render
-// class by spellcasting.test.jsx:184/:275, spend+refusal class by :281/:518,
+// class by spellcasting.test.jsx:185/:276, spend+refusal class by :282/:508,
 // at-Will advisory class by ma0524:222 — here: BY-name gate map, distinct
 // save_dc/save_type bytes, and the merged PK cast e2e through the fixed seam.
 import { readFileSync } from 'node:fs';

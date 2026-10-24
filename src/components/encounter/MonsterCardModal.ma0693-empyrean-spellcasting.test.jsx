@@ -8,7 +8,7 @@
 // Lanes here (distinct bytes only): typo-gone data lock, Empyrean BY-name
 // extraction + exact 1/Day gate map, and one merged advisory-cast e2e
 // (single render, PWT + Greater Restoration). Cite-skipped owners: extraction/
-// counter/refusal/spend template spellcasting.test.jsx:184/:275/:281/:317/:518,
+// counter/refusal/spend template spellcasting.test.jsx:185/:276/:282/:318/:508,
 // usage text #571 usage.test.js:16-38, ability-save-uses :127, advisory class
 // ma0524-couatl:222. Empyrean legendary lane (Bolster/Shockwave/Smite) owned
 // by legendary-uses-empyrean.test.jsx (#630) — zero legs here. Save-shell is

@@ -13,19 +13,25 @@
 // staged_paralysis.paralyzed_minutes 1 (Adult Silver Dragon DC 20 is the
 // near-miss twin: NO staged_paralysis — never stages here).
 //
-// #1295 CLASS (multi-dragon te collision): writers carry te.source
-// (stageEffect + the escalation remove_target_effect payload), but every
-// reader filters by effect+target ONLY — never te.source — so a second
-// Ancient Silver Dragon re-staging the SAME target overwrites the first
-// ladder's envelope (source/dc takeover, one te per target by design). The
-// takeover is pinned honestly below; collateral on OTHER targets survives.
+// #1295/#1390 CLASS fix#343 (multi-dragon te collision): writers always
+// carried te.source (stageEffect :73 + the escalation remove_target_effect
+// payload); readers NOW match effect+target+SOURCE (registry identity law
+// registerTargetEffect :1508-1509, fix#112 weakeningBreath precedent). A
+// second Ancient Silver Dragon re-staging the SAME target COEXISTS as its own
+// ladder — no more silent takeover of the first dragon's envelope, and every
+// mutation triple-matches so no collateral edits. Turn-END returns
+// { handled, results[] } — one {source, success, roll, total} row per source
+// instance (navigationHandlers caller ignores the value; these pins own it).
+// Legacy/sourceless te: REFUSED — the turn-END never ladders a te without
+// source and console.errors it loudly (producers never omit it; the staging
+// dedup refuses to merge one: strict === survives it as its own row).
 //
-// Quirk pins: sparse GM-added te falls back to dc 24 / 'Paralyzing Breath'
-// label / 10 rounds; the stage gate is strict lowercase 'paralyzed' (a
-// capital-'Paralyzed' stage rides the stage-1 escalate leg) while condition
-// filtering is case-INsensitive (lower(), applyCondition:51); a combat-summary
-// miss means +0 saveBonus; the PC prompt envelope ??0-swallow logs
-// "rolled 0 + 0 = 0". No wall-clock in this lane (no Date.now/setTimeout/
+// Quirk pins preserved per-instance: sparse GM-added te falls back to dc 24 /
+// 'Paralyzing Breath' label / 10 rounds; the stage gate is strict lowercase
+// 'paralyzed' (a capital-'Paralyzed' stage rides the stage-1 escalate leg)
+// while condition filtering is case-INsensitive (lower(), applyCondition); a
+// combat-summary miss means +0 saveBonus; the PC prompt envelope ??0-swallow
+// logs "rolled 0 + 0 = 0". No wall-clock in this lane (no Date.now/setTimeout/
 // setInterval anywhere in paralyzingBreathService.js).
 //
 // OWNERSHIP: this file owns the service staging + turn-END ladder legs. The
@@ -167,7 +173,7 @@ const dice = (x) => vi.spyOn(Math, 'random').mockReturnValue(x); // roll = floor
 const tuples = (from = 0) => writes.slice(from).map(w => [w.owner, w.key, w.value, w.skipSync]);
 
 describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)', () => {
-    it('stages a byte-exact te per failed target (source carried, skipSync budget audited); a same-target re-stage REPLACES — one te per target, last dragon takes over (#1295 class)', async () => {
+    it('stages a byte-exact te per failed target (source carried, skipSync budget audited); a same-source re-stage REPLACES its own ladder; a DIFFERENT-source re-stage on the SAME target COEXISTS — two ladders, two DCs, no takeover (fix#343 flips the #1295 takeover pin)', async () => {
         store[T1] = { activeConditions: ['poisoned'] }; // pre-existing condition survives the append
 
         const staged = await stageParalysisTargets(campaignName, CASTER, [T1, T2], DISK_DC, {
@@ -193,18 +199,31 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
             ['campaign', 'targetEffects', [stagedTe(), stagedTe({ target: T2 })], undefined],
         ]);
 
-        // Second dragon breathes the SAME target: existingIdx replace branch
-        // (never covered before) — te count stays 2, T1's ladder untouched,
-        // T2's te now carries CASTER2 (source takeover, effect+target-only key).
+        // Second dragon breathes the SAME target: source-matched existingIdx
+        // (fix#343) — CASTER2's ladder is its OWN row; CASTER1's te on T2 is
+        // untouched (pre-fix: silent takeover, flipped honestly here). Same-
+        // SOURCE re-stage still replaces (ladder reset) — pinned next.
         const w0 = writes.length;
         const restaged = await stageParalysisTargets(campaignName, CASTER2, [T2], DISK_DC, {
             saveType: breathRow.save_type, label: breathRow.name, logLabel: breathRow.name, paralyzedRounds: DISK_ROUNDS,
         });
         expect(restaged).toEqual([T2]);
-        expect(store.campaign.targetEffects).toEqual([stagedTe(), stagedTe({ target: T2, source: CASTER2 })]);
+        expect(store.campaign.targetEffects).toEqual([stagedTe(), stagedTe({ target: T2 }), stagedTe({ target: T2, source: CASTER2 })]);
         expect(tuples(w0)).toEqual([
             [T2, 'activeConditions', ['incapacitated'], false], // applyCondition always re-writes (dedupe via lower()-filter, then append)
-            ['campaign', 'targetEffects', [stagedTe(), stagedTe({ target: T2, source: CASTER2 })], undefined],
+            ['campaign', 'targetEffects', [stagedTe(), stagedTe({ target: T2 }), stagedTe({ target: T2, source: CASTER2 })], undefined],
+        ]);
+
+        // Same-source re-stage still REPLACES (one te per target+effect+source
+        // — registry law registerTargetEffect :1508-1509), at the new dc.
+        const w1 = writes.length;
+        await stageParalysisTargets(campaignName, CASTER2, [T2], DISK_DC + 1, {
+            saveType: breathRow.save_type, label: breathRow.name, logLabel: breathRow.name, paralyzedRounds: DISK_ROUNDS,
+        });
+        expect(store.campaign.targetEffects).toEqual([stagedTe(), stagedTe({ target: T2 }), stagedTe({ target: T2, source: CASTER2, dc: DISK_DC + 1 })]);
+        expect(tuples(w1)).toEqual([
+            [T2, 'activeConditions', ['incapacitated'], false],
+            ['campaign', 'targetEffects', [stagedTe(), stagedTe({ target: T2 }), stagedTe({ target: T2, source: CASTER2, dc: DISK_DC + 1 })], undefined],
         ]);
         expect(logs).toHaveLength(0);       // staging itself is silent (the modal lane owns roll/grant logs)
         expect(expirations).toHaveLength(0); // clocks register only at the escalation seam
@@ -220,7 +239,7 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
         // (a WIS-consuming bug would tie 15 + 9 = 24 and falsely END here).
         dice(0.7);
         const r1 = await applyParalyzingBreathTurnEnd(campaignName, T1);
-        expect(r1).toEqual({ handled: true, success: false, roll: 15, total: 19 });
+        expect(r1).toEqual({ handled: true, results: [{ source: CASTER, success: false, roll: 15, total: 19 }] });
         const escalated = stagedTe({ stage: 'paralyzed', condition: 'paralyzed' });
         expect(tuples()).toEqual([
             ['campaign', 'targetEffects', [escalated, unrelated], false],
@@ -254,7 +273,7 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
         const w = writes.length, l = logs.length;
         dice(0);
         const r2 = await applyParalyzingBreathTurnEnd(campaignName, T1);
-        expect(r2).toEqual({ handled: true, success: false, roll: 1, total: 5 });
+        expect(r2).toEqual({ handled: true, results: [{ source: CASTER, success: false, roll: 1, total: 5 }] });
         expect(writes).toHaveLength(w);
         expect(expirations).toHaveLength(1);
         expect(logs.slice(l)).toEqual([{
@@ -269,7 +288,7 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
         const w2 = writes.length;
         dice(0.999);
         const r3 = await applyParalyzingBreathTurnEnd(campaignName, T1);
-        expect(r3).toEqual({ handled: true, success: true, roll: 20, total: 24 });
+        expect(r3).toEqual({ handled: true, results: [{ source: CASTER, success: true, roll: 20, total: 24 }] });
         expect(tuples(w2)).toEqual([
             ['campaign', 'targetEffects', [unrelated], false],
             [T1, 'activeConditions', [], false],
@@ -299,7 +318,7 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
                 dcSuccess: 'none', sourceName: CASTER, condition: 'Paralyzing Breath (repeat save)',
             },
         }]);
-        expect(result).toEqual({ handled: true, success: true, roll: 0, total: 0 });
+        expect(result).toEqual({ handled: true, results: [{ source: CASTER, success: true, roll: 0, total: 0 }] });
         expect(tuples()).toEqual([
             ['campaign', 'targetEffects', [], false],
             ['HexWarlock', 'activeConditions', [], false],
@@ -333,7 +352,7 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
         dice(0.5); // roll 11 + 0 = 11 < 24 → fail
         const result = await applyParalyzingBreathTurnEnd(campaignName, T1);
 
-        expect(result).toEqual({ handled: true, success: false, roll: 11, total: 11 });
+        expect(result).toEqual({ handled: true, results: [{ source: CASTER, success: false, roll: 11, total: 11 }] });
         // Escalate spread preserves ONLY the authored keys — no fabricated dc/label/duration bytes.
         expect(store.campaign.targetEffects).toEqual([
             { ...sparse, stage: 'paralyzed', condition: 'paralyzed' },
@@ -401,7 +420,7 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
 
         const result = await applyParalyzingBreathTurnEnd(campaignName, T1);
 
-        expect(result).toEqual({ handled: true, success: false, roll: 1, total: 5 });
+        expect(result).toEqual({ handled: true, results: [{ source: CASTER, success: false, roll: 1, total: 5 }] });
         // Catch-order is deterministic (handlers attached in call order, flushed before the await resumes).
         expect(consoleSpy.mock.calls).toEqual([
             ['[paralyzingBreathService] Error logging repeat save result:', err],
@@ -411,5 +430,130 @@ describe('MA-0248 paralyzingBreathService (producer staging + turn-END ladder)',
         expect(store.campaign.targetEffects[0]).toEqual(stagedTe({ stage: 'paralyzed', condition: 'paralyzed' }));
         expect(store[T1].activeConditions).toEqual(['paralyzed']);
         expect(expirations).toHaveLength(1); // mechanics complete even when every log POST fails
+    });
+
+    // fix#343 falsifiability arm (i): a SECOND dragon's ladder on the SAME
+    // target does NOT hijack the FIRST dragon's ladder — each distinct-source
+    // te adjudicates at its OWN dc, escalates its OWN te row, registers its
+    // OWN clock, and a save success strips ONLY its own instance (fix#112
+    // precedent). Pre-fix: the source-blind find/findIndex edited the FIRST
+    // row for every outcome and the re-stage silently moved the ladder.
+    it('fix#343 two-dragon same-target: CASTER1(dc24) + CASTER2(dc20) ladder independently — turn 1 both fail and escalate their OWN te rows with a clock each; turn 2 roll 20: dc24 FAILS (stays), dc20 succeeds on the >= tie and strips ONLY its own row; shared Paralyzed condition stays held by CASTER1 (sibling guard)', async () => {
+        cs.creatures = [{ name: T1, type: 'npc', saveBonuses: { con: 0 } }];
+        const ladder1 = stagedTe({ dc: 24 }); // CASTER
+        const ladder2 = stagedTe({ source: CASTER2, dc: 20 }); // SAME target T1
+        store.campaign.targetEffects = [ladder1, ladder2];
+        store[T1] = { activeConditions: ['incapacitated'] };
+
+        // Turn-end 1: dice(0.45) → roll floor(0.45*20)+1 = 10, bonus 0.
+        // CASTER1 10 < 24 fail → escalates its row; CASTER2 10 < 20 fail →
+        // escalates its own row. Two te writes, two clocks, zero takeover.
+        const w0 = writes.length;
+        dice(0.45);
+        const r = await applyParalyzingBreathTurnEnd(campaignName, T1);
+        const esc1 = stagedTe({ dc: 24, stage: 'paralyzed', condition: 'paralyzed' });
+        const esc2 = stagedTe({ source: CASTER2, dc: 20, stage: 'paralyzed', condition: 'paralyzed' });
+        expect(r).toEqual({
+            handled: true,
+            results: [
+                { source: CASTER, success: false, roll: 10, total: 10 },
+                { source: CASTER2, success: false, roll: 10, total: 10 },
+            ],
+        });
+        expect(store.campaign.targetEffects).toEqual([esc1, esc2]);
+        expect(expirations).toHaveLength(2); // one clock per source, never shared
+        expect(expirations[0].attackerName).toBe(CASTER);
+        expect(expirations[1].attackerName).toBe(CASTER2);
+        expect(tuples(w0)).toEqual([
+            // CASTER escalates idx0; CASTER2 still rides 'incapacitated' in the
+            // SAME fresh-read array → sibling guard HOLDS the stored condition
+            // (no [] write), Paralyzed is appended beside it.
+            ['campaign', 'targetEffects', [esc1, ladder2], false],
+            [T1, 'activeConditions', ['incapacitated', 'paralyzed'], false],
+            // CASTER2 escalates its own idx; with no ladder left riding
+            // 'incapacitated', the guard releases and it is stripped; its own
+            // applyCondition('paralyzed') re-canonicalizes the row (append always writes).
+            ['campaign', 'targetEffects', [esc1, esc2], false],
+            [T1, 'activeConditions', ['paralyzed'], false],
+            [T1, 'activeConditions', ['paralyzed'], false],
+        ]);
+        expect(logs.map(l => [l.type, l.characterName, l.saveDc ?? null, l.sourceName ?? null])).toEqual([
+            ['save_result', CASTER, 24, null],
+            ['condition', T1, null, CASTER],
+            ['save_result', CASTER2, 20, null],
+            ['condition', T1, null, CASTER2],
+        ]);
+
+        // Turn-end 2: dice(0.999) → roll 20, bonus 0.
+        // CASTER1: 20 < 24 fail while Paralyzed → stays, ZERO writes.
+        // CASTER2: 20 >= 20 tie SUCCESS → strips ONLY its own row; the shared
+        // 'paralyzed' condition STAYS held by CASTER1 (siblingHoldsStage).
+        const w2 = writes.length;
+        dice(0.999);
+        const r2 = await applyParalyzingBreathTurnEnd(campaignName, T1);
+        expect(r2.results).toEqual([
+            { source: CASTER, success: false, roll: 20, total: 20 },
+            { source: CASTER2, success: true, roll: 20, total: 20 },
+        ]);
+        expect(store.campaign.targetEffects).toEqual([esc1]); // NO collateral strip
+        expect(tuples(w2)).toEqual([
+            ['campaign', 'targetEffects', [esc1], false], // ONLY CASTER2's te removed
+        ]);
+        expect(store[T1].activeConditions).toEqual(['paralyzed']); // CASTER1 still paralyzes T1
+        expect(expirations).toHaveLength(2); // no new clocks
+        expect(logs.at(-1)).toEqual({
+            type: 'condition', action: 'removed', characterName: T1, condition: 'Paralyzed',
+            reason: 'Paralyzing Breath ends (repeat save succeeded)', sourceName: CASTER2,
+        });
+    });
+
+    // fix#343 falsifiability arm (iii): a sourceless te (no te.source) is REFUSED
+    // LOUDLY — never laddered, never hijacked. Producers never omit source, so a
+    // sourceless row is an orphan a GM must resolve; the turn-END console.errors and
+    // leaves it inert (handled:false when it is the ONLY row; skipped beside sourced rows).
+    it('fix#343 sourceless te: REFUSED loudly — handled:false on a lone orphan, skipped beside sourced ladders, never edited', async () => {
+        const orphan = { target: T1, effect: PARALYZING_STAGED_TE, condition: 'incapacitated', stage: 'incapacitated', dc: 24, saveType: 'CON' }; // NO source
+        store.campaign.targetEffects = [orphan];
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const lone = await applyParalyzingBreathTurnEnd(campaignName, T1);
+        expect(lone).toEqual({ handled: false });
+        expect(consoleSpy.mock.calls.map(c => c[0])).toContain(
+            `[paralyzingBreathService] sourceless ${PARALYZING_STAGED_TE} te on ${T1} — refusing to adjudicate its ladder`
+        );
+        expect(store.campaign.targetEffects).toEqual([orphan]); // untouched
+        expect(writes).toHaveLength(0);
+        expect(expirations).toHaveLength(0);
+
+        // Beside a sourced ladder: the sourced row adjudicates, the orphan survives untouched.
+        consoleSpy.mockClear();
+        store.campaign.targetEffects = [orphan, stagedTe({ source: CASTER2, dc: 20 })];
+        store[T1] = { activeConditions: ['incapacitated'] };
+        cs.creatures = [{ name: T1, type: 'npc', saveBonuses: { con: 0 } }];
+        dice(0.999); // roll 20 + 0 = 20 >= 20 → CASTER2 succeeds
+        const mixed = await applyParalyzingBreathTurnEnd(campaignName, T1);
+        expect(mixed).toEqual({ handled: true, results: [{ source: CASTER2, success: true, roll: 20, total: 20 }] });
+        expect(store.campaign.targetEffects).toEqual([orphan]); // orphan survives, CASTER2 stripped
+        // The surviving orphan declares stage-1 → the sibling guard HOLDS the
+        // stored 'incapacitated' (refused ladder = refused condition cleanup).
+        expect(store[T1].activeConditions).toEqual(['incapacitated']);
+        expect(consoleSpy.mock.calls).toEqual([
+            [`[paralyzingBreathService] sourceless ${PARALYZING_STAGED_TE} te on ${T1} — refusing to adjudicate its ladder`],
+        ]);
+    });
+
+    // fix#343 staging leg (iii): the source-matched dedup REFUSES to absorb a
+    // sourceless row — a dragon staging beside an orphan APPENDS its own ladder
+    // (strict ===, #1517 one-sided-null survives); same-source still replaces.
+    it('fix#343 staging leg: sourceless orphan te survives a re-stage as its OWN row (strict === refuses the merge) while same-source re-stage replaces its own row', async () => {
+        const orphan = { target: T1, effect: PARALYZING_STAGED_TE, condition: 'incapacitated', stage: 'incapacitated', dc: 99 }; // NO source
+        store.campaign.targetEffects = [orphan];
+
+        await stageParalysisTargets(campaignName, CASTER, [T1], DISK_DC, { saveType: 'CON', label: 'Paralyzing Breath', logLabel: 'Paralyzing Breath', paralyzedRounds: DISK_ROUNDS });
+        expect(store.campaign.targetEffects).toEqual([orphan, stagedTe({ source: CASTER })]);
+
+        // Same-source re-stage replaces ITS OWN row; the orphan stays untouched.
+        await stageParalysisTargets(campaignName, CASTER, [T1], DISK_DC + 2, { saveType: 'CON', label: 'Paralyzing Breath', logLabel: 'Paralyzing Breath', paralyzedRounds: DISK_ROUNDS });
+        expect(store.campaign.targetEffects).toEqual([orphan, stagedTe({ source: CASTER, dc: DISK_DC + 2 })]);
     });
 });

@@ -8,13 +8,15 @@
 // is the fallback when the runtime key holds the long-rest null byte
 // (restRules-longRest.js:330), runtime BEATS class JSON when both are set and differ
 // (CharSheet.jsx display injects class.major/subclass.type locally while damage path
-// consults runtime — the CLA-237 split that broke), campaign-scoped lookup args, and
-// the poisoned conditionImmunity leg independent of land type.
+// consults runtime — the CLA-237 split that broke), the threaded campaignName arg-shape
+// census (fix#339: store reader is arity-2 useRuntimeState.js:63 — campaignName is
+// channel vocabulary, resolution is campaign-blind until #1520), and the poisoned
+// conditionImmunity leg independent of land type.
 // Producer bytes: CircleOfTheLandSpellsModal.jsx:22 writes landType.name capitalized
-// ('Arid'/'Polar'/'Temperate'/'Tropical') WITH campaignName; the store mock keys on
-// the full campaign:name:key triple so a dropped or misordered campaignName arg misses
-// (getCurrentCombatRound arg-drop family). Fixtures never set class-JSON land types
-// except where a test says so, matching production shape per the CLA-237 root cause.
+// ('Arid'/'Polar'/'Temperate'/'Tropical') WITH campaignName; the store mock routes on
+// the production (characterKey, propertyName) pair (fix#339 flip: the pre-fix triple
+// mock claimed a campaign-scoped read production cannot honor — pin-lie retired per
+// #1348; arg-drop/reorder falsifiability moved to the exact call-shape census below).
 // Cited, not duplicated: rulesFactory.test.js owns the selector matrix, the synthetic
 // class-type ladder (match/mismatch, major>subclass, trim) and the :153 landMappings
 // console.error/throw guard; automationPassives.landResistance.test.js owns the
@@ -90,12 +92,14 @@ vi.mock('../automation/common/choiceStorage.js', () => ({
   getChosenRuntimeValue: vi.fn(() => null),
 }))
 
-// Real signature is getRuntimeValue(name, key, campaignName) — route on the full
-// triple so dropped/misordered campaign args miss instead of silently resolving.
+// fix#339 flip: route on the REAL arity-2 signature getRuntimeValue(characterKey,
+// propertyName) (useRuntimeState.js:63) — production is campaign-blind at read time;
+// the old triple-route mock pinned a scoping claim production never honored.
+// Threaded-arg falsifiability lives in the exact call-shape census (test 1).
 const runtimeStore = new Map()
-const LAND_STORE_KEY = 'test-campaign:Wild_Sage_Druid:_circleOfTheLandType'
+const LAND_STORE_KEY = 'Wild_Sage_Druid:_circleOfTheLandType'
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((name, key, campaignName) => runtimeStore.get(`${campaignName}:${name}:${key}`)),
+  getRuntimeValue: vi.fn((name, key) => runtimeStore.get(`${name}:${key}`) ?? null),
 }))
 
 // Byte-exact Nature's Ward automation envelope from public/data/2024/classes.json
@@ -128,12 +132,14 @@ describe('rulesFactory Nature\u2019s Ward land resistance (CLA-237)', () => {
     vi.clearAllMocks()
   })
 
-  it('resolves the merged resistance from the runtime land byte, exactly once, campaign-scoped, and flips live', async () => {
+  it('resolves the merged resistance from the runtime land byte, exactly once, with the threaded campaignName arg-shape, and flips live', async () => {
     armLand('Temperate')
     const result = await callFactory(druidSummary())
     expect(result.resistances).toEqual(['Lightning'])
     expect(result.immunities).toEqual(['poisoned'])
-    // Single land lookup with the modal-producer arg order; no stray keys consulted.
+    // Single land lookup; campaignName threaded (fix#153 channel vocabulary) — the
+    // shape census falsifies an arg drop/reorder; resolution itself is campaign-blind
+    // until #1520 (next test).
     expect(getRuntimeValue.mock.calls).toEqual([['Wild_Sage_Druid', '_circleOfTheLandType', 'test-campaign']])
 
     armLand('Arid')
@@ -159,5 +165,24 @@ describe('rulesFactory Nature\u2019s Ward land resistance (CLA-237)', () => {
     // :164 ternary falsifier: an unmapped empty land yields [] — never [undefined].
     expect(result.resistances).toEqual([])
     expect(result.immunities).toEqual(['poisoned'])
+  })
+
+  it('fix#339 scope arm: resolution is campaign-blind — foreign-campaign ghost keys are dead bytes and the threaded arg never scopes the lookup', async () => {
+    // Pre-fix triple-route mock territory: a campaign-prefixed write is invisible to
+    // the arity-2 reader (useRuntimeState.js:63 — stores Map keyed characterKey only).
+    runtimeStore.set('other-campaign:Wild_Sage_Druid:_circleOfTheLandType', 'Tropical')
+    const ghost = await callFactory(druidSummary())
+    expect(ghost.resistances).toEqual([])
+
+    // Same mirror value resolves regardless of the summary's campaignName byte —
+    // scope is the SSE-mirrored active campaign (App.jsx:87-96), not the argument.
+    armLand('Arid')
+    const swapped = await callFactory({ ...druidSummary(), campaignName: 'other-campaign' })
+    expect(swapped.resistances).toEqual(['Fire'])
+    // ...while the threaded arg-shape census still records what was sent (fix#153).
+    expect(getRuntimeValue.mock.calls).toEqual([
+      ['Wild_Sage_Druid', '_circleOfTheLandType', 'test-campaign'],
+      ['Wild_Sage_Druid', '_circleOfTheLandType', 'other-campaign'],
+    ])
   })
 })

@@ -15,12 +15,13 @@
 //     inert non-zone rows, §70 fallback builders). Never re-driven here.
 //   monsterSelfAura.ink-cloud.test.js  MA-0813/MA-1251 — ink_cloud te
 //     REGISTRATION golden (label/group/slot/description), giant-octopus and
-//     octopus disk bytes, uses-gate fresh/spent shape. Cited, not duplicated.
+//     octopus disk bytes. uses-gate fresh/spent retargeted per rec #1135 to
+//     the uses-lane CANON #1082 (monsterAbilityUses.test.js MA-0020).
 //   this file                      MA-0830 — giant-squid disk row verbatim
 //     bytes + those bytes resolving: 8-ft centered self-arm, 1/Day chip
 //     economy end-to-end (store-faithful refusal, zero-applied-must-not-burn).
 // old->new: 'te reuse (no re-registration)' -> ink-cloud.test.js te registry;
-// 'uses counter gate fresh/spent' -> ink-cloud.test.js gate test;
+// 'uses counter gate fresh/spent' -> uses-lane CANON monsterAbilityUses.test.js (#1082/#1135);
 // 'first click' + 'second click' -> consolidated day-economy lifecycle below.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {

@@ -14,12 +14,14 @@
 // distinct tokens preserved (already_X latch detail vs the MA-0020
 // "has already used … today (1/Day)" copy — the te latch wins first).
 // te label/icon/cls/group/exactly-once registry bytes → golden
-// targetEffectDefinitions.test.js #1012 (:107 enlarged / :110 invisible,
+// targetEffectDefinitions.test.js #1012 (:108 enlarged / :111 invisible,
 // roster census dedupes) — only the consumer-quoted description clauses stay
 // here. Card-row mirrors of other cards never live here (#1132 lesson):
 // base pins ONLY the canonical duergar rows + synthetic degenerates (#945).
 //
-// PRESERVED-CITED-BY (refreshed #1138-#1145 — lanes cite these faces):
+// PRESERVED-CITED-BY (refreshed #1138-#1145 — lanes cite these faces; ender
+// suite fix#363 rec#1146-refresh: grant-seam ender :327-364 + sole-owner
+// consumer :365-405, enlarged twin builders :168-177, flow :195-282):
 //   ender consumer attack/cast/inert (old :371-417, sole owner x7) → ender suite
 //   duergar Enlarge disk anchor (old :61) → disk census legs
 //   duergar Invisibility disk anchor verbatim (old :216; imp/green-hag/

@@ -9,10 +9,12 @@
 // perSpell/type-filter loop arms -> uncovered.*'. Loop-vs-gate boundary
 // (#1526 L1-L6): the AUTHORIZE scan (isFreeCastAuthorized gates) lives in
 // uncovered.isFreeCastAuthorized.test.js — THIS lane runs the post-auth
-// consumption phase only: freeCastAuthorized rides in as caller-supplied
-// truth (:985 payment-authority, #1514 cite, never recomputed here) and the
-// pins are invocationCallOrder authorize-read -> consume-write ledgers
-// (#1513/#1526 form).
+// consumption phase only. FIX#341(a) DOCTRINE FLIP (#1348 law): freeCastAuthorized
+// is NO LONGER caller-supplied payment truth (:1056-era '#1514 cite' retired) —
+// prepareSpellCast re-consults the authorized LISTS in-lane and every fixture
+// here is LIST-BACKED (real grant shapes, armed counters, runtime selections) so
+// each consumed byte is proven by the list, not asserted by the param. Pins are
+// invocationCallOrder authorize-read -> consume-write ledgers (#1513/#1526 form).
 //
 // INBOUND CLAIM DISPOSITION (all three claims consumed, verified against
 // live source 2026-10-21):
@@ -484,16 +486,35 @@ describe('prepareSpellCast — consume loop arms :445-459 (post-auth, cla229-doc
     expect(r2.metaCtx.slotConsumed).toBe(false);
   });
 
-  it('D2: spent-0 REFUSES WITH READ (#1515 distinction canon) — counter consulted, byte 0 honored (:379 null), exact-of-0 write ledger, freeCastUsed stays caller-truth', async () => {
+  it('D2: spent-0 counter REFUTES the flag LOUD and pays normally (fix#341(a) flip of the #1515 caller-truth pin) — consumed 0 consulted at the LIST (:101), never at payment; the NR-backed twin row keeps the :390 READ-happens/WRITE-silent consume arm', async () => {
     const stats = wizardStats({ automation: { actions: [miLevel1], bonusActions: [], specialActions: [], passives: [] } });
     freshStore({ [MI_LATCH]: 0 });
 
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await cast(DISK.burningHands, stats, { freeCastAuthorized: true });
 
-    expect(result.freeCastUsed).toBe(true); // :840/:842 — payment authority is caller-supplied (:985, #1514 cite)
-    expect(readsOf(MI_LATCH)).toEqual([[TW, MI_LATCH, CAMPAIGN]]); // campaign-tier read happened (unified)
+    expect(result.freeCastUsed).toBe(false); // flag-only claim, list denies — FREE is gone (#337S defect flipped)
+    expect(result.slotConsumed).toBe(false); // lv1 bank unseeded -> honest unpaid, dry
+    expect(readsOf(MI_LATCH)).toEqual([[TW, MI_LATCH, CAMPAIGN]]); // campaign-tier LIST probe happened (:101); consume never runs
     expect(setRuntimeValue.mock.calls).toEqual([]);
-    expect(__mem.get(`${TW}|${MI_LATCH}`)).toBe(0); // spent byte un-touched
+    const refuted = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refuted.length).toBe(1); // exact-of-1, never silent
+    errSpy.mockRestore();
+
+    // backing arm (list-backed free while the MI counter is spent): the adjust consume
+    // arm still consults the counter and honors byte 0 (:390 shared ops null) — READ
+    // happens, WRITE silent, no negative ledger ever (#1515 distinction canon).
+    const errSpy2 = vi.spyOn(console, 'error').mockImplementation(() => {});
+    freshStore({ [MI_LATCH]: 0, naturalRecoveryFreeCast: [DISK.burningHands.name] });
+    const paid = await cast(DISK.burningHands, stats, { freeCastAuthorized: true });
+    expect(paid.freeCastUsed).toBe(true); // granted by the runtime-selection LIST (:279), not by the flag
+    expect(readsOf(MI_LATCH)).toEqual([[TW, MI_LATCH, CAMPAIGN]]); // consume adjust READ-happens
+    expect(setRuntimeValue.mock.calls).toEqual([
+      [TW, 'naturalRecoveryFreeCast', null, CAMPAIGN], // the granting channel pays (consumeSpecial NR arm)
+      [TW, 'naturalRecoveryFreeCastUsed', true, CAMPAIGN],
+    ]); // MI latch WRITE-silent at spent-0 (:390 null)
+    expect(errSpy2).toHaveBeenCalledTimes(0); // list-backed: no refutation noise
+    errSpy2.mockRestore();
   });
 
   it('D3: featureLevel-mismatch CONTINUES (:416/:451) past a planted case-trail type that the :447 case-EXACT filter admits NOTHING — the verbatim HexWarlock recharge row alone consumes 1->0', async () => {
@@ -508,7 +529,7 @@ describe('prepareSpellCast — consume loop arms :445-459 (post-auth, cla229-doc
     expect(setRuntimeValue.mock.calls).toEqual([[TW, INST_LATCH, 0, CAMPAIGN]]); // exact-of-1
     expect(readsOf(MI_LATCH)).toEqual([]); // :451 continue — mismatched parsed level never touches the latch
     expect(readsOf('_Planted_Case_Trail_Bait_freeCastCount')).toEqual([]); // :447 case-exact filter, pre-loop skip
-    expect(readsOf(INST_LATCH)).toEqual([[TW, INST_LATCH, CAMPAIGN]]); // :437 unified read, fresh ?? uses=1 -> consume to 0
+    expect(readsOf(INST_LATCH)).toEqual([[TW, INST_LATCH, CAMPAIGN], [TW, INST_LATCH, CAMPAIGN]]); // fix#341(a): validator recharge probe :89 + consume :448 fresh ?? uses=1 -> 0 — unified arity-3 on both sides
   });
 });
 
@@ -519,89 +540,128 @@ describe('prepareSpellCast — consume loop arms :445-459 (post-auth, cla229-doc
 // and the Signature re-stamp cousin.
 // ---------------------------------------------------------------------------
 
-describe('prepareSpellCast — consumeSpecialFreeCastFlags :489-523 ledgers', () => {
-  it('Q1 (#1527 FIXED, was the #1524 quirk home): Favored Enemy disk row consumed on a Hunter\'s Mark free cast — the consume-side DECREMENT LANDS: armed latch byte 2 stamps favoredEnemyUses 1 (pre-fix vacuous self-copy stamped the read-count 2 twice); two casts read the latch arity-3 exactly twice, latch written EXACTLY ZERO (different-keys ledger is the #1512 restore-lane law, cited not grown); reads precede writes (#1513 form); a null store writes nothing (null-guard arm)', async () => {
-    const favoredActions = [{ ...diskFeature(classes2024,
-      (o, autos) => o.name === 'Favored Enemy' && autos.some(a => a.spell === "Hunter's Mark"),
-      'Favored Enemy automation for consume residence').automation }];
-    const stats = wizardStats({ automation: { actions: favoredActions, bonusActions: [], specialActions: [], passives: [] } });
-
-    // casts 1+2 against ONE armed latch byte 2 (_Favored_Enemy_freeCastCount
-    // is producer-seeded via the arm modal / LR re-arm restRules-longRest.js:733
-    // null -> armed byte): every consume stamps latch-1 — the ledger MOVES.
-    // The stamped byte repeats across casts only because the consume never
-    // drains the latch itself (#1512 open different-keys lane); the REAL store
-    // short-circuits the identical sequel write (useRuntimeState.js:96 valuesEqual).
-    freshStore({ _Favored_Enemy_freeCastCount: 2 });
-    const r1 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
-    const r2 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
-    expect([r1.freeCastUsed, r2.freeCastUsed]).toEqual([true, true]);
-    expect(setRuntimeValue.mock.calls).toEqual([
-      [TW, 'favoredEnemyUses', 1, CAMPAIGN], // decrement landed (1 === read-1, NOT the re-stamp's 2)
-      [TW, 'favoredEnemyUses', 1, CAMPAIGN],
-    ]);
-    expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(1); // store-bytes MOVED off the read-count
-    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([[TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN]]); // unified campaign-tier literal read
-    expect(readsOf('favoredEnemyUses')).toEqual([]); // latch is the count source; the uses key is WRITE-only here
-    expect(getRuntimeValue.mock.invocationCallOrder[0]).toBeLessThan(setRuntimeValue.mock.invocationCallOrder[0]); // read-ledger -> consume-write order
-    expect(readsOf('activeBuffs')).toEqual([]); // loop-inert disk shape: gate :448 false (usesMax absent, census at load)
-
-    // deny half — REAL-null missing byte (#1517): null-guard short-circuits.
-    freshStore({});
-    const r3 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
-    expect(r3.freeCastUsed).toBe(true);
-    expect(setRuntimeValue.mock.calls).toEqual([]);
-    expect(getCombatSummary).toHaveBeenCalledWith(CAMPAIGN); // concentration consult: cs-null golden guard (crash twin oracle #1513/#1518, cited)
+describe('prepareSpellCast — consumeSpecialFreeCastFlags :500-545 ledgers', () => {
+  // fix#341(a): the OLD fixture spread the ARRAY .automation of the disk feature into
+  // {0:..,1:..} — typeless, validator-INVISIBLE, payable only by the caller's param
+  // (the #337S ':1056' defect pinned as doctrine). HONEST replacement: the PRODUCTION
+  // builder shape (automationInfoBuilder/spell.js:4-27 — auto.uses_expression resolves
+  // to usesMax AT BUILD TIME), assembled from the disk Favored Enemy row bytes plus
+  // the Ranger class_levels 'favored_enemy' column the expression evaluates against
+  // (drift-throw). Payment is then LIST-derived and BOTH consume arms run exactly as
+  // production: the adjust twin drains the latch (:422-424) and the special-flag arm
+  // stamps the ledger (#1527 land-or-loud, :510-516 — cited, not grown).
+  const favoredFeature = diskFeature(classes2024,
+    (o, autos) => o.name === 'Favored Enemy' && autos.some(a => a.spell === "Hunter's Mark"),
+    'Favored Enemy automation for consume residence');
+  const favoredAuto = (Array.isArray(favoredFeature.automation) ? favoredFeature.automation : [favoredFeature.automation])
+    .find(a => a.type === 'free_spell' && a.spell === "Hunter's Mark");
+  if (!favoredAuto || favoredAuto.uses_expression !== 'favored_enemy_min_1' || favoredAuto.usesMax !== undefined || favoredAuto.uses !== undefined) {
+    throw new Error('disk drift: Ranger Favored Enemy uses_expression-no-usesMax disk row changed — re-read classes.json');
+  }
+  const rangerDisk = classes2024.find(c => c.name === 'Ranger');
+  const favoredLv1 = rangerDisk.class_levels.find(cl => cl.level === 1)?.favored_enemy;
+  if (favoredLv1 !== 2) throw new Error(`disk drift: Ranger lv1 favored_enemy column changed (${favoredLv1}) — re-read classes.json`);
+  const favoredEntry = {
+    // builder coercion of the disk row, spell.js:4-27 verbatim shape; uses/usesMax =
+    // evaluateAutoExpression('favored_enemy_min_1') = lv1 column byte 2:
+    type: 'free_spell', name: favoredFeature.name, description: favoredFeature.description || '',
+    spell: favoredAuto.spell, uses: favoredLv1, uses_expression: favoredAuto.uses_expression, usesMax: favoredLv1,
+    recharge: favoredAuto.recharge || 'long_rest', action: favoredAuto.action || 'action', duration: '',
+    casting_time: favoredAuto.casting_time || '', concentration: !!favoredAuto.concentration,
+    noConcentration: !!favoredAuto.noConcentration, resourceCost: favoredAuto.resourceCost || '',
+    freeCasts: favoredAuto.freeCasts || '', perSpellTracking: !!favoredAuto.perSpellTracking, hasAutomation: true,
+  };
+  const favoredStats = () => wizardStats({
+    class: { name: 'Ranger' },
+    automation: { actions: [favoredEntry], bonusActions: [], specialActions: [], passives: [] },
   });
 
-  it('Q1b (#1348 decrement table, #1527): latch 3 writes 2, latch 1 writes LAWFUL spent-0 (fix#90 zero-is-data, never -1), latch 0 no-op consumption REFUSES LOUD with ZERO writes (negative impossible; the pre-fix :493 `>= 0` arm silently stamped byte 0)', async () => {
-    const favoredActions = [{ ...diskFeature(classes2024,
-      (o, autos) => o.name === 'Favored Enemy' && autos.some(a => a.spell === "Hunter's Mark"),
-      'Favored Enemy automation for consume residence').automation }];
-    const stats = wizardStats({ automation: { actions: favoredActions, bonusActions: [], specialActions: [], passives: [] } });
+  it('Q1 (#1527 decrement LANDS + fix#341(a) list-derived authority): Hunter\'s Mark free cast on a builder-shaped Favored Enemy entry — validator authorizes off the latch (:101/:104), the adjust twin drains it (:423-424) AND the special-flag arm stamps the ledger latch-1 (:510-516); two casts: latch 2->1->0, ledger 0 once, reads precede writes (#1513 form); spent latch REFUTES the sequel flag LOUD', async () => {
+    const stats = favoredStats();
+    // cast1 on armed latch byte 2: validator READ (:104) -> free; adjust READ+WRITE
+    // 2->1 (:423/:424); consumeSpecial READ 1 -> ledger WRITE 0 (:510/:514).
+    freshStore({ _Favored_Enemy_freeCastCount: 2 });
+    const r1 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
+    expect(r1.freeCastUsed).toBe(true); // LIST-backed, not caller-asserted
+    expect(setRuntimeValue.mock.calls).toEqual([
+      [TW, '_Favored_Enemy_freeCastCount', 1, CAMPAIGN], // adjust decrement LANDS on the latch (production drain channel)
+      [TW, 'favoredEnemyUses', 0, CAMPAIGN], // special-flag ledger stamp, byte = post-adjust latch - 1 (#1527 mapping, cited not grown)
+    ]);
 
-    for (const [latch, stamped] of [[3, 2], [1, 0]]) {
+    // cast2 on the drained latch byte 1: adjust 1->0 LANDS; consumeSpecial READS 0 and
+    // REFUSES LOUD (:511-516) — the ledger is NOT double-decremented (#1527 zero-write
+    // refuse face lives on exactly as pinned; the ledger byte 0 survives as lawful data).
+    const r2 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
+    expect(r2.freeCastUsed).toBe(true); // latch was still armed (1>0) at the LIST probe
+    expect(setRuntimeValue.mock.calls.length).toBe(3); // cumulative: latch 1, ledger 0, latch 0
+    expect(setRuntimeValue.mock.calls[2]).toEqual([TW, '_Favored_Enemy_freeCastCount', 0, CAMPAIGN]);
+    expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(0); // lawful ledger byte UNTOUCHED by the refused ledger arm
+    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([
+      [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], // cast1 validator probe
+      [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], // cast1 adjust read
+      [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], // cast1 consumeSpecial read
+      [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], // cast2 validator probe
+      [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], // cast2 adjust read
+      [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], // cast2 consumeSpecial read (loud-refuse input)
+    ]); // campaign-tier literal reads, three per cast, arity unified
+    expect(readsOf('favoredEnemyUses')).toEqual([]); // latch is the count source; the uses key stays WRITE-only here (#1512 restore lane owns its READ)
+    expect(getRuntimeValue.mock.invocationCallOrder[0]).toBeLessThan(setRuntimeValue.mock.invocationCallOrder[0]); // read-ledger -> consume-write order
+  });
+
+  it('Q1b (#1348 decrement table + fix#341(a)): latch 3 -> latch 2 + ledger 1; latch 1 -> latch 0 + ledger LOUD-refuse (zero ledger writes, negative impossible); latch 0 -> the LIST denies the flag LOUD and the paid cast drains NOTHING; absent latch falls back to builder usesMax 2 (#1517 REAL-null face)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    for (const [latch, expectedWrites] of [
+      [3, [[TW, '_Favored_Enemy_freeCastCount', 2, CAMPAIGN], [TW, 'favoredEnemyUses', 1, CAMPAIGN]]], // adjust LANDS 3->2; ledger stamp byte = post-adjust latch - 1 (#1527)
+      [1, [[TW, '_Favored_Enemy_freeCastCount', 0, CAMPAIGN]]], // adjust LANDS 1->0; ledger arm refuses LOUD (pre-fix :493 '>=0' self-stamp retired)
+    ]) {
       freshStore({ _Favored_Enemy_freeCastCount: latch });
-      const result = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
-      expect(result.freeCastUsed).toBe(true);
-      expect(setRuntimeValue.mock.calls).toEqual([[TW, 'favoredEnemyUses', stamped, CAMPAIGN]]); // exact-of-1, byte = latch-1
-      expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(stamped);
+      const errBefore = errSpy.mock.calls.length;
+      const result = await cast(DISK.huntersMark, favoredStats(), { freeCastAuthorized: true });
+      expect(result.freeCastUsed).toBe(true); // latch armed at the probe — LIST-backed
+      expect(setRuntimeValue.mock.calls).toEqual(expectedWrites); // exact-of-ledger, byte = latch-1
+      const refused = errSpy.mock.calls.slice(errBefore).filter(c => String(c[0]).includes('Favored Enemy free-cast consume refused'));
+      expect(refused.length).toBe(latch === 1 ? 1 : 0); // LOUD exactly on the spent-after-adjust read, never silent
     }
 
-    // already-spent latch: loud refusal, zero writes, no negative byte anywhere.
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // spent latch 0: the LIST denies up front (:101/:104 count !> 0 -> continue -> deny)
+    // -> the flag is REFUTED LOUD and the paid cast drains NOTHING (pre-fix: sailed
+    // freeCastUsed:true on the param's word, consuming nothing — the #337S defect).
     freshStore({ _Favored_Enemy_freeCastCount: 0, favoredEnemyUses: 0 }); // ledger holds lawful spent-0 (fix#90)
-    const r0 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
-    expect(r0.freeCastUsed).toBe(true); // payment authority is caller-supplied truth (#1514)
-    expect(setRuntimeValue.mock.calls).toEqual([]); // pre-fix wrote byte 0 here (CAPTURE-A0) — now REFUSED
+    const errBefore0 = errSpy.mock.calls.length;
+    const r0 = await cast(DISK.huntersMark, favoredStats(), { freeCastAuthorized: true });
+    expect(r0.freeCastUsed).toBe(false); // FLIPPED: payment authority is the INTERSECTION (#341), not the caller
+    expect(r0.slotConsumed).toBe(false); // lv1 bank unseeded -> honest unpaid dry
+    expect(setRuntimeValue.mock.calls).toEqual([]); // consume never runs — no negative byte anywhere
     expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(0); // lawful spent byte UNTOUCHED
-    const refused = errSpy.mock.calls.filter(c => String(c[0]).includes('Favored Enemy free-cast consume refused'));
-    expect(refused.length).toBe(1); // refusals EXACTLY-one, never silent
-    expect(refused[0][1]).toEqual({ playerName: TW, favoredEnemyCount: 0, spellName: DISK.huntersMark.name });
+    const flagRefuted = errSpy.mock.calls.slice(errBefore0).filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(flagRefuted.length).toBe(1); // exact-of-1, never silent
     errSpy.mockRestore();
   });
 
-  it('X1: Natural Recovery [spellName] grant (:497-501, NaturalRecoveryModal.jsx:29 bytes) consumed to null + used-flag true, alongside the Signature lv3 stamp (:512-515, spellCalc2024.js:661 selection) — exact-of-3 flag-arm order; SEQUEL cast exposes the Signature used-flag RE-STAMP quirk (no used==null gate), NR stays gated (:498 null fall-through, exact-of-1)', async () => {
+  it('X1: Natural Recovery [spellName] grant (:520-524, NaturalRecoveryModal.jsx:29 bytes) consumed to null + used-flag true, alongside the Signature lv3 stamp (:535-539, spellCalc2024.js:661 selection) — exact-of-3 flag-arm order; SEQUEL cast of the SAME spell — fix#337S Signature RE-STAMP quirk KILLED by fix#341(a): with NR spent and the Signature used-flag true, NO list grants it -> the flag is REFUTED LOUD and the used-flag can no longer be re-stamped', async () => {
     const stats = wizardStats();
     freshStore({ naturalRecoveryFreeCast: [DISK.fireball.name], SignatureSpells_selection: [DISK.fireball.name] });
 
     const r1 = await cast(DISK.fireball, stats, { freeCastAuthorized: true });
-    expect(r1.freeCastUsed).toBe(true);
+    expect(r1.freeCastUsed).toBe(true); // NR selection LIST-grants it (:279) — backed, not asserted
     expect(setRuntimeValue.mock.calls).toEqual([
       [TW, 'naturalRecoveryFreeCast', null, CAMPAIGN],
       [TW, 'naturalRecoveryFreeCastUsed', true, CAMPAIGN],
       [TW, 'SignatureSpells_Fireball_used', true, CAMPAIGN],
     ]);
 
+    // Sequel: every granting list is spent (NR null, used-flag true) -> DENIED.
+    // Pre-fix the param sailed this cast freeCastUsed:true and RE-STAMPED the used
+    // flag (the #1527-X1 quirk). Post-fix#341(a): LOUD refutation, zero writes —
+    // the quirk's observability depended on param authority alone.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.clearAllMocks(); // isolate the sequel census from cast1's three landed writes
     const r2 = await cast(DISK.fireball, stats, { freeCastAuthorized: true });
-    expect(r2.freeCastUsed).toBe(true);
-    expect(setRuntimeValue.mock.calls).toEqual([ // cumulative exact-of-4: cast1's three + the SEQUEL re-stamp
-      [TW, 'naturalRecoveryFreeCast', null, CAMPAIGN],
-      [TW, 'naturalRecoveryFreeCastUsed', true, CAMPAIGN],
-      [TW, 'SignatureSpells_Fireball_used', true, CAMPAIGN],
-      [TW, 'SignatureSpells_Fireball_used', true, CAMPAIGN],
-    ]);
-    expect(__mem.get(`${TW}|naturalRecoveryFreeCast`)).toBeNull(); // NR stays spent (single-use byte honored)
+    expect(r2.freeCastUsed).toBe(false); // was true on the caller's word alone — FLIPPED
+    expect(setRuntimeValue.mock.calls.length).toBe(0); // no re-stamp, no slot (lv3 bank unseeded -> honest dry)
+    const refuted = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refuted.length).toBe(1); // exact-of-1, never silent
+    errSpy.mockRestore();
   });
 
   it('X2: Bewitching Magic latch consumes ONLY on the case-exact name Misty Step (:502) — armed+match nulls it exact-of-1; a foreign name with an armed latch writes NOTHING (READ-happens/WRITE-silent #1515); Divination Savant stamps its real lv2 Divination disk row (:518-522)', async () => {
@@ -613,15 +673,18 @@ describe('prepareSpellCast — consumeSpecialFreeCastFlags :489-523 ledgers', ()
 
     freshStore({ _Divination_Savant_selection: [DISK.detectThoughts.name] });
     const r2 = await cast(DISK.detectThoughts, stats, { freeCastAuthorized: true });
-    expect(r2.freeCastUsed).toBe(true);
+    expect(r2.freeCastUsed).toBe(true); // Savant selection LIST-grants it (:179-184) — backed
     expect(setRuntimeValue.mock.calls).toEqual([[TW, '_Divination_Savant_Detect_Thoughts_used', true, CAMPAIGN]]);
-    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast', CAMPAIGN]]); // unified read happened, latch absent -> no write
+    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast', CAMPAIGN], [TW, '_Bewitching_Magic_freeCast', CAMPAIGN]]); // validator check[0] probe + consumeSpecial :524 probe — unified arity-3, latch absent -> no write
 
     freshStore({ _Bewitching_Magic_freeCast: true });
+    const errSpyX = vi.spyOn(console, 'error').mockImplementation(() => {});
     const r3 = await cast(DISK.fireball, stats, { freeCastAuthorized: true });
-    expect(r3.freeCastUsed).toBe(true);
-    expect(setRuntimeValue.mock.calls).toEqual([]); // foreign name — :502 exact-name gate denies
-    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast', CAMPAIGN]]);
+    expect(r3.freeCastUsed).toBe(false); // fix#341(a) FLIP: the armed Bewitching latch grants ONLY the case-exact 'Misty Step' (:160) — Fireball hits no list -> flag REFUTED LOUD, pays normally (dry bank -> honest unpaid)
+    expect(setRuntimeValue.mock.calls).toEqual([]); // :524-526 exact-name gate denies AND consume never runs — a foreign name steals nothing
+    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast', CAMPAIGN]]); // validator probe only (paid cast skips consumeSpecial)
+    expect(errSpyX.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED')).length).toBe(1); // exact-of-1, never silent
+    errSpyX.mockRestore();
   });
 
   it('TK1 (CLA-356 :543-544 consume half, authorize half oracle gate #2 cited): a _telekineticMasterFreeCast-stamped Telekinesis cast skips the ENTIRE decrement phase — armed instance latch, favored latch and NR grant ALL survive an authorized free cast, exact-of-0 write ledger', async () => {
@@ -636,9 +699,9 @@ describe('prepareSpellCast — consumeSpecialFreeCastFlags :489-523 ledgers', ()
     expect(result.freeCastUsed).toBe(true);
     expect(result.slotConsumed).toBe(false);
     expect(setRuntimeValue.mock.calls).toEqual([]); // guard :544 returns BEFORE phantasmal/shadow/arcanum/loop/flags
-    expect(readsOf('_Level_1_Spell_[Instance_1]_freeCastCount')).toEqual([]);
-    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([]);
-    expect(readsOf('naturalRecoveryFreeCast')).toEqual([]);
+    expect(readsOf('_Level_1_Spell_[Instance_1]_freeCastCount')).toEqual([]); // scan :317 never reached — the TK stamp short-circuits at check :290
+    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([]); // latch survives (guard :566 before consumeSpecial) AND is never even probed
+    expect(readsOf('naturalRecoveryFreeCast')).toEqual([[TW, 'naturalRecoveryFreeCast', CAMPAIGN]]); // fix#341(a): the validator's check[0] probe READ-happens before the :290 TK grant decides — consume stays dark (guard), grant survives #691 seed byte
     expect(__mem.get(`${TW}|_Favored_Enemy_freeCastCount`)).toBe(3);
     expect(addEntry).not.toHaveBeenCalled();
     // concentration face: cs-null golden guard (disk lv5 concentration:true)

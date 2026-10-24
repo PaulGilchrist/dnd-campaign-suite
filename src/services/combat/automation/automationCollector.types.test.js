@@ -207,14 +207,18 @@ describe('collectAutomationFromFeatures – passive_rule effect routing', () => 
             name: 'Arcane Apotheosis',
             automation: { type: 'passive_rule', effect: 'arcane_apotheosis', condition: 'innate_sorcery_active', casting_time: 'passive' },
         }], ps)
-        expect(result.passives).toEqual([{
-            type: 'passive_rule',
-            name: 'Arcane Apotheosis',
-            effect: 'arcane_apotheosis',
-            hasAutomation: true,
-        }])
-        expect(result.actions).toEqual([])
-        expect(result.specialActions).toEqual([])
+        // Full-envelope fingerprint (fix#364, rec #972): exact row in passives and
+        // EVERY other routed bucket empty — subsumes the former actions/specialActions
+        // empties pair and additionally fingerprints the six buckets it left unchecked.
+        expect(Object.fromEntries(ROUTED_BUCKETS.map(b => [b, result[b]]))).toEqual({
+            ...Object.fromEntries(ROUTED_BUCKETS.map(b => [b, []])),
+            passives: [{
+                type: 'passive_rule',
+                name: 'Arcane Apotheosis',
+                effect: 'arcane_apotheosis',
+                hasAutomation: true,
+            }],
+        })
     })
 })
 

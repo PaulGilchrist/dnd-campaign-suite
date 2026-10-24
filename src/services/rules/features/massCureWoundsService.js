@@ -16,7 +16,11 @@ const MASS_CURE_WOUNDS_NAME = 'Mass Cure Wounds';
 const DEFAULT_MAX_TARGETS = 6;
 
 function isMassCureWounds(spell) {
-    return (spell.name || '') === MASS_CURE_WOUNDS_NAME;
+    // fix#349 #1384: dispatcher twin of massHealingWordService.js — the
+    // lowercase dispatch at triggerSpells.js:422 `spell.name.toLowerCase() ===
+    // 'mass cure wounds'` reaches this gate with any casing; strict equality
+    // silently nulled case-drift casts. Fold BOTH sides (fix#109 precedent).
+    return (spell.name || '').toLowerCase() === MASS_CURE_WOUNDS_NAME.toLowerCase();
 }
 
 function getSpellCastingMod(playerStats, spell) {

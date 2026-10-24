@@ -40,14 +40,11 @@ describe('npcFormUtils', () => {
   describe('constants', () => {
     it('pins the six ability abbreviations and their uppercase labels', () => {
       expect(ABILITY_ABBR).toEqual(['str', 'dex', 'con', 'int', 'wis', 'cha']);
-      expect(ABILITY_LABELS).toEqual({
-        str: 'STR',
-        dex: 'DEX',
-        con: 'CON',
-        int: 'INT',
-        wis: 'WIS',
-        cha: 'CHA',
-      });
+      // #1006 fix#363: hand-typed uppercase-label golden trimmed as low-value —
+      // key-set stays exact here; the LABEL bytes are pinned consumer-side where
+      // they render verbatim: NPCStatBlockForm.jsx:134 prints ABILITY_LABELS[ab]
+      // and NPCStatBlockForm.test.jsx:86 pins the rendered list against the map.
+      expect(Object.keys(ABILITY_LABELS)).toEqual(ABILITY_ABBR);
     });
 
     it('pins attitude options and matches every option value to a color entry', () => {

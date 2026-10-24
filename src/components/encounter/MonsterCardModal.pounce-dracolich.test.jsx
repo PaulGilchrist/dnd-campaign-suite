@@ -101,8 +101,9 @@ describe('MA-0620 monsters.json data: dracolich legendary header + Pounce delega
   it('rows[0] canonical header uses:1; children childless of uses; Pounce full-row delegates_to Rend (advisory prose, no own numbers); own Rend +13 / 2d10 + 7 Slashing + 1d8 Necrotic resolves through the delegate seam', () => {
     const h = legendaryRows()[0];
     expect(Object.keys(h)).toEqual(['name', 'uses', 'description']);
-    expect(h.name).toBe('Legendary Action Uses: 1');
-    expect(h.uses).toBe(1);
+    // name/uses values dropped per rec #779: byte-verbatim owner is
+    // MonsterCardModal.terrifying-presence-dracolich.test.jsx:120-123
+    // (same disk row, same two bytes). Keys-shape + description stay here.
     expect(h.description).toContain('regains expended legendary uses at the start of its turn');
     expect(legendaryHeaderAction(dracolich())).toBe(h);
     for (const child of legendaryRows().slice(1)) {

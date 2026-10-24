@@ -269,10 +269,14 @@ describe('CharReactions - Reaction Spell Row Click Lanes', () => {
         }
     });
 
-    // Attack bonus cell: visual disable on cannotAct, but the click handler stays
-    // attached and rolls with the spell's toHit either way (gating is downstream).
+    // fix#344(a) PIN FLIP (honest pin #1348 retired): this lane previously pinned
+    // "visual disable on cannotAct, but the click handler stays attached and rolls
+    // either way" — that WAS the bypass defect (SP-109/SP-109-class, ledger fix#337S
+    // chips row). The hit chip now folds cannotAct silently exactly like canonical
+    // handleReactionClick and refuses slowed clicks loudly via the same
+    // isSlowed/refuseSlowedReaction gate (CharReactions.jsx:456-469).
     it.each([true, false])(
-        'spell attack bonus cell renders disabled-attack when cannotAct=%s, yet clicking still rolls the spell attack',
+        'spell attack bonus cell renders disabled-attack when cannotAct=%s and rolls only when able to act',
         (cannotAct) => {
             getReactionSpellNames.mockReturnValue(new Set([THORN_WHIP.name]));
             resolveSpellDamageAtLevel.mockReturnValue('1d8+3 thunder');
@@ -292,7 +296,11 @@ describe('CharReactions - Reaction Spell Row Click Lanes', () => {
                 expect(attackCell).not.toHaveClass('disabled-attack');
             }
             fireEvent.click(attackCell);
-            expect(rollAttack).toHaveBeenCalledWith('Thorn Whip', 5, expect.any(Object));
+            if (cannotAct) {
+                expect(rollAttack).not.toHaveBeenCalled();
+            } else {
+                expect(rollAttack).toHaveBeenCalledWith('Thorn Whip', 5, expect.any(Object));
+            }
         }
     );
 

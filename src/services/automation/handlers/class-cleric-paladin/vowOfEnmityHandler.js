@@ -159,15 +159,30 @@ function setupVowTransferListener(playerName, targetName, campaignName) {
                 // Target is at 0 HP - clear the vow from attacker and target
                 await setRuntimeValue(playerName, 'vowOfEnmityTarget', null, campaignName);
                 await setRuntimeValue(playerName, 'vowOfEnmityCostPaid', null, campaignName);
+                // fix#354(b) site 3/4 (leg 1, attacker store): validate-first idiom
+                // per invisibilityService.js:20-35 (fix#349(a): validation gates
+                // precede every write, ZERO write on invalid) + fix#352 loud
+                // console.error naming the data defect. Pre-fix the tolerant ternary
+                // `Array.isArray(stored) ? stored : []` CLOBBERED a non-array store
+                // with [] (fix#170 census / fix#337S stamp ledger :1817).
                 const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-                const activeBuffs = Array.isArray(stored) ? stored : [];
-                const filtered = activeBuffs.filter(b => b.effect !== 'vow_of_enmity');
-                await setRuntimeValue(playerName, 'activeBuffs', filtered, campaignName);
+                if (!Array.isArray(stored)) {
+                    console.error('[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:', playerName, stored);
+                } else {
+                    const filtered = stored.filter(b => b.effect !== 'vow_of_enmity');
+                    await setRuntimeValue(playerName, 'activeBuffs', filtered, campaignName);
+                }
 
-                // Also clear from target's activeBuffs
-                const targetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
-                const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
-                await setRuntimeValue(targetName, 'activeBuffs', filteredTargetBuffs, campaignName);
+                // fix#354(b) site 4/4 (leg 2, target store): same idiom, guarded
+                // independently — a corrupt attacker store never blocks a valid
+                // target clear, and vice versa. Valid store -> filter+write verbatim.
+                const targetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName);
+                if (!Array.isArray(targetBuffs)) {
+                    console.error('[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:', targetName, targetBuffs);
+                } else {
+                    const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
+                    await setRuntimeValue(targetName, 'activeBuffs', filteredTargetBuffs, campaignName);
+                }
             }
         }
     };

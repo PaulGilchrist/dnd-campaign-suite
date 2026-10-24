@@ -4,6 +4,8 @@
 // and the L5-003 §8.1 token-move seam. Dispatch routing is owned by
 // automation/index.psychicTeleportation.test.js; psionic_energy_die
 // resolution is owned by automationExpressions.test.js — not re-pinned here.
+// fix#363 #1068: seam legs verified at current bytes — shape is already
+// toHaveBeenCalledWith(seam args)+prose-passthrough, no semantics re-derivation.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './psychicTeleportationHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';

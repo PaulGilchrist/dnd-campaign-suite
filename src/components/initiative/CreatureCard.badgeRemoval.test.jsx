@@ -3,7 +3,7 @@
 // Owned here (de-facto badge-mechanics owner; CreatureBadge leaf has no direct tests):
 //   card-badge × remove → exact dispatch payload per removal lane.
 // NOT owned here (do not duplicate):
-//   condition break + concentration break removal → CreatureCard.conditions.test.jsx:126/:153
+//   condition break + concentration break removal → CreatureCard.conditions.test.jsx:121/:149
 //   badge rendering faces → CreatureCard.badges.test.jsx
 //   generic ConditionEffectBadges te removal → ConditionEffectBadges.target-effect-removal.test.jsx
 import { render, screen, fireEvent, within } from '@testing-library/react';

@@ -281,9 +281,8 @@ describe('spellCalc', () => {
         { name: 'Light', prepared: '' },
       ]);
 
-      // Nature (Druid): +1 cantrip, no pushed row; Druids know the whole class
-      // list. spells must be non-null to reach the subclass-bonus branch
-      // (applyClassSpellListAndSubclassBonus early-returns on null).
+      // fix#348(b): spells:null NO LONGER skips the grants — the whole-list Druid still
+      // canonicalises spells_known to null, and the Nature bump lands with a null bag.
       const nature = casterWith('Wisdom', {
         class: { name: 'Druid', subclass: { name: 'Nature' } },
         spells: [],
@@ -298,13 +297,31 @@ describe('spellCalc', () => {
     it('sets school limits and arcane trickster cantrip bonus', () => {
       // Arcane Trickster pushes Mage Hand when absent and adds 3 cantrips;
       // Rogue is an all-prepared class so the pushed row is stamped Always.
-      // (spells: [] — non-null is required to reach the bonus-cantrip branch.)
       const trickster = makePlayerStats({ class: { name: 'Rogue', subclass: { name: 'Arcane Trickster' } }, spells: [] });
       setSpellcasting(trickster, spellcasting());
       const trickResult = getSpellAbilities([], trickster);
       expect(trickResult.schoolLimits).toEqual(['enchantment', 'illusion']);
       expect(trickResult.cantrips_known).toBe(6);
       expect(trickResult.spells).toEqual([{ name: 'Mage Hand', prepared: 'Always' }]);
+
+      // fix#348(b) falsifiability arm: NULL spell bag still receives the AT bonus
+      // cantrip grant — the grants belong to the subclass feature, not the bag.
+      // Pre-fix the early-return on null spells skipped both the pushed row and the
+      // +3 bump (cantrips_known stayed 3, spells stayed []).
+      const nullBagTrickster = makePlayerStats({ class: { name: 'Rogue', subclass: { name: 'Arcane Trickster' } }, spells: null });
+      setSpellcasting(nullBagTrickster, spellcasting());
+      const nullBagResult = getSpellAbilities([], nullBagTrickster);
+      expect(nullBagResult.cantrips_known).toBe(6);
+      expect(nullBagResult.spells).toEqual([{ name: 'Mage Hand', prepared: 'Always' }]);
+
+      // Null-bag Light caster: the pushed Light row lands even with no persisted bag.
+      // Cleric is a prepared caster (maxPreparedSpells branch) — the pushed row keeps
+      // prepared:'' until the sheet selects it (all-prepared stamping belongs to Rogue).
+      const nullBagLight = makePlayerStats({ class: { name: 'Cleric', subclass: { name: 'Light' } }, spells: null });
+      setSpellcasting(nullBagLight, spellcasting());
+      const nullBagLightResult = getSpellAbilities([], nullBagLight);
+      expect(nullBagLightResult.cantrips_known).toBe(4);
+      expect(nullBagLightResult.spells).toEqual([{ name: 'Light', prepared: '' }]);
 
       // Eldritch Knight gets its own limit pair and no bonus cantrips.
       const knight = makePlayerStats({ class: { name: 'Fighter', subclass: { name: 'Eldritch Knight' } } });

@@ -10,7 +10,7 @@
 //  - isCompositeAttackSaveRow save_dc:0 false arm → MonsterCardModal.secondary-save-transport.test.js:115
 //  - positive-DC clickable chip render + save-seam press → MonsterAction.ma1546-succubus-charm-save-effect.test.jsx / ma1847-apep-devour-the-boat-save.test.jsx
 //  - buildSaveOptions dc>0 half-default → MonsterCardModal.cockatrice-bite.test.jsx:44, ma1971-wing-defense.test.jsx:46 (line-drift refresh #336T: assertion moved from :95)
-//  - breathAoeShape save_dc:0 → null + prose-cone parse → MonsterCardModal.save-variant-shape.test.jsx:21/:29
+//  - breathAoeShape save_dc:0 → null + prose-cone parse → MonsterCardModal.save-variant-shape.test.jsx:59-61/:55-57
 //  - Rapport Spores DC0 disk pins/zone lane → MonsterAction.ma1212-rapport-spores-zone-chip.test.jsx:55
 //  - Bone Whip (MA-1070) byte-twin gate = same fork as Pincer Staff row below — redundant arm, trimmed.
 import { render, fireEvent } from '@testing-library/react';

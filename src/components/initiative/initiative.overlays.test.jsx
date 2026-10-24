@@ -143,7 +143,7 @@ describe('Initiative overlay loading', () => {
         // into state (count ≠ 0) or the card never renders (getBy throws).
         await act(async () => {});
 
-        expect(mockFetchSpellOverlays).toHaveBeenCalled();
+        expect(mockFetchSpellOverlays).toHaveBeenCalledWith('test-campaign');
         expect(screen.getByTestId('overlay-count-Alice')).toHaveTextContent('0');
     });
 });

@@ -3,6 +3,7 @@ import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyDamageToTarget } from '../combat/applyDamage.js';
+import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { endInvisibilityOnHostileAction } from '../features/invisibilityService.js';
 import { findLastAttack } from '../../automation/common/damageRollback.js';
 
@@ -155,7 +156,9 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
         timestamp: Date.now(),
     };
 
-    if (damageDifference !== 0) {
+    if (damageDifference > 0) {
+        // fix#345: HIGHER reroll = extra damage owed. Route the POSITIVE delta to
+        // the damage lane (mirror choose-higher sibling CharSheet.handlers.js:325).
         const applyResult = await applyDamageToTarget(combatSummary, lastEvent.targetName, damageDifference, lastEvent.damageTypes ? lastEvent.damageTypes : [], { campaignName, characters: characters, ignoreResistance: false, attackerName: name });
 
         if (applyResult && applyResult.finalDamage > 0) {
@@ -180,6 +183,38 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
                     originalDice: originalRolls,
                     newDice: newRolls,
                     targetCurrentHp: applyResult?.newHp,
+                },
+                completed: true,
+            },
+        };
+    }
+
+    if (damageDifference < 0) {
+        // fix#345: LOWER reroll ("You must use the new rolls." :261/:263) = refund of
+        // over-applied damage. Negatives are NOT damage — the damage lane loud-refuses
+        // them (applyDamage.js:985 fix#143), so the reduction routes through the
+        // canonical heal choke point, mirroring the retroactive-negation idiom
+        // damageRollback.js:76 (rollbackDamage) / :323 (rollbackTarget).
+        const healResult = applyHealingToTarget(combatSummary, lastEvent.targetName, -damageDifference, campaignName);
+
+        return {
+            logEntries: [logEntry],
+            popupState: {
+                type: 'empowered_spell',
+                name: 'Metamagic - Empowered Spell',
+                currentSP: currentSP - 1,
+                maxSP,
+                lastEvent: updatedLastEvent,
+                chaMod,
+                result: {
+                    oldTotal: lastEvent.rawDamage,
+                    newTotal,
+                    damageDifference,
+                    rerollCount,
+                    rerolledDice: rerollIndices,
+                    originalDice: originalRolls,
+                    newDice: newRolls,
+                    targetCurrentHp: healResult?.newHp,
                 },
                 completed: true,
             },

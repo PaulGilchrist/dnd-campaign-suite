@@ -109,7 +109,7 @@ function buildConditionOnlyAoePopup({ fullSpell, spell, metaCtx, playerStats, ca
                 conditionLabel: conditionNames.join(', '),
                 activeOverlay,
                 metamagicCareful: metaCtx?.metamagicCareful || false,
-                metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
+                metamagicHeighten: !!(hasInvisible || metaCtx?.metamagicHeighten), // fix#358 (#1464): strict boolean — 'false || undefined' shipped undefined when the hub :825 pre-stamp is bypassed; !! mirrors that fold and this file's :169 coercion
                 includeCaster,
             },
         },
@@ -140,7 +140,7 @@ function buildSaveAttackAoePopup({ fullSpell, spell, metaCtx, playerStats, campa
                 dcSuccess: normalizeDcSuccess(fullSpell, spell),
                 activeOverlay,
                 metamagicCareful: metaCtx?.metamagicCareful || false,
-                metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
+                metamagicHeighten: !!(hasInvisible || metaCtx?.metamagicHeighten), // fix#358 (#1464): strict boolean — 'false || undefined' shipped undefined when the hub :825 pre-stamp is bypassed; !! mirrors that fold and this file's :169 coercion
                 overchannelActive: !!overchannelActive,
                 overchannelUseCount: overchannelUseCount || 0,
                 overchannelSpellLevel: slotLevel,
@@ -223,7 +223,7 @@ function buildSingleTargetSaveContext(target, mapName, { playerStats, metaCtx, f
         saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
         saveType: fullSpell.dc?.dc_type || spell.dc.dc_type,
         dcSuccess: fullSpell.dc?.dc_success ?? spell.dc.dc_success,
-        metamagicHeighten: hasInvisible || metaCtx?.metamagicHeighten,
+        metamagicHeighten: !!(hasInvisible || metaCtx?.metamagicHeighten), // fix#358 (#1464): strict boolean — mirrors the hub :825 fold; same-bytes third site of the :112/:143 census
         isCantrip: spell.baseLevel === 0 || spell.level === 0,
         overchannelActive,
         overchannelUseCount,

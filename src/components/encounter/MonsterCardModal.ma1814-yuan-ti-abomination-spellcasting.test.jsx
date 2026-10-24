@@ -235,7 +235,7 @@ describe('MA-1814 MonsterCardModal Yuan-ti Abomination Spellcasting chips', () =
     expect(context.saveType).toBe('WIS');
     expect(context.dcSuccess).toBe('none');
     expect(refusals()).toHaveLength(0);
-    // null monsterSpellUses store is owned by spellcasting.test.jsx:327/:561.
+    // null monsterSpellUses store is owned by spellcasting.test.jsx:328/:551.
   });
 
   it('Suggestion spends 3→0 over three casts (each logs a 3/Day remaining-today record carrying DC 15 WIS), refuses the 4th zero-spend', async () => {
@@ -256,7 +256,7 @@ describe('MA-1814 MonsterCardModal Yuan-ti Abomination Spellcasting chips', () =
     expect(spends).toMatch(/3\/Day use spent — 1 remaining today/);
     expect(spends).toMatch(/3\/Day use spent — 0 remaining today/);
 
-    // Exhausted-refuse shape owned by spellcasting.test.jsx:288-302; this
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:289-303; this
     // pins only the 3/Day-specific refusal bytes + gate holding the record.
     await act(async () => { fireEvent.click(linkByText('Suggestion')); });
     await waitFor(() => expect(refusals('Suggestion').length).toBe(1));

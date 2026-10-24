@@ -184,10 +184,12 @@ function makePlayerStats({ name = WIZARD, className = 'Wizard', passives = [] } 
 //  _noConcentrationChoice leaks onto a paid recast                  -> T9 absence pin
 
 describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps, purity)', () => {
+  let errSpy; // fix#341(a): console.error stays spied-and-counted — the REFUTED flag is loud, never noise
   beforeEach(() => {
     vi.clearAllMocks();
     mem.clear();
     getCombatSummary.mockReturnValue(null);
+    errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   it('T1: no modifier applies — fresh outer copy with shared inner bytes, zero fabricated stamps, golden no-automation cast', async () => {
@@ -345,7 +347,9 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
   it('T6: Phantasmal free cast stamps school + flags with pure bytes; halvesHp is !!-coerced, never omitted', async () => {
     const spell = freshSpell(diskBeast);
     const snapshot = JSON.parse(JSON.stringify(spell));
-    seed(WIZARD, PHANTASMAL_BEAST_COUNTER, 0); // pre-spent: keeps the ledger silent for this byte row
+    seed(WIZARD, PHANTASMAL_BEAST_COUNTER, 1); // fix#341(a): ARMED byte — the payment is now proven
+    // by the list (perSpellFreeCastAvailable FREE_CAST_CHECKS :306), not just asserted by the
+    // param; consume therefore LANDS (1->0), which the old pre-spent-0 silence concealed.
 
     const result = await prepareSpellCast(spell, { slotLevel: 2 }, {
       playerName: WIZARD, playerStats: makePlayerStats({ passives: [phantasmalPassive()] }), campaignName: CAMPAIGN, freeCastAuthorized: true,
@@ -353,11 +357,17 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
     expect(result.modifiedSpell).toStrictEqual({ ...snapshot, school: 'Illusion', _phantasmalCreatures: true, _phantasmalHalvesHp: true }); // 3-key diff: Conjuration -> Illusion + 2 stamps
     expect(result.modifiedSpell.duration).toBe('Concentration, up to 1 hour'); // duration text is carried, never arithmetic-on-text
     expect(spell).toStrictEqual(snapshot); // input purity: the stamp mutates the copy only
+    expect(result.freeCastUsed).toBe(true); // list-backed: the intersection sails
     expect(setRuntimeValue.mock.calls.every(c => !String(c[1]).startsWith('spell_slots_'))).toBe(true); // free lane pays nothing
+    expect(setRuntimeValue.mock.calls).toEqual([
+      [WIZARD, PHANTASMAL_BEAST_COUNTER, 0, CAMPAIGN], // consume decrement lands (armed 1 -> spent 0)
+      [WIZARD, PHANTASMAL_LIST, ['Bestial Spirit'], CAMPAIGN], // summoned-creature ledger stamp
+    ]);
 
     // halvesHp falsy arm: !!coerces to FALSE (key present) — never undefined
     const lenient = JSON.parse(JSON.stringify(diskPhantasmal.automation));
     lenient.halvesHp = false;
+    seed(WIZARD, PHANTASMAL_BEAST_COUNTER, 1); // re-arm for the second byte row
     const r2 = await prepareSpellCast(spell, { slotLevel: 2 }, {
       playerName: WIZARD, playerStats: makePlayerStats({ passives: [lenient] }), campaignName: CAMPAIGN, freeCastAuthorized: true,
     });
@@ -367,36 +377,47 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
   });
 
   it('T7: summoned-creature ledger — ternary both arms append exact bytes, campaign-scoped read, dedup arm never re-writes', async () => {
-    // fresh store: Summon Beast -> Bestial Spirit (copy-append, new reference)
-    seed(WIZARD, PHANTASMAL_BEAST_COUNTER, 0);
+    // fix#341(a): casts are LIST-BACKED — counters ARMED (1) so the free branch is
+    // proven by perSpellFreeCastAvailable and the consume decrement LANDS (1->0);
+    // the old 'pre-spent 0 keeps the ledger silent' trick only worked because the
+    // param alone could pay for the cast.
+    seed(WIZARD, PHANTASMAL_BEAST_COUNTER, 1);
     await prepareSpellCast(freshSpell(diskBeast), { slotLevel: 2 }, {
       playerName: WIZARD, playerStats: makePlayerStats({ passives: [phantasmalPassive()] }), campaignName: CAMPAIGN, freeCastAuthorized: true,
     });
     expect(getRuntimeValue).toHaveBeenCalledWith(WIZARD, PHANTASMAL_LIST, CAMPAIGN); // CLA-252 campaign passthrough on the read
-    expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, PHANTASMAL_LIST, ['Bestial Spirit'], CAMPAIGN]]); // full-array byte, not arrayContaining
+    expect(setRuntimeValue.mock.calls).toEqual([
+      [WIZARD, PHANTASMAL_BEAST_COUNTER, 0, CAMPAIGN], // consume decrement lands
+      [WIZARD, PHANTASMAL_LIST, ['Bestial Spirit'], CAMPAIGN], // full-array byte, not arrayContaining
+    ]);
 
     // seeded store: Summon Fey appends onto a COPY — written array is a new ref, list grows to both spirits
     vi.clearAllMocks();
     const seeded = ['Bestial Spirit'];
     seed(WIZARD, PHANTASMAL_LIST, seeded);
-    seed(WIZARD, '_Phantasmal_Creatures_Summon_Fey_freeCastCount', 0); // pre-spent: keeps the counter ledger silent for this list row
+    seed(WIZARD, '_Phantasmal_Creatures_Summon_Fey_freeCastCount', 1); // armed — consume lands 1->0
     await prepareSpellCast(freshSpell(diskFey), { slotLevel: 4 }, {
       playerName: WIZARD, playerStats: makePlayerStats({ passives: [phantasmalPassive()] }), campaignName: CAMPAIGN, freeCastAuthorized: true,
     });
-    expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, PHANTASMAL_LIST, ['Bestial Spirit', 'Fey Spirit'], CAMPAIGN]]);
-    expect(setRuntimeValue.mock.calls[0][2]).not.toBe(seeded); // copy-before-mutating (store short-circuits identical refs)
+    expect(setRuntimeValue.mock.calls).toEqual([
+      [WIZARD, '_Phantasmal_Creatures_Summon_Fey_freeCastCount', 0, CAMPAIGN],
+      [WIZARD, PHANTASMAL_LIST, ['Bestial Spirit', 'Fey Spirit'], CAMPAIGN],
+    ]);
+    expect(setRuntimeValue.mock.calls[1][2]).not.toBe(seeded); // copy-before-mutating (store short-circuits identical refs)
 
-    // dedup guard: already-listed creature writes NOTHING
+    // dedup guard: already-listed creature writes NOTHING to the list (counter still pays)
     vi.clearAllMocks();
+    seed(WIZARD, PHANTASMAL_BEAST_COUNTER, 1);
     await prepareSpellCast(freshSpell(diskBeast), { slotLevel: 2 }, {
       playerName: WIZARD, playerStats: makePlayerStats({ passives: [phantasmalPassive()] }), campaignName: CAMPAIGN, freeCastAuthorized: true,
     });
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, PHANTASMAL_BEAST_COUNTER, 0, CAMPAIGN]]); // list-dark: dedup arm never re-writes
 
-    // membership gate: freeCastAuthorized:true but Fireball is not a freeCastSpell -> plain bytes.
-    // QUANTIFIED QUIRK (producer-side, pinned live): the authorization PARAM is PAYMENT-authoritative —
-    // an off-list 'authorized' cast pays NOTHING (no slot write) yet reports freeCastUsed:true.
-    // Upstream (FREE_CAST_CHECKS) is the real membership gate; preparation trusts the caller's flag.
+    // membership gate — fix#341(a) FLIP (was the #337S ':1056' param-authority quirk,
+    // pinned live as "off-list authorized pays NOTHING yet reports freeCastUsed:true"):
+    // the flag no longer outranks the list. Fireball is NOT a phantasmal freeCastSpell,
+    // no FREE_CAST_CHECKS grants it -> the flag is REFUTED LOUD and the cast
+    // CONSUMES NORMALLY (fail-safe toward consumption, never toward free-casting).
     vi.clearAllMocks();
     seed(WIZARD, 'spell_slots_level_3', 2);
     const plain = freshSpell(diskFireball);
@@ -404,9 +425,11 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
       playerName: WIZARD, playerStats: makePlayerStats({ passives: [phantasmalPassive()] }), campaignName: CAMPAIGN, freeCastAuthorized: true,
     });
     expect(paid.modifiedSpell).toStrictEqual(plain); // school stays Evocation; no phantasmal keys (kills old 'non-summon' + 'does-not-mark' rows)
-    expect(setRuntimeValue).not.toHaveBeenCalled(); // zero write census — slot AND counter both untouched
-    expect(paid.slotConsumed).toBe(false);
-    expect(paid.freeCastUsed).toBe(true);
+    expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, 'spell_slots_level_3', 1, CAMPAIGN]]); // the slot PAYS — nothing sails free
+    expect(paid.slotConsumed).toBe(true);
+    expect(paid.freeCastUsed).toBe(false);
+    expect(errSpy).toHaveBeenCalledTimes(1); // exact-of-1 REFUTED, never silent
+    expect(String(errSpy.mock.calls[0][0])).toContain('freeCastAuthorized flag REFUTED');
 
     // unauthorized control: same caster/spell pays its slot, stamps nothing
     vi.clearAllMocks();
@@ -414,7 +437,7 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
       playerName: WIZARD, playerStats: makePlayerStats({ passives: [phantasmalPassive()] }), campaignName: CAMPAIGN, freeCastAuthorized: false,
     });
     expect(unpaid.modifiedSpell).toStrictEqual(plain);
-    expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, 'spell_slots_level_3', 1, CAMPAIGN]]); // pays its slot, touches no feature key
+    expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, 'spell_slots_level_3', 0, CAMPAIGN]]); // pays its slot (sequel bank 1 -> 0), touches no feature key
     expect(unpaid.slotConsumed).toBe(true);
     expect(unpaid.freeCastUsed).toBe(false);
   });
@@ -422,7 +445,9 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
   it('T8: per-spell free-cast counter consumes 1->fresh with the exact log note; spent-0 guard stays silent; null is the same fresh byte', async () => {
     const stats = makePlayerStats({ passives: [phantasmalPassive()] });
     seed(WIZARD, PHANTASMAL_LIST, ['Bestial Spirit']); // keep list ledger silent (dedup arm)
-    // absent counter: stored undefined -> count = usesMax(1) from the disk passive -> writes 0
+    // absent counter: stored undefined -> validator ARMS from usesMax(1) (fix#341(a):
+    // the list, not the param, makes this cast free) -> consume writes 0
+    mem.delete(`${WIZARD}::${PHANTASMAL_BEAST_COUNTER}`);
     const result = await prepareSpellCast(freshSpell(diskBeast), { slotLevel: 2 }, {
       playerName: WIZARD, playerStats: stats, campaignName: CAMPAIGN, freeCastAuthorized: true,
     });
@@ -441,15 +466,19 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
       note: 'Phantasmal Creatures free cast of Summon Beast — spectral, half HP, no spell slot consumed. 0 free casts of Summon Beast remaining until your next Long Rest.', // plural at 0: remaining === 1 ? '' : 's'
     });
 
-    // spent arm: stored 0 -> count <= 0 early return: zero writes, zero logs
+    // spent arm: stored 0 -> perSpellFreeCastAvailable DENIES -> the param flag is
+    // REFUTED LOUD and the cast pays normally (fix#341(a) flip of the old
+    // "caller gate stays authoritative" quirk; lv2 bank dry here -> honest unpaid)
     vi.clearAllMocks();
     seed(WIZARD, PHANTASMAL_BEAST_COUNTER, 0);
     const spent = await prepareSpellCast(freshSpell(diskBeast), { slotLevel: 2 }, {
       playerName: WIZARD, playerStats: stats, campaignName: CAMPAIGN, freeCastAuthorized: true,
     });
-    expect(spent.freeCastUsed).toBe(true); // caller gate stays authoritative for the cast itself
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(spent.freeCastUsed).toBe(false);
+    expect(spent.slotConsumed).toBe(false); // no lv2 bank seeded -> nothing left to pay with, honestly false
+    expect(setRuntimeValue).not.toHaveBeenCalled(); // consumeFreeCast never runs (flag refuted)
     expect(addEntry).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledTimes(1); // REFUTED exact-of-1, never silent
 
     // null is the same fresh byte as absent (stored != null coalesce, #1512 form)
     vi.clearAllMocks();

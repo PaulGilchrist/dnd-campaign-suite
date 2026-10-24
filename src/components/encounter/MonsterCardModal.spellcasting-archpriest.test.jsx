@@ -10,9 +10,9 @@
 // from one authored byte). DC arithmetic restatement removed (row dc bytes
 // pinned once); sibling-field-shape cross-check removed — archmage/ancient-red
 // rows are owned at their own files (rec #772). Generic lanes cited, not
-// duplicated: counter badge render spellcasting.test.jsx:275, exhausted
-// 1/Day spend + spell-named refusal spellcasting.test.jsx:281-302, At Will
-// repeat / null store spellcasting.test.jsx:317, upcast prose parser
+// duplicated: counter badge render spellcasting.test.jsx:276, exhausted
+// 1/Day spend + spell-named refusal spellcasting.test.jsx:282-303, At Will
+// repeat / null store spellcasting.test.jsx:318, upcast prose parser
 // MonsterCardHelpers spellCastLevelFromSpellcasting (owner ma1202/barlgura).
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
@@ -151,7 +151,7 @@ describe('MA-0318 MonsterCardModal Archpriest Spellcasting chips + Flame Strike 
     const flameStrike = linkByText('Flame Strike');
     expect(flameStrike).toBeTruthy();
     expect(flameStrike.textContent).toMatch(/\(1\/Day · 1 left\)/);
-    // At Will stays bare (badge shape owner spellcasting.test.jsx:275).
+    // At Will stays bare (badge shape owner spellcasting.test.jsx:276).
     expect(linkByText('Light').textContent).not.toMatch(/\/Day/);
 
     await act(async () => { fireEvent.click(flameStrike); });
@@ -170,7 +170,7 @@ describe('MA-0318 MonsterCardModal Archpriest Spellcasting chips + Flame Strike 
     expect(abilityUseEntries('Flame Strike')[0].characterName).toBe(MONSTER_NAME);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Flame Strike': 1 });
 
-    // Exhausted-refuse shape owned by spellcasting.test.jsx:281-302 — this
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:282-303 — this
     // pins only that THIS row's parsed 1/Day Each header gates live.
     await act(async () => { fireEvent.click(linkByText('Flame Strike')); });
     await waitFor(() => expect(refusals('Flame Strike').length).toBe(1));

@@ -84,12 +84,17 @@ function resolveClassSpellcasting(playerStats) {
 
 // Build the prepared-spells list from playerStats.spells and apply subclass cantrip
 // bonuses (Mage Hand Legerdemain, Lighting Cantrip, Acolyte of Nature).
+// fix#348(b): the bonus-cantrip grants below belong to the SUBCLASS FEATURE, not to the
+// persisted spell bag — a caster whose playerStats.spells is still null (pre-population,
+// fresh load) is still an Arcane Trickster / Light / Nature holder and still receives them.
+// The old early-return on a null bag SKIPPED the grants entirely (owner-review #1263).
+// The bag merge is now guarded; the grants run regardless.
 function applyClassSpellListAndSubclassBonus(spellAbilities, playerStats) {
-    if (!playerStats.spells) {
+    if (playerStats.spells) {
+        spellAbilities.spells = playerStats.spells.map(spell => { return { name: spell, prepared: '' }; });
+    } else {
         spellAbilities.spells = [];
-        return;
     }
-    spellAbilities.spells = playerStats.spells.map(spell => { return { name: spell, prepared: '' }; });
     const subclassName = playerStats.class.subclass?.name;
     if (subclassName === 'Arcane Trickster') { // Mage Hand Legerdemain
         if (!spellAbilities.spells.find(s => s.name === 'Mage Hand')) {

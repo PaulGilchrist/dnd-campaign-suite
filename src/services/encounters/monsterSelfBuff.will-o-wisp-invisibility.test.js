@@ -22,7 +22,7 @@
 // selfBuff family map: owner monsterSelfBuff.test.js (duergar enlarged +
 // invisible; disk anchors :102-112; row-admission/not-self-buff :122-133;
 // refusal copy :179-192; endSelfBuffOnTrigger ender consumer sole owner
-// :322-368 — #1146 refreshed); ghost #1138 (ethereal 8h at-will);
+// :327-405 — #1146 refreshed); ghost #1138 (ethereal 8h at-will);
 // green-hag #1139 (invisible 1/Day); imp #1140 (invisible, at will);
 // quasit #1142 (invisible, at will; canonical template); sprite #1144
 // (invisible, at will); sea-hag #1143 (disguised); wisp = THIS lane
@@ -33,7 +33,7 @@
 //   pinned verbatim in its own lane (duergar by owner anchor :102-112) —
 //   identity follows transitively (delete-citing).
 // - endSelfBuffOnTrigger attack/inert ender mirrors deleted: generic te
-//   `invisible` consumer bytes owned by monsterSelfBuff.test.js:322-368
+//   `invisible` consumer bytes owned by monsterSelfBuff.test.js:327-405
 //   (#1146 base pass — refreshed range; #1138/#1139/#1140 precedent).
 // - resolver not-self-buff refusal → owner monsterSelfBuff.test.js:122-133.
 // - registry te bytes → golden targetEffectDefinitions.test.js:110/#1012.
@@ -48,7 +48,7 @@
 //   else-copy's "or uses its Enlarge" residual asserted honestly — the wisp
 //   has no Enlarge; the real enders are attack/cast (§70) (#1140).
 // old->new: disk[5]→disk[1]; flow[4]→flow[1 honest triple-press];
-// enders[2]→0 (owner monsterSelfBuff.test.js:322-368);
+// enders[2]→0 (owner monsterSelfBuff.test.js:327-405);
 // registry[1]→golden #1012 :110.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
@@ -199,7 +199,7 @@ describe('MA-1720 honest triple press — AT WILL zero-spend, real te latch, re-
     expect(setPopupHtml).toHaveBeenLastCalledWith(expect.stringContaining('Already Invisible'));
 
     // The te drops early via a Shock-attack ender (consumer bytes owned by
-    // monsterSelfBuff.test.js:322-368 — #1146 refreshed). Simulated here by
+    // monsterSelfBuff.test.js:327-405 — #1146 refreshed). Simulated here by
     // clearing the harness store, honest to this lane's next press.
     store[TE_KEY] = [{ target: 'PC 1', effect: 'invisible', source: 'Archmage 1' }];
 

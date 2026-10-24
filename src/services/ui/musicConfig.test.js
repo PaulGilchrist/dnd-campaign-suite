@@ -15,9 +15,12 @@
  * and the volume default. No audio-timing constants exist here, so the
  * no-timers guard has nothing to allowlist for this module.
  *
- * Config objects are NOT frozen and getTracksForMood returns the SAME
- * MOODS.tracks reference (shared-config identity, pinned below; mutation
- * by a consumer would leak across clients-in-process — noted, not fixed).
+ * fix#352(c): the catalogue is FROZEN DEEP (rows, tracks arrays, mood
+ * objects, MOODS) and getTracksForMood hands back a defensive COPY on the
+ * catalogue arm (caller-owned overrides keep pass-through identity, pinned
+ * below). Consumer census (MusicPlayer.jsx :45-51/:70-75/:96-97/:104-105/
+ * :127-128) is read-only .length/.map — zero persistence-via-mutation abuse,
+ * so freeze + copy retire the pollution hole with zero behavior change.
  */
 import { describe, it, expect } from 'vitest';
 import * as musicConfig from './musicConfig.js';
@@ -128,19 +131,28 @@ describe('getTracksForMood — override precedence law', () => {
     expect(getTracksForMood('nope', { nope: override })).toBe(override);
   });
 
-  it('falls back to starter reference for absent/empty/non-array overrides; unknown mood gets []', () => {
+  it('FLIPPED quirk pin: fallback returns a defensive COPY — catalogue identity content, never the live array', () => {
     const town = getMood('town').tracks;
     for (const overrides of [null, undefined, {}, { town: [] }]) {
-      expect(getTracksForMood('town', overrides)).toBe(town);
+      // fix#352(c): was toBe(town) (live-ref handout); now equal-by-content
+      // but NOT the catalogue array itself.
+      const result = getTracksForMood('town', overrides);
+      expect(result).not.toBe(town);
+      expect(result).toEqual(town);
     }
     // Array.isArray guard: truthy non-array overrides must NOT be returned
     // (dropping the guard returns the raw value — MusicPlayer would then
     // crash on .map in selectMood).
     for (const junk of ['q9yaKpYS9qc', { 0: 'x' }, 0, false, '']) {
-      expect(getTracksForMood('town', { town: junk })).toBe(town);
+      expect(getTracksForMood('town', { town: junk })).toEqual(town);
     }
-    // shared-config identity + purity: two calls hand back the SAME array.
-    expect(getTracksForMood('town', {})).toBe(getTracksForMood('town', {}));
+    // fix#352(c): two calls hand back EQUAL but DISTINCT arrays (copy law —
+    // the old toBe identity was the pollution surface itself).
+    const a = getTracksForMood('town', {});
+    const b = getTracksForMood('town', {});
+    expect(a).not.toBe(b);
+    expect(a).toEqual(b);
+    expect(a[0]).toBe(b[0]); // rows are frozen shared refs — copy is shallow BY DESIGN, isolation via Object.freeze
     // unknown mood, no override: fresh empty array (blocks selectMood via
     // its length===0 console.error arm).
     expect(getTracksForMood('nope', null)).toEqual([]);
@@ -148,6 +160,50 @@ describe('getTracksForMood — override precedence law', () => {
   });
 });
 
+describe('frozen config law (fix#352(c)) — mutation throws, copies isolate', () => {
+  it('MOODS, mood rows, tracks arrays, and track rows are all Object.frozen', () => {
+    expect(Object.isFrozen(MOODS)).toBe(true);
+    for (const mood of MOODS) {
+      expect(Object.isFrozen(mood)).toBe(true);
+      expect(Object.isFrozen(mood.tracks)).toBe(true);
+      for (const track of mood.tracks) {
+        expect(Object.isFrozen(track)).toBe(true);
+      }
+    }
+  });
+
+  it('mutating the frozen catalogue throws TypeError (strict ES-module scope) — pollution impossible', () => {
+    // ES modules are ALWAYS strict mode: a frozen-target write THROWS, it does
+    // not silently fail — the throw itself is the enforcement this stamp owed.
+    expect(() => MOODS.push({ key: 'x' })).toThrow(TypeError);
+    expect(() => MOODS.pop()).toThrow(TypeError);
+    expect(() => MOODS[0] = null).toThrow(TypeError);
+    expect(() => getMood('town').label = 'LOL').toThrow(TypeError);
+    expect(() => getMood('town').tracks.push({ videoId: 'abuseabuse1' })).toThrow(TypeError);
+    expect(() => getMood('town').tracks[0].videoId = 'evilid').toThrow(TypeError);
+    expect(MOODS).toHaveLength(5); // untouched after every attempted abuse
+  });
+
+  it('copy isolation: pushing/splicing the returned array cannot pollute the catalogue, even across many pushes', () => {
+    const tracks = getTracksForMood('town', null);
+    tracks.push({ videoId: 'abuseabuse1', title: 'pollution attempt' }); // legal on the COPY
+    tracks.splice(0, 1); // removes the copy's first element, not the appended abuse row
+    expect(tracks.map(t => t.videoId)).toEqual(['o-b5nMCj5hI', 'abuseabuse1']); // local, whatever
+    // The catalogue never saw any of it:
+    expect(getMood('town').tracks.map(t => t.videoId)).toEqual(['q9yaKpYS9qc', 'o-b5nMCj5hI']);
+    const fresh = getTracksForMood('town', null);
+    expect(fresh).not.toBe(tracks);
+    expect(fresh.map(t => t.videoId)).toEqual(['q9yaKpYS9qc', 'o-b5nMCj5hI']);
+    // Writing a row of the copy is still refused — rows are frozen shared refs:
+    expect(() => { fresh[0].title = 'rewritten'; }).toThrow(TypeError);
+  });
+
+  it('override arm stays caller-owned pass-through (identity) — the copy law covers config only', () => {
+    const override = [{ videoId: 'aaaaaaaaaaa', title: 'Custom' }];
+    expect(getTracksForMood('town', { town: override })).toBe(override);
+    expect(getTracksForMood('nope', { nope: override })).toBe(override);
+  });
+});
 describe('extractVideoId — GM paste-editor parser', () => {
   it('accepts raw ids and every supported YouTube URL shape', () => {
     expect(extractVideoId(ID)).toBe(ID);

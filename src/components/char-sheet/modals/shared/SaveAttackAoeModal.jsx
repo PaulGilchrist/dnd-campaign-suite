@@ -9,7 +9,7 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { triggerBewitchingMagic } from '../../../../services/rules/spells/postCastRiderService.js';
-import { registerTargetEffect, abilitySaveDisadvantageActive } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
+import { registerTargetEffect, abilitySaveDisadvantageActive, getEffectDefinition } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { isZonesEnforced } from '../../../../services/rules/features/zoneRepeatTurnEndService.js';
 import { isCircleOfPowerActive } from '../../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { resolveAoESaveEvasion, evasionLedgerName } from '../../../../services/rules/combat/evasionUtils.js';
@@ -310,7 +310,7 @@ function resolvePcTarget(ctx) {
         saveConditions: saveConditions || [],
     });
 
-    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
+    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []); // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198 — reader is arity-2 (useRuntimeState.js:63), scope = SSE-mirrored active-campaign store until #1520
     existingPrompts.push(promptId);
     setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
     return { prompt: { promptId, targetName, secondary } };
@@ -1185,7 +1185,8 @@ function grantSlowedClauses({ effects, campaignName, targetName, casterName, act
 
 // Result-row copy: damage rows keep the byte-identical damage line; damageless
 // rows never print "null null damage" (MA-0090 cosmetic), and staged sleep
-// rows state the Incapacitated-until-repeat-save semantics (MA-0068).
+// rows state the Incapacitated-until-repeat-save semantics (MA-0068);
+// staged-petrify rows state the Restrained-until-repeat-save ladder (fix#347).
 // MA-0563: dual-pool results row — "35 Fire + 30 Necrotic" when a secondary
 // rode the row; single-damage rows render the legacy byte-identical text.
 function damageTotalsText(r, damageType) {
@@ -1193,7 +1194,9 @@ function damageTotalsText(r, damageType) {
     return `${r.finalDamage ?? 0} ${damageType} + ${r.secondaryFinalDamage} ${r.secondaryDamageType}`;
 }
 
-function resultRowText(r, damage, damageType, sleepStaging, stagedParalysis) {
+// fix#347: the three staged-ladder flags ride ONE object param (max-params
+// law) — { sleepStaging, stagedParalysis, stagedPetrify }.
+function resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify }) {
     if (r.soulstitchProtected) return 'Soulstitch — automatically succeeds, takes no damage';
     if (r.success) {
         return (r.finalDamage ?? 0) > 0
@@ -1203,6 +1206,13 @@ function resultRowText(r, damage, damageType, sleepStaging, stagedParalysis) {
     if (!damage) {
         if (sleepStaging || stagedParalysis) {
             return `Failed — Incapacitated until the end of its next turn, then repeats the save (rolled ${r.roll ?? 0})`;
+        }
+        // fix#347 (#1725-era): staged-petrify rows (MA-0501/MA-0904 ladder)
+        // mirror the staged-paralysis branch shape above; fail#1 stage is
+        // Restrained (cockatricePetrifyService stage-1 vocabulary), the label
+        // is the registry's BY-name — never a generic 'Failed the save'.
+        if (stagedPetrify) {
+            return `Failed — Restrained until the end of its next turn, then repeats the save (${getEffectDefinition('petrifying_bite_staged').label}) (rolled ${r.roll ?? 0})`;
         }
         return `Failed the save (rolled ${r.roll ?? 0})`;
     }
@@ -1930,7 +1940,7 @@ function SaveAttackAoeModal({
                     <div className="abjure-results-list">
                         {ctx.results.map(r => (
                             <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, sleepStaging, stagedParalysis)}
+                                <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify })}
                             </div>
                         ))}
                         {ctx.pendingPrompts.map(p => (
@@ -1980,7 +1990,7 @@ function SaveAttackAoeModal({
                         <div className="abjure-results-list">
                             {summary.results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                    <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, sleepStaging, stagedParalysis)}
+                                    <strong>{r.targetName}</strong>: {resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify })}
                                 </div>
                             ))}
                         </div>

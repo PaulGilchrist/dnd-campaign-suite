@@ -15,7 +15,7 @@
 //    → MonsterCardModal.ma1212-rapport-spores-zone-picker.test.jsx
 //  - picker-confirm te grant + caster tracking →
 //    ../char-sheet/modals/shared/SaveAttackAoeModal.ma1212-rapport-zone-grant.test.jsx
-//  - breathAoeShape save_dc:0 → null → MonsterCardModal.save-variant-shape.test.jsx:21/:29
+//  - breathAoeShape save_dc:0 → null → MonsterCardModal.save-variant-shape.test.jsx:59-61
 //  - rapport_spores te registry → services/combat/conditions/targetEffectDefinitions.test.js:124
 //  - sovereign Animating Spores summon lane → services/encounters/monsterSummon.test.js:716
 import { render, fireEvent } from '@testing-library/react';

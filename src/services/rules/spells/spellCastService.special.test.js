@@ -333,14 +333,16 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
   // canonical set "tasha's hideous laughter" || 'hideous laughter' —
   // the house edition-rename idiom (mirrors Otto :210 / sphere :218).
   // RAW disk names of BOTH rulesets open the :314 span with the SAME
-  // stamped tuple and RAW-forward identity (triggerSpells.js:389).
+  // stamped tuple; fix#358 (#1459) retires the RAW-forward identity —
+  // the host now wraps { automationPopup } per the faerie-sibling
+  // guard (triggerSpells.js:385-389, host mirror at :403-407).
   // SERVICE_HANDLED (:53) already carried both literals — post-fix they
   // are LIVE shields for the routed 5e cast, not inert entries.
   // ------------------------------------------------------------------
   it.each([
     ['Hideous Laughter', '5e', 'real 5e disk name — second literal, previously slipped'],
     ["Tasha's Hideous Laughter", '2024', 'real 2024 disk name — first literal'],
-  ])('#1423 fixed: %s (%s) opens the Tasha modal span, exact stamped tuple, RAW-forward', async (name, ruleset) => {
+  ])('#1423 fixed: %s (%s) opens the Tasha modal span, exact stamped tuple, automationPopup-wrapped forward', async (name, ruleset) => {
     const envelope = diskRow(name, ruleset)
     const services = makeServices({ playerStats: makePlayerStats({ rules: ruleset }) })
     const callerMetaCtx = { slotLevel: 1 }
@@ -356,7 +358,8 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
       services.playerStats, CAMPAIGN, MAP,
     )
     expect(triggerTashasHideousLaughter.mock.calls[0][0]).toBe(envelope) // envelope identity
-    expect(res).toBe(sentinel) // RAW-forward quirk identity (index.js :314 lane)
+    expect(res).toStrictEqual({ automationPopup: sentinel }) // fix#358 flip of the retired RAW-forward pin (:314 lane)
+    expect(res.automationPopup).toBe(sentinel) // verbatim identity inside the wrap (faerie :387 shape)
     expect(automation.executeHandler).not.toHaveBeenCalled() // SERVICE_HANDLED :53 shields both names
     expect(errSpy).not.toHaveBeenCalled() // real disk names: zero lookup misses
     expect(fetchCalls).toStrictEqual([ruleset === '2024' ? '/data/2024/spells.json' : '/data/spells.json'])

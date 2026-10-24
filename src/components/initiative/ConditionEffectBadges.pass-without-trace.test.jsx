@@ -9,7 +9,7 @@
 // Owned elsewhere, not repeated here: empty state lives in
 // ConditionEffectBadges.test.jsx:73-89; isLocalhost remove-gating face in
 // auras.test.jsx:91-98; wrong-target findDirect map in
-// control-spells.test.jsx:67-73; dedupe in common.test.jsx; the
+// control-spells.test.jsx:71-77; dedupe in common.test.jsx; the
 // click→store removal dispatch for this badge's generic removeAction
 // 'target_effect' (jsx:126) lives in target-effect-removal.test.jsx:98-137.
 import { render, screen } from '@testing-library/react';

@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-19
+// @maintained-by-ai: 2026-10-24
 // CLA-120 lane (unit seam, processPotentCantrip): the potent-cantrip miss-half
 // formula rides the pre-baked autoDamageFormula — buildPotentMissFormula appends
 // the INT term ONLY when '[Empowered Evocation]' is absent (CLA-279 idempotency
@@ -12,7 +12,12 @@
 // Pipeline-side CLA-120 dedupe copies are owned by the services/*cla120* lanes.
 // Old→new: t1 formula-only pre-baked → t1 full log+damage bytes, zero re-roll;
 // t2 unmarked fold → folded into t2 it.each (same seam, auto-miss roll path);
-// t3 school gate → t3, strengthened with roll-path bytes.
+// t3 school gate → t3, strengthened with roll-path bytes; REC #931 FOLDED IN
+// (fix#364): the zero-INT-modifier non-fold arm migrated here from
+// useLoggedDiceRollAttack.potent-cantrip.test.js's it.each — gate term
+// empEvocIntMod > 0 is buildPotentMissFormula's third conjunct (attackPostPro
+// cessing.js:437) and this lane owns every folding-gate term; the full-lane
+// wiring of the unfolded pass-through stays pinned at :226 of the consumer lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
@@ -55,6 +60,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { processPotentCantrip } from './attackPostProcessing.js';
 
 const FOLDED = '4d10 + 5 [Empowered Evocation]';
@@ -158,15 +164,24 @@ describe('processPotentCantrip — CLA-120 miss-half formula folds INT exactly o
     }));
   });
 
-  it('auto miss in a non-evocation school → formula passes through unfolded', async () => {
+  it.each([
+    // School-gate term: non-evocation never folds (intMod 5 present — school alone must veto).
+    ['a non-evocation school', 'Necromancy', '4d12', undefined],
+    // Zero-INT term: evocation school with empEvocIntMod === 0 never folds
+    // (migrated from useLoggedDiceRollAttack.potent-cantrip.test.js per REC #931, fix#364).
+    ['a zero INT modifier', 'Evocation', '4d10', 0],
+  ])('auto miss in %s → formula passes through unfolded', async (_label, autoDamageSchool, autoDamageFormula, intMod) => {
+    if (intMod !== undefined) {
+      vi.mocked(getEmpoweredEvocationIntModifier).mockReturnValueOnce(intMod);
+    }
     const { logEntry } = await runMiss({
       isAutoMiss: true,
-      context: { autoDamageFormula: '4d12', autoDamageSchool: 'Necromancy', saveDc: 18 },
+      context: { autoDamageFormula, autoDamageSchool, saveDc: 18 },
     });
 
     expect(rollExpression).toHaveBeenCalledTimes(1);
-    expect(rollExpression).toHaveBeenCalledWith('4d12');
+    expect(rollExpression).toHaveBeenCalledWith(autoDamageFormula);
     expect(logEntry).toHaveBeenCalledTimes(1);
-    expect(logEntry).toHaveBeenCalledWith(expect.objectContaining({ formula: '4d12', total: 11 }));
+    expect(logEntry).toHaveBeenCalledWith(expect.objectContaining({ formula: autoDamageFormula, total: 11 }));
   });
 });

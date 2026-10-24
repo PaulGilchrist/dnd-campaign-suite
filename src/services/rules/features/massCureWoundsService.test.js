@@ -229,7 +229,6 @@ describe('massCureWoundsService.triggerMassCureWounds', () => {
         ['real-disk near-miss Cure Wounds (has heal tiers)', diskRow(spells5e, 'Cure Wounds')],
         ['real-disk family twin Mass Healing Word', diskRow(spells5e, 'Mass Healing Word')],
         ['real-disk near-miss Mass Heal', diskRow(spells5e, 'Mass Heal')],
-        ['case-drift name (caller gates lowercase, service does not)', { name: 'mass cure wounds', level: 5, heal_at_slot_level: mcw5e.heal_at_slot_level }],
         ['missing name', { level: 5, heal_at_slot_level: mcw5e.heal_at_slot_level }],
         ['null name', { name: null, level: 5 }],
     ])('name gate rejects %s before any engine work', async (_label, spell) => {
@@ -242,6 +241,24 @@ describe('massCureWoundsService.triggerMassCureWounds', () => {
         expect(dispatchSpy).not.toHaveBeenCalled();
         expect(consoleSpy).not.toHaveBeenCalled();
     });
+
+    // fix#349 #1384 mixed-case-name-caller-lands-service arm (flips the old
+    // 'case-drift ... service does not [gate]' reject row): twin of the MHW
+    // lane — gate folds case on BOTH sides with the exact triggerSpells.js:422
+    // dispatcher idiom (`spell.name.toLowerCase() === 'mass cure wounds'`).
+    it.each(['mass cure wounds', 'MASS CURE WOUNDS', 'Mass cure wounds', 'Mass Cure Wounds'])(
+        'name %s reaches the engine and heals (folded gate parity with dispatcher)', async (name) => {
+            getCombatContext.mockResolvedValue(cs([{ name: 'Ally', maxHp: 100 }]));
+            seedHp('Ally', 50);
+            roll('normal', 20, [4, 4, 4, 4, 4]);
+
+            const result = await trigger({ ...mcw5e, name });
+
+            expect(result).not.toBeNull();
+            expect(result.formula).toBe(mcw5e.heal_at_slot_level[5].replace('MOD', '4'));
+            expect(applyHealingToTarget).toHaveBeenLastCalledWith(expect.anything(), 'Ally', 20, CAMPAIGN);
+            expect(rollExpression).toHaveBeenCalledTimes(1);
+        });
 
     it('short-circuits combat context: null context, missing creatures array (exact throw + log), empty creatures', async () => {
         getCombatContext.mockResolvedValueOnce(null);

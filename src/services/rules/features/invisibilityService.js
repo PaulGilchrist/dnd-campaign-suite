@@ -16,16 +16,28 @@ export function endInvisibility(targetName, campaignName, reason) {
 
     const activeBuffs = getActiveBuffs(targetName, campaignName);
     const filtered = activeBuffs.filter(b => b.name !== INVISIBILITY_BUFF_NAME);
-    if (filtered.length !== activeBuffs.length) {
-        setRuntimeValue(targetName, 'activeBuffs', filtered, campaignName);
-    }
 
+    // fix#349 #1382 commit-ordering: conditions-validate moved BEFORE the first
+    // store write (validate-first idiom, sibling wardingBondService.js:36-43 —
+    // fix#1427(c)/fix#5 refuse-shape: validation gates precede every write,
+    // "ZERO write/log/state on BOTH legs — no half-baked state"; also
+    // massHealingWordService.js:143-152 which nulls before any heal write).
+    // Pre-fix the throw below landed AFTER the :20 activeBuffs commit, so an
+    // abort left the buff stripped while the `_activeInvisibility_` latch stayed
+    // armed — a partial-removal state (buff gone, invisible condition and latch
+    // left behind) that callers without a retry path never reconcile. Post-fix
+    // an abort mutates NOTHING: latch armed ⟺ inputs intact, so the retry (or
+    // the GM repairing the store) composes the FULL removal budget atomically.
     const conditions = (() => {
         const x = getRuntimeValue(targetName, 'activeConditions', campaignName);
         if (x == null) { console.error('[invisibilityService] Missing array:', x); throw new Error('Expected array, got ' + x); }
         return x;
     })();
     const condFiltered = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
+
+    if (filtered.length !== activeBuffs.length) {
+        setRuntimeValue(targetName, 'activeBuffs', filtered, campaignName);
+    }
     if (condFiltered.length !== conditions.length) {
         setRuntimeValue(targetName, 'activeConditions', condFiltered, campaignName);
     }
@@ -59,16 +71,20 @@ export function endGreaterInvisibility(targetName, campaignName, reason) {
 
     const activeBuffs = getActiveBuffs(targetName, campaignName);
     const filtered = activeBuffs.filter(b => b.name !== GREATER_INVISIBILITY_BUFF_NAME);
-    if (filtered.length !== activeBuffs.length) {
-        setRuntimeValue(targetName, 'activeBuffs', filtered, campaignName);
-    }
 
+    // fix#349 validate-first — same ordering law as endInvisibility above:
+    // the throw must precede every store write, never follow a committed
+    // buff-strip with the latch still armed.
     const conditions = (() => {
         const x = getRuntimeValue(targetName, 'activeConditions', campaignName);
         if (x == null) { console.error('[invisibilityService] Missing array:', x); throw new Error('Expected array, got ' + x); }
         return x;
     })();
     const condFiltered = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
+
+    if (filtered.length !== activeBuffs.length) {
+        setRuntimeValue(targetName, 'activeBuffs', filtered, campaignName);
+    }
     if (condFiltered.length !== conditions.length) {
         setRuntimeValue(targetName, 'activeConditions', condFiltered, campaignName);
     }

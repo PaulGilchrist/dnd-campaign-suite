@@ -340,6 +340,30 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
   return false;
 }
 
+// fix#341(a) (#337S row, was ':1056 isFreeCast = freeCastAuthorized'): payment
+// authority is the INTERSECTION — the caller's flag AND a live re-query of the
+// authorized lists. Every production caller computes freeCastAuthorized live via
+// isFreeCastAuthorized just before prepareSpellCast (useSpellMetamagicGates.js:373,
+// useMetamagicHandler.js:50/:120, useCustomHandlers.js:20/:52/:83/:306,
+// useComplexSpellHandlers.js:133/:214/:247, useTwoStageHandlers.js:125,
+// useActionSpellMetamagic.js:154/:180/:255, useConfirmableFlow.js:131,
+// MassSuggestionModal.jsx:20, CreatureTargetPopups.jsx:91), and the validator scans
+// the authorized lists — runtime selections (:279), disk-stamped
+// _ritualOnly/_telekineticMasterFreeCast rows (:288), mastery/savants (:293),
+// arcanums (:296), Ritual Adept (:303), per-spell passives (:306/:314), the
+// automation actions/bonusActions/specialActions entries (:317/:322/:327) and
+// buff-flag lanes (:319/:324/:329/:331) — re-reading the SAME store + playerStats
+// the caller's gate read, so a backed cast stays byte-stable. A flagged-free spell
+// NO list authorizes is a refuted flag: LOUD (no-fallbacks law) and CONSUMED
+// NORMALLY — fail-safe toward consumption, never toward free-casting.
+function resolveFreeCastPayment({ spell, freeCastAuthorized, playerName, playerStats, effectiveSpellLevel, campaignName }) {
+  const listAuthorized = isFreeCastAuthorized(playerName, spell.name, effectiveSpellLevel, playerStats, campaignName);
+  if (freeCastAuthorized === true && !listAuthorized) {
+    console.error('[spellPreparationService] freeCastAuthorized flag REFUTED by the authorized lists — consuming normally (a flag cannot pay for a spell no list grants):', { playerName, spellName: spell.name, spellLevel: effectiveSpellLevel });
+  }
+  return freeCastAuthorized === true && listAuthorized;
+}
+
 // Per-spell free-cast grants consumed on cast (CLA-252 phantasmal_creatures,
 // CLA-308 Shadow Arts) — same counter shape (one free cast PER SPELL per Long Rest),
 // different ability-name fallback and log note.
@@ -627,11 +651,38 @@ function restoreSignatureLatch(playerName, spellName, campaignName) {
 // restore can VERIFY the feature owner before re-arming — never fabricate a latch state
 // for a caster who has no Bewitching Magic passive.
 function restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName, playerStats) {
-  const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount', campaignName);
-  if (favoredEnemyCount != null) {
-    const newCount = Number(favoredEnemyCount);
-    if (newCount >= 0) {
-      setRuntimeValue(playerName, 'favoredEnemyUses', newCount + 1, campaignName);
+  // fix#341(b) (#337S row, was ':629-637'): SYMMETRIC-CHANNEL restore (#1520
+  // arity-symmetry law), capped at the disk grant. The old lane read the LATCH
+  // '_Favored_Enemy_freeCastCount' and wrote the DIFFERENT key 'favoredEnemyUses'
+  // at latch+1 UNCAPPED under '>= 0' — repeated cancels minted uses no disk ever
+  // granted. The LEDGER is the favored-enemy economy channel this lane touches:
+  // consume stamps it (:510-516, #1527 land-or-loud), TrackedResourceInput
+  // renders/edits it (CharClassFeatures.jsx:583 via useTrackedResource
+  // resolveCurrent), and the Long Rest nulls it to re-arm (restRules-constants.js:224;
+  // the latch twin nulled at restRules-longRest.js:739). Restore now reads AND
+  // writes that same key; the feature-keyed LATCH refund stays in its symmetric
+  // adjust twin (restoreActionFreeCastCounters :592-594 mirroring
+  // consumeActionFreeCastCounters :456-470) — not grown here.
+  // Disk cap, BY-NAME from public/data/2024/classes.json Ranger lv1 'Favored Enemy':
+  // RAW "You can cast it twice without expending a spell slot" + automation
+  // uses_expression:'favored_enemy_min_1' — the value source is the Ranger
+  // class_levels 'favored_enemy' column (byte ladder lv1-4:2, lv5-8:3, lv9-12:4,
+  // lv13-16:5, lv17-20:6), resolved with the SAME ceiling the UI input enforces:
+  // Math.max(1, column) (trackedResources.js:299-300; CharClassFeatures.jsx:583).
+  // Arms: count < max writes count + 1 (mirrors FREE_CAST_RESTORE_OPS.shared :409
+  // clamp — at-cap writes NOTHING); a non-finite ledger byte is a LOUD refusal with
+  // zero writes (no-fallbacks); absent/null ledger (never-consumed or LR re-arm
+  // byte) writes nothing — the #1512 restore-merge face refunds only consumed stamps.
+  const favoredEnemyLedger = getRuntimeValue(playerName, 'favoredEnemyUses', campaignName);
+  if (favoredEnemyLedger != null) {
+    const count = Number(favoredEnemyLedger);
+    if (!Number.isFinite(count)) {
+      console.error('[spellPreparationService] Favored Enemy restore refused — favoredEnemyUses ledger byte is not a finite number (zero writes):', { playerName, favoredEnemyLedger, spellName });
+    } else {
+      const favoredEnemyMax = Math.max(1, (playerStats?.class?.class_levels || []).find(cl => cl.level === playerStats?.level)?.favored_enemy || 0);
+      if (count < favoredEnemyMax) {
+        setRuntimeValue(playerName, 'favoredEnemyUses', count + 1, campaignName);
+      }
     }
   }
   const nrFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast', campaignName);
@@ -1039,9 +1090,15 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   // Concentration management
   const isWgbSpell = isWarGodsBlessingSpell(playerName, spell.name, campaignName);
 
+  // fix#341(a): payment authority is the INTERSECTION of the caller's flag and the
+  // authorized lists — full byte-evidence comment lives on resolveFreeCastPayment
+  // (:344). A refuted flag is LOUD and pays normally; never fail toward free-casting.
+  const isFreeCast = resolveFreeCastPayment({ spell, freeCastAuthorized, playerName, playerStats, effectiveSpellLevel, campaignName });
+
   // CLA-138: arm-time "Skip Concentration" choice on a free-cast feature
-  // (Fey Reinforcements → Summon Fey) — honored only on the free cast itself.
-  const featureDropsConcentration = freeCastAuthorized === true && noConcentrationChoicePending(playerStats, spell.name, playerName, campaignName);
+  // (Fey Reinforcements → Summon Fey) — honored only on the free cast itself
+  // (fix#341(a): gated on the intersection, not the raw flag).
+  const featureDropsConcentration = isFreeCast && noConcentrationChoicePending(playerStats, spell.name, playerName, campaignName);
 
   const concentration = resolveConcentrationChange(spell, playerName, playerStats, campaignName, isWgbSpell);
   const shouldSetConcentration = concentration.shouldSetConcentration && !featureDropsConcentration;
@@ -1052,8 +1109,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   result.metaCtx.oldConcentrationSpell = oldConcentrationSpell;
   result.metaCtx.shouldSetConcentration = shouldSetConcentration;
 
-  // Psionic Sorcery payment
-  const isFreeCast = freeCastAuthorized;
+  // Psionic Sorcery payment (isFreeCast derived above at the intersection seam, fix#341(a))
   if (isPsionic && hasPsionic && !isFreeCast && usePsionicPayment) {
     applyPsionicSorceryPayment(spell, playerName, effectiveSpellLevel, campaignName, result.metaCtx);
   }

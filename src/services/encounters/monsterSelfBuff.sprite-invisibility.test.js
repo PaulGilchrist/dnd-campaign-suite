@@ -18,7 +18,7 @@
 // advisory — same residual as the imp/quasit twins.
 //
 // selfBuff family map: owner monsterSelfBuff.test.js (duergar enlarged +
-// invisible, ender consumer :371-417); ghost #1138 (ethereal 8h at-will);
+// invisible, ender consumer :327-405); ghost #1138 (ethereal 8h at-will);
 // green-hag #1139 (invisible 1/Day); imp #1140 (invisible, at will);
 // quasit #1142 (invisible, at will; canonical template); sea-hag #1143
 // (disguised); sprite = THIS lane (invisible, at will); wisp lane reads
@@ -29,7 +29,7 @@
 //   row pinned verbatim here, imp by imp lane, duergar by owner :216, hag
 //   by hag lane — identity follows transitively (delete-citing).
 // - endSelfBuffOnTrigger attack/inert ender tests deleted: generic consumer
-//   bytes for te `invisible` owned by monsterSelfBuff.test.js:371-417
+//   bytes for te `invisible` owned by monsterSelfBuff.test.js:327-405
 //   (same key; #1138/#1139/#1140 precedent).
 // - registry te bytes → golden targetEffectDefinitions.test.js:110/#1012.
 // - Needle Sword/Enchanting Bow/Heart Sight inert pins folded into the
@@ -41,7 +41,7 @@
 //   (#993); zero-write census (#1026); loud PC decoy + bystander survivor
 //   (#948/#1057); seam clock never wall-clock (MANDATORY).
 // old->new: disk[4]→disk[1]; grant-flow[4]→flow[1 honest triple-press];
-// enders[2]→0 (owner monsterSelfBuff.test.js:371-417);
+// enders[2]→0 (owner monsterSelfBuff.test.js:327-405);
 // registry[1]→golden #1012.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
@@ -184,7 +184,7 @@ describe('MA-1522 honest triple press — AT WILL zero-spend, real te latch, re-
     expect(setPopupHtml).toHaveBeenLastCalledWith(expect.stringContaining('Already Invisible'));
 
     // The te drops early via a Needle Sword/cast ender (consumer bytes owned
-    // by monsterSelfBuff.test.js:371-417 — #1138/#1139/#1140 precedent).
+    // by monsterSelfBuff.test.js:327-405 — #1138/#1139/#1140 precedent).
     // Simulated here by clearing the harness store, honest to this lane's
     // next press.
     store[TE_KEY] = [{ target: 'PC 1', effect: 'invisible', source: 'Archmage 1' }];

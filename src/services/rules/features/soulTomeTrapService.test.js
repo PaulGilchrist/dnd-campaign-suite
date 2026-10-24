@@ -21,10 +21,15 @@
 // (targetEffectDefinitions.js:1510, mirrored by the fake); the service's own
 // writes (soulTomeTrapService.js:36/:44/:52) are arity-4 WITHOUT skipSync —
 // original writes, no SSE-echo loop risk.
-// Pinned AS-IS source smells: (1) PC prompt hard-codes saveType 'CHA'
-// (:103) over a te whose saveType field may differ (e.g. 'WIS'), and the
-// save_result prose hard-codes 'Charisma' while its saveType FIELD mirrors te
-// — pinned byte-exact by the coercion-walk test below; (2) service calls
+// Pinned AS-IS source smells: (1) fix#353 FIXED (#1419): the PC prompt no
+// longer hard-codes 'CHA' — resolveRepeatSave takes the te-threaded saveType
+// (:141/:146 caller bytes) and mirrors the NPC-leg idiom above it (:96
+// `saveTypeAbbr(csCreature?.saveType)`), normalizing via the SAME saveTypeAbbr
+// whose silent 'cha' default (:27/:29) IS the NPC leg's only fallback law —
+// zero console.error on the fallback, none invented. WIS-honored and
+// absent-te->silent-CHA arms pinned below; prose interpolates the honored
+// abbr (repo idiom: baneService.js:96/:113 'CHA save'). NPC leg still reads
+// the COMBAT SUMMARY row (quirk 3, byte-pinned at :303); (2) service calls
 // getRuntimeValue with 3 args while production is arity-2 (:63) — 3rd arg
 // inert by design, arity censused on every read; (3) NPC auto-roll reads
 // saveType/saveBonuses from the COMBAT SUMMARY row, not from the te (:96-97),
@@ -140,9 +145,11 @@ const MA104 = (target = V) => ({
     duration: 'until_start_of_attacker_next_turn', rounds: 2,
 });
 const grantedDesc = (target = V, dc = 17) => `${target} failed ${ARC}'s ${LABEL} save (DC ${dc}) — trapped in a demiplane inside the Soul Tome with the Incapacitated condition (indefinite until a repeat save succeeds at the end of its turn; becoming bound to the tome after three cumulative fails is GM-enforced — no fail-counter consumer).`;
-const repeatDesc = (target, dc) => `${target} repeats its Charisma save (DC ${dc}) at the end of its turn to escape the Soul Tome.`;
-const successDesc = (target, dc, roll, bonus, total) => `${target} succeeded its repeat Charisma save (DC ${dc}, rolled ${roll} + ${bonus} = ${total}) — escapes the Soul Tome, appearing in the space it left or the nearest unoccupied space (placement GM-enforced).`;
-const failDesc = (target, dc, roll, bonus, total) => `${target} failed its repeat Charisma save (DC ${dc}, rolled ${roll} + ${bonus} = ${total}) — remains trapped (Incapacitated); cumulative fails toward becoming bound to the tome (3) are GM-enforced — no fail-counter consumer.`;
+// fix#353: prose carries the HONORED abbr (te-threaded), default 'CHA' keeps
+// every pre-existing byte-pinned call site identical.
+const repeatDesc = (target, dc, abbr = 'CHA') => `${target} repeats its ${abbr} save (DC ${dc}) at the end of its turn to escape the Soul Tome.`;
+const successDesc = (target, dc, roll, bonus, total, abbr = 'CHA') => `${target} succeeded its repeat ${abbr} save (DC ${dc}, rolled ${roll} + ${bonus} = ${total}) — escapes the Soul Tome, appearing in the space it left or the nearest unoccupied space (placement GM-enforced).`;
+const failDesc = (target, dc, roll, bonus, total, abbr = 'CHA') => `${target} failed its repeat ${abbr} save (DC ${dc}, rolled ${roll} + ${bonus} = ${total}) — remains trapped (Incapacitated); cumulative fails toward becoming bound to the tome (3) are GM-enforced — no fail-counter consumer.`;
 
 function seedCond(owner, conditions) { runtimeStore[`${owner}.activeConditions`] = conditions; }
 function seedTes(...tes) { runtimeStore['campaign.targetEffects'] = tes; }
@@ -298,6 +305,71 @@ describe('applySoulTomeTrapTurnEnd — MA-0048 turn-END repeat-save consumer (na
                 success: false, roll: 3, total: 2, saveBonus: -1, description: failDesc(V, 17, 3, -1, 2), timestamp: 1792584000000,
             },
         ]);
+    });
+
+    // fix#353 arms (#1419): PC leg honors the te-threaded saveType; fallback
+    // law is the NPC leg's OWN silent 'cha' default in saveTypeAbbr (:27/:29)
+    // — zero console.error on the fallback path is ITSELF pinned (no invented
+    // loud law) — while :78's granted-prose 'DC undefined' leg stays byte-
+    // honest as pinned in the grant lane above (fix#353 adjudication: the sole
+    // production caller threads saveDc through detail.saveDc ?? pending.saveDc,
+    // useLoggedDiceRollEventHandlers.js:455; no fabricated numeric default).
+    it('te-saveType-honored: WIS-stamped te prompts WIS and every PC-leg log byte carries WIS (retired hardcoded CHA impossible)', async () => {
+        seedTes(TE({ saveType: 'WIS' }));
+        seedCond(V, ['incapacitated']);
+        saveOutcome = { roll: 18, saveBonus: 0, success: true };
+        clearCalls();
+
+        const res = await applySoulTomeTrapTurnEnd(C, V);
+
+        expect(res).toEqual({ handled: true, success: true, roll: 18, total: 18 });
+        expect(listeners).toEqual([{ targetName: V, saveType: 'WIS', saveDc: 17, dcSuccess: 'none', sourceName: ARC, condition: `${LABEL} (repeat save)` }]);
+        expect(logs).toEqual([
+            { type: 'ability_use', characterName: ARC, abilityName: LABEL, description: repeatDesc(V, 17, 'WIS'), promptId: 'soul-prompt-1' },
+            {
+                type: 'save_result', characterName: ARC, rollType: 'save-soul-tome-repeat', targetName: V, saveDc: 17, saveType: 'WIS',
+                success: true, roll: 18, total: 18, saveBonus: 0, description: successDesc(V, 17, 18, 0, 18, 'WIS'), timestamp: 1792584000000,
+            },
+            {
+                type: 'condition', action: 'removed', characterName: V, condition: 'Incapacitated',
+                reason: 'Escaped the Soul Tome (repeat save succeeded)', sourceName: ARC, timestamp: 1792584000000,
+            },
+        ]);
+    });
+
+    it('absent te.saveType: silent CHA fallback via the NPC-leg saveTypeAbbr law (prompt + field + prose all CHA, ZERO console.error — loud arm not invented)', async () => {
+        const teNoType = TE();
+        delete teNoType.saveType;
+        seedTes(teNoType);
+        seedCond(V, ['incapacitated']);
+        saveOutcome = { roll: 3, saveBonus: -1, success: false };
+        const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+        clearCalls();
+
+        const res = await applySoulTomeTrapTurnEnd(C, V);
+
+        expect(res).toEqual({ handled: true, success: false, roll: 3, total: 2 });
+        expect(listeners).toEqual([{ targetName: V, saveType: 'CHA', saveDc: 17, dcSuccess: 'none', sourceName: ARC, condition: `${LABEL} (repeat save)` }]);
+        expect(logs).toEqual([
+            { type: 'ability_use', characterName: ARC, abilityName: LABEL, description: repeatDesc(V, 17), promptId: 'soul-prompt-1' },
+            {
+                type: 'save_result', characterName: ARC, rollType: 'save-soul-tome-repeat', targetName: V, saveDc: 17, saveType: 'CHA',
+                success: false, roll: 3, total: 2, saveBonus: -1, description: failDesc(V, 17, 3, -1, 2), timestamp: 1792584000000,
+            },
+        ]);
+        expect(err).not.toHaveBeenCalled();
+    });
+
+    it('malformed te.saveType normalizes through saveTypeAbbr (echoed verbatim into the log field BEFORE fix#353; coerced to CHA with it)', async () => {
+        seedTes(TE({ saveType: 'ChA' }));
+        seedCond(V, ['incapacitated']);
+        saveOutcome = { roll: 19, saveBonus: 0, success: true };
+        clearCalls();
+
+        await applySoulTomeTrapTurnEnd(C, V);
+
+        expect(listeners[0].saveType).toBe('CHA'); // saveTypeAbbr('ChA') -> 'cha' -> 'CHA'
+        expect(logs.find(l => l.type === 'save_result').saveType).toBe('CHA');
     });
 
     it('NPC leg auto-rolls inline (NO prompt) off the COMBAT-SUMMARY save row: missing saveType/saveBonuses chain to bonus 0 and the >= dc boundary decides', async () => {

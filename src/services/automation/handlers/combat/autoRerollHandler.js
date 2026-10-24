@@ -18,7 +18,14 @@ async function applyMissTurnedHitDamage({ campaignName, attackEvent, playerStats
     const cs = await getCombatContext(campaignName);
     const characters = [playerStats];
     try {
-        const appliedDmg = applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], { campaignName: characters, characters: false, ignoreResistance: characterName });
+        // fix#337S-LIVE (a): options were SCRAMBLED one slot ({campaignName: characters,
+        // characters: false, ignoreResistance: characterName}) — the array landed in the
+        // campaign slot and a truthy name in ignoreResistance BYPASSED resistance.
+        // Contract: applyDamage.js:1023 { campaignName, characters, ignoreResistance = false,
+        // attackerName = null, ... }. Unscrambled + result-read law fix#116: await so
+        // appliedDmg.finalDamage (:34) is the real number, rejection lands in catch(:37),
+        // and the damage log cannot race ahead of combatSummary persistence (applyDamage.js:1082).
+        const appliedDmg = await applyDamageToTarget(cs, attackEvent.targetName, damageResult.total, [attackEvent.damageType || 'unknown'], { campaignName, characters, ignoreResistance: false, attackerName: characterName });
         if (appliedDmg) {
             addEntry(campaignName, {
                 type: 'roll',

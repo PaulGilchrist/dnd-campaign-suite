@@ -289,13 +289,18 @@ describe('settlementGenerator', () => {
     });
   });
 
-  describe('culture fallback ladder', () => {
+  describe('culture fallback ladder (fix#357 LOUD-but-returning)', () => {
     // Only Human.town survives: culture rolls 'Elven' (city pool last) →
     // names.Elven missing → names.Human.city missing → names.Human.town.
+    // fix#357 flip: the #app no-fallbacks law makes every fallback leg LOUD —
+    // producer census (settlement-names.json: all 5 cultures x 4 sizes non-empty)
+    // proves a miss on real disk is key drift, so the leg is announced while it
+    // still returns the fallback name. Result + roll economy pins are unchanged.
     const LADDER_NAMES = { Human: { town: ['Fallbackton'] } };
 
-    it('walks culture → Human[size] → Human.town and pins the result', async () => {
+    it('walks culture → Human[size] → Human.town, announces the fallback leg, pins the result quiet-terminal', async () => {
       serveDisk({ '/data/settlement-names.json': LADDER_NAMES });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const randomSpy = riggedRandom(0.999999);
 
       const result = await generateSettlement([], { size: 'city' });
@@ -303,23 +308,110 @@ describe('settlementGenerator', () => {
       expect(result.name).toBe('Fallbackton');
       expect(result.tags).toBe('city, elven-culture, stable, many-services');
       expect(randomSpy).toHaveBeenCalledTimes(83); // city economy, unchanged by fallback
+      // loud-leg flip: exactly one settlement-name announcement, naming the drift
+      const nameLegCalls = errorSpy.mock.calls.filter(c => String(c[0]).includes('walking Human fallback'));
+      expect(nameLegCalls).toHaveLength(1);
+      expect(nameLegCalls[0][0]).toContain("culture 'Elven' has no 'city' name pool");
     });
 
-    it('applies the conflict suffix to fallback names too', async () => {
+    it('applies the conflict suffix to fallback names too (still loud, still returning)', async () => {
       serveDisk({ '/data/settlement-names.json': LADDER_NAMES });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       riggedRandom(0.999999);
 
       const result = await generateSettlement([{ name: 'Fallbackton' }], { size: 'city' });
 
       expect(result.name).toBe('Fallbackton 2');
+      expect(errorSpy.mock.calls.filter(c => String(c[0]).includes('walking Human fallback')).length).toBe(1);
+    });
+
+    it('fix#357 loud-terminal: Human[size] present-but-empty [] routes through length-checked town arm and still returns (never pick([])===undefined)', async () => {
+      // old `fallback[size] || fallback['town']` shape rode a present-empty []
+      // terminal into an undefined name; new arms are length-checked, same walk.
+      serveDisk({ '/data/settlement-names.json': { Elven: { city: [] }, Human: { city: [], town: ['Fallbackton'] } } });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const randomSpy = riggedRandom(0.999999);
+
+      const result = await generateSettlement([], { size: 'city' });
+
+      expect(result.name).toBe('Fallbackton'); // pick of ['Fallbackton'] is index-exact
+      expect(randomSpy).toHaveBeenCalledTimes(83); // guard consumes zero extra rolls
+      expect(errorSpy).toHaveBeenCalled();
+    });
+
+    it('fix#357 loud-terminal: Human pools absent-or-empty across the ladder throws TypeError, no undefined-name settlement', async () => {
+      // old pick([]) === undefined settlement name terminal; now announced + refused.
+      serveDisk({ '/data/settlement-names.json': { Elven: { city: [] }, Human: { city: [], town: [] } } });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      riggedRandom(0.999999);
+
+      await expect(generateSettlement([], { size: 'city' })).rejects.toThrow(TypeError);
+      expect(errorSpy.mock.calls.map(c => String(c[0])).some(m => m.includes('no non-empty settlement-name pool'))).toBe(true);
+    });
+
+    it('fix#357 loud-terminal: no Human bank at all — announced exhaustion TypeError, never raw undefined[size]', async () => {
+      // the old chain TypeErrored raw on undefined[size]; same TypeError terminal,
+      // now named as data exhaustion (fresh module in beforeEach = fresh cache).
+      serveDisk({ '/data/settlement-names.json': { Elven: { city: [] } } });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      riggedRandom(0.999999);
+
+      await expect(generateSettlement([], { size: 'city' })).rejects.toThrow(TypeError);
+      expect(errorSpy.mock.calls.map(c => String(c[0])).some(m => m.includes('walking Human fallback'))).toBe(true);
     });
 
     it('rejects loudly (TypeError) on an unknown size instead of inventing data', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       riggedRandom(0);
 
       // No culture map for 'hamlet' → pick(undefined) throws; the generator
       // never silently fabricates a settlement for a size it doesn't know.
       await expect(generateSettlement([], { size: 'hamlet' })).rejects.toThrow(TypeError);
+      // unknown size dies at the culture map, BEFORE the name ladder — zero fallback noise
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('real-disk quiet-preservation (fix#357)', () => {
+    it('verbatim disk never touches a loud leg: full village and metropolis generations log ZERO console.error', async () => {
+      // producer census pinned quiet: every culture x size bank is non-empty on disk,
+      // so neither the settlement-name fallback nor the pickNpcName gender/race leg
+      // fires. Authored-intent defaults stay silent (fix#357 preservation arm).
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      riggedRandom(0);
+      await generateSettlement([], { size: 'village' });
+      riggedRandom(0.999999);
+      await generateSettlement([], { size: 'metropolis' });
+
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('fix#357 loud-but-returning NPC gender leg: present-empty race gender pool substitutes announced male pool; exhausted race bank throws', async () => {
+      // Constant 0.42 rig: settlement head rolls all land mid-table; decisive pins —
+      // pickNpcName race idx floor(.42*6)=2 'Dwarf', gender .42<=.5 'female'.
+      // (a) Dwarf.female present-empty (synthetic drift): the leg is ANNOUNCED and
+      // still returns from Dwarf.male — pre-fix the terminal `|| []` leaked undefined.
+      serveDisk({ '/data/npc-names.json': { ...disk['/data/npc-names.json'], Dwarf: { male: ['Durry'], female: [] } } });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      riggedRandom(0.42);
+
+      const result = await generateSettlement([], { size: 'village' });
+
+      const subCalls = errorSpy.mock.calls.filter(c => String(c[0]).includes('substituted male pool'));
+      expect(result.services.length).toBeGreaterThan(0);
+      expect(subCalls.length).toBe(result.notableNPCs.filter(n => n.name.startsWith('Durry')).length);
+      expect(subCalls.length).toBeGreaterThan(0);
+      expect(result.notableNPCs.every(n => n.name !== 'undefined')).toBe(true);
+    });
+
+    it('fix#357 loud-terminal NPC leg: empty npc-names bank throws TypeError, no unnamed NPC', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      serveDisk({ '/data/npc-names.json': {} });
+      riggedRandom(0.42);
+
+      await expect(generateSettlement([], { size: 'village' })).rejects.toThrow(TypeError);
+      expect(errorSpy.mock.calls.map(c => String(c[0])).some(m => m.includes('no non-empty name pool for race'))).toBe(true);
     });
   });
 });

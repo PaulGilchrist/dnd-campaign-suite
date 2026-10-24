@@ -338,15 +338,39 @@ describe('abilityCalc2024', () => {
       }))).toBe(26); // both stack: 6 + 8 + 3 + 3 + 6
     });
 
-    it('throws when the Constitution ability is missing (2024 diverges from 5e twin)', () => {
-      // 5e defaults Con to 0 (abilityCalc.js:39-40, pinned at abilityCalc.test.js:261-269);
-      // 2024 reads constitution.bonus unguarded (abilityCalc2024.js:72,78) and throws.
-      expect(() => getHitPoints({
-        level: 1,
-        abilities: [{ name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 }],
-        class: { hit_point_die: 'd8' },
-        race: {},
-      })).toThrow();
+    it('defaults a missing Constitution to 0 AND logs the data defect loudly (fix#352(b) strictness-parity flip)', () => {
+      // Pre-fix quirk flipped (#1348): 2024 read constitution.bonus UNGUARDED
+      // and threw, while the 5e twin defaulted (abilityCalc.js:42-43
+      // 'abilities?.find' + 'constitution?.bonus || 0'). Adjudicated fix: match
+      // the twin's 0 AND name the defect — absent CON is a data defect, not a
+      // game state; silent-0 was the defect, loud-0 honors both rulesets.
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        // level 1, d8, no CON row: 8 + (8/2+1)*(0) + 0*1 = 8
+        expect(getHitPoints({
+          level: 1,
+          abilities: [{ name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 }],
+          class: { hit_point_die: 'd8' },
+          race: {},
+        })).toBe(8);
+        expect(spy).toHaveBeenCalledWith('getHitPoints: Constitution ability missing from playerStats.abilities — data defect; bonus defaulted to 0 (5e twin parity, abilityCalc.js:43)');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('loudens ONLY on absence — a present Constitution stays silent at bonus 0 (zero-is-data)', () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        expect(getHitPoints(makeStats({
+          level: 2,
+          conBonus: 0,
+          class: { hit_point_die: 'd10' },
+        }))).toBe(16); // 10 + (10/2+1)*1 + 0*2 = 16
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('folds static and expression max_hp_increase passives through the shared pipeline', () => {

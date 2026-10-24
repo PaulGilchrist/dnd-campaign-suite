@@ -248,8 +248,8 @@ describe('MA-1634 MonsterCardModal Unicorn Spellcasting chips', () => {
     expect(abilityUseEntries('Entangle').length).toBe(1);
   });
 
-  // Generic exhausted-refuse shape is owned by spellcasting.test.jsx:288-302;
-  // multi-key independence by spellcasting.test.jsx:522-548. This test pins
+  // Generic exhausted-refuse shape is owned by spellcasting.test.jsx:289-303;
+  // multi-key independence by spellcasting.test.jsx:512-540. This test pins
   // ONLY the unicorn-specific claim: the canonical capital-W chip LIVE-resolves.
   it('canonical Pass Without Trace LIVE-resolves and spends its own 1/Day key (§1241 capital-W live)', async () => {
     renderUnicorn();

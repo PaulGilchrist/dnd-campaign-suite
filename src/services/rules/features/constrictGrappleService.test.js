@@ -206,7 +206,7 @@ describe('MA-1842 constrict_grapple turn-start tick', () => {
         expect(setCombatSummaryCache).not.toHaveBeenCalled();
     });
 
-    it('dead victim: pays nothing — no HP write, no cs rewrite, no logs', async () => {
+    it('dead victim: pays nothing — no roll burn, no HP write, no cs rewrite, no logs', async () => {
         store({ currentHitPoints: 0 });
         loadCombatSummary.mockResolvedValue({
             creatures: [
@@ -216,6 +216,7 @@ describe('MA-1842 constrict_grapple turn-start tick', () => {
         });
         await applyConstrictGrappleTurnStart(VICTIM, CAMPAIGN);
 
+        expect(rollExpression).not.toHaveBeenCalled(); // fix#363 #1350: guard precedes roll — dead victim never burns a die
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(setCombatSummaryCache).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();

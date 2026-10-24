@@ -614,6 +614,9 @@ describe('tempTeleportHandler', () => {
     });
 
     describe('§8.1 teleport token-move seam', () => {
+        // fix#363 #1068: softened shape confirmed at bytes — seam args pinned via
+        // toHaveBeenCalledWith(objectContaining); coordinates arrive THROUGH the
+        // seam mock and only appear as prose toContain (no in-test re-derivation).
         it('passes the resolved target as anchor with the chosen distance in feet', async () => {
             await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
 

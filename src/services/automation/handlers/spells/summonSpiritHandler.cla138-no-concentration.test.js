@@ -185,6 +185,46 @@ describe('CLA-138 summonSpirit honors runtime no-Concentration choice', () => {
         expect(addEntry.mock.calls.some(c => c[1].automationType === 'create_thrall_applied')).toBe(false);
     });
 
+    it('_noConcentrationChoice with a finite disk duration: clock scales from the stamped duration, never a fabricated default (#351(b) arm)', async () => {
+        // fix#351(b) counter-arm: with the `|| 10` fallback deleted, FINITE
+        // durations must still clock exactly — CLA-334 recipe minutes×10 /
+        // hours×600. An unparseable-or-instantaneous spell must produce NO
+        // clock (loud refuse), while this 10-minute stamped shape produces 100.
+        const action = summonFeyAction(
+            { concentration: false, duration: 'Up to 10 minutes', _noConcentrationChoice: true },
+            { freeCastUsed: true }
+        );
+
+        const result = await confirmSummonSpirit(action, rangerStats(), CAMPAIGN, VARIANT);
+
+        expect(result.type).toBe('popup');
+        expect(addConcentration).not.toHaveBeenCalled();
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: CASTER,
+            targetName: CASTER,
+            effects: despawnEffects,
+            campaignName: CAMPAIGN,
+            rounds: 100, // 'Up to 10 minutes' → 10 × 10 (CLA-334), NOT the dead ||10
+        });
+    });
+
+    it('_noConcentrationChoice with an instantaneous stamped duration: ZERO clock, summon stays clock-free (#351(b) guard)', async () => {
+        // The guard-leg: even a stamped-choice cast whose duration text reads
+        // 'Instantaneous' must NOT inherit a fabricated clock — same RAW law
+        // that keeps Find Steed despawn-free.
+        const action = summonFeyAction(
+            { concentration: false, duration: 'Instantaneous', _noConcentrationChoice: true },
+            { freeCastUsed: true }
+        );
+
+        const result = await confirmSummonSpirit(action, rangerStats(), CAMPAIGN, VARIANT);
+
+        expect(result.type).toBe('popup');
+        expect(addConcentration).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+    });
+
     it('default (no stamp): concentration stamped, spell-duration expiry clock, slot log', async () => {
         // Differential CONTROL (passes pre-fix too, by design): keeps the
         // unstamped lane byte-identical and kills "always no-Concentration"

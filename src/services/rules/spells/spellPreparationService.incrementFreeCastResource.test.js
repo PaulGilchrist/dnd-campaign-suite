@@ -22,9 +22,10 @@ import { readFileSync } from 'fs';
 //   arcanum lv-key   -> number 1 only, cap 1, absent/null -> no write
 //   NR / Bewitching  -> explicit null (+ used flag)
 //   used-flag lanes  -> boolean false only
-//   favored enemy    -> read '_Favored_Enemy_freeCastCount', WRITE DIFFERENT
-//                       key 'favoredEnemyUses' = Number+1, UNCAPPED, writes
-//                       even from 0 (:0-writes), skips only null/absent
+//   favored enemy    -> fix#341(b): SYMMETRIC CHANNEL — read AND write
+//                       'favoredEnemyUses', capped at the disk Ranger class_levels
+//                       'favored_enemy' column (Math.max(1, column) — the UI ceiling);
+//                       at-cap/null/absent write NOTHING; a non-finite byte refuses LOUD
 //
 // RECHARGE-KIND CENSUS (real disk, both rulesets, types free_spell/
 // fey_reinforcements/misty_wanderer/dragon_companion; incrementFreeCastResource
@@ -221,24 +222,64 @@ describe('incrementFreeCastResource — restore lane (rollback twin of the #1510
     }
   });
 
-  it('Favored Enemy ledger: reads _Favored_Enemy_freeCastCount, writes DIFFERENT key favoredEnemyUses uncapped, writes from 0, skips only null/absent', () => {
-    const stats = makePlayerStats();
-    const ledgers = [
-      [2, 3, 'counts past 2 — no usesMax clamp exists on this lane'],
-      [0, 1, ':0-writes (0 >= 0 arm) — no zero-swallow'],
-      [9, 10, 'uncapped quirk pinned: rollback can exceed any nominal max'],
+  // fix#341(b) (#337S ':629-637' row) FLIP — was: 'reads _Favored_Enemy_freeCastCount,
+  // writes DIFFERENT key favoredEnemyUses UNCAPPED'. The restore lane now reads AND
+  // writes the SAME structure — the 'favoredEnemyUses' ledger (symmetric channel,
+  // #1520 law) — capped at the disk grant. Disk law BY-NAME, public/data/2024/classes.json
+  // Ranger lv1 'Favored Enemy': "You can cast it twice without expending a spell slot,
+  // and you regain all expended uses when you finish a Long Rest" + automation
+  // uses_expression:'favored_enemy_min_1'. The numeric cap is the Ranger class_levels
+  // 'favored_enemy' column, loaded live (drift-throw) — lv1: 2 (ladder 2/3/4/5/6).
+  it('Favored Enemy restore fix#341(b): symmetric channel — reads AND writes favoredEnemyUses, capped at the disk column; latch never touched by this lane; null/absent skip; NaN refuses loud', () => {
+    const ranger = JSON.parse(readFileSync(CLS2024, 'utf8')).find(c => c.name === 'Ranger');
+    const lv1 = ranger.class_levels.find(cl => cl.level === 1);
+    if (lv1.favored_enemy !== 2) throw new Error(`disk drift: 2024 Ranger lv1 favored_enemy changed (${lv1.favored_enemy}) — re-read classes.json`);
+    const stats = makePlayerStats({ class: { name: 'Ranger', class_levels: ranger.class_levels }, level: 1 });
+    // write rows: below-cap refunds +1, exact bytes; at-cap writes NOTHING (FREE_CAST_RESTORE_OPS.shared :409 clamp mirror)
+    const writes = [
+      [0, 1, 'spent-0 (consume stamp) refunds to exactly 1'],
+      [1, 2, 'one below the disk cap refunds to exactly the cap'],
     ];
-    for (const [stored, next] of ledgers) {
-      vi.clearAllMocks(); seed({ _Favored_Enemy_freeCastCount: stored });
+    for (const [stored, next] of writes) {
+      vi.clearAllMocks(); seed({ favoredEnemyUses: stored });
       incrementFreeCastResource(PLAYER, 'Hunter\'s Mark', 1, stats, CAMPAIGN);
-      expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, 'favoredEnemyUses', next, CAMPAIGN]]);
-      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, '_Favored_Enemy_freeCastCount', CAMPAIGN);
+      expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, 'favoredEnemyUses', next, CAMPAIGN]]); // SAME key it read
+      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, 'favoredEnemyUses', CAMPAIGN); // symmetric-channel READ
+      expect(getRuntimeValue.mock.calls.filter(c => c[1] === '_Favored_Enemy_freeCastCount')).toEqual([]); // latch dark: the adjust twin owns it
     }
+    // at-cap and past-cap: zero writes — cancels can no longer mint uses the disk never granted
+    for (const stored of [2, 5]) {
+      vi.clearAllMocks(); seed({ favoredEnemyUses: stored });
+      incrementFreeCastResource(PLAYER, 'Hunter\'s Mark', 1, stats, CAMPAIGN);
+      expect(setRuntimeValue).not.toHaveBeenCalled(); // capped (pre-fix UNCAPPED quirk retired)
+    }
+    // null/absent (LR re-arm byte / never-consumed): restore-merge face — nothing to refund
     for (const skipped of [null, undefined]) {
-      vi.clearAllMocks(); seed({ _Favored_Enemy_freeCastCount: skipped });
+      vi.clearAllMocks(); seed({ favoredEnemyUses: skipped });
       incrementFreeCastResource(PLAYER, 'Hunter\'s Mark', 1, stats, CAMPAIGN);
       expect(setRuntimeValue).not.toHaveBeenCalled();
     }
+    // corrupt byte: LOUD refusal, zero writes (no-fallbacks law)
+    vi.clearAllMocks(); seed({ favoredEnemyUses: 'two' });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    incrementFreeCastResource(PLAYER, 'Hunter\'s Mark', 1, stats, CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    const refused = errSpy.mock.calls.filter(c => String(c[0]).includes('Favored Enemy restore refused'));
+    expect(refused.length).toBe(1); // exact-of-1, never silent
+    errSpy.mockRestore();
+    // symmetric-channel proof (restore-then-read-sees-restored): feed the byte the
+    // restore WROTE back as the next READ of the SAME key — the second refund climbs
+    // from it (0 -> 1 -> 2, then capped): the lane consumes its own writes.
+    vi.clearAllMocks();
+    seed({ favoredEnemyUses: 0 });
+    incrementFreeCastResource(PLAYER, 'Hunter\'s Mark', 1, stats, CAMPAIGN);
+    const written = setRuntimeValue.mock.calls[0][2];
+    expect(written).toBe(1);
+    const store2 = { favoredEnemyUses: written }; // the REAL store persists the write
+    getRuntimeValue.mockImplementation((_p, key) => (key in store2 ? store2[key] : undefined));
+    vi.clearAllMocks();
+    incrementFreeCastResource(PLAYER, 'Hunter\'s Mark', 1, stats, CAMPAIGN);
+    expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, 'favoredEnemyUses', 2, CAMPAIGN]]); // read of the RESTORED byte drives the next refund
   });
 
   it('Natural Recovery re-arm: exact two-write tuple (explicit null + boolean false); miss/null/empty store inert', () => {

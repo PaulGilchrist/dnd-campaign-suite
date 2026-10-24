@@ -436,7 +436,7 @@ describe('sleepService — SP-107 Sleep spell face (base lane)', () => {
         expect(consoleSpy).not.toHaveBeenCalled();
     });
 
-    it('concentration block is name-keyed on the literal "Sleep" only: already-concentrating-on-Sleep skips addConcentration + storage.set entirely (te write still commits, replacing the same-target BREATH te — the spell silently clobbers the dragon ladder, same effect+target takeover mechanism pinned by the breath twin at staged-breath.test.js:223/#1295); concentrating on anything else still registers; a cs without the caster is inert', async () => {
+    it('concentration block is name-keyed on the literal "Sleep" only: already-concentrating-on-Sleep skips addConcentration + storage.set entirely (te write still commits — fix#343 flips the #1295 takeover: a same-target BREATH te from ANOTHER source now COEXISTS, the spell APPENDS its own ladder instead of clobbering the dragon ladder); concentrating on anything else still registers; a cs without the caster is inert', async () => {
         store.campaign.targetEffects = [BREATH_BST, HEX];
         store[T2] = { activeConditions: ['slowed'] };
         cs.creatures = [{ name: CASTER, concentration: { spell: 'Sleep', dc: DC } }];
@@ -444,24 +444,29 @@ describe('sleepService — SP-107 Sleep spell face (base lane)', () => {
         const staged = await stageSleepTargets(campaignName, CASTER, [T1, T2], DC);
 
         expect(staged).toEqual([T1, T2]);
-        expect(store.campaign.targetEffects).toEqual([spellTe(), HEX, spellTe({ target: T2 })]); // in-place replace at idx 0; CON/100-round shape gone, saveType+duration are the only discriminators (#1378)
+        // fix#343: BREATH_BST (source 'Adult Brass Dragon 1') survives the spell
+        // staging untouched — identity is target+effect+source (registry law
+        // registerTargetEffect :1508-1509), two ladders ride the same key.
+        expect(store.campaign.targetEffects).toEqual([BREATH_BST, HEX, spellTe(), spellTe({ target: T2 })]); // append; saveType/duration stay the per-ladder faces (#1378)
         expect(addConcentration).not.toHaveBeenCalled();
         expect(storage.set).not.toHaveBeenCalled();
         expect(tuples()).toEqual([
             [T1, 'activeConditions', ['incapacitated'], false],
             [T2, 'activeConditions', ['slowed', 'incapacitated'], false],
-            ['campaign', 'targetEffects', [spellTe(), HEX, spellTe({ target: T2 })], undefined],
+            ['campaign', 'targetEffects', [BREATH_BST, HEX, spellTe(), spellTe({ target: T2 })], undefined],
         ]);
 
         cs.creatures = [{ name: CASTER, concentration: { spell: 'Invisibility', dc: DC } }];
         const w0 = writes.length;
         await stageSleepTargets(campaignName, CASTER, [T1], DC);
-        expect(addConcentration).toHaveBeenCalledTimes(1); // 'Sleep' literal check (:144) — rename-drift detector
+        expect(addConcentration).toHaveBeenCalledTimes(1); // 'Sleep' literal check — rename-drift detector
         expect(addConcentration).toHaveBeenCalledWith(cs, CASTER, 'Sleep', DC);
         expect(storageCalls).toEqual([['combatSummary', cs]]);
+        // Same-source re-cast REPLACES the wizard's own row (ladder reset);
+        // BREATH_BST still untouched at idx 0.
         expect(tuples(w0)).toEqual([
             [T1, 'activeConditions', ['incapacitated'], false],
-            ['campaign', 'targetEffects', [spellTe(), HEX, spellTe({ target: T2 })], undefined],
+            ['campaign', 'targetEffects', [BREATH_BST, HEX, spellTe(), spellTe({ target: T2 })], undefined],
         ]);
 
         cs.creatures = [];
@@ -512,7 +517,7 @@ describe('sleepService — SP-107 Sleep spell face (base lane)', () => {
         dice(15); // 15 + 3 = 18 ≥ DC 16 (a >-bug is the breath twin's tie leg)
         const result = await applySleepTurnEnd(campaignName, T1, { skipSync: true });
 
-        expect(result).toEqual({ handled: true, success: true, roll: 15, total: 18 });
+        expect(result).toEqual({ handled: true, results: [{ source: CASTER, success: true, roll: 15, total: 18 }] });
         expect(tuples()).toEqual([
             ['campaign', 'targetEffects', [HEX], true],
             [T1, 'activeConditions', [], true], // ONE condition write — both shed
@@ -620,5 +625,29 @@ describe('sleepService — SP-107 Sleep spell face (base lane)', () => {
         expect(breathTe.saveType).toBe('CON');
         expect(breathTe.unconsciousRounds).toBe(100);
         expect(addConcentration).toHaveBeenCalledTimes(addC0); // no caster concentration on the non-concentrating face
+    });
+
+    // fix#343 falsifiability arm (iii): sourceless sleep_staged te — REFUSED
+    // loudly at the turn-END (never laddered, never edited) and never absorbed
+    // by the staging dedup (strict === survives as its own orphan row).
+    it('fix#343 sourceless te: turn-END REFUSES loudly (handled:false, te untouched, zero writes); staging appends beside the orphan instead of merging it', async () => {
+        const orphan = { target: T1, effect: SLEEP_TE_EFFECT, condition: 'incapacitated', stage: 'incapacitated', dc: DC, saveType: 'WIS' }; // NO source
+        store.campaign.targetEffects = [orphan];
+        cs.creatures = [{ name: T1, type: 'npc', saveBonuses: { wis: 3 } }];
+
+        const refused = await applySleepTurnEnd(campaignName, T1);
+        expect(refused).toEqual({ handled: false });
+        expect(consoleSpy.mock.calls).toEqual([
+            [`[sleepService] sourceless ${SLEEP_TE_EFFECT} te on ${T1} — refusing to adjudicate its ladder`],
+        ]);
+        expect(store.campaign.targetEffects).toEqual([orphan]);
+        expect(writes).toHaveLength(0);
+        expect(expirations).toHaveLength(0);
+        expect(rolls).toEqual([]); // refused ladder never rolls
+
+        // Staging beside the orphan: source-matched dedup APPENDS (fix#343).
+        cs.creatures = [{ name: CASTER, type: 'player', concentration: null }];
+        await stageSleepTargets(campaignName, CASTER, [T1], DC);
+        expect(store.campaign.targetEffects).toEqual([orphan, spellTe()]);
     });
 });

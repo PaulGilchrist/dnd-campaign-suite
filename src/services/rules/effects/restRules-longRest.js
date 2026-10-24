@@ -175,7 +175,16 @@ function clearLongRestCharacterFlags(charData) {
 async function clearVowOfEnmityTargets(name, campaignName) {
   const vowTarget = getRuntimeValue(name, 'vowOfEnmityTarget', campaignName)
   if (!vowTarget) return
-  const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName) || []
+  // fix#354(b) site 2/4 (unguarded-filtered-activeBuffs-rewrite class, fix#170
+  // census / fix#337S stamp ledger :1817): validate-first idiom per
+  // invisibilityService.js:20-35 (fix#349(a)) + fix#352 loud-console.error +
+  // zero-write refusal. Pre-fix `|| []` clobbered a missing store with [].
+  // Valid store -> filter+write verbatim.
+  const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName)
+  if (!Array.isArray(targetBuffs)) {
+    console.error('[restRules] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:', vowTarget, targetBuffs)
+    return
+  }
   const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity')
   await setRuntimeValue(vowTarget, 'activeBuffs', filteredTargetBuffs, campaignName)
 }

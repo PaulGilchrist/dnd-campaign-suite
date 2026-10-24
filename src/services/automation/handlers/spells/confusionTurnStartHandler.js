@@ -88,7 +88,7 @@ export function applyEndOfTurnConfusionSave(targetName, campaignName, saveDc, sa
     const promptId = `confusion-end-turn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
     // Store the save context so the save result handler can process it
-    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
+    const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []); // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198 — reader is arity-2 (useRuntimeState.js:63), scope = SSE-mirrored active-campaign store until #1520
     existingPrompts.push(promptId);
     setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
 

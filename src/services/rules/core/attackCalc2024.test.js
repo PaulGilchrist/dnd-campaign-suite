@@ -139,10 +139,51 @@ describe('attackCalc2024 - getAttacks base seams', () => {
         damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
         hitBonus: 5,
         hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
-        range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+        range: 80, type: 'Action', weaponType: 'ranged', mastery: 'Vex',
         properties: ['Ammunition', 'Two-Handed'],
       },
     ]);
+  });
+
+  // fix#350(c) consumer-behavior arms — twin of fix#348(d) in attackCalc.test.js:274-308.
+  // The filters below are copied byte-for-byte from the live consumers of the sheet row's
+  // weaponType — contextBuilder-sync.js:547-548 (isSneakAttackWeapon:
+  // `hasFinesse || attack.weaponType === 'ranged'`), combatSuperiorityQueries.js:20
+  // (isWeaponAttack), bonusActionAttackHandler.js:24-26 (War Priest pick),
+  // damageReductionHandler.js:68 (ranged_weapon_attack_hit trigger reads
+  // lastAttack.attackEvent?.weaponType), executeActionManeuvers.js:471 and
+  // reactionDamageHandler.js:151 (melee-only reaction ranged refusals).
+  // Pre-fix the 2024 main-hand bow row carried weaponType:'' — sneak dice and weapon-attack
+  // maneuvers failed CLOSED on bows; the Riposte / adjacent-reaction refusals failed OPEN.
+  it('fix#350(c): 2024 main-hand ranged row satisfies the ranged consumers that previously saw empty weaponType', () => {
+    const row = getAttacks(CATALOG, [], char({ str: -1, dex: 3, equipped: ['Shortbow'] }))[0];
+
+    // contextBuilder-sync.js:547-548 shape — Shortbow is not finesse, so eligibility
+    // rides entirely on the weaponType stamp.
+    const weaponProperties = row.properties || [];
+    const hasFinesse = weaponProperties.some(p => p.toLowerCase() === 'finesse');
+    expect(hasFinesse).toBe(false);
+    expect(hasFinesse || row.weaponType === 'ranged').toBe(true);
+
+    // combatSuperiorityQueries.js:20 shape — maneuver context sees a weapon attack.
+    const isWeaponAttack = row.weaponType === 'melee' || row.weaponType === 'ranged' || row.isUnarmedStrike;
+    expect(isWeaponAttack).toBe(true);
+
+    // bonusActionAttackHandler.js:24-26 shape — War Priest can pick the loaded bow
+    // (no 'melee' row equipped, so the ranged branch must match).
+    const isLoadedRanged = a => a.weaponType === 'ranged' && !(a.properties || []).some(p => /loading/i.test(String(p)));
+    expect(row.weaponType === 'melee' || isLoadedRanged(row)).toBe(true);
+
+    // damageReductionHandler.js:68 shape — the ranged-hit reduction trigger fires.
+    expect({ attackEvent: row }.attackEvent?.weaponType === 'ranged').toBe(true);
+
+    // executeActionManeuvers.js:471 / reactionDamageHandler.js:151 shape — a bow
+    // attackEvent now trips the melee-only-reaction refusal instead of slipping past it.
+    expect(row.weaponType === 'ranged').toBe(true);
+
+    // Melee sibling untouched: the Longsword row still reports 'melee'.
+    const meleeRow = getAttacks(CATALOG, [], char({ str: 3, dex: 0, equipped: ['Longsword'] }))[0];
+    expect(meleeRow.weaponType).toBe('melee');
   });
 
   // Melee ability select (attackCalc2024.js:241-242): max(STR, DEX), tie →
@@ -201,7 +242,7 @@ describe('attackCalc2024 - getAttacks base seams', () => {
         damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
         hitBonus: 5,
         hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
-        range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+        range: 80, type: 'Action', weaponType: 'ranged', mastery: 'Vex',
         properties: ['Ammunition', 'Two-Handed'],
       },
       {

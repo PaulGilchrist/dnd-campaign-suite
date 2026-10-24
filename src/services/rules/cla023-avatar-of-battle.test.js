@@ -11,6 +11,17 @@
 // public/data/2024/classes.json majors/features (2024 lv17) — exactly one hit per
 // disk, pinned below (BY NAME #977). The 5e 'nonmagical' qualifier is NOT modeled
 // at this seam — adjudicated, documented ungated-emit in automationPassives.js:327-328.
+// fix#356(b) census re-verified at current bytes — magic-weapon signal at the
+// applyDamage chokepoint: NONE. applyDamageToTarget options carry isSpellDamage
+// only (zero weapon-identity keys across all 72 call sites); the lastAttack stamp
+// (applyDamage.js:192-215) carries weaponType melee/ranged/unarmed + isUnarmed-
+// Strike but no magic flag; equipment.json property tokens are Ammunition..
+// Versatile (no 'magic'); magic-items.json is a catalog never joined to attack
+// payloads. Gating the 5e prose without that plumbing means guessing magic from
+// damage type alone — forbidden. 2024 disk prose is unconditional ("Resistance to
+// Bludgeoning, Piercing, and Slashing damage."), so ungated halving is correct
+// for 2024 rows; the 5e-side gate is QUEUED owner architecture (plumbing options
+// reported: payload magic flag at attack lanes, or source-tagged resistances).
 // Owners cited, not re-driven: producer emit from the envelope
 // (getDamageResistances, no store reads) -> automationPassives.stormbornResistance.test.js:141-145;
 // generic helper arithmetic (throw-guards, immunity-beats-resistance, floor,

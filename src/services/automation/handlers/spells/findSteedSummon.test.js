@@ -10,8 +10,9 @@
 //   5e   → six-form chooser, statistics of the chosen form verbatim (scale:false).
 // Summon seams: real stats pulled from monsters.json via loadMonsters, consumers-
 // exact (#755/#844); te written exactly once per spawn with exact payload (#825);
-// ONE addExpiration (§38) — its current rounds:10 fallback on an INSTANTaneous
-// summon is a flagged source defect, pinned honestly below; concentration policy
+// ONE addExpiration (§38) — fixed fix#351(b): the old rounds:10 `|| 10` fallback
+// on this INSTANTaneous summon was a flagged source defect (#951), pinned honest;
+// the handler now routes duration='Instantaneous' clock-free; concentration policy
 // byte: Find Steed is Instantaneous/non-Concentration (#app) — addConcentration
 // never fires, te label '1_minute' is a documented display residual; log exact
 // bytes, zero noise (#829); refusal guard zero-write (#936).
@@ -207,19 +208,14 @@ describe('CLA-130 Find Steed summon lane (defect b)', () => {
             }], CAMPAIGN);
 
             // Non-Concentration RAW: addConcentration must never fire (steed survives
-            // a Long Rest). ONE expiry clock (§38) — but rounds:10 is a FLAGGED SOURCE
-            // DEFECT: 'Instantaneous' has no round duration, the lane's `|| 10`
-            // fallback despawns the steed after 10 rounds. Pinned honestly so a fix
-            // (or worsening) lands here.
+            // a Long Rest). fix#351(b) #1348 flip of the old FLAGGED rounds:10 pin:
+            // duration='Instantaneous' (both rulesets' disk 'Find Steed' rows, BY-name
+            // quoted at summonSpiritHandler.js applySummonDuration) means the spell
+            // ENDS as cast — the steed persists until dismissed, so NO expiry clock
+            // may be armed. The handler's fabricated `|| 10` despawn clock is deleted:
+            // addExpiration now never fires on this lane (zero-clock on BOTH legs).
             expect(addConcentration).not.toHaveBeenCalled();
-            expect(addExpiration).toHaveBeenCalledTimes(1);
-            expect(addExpiration).toHaveBeenCalledWith({
-                attackerName: 'ElderPaladin',
-                targetName: 'ElderPaladin',
-                effects: [{ type: 'remove_summoned_creatures', spell: 'Find Steed' }],
-                campaignName: CAMPAIGN,
-                rounds: 10,
-            });
+            expect(addExpiration).not.toHaveBeenCalled();
 
             // summons log: exact payload, zero noise (#829).
             expect(addEntry).toHaveBeenCalledTimes(1);
@@ -277,6 +273,10 @@ describe('CLA-130 Find Steed summon lane (defect b)', () => {
                 duration: '1_minute',
             }]);
             expect(addConcentration).not.toHaveBeenCalled();
+            // fix#351(b) instantaneous arm (5e leg): the 5e disk row is ALSO
+            // duration='Instantaneous' (pinned above in D2) — the chooser-confirm
+            // spawn must ride clock-free exactly like the 2024 auto-summon.
+            expect(addExpiration).not.toHaveBeenCalled();
 
             expect(addEntry).toHaveBeenCalledTimes(1);
             expect(addEntry.mock.calls[0][1]).toMatchObject({

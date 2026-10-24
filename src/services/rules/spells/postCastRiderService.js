@@ -42,6 +42,31 @@ export function getSpellThiefFeatures(playerStats) {
     return reactions.filter(r => r.type === 'spell_thief');
 }
 
+// fix#356(c): disk-nested shape reaches the rider. 2024/classes.json Bard
+// "Words of Creation" nests the spread INSIDE its automation:
+// {type:'passive_rule', effect:'always_prepared_spells', spells:[
+//  'Power Word Heal','Power Word Kill'], multi_target_spread:{
+//  spellFilter:['Power Word Heal','Power Word Kill'], range:'10 ft'},
+//  casting_time:'passive'} — the old flat type==='multi_target_spread'
+// filter matched only the builder envelope for a FLAT disk automation
+// (automationInfoBuilder/core-handlers.js:425-433), a dispatch key with
+// ZERO disk producers (#1916 liveness audit, core-handlers-more.test.js
+// :29-36: "Disk routes them via passive_rule... Words of Creation nests
+// multi_target_spread inside a passive_rule"), so the rider was custom-data-
+// only and never fired on disk-byte casts. Traversal idiom reused from the
+// sibling riderSave dig in this same file (:32
+// `p.type === 'passive_rule' && p.riderSave`) and automationPassives.js:234
+// (`p.type === 'passive_rule' && ... && p.alsoSelfHealing?.extraHealing-
+// Expression`). Census of this file's other passives selectors: soulstitch
+// (:149), empowered_evocation (:214) and bewitching_magic (:246) are FLAT
+// disk automation.type rows (2024/classes.json:13496/:13505/:12224, 5e
+// classes.json:13458) — no same-class nesting-blindness remains here.
+// RESIDUAL (builder owner, outside this row's home): the collector's
+// passive_rule builder (automationInfoBuilder/conditional.js:94-110) copies
+// riderSave/spells by whitelist and still DROPS the nested multi_target_spread
+// key, so disk-built WoC characters need that one-key whitelist before this
+// traversal sees the row in production; live gameplay stays covered by the
+// CLA-392 native Power Word lane (useSpellMetamagicGates.js:391).
 export function getMultiTargetSpreads(playerStats) {
     const rawPassives = playerStats.automation?.passives;
     if (rawPassives == null) {
@@ -49,20 +74,28 @@ export function getMultiTargetSpreads(playerStats) {
         throw new Error('Expected array, got ' + rawPassives);
     }
     const passives = rawPassives;
-    return passives.filter(p => p.type === 'multi_target_spread');
+    return passives.filter(p => p.type === 'multi_target_spread'
+        || (p.type === 'passive_rule' && p.multi_target_spread != null));
 }
 
 export function getMultiTargetSpreadForSpell(playerStats, spellName) {
     const spreads = getMultiTargetSpreads(playerStats);
     for (const spread of spreads) {
-        const rawFilter = spread.spellFilter;
+        // fix#356(c): shape-discriminated filter read — the nested disk shape
+        // carries spellFilter inside spread.multi_target_spread; the flat
+        // custom/builder shape carries it top-level. Consumers read only
+        // .range off the return (useSpellMetamagicGates.js:331/:72), so the
+        // nested row returns its nested envelope; flat rows keep identity.
+        const isNested = spread.type === 'passive_rule';
+        const envelope = isNested ? spread.multi_target_spread : spread;
+        const rawFilter = envelope.spellFilter;
         if (rawFilter == null) {
             console.error('[postCastRiderService] Missing array:', rawFilter);
             throw new Error('Expected array, got ' + rawFilter);
         }
         const filter = rawFilter;
         if (filter.includes(spellName)) {
-            return spread;
+            return envelope;
         }
     }
     return null;

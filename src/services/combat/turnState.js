@@ -55,10 +55,13 @@ export function getTurnState(turnState, creatureName) {
     const cap = Math.floor(Number(entry.reactionCap));
     const companion = typeof entry.companionOf === 'string' && entry.companionOf.trim() !== '' ? entry.companionOf : null;
     return {
-        actionsUsed: Number(entry.actionsUsed) || 0,
-        bonusActionsUsed: Number(entry.bonusActionsUsed) || 0,
-        reactionsUsed: Number(entry.reactionsUsed) || 0,
-        movementUsedFeet: Number(entry.movementUsedFeet) || 0,
+        // #1070 fix#363 defense-in-depth clamp: forged negative counters would
+        // over-grant budget at hasBudget (: -5 < cap === true). Identity on every
+        // legitimate non-negative counter write; negatives floor to 0.
+        actionsUsed: Math.max(0, Number(entry.actionsUsed) || 0),
+        bonusActionsUsed: Math.max(0, Number(entry.bonusActionsUsed) || 0),
+        reactionsUsed: Math.max(0, Number(entry.reactionsUsed) || 0),
+        movementUsedFeet: Math.max(0, Number(entry.movementUsedFeet) || 0),
         hasMoved: !!entry.hasMoved,
         turnActive: !!entry.turnActive,
         reactionCap: Number.isFinite(cap) && cap >= 1 && cap <= REACTION_CAP_MAX ? cap : 1,

@@ -12,9 +12,9 @@
 // Lane owns Spellcasting-ROW bytes only: Fire Bolt legendary-cast lane is
 // ma1853, Dread Word DC 22 chip lane is ma1855 — cited, not absorbed.
 // Generic owners cited (not duplicated here): 1/Day spend+refusal
-// spellcasting.test.jsx:281-304 (this row authors NO gates — uses map {},
+// spellcasting.test.jsx:282-305 (this row authors NO gates — uses map {},
 // so no spend cascade exists in this lane); Lightning Bolt save routing
-// (half/8d6) spellcasting.test.jsx:226-241.
+// (half/8d6) spellcasting.test.jsx:227-242.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -160,7 +160,7 @@ describe('MA-1850 monsters.json data lock: Archlich Spellcasting row', () => {
     expect(extractSpellNamesFromSpellcasting(archlichRow.description)).toEqual(CHIP_NAMES);
   });
 
-  it('no 1/Day headers on this row — every chip ungated (At-Will/level bands by design §57; spend-cascade lane N/A, owner spellcasting.test.jsx:281-304)', () => {
+  it('no 1/Day headers on this row — every chip ungated (At-Will/level bands by design §57; spend-cascade lane N/A, owner spellcasting.test.jsx:282-305)', () => {
     expect(extractSpellcastingSpellUses(archlichRow.description)).toEqual({});
   });
 
@@ -170,7 +170,7 @@ describe('MA-1850 monsters.json data lock: Archlich Spellcasting row', () => {
     expect(monsterSpellAttackBonus(archlichRow)).toBe(14);
   });
 
-  it('spell-DB pins: Phantasmagoria absent from BOTH spells.json (why it stays unmarked); Blade Ward 2024-only (§207 fallback). Lightning Bolt half/8d6 shape owned by spellcasting.test.jsx:226-241', () => {
+  it('spell-DB pins: Phantasmagoria absent from BOTH spells.json (why it stays unmarked); Blade Ward 2024-only (§207 fallback). Lightning Bolt half/8d6 shape owned by spellcasting.test.jsx:227-242', () => {
     expect(spells5e.some(s => s.name === 'Phantasmagoria')).toBe(false);
     expect(spells2024.some(s => s.name === 'Phantasmagoria')).toBe(false);
     expect(spells5e.some(s => s.name === 'Blade Ward')).toBe(false);

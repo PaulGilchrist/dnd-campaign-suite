@@ -56,16 +56,20 @@
  * applyRemoveCurse reads result.targetName). Same class as #1370 dormant
  * seam / #1397 never-attached structural find. Report-only.
  *
- * :0-swallow chain (structural, cross-file — REPORT ONLY, not fixed):
- * triggerSpells.js:447-448 awaits triggerRemoveCurse then returns
- * `{ handled: true }` — the selection popup from executeHandler is DISCARDED,
- * unlike sibling lanes (e.g. triggerSpells.js:341/352
- * `{ handled: true, result: { automationPopup: result } }` and
- * handleGenericAutomation :464). Target UX actually flows via the two-stage
- * gate spellGates.js:244-251 gateRemoveCurse (makePending builds its own
+ * :0-swallow chain (structural, cross-file — fix#353 host-leg FIXED, hub half
+ * carried): triggerSpells.js handleRemoveCurse (:453) previously awaited
+ * triggerRemoveCurse then returned `{ handled: true }` — the selection popup
+ * from executeHandler was DISCARDED, unlike sibling lanes. fix#353 (#1466/
+ * #1499) propagated it at the host with the exact sibling three-state shape
+ * (triggerSpells.js handleFaerieFire/handleImprisonment: truthy ->
+ * `{ handled: true, result: { automationPopup: result } }`) — pinned in the
+ * new co-located lane triggerSpells.removeCurse.test.js. The hub consumer
+ * index.js:436-440 still reads only `.handled` (the stamp's DOUBLE-DISCARD
+ * second half) — owner-queued with family #1499, OUT of the fix#353 edit
+ * whitelist. Target UX otherwise flows via the two-stage gate
+ * spellGates.js:244-251 gateRemoveCurse (makePending builds its own
  * creatureTargets + `range: spell.range || 'Touch'`) → confirm lane at
- * useSimpleSpellHandlers.js:313. The trigger's popup result survives only
- * in service-contract form (identity pin below) — source note filed.
+ * useSimpleSpellHandlers.js:313. Source note closed at host level.
  *
  * NO-CLOCK: service file has ZERO Date/setTimeout/setInterval bytes
  * (grep -c = 0); disk duration Instantaneous both rulesets. Zero-clean.

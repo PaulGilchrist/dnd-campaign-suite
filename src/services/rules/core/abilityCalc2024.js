@@ -78,7 +78,16 @@ export function getHitPoints(playerStats) {
     if (isNaN(hitPointDie)) {
         hitPointDie = 8;
      }
-    let hitPoints = hitPointDie + ((hitPointDie / 2 + 1) * (playerStats.level - 1)) + (constitution.bonus * playerStats.level);
+    // fix#352(b): ruleset strictness-parity with the 5e twin — twin bytes
+    // abilityCalc.js:42-43 ('abilities?.find' + 'constitution?.bonus || 0').
+    // Adjudication: absent CON is a DATA defect, not a game state; the twin's
+    // 0-default is adopted so both rulesets answer identically, but silently
+    // is not acceptable under the no-fallbacks law — the defect is named LOUD.
+    if (!constitution) {
+        console.error('getHitPoints: Constitution ability missing from playerStats.abilities — data defect; bonus defaulted to 0 (5e twin parity, abilityCalc.js:43)');
+    }
+    const conBonus = constitution?.bonus || 0;
+    let hitPoints = hitPointDie + ((hitPointDie / 2 + 1) * (playerStats.level - 1)) + (conBonus * playerStats.level);
 
     if (playerStats.race.subrace && playerStats.race.subrace.hit_point_bonus_per_level) {
         hitPoints += playerStats.race.subrace.hit_point_bonus_per_level * playerStats.level;

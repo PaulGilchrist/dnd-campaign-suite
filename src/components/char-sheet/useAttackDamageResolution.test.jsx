@@ -1,6 +1,6 @@
 // @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useAttackDamageResolution from './useAttackDamageResolution.js';
+import useAttackDamageResolution, { normalizeAutoDamage } from './useAttackDamageResolution.js';
 
 // BASE LANE — only surface no sibling lane owns, verified against the real
 // buildPipelineForAction chain: public API shape, default no-op manual-click
@@ -185,6 +185,38 @@ describe('useAttackDamageResolution — base hook seam', () => {
 
             expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrike', null, CAMPAIGN);
             expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrikeTarget', null, CAMPAIGN);
+        });
+
+        // fix#344(b) PROOF ARM — DISCHARGED-STALE, not a code fix (ledger fix#337S
+        // housekeeping row). Mechanism quoted at bytes: the mandatory housekeeping step
+        // subscribes 'housekeeping:do' ONLY on the attack lane (attackRollHousekeeping.js:77,
+        // registered by attackRollDamageSteps.js:9); the spell lane subscribes 'spell:do'
+        // instead (directSpellDamageSteps.js:109), and the chain runs ZERO steps when no
+        // subscriber matches (actionPipeline.js:27-28). What it cleans: the pending-prompt
+        // keys _Stalker's_Flurry_option / stalkersFlurryChosenTarget / pendingSuddenStrike /
+        // pendingSuddenStrikeTarget → null (attackRollHousekeeping.js:38-44). Skip-proof at
+        // live bytes: every production caller of resolveAttackDamage/…Standalone feeds
+        // normalizeAutoDamage output, and buildNormalizedAttack stamps weaponType
+        // UNCONDITIONALLY (:122 `weaponType: isUnarmed ? 'unarmed' : (weaponAttack?.weaponType || 'weapon')`),
+        // so steps/index.js:36 forces the attack lane even for spell-flavoured autoDamage —
+        // this arm observes the cleanup side-effects with the spell lane's subscriber absent.
+        it('fix#344(b) housekeeping runs without the spell-lane subscriber: spell-shaped autoDamage is forced onto the attack lane and clears every pending key', async () => {
+            const autoDamage = {
+                name: 'Fire Bolt', formula: '2d10', damageType: 'fire',
+                autoDamageSchool: 'evocation', attackType: 'Spell', targetName: 'Goblin',
+            };
+            const { attack } = normalizeAutoDamage(autoDamage, false, makePlayerStats());
+            // The non-skippable byte: attack-lane routing is unconditional post-normalize.
+            expect(attack.weaponType).toBeTruthy();
+
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
+
+            await resolveAttackDamage(attack, { hit: true, targetName: 'Goblin' });
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrike', null, CAMPAIGN);
+            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrikeTarget', null, CAMPAIGN);
+            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'stalkersFlurryChosenTarget', null, CAMPAIGN);
+            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, "_Stalker's_Flurry_option", null, CAMPAIGN);
         });
 
         it('critical popup doubles the dice and clears the popup before damage lands', async () => {

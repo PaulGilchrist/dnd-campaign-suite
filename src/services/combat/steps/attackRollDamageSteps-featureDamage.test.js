@@ -23,52 +23,42 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────
 
-vi.mock('../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
+// #1072 fix#363 in-lane fold: the three roller stubs shared one byte-identical
+// NdM prelude (strip [brackets] → match → half-max dice). parseNdM is now the
+// single factory-local helper; each roller's tail stays verbatim, including the
+// maximizer's missing '0' guard (returns the 12-fallback for '0', honest quirk)
+// and the 6-vs-12 fallback split. Shared diceStub.js across lanes stays QUEUED
+// (cross-file mock-kit, owner batch scope).
+vi.mock('../../dice/diceRoller.js', () => {
+  const parseNdM = (formula) => {
     const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
     if (!baseFormula) return null;
     const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = rolls.reduce((s, r) => s + r, 0) + modStr;
-      return { total, rolls, modifier: modStr };
-    }
-    return { total: 6, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionDoubled: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = (rolls.reduce((s, r) => s + r, 0) * 2) + modStr;
-      const doubledRolls = rolls.concat(rolls);
-      return { total, rolls, doubledRolls, modifier: modStr };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionMaximized: vi.fn((formula) => {
-    if (!formula) return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      return { total: count * sides + modStr, rolls: Array(count).fill(sides), modifier: modStr, maximized: true };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-}));
+    if (!match) return null;
+    const count = parseInt(match[1], 10);
+    const sides = parseInt(match[2], 10);
+    const mod = match[3] ? parseInt(match[3], 10) : 0;
+    const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
+    return { count, sides, mod, rolls, sum: rolls.reduce((s, r) => s + r, 0) };
+  };
+  return {
+    rollExpression: vi.fn((formula) => {
+      if (!formula || formula === '0') return null;
+      const p = parseNdM(formula);
+      return p ? { total: p.sum + p.mod, rolls: p.rolls, modifier: p.mod } : { total: 6, rolls: [6], modifier: 0 };
+    }),
+    rollExpressionDoubled: vi.fn((formula) => {
+      if (!formula || formula === '0') return null;
+      const p = parseNdM(formula);
+      return p ? { total: p.sum * 2 + p.mod, rolls: p.rolls, doubledRolls: p.rolls.concat(p.rolls), modifier: p.mod } : { total: 12, rolls: [6], modifier: 0 };
+    }),
+    rollExpressionMaximized: vi.fn((formula) => {
+      if (!formula) return null;
+      const p = parseNdM(formula);
+      return p ? { total: p.count * p.sides + p.mod, rolls: Array(p.count).fill(p.sides), modifier: p.mod, maximized: true } : { total: 12, rolls: [6], modifier: 0 };
+    }),
+  };
+});
 
 vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),

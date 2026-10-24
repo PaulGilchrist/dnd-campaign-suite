@@ -225,7 +225,7 @@ describe('MA-1742 MonsterCardModal Yochlol Spellcasting chips', () => {
     await waitFor(() => expect(abilityUseEntries('Gaseous Form').length).toBe(2));
     expect(rollSavingThrow).toHaveBeenCalledTimes(0);
     expect(refusals().length).toBe(0);
-    // null monsterSpellUses store is owned by spellcasting.test.jsx:327/:561.
+    // null monsterSpellUses store is owned by spellcasting.test.jsx:328/:551.
   });
 
   it('Dominate Person spends its 1/Day and routes the enforced DC 15 WIS save; re-cast refuses, store and save calls unchanged', async () => {
@@ -242,7 +242,7 @@ describe('MA-1742 MonsterCardModal Yochlol Spellcasting chips', () => {
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dominate Person': 1 });
     expect(abilityUseEntries('Dominate Person')[0].description).toMatch(/1\/Day use spent — 0 remaining today/);
 
-    // Exhausted-refuse shape owned by spellcasting.test.jsx:288-302; this
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:289-303; this
     // pins only the yochlol-specific refusal byte + gate holding the save.
     await act(async () => { fireEvent.click(linkByText('Dominate Person')); });
     await waitFor(() => expect(refusals('Dominate Person').length).toBe(1));

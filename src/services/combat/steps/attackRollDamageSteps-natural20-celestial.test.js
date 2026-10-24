@@ -98,6 +98,7 @@ vi.mock('./features/index.js', () => ({
 // ── Imports ──────────────────────────────────────────────────────
 
 const { buildAttackRollDamageSteps } = await import('./attackRollDamageSteps.js');
+const { createPipeline } = await import('../actionPipeline.js');
 const { rollExpression } = await import('../../dice/diceRoller.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { getCurrentCombatRound } = await import('../../encounters/combatData.js');
@@ -388,6 +389,88 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
         // imported row): '1d8+3 + 4 [Overwhelming Strike]' — type byte discarded.
         expect(r.data).toEqual({ formula: '1d8+3 + 4 [slashing]', total: 15, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
+
+      // fix#350(a) double-fire arm (#1035 queue, REFUTED-VERIFIED): the ledger row
+      // claimed "stacks every nat20, no consumption stamp" vs the celestial sibling's
+      // oncePerTurn latch. Pipeline-shape evidence refutes the defect: the runner is a
+      // linear event chain (actionPipeline.js:23-68) — each run() visits
+      // 'weapon_hit:applied' → natural20Bonuses exactly once, no step in
+      // attackRollDamageSteps.js ever sets a nextEvent re-entry edge (grep: zero), and
+      // resume() (:73-79) continues from the PAUSED step's emit, so a modal pause at
+      // weaponHitBonuses re-enters AFTER, not over, this step. Proven live below with
+      // the real createPipeline + real sibling steps.
+      it('fix#350(a): natural20 handler fires EXACTLY once per attack pipeline, even through an upstream modal pause/resume (same-attack double-stack structurally impossible)', async () => {
+        getCurrentCombatRound.mockReturnValue(1);
+        getRuntimeValue.mockReturnValue(null);
+        const n20 = steps[13];
+        const spy = vi.fn((ctx) => n20.handler(ctx));
+
+        const pipeline = createPipeline();
+        pipeline
+          .step(steps[12]) // real weaponHitBonuses — 'fire or cold' row forces the modal pause
+          .step({ ...n20, handler: spy })
+          .step({ name: 'terminal', subscribe: 'n20:applied', emit: 'terminal:done', handler: async () => ({ data: { terminalReached: true } }) });
+
+        const ctx = makeCtx({
+          isNatural20: true,
+          attack: { damageType: 'Slashing', properties: [] },
+          playerStats: {
+            name: 'TestChar',
+            abilities: [{ name: 'Strength', bonus: 4 }, { name: 'Dexterity', bonus: 3 }],
+            automation: {
+              actions: [
+                { name: 'Type Choice Rider', type: 'damage_bonus', trigger: 'weapon_attack_hit', damageExpression: '1d8', damageType: 'fire or cold' },
+                { name: 'Overwhelming Strike', ...diskN20Automation },
+              ],
+            },
+            level: 5,
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        });
+        const resumeRef = { current: null };
+
+        await pipeline.run('automation:applied', ctx, resumeRef);
+        expect(resumeRef.current?._pausedStep).toBe('weaponHitBonuses'); // paused at the modal, BEFORE n20
+        expect(spy).not.toHaveBeenCalled();
+
+        await pipeline.resume(ctx, resumeRef);
+        expect(spy).toHaveBeenCalledTimes(1); // one visit per run-chain — even with re-entry
+        expect(ctx.terminalReached).toBe(true); // chain completed past n20 → celestial lane
+        expect(String(ctx.formula).match(/\+ 4 \[slashing\]/g)).toHaveLength(1); // appended exactly once
+        expect(resumeRef.current).toBeNull();
+      });
+
+      // fix#350(a) RAW half: the disk rider text is per-attack-roll — "When you roll a
+      // 20 on the d20 for an attack roll, you can deal extra damage..." (2024 feats.json
+      // boon-of-irresistible-offense, Overwhelming Strike) — and the disk row carries NO
+      // oncePerTurn flag (pinned below), while every celestial attack_rider rider on disk
+      // DOES, which is exactly why the sibling latch is written data-driven
+      // (`if (rider.oncePerTurn && ...)` :587 / `if (rider.oncePerTurn) stamp` :605):
+      // mirrored to natural20 the latch would be INERT, and an UNconditional latch would
+      // REFUSE the lawful second bonus on a Boon-holder's second nat20 attack (Extra
+      // Attack) — the latch would be the defect. Two runs = two attacks = two bonuses.
+      it('fix#350(a): disk row has no oncePerTurn; two attacks one turn each lawfully append once (per-attack RAW, no latch owed)', async () => {
+        expect(diskN20Automation.oncePerTurn).toBeUndefined(); // sibling latch key absent on disk
+        const mk = () => makeCtx({
+          isNatural20: true,
+          attack: { damageType: 'Slashing' },
+          playerStats: {
+            name: 'TestChar',
+            abilities: [{ name: 'Strength', bonus: 4 }, { name: 'Dexterity', bonus: 3 }],
+            automation: { actions: [{ name: 'Overwhelming Strike', ...diskN20Automation }] },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        });
+        const attack1 = await steps[13].handler(mk());
+        const attack2 = await steps[13].handler(mk()); // separate attack roll, same round (round stays 1)
+        expect(attack1.data.formula).toBe('1d8+3 + 4 [slashing]');
+        expect(attack2.data.formula).toBe('1d8+3 + 4 [slashing]'); // both attacks ride — RAW
+        expect(setRuntimeValue).not.toHaveBeenCalled(); // no consumption stamp exists or is owed
       });
     });
   });

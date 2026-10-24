@@ -50,6 +50,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import classes2024 from '../../../public/data/2024/classes.json';
+import classes5e from '../../../public/data/classes.json';
+
 vi.mock('../character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(),
 }));
@@ -321,8 +324,33 @@ describe('computeTrackedResources', () => {
     expect(computeTrackedResources(bm('5e', 15)).superiorityDice).toEqual({ current: 6, max: 6 });
     expect(computeTrackedResources(bm('5e', 7)).superiorityDice).toEqual({ current: 5, max: 5 });
     expect(computeTrackedResources(bm('5e', 6)).superiorityDice).toEqual({ current: 4, max: 4 });
+    // fix#346 (#1318) tier-boundary arms, both sides of each DISK step
+    // (5e/classes.json Battle Master lv3 'Combat Superiority': "You gain
+    // another superiority die at 7th level and one more at 15th level."):
+    // lv6->4 / lv7->5 and lv14->5 / lv15->6 exact. The rec's 'PHB
+    // 11->5/17->6' ladder is REFUTED at disk: lv10 and lv11 BOTH sit at 5
+    // (under the phantom 11/17 law lv10 would have to seed 4).
+    expect(computeTrackedResources(bm('5e', 14)).superiorityDice).toEqual({ current: 5, max: 5 });
+    expect(computeTrackedResources(bm('5e', 15)).superiorityDice).toEqual({ current: 6, max: 6 });
+    expect(computeTrackedResources(bm('5e', 10)).superiorityDice).toEqual({ current: 5, max: 5 });
+    expect(computeTrackedResources(bm('5e', 11)).superiorityDice).toEqual({ current: 5, max: 5 });
+    expect(computeTrackedResources(bm('5e', 16)).superiorityDice).toEqual({ current: 6, max: 6 });
     expect(computeTrackedResources(bm('2024', 5, { superiority_dice: 5 })).superiorityDice).toEqual({ current: 5, max: 5 });
     expect(computeTrackedResources(bm('2024', 5, { superiority_dice: 0 })).superiorityDice).toEqual({ current: 0, max: 0 });
+    // 2024 disk ladder BY-level census agrees with the 5e fallback shape:
+    // superiority_dice column is 4 (lv3-6), 5 (lv7-14), 6 (lv15-20).
+    const f2024 = classes2024.find((c) => c.name === 'Fighter');
+    const sd = (lv) => f2024.class_levels.find((cl) => cl.level === lv).superiority_dice;
+    expect([sd(3), sd(6), sd(7), sd(14), sd(15), sd(20)]).toEqual([4, 4, 5, 5, 6, 6]);
+    // 5e disk carries NO superiority_dice field (fallback :79-81 is the law,
+    // and it matches the lv3 prose quote above — fix#346 DISCHARGED-STALE).
+    const f5e = classes5e.find((c) => c.name === 'Fighter');
+    expect(f5e.class_levels.every((cl) => !('superiority_dice' in cl))).toBe(true);
+    const bm5e = f5e.subclasses.find((s) => s.name === 'Battle Master')
+      .class_levels.find((cl) => cl.level === 3).features.find((f) => f.name === 'Combat Superiority');
+    expect(bm5e.description).toContain('You have four superiority dice, which are d8s');
+    expect(bm5e.description).toContain('You gain another superiority die at 7th level and one more at 15th level.');
+    expect(bm5e.description).not.toMatch(/at 11th level and one more at 17th level/);
     // 2024 BM with no class_levels row -> classLevel undefined -> 0 (no crash)
     expect(computeTrackedResources(basePlayerStats({
       rules: '2024', class: wizardClass({ name: 'Fighter', major: { name: 'Battle Master' } }),

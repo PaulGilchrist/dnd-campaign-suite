@@ -11,10 +11,10 @@
 // Kept: BY-name disk extraction + 2/Day Each trio / 1/Day gate map + distinct
 // DC 16 Wisdom row lock + markup-only strip-diff + the advisory cast seam
 // (row DC printed, 1-of-2 spent).
-// Cite-skip owners: chip render spellcasting.test.jsx:184; counters
-// ability-save-uses.test.jsx:127 + spellcasting.test.jsx:275; advisory class
+// Cite-skip owners: chip render spellcasting.test.jsx:185; counters
+// ability-save-uses.test.jsx:127 + spellcasting.test.jsx:276; advisory class
 // ma0524-couatl:222 (DC 15 WIS) / ma0558:219 (DC 14 Wisdom); refusals
-// spellcasting.test.jsx:281 (1/Day) and :518 (2/Day 3rd-cast) — this row's
+// spellcasting.test.jsx:282 (1/Day) and :508 (2/Day 3rd-cast) — this row's
 // gate arithmetic differs only in DC/name, helpers owned suite-wide.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';

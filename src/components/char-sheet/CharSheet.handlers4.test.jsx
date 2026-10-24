@@ -42,6 +42,12 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn().mockReturnValue(null),
 }));
 
+// fix#345: LOWER-reroll refunds route through the canonical heal choke point
+// (applyHealing.js:8, synchronous, resolves { actualHeal, oldHp, newHp, maxHp }).
+vi.mock('../../services/rules/combat/applyHealing.js', () => ({
+  applyHealingToTarget: vi.fn().mockReturnValue({ actualHeal: 0, oldHp: 10, newHp: 10, maxHp: 20 }),
+}));
+
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn().mockResolvedValue(null),
 }));
@@ -146,6 +152,93 @@ describe('handlePuncture', () => {
       finalDamage: 14,
     }));
     expect(result.newDice).toEqual([5, 5, 5]);
+  });
+
+  it('fix#345 LOWER-reroll arm: a negative delta refunds |delta| through the HEAL lane, never the damage lane (which loud-refuses negatives, applyDamage.js:985 fix#143)', async () => {
+    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    const { getCombatContext } = await import('../../services/rules/combat/damageUtils.js');
+    const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
+    const { applyHealingToTarget } = await import('../../services/rules/combat/applyHealing.js');
+
+    getRuntimeValue.mockReturnValue(null);
+    getCombatContext.mockResolvedValue({ creatures: [{ name: 'Zombie 1' }] });
+    applyHealingToTarget.mockReturnValue({ actualHeal: 3, oldHp: 12, newHp: 15, maxHp: 20 });
+
+    // newRolls 9 + modifier 0 − rawDamage 12 = -3 (reroll LOWERED the total).
+    const punctureData = {
+      rawDamage: 12,
+      targetName: 'Zombie 1',
+      damageTypes: ['Piercing'],
+      originalRolls: [6, 6],
+      newRolls: [4, 5],
+      rerolledIndex: 0,
+      originalValue: 6,
+      newValue: 4,
+    };
+
+    await handlePuncture({ playerStats: mockPlayerStats, campaignName: mockCampaignName, characters: [], popupHtml: { modifier: 0, damageType: 'Piercing' }, setPopupHtml: vi.fn(), punctureData });
+
+    // pre-fix dispatched -3 here — must never see a negative:
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    // refund lands once, positive, via the canonical heal choke point:
+    expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+    expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Zombie 1', 3, mockCampaignName);
+  });
+
+  it('fix#345 higher-reroll arm: a positive delta lands once through the damage lane, heal lane untouched', async () => {
+    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    const { getCombatContext } = await import('../../services/rules/combat/damageUtils.js');
+    const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
+    const { applyHealingToTarget } = await import('../../services/rules/combat/applyHealing.js');
+
+    getRuntimeValue.mockReturnValue(null);
+    getCombatContext.mockResolvedValue({ creatures: [{ name: 'Zombie 1' }] });
+    applyDamageToTarget.mockReturnValue({ finalDamage: 2, newHp: 8 });
+
+    // newRolls 14 + modifier 0 − rawDamage 12 = +2.
+    const punctureData = {
+      rawDamage: 12,
+      targetName: 'Zombie 1',
+      damageTypes: ['Piercing'],
+      originalRolls: [6, 6],
+      newRolls: [8, 6],
+      rerolledIndex: 0,
+      originalValue: 6,
+      newValue: 8,
+    };
+
+    await handlePuncture({ playerStats: mockPlayerStats, campaignName: mockCampaignName, characters: [], popupHtml: { modifier: 0, damageType: 'Piercing' }, setPopupHtml: vi.fn(), punctureData });
+
+    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Zombie 1', 2, ['Piercing'], { campaignName: mockCampaignName, characters: [], ignoreResistance: false, attackerName: 'Test Character' });
+    expect(applyHealingToTarget).not.toHaveBeenCalled();
+  });
+
+  it('fix#345 zero-arm: an equal-totals reroll is a verbatim no-op on BOTH lanes (fix#143 zero-preserved contract)', async () => {
+    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    const { getCombatContext } = await import('../../services/rules/combat/damageUtils.js');
+    const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
+    const { applyHealingToTarget } = await import('../../services/rules/combat/applyHealing.js');
+
+    getRuntimeValue.mockReturnValue(null);
+    getCombatContext.mockResolvedValue({ creatures: [{ name: 'Zombie 1' }] });
+
+    // newRolls 12 + modifier 0 − rawDamage 12 = 0 (reroll swapped equal dice).
+    const punctureData = {
+      rawDamage: 12,
+      targetName: 'Zombie 1',
+      damageTypes: ['Piercing'],
+      originalRolls: [6, 6],
+      newRolls: [6, 6],
+      rerolledIndex: 0,
+      originalValue: 6,
+      newValue: 6,
+    };
+
+    await handlePuncture({ playerStats: mockPlayerStats, campaignName: mockCampaignName, characters: [], popupHtml: { modifier: 0, damageType: 'Piercing' }, setPopupHtml: vi.fn(), punctureData });
+
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(applyHealingToTarget).not.toHaveBeenCalled();
   });
 
   it('gates a second same-turn puncture after the flag is written', async () => {

@@ -6,7 +6,9 @@
 //
 // Lane ownership (do not duplicate here):
 // - attackRiderManeuvers step prompt gating (hit/miss/crit/no-maneuvers) →
-//   steps/attackRollDamageSteps.test.js
+//   steps/attackRollRiders.test.js (gate census :155-172 + chooser routing :22;
+//   cite retargeted fix#363 #1041 — steps/attackRollDamageSteps.test.js is the
+//   zero-body composition-contract lane since #1039)
 // - Precision miss die consumption + spend-log flush → useAttackDamageResolution.mn014.test.js
 // - MN-015 save-DC forwarding + size-gate refusal → .mn015SaveDc.test.js
 // - MN-011 Maneuvering Attack ally picker + plain popup passthrough → .maneuveringAlly.test.js

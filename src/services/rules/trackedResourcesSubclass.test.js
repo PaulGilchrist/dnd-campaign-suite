@@ -26,8 +26,9 @@
 //     'Star Map' automation.uses_expression 'WIS modifier_min_1' -> max(WIS,1)
 //   _Steps_of_the_Fey_freeCast   :231-234 isWarlock + 'Archfey Patron' + bonusActions
 //     type 'steps_of_the_fey' disk 2024 warlock feature lv3 uses_expression
-//     'CHA modifier_min_1'. DRIFT pinned: NO lv gate in code — the stamped
-//     automation is the grant proxy (disk lv3).
+//     'CHA modifier_min_1'. fix#346 (#1533): DRIFT CLOSED — explicit
+//     is2024 + lv>=3 disk floor added; lv6-floor proposal REFUTED at disk
+//     bytes (steps.level === 3); 5e disk has no 'Steps of the Fey' row.
 //   tirelessUses                 :292-293 Ranger lv>=10 max(WIS,1), 2024-only
 //     (fix#134) — disk 2024 Ranger lv10 'Tireless' automation.resourceKey
 //     'tirelessUses'; 5e disk has no row -> 0
@@ -273,7 +274,7 @@ describe('subclass-gated seeds', () => {
     for (const [label, stats, expected] of rows) expectPools(stats, ['_Star_Map_freeCastCount'], expected, label);
   });
 
-  it('_Steps_of_the_Fey_freeCastCount :231-234 — warlock+Archfey+automation triple gate, max(CHA,1); automation is the lv proxy (no lv gate)', () => {
+  it('_Steps_of_the_Fey_freeCastCount :231-234 — warlock+Archfey+2024+lv>=3+automation gate, max(CHA,1) per disk BY-name row (fix#346 #1533)', () => {
     const war = (majorName, level, automation, abilities = [], viaSubclass = false) => basePlayerStats({
       rules: '2024',
       level,
@@ -283,13 +284,25 @@ describe('subclass-gated seeds', () => {
     });
     const rows = [
       ['major Archfey lv5 CHA+3', war(ARCHFEY.name, 5, stepsAutomation, diskAbilities('Charisma', 3)), { current: 3, max: 3 }],
-      ['subclass Archfey lv2 + automation -> still seeds (no lv gate; automation proxy)', war(ARCHFEY.name, 2, stepsAutomation, diskAbilities('Charisma', 2), true), { current: 2, max: 2 }],
+      // fix#346: explicit disk floor lv>=3 (disk row is lv3 — the rec's
+      // lv6 floor REFUTED at bytes: steps.level === 3, census test above).
+      // Old row 'subclass Archfey lv2 + automation -> still seeds (no lv
+      // gate)' flipped honestly to the lv2->0 miss arm; lv3 seeds.
+      ['subclass Archfey lv2 -> 0 (below disk lv3 grant; was-seed drift flipped)', war(ARCHFEY.name, 2, stepsAutomation, diskAbilities('Charisma', 2), true), { current: 0, max: 0 }],
+      ['subclass Archfey lv3 boundary -> seeds (disk BY-name grant level)', war(ARCHFEY.name, 3, stepsAutomation, diskAbilities('Charisma', 2), true), { current: 2, max: 2 }],
+      ['major Archfey lv5 seeded where phantom lv6-floor law would allow (lv5>=3) — floor is the disk lv3, not lv6', war(ARCHFEY.name, 5, stepsAutomation, diskAbilities('Charisma', 1)), { current: 1, max: 1 }],
       ['Archfey, no bonusActions -> 0', war(ARCHFEY.name, 5, undefined), { current: 0, max: 0 }],
       ['Archfey, other bonusAction type -> 0', war(ARCHFEY.name, 5, { bonusActions: [{ type: 'misty_step' }] }, diskAbilities('Charisma', 5)), { current: 0, max: 0 }],
       ['Celestial Patron + steps automation -> 0 (patron gate)', war(CELESTIAL.name, 5, stepsAutomation, diskAbilities('Charisma', 5)), { current: 0, max: 0 }],
       ['GATE: wizard Archfey + automation -> 0 (isWarlock gate)', basePlayerStats({ rules: '2024', level: 5, class: cls('Wizard', ARCHFEY.name), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), { current: 0, max: 0 }],
       ['CHA 0 -> floor 1', war(ARCHFEY.name, 5, stepsAutomation, diskAbilities('Charisma', 0)), { current: 1, max: 1 }],
       ['CHA entry without bonus -> floor 1', war(ARCHFEY.name, 5, stepsAutomation, [{ name: 'Charisma' }]), { current: 1, max: 1 }],
+      // fix#346: 5e RULESET gate — 5e/classes.json carries NO 'Steps of the
+      // Fey' row at any level (sole file hit repo-wide is 2024/classes.json);
+      // disk-absent = no-resource-in-that-edition, same ruling as the
+      // tireless/naturesVeil fix#134 idiom. Loud-stamp stands: the stamped
+      // automation proxy alone no longer seeds a 5e character.
+      ['RULESET-GATED: 5e major Archfey + automation -> 0 (no 5e disk row)', basePlayerStats({ rules: '5e', level: 5, class: cls('Warlock', ARCHFEY.name), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), { current: 0, max: 0 }],
       ['5e near-miss disk name The Archfey -> 0 (gates are 2024 names; drift reported)', basePlayerStats({ rules: '5e', level: 5, class: cls('Warlock', 'The Archfey'), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), { current: 0, max: 0 }],
     ];
     for (const [label, stats, expected] of rows) expectPools(stats, ['_Steps_of_the_Fey_freeCastCount'], expected, label);

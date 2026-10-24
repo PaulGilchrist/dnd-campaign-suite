@@ -224,8 +224,10 @@ function makeSavePathArgs(overrides = {}) {
 /*   M6/M7 drop ==0 / ==0.5 (:85) → T2 numeric rows survive unmapped.  */
 /*   M8 over-match unknown (:85)  → T2 disk '1d10' passthrough dies.   */
 /*   M9 ?? → || (:84)             → T2 numeric-0-vetoes-spell-row dies. */
-/*   M10 drop hasInvisible (:143) → T3 row 1 ships 'Heightened'.       */
-/*   M11 add ||false to heighten (:143) → T3 falsy row: false ≠ undef. */
+/*   M10 drop hasInvisible (:143) → T3 ambushed row ships false ≠ true. */
+/*   M11 (fix#358: ||false IS the law — !! mirrors hub :825 fold; the   */
+/*      retired undefined-vs-false discriminator is superseded; T3 both-   */
+/*      falsy strict-false pin now KILLS any de-coercion back to ||).    */
 /*   M12 innate +1 mutant (:139)  → T4 saveDc 18/17/NaN ladder dies.   */
 /*   M13 drop ||'0' (:169)        → T1 rows e/f ship undefined damage.  */
 /*   M14 in-place mutation        → T5 disk-row snapshot + purity dies. */
@@ -383,7 +385,7 @@ describe('savePath.js — handleAoE gate routing + saveAttackAoe metadata bytes'
     expect(fallthrough.automationPopup.payload.dcSuccess).toBe('half');
   });
 
-  it('discriminates metamagicHeighten across its three shapes — hasInvisible short-circuits to true over a metaCtx string, metaCtx passes its value through, and both-false yields undefined (key present) while metamagicCareful guards to false (falsy-default asymmetry, :143 vs :142)', async () => {
+  it('discriminates metamagicHeighten across its three shapes — hasInvisible short-circuits to true over a metaCtx string, metaCtx truthy coerces to STRICT true, and both-falsy ships strict FALSE (fix#358 #1464 flip of the retired undefined-pin: !! mirrors the hub :825 fold when the pre-stamp is bypassed; metamagicCareful falsy-default parity :143-vs-:142 retired)', async () => {
     const invisibleWins = await handleSavePath(makeSavePathArgs({
       hasInvisible: true,
       metaCtx: { metamagicHeighten: 'Heightened' },
@@ -394,13 +396,43 @@ describe('savePath.js — handleAoE gate routing + saveAttackAoe metadata bytes'
       hasInvisible: false,
       metaCtx: { metamagicHeighten: 'Heightened', metamagicCareful: ['Goblin'] },
     }));
-    expect(passthrough.automationPopup.payload.metamagicHeighten).toBe('Heightened');
+    expect(passthrough.automationPopup.payload.metamagicHeighten).toBe(true); // fix#358: strict boolean — truthy coerces, the raw string never ships (hub :825 fold parity)
+    expect(typeof passthrough.automationPopup.payload.metamagicHeighten).toBe('boolean');
     expect(passthrough.automationPopup.payload.metamagicCareful).toEqual(['Goblin']); // || false never fires past truthy
 
+    const truePass = await handleSavePath(makeSavePathArgs({
+      hasInvisible: false,
+      metaCtx: { metamagicHeighten: true },
+    }));
+    expect(truePass.automationPopup.payload.metamagicHeighten).toBe(true); // true-passthrough arm — semantics unchanged by the !! tightening
+
     const bothFalsy = await handleSavePath(makeSavePathArgs());
-    expect('metamagicHeighten' in bothFalsy.automationPopup.payload).toBe(true);
-    expect(bothFalsy.automationPopup.payload.metamagicHeighten).toBe(undefined); // false || undefined → undefined (M11: no || false guard here, unlike careful)
+    expect('metamagicHeighten' in bothFalsy.automationPopup.payload).toBe(true); // key-presence pin (pre- AND post-fix) survives normalization
+    expect(bothFalsy.automationPopup.payload.metamagicHeighten).toBe(false); // fix#358 flip: was undefined (false || undefined) — ===false consumers no longer miss
+    expect(typeof bothFalsy.automationPopup.payload.metamagicHeighten).toBe('boolean');
     expect(bothFalsy.automationPopup.payload.metamagicCareful).toBe(false);
+  });
+
+  it('ships strict metamagicHeighten:false on the aoeCondition arm too (:112 same-bytes site) when the hub pre-stamp is bypassed, and strict true when armed', async () => {
+    // Condition-only keystone: Arms of Hadar minus its damage ladder — the
+    // :189 isConditionOnlyAoe discriminator (fail effects + no damage), a
+    // documented synthetic probe shape (header fraud-ban form), never a
+    // real-name impersonation.
+    const condRow = { ...DISK_ARMS_OF_HADAR_2024, damage: undefined };
+    const args = (metaCtx, hasInvisible) => ({
+      ...makeSavePathArgs({ fullSpell: condRow, spell: castMirror(condRow), metaCtx, hasInvisible }),
+    });
+
+    const off = await handleSavePath(args({}, false));
+    expect(off.automationPopup.modalName).toBe('aoeCondition'); // arm discriminator
+    expect(off.automationPopup.payload.metamagicHeighten).toBe(false); // pre-fix: undefined
+    expect(off.automationPopup.payload.metamagicCareful).toBe(false);
+
+    const on = await handleSavePath(args({ metamagicHeighten: true }, false));
+    expect(on.automationPopup.payload.metamagicHeighten).toBe(true);
+
+    const ambushed = await handleSavePath(args({}, true));
+    expect(ambushed.automationPopup.payload.metamagicHeighten).toBe(true); // magical-ambush fold still surfaces
   });
 
   it('applies the innate-sorcery +1 to saveDc on the saveAttackAoe arm only when active — 17→18, untouched 17, and an undefined spellSaveDc surfacing NaN (documented probe: caller index.js:193-221 computes a numeric DC today; pins that no ?? rescue exists at :139, the "null + N" face)', async () => {

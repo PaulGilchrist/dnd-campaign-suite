@@ -5,8 +5,9 @@
 //           spend marker + until-clause durationNote (ungated rows: no counter, no marker)
 //   partial → live '(2/Day · 1 left)', still arms
 //   exhausted → refusal popup + dominate_mind_refused log, zero prompts, spent class.
-// Cite-skip owners: gate arithmetic services/encounters/monsterAbilityUses.test.js:32-36;
-// spend-at-confirm + refusal wording monsterAbilityUses.test.js:44-99 and consumer
+// Cite-skip owners: gate arithmetic services/encounters/monsterAbilityUses.test.js:105-127
+// (truth-table; ranges refreshed fix#363 #1082); refusal wording #829 block :129-145;
+// spend-at-confirm cycle :146-204 and consumer
 // saveProcessing.failed-save-conditions.test.js; usage-string format
 // MonsterCardHelpers.usage.test.js (#571); generic gated reactions
 // MonsterAction.gated-reaction.test.jsx. No At Will save rows exist in this lane,

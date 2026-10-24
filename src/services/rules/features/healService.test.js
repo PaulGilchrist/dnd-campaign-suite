@@ -25,8 +25,13 @@
  *  NOT 10+d10 — the steering's d10 recollection is not disk canon.
  *
  * SOURCE BUGS REPORTED (not fixed here):
- *  - healService.js:8 hardcoded remove-list has 'poisoned' but the 5e disk
- *    ends DISEASES (2024 semantics): 5e casts clear Poisoned and never Disease.
+ *  - healService.js:8 remove-list (FIXED fix#349 #1372): the fallback trio
+ *    ['blinded','deafened','poisoned'] cleared Poisoned on 5e casts though the
+ *    5e disk prose ends "blindness, deafness, and any diseases" — the fallback
+ *    now encodes the 5e disk set exactly (blinded/deafened/diseased);
+ *    Poisoned stays 2024-only via the disk status_effects path. Disk rows are
+ *    read BY-name at the top of this lane and re-pinned in the ruleset-split
+ *    rows below (5e clears Disease NOT Poison; 2024 clears Poison NOT Disease).
  *  - healService.js:32-41 over-log (FIXED fix#337S #1372): the log loop now
 *    names ONLY conditions the target actually had (candidate-order canonical
 *    names); phantom never-stored names can no longer land. Rows A/B/D flipped.
@@ -303,6 +308,15 @@ describe('healService.triggerHeal', () => {
             heal5e, ['Prone', 'Restrained'], [30, 100], null, [], 70],
         ['D: target at full HP — no healing applied yet Blinded is still cleared (condition removal is outside the actualHeal>0 gate) and the log names only the real removal',
             heal5e, ['Blinded'], [100, 100], [], ['Blinded'], null],
+        // fix#349 #1372 ruleset-split arms (disk BY-name rows, quoted in the
+        // header): the 5e disk prose set NEVER includes Poisoned; the 2024
+        // disk status_effects set NEVER includes Diseased. Each row falsifies
+        // the old hardcoded trio: pre-fix 5e cleared Poisoned and never
+        // Diseased — both flips land here.
+        ['E: 5e disk clears Disease, NOT Poison — 5e cast on Poisoned+Diseased strips only Diseased, writes and logs exactly that',
+            heal5e, ['Poisoned', 'Diseased'], [30, 100], ['Poisoned'], ['Diseased'], 70],
+        ['F: 2024 disk status_effects clears Poison, NOT Disease — stored Poisoned+Diseased strips only Poisoned',
+            heal2024, ['Poisoned', 'Diseased'], [30, 100], ['Diseased'], ['Poisoned'], 70],
     ])('condition removal — %s', async (_label, spell, stored, [currentHp, maxHp], expectWrite, expectLogged, expectApply) => {
         combatCtx.creatures = [{ name: 'Target', type: 'npc', currentHp, maxHp }];
         seed('Target', 'activeConditions', stored);
@@ -332,7 +346,7 @@ describe('healService.triggerHeal', () => {
         }
     });
 
-    it('anti-phantom pin (fix#337S #1372): stored-only removal logs — Prone-only target produces zero condition logs', async () => {
+    it('anti-phantom pin (fix#337S #1372): stored-only removal logs — Prone-only target produces zero condition logs; and 5e Blinded+Poisoned logs EXACTLY one Blinded removal (zero-is-data: removals logged == removals stored, fix#349)', async () => {
         combatCtx.creatures = [{ name: 'Target', type: 'npc', currentHp: 30, maxHp: 100 }];
         seed('Target', 'activeConditions', ['Prone']);
 
@@ -340,6 +354,23 @@ describe('healService.triggerHeal', () => {
 
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(logsOfType('condition')).toEqual([]);
+
+        // log-matches-stored arm: of the 5e disk set {blinded,deafened,
+        // diseased} only Blinded is stored, so exactly one condition log lands
+        // and Poisoned — no longer on the 5e list — survives both store and log.
+        seed('Target', 'activeConditions', ['Blinded', 'Poisoned']);
+        await triggerHeal(heal5e, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
+
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+        expect(setRuntimeValue).toHaveBeenCalledWith('Target', 'activeConditions', ['Poisoned'], CAMPAIGN);
+        expect(logsOfType('condition')).toEqual([{
+            type: 'condition',
+            action: 'removed',
+            characterName: 'Target',
+            condition: 'Blinded',
+            reason: 'Heal',
+            timestamp: 0,
+        }]);
     });
 
     it.each([

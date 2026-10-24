@@ -178,11 +178,21 @@ function applyUnarmoredDefense2024({ armorClass, playerStats, armorName, shield,
             return draconicAc;
         }
     }
+    // fix#340 (#ledger:1253): disk public/data/2024/classes.json Barbarian lv1
+    // 'Unarmored Defense': "While you aren't wearing any armor, your base Armor
+    // Class equals 10 plus your Dexterity and Constitution modifiers." — NO shield
+    // clause (unlike the College of Dance twin :165, whose !shield gate is driven
+    // by its own disk text "aren't wearing armor or wielding a shield"). A shield
+    // is not armor at this lane (:227 armorName excludes armor_category 'Shield'),
+    // so the UD overwrite must PRESERVE applyShield's :251 bonus instead of
+    // dropping it — the shielded Barbarian no longer loses the +2.
     if (playerStats.class.name === 'Barbarian' && !armorName) {
-        const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
+        const shieldBonus = shield ? 2 + parseMagicItemName(shield).magicBonus : 0;
+        const barbarianAc = 10 + dexterity.bonus + constitution.bonus + shieldBonus;
         if (barbarianAc > armorClass) {
             contributions.length = 0;
             contributions.push(`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Constitution Bonus (${constitution.bonus})`);
+            if (shield) contributions.push(`Shield (2) + Shield Magic Bonus (${parseMagicItemName(shield).magicBonus})`);
             return barbarianAc;
         }
     }

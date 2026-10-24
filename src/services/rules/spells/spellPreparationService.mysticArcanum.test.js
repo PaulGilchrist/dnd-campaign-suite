@@ -145,25 +145,36 @@ describe('CLA-231 — Mystic Arcanum per-level counter key select (authorize / c
   });
 
   describe('prepareSpellCast — consume census (exactly one arcanum write, or none)', () => {
-    // [spell, level, stored counters, expected FULL setRuntimeValue census, expected arcanum reads]
+    // fix#341(a) (#337S ':1056' row): payment authority is the INTERSECTION — caller
+    // flag AND live list (arcanumFreeCast :190-196 is a FREE_CAST_CHECKS member).
+    // List-backed rows sail (freeCastUsed true) but now read their own-level key
+    // EXACTLY TWICE inside prepareSpellCast: the in-lane validator re-query plus the
+    // consume decrement. Flag-only rows the list DENIES flip HONEST (#1348): LOUD
+    // console.error + normal consumption (slot paid, or unpaid when the bank is dry) —
+    // pre-fix they sailed freeCastUsed:true consuming NOTHING (the defect).
+    // [spell, level, stored counters, expected freeCastUsed, expected slotConsumed,
+    //  expected FULL setRuntimeValue census, expected arcanum reads, expected refuses]
     const rows = [
       // CLA-231 core: own-level drain, full census — no lv7/slot write on a lv6 cast
-      [EYEBITE, 6, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, [[PLAYER, 'mysticArcanumLevel6', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel6', CAMPAIGN]]],
+      [EYEBITE, 6, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, true, false, [[PLAYER, 'mysticArcanumLevel6', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel6', CAMPAIGN], [PLAYER, 'mysticArcanumLevel6', CAMPAIGN]], 0],
       // CLA-231 core: pre-fix [6,7,8,9] loop drained lv6 first — assert lv7 write, zero lv6 writes
-      [ETHEREALNESS, 7, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, [[PLAYER, 'mysticArcanumLevel7', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel7', CAMPAIGN]]],
-      // absent-counter quirk (:557 ?? 1): auto-arms to 1 then consumes to 0 — consumes may go first
-      [PWS, 8, {}, [[PLAYER, 'mysticArcanumLevel8', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel8', CAMPAIGN]]],
-      // count>0 guard (:558): READ happens, WRITE does not — no negative ledger even on a contradictory authorize
-      [ETHEREALNESS, 7, { mysticArcanumLevel7: 0 }, [], [[PLAYER, 'mysticArcanumLevel7', CAMPAIGN]]],
-      // level gate consume face (:554 isMysticArcanumLevel): lv5 name-in-list never reads or writes an arcanum key
-      [EYEBITE, 5, { mysticArcanumLevel6: 1 }, [], []],
-      // membership gate consume face + case trail: lowercase not a member
-      ['eyebite', 6, { mysticArcanumLevel6: 1 }, [], []],
+      [ETHEREALNESS, 7, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, true, false, [[PLAYER, 'mysticArcanumLevel7', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel7', CAMPAIGN], [PLAYER, 'mysticArcanumLevel7', CAMPAIGN]], 0],
+      // absent-counter quirk (:579 ?? 1): auto-arms to 1 then consumes to 0 — validator + consume read the same ?? 1
+      [PWS, 8, {}, true, false, [[PLAYER, 'mysticArcanumLevel8', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel8', CAMPAIGN], [PLAYER, 'mysticArcanumLevel8', CAMPAIGN]], 0],
+      // spent-0 is now a DECISIVE LIST DENIAL (arcanumFreeCast :195 count>0 false): flag true refuted — LOUD,
+      // zero arcanum writes (consumeFreeCast never runs); lv7 bank dry -> nothing paid (#337S off-list-flags-free flip)
+      [ETHEREALNESS, 7, { mysticArcanumLevel7: 0 }, false, false, [], [[PLAYER, 'mysticArcanumLevel7', CAMPAIGN]], 1],
+      // level gate: lv5 name-in-list — arcanum check DENIES decisively (:193) BEFORE any key read
+      // -> flag refuted LOUD, pays its lv5 warlock slot (available 1 -> 0), zero arcanum reads
+      [EYEBITE, 5, { mysticArcanumLevel6: 1 }, false, true, [[PLAYER, 'spell_slots_level_5', 0, CAMPAIGN]], [], 1],
+      // membership gate + case trail: lowercase non-member hits no list -> flag refuted LOUD, dry lv6 bank pays nothing
+      ['eyebite', 6, { mysticArcanumLevel6: 1 }, false, false, [], [], 1],
     ];
-    it.each(rows)('%s lv%i @ %j', async (spellName, level, store, expectedWrites, expectedReads) => {
+    it.each(rows)('%s lv%i @ %j', async (spellName, level, store, expectedFree, expectedSlot, expectedWrites, expectedReads, expectedRefused) => {
       seed(store);
       const stats = makeWarlockStats();
       const spell = makeSpell(spellName, level);
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const res = await prepareSpellCast(spell, {}, {
         playerName: PLAYER,
         playerStats: stats,
@@ -171,14 +182,17 @@ describe('CLA-231 — Mystic Arcanum per-level counter key select (authorize / c
         freeCastAuthorized: true,
       });
 
-      expect(res.freeCastUsed).toBe(true);
-      expect(res.slotConsumed).toBe(false);
-      expect(res.metaCtx.freeCastUsed).toBe(true);
-      expect(res.metaCtx.slotConsumed).toBe(false);
-      // FULL write census — exactly the arcanum key(s), nothing else (:556-559)
+      expect(res.freeCastUsed).toBe(expectedFree);
+      expect(res.slotConsumed).toBe(expectedSlot);
+      expect(res.metaCtx.freeCastUsed).toBe(expectedFree);
+      expect(res.metaCtx.slotConsumed).toBe(expectedSlot);
+      // FULL write census — exactly the listed keys, nothing else
       expect(setRuntimeValue.mock.calls).toEqual(expectedWrites);
       // read ledger: own-level key, explicit campaign tier (family unify — owner unify call)
       expect(arcanumReads()).toEqual(expectedReads);
+      const refuted = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+      expect(refuted.length).toBe(expectedRefused); // exact-of-refused, never silent
+      errSpy.mockRestore();
       // purity / input immutability (#1511/T4): inputs byte-identical after the cast
       expect(spell).toEqual(makeSpell(spellName, level));
       expect(stats).toEqual(makeWarlockStats());

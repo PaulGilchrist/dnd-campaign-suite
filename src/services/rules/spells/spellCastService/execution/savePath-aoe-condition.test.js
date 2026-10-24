@@ -224,7 +224,7 @@ describe('savePath.js — condition-only AoE save path → aoeCondition modal pa
     expect(rollExpression).not.toHaveBeenCalled();
   });
 
-  it('ships the full aoeCondition popup for the live disk Entangle row: includeCaster stays false off-grease, concentration duration rides as text, metamagic values pass through metaCtx, saveDc untouched without innate sorcery', async () => {
+  it('ships the full aoeCondition popup for the live disk Entangle row: includeCaster stays false off-grease, concentration duration rides as text, metamagicHeighten coerces to strict true (fix#358) while careful passes through metaCtx, saveDc untouched without innate sorcery', async () => {
     const args = makeSavePathArgs({
       fullSpell: DISK_ENTANGLE_2024,
       spell: makeCastSpell({ name: 'Entangle' }),
@@ -250,7 +250,7 @@ describe('savePath.js — condition-only AoE save path → aoeCondition modal pa
           conditionLabel: 'restrained',
           activeOverlay: null,
           metamagicCareful: ['Goblin'],
-          metamagicHeighten: 'Heightened',
+          metamagicHeighten: true, // fix#358 (#1464) flip: strict boolean — 'Heightened' string coerces via !!, raw string never ships (:112 arm)
           includeCaster: false,
         },
       },

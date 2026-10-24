@@ -15,7 +15,7 @@
 // consumer exists; "At Will (no charge)"/"1 Charge:"/"2 Charges:" miss the
 // N/Day pattern → chips ungated fire-by-design, At-Will precedent).
 // N/Day grammar parse owned by spellcasting canonical extractor tests
-// (spellcasting.test.jsx:333/:340; legendary-uses twin ma1883) — this file
+// (spellcasting.test.jsx:334/:341; legendary-uses twin ma1883) — this file
 // binds THIS row's bytes only. Spellcasting-row chip names owned by
 // ma1958-orcus-spellcasting.test.jsx:202; generic counter badge / spend /
 // refusal / At-Will null-store bytes owned by spellcasting.test.jsx

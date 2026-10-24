@@ -30,6 +30,11 @@
 /*  8+prof arithmetic row dead if removed); :192 ?.||0 / :218 ||0.     */
 /*  #1505 pin: metamagicHeighten arrives at :256 as an explicit        */
 /*  `false` byte (never key-absent) for a plain-vanilla caster.        */
+/*  fix#355(b) (#1496) FLIP: the MOD arm's silent fallthrough when a   */
+/*  truthy cantripSpellAbility is ABSENT from abilities is retired —    */
+/*  Row E console.errors the data hole and coalesces to                 */
+/*  spellAbilities.modifier (massHealUtils.js:10-:22 twin; MOD census   */
+/*  now 4/6/0/0/7/+5 control — every byte unique #1348).                 */
 /*                                                                     */
 /*  Fixtures: REAL disk rows (drift-throw if a row disappears) +      */
 /*  runtime PlayerStats shape (abilities:[{name,bonus}] as computed by  */
@@ -457,6 +462,41 @@ describe('executeSpellCast — computeSpellStats producer (index.js:191-222)', (
     await executeSpellCast(cw(), { targetName: 'Goblin' }, services(makeCaster({ spellAbilities: null })));
     expect(rollExpression).toHaveBeenLastCalledWith('1d8 + 0');
     expect(massSuggestionDc()[3]).toBe(12);
+  });
+
+  it('FLIPPED #1496 (fix#355(b)) Row E: truthy cantripSpellAbility ABSENT from the abilities list is LOUD — console.error names the defect and the MOD coalesces to spellAbilities.modifier per the massHealUtils.js getSpellCastingMod twin (:10-:22, cached 7 here), never the silent 0 the pre-fix if/else-if shipped; the tolerant DC twin stays byte-unchanged', async () => {
+    // Data-hole shape (attackCalc2024.js:16-:23 findAbility law: absent row = data
+    // hole, log loudly, never fabricate): the featBuffService.js:617-lineage spell
+    // stamp / spellAbilities default still NAMES Charisma while the abilities row is
+    // stripped (e.g. Admin clear). MOD census #1348: this row's 7 is unique —
+    // rows A-D gave 4/6/0/0; silent-0 and ability-swap mutants both die.
+    const cw = diskRow('Cure Wounds');
+    cw.spellCastingAbility = 'Charisma'; // stamp survives while the row does not
+    const holed = makeCaster({
+      abilities: makeAbilities({ Strength: 8, Dexterity: 12, Constitution: 14, Intelligence: 20, Wisdom: 16 }), // NO Charisma row
+      spellAbilities: { spellCastingAbility: 'Charisma', toHit: 99, saveDc: 13, modifier: 7 },
+    });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await executeSpellCast(cw, { targetName: 'Goblin' }, services(holed));
+      const loud = spy.mock.calls.map(c => String(c[0])).filter(t => t.includes("cantripSpellAbility 'Charisma'"));
+      expect(loud, 'the absent-ability data hole must console.error').toHaveLength(1);
+      expect(loud[0]).toContain('computeSpellStats');
+      expect(loud[0]).toContain('absent from playerStats.abilities');
+      expect(loud[0]).toContain('massHealUtils getSpellCastingMod twin');
+      // Lawful default = twin fallback (massHealUtils.js:18-:19), NOT 0:
+      expect(rollExpression).toHaveBeenLastCalledWith('1d8 + 7');
+      // Normal path unchanged (quiet control): named row PRESENT → ability.bonus wins,
+      // zero console noise from the new third arm.
+      spy.mockClear();
+      await executeSpellCast(diskRow('Cure Wounds'), { targetName: 'Goblin' }, services(makeCaster({
+        spellAbilities: { spellCastingAbility: 'Intelligence', toHit: 99, saveDc: 13, modifier: 7 },
+      })));
+      expect(spy.mock.calls.map(c => String(c[0])).filter(t => t.includes('cantripSpellAbility'))).toHaveLength(0);
+      expect(rollExpression).toHaveBeenLastCalledWith('1d8 + 5'); // INT +5 row beats cached 7
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('reads innate sorcery at :692 for (name, campaign) and applies the +1 ONLY at the adjudication-context seam :254 — REAL Friends disk row: active 17→18, inactive stays 17, and every other byte of the zero-damage rollDamage envelope (pre-innate 17 at :704 and in the cast log, explicit metamagicHeighten:false #1505, lowercase disk status byte) is exact', async () => {

@@ -18,7 +18,17 @@ function computeRange(spell, metaCtx, attackerPos, targetPos, featEffects) {
     const initialRange = computeEffectiveSpellRange(spell.range, metaCtx);
     if (initialRange == null) return {};
 
-    let effectiveRange = applyRangeBonus(initialRange, spell, featEffects, 'cantripRangeBonus', spell.level === 0);
+    // fix#348(a): symmetric cantrip gate — a cantrip cast into a higher slot is still a
+    // cantrip (RAW: cantrip effects scale by cantrip level, not slot level — disk proof
+    // spells.json Fire Bolt row: level 0, damage.damage_at_character_level {"1":"1d10",
+    // "5":"2d10","11":"3d10","17":"4d10"} — character-level keys, never slot-level).
+    // Upcast producers stamp {level:slotLevel, baseLevel:0} (useSimpleSpellHandlers.js:168,
+    // useSpellMetamagicGates.js:270, SpellDetailPopup.jsx:378), so the gate reuses this
+    // file's OWN cantrip idiom verbatim from computeBlessedStrikes :91
+    // (`spell.baseLevel === 0 || spell.level === 0`) — pre-fix this gate read spell.level
+    // only and upcast cantrips silently lost featEffects.cantripRangeBonus (disk producer
+    // Improved Elemental Fury +300 via featRangeService.js:52 cantrip_range_bonus).
+    let effectiveRange = applyRangeBonus(initialRange, spell, featEffects, 'cantripRangeBonus', spell.baseLevel === 0 || spell.level === 0);
     effectiveRange = applyRangeBonus(effectiveRange, spell, featEffects, 'spellRangeBonus', !!spell.attack_type && !spell.dc);
 
     const distanceFt = getDistanceFeet(attackerPos, targetPos);

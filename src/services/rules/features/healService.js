@@ -5,7 +5,17 @@ import { addEntry } from '../../ui/logService.js';
 import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
 
 const HEAL_NAME = 'Heal';
-const CONDITIONS_TO_REMOVE = ['blinded', 'deafened', 'poisoned'];
+// fix#349 #1372: the remove-list is DISK-driven per ruleset, never hardcoded
+// for both. 2024 'Heal' (public/data/2024/spells.json BY-name) carries
+// status_effects ["Blinded","Deafened","Poisoned"] and flows through
+// getConditionsToRemove's disk read below (:15-17 of this file). The 5e disk
+// row (public/data/spells.json 'Heal') carries NO status_effects key, so it
+// reaches this fallback; its prose BYTES read: "This spell also ends
+// blindness, deafness, and any diseases affecting the target." — encoded
+// exactly: blinded/deafened/diseased. Poisoned is 2024-only wording: 5e Heal
+// NEVER clears Poisoned (the old trio here was the #1372 defect), and it
+// always should have cleared Diseased (it never did).
+const CONDITIONS_TO_REMOVE_5E = ['blinded', 'deafened', 'diseased'];
 
 function isHealSpell(spell) {
     return (spell.name || '') === HEAL_NAME;
@@ -15,7 +25,9 @@ function getConditionsToRemove(spell) {
     if (spell.status_effects && spell.status_effects.length > 0) {
         return spell.status_effects.map(e => e.toLowerCase());
     }
-    return CONDITIONS_TO_REMOVE;
+    // No status_effects key ⇒ this is the 5e disk-row shape; the disk prose
+    // set above is the only lawful list (fix#349).
+    return CONDITIONS_TO_REMOVE_5E;
 }
 
 function removeConditionsOnTarget(targetName, campaignName, spell, reason) {

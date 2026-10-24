@@ -84,6 +84,7 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 }));
 
 import { addEntry } from '../../../../services/ui/logService.js';
+import { getEffectDefinition } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
 import { stageParalysisTargets } from '../../../../services/rules/features/paralyzingBreathService.js';
@@ -218,6 +219,26 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
     // Copy is advisory only: nothing staged before Confirm.
     expect(ladderTes()).toHaveLength(0);
     expect(runtime.store[`${TARGET}.activeConditions`]).toBeUndefined();
+  });
+
+  // fix#347 (#1725-era): resultRowText now RECEIVES stagedPetrify — a
+  // damageless armed fail renders the ladder's Restrained stage-1 row with
+  // the registry label BY-name (targetEffectDefinitions.js:560-561
+  // 'petrifying_bite_staged' → 'Petrifying Bite', cockatricePetrifyService
+  // stage-1 vocabulary) instead of the generic 'Failed the save' prose.
+  it('armed fail result row renders the staged-petrify ladder copy with the registry label, never generic prose', async () => {
+    spyRandom(0.01); // nat 1 + con +2 = 3 < DC 15 → fail
+    const { getByText, container } = renderBreath();
+    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual([TARGET]));
+    fireEvent.click(getByText('Confirm'));
+
+    expect(getEffectDefinition('petrifying_bite_staged').label).toBe('Petrifying Bite');
+    await waitFor(() => expect(container.textContent).toContain(
+      'Failed — Restrained until the end of its next turn, then repeats the save (Petrifying Bite)'
+    ));
+    // Gated absence proofs: the generic row and the landed-Petrified lie.
+    expect(container.textContent).not.toContain('Failed the save (rolled');
+    expect(container.textContent).not.toContain('target is Petrified');
   });
 
   it('disarmed picker copy keeps the MA-0063 flat grant text byte-intact', () => {

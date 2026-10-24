@@ -10,13 +10,13 @@
 // +15 lv2 for Ancient Silver Dragon, bonus resolving from row prose.
 // Cross-file owners (not re-pinned here): helper unit parses — isSpellAttackSpell
 // true bytes ma0452-bullywug:189 / scorching-ray:138, save-route negatives
-// spellcasting.test.jsx:226/:245, spellCastLevelFromSpellcasting + upcast
-// formula MonsterCardHelpers.ma1202:52-55 ("MA-0033 upcast lane") / barlgura:185-187,
+// spellcasting.test.jsx:227/:246, spellCastLevelFromSpellcasting + upcast
+// formula MonsterCardHelpers.ma1202:52-55 ("MA-0033 upcast lane") / barlgura:146-148,
 // monsterSpellAttackBonus authored ma0452:176 / scorching-ray:134, prose
 // fallback ma1850-archlich:170. Generic spell-attack press template, At-Will
 // ungating, and no-armed-target refusal (identical spell-agnostic lane code):
 // scorching-ray.test.jsx:172-201/:203-216; generic spellcast cites
-// spellcasting.test.jsx:192/:275/:281-302/:317/:522-548/:561.
+// spellcasting.test.jsx:193/:276/:282-303/:318/:512-540/:551.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

@@ -5,9 +5,9 @@ import { applyLongRest } from './restRules.js'
 // This file owns the SPECIAL long-rest seams: named consumers inside applyLongRest
 // that do more than null resource keys (Star Map/Cosmic Omen, Chef, campaign
 // targetEffects rows, True Polymorph persistence, Spell Thief cross-store prune,
-// log lines). Base batch/exhaustion-reset, regenerateActive clearing (:547),
-// bolsteringTreats craft count (:171), Bastion of Law ward reset (:430-439) and
-// Spell Thief batch tracking + null-branch (:489-511) live in restRules-longRest.test.js.
+// log lines). Base batch/exhaustion-reset, regenerateActive clearing (:641-660),
+// bolsteringTreats craft count (:201-216), Bastion of Law ward reset (:460-489) and
+// Spell Thief batch tracking + null-branch (:549-568) live in restRules-longRest.test.js.
 
 // Mock dependencies
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -177,7 +177,7 @@ describe('restRules - long rest special features', () => {
       })
       await applyLongRest(chefStats, CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'replenishingMeals', 9, CAMPAIGN, true)
-      // craft-count write (chefBolsteringTreats) is owned by restRules-longRest.test.js:171
+      // craft-count write (chefBolsteringTreats) is owned by restRules-longRest.test.js:207
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bolsteringTreat', null, CAMPAIGN, true)
       expect(addEntry).toHaveBeenCalledWith(
         CAMPAIGN,

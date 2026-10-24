@@ -517,8 +517,32 @@ describe('applyLongRest', () => {
       })
       await applyLongRest(makeStats(), CAMPAIGN)
       // Exact full writer-set for the marked enemy: only the filtered buff list.
+      // fix#354(b) site 2/4 valid-arm: validate-first keeps filter+write VERBATIM.
       expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Enemy2'))
         .toEqual([['Enemy2', 'activeBuffs', [{ effect: 'haste' }], CAMPAIGN]])
+    })
+
+    // fix#354(b) site 2/4 non-array-store arms (fix#337S stamp ledger :1817):
+    // invalid store -> LOUD console.error + ZERO writes to the enemy; pre-fix
+    // `|| []` clobbered a missing store with [] / TypeError'd mid-rewrite on
+    // non-array truthy.
+    it.each([
+      ['missing (null) store', null],
+      ['non-array truthy store', 'corrupt'],
+    ])('vow target %s: LOUD console.error + ZERO Enemy2 writes', async (_desc, stored) => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(getRuntimeValue).mockImplementation((n, key) => {
+        if (key === 'vowOfEnmityTarget') return 'Enemy2'
+        if (key === 'activeBuffs') return n === 'Enemy2' ? stored : []
+        return undefined
+      })
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[restRules] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
+        'Enemy2', stored,
+      )
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Enemy2')).toHaveLength(0)
+      consoleSpy.mockRestore()
     })
   })
 

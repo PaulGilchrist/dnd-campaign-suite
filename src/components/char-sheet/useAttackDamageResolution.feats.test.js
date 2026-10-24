@@ -534,9 +534,10 @@ describe('useAttackDamageResolution - feats', () => {
                 const teIdx = setRuntimeValue.mock.calls.findIndex((c) => c[1] === 'targetEffects');
                 expect(latchIdx).toBeGreaterThanOrEqual(0);
                 expect(latchIdx).toBeLessThan(teIdx);
-                expect(callsForKey('_Tavern_Brawler_Push_UsedRound')).toEqual([
-                    [attackerName, '_Tavern_Brawler_Push_UsedRound', 1, mockCampaignName],
-                ]);
+                // #1062 fix#363: seam pins PRESENCE-once only — the exact latch-value
+                // tuple ([attacker, key, round, campaign]) is byte-owned at the push
+                // lane, tavernBrawlerPush.test.js :167-170 (pair-split table #1061).
+                expect(callsForKey('_Tavern_Brawler_Push_UsedRound')).toHaveLength(1);
             } else {
                 expect(pushes).toHaveLength(0);
                 expect(callsForKey('_Tavern_Brawler_Push_UsedRound')).toHaveLength(0);

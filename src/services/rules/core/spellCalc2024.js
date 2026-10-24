@@ -663,12 +663,22 @@ function applyAutomationSpellGrants(spellAbilities, playerStats, playerSummary, 
     ];
     autoFeatures.forEach(feature => applyAutomationFeature(spellAbilities, feature, playerStats, playerSummary, allSpells));
 
-    // Spell Mastery: read runtime state for player-chosen spells
+    // Spell Mastery: read runtime state for player-chosen spells.
+    // fix#348(c): gate the store reads by the spell_mastery passive's presence — a stray
+    // 'SpellMastery_level1/2' store entry must NEVER grant Always rows to a character who
+    // does not hold the feature (defense-in-depth; disk law classes.json[11].class_levels[17]
+    // wizard lv18 automation {type:'spell_mastery', casting_time:'passive'} lands the row in
+    // automation.passives). Presence-check idiom reused verbatim from the sibling
+    // applyImprovedIllusions :362 / stampImprovedIllusionsCastingTime :378
+    // (`playerStats.automation?.passives?.some(p => p.type === '<type>')`).
     const campaignName = playerSummary?.campaignName;
-    const level1Spell = getRuntimeValue(playerStats.name, 'SpellMastery_level1', campaignName);
-    const level2Spell = getRuntimeValue(playerStats.name, 'SpellMastery_level2', campaignName);
-    if (level1Spell) addAlwaysPrepared(spellAbilities, level1Spell);
-    if (level2Spell) addAlwaysPrepared(spellAbilities, level2Spell);
+    const hasSpellMastery = playerStats.automation?.passives?.some(p => p.type === 'spell_mastery');
+    if (hasSpellMastery) {
+        const level1Spell = getRuntimeValue(playerStats.name, 'SpellMastery_level1', campaignName);
+        const level2Spell = getRuntimeValue(playerStats.name, 'SpellMastery_level2', campaignName);
+        if (level1Spell) addAlwaysPrepared(spellAbilities, level1Spell);
+        if (level2Spell) addAlwaysPrepared(spellAbilities, level2Spell);
+    }
 
     // Class Savants: read runtime state for player-chosen spells of the school
     addRuntimeSelectionSpells(spellAbilities, playerStats.name, '_Abjuration_Savant_selection', campaignName);

@@ -157,29 +157,52 @@ describe('rules.getArmorClass — 2024 ruleset', () => {
     });
   });
 
-  // QUIRK PINS: 2024 unarmored defense x shield. The 2024 disk texts differ
-  // feature-by-feature, and the shared shield lane (applyShield at :241 runs
-  // BEFORE applyUnarmoredDefense2024) honors neither correctly. Reported as
-  // SOURCE BUGS; these rows pin current behavior so any change is deliberate.
-  describe('QUIRK PINS: shield interaction with 2024 unarmored defenses', () => {
-    it.each([
-      {
-        // Disk: Barbarian UD applies "while you aren't wearing any armor" (shield
-        // allowed). applyUnarmoredDefense2024:174 replaces armorClass — which
-        // already includes the shield +2 — with a bare 10+Dex+Con, dropping it.
-        // Rules-correct would be 10 + 2 + 3 + shield 2 = 17.
-        label: 'Barbarian: shield dropped when UD overwrites (rules-correct 17, actual 15)',
-        playerStats: stats2024({
-          cls: { name: 'Barbarian' },
-          abilities: [{ name: 'Dexterity', bonus: 2 }, { name: 'Constitution', bonus: 3 }],
-          equipped: ['Shield']
-        }),
-        ac: 15
-      }
-    ])('$label', ({ playerStats, ac }) => {
-      const [actualAc] = rules.getArmorClass(ARMOR_CATALOG, playerStats);
+  // FIXED #340 (#ledger:1253): shield no longer dropped when Barbarian UD
+  // overwrites. Disk public/data/2024/classes.json Barbarian lv1
+  // 'Unarmored Defense': "While you aren't wearing any armor, your base Armor
+  // Class equals 10 plus your Dexterity and Constitution modifiers." — a shield
+  // is not armor (armorName derivation excludes armor_category 'Shield'), so
+  // UD applies and applyShield's :251 +2 must survive the overwrite.
+  // Pre-fix the branch replaced armorClass with bare 10+Dex+Con (15); the
+  // former QUIRK PIN recorded that drop. Rules-correct 10 + Dex 2 + Con 3 +
+  // Shield 2 = 17, now the actual. The College of Dance twin keeps its
+  // !shield gate — its disk text explicitly says "aren't wearing armor or
+  // wielding a shield" (#1249 lane above).
+  describe('FIXED #340: Barbarian UD keeps the shield +2 (disk: no shield clause)', () => {
+    const barbarian = (equipped, dex = 2, con = 3) => stats2024({
+      cls: { name: 'Barbarian' },
+      abilities: [{ name: 'Dexterity', bonus: dex }, { name: 'Constitution', bonus: con }],
+      equipped
+    });
 
-      expect(actualAc).toBe(ac);
+    it('shielded Barbarian: 10 + Dex 2 + Con 3 + Shield 2 = 17 (pre-fix dropped the +2 for 15)', () => {
+      const [ac, formula] = rules.getArmorClass(ARMOR_CATALOG, barbarian(['Shield']));
+
+      expect(ac).toBe(17);
+      expect(formula).toContain('Unarmored AC (10) + Dexterity Bonus (2) + Constitution Bonus (3)');
+      expect(formula).toContain('Shield (2)');
+    });
+
+    it('magic shield stacks through the UD overwrite: 10 + Dex 2 + Con 3 + Shield 2 + magic 1 = 18', () => {
+      const [ac, formula] = rules.getArmorClass(ARMOR_CATALOG, barbarian(['+1 Shield']));
+
+      expect(ac).toBe(18);
+      expect(formula).toContain('Shield Magic Bonus (1)');
+    });
+
+    it('armor still blocks UD (!armorName gate): Chain Mail 16 + Shield 2 = 18, no UD bytes', () => {
+      const [ac, formula] = rules.getArmorClass(ARMOR_CATALOG, barbarian(['Chain Mail', 'Shield']));
+
+      expect(ac).toBe(18);
+      expect(formula).toContain('Armor (16)');
+      expect(formula).not.toContain('Constitution Bonus');
+    });
+
+    it('falsifier — the +2 is the shield law, not free CON inflation: unshielded stays 10+Dex+Con = 15', () => {
+      const [ac, formula] = rules.getArmorClass(ARMOR_CATALOG, barbarian([]));
+
+      expect(ac).toBe(15);
+      expect(formula).not.toContain('Shield');
     });
   });
 

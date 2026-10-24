@@ -112,7 +112,7 @@ export function createSaveListener(campaignName, config) {
     pendingSaves[promptId] = { promptId, campaignName, ...payload };
     setRuntimeValue('campaign', 'pendingSavePrompts', pendingSaves, campaignName);
 
-    const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || [];
+    const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []; // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198 — reader is arity-2 (useRuntimeState.js:63), scope = SSE-mirrored active-campaign store until #1520
     listenerPrompts.push(promptId);
     setRuntimeValue('campaign', 'pendingSaveListenerPrompts', listenerPrompts, campaignName);
 

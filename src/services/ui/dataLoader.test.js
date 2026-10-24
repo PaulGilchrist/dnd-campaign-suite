@@ -232,12 +232,14 @@ describe('dataLoader', () => {
             ]);
         });
 
-        it('pins the in-flight dedupe law: loadData double-fetches concurrent callers; spells dedupes per version', async () => {
-            // #1509 double-load: the dataPromises slot is nulled synchronously
-            // before the fetch resolves, so the dedupe check can never hit.
+        it('in-flight dedupe law LIVE (fix#352(d) flip): concurrent loadData shares ONE fetch; spells dedupes per version', async () => {
+            // Quirk pin flipped (#1348): pre-fix the dataPromises slot was nulled
+            // SYNCHRONOUSLY after creation (old :115-116), so the dedupe read at
+            // :79-81 could never hit and concurrent callers double-fetched.
+            // Now the slot is released only on promise SETTLE — the dedupe is real.
             const [a, b] = await Promise.all([loadClassData('5e'), loadClassData('5e')]);
-            expect(fetchMock).toHaveBeenCalledTimes(2);
-            expect(a).toBe(b);
+            expect(fetchMock).toHaveBeenCalledTimes(1); // dedupe HITS
+            expect(a).toBe(b);                          // one shared promise, one parse
 
             fetchMock.mockClear();
             const [s1, s2] = await Promise.all([loadSpells('5e'), loadSpells('5e')]);
@@ -255,6 +257,29 @@ describe('dataLoader', () => {
             expect(c5).toBe(v5);
             expect(c24).toBe(v24);
             expect(fetchMock).toHaveBeenCalledTimes(2); // both versions cached independently
+        });
+
+        it('settle releases the slot: post-settle callers after clearDataCache refetch — no stale settled promise ever served (fix#352(d))', async () => {
+            // The NEW risk introduced by async slot release: if the settle cleanup
+            // failed, clearDataCache() would be poisoned by the still-stored
+            // ALREADY-RESOLVED promise (cache cleared, yet loadData answers the
+            // stale settled ref with zero fetch). This row falsifies that.
+            const first = await loadClassData('5e');
+            expect(first).toBe(realData('/data/classes.json'));
+
+            clearDataCache();
+            fetchMock.mockClear();
+            const second = await loadClassData('5e');
+            expect(fetchMock).toHaveBeenCalledTimes(1); // slot was released at settle -> genuine refetch
+            expect(second).toBe(realData('/data/classes.json'));
+
+            // Concurrent trio on the cold cache: ONE fetch, THREE identical results.
+            fetchMock.mockClear();
+            clearDataCache();
+            const trio = await Promise.all([loadClassData('5e'), loadClassData('5e'), loadClassData('5e')]);
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            expect(trio[0]).toBe(trio[1]);
+            expect(trio[1]).toBe(trio[2]);
         });
 
         it('clearDataCache resets the exact versioned shape and every lane refetches; getCacheState is a fresh deep clone', async () => {

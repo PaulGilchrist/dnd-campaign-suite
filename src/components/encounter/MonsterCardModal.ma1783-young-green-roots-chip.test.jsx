@@ -10,7 +10,7 @@
 // Cited owners, NOT re-pinned here: disk data locks (monsterLairActions.test.js
 // :2881-2895, :2974-2978), chip-vs-static render branches + inert gate
 // (MonsterCardModal.lair-actions.test.jsx:114/:153/:176), breathAoeShape
-// Line-parse of the thorn row (MonsterCardModal.save-variant-shape.test.jsx:50-55).
+// Line-parse of the thorn row (MonsterCardModal.save-variant-shape.test.jsx:73-82).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -101,7 +101,7 @@ function lairChips() {
 // Per-chip picker contract: [0]/[1] are the STR DC 15 restrained save twins
 // (20-ft Radius picker from prose radius, rangeGateFt null); [2] is the DEX
 // half-damage thorn leg (prose Line, coverage 120 — parse owned by
-// save-variant-shape.test.jsx:50-55). Nulling pickerProps.current first
+// save-variant-shape.test.jsx:73-82). Nulling pickerProps.current first
 // proves THIS click (not a stale render) opened/updated the picker.
 const PICKER_CASES = [
   { i: 0, saveType: 'Strength', dcSuccess: 'none', saveConditions: ['restrained'], range: 20, rangeGateFt: null, titleOverride: '20-ft Radius (GM positions tokens; selection advisory)' },

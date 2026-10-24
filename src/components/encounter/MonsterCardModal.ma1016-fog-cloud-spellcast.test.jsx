@@ -14,7 +14,7 @@
 // wiring through the real row). Press 2 refuses via the SERVICE numeric gate
 // through the modal runtime store: mc-prerequisite-refusal popup +
 // fog_cloud_refused log, zero extra records (§57) — distinct emitter from
-// spellcasting.test.jsx:281's buildMonsterSpellRefusalEntry "already cast
+// spellcasting.test.jsx:282's buildMonsterSpellRefusalEntry "already cast
 // today" lane. Restored-uses pins the MA-0020 uses-gate re-arm at the modal
 // seam (service fog test has no recovered-row test; §70 rest-rearm stays
 // GM-enforced). Generic advisory record: service owner

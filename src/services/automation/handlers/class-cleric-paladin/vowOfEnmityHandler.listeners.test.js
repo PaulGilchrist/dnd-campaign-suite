@@ -209,13 +209,16 @@ describe('vowOfEnmityHandler setupVowTransferListener', () => {
     // Activate a vow against Goblin so the listener is registered, then wipe
     // the activation writes so post-dispatch assertions see only the listener.
     async function registerVow(initial = {}) {
-        setupRuntime({ channelDivinityCharges: 1, ...initial });
+        const state = setupRuntime({ channelDivinityCharges: 1, ...initial });
         mockCombat({ creatures: [{ name: 'Goblin', currentHp: 5 }] }, { name: 'Goblin' });
         await handle(makeAction(), makePlayerStats(), campaignName);
         runtimeState.setRuntimeValue.mockClear();
+        // fix#354(b): expose the store so arms can corrupt it post-activation.
+        return state;
     }
 
     it('clears vow and filters vow_of_enmity from attacker and target buffs, preserving unrelated buffs', async () => {
+        // fix#354(b) sites 3+4 valid-arms: validate-first keeps filter+write VERBATIM.
         await registerVow({
             'Paladin1:activeBuffs:test-campaign': [vowBuff, blessBuff],
             'Goblin:activeBuffs:test-campaign': [markedBuff],
@@ -260,21 +263,66 @@ describe('vowOfEnmityHandler setupVowTransferListener', () => {
         );
     });
 
-    it('defaults missing activeBuffs to [] on both attacker and target clears', async () => {
-        await registerVow({
-            'Paladin1:activeBuffs:test-campaign': null,
-            'Goblin:activeBuffs:test-campaign': null,
-        });
+    it('FLIPPED #1348 (fix#354(b) sites 3+4/4): missing activeBuffs stores are LOUD-refused with ZERO writes — no more tolerant-clobber []', async () => {
+        // Pre-fix pinned quirk: the two listener legs coerced invalid stores
+        // (`Array.isArray(x) ? x : []` leg 1, `|| []` leg 2) and WROTE [] over
+        // them — clobbering concurrent writes and churning no-ops (fix#170
+        // census, fix#337S stamp ledger :1817). Validate-first idiom per
+        // invisibilityService.js:20-35 (fix#349(a)) + fix#352: invalid store ->
+        // console.error naming the data defect, store untouched.
+        // Stores are corrupted AFTER registerVow: handle()'s activation leg
+        // re-stamps the target's activeBuffs, pre-corruption fixtures die.
+        const state = await registerVow();
+        state['Paladin1:activeBuffs:test-campaign'] = null;
+        state['Goblin:activeBuffs:test-campaign'] = null;
 
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         mockCombat({ creatures: [{ name: 'Goblin', currentHp: 0 }] });
         await dispatchSummaryUpdate();
 
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1', 'activeBuffs', [], campaignName,
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
+            'Paladin1', null,
         );
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Goblin', 'activeBuffs', [], campaignName,
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
+            'Goblin', null,
         );
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            'Paladin1', 'activeBuffs', expect.anything(), campaignName,
+        );
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            'Goblin', 'activeBuffs', expect.anything(), campaignName,
+        );
+        // Vow-completes-on-death latch clears are unrelated keys: still land.
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Paladin1', 'vowOfEnmityTarget', null, campaignName,
+        );
+        consoleSpy.mockRestore();
+    });
+
+    it('non-array truthy attacker store never blocks the valid target clear (per-leg independent guards, fix#354(b))', async () => {
+        await registerVow({
+            'Paladin1:activeBuffs:test-campaign': 'corrupt',
+            'Goblin:activeBuffs:test-campaign': [vowBuff, markedBuff],
+        });
+
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockCombat({ creatures: [{ name: 'Goblin', currentHp: 0 }] });
+        await dispatchSummaryUpdate();
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[vowOfEnmity] Refusing vow_of_enmity activeBuffs rewrite — stored activeBuffs is not an array:',
+            'Paladin1', 'corrupt',
+        );
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+            'Paladin1', 'activeBuffs', expect.anything(), campaignName,
+        );
+        // Valid leg rewrites verbatim: vow markers stripped, foreign buff kept.
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Goblin', 'activeBuffs', [markedBuff], campaignName,
+        );
+        consoleSpy.mockRestore();
     });
 
     it('does nothing when combat context is null', async () => {

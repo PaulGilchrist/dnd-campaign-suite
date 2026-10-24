@@ -217,8 +217,24 @@ function pickSettlementName(names, culture, size, existingNames) {
   if (cultureNames && cultureNames[size] && cultureNames[size].length > 0) {
     name = pick(cultureNames[size]);
   } else {
-    const fallback = names['Human'];
-    name = pick(fallback[size] || fallback['town'] || []);
+    // fix#357 (fix#197 twin, :221-era ||-chain `pick(fallback[size] || fallback['town'] || [])`):
+    // PRODUCER CENSUS: settlement-names.json ships all five SIZE_CULTURE_MAP cultures at every
+    // size, all twenty [culture][size] pools non-empty (150-208 entries each, disk 2026-10-24) —
+    // the culture lookup CANNOT legitimately yield empty, so this fallback leg is reached only on
+    // key drift (renamed/emptied bank). LOUD-but-returning per #app no-fallbacks: the walk to
+    // Human[size]→Human.town still returns the fallback name (shape unchanged, zero extra rolls),
+    // but it is announced, and an exhausted ladder throws instead of the old
+    // `pick([]) === undefined` 'undefined'-named settlement leak.
+    console.error(`settlementGenerator: culture '${culture}' has no '${size}' name pool — walking Human fallback (key drift or emptied bank?)`);
+    const fallback = names['Human'] || {};
+    const fallbackPool = (fallback[size] && fallback[size].length > 0 && fallback[size])
+      || (fallback['town'] && fallback['town'].length > 0 && fallback['town'])
+      || null;
+    if (!fallbackPool) {
+      console.error(`settlementGenerator: no non-empty settlement-name pool for culture '${culture}' size '${size}' (Human fallback absent or empty)`);
+      throw new TypeError(`settlementGenerator: settlement-names data exhausted for size '${size}'`);
+    }
+    name = pick(fallbackPool);
   }
 
   let uniqueName = name;
@@ -252,8 +268,28 @@ function pickServiceName(svcType, shopNames, serviceConfig, usedShopNames) {
 function pickNpcName(npcNames, npcNameUsed) {
   const npcRace = pick(['Human', 'Elf', 'Dwarf', 'Halfling', 'Half-Elf', 'Half-Orc']);
   const npcGender = Math.random() > 0.5 ? 'male' : 'female';
-  const npcNamePool = npcNames[npcRace] || npcNames['Human'];
-  const npcFirstName = pick(npcNamePool[npcGender] || npcNamePool['male'] || []);
+  // fix#357 (fix#197 twin, :256-era chain `pick(npcNamePool[npcGender] || npcNamePool['male'] || [])`):
+  // PRODUCER CENSUS: npc-names.json carries every inline race (Human/Elf/Dwarf/Halfling/Half-Elf/
+  // Half-Orc, plus 9 more) with BOTH gender pools non-empty (disk 2026-10-24) — an absent race key
+  // or empty/absent gender pool is key drift, never authored nullability. LOUD-but-returning per
+  // #app no-fallbacks: race→Human and gender→male legs still return their fallback pick (shape
+  // unchanged, zero extra rolls), but each substituted leg is announced; an exhausted ladder throws
+  // instead of the old `pick([]) === undefined` slot feeding the 'undefined N' dedupe cascade.
+  let npcNamePool = npcNames[npcRace];
+  if (!npcNamePool) {
+    console.error(`settlementGenerator: no name pool for race '${npcRace}' — walking Human fallback (key drift?)`);
+    npcNamePool = npcNames['Human'];
+  }
+  let genderPool = npcNamePool && npcNamePool[npcGender];
+  if (!(genderPool && genderPool.length > 0)) {
+    genderPool = npcNamePool && npcNamePool['male'];
+    if (!(genderPool && genderPool.length > 0)) {
+      console.error(`settlementGenerator: no non-empty name pool for race '${npcRace}' gender '${npcGender}' (male fallback absent or empty)`);
+      throw new TypeError(`settlementGenerator: npc-names data exhausted for race '${npcRace}'`);
+    }
+    console.error(`settlementGenerator: race '${npcRace}' gender '${npcGender}' pool absent-or-empty — substituted male pool (key drift or emptied pool?)`);
+  }
+  const npcFirstName = pick(genderPool);
 
   let uniqueNpcName = `${npcFirstName}`;
   let npcCounter = 2;

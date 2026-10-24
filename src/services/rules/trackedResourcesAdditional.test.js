@@ -20,11 +20,13 @@
 // (LONG_REST_RESOURCES re-arms the tranceOfOrder latch, CLA-364).
 //
 // Disk-quoted max formulas (public/data, both rulesets where present):
-//   darkOnesLuckUses :201-202  2024/classes.json "Dark One's Own Luck":
-//     "Uses = Charisma modifier (minimum once)" -> Math.max(1, CHA).
-//     DRIFT (reported): 5e/classes.json says "Once you use this feature,
-//     you can't use it again until you finish a short or long rest" (=1);
-//     the code applies the CHA formula on BOTH rulesets — pinned as-is.
+//   darkOnesLuckUses :201-202  fix#346 (#1532): RULESET-SPLIT per disk BY-
+//     name rows. 2024/classes.json 'Fiend Patron' lv6 "Dark One's Own Luck":
+//     "Uses = Charisma modifier (minimum once). Regain on Long Rest." ->
+//     max(1, CHA) in 2024 ONLY. 5e/classes.json 'Fiend' lv6: "Once you use
+//     this feature, you can't use it again until you finish a short or long
+//     rest" (=1) -> 5e seeds exactly 1 (old both-rulesets CHA-scaling was
+//     the reported DRIFT; flipped here).
 //   arcaneWard*Hp    :111-116  classes.json "Arcane Ward": "hit point
 //     maximum equal to twice your wizard level + your Intelligence
 //     modifier" -> 2*level + INT, negative INT NOT clamped (row pinned).
@@ -62,8 +64,9 @@
 //   tranceOfOrder    CLA-364 BUG-A (module :346-353): NEVER seeded here;
 //     handler-owned null-as-available latch, Long-Rest null re-arm.
 //   favoredEnemy   :288-290     exact-level class_levels row wins, else
-//     floor 1. QUIRK (reported): NOT Ranger-gated — every class seeds
-//     favoredEnemyUses >= 1 (row pins the leak honestly).
+//     floor 1. fix#346 (#1532): QUIRK CLOSED — Ranger-gated mirroring the
+//     warPriest idiom (fix#336S :276 `isCleric ? formula : 0`); non-Ranger
+//     gate arms flipped from the old seed-1 quirk row.
 //
 // Kill-matrix (analytic declaration; every mutation flips >=1 row):
 //   re-add tranceOfOrderUses seed (CLA-364 regression) -> lane 1 both arms;
@@ -156,18 +159,37 @@ describe('computeTrackedResources — additional seed lanes', () => {
     for (const [label, stats, expected] of rows) expectPool(stats, ['adrenalineRushUses'], expected, label);
   });
 
-  // :199-203 — matchesPatron reads major.name OR subclass.name; uses =
-  // max(1, CHA). Negative CHA still floors at 1 ("minimum once").
-  it('darkOnesLuckUses: Fiend identity via major/subclass, max(1,CHA) clamps, warlock gate', () => {
+  // :199-203 — matchesPatron reads major.name OR subclass.name. fix#346
+  // (#1532): seed shape per disk BY-name rows — 5e seeds exactly 1 ("Once
+  // you use this feature, you can't use it again until you finish a short or
+  // long rest"), 2024 scales max(1, CHA) ("Uses = Charisma modifier
+  // (minimum once)"). Old 5e rows pinned max(1,CHA) on BOTH rulesets —
+  // flipped honestly (5e CHA 3 -> 1, was 3; 5e CHA 2 -> 1, was 2).
+  it('darkOnesLuckUses: Fiend identity via major/subclass, 5e seeds 1 verbatim, 2024 max(1,CHA), warlock gate', () => {
     const rows = [
-      ['major Fiend CHA 3', basePlayerStats({ class: warlock({ major: { name: 'Fiend' } }), abilities: [{ name: 'Charisma', bonus: 3 }] }), { current: 3, max: 3 }],
-      ['major Fiend Patron CHA 0 -> floor 1', basePlayerStats({ class: warlock({ major: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: 0 }] }), { current: 1, max: 1 }],
-      ['subclass Fiend CHA 2', basePlayerStats({ class: warlock({ subclass: { name: 'Fiend' } }), abilities: [{ name: 'Charisma', bonus: 2 }] }), { current: 2, max: 2 }],
-      ['subclass Fiend Patron CHA -2 -> floor 1', basePlayerStats({ class: warlock({ subclass: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: -2 }] }), { current: 1, max: 1 }],
+      ['5e major Fiend CHA 3 -> 1 (flipped from 3: 5e disk = exactly one per rest)', basePlayerStats({ class: warlock({ major: { name: 'Fiend' } }), abilities: [{ name: 'Charisma', bonus: 3 }] }), { current: 1, max: 1 }],
+      ['5e major Fiend Patron CHA 0 -> 1', basePlayerStats({ class: warlock({ major: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: 0 }] }), { current: 1, max: 1 }],
+      ['5e subclass Fiend CHA 2 -> 1 (flipped from 2)', basePlayerStats({ class: warlock({ subclass: { name: 'Fiend' } }), abilities: [{ name: 'Charisma', bonus: 2 }] }), { current: 1, max: 1 }],
+      ['5e subclass Fiend Patron CHA -2 -> 1', basePlayerStats({ class: warlock({ subclass: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: -2 }] }), { current: 1, max: 1 }],
+      ['2024 major Fiend Patron CHA 3 -> 3 (disk: Uses = Charisma modifier)', basePlayerStats({ rules: '2024', class: warlock({ major: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: 3 }] }), { current: 3, max: 3 }],
+      ['2024 subclass Fiend Patron CHA -2 -> floor 1 (minimum once)', basePlayerStats({ rules: '2024', class: warlock({ subclass: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: -2 }] }), { current: 1, max: 1 }],
       ['non-Fiend warlock CHA 5 -> 0', basePlayerStats({ class: warlock({ major: { name: 'Archfey' } }), abilities: [{ name: 'Charisma', bonus: 5 }] }), { current: 0, max: 0 }],
       ['non-warlock CHA 5 -> 0', basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 5 }] }), { current: 0, max: 0 }],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['darkOnesLuckUses'], expected, label);
+  });
+
+  // fix#346 (#1532) disk law census — both edition rows quoted BY-name,
+  // byte-exact, side by side: 5e carries NO CHA pool; 2024 scales by CHA.
+  it('darkOnesLuck disk law census: 5e once-per-rest bytes, 2024 CHA-modifier bytes', () => {
+    const fiend5e = classes5e.find((c) => c.name === 'Warlock').subclasses.find((s) => s.name === 'Fiend')
+      .class_levels.find((cl) => cl.level === 6).features.find((f) => f.name === "Dark One's Own Luck");
+    expect(fiend5e.description).toContain('Once you use this feature, you can\'t use it again until you finish a short or long rest.');
+    expect(fiend5e.description).not.toMatch(/[Cc]harisma modifier/);
+    const fiend2024 = classes2024.find((c) => c.name === 'Warlock').majors.find((m) => m.name === 'Fiend Patron')
+      .features.find((f) => f.name === "Dark One's Own Luck");
+    expect(fiend2024.level).toBe(6);
+    expect(fiend2024.description).toContain('Uses = Charisma modifier (minimum once). Regain on Long Rest.');
   });
 
   // :254-261 — paladin gate + max(CHA, 1) ("minimum of +1", disk).
@@ -271,14 +293,19 @@ describe('computeTrackedResources — additional seed lanes', () => {
   });
 
   // :288-290 — exact-level class_levels row wins; floor 1 otherwise.
-  // QUIRK (reported, header): no Ranger gate — every class seeds >= 1.
-  it('favoredEnemyUses: exact-level row value, floor 1 on 0/miss, un-Ranger-gated quirk', () => {
+  // fix#346 (#1532): Ranger-gated (was the reported QUIRK — every class
+  // seeded >= 1). Gate mirrors the warPriest idiom of fix#336S (:276):
+  // `isRanger ? formula : 0`. Old quirk row 'Fighter seeds floor 1'
+  // flipped honestly to the gate arm Fighter -> 0.
+  it('favoredEnemyUses: Ranger gate (warPriest idiom), exact-level row value, floor 1 on 0/miss', () => {
     const ranger = (classLevels) => basePlayerStats({ class: { name: 'Ranger', class_levels: classLevels, major: {}, subclass: {} } });
     const rows = [
       ['ranger lv5 row favored_enemy 2', ranger([{ level: 5, favored_enemy: 2 }]), { current: 2, max: 2 }],
       ['ranger lv5 row favored_enemy 0 -> floor 1', ranger([{ level: 5, favored_enemy: 0 }]), { current: 1, max: 1 }],
-      ['lv5 char, level-3 row only -> exact-match miss, floor 1', basePlayerStats({ level: 5, class: { name: 'Ranger', class_levels: [{ level: 3, favored_enemy: 2 }], major: {}, subclass: {} } }), { current: 1, max: 1 }],
-      ['QUIRK: Fighter seeds floor 1 too (class-ungated)', basePlayerStats({ class: { name: 'Fighter' } }), { current: 1, max: 1 }],
+      ['ranger lv5 char, level-3 row only -> exact-match miss, floor 1', basePlayerStats({ level: 5, class: { name: 'Ranger', class_levels: [{ level: 3, favored_enemy: 2 }], major: {}, subclass: {} } }), { current: 1, max: 1 }],
+      ['GATE ARM: Fighter seeds 0 (was QUIRK floor 1 — flipped fix#346)', basePlayerStats({ class: { name: 'Fighter' } }), { current: 0, max: 0 }],
+      ['GATE ARM: Wizard with a favored_enemy-bearing row -> 0', basePlayerStats({ class: { name: 'Wizard', class_levels: [{ level: 5, favored_enemy: 4 }], major: {}, subclass: {} } }), { current: 0, max: 0 }],
+      ['GATE ARM: Cleric seeds 0', basePlayerStats({ class: { name: 'Cleric' } }), { current: 0, max: 0 }],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['favoredEnemyUses'], expected, label);
   });
@@ -372,7 +399,9 @@ describe('computeTrackedResources — additional seed lanes', () => {
     // No shared references anywhere: twins (arcaneWardHp/Max, keystone
     // focus/ki) are separate objects, so a later consume can split them.
     expect(new Set(pools).size).toBe(pools.length);
-    expect(result.darkOnesLuckUses).toEqual({ current: 4, max: 4 });
+    // fix#346: fixture is rules '5e' — Dark One's seed is exactly 1 (was
+    // max(1,CHA)=4 under the old both-rulesets shape; flipped honestly).
+    expect(result.darkOnesLuckUses).toEqual({ current: 1, max: 1 });
     expect(result.arcaneWardMax).toEqual({ current: 12, max: 12 });
   });
 });

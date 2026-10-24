@@ -30,7 +30,7 @@ import { grantInfernalWound } from '../../services/rules/features/infernalWoundS
 const SECONDARY_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 
 function syncListenerPromptFilters(detail, pending, campaignName) {
-    const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts');
+    const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName); // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198 — reader is arity-2 (useRuntimeState.js:63), scope = SSE-mirrored active-campaign store until #1520
     const prompts = Array.isArray(listenerPrompts) ? listenerPrompts : [];
     const filteredPrompts = prompts.filter(id => id !== detail.promptId);
     if (filteredPrompts.length === prompts.length) return;

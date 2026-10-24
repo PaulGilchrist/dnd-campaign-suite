@@ -314,11 +314,17 @@ function ReactionModals({ modalState, playerStats, campaignName, mapName, charac
     );
 }
 
-function renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack }) {
+// fix#344(a): the hit chip dispatches through the SAME SP-109 gate the canonical
+// paths use — isSlowed/refuseSlowedReaction (:456-469, threaded in via props :878-879,
+// name-cell precedent :345, handleReactionClick precedent :478-481). cannotAct folds
+// silently exactly like canonical handleReactionClick:472. Reuse, no reimplementation.
+function renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack, isSlowed, refuseSlowedReaction }) {
     if (autoHit) return <div></div>;
     if (isSpellAtk) {
         if (!hasAttackType) return <div></div>;
         return <div className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
+            if (cannotAct) return;
+            if (isSlowed()) { refuseSlowedReaction(spell.name); return; }
             const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: null, saveType: null, saveSuccess: null, damage: resolvedDamage, damageType };
             rollAttack(attackItem.name, attackItem.hitBonus, { forcedMode: undefined });
         }}>{signFormatter.format(playerStats.spellAbilities?.toHit)}</div>;
@@ -341,9 +347,12 @@ function ReactionSpellRow({ spell, playerStats, cannotAct, rollAttack, gateMetam
         }}>{spell.name}</div>
         <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
         <div>{spell.range}</div>
-        {renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack })}
+        {renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack, isSlowed, refuseSlowedReaction })}
         <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
             if (cannotAct) return;
+            // fix#344(a): SP-109 gate parity with the name cell above — the damage chip
+            // routes through the same isSlowed/refuseSlowedReaction gate, refused loudly.
+            if (isSlowed()) { refuseSlowedReaction(spell.name); return; }
             // SINGLE ENTRY POINT for reaction spell casting:
             // gateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
             // NEVER call reactionCastAction, castAction, or executeSpellCast directly from JSX onClick handlers.

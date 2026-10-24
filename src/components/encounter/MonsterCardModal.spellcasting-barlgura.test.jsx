@@ -14,8 +14,8 @@
 // Entangle REMAINS advisory BY DESIGN: zone carve-out (area_of_effect cube 20,
 // MA-0003/CLA-325 — no zone-consumer engine, MA-0348 report precedent).
 // Generic lanes cited, not duplicated: exhausted spend + spell-named refusal
-// spellcasting.test.jsx:281-302, 2/Day spend×2 + third refusal + At Will
-// advisory spellcasting.test.jsx:522-548/:561, badge counter shape
+// spellcasting.test.jsx:282-303, 2/Day spend×2 + third refusal + At Will
+// advisory spellcasting.test.jsx:512-540/:551, badge counter shape
 // ability-save-uses.test.jsx:127, no-target refusal builder bytes
 // MonsterCardHelpers.usage.test.js:41, modal unarmed-save press owner
 // ma1150-merfolk-wavebender:197. DC arithmetic removed — row save_dc byte
@@ -199,7 +199,7 @@ describe('MA-0362 Barlgura Spellcasting — adjudicated PK save-leg, DC 13, no "
     expect(spend.description).toMatch(/1\/Day use spent/);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Phantasmal Killer': 1 });
 
-    // Exhausted-refuse shape owner spellcasting.test.jsx:281-302 — this pins
+    // Exhausted-refuse shape owner spellcasting.test.jsx:282-303 — this pins
     // only that THIS row's parsed "1/Day Each:" header gates live.
     await act(async () => { fireEvent.click(chip); });
     await waitFor(() => expect(refusals('Phantasmal Killer').length).toBe(1));
@@ -209,7 +209,7 @@ describe('MA-0362 Barlgura Spellcasting — adjudicated PK save-leg, DC 13, no "
 
     // Negative guard (#775 pattern): no-save utility spells on THIS row must
     // not ride the save leg. 2/Day spend×2 + third-refuse shape owner
-    // spellcasting.test.jsx:522-548; badge bytes ability-save-uses:127.
+    // spellcasting.test.jsx:512-540; badge bytes ability-save-uses:127.
     await act(async () => { fireEvent.click(linkByText('Disguise Self')); });
     await act(async () => { fireEvent.click(linkByText('Invisibility')); });
     expect(rollSavingThrow).toHaveBeenCalledTimes(1);

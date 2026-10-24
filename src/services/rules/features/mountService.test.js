@@ -263,15 +263,34 @@ describe('mountRider', () => {
         if (preset) expect(runtimeStore.get(preset[0]).get('mountedBy')).toBe(preset[1]); // existing latch untouched
     });
 
-    it('quirk: rider is NOT validated against initiative — Ghost mounts with runtime state + success log but zero combatSummary POST (Mounted Strike leg silently dead)', async () => {
+    it('fix#351(c) rider absent from initiative: refused rider_not_in_initiative with ZERO writes and zero success log (phantom-mount quirk flipped)', async () => {
+        // #1348 flip of the old honest 'rider NOT validated' quirk pin: an off-
+        // board/absent rider used to get runtime mountName/mountSize + the mount's
+        // mountedBy latch + an ok:true success log while stampCombatSummaryRider
+        // silently rider-missed (phantom mount, Mounted Strike leg dead). Per the
+        // invisibilityService fix#349(a) validate-first reorder now mirrored in
+        // mountService.js, validation precedes EVERY write: refusal logs
+        // mount_refused and touches nothing.
         const res = await mountRider('Ghost', 'Pony', CAMPAIGN, 'Medium');
-        expect(res).toEqual({ ok: true, mountSize: 'Medium', advisory: ' Advisory: a mount should be at least one size larger than the rider (GM-advisory).' });
-        expect(runtimeStore.get('Ghost').get('mountName')).toBe('Pony');
-        expect(runtimeStore.get('Pony').get('mountedBy')).toBe('Ghost');
-        expect(storage.set).not.toHaveBeenCalled(); // stampCombatSummaryRider rider-miss aborts the whole POST
+        expect(res).toEqual({ ok: false, reason: 'rider_not_in_initiative' });
+
+        expect(loggedEntries).toEqual([{
+            type: 'automation',
+            automationType: 'mount_refused',
+            automationDetail: 'rider_not_in_initiative',
+            characterName: 'Ghost',
+            abilityName: 'Mount',
+            description: 'Ghost tried to mount Pony — refused (rider_not_in_initiative). Zero mount state written.',
+            timestamp: FROZEN_TS,
+        }]);
+        expect(loggedEntries.some(e => e.type === 'ability_use')).toBe(false); // no success log
+        expect(setRuntimeObject).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
         expect(setCombatSummaryCache).not.toHaveBeenCalled();
+        expect(runtimeStore.has('Ghost')).toBe(false);           // rider store never created
+        expect(runtimeStore.has('Pony')).toBe(false);            // mount latch never armed
         expect(combatSummary.creatures.find(c => c.name === 'Pony').mountedBy).toBeUndefined();
-        expect(loggedEntries[0].description).toBe('Ghost mounts Pony Advisory: a mount should be at least one size larger than the rider (GM-advisory).');
     });
 });
 

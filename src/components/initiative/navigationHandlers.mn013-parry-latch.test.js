@@ -6,7 +6,7 @@
 //          for player creatures (:131); non-wrap never reaches clearPlayerRoundLatches.
 // Cut with cites (covered elsewhere, do not re-test here):
 //   generic stamp/wrap machinery → #866 (navigationHandlers.active-creature-stamp.test.jsx)
-//   turn-start effects / majesty trackers / __initiative__ gate → base navigationHandlers.test.jsx :163/:203/:235
+//   turn-start effects / majesty trackers / __initiative__ gate → base navigationHandlers.test.jsx :163/:191/:211
 //   initiative-rolled clears → #864; _Vex_appliedTarget round latch → navigationHandlers.wm008-vex-latch.test.js
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createNextCreatureHandler } from './navigationHandlers.js';

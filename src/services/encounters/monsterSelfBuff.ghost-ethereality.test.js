@@ -9,7 +9,7 @@
 //
 // Maintainer trim: te `ethereal` registry bytes → golden owner
 // targetEffectDefinitions.test.js:108 (#1012); enlarged/invisible twin grant
-// copy → monsterSelfBuff.test.js:419 + sea-hag-illusory-appearance.test.js:196
+// copy → monsterSelfBuff.test.js:168-177 (twin builders) + sea-hag-illusory-appearance.test.js:196
 // (delete-citing owners, #1136). The injected activeTe fixture is gone — the
 // real registerTargetEffect/getActiveTargetEffect run on a store-faithful
 // runtime (#1137) so the honest double press arms and refuses off REAL

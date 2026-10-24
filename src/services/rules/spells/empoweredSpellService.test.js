@@ -40,6 +40,13 @@ vi.mock('../features/invisibilityService.js', () => ({
   endInvisibilityOnHostileAction: vi.fn(),
 }));
 
+// fix#345: LOWER-reroll refunds route through the canonical heal choke point
+// (applyHealing.js:8). REAL applyHealingToTarget is SYNCHRONOUS, resolving
+// { actualHeal, oldHp, newHp, maxHp } (hpModifier.js:52) — lane stubs it faithfully.
+vi.mock('../combat/applyHealing.js', () => ({
+  applyHealingToTarget: vi.fn(),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import {
@@ -60,6 +67,7 @@ import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyDamageToTarget } from '../combat/applyDamage.js';
+import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { endInvisibilityOnHostileAction } from '../features/invisibilityService.js';
 
 // ── REAL disk metamagic rows (public/data[.2024]/classes.json, Sorcerer) ──
@@ -394,14 +402,14 @@ describe('executeEmpoweredReroll — 5e arbitration', () => {
     expect(cloneDeep(lastEvent).rawDamage).toBe(12);
   });
 
-  it('new roll may be WORSE — negative delta is reapplied (must-use-new-rolls), SP still spent at SP=1 boundary, lowest-of-ties picks first index', async () => {
+  it('fix#345 FLIP (was: "negative delta is reapplied"): WORSE reroll refunds |delta| through the HEAL lane — the damage lane never sees a negative (applyDamage.js:985 fix#143 loud-refuse meant the reduction vanished); SP still spent at SP=1 boundary, lowest-of-ties picks first index', async () => {
     const parsed = { count: 3, sides: 6, modifier: 0 };
     const lastEvent = makeEvent({ damageFormula: '3d6', rolls: [6, 5, 5], rawDamage: 16 });
     parseExpression.mockReturnValue(parsed);
     getMaxSorceryPoints.mockReturnValue(5);
     getCurrentSorceryPoints.mockReturnValue(1);
     getCombatContext.mockResolvedValue({ round: 2, creatures: [{ name: 'Goblin' }] });
-    applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 20 });
+    applyHealingToTarget.mockReturnValue({ actualHeal: 4, oldHp: 16, newHp: 20, maxHp: 30 });
     stubDice([1]); // chaMod=1 rerolls only ONE of the two 5s — tie goes to earlier index
 
     const result = await executeEmpoweredReroll({
@@ -417,13 +425,18 @@ describe('executeEmpoweredReroll — 5e arbitration', () => {
     expect(result.popupState.result.damageDifference).toBe(-4);
     expect(result.popupState.currentSP).toBe(0); // boundary: 1 -> 0, spent honestly
     expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
-    expect(applyDamageToTarget).toHaveBeenCalledWith(
+    // NEGATIVE never enters the damage lane (pre-fix dispatched -4 here):
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    // refund lands once, positive, through the canonical heal choke point
+    // (damageRollback.js:76 rollbackDamage idiom):
+    expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+    expect(applyHealingToTarget).toHaveBeenCalledWith(
       { round: 2, creatures: [{ name: 'Goblin' }] },
-      'Goblin', -4, ['Fire'],
-      { campaignName: CAMPAIGN, characters: undefined, ignoreResistance: false, attackerName: 'Xander' },
+      'Goblin', 4, CAMPAIGN,
     );
-    // resolved finalDamage 0 fails the :161 guard — invisibility must stay intact
-    expect(result.popupState.result.targetCurrentHp).toBe(20); // awaited applyResult.newHp
+    // popup consumes the heal channel's newHp
+    expect(result.popupState.result.targetCurrentHp).toBe(20);
+    // a refund is not a hostile action — invisibility stays intact
     expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
   });
 

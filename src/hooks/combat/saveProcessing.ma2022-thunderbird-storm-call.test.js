@@ -19,13 +19,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
-import { rechargeUsageOf, monsterRechargeGate, rechargeActionKey } from '../../services/encounters/monsterRecharge.js';
+import { rechargeUsageOf, monsterRechargeGate } from '../../services/encounters/monsterRecharge.js';
 import { legendaryDelegateAction, legendaryActionCost } from '../../services/encounters/monsterLegendaryUses.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const THUNDERBIRD = monsters.find((m) => m.index === 'thunderbird');
-const STORM_CALL = THUNDERBIRD.legendary_actions[3];
-const STRIKE = THUNDERBIRD.actions.find((a) => a.name === 'Thunderstrike (Recharge 5-6)');
+const STORM_CALL = THUNDERBIRD.legendary_actions[3]; // brittle positional index noted — outside #1126's cited range, next-touch rec
 
 describe('MA-2022 disk fingerprint: Thunderbird Storm Call self-resolving save row', () => {
   it('RAW identity + own save fields authored + costs-2 name parse — delegates_to GONE (§204/§225 hijack dead)', () => {
@@ -60,17 +59,12 @@ describe('MA-2022 disk fingerprint: Thunderbird Storm Call self-resolving save r
     expect(monsterRechargeGate(STORM_CALL, { Thunderstrike: { recharged: false, threshold: 5 } })).toBeNull();
   });
 
-  it('master Thunderstrike stays byte-untouched (MA-2017 recharge twin intact)', () => {
-    expect(STRIKE.save_dc).toBe(24);
-    expect(STRIKE.save_type).toBe('Dexterity');
-    expect(STRIKE.damage_dice_primary).toBe('12d10');
-    expect(STRIKE.damage_type_primary).toBe('Lightning');
-    expect(STRIKE.recharge).toBe('5-6');
-    expect(STRIKE.dc_success).toBeUndefined(); // half-on-success RAW-correct on the master — pin its ABSENCE
-    expect(rechargeUsageOf(STRIKE)).toEqual({ threshold: 5 });
-    expect(rechargeActionKey(STRIKE)).toBe('Thunderstrike');
-    expect(monsterRechargeGate(STRIKE, { Thunderstrike: { recharged: false, threshold: 5 } }).available).toBe(false);
-  });
+    // master Thunderstrike byte re-drive (:63-72) dropped per rec #1126:
+    // DC24/DEX/12d10/Lightning/recharge 5-6/dc_success-absence/key+threshold
+    // + gate arithmetic OWNED verbatim by monsterRecharge.ma2017-
+    // thunderbird-thunderstrike.test.js :80-99 + whole-DB split :121 (same
+    // disk row). This lane's distinctive decoupling proof is the STORM_CALL
+    // gate-null leg above — never re-drive the master's numbers here.
 });
 
 // ── Live-lane unit: saveProcessing NPC-inline branch driven from the disk row's OWN

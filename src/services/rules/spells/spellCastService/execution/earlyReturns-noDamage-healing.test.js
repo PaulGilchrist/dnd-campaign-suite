@@ -609,7 +609,7 @@ describe('executeSpellCast — noDamage first-chain tail (:316-320): passThrough
   }
 });
 
-describe('executeSpellCast — noDamage tail arms after the :341 Healing-Word fire: protections (:345-347), Remove Curse (:351-355), Resistance (:359) swallow undefined and never reach the damage lane', () => {
+describe('executeSpellCast — noDamage tail arms after the :341 Healing-Word fire: protections (:345-347) and Resistance (:359) swallow undefined; Remove Curse (:351-355) FORWARDS its popup (fix#358) — never reaches the damage lane', () => {
   beforeEach(resetAllMocks);
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (url) => ({
@@ -645,7 +645,7 @@ describe('executeSpellCast — noDamage tail arms after the :341 Healing-Word fi
       wordBefore: true,
     },
     {
-      spell: lightweight(diskRow(spells5e, 'Remove Curse')), lane: 'swallow', arm: mockRemoveCurse, tuple: posHeal,
+      spell: lightweight(diskRow(spells5e, 'Remove Curse')), lane: 'passThrough', arm: mockRemoveCurse, tuple: posHeal, // fix#358 (#1459): hub remove-curse leg FORWARDS value — pre-fix this lane swallowed undefined (the bare { handled:true } half of the DOUBLE-DISCARD)
       before: [mockGenericAutomation, ...FIRST_TAIL, ...MASS_ARMS, mockProtectionFromEnergy, mockProtectionFromPoison],
       after: [mockResistance],
       order: [...MASS_ARMS, triggerHealingWord, mockProtectionFromEnergy, mockProtectionFromPoison, mockRemoveCurse, triggerWildMagicSurge],

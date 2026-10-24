@@ -133,9 +133,10 @@ vi.mock('../automation/common/choiceStorage.js', () => ({
   ),
 }))
 
-// Runtime store mock keyed on the triple as SENT (factory :122/:128/:162 pass
-// campaignName 3rd; production getRuntimeValue is 2-arity and drops it — quirk
-// reported in header, census pins bytes as sent).
+// Runtime store mock keyed on (characterKey propertyName) — the PRODUCTION shape
+// (useRuntimeState.js:63 is arity-2; factory :122/:128/:162 thread campaignName as
+// channel vocabulary per fix#339/#153 — arg is recorded in the call census but cannot
+// scope resolution until the #1520 campaign-scoped store lands).
 const runtimeStore = new Map()
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((name, key) => runtimeStore.get(`${name}:${key}`) ?? null),
@@ -389,6 +390,26 @@ describe('rulesFactory', () => {
     // un-gated resistance passive ignores both gates
     const ungated = await callFactory(summary({ automation: { passives: [{ type: 'resistance', name: 'Other', damageTypes: ['Acid'] }] } }))
     expect(ungated.resistances).toEqual(['5e-lane-resistance', 'Acid'])
+  })
+
+  it('T7b fix#339 scope arm: gate reads are campaign-blind — campaign-prefixed ghost keys stay closed, the threaded arg never scopes resolution', async () => {
+    const STORM = { type: 'resistance', name: 'Stormborn', damageTypes: ['Cold'] }
+    // Ghost bytes in the #1520 triple-mock key space do NOT open the gate —
+    // the arity-2 reader (useRuntimeState.js:63) resolves (name, key) only.
+    runtimeStore.set('test-campaign:Test_Hero:wrathOfTheSeaActive', true)
+    const ghost = await callFactory(summary({ automation: { passives: [STORM] } }))
+    expect(ghost.resistances).toEqual(['5e-lane-resistance'])
+    // Real production-shape write resolves regardless of the summary campaignName
+    // byte — scope is the SSE-mirrored active campaign, not the argument — while
+    // the call census records the threaded channel vocabulary (fix#153/#339).
+    runtimeStore.clear()
+    runtimeStore.set('Test_Hero:wrathOfTheSeaActive', true)
+    const swapped = await callFactory(summary({ campaignName: 'other-campaign', automation: { passives: [STORM] } }))
+    expect(swapped.resistances).toEqual(['5e-lane-resistance', 'Cold'])
+    expect(getRuntimeValue.mock.calls).toEqual([
+      ['Test_Hero', 'wrathOfTheSeaActive', 'test-campaign'],
+      ['Test_Hero', 'wrathOfTheSeaActive', 'other-campaign'],
+    ])
   })
 
   it('T8 resistance merges: resistance + passive_immunity legs append in source order, deduped against existing bytes', async () => {

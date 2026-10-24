@@ -241,17 +241,43 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
     // Wild Magic Surge: expire effects with "start of your next turn" duration
     await expireWildMagicSurgeEffects(activeName, campaignName, 'start of your next turn');
 
+    // fix#356(a): single-authoritative-writer latch for currentHitPoints.
+    // The typed regenerate row and the spell-buff tick below both heal the SAME
+    // RAW event — public/data/spells.json + public/data/2024/spells.json
+    // Regenerate: "the target regains 1 hit point at the start of each of its
+    // turns" (automation.healExpression "1" both editions). The collector emits
+    // the disk-expression owner (automation/turnStartEffects.js:92-98,
+    // healExpression from disk); the tick at the old :252-255 re-tick'd a flat
+    // 1 onto the same invocation, paying +expression AND +1 per turn. Adjudicated
+    // by what each write REPRESENTS (:425 eval(effect.healExpression, default 1)
+    // === the disk start-of-turn heal; :526 `const healAmount = 1` === the same
+    // heal restated flat): the expression owner is authoritative; the sibling
+    // skips if already written this turn. Latch idiom reused from the house
+    // once-per-turn round-stamp (expeditiousRetreatDashHandler.js:66-69
+    // `usedRound === currentRound`), scoped to this invocation because callers
+    // already round-gate this function (navigationHandlers turnStartGateKey
+    // `${round}:${name}` / sseHandlers applyTurnStartPass, CLA-350 note :453-456).
+    // Pure turn-seam flag — no clock.
+    let regenerateExpressionHealLanded = false;
     for (const effect of turnStartEffects) {
         const handler = TURN_START_HANDLERS[effect.type];
         if (handler) {
             const result = handler(activeName, playerStats, effect, campaignName, characters);
-            if (result) await result;
+            if (result) {
+                const outcome = await result;
+                if (effect.type === 'regenerate_turn_start_heal' && outcome === true) {
+                    regenerateExpressionHealLanded = true;
+                }
+            }
         }
     }
 
-    // Check for regenerate buff (not tied to turnStartEffects - it's a spell buff)
+    // Regenerate spell-buff FALLBACK tick — cast lanes stamp regenerateActive
+    // without a typed row (spellCastService/execution/helpers.js:538,
+    // regenerateHandler.js:154); those targets still owe the disk 1 HP/turn.
+    // fix#356(a): skipped when the expression owner already wrote this turn.
     const regenerateActive = getRuntimeValue(activeName, 'regenerateActive', campaignName);
-    if (regenerateActive) {
+    if (regenerateActive && !regenerateExpressionHealLanded) {
         await applyRegenerateBuffHeal(activeName, playerStats, campaignName);
     }
 
@@ -418,6 +444,12 @@ function applyUseMagicDeviceTurnStart(_activeName, _playerStats, _effect, _campa
     // This turn start handler is a no-op placeholder for future state management.
 }
 
+// fix#356(a): authoritative single writer of the disk regenerate expression at
+// the turn seam (spells.json automation.healExpression via collector
+// automation/turnStartEffects.js:92-98). Returns true when its
+// currentHitPoints write lands so applyTurnStartEffects can skip the flat-1
+// spell-buff tick for the same RAW event ("regains 1 hit point at the start
+// of each of its turns").
 async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, campaignName) {
     const regenerateActive = getRuntimeValue(activeName, 'regenerateActive', campaignName);
     if (!regenerateActive) return;
@@ -436,6 +468,7 @@ async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, cam
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
+    return true;
 }
 
 // CLA-350 Survivor (Champion Fighter 18, 5e + 2024). Disk law, verbatim
@@ -522,6 +555,15 @@ async function applyAuraOfLifeTurnStartHeal(activeName, playerStats, effect, cam
     }).catch((e) => { console.error('[auraOfLife] Error:', e); });
 }
 
+// fix#356(a): FALLBACK tick only — pays the disk 1 HP/turn when the cast lane
+// stamped regenerateActive without a regenerate_turn_start_heal row
+// (spellCastService/execution/helpers.js:538, regenerateHandler.js:154).
+// When the typed row ran this invocation the expression owner already paid the
+// same RAW event and the caller's latch skips this — one write per turn.
+// (Sibling currentHitPoints writers :314/:480/:513 stay additive BY DESIGN:
+// Elder Champion / Survivor / Aura of Life are distinct disk events with
+// distinct gates — same-turn overlap is legitimate multi-source healing, not
+// a double-write of one event.)
 async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {
     const healAmount = 1;
     const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);

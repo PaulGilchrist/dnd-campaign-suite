@@ -119,6 +119,20 @@ export async function mountRider(riderName, mountName, campaignName, riderSize) 
         await addEntry(campaignName, mountRefusalLog(riderName, `already_mounted_by_${mountedBy}`, mountName)).catch((e) => { console.error('[mountService] Error:', e); });
         return { ok: false, reason: 'already_mounted' };
     }
+    // fix#351(c) validate-first (#1388): the RIDER must be on the initiative
+    // card before ANY mount state commits — mirrors the invisibilityService
+    // fix#349(a) commit-ordering reorder (:20-28 "validation gates precede
+    // every write, ZERO write/log/state on BOTH legs — no half-baked state").
+    // Pre-fix only the mount was validated: an off-board/absent rider still
+    // armed rider-store mountName/mountSize (:127+), the mount-store mountedBy
+    // latch, AND the success log — while stampCombatSummaryRider silently
+    // returned null on the rider-miss (:93): ok:true phantom mount with no
+    // combatSummary isMounted row for mountedAndTargetSmaller to read.
+    const riderCreature = findCreature(campaignName, riderName);
+    if (!riderCreature) {
+        await addEntry(campaignName, mountRefusalLog(riderName, 'rider_not_in_initiative', mountName)).catch((e) => { console.error('[mountService] Error:', e); });
+        return { ok: false, reason: 'rider_not_in_initiative' };
+    }
     const mountSize = mountCreature.size || 'Medium';
     const advisory = buildMountAdvisory(mountCreature, riderSize);
 

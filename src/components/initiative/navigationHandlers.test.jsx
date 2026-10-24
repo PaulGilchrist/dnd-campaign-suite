@@ -15,9 +15,8 @@
 //
 // KEYDOWN ruling: the keydown listener attaches to window at Initiative.jsx:564 (container DOM
 // layer). navigationHandlers.js exports pure handler factories with no DOM access, so keydown
-// wiring can never be claimed in this factory-level file; container #865's forward-cite should
-// be re-homed to initiative-callbacks.test.jsx, which already mounts Initiative and owns its
-// window-event listeners (reported, not implemented — out of scope here).
+// wiring can never be claimed in this factory-level file; re-homed to
+// initiative-callbacks.test.jsx — EXECUTED fix#362 (window keydown navigation describe).
 //
 // Cited-face map (canonical assertion bytes preserved byte-intact; old → new line):
 //   :158 → 158  _cunningStrikeCostUsed NOT reset on non-wrap steps
@@ -341,7 +340,7 @@ describe('navigationHandlers.js', () => {
             expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Alice', expect.any(Object), campaignName, baseCharacters);
             expect(setRuntimeStateTick).toHaveBeenCalled();
             // Previous-lane quirk: rewind re-arms majesty trackers on EVERY step,
-            // unlike next where they are round-wrap-only (:203 canonical seam above).
+            // unlike next where they are round-wrap-only (:191 canonical seam above).
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Alice', campaignName, 1);
             // BUG CLA-307: rewinding never runs the turn-END condition removal pass.
             expect(expirations.applyTurnEndConditionRemoval).not.toHaveBeenCalled();

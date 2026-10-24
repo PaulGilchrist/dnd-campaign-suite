@@ -6,10 +6,21 @@ import { isDistanceInRange } from '../../rules/combat/rangeCheck.js';
 function endWardingBond(targetName, casterName, campaignName, reason) {
     const rawTargetBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName);
     const targetBuffs = Array.isArray(rawTargetBuffs) ? rawTargetBuffs : [];
-    setRuntimeValue(targetName, 'activeBuffs', targetBuffs.filter(b => b.effect !== 'warding_bond'), campaignName);
+    // fix#352(e): fire-and-forget RETAINED (fix#349(d) ruling — no awaits
+    // added); the CLASS owed loud-CATCH arms per the precedent bytes at
+    // relentlessRageService.js:113-114 ('setRuntimeValue(...).catch((e) => {
+    // console.error(...); })'). Wrapped in Promise.resolve because the real
+    // store core answers creature-key writes with UNDEFINED (useRuntimeState
+    // .js:97-98 valuesEqual 'return;' and the no-return fall-through at the
+    // function's end) — bare .catch on undefined throws TypeError; the store
+    // core is off-limits, so the arm lives here. Store-reject loud-vs-
+    // stranded-store honesty per #1428.
+    Promise.resolve(setRuntimeValue(targetName, 'activeBuffs', targetBuffs.filter(b => b.effect !== 'warding_bond'), campaignName))
+        .catch((e) => { console.error('[wardingBond] target activeBuffs store reject:', e); });
     const rawCasterBuffs = getRuntimeValue(casterName, 'activeBuffs', campaignName);
     const casterBuffs = Array.isArray(rawCasterBuffs) ? rawCasterBuffs : [];
-    setRuntimeValue(casterName, 'activeBuffs', casterBuffs.filter(b => b.effect !== 'warding_bond'), campaignName);
+    Promise.resolve(setRuntimeValue(casterName, 'activeBuffs', casterBuffs.filter(b => b.effect !== 'warding_bond'), campaignName))
+        .catch((e) => { console.error('[wardingBond] caster activeBuffs store reject:', e); });
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: casterName,
@@ -48,7 +59,9 @@ function shareWardingBondDamage({ casterName, casterCreature, casterIsPlayer, ca
     // casterHp - sharedDamage on negative input ADDED HP uncapped by :31-33 maxHp).
     const newHp = Math.max(0, casterHp - sharedDamage);
     if (casterIsPlayer) {
-        setRuntimeValue(casterName, 'currentHitPoints', newHp, campaignName);
+        // fix#352(e): loud-CATCH arm (see endWardingBond :9-13 for rationale).
+        Promise.resolve(setRuntimeValue(casterName, 'currentHitPoints', newHp, campaignName))
+            .catch((e) => { console.error('[wardingBond] caster currentHitPoints store reject:', e); });
     } else {
         casterCreature.currentHp = newHp;
     }
@@ -76,7 +89,30 @@ function shareWardingBondDamage({ casterName, casterCreature, casterIsPlayer, ca
         abilityName: 'Warding Bond',
     }).catch((e) => { console.error("[wardingBond] Error:", e); });
     if (concentration && sharedDamage > 0) {
-        concentration.dc = Math.max(10, Math.floor(sharedDamage / 2));
+        const newDc = Math.max(10, Math.floor(sharedDamage / 2));
+        if (casterIsPlayer) {
+            // fix#349 #1425 store-first: clone-write + setRuntimeValue — the
+            // canonical persist idiom, sibling sleetStormHandler.js:219-224
+            // (read → Array-safe copy → mutate the COPY → setRuntimeValue
+            // (casterName, key, copy, campaignName), fire-and-forget unawaited).
+            // Pre-fix :79 mutated the store-reachable LIVE concentration object
+            // with no write-back: no disk persist, no SSE broadcast — silent
+            // drift between clients. NPC caster keeps the in-place combatSummary
+            // mutation, canonical at its sibling applyDamage.js:903-911
+            // (handleSummonVanishAndConcentrationDc: "Mutates combatSummary in
+            // place — the combatSummaryChanged persist below writes"). Fire-and-
+            // forget RETAINED (siblings unawaited; AGENTS.md: setRuntimeValue
+            // need not be awaited). Race stated: another client reading the dc
+            // before the POST flush + SSE echo sees the pre-damage dc — the
+            // same optimistic-write window every unawaited setRuntimeValue lane
+            // carries; fix#352(e) CLOSED the no-catch policy (#1428) on this
+            // write with a loud-CATCH arm below — fire-and-forget RETAINED,
+            // no await added (fix#349(d) ruling).
+            Promise.resolve(setRuntimeValue(casterName, 'concentration', { ...concentration, dc: newDc }, campaignName))
+                .catch((e) => { console.error('[wardingBond] caster concentration store reject:', e); });
+        } else {
+            concentration.dc = newDc;
+        }
     }
     // RAW: the bond ends when the caster drops to 0 hit points.
     if (newHp <= 0) {

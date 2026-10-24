@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
+import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js'
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
 import { executeEmpoweredReroll } from '../../services/rules/spells/empoweredSpellService.js'
 import { getManeuversForRules, getSuperiorityDice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js'
@@ -191,6 +192,22 @@ export async function handleEmpoweredSpell(playerStats, campaignName, characters
     return null;
 }
 
+// fix#345: settle a signed reroll delta ("You must use the new rolls." —
+// empoweredSpellService.js:261/:263 REPLACE semantics, implemented post-settle as a
+// delta vs the already-applied rawDamage). A HIGHER reroll = extra damage owed
+// to the DAMAGE lane (mirror choose-higher sibling handleSavageAttackerChoice:325);
+// a LOWER reroll = refund of over-applied damage owed back through the HEAL lane —
+// the damage lane loud-refuses negatives (applyDamage.js:985 fix#143), so refunds
+// mirror the canonical rollback idiom damageRollback.js:76/:323 (applyHealingToTarget).
+// Zero stays a verbatim no-op (fix#143 zero-preserved contract).
+function settleRerollDelta({ combatSummary, damageDifference, targetName, damageTypes, popupHtml, campaignName, characters, playerName }) {
+    if (damageDifference > 0) {
+        applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Piercing'], { campaignName, characters, ignoreResistance: false, attackerName: playerName });
+    } else if (damageDifference < 0) {
+        applyHealingToTarget(combatSummary, targetName, -damageDifference, campaignName);
+    }
+}
+
 export async function handlePuncture({ playerStats, campaignName, characters, popupHtml, setPopupHtml, punctureData }) {
     if (!playerStats || !campaignName || !punctureData) return null;
     
@@ -205,11 +222,9 @@ export async function handlePuncture({ playerStats, campaignName, characters, po
     if (!combatSummary || !targetName) return null;
 
     const damageDifference = newRolls.reduce((sum, r) => sum + r, 0) + (popupHtml?.modifier || 0) - rawDamage;
-    
-    if (damageDifference !== 0) {
-        applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Piercing'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
-    }
-    
+
+    settleRerollDelta({ combatSummary, damageDifference, targetName, damageTypes, popupHtml, campaignName, characters, playerName });
+
     await setRuntimeValue(playerName, usedKey, true, campaignName);
     
     await addEntry(campaignName, {

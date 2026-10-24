@@ -10,10 +10,10 @@
 // no-dc At Will utility spells stay advisory; unarmed presses refuse with
 // zero spend via the MA-0049 guard (refuseUnarmedMonsterSaveCast rides the
 // lifted routesToSave, MonsterCardModal.jsx:2578).
-// Generic lanes cited, not duplicated: badge shape spellcasting.test.jsx:275,
-// exhausted 1/Day spend + spell-named refusal spellcasting.test.jsx:281-302,
-// At Will repeat/null store spellcasting.test.jsx:317, zone-save advisory
-// (Gust of Wind — NOT on this row, owner lane) spellcasting.test.jsx:195,
+// Generic lanes cited, not duplicated: badge shape spellcasting.test.jsx:276,
+// exhausted 1/Day spend + spell-named refusal spellcasting.test.jsx:282-303,
+// At Will repeat/null store spellcasting.test.jsx:318, zone-save advisory
+// (Gust of Wind — NOT on this row, owner lane) spellcasting.test.jsx:196,
 // no-target refusal builder bytes MonsterCardHelpers.usage.test.js:41,
 // modal unarmed-save press owner ma1150-merfolk-wavebender:197. Fabricated
 // Gust-of-Wind row test removed (row bytes invented; lane owned :195).
@@ -159,7 +159,7 @@ describe('MA-0348 MonsterCardModal Bandit Deceiver Spellcasting — lifted Hold 
     const holdPerson = linkByText('Hold Person');
     expect(holdPerson).toBeTruthy();
     expect(holdPerson.textContent).toMatch(/\(1\/Day · 1 left\)/);
-    // At Will cantrips stay bare (badge shape owner spellcasting.test.jsx:275).
+    // At Will cantrips stay bare (badge shape owner spellcasting.test.jsx:276).
     expect(linkByText('Minor Illusion').textContent).not.toMatch(/\/Day/);
 
     await act(async () => { fireEvent.click(holdPerson); });
@@ -179,7 +179,7 @@ describe('MA-0348 MonsterCardModal Bandit Deceiver Spellcasting — lifted Hold 
     await waitFor(() => expect(entriesOf('Hold Person').filter(e => e.type === 'ability_use').length).toBe(1));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Hold Person': 1 });
 
-    // Exhausted-refuse shape owned by spellcasting.test.jsx:281-302 — this
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:282-303 — this
     // pins only that THIS row's parsed "1/Day Each:" header gates live.
     await act(async () => { fireEvent.click(linkByText('Hold Person')); });
     await waitFor(() => expect(refusals('Hold Person').length).toBe(1));
@@ -189,7 +189,7 @@ describe('MA-0348 MonsterCardModal Bandit Deceiver Spellcasting — lifted Hold 
 
     // Negative guard for the MA-0348 lift predicate: a no-dc, no-condition
     // At Will spell on THIS row must not ride the save leg (ungated repeat
-    // lane owner spellcasting.test.jsx:317).
+    // lane owner spellcasting.test.jsx:318).
     await act(async () => { fireEvent.click(linkByText('Disguise Self')); });
     await waitFor(() => expect(entriesOf('Disguise Self').length).toBe(1));
     expect(rollSavingThrow).toHaveBeenCalledTimes(1);

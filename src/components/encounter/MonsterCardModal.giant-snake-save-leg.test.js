@@ -1,7 +1,9 @@
 // @maintained-by-ai
-// Owner legs (keep stable): disk BY-name bytes L22-32 · save-chip ctx damage
-// fields L34-51. Predicate truth tables owned by secondary-save-transport
-// .test.js:111-128; salamander constrict bytes owned by ma1427 twin.
+// Owner legs (keep stable): disk BY-name bytes · save-chip ctx damage
+// fields adjudicating 3d6 Poison through the composite save-leg path.
+// Predicate truth tables owned by secondary-save-transport.test.js (it.each
+// :303-312); this row's predicate satisfaction is covered transitively by
+// the save-chip leg below. Salamander constrict bytes owned by ma1427 twin.
 // MA-0816: Giant Poisonous Snake Bite — save_leg was rolling the attack
 // primary dice ("1d4 + 4" Piercing) because the row lacked damage_dice_secondary,
 // so saveLegCarriesSecondaryDamage was false and resolveSaveLegDamageFields
@@ -14,7 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { buildAbilitySaveRollContext, isCompositeAttackSaveRow, saveLegCarriesSecondaryDamage } from './MonsterCardModal.jsx';
+import { buildAbilitySaveRollContext } from './MonsterCardModal.jsx';
 
 const getDamageTypesForAction = (action) => [action?.damage_type_primary || 'Piercing'];
 
@@ -31,8 +33,6 @@ describe('MA-0816 giant-poisonous-snake Bite — save-leg secondary data', () =>
         expect(snakeRow.damage_dice_secondary).toBe('3d6');
         expect(snakeRow.damage_type_secondary).toBe('Poison');
         expect(snakeRow.save_effect.includes('3d6')).toBe(true);
-        expect(isCompositeAttackSaveRow(snakeRow)).toBe(true);
-        expect(saveLegCarriesSecondaryDamage(snakeRow)).toBe(true);
     });
 
     it('save chip adjudicates 3d6 Poison, NOT the attack primary "1d4 + 4"', () => {

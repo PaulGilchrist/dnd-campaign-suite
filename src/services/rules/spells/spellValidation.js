@@ -142,6 +142,14 @@ async function extractSpellsFromDescription(description, result, version = '5e')
   }
 }
 
+// Shared description-shape coercion (fix#342(b)): disk prose arrives either as a string
+// or as an array of prose blocks (5e feats.json BY-name: Magic Initiate 3 elements,
+// Actor/Alert/Athlete 1 each) — join arrays so BOTH shapes reach the identical
+// catalog-validated text parser instead of an array defeating a string includes-gate.
+function joinDescription(description) {
+  return Array.isArray(description) ? description.join(' ') : (description || '');
+}
+
 /**
  * Checks if a background grants any spells
  * @param {object} backgroundData - The background data object
@@ -158,8 +166,7 @@ async function extractBackgroundSpells(backgroundData, version = '5e') {
   // Check features/traits for spell-granting abilities
   const features = backgroundData.features || backgroundData.traits || [];
   for (const feature of features) {
-    const desc = Array.isArray(feature.description) ? feature.description.join(' ') : (feature.description || '');
-    await extractSpellsFromDescription(desc, result, version);
+    await extractSpellsFromDescription(joinDescription(feature.description), result, version);
   }
   
   return result;
@@ -185,7 +192,15 @@ async function extractFeatSpells(featData, version = '5e') {
   }
   
   const featName = featData.name || '';
-  const desc = featData.description || '';
+  // fix#342(b): 5e feats.json descriptions ARE arrays; the old `featData.description || ''`
+  // kept the array, so the spell-text gate below became a strict element check
+  // ('cantrip'/'spell' vs whole prose blocks) that never matched -> ALL 5e feat spell-text
+  // parsing was bypassed (#1530 Q3). Coerce via joinDescription (same recipe the background
+  // extractor uses) so both shapes flow through the identical validated parse path.
+  // Over-grant audit (fix#342): re-enabled parsing admits ZERO new disk grants — no 5e feat
+  // text carries <em> markup or a catalog-matched 'know/learn X cantrip' capture; Magic
+  // Initiate's 'two' is refused loudly by the #1530 catalog filter.
+  const desc = joinDescription(featData.description);
   
   // Magic Initiate feat
   if (featName === 'Magic Initiate') {
@@ -282,11 +297,34 @@ async function applyFeatSpellSources(sources, formData, version) {
   }
 }
 
+// fix#342(a): RAW caster-detection law (#1530 Q1: isSpellcaster was TRUE
+// unconditionally for ANY class name, incl. off-disk 'Artificer' — UI over-admitted
+// non-casters). The oracle is the disk class spellcasting table BY-name:
+// public/data/classes.json Barbarian/Fighter/Monk/Rogue carry ZERO spellcasting rows
+// while Bard/Cleric/Druid/Paladin/Ranger/Sorcerer/Warlock/Wizard carry one at lv1;
+// public/data/2024/classes.json gates the four non-caster classes' rows behind
+// required_major. Recipe mirrors the sibling rules module spellLimits.js —
+// requiresOtherMajor (:85) + findSpellcastingInClass (:173): rows at-or-below the
+// character level; a required_major-gated row (2024) is in force only when the
+// character's chosen major matches; 5e subclass casters (Eldritch Knight/Arcane
+// Trickster, subclass rows lv3+) come from the class's subclasses[].class_levels.
+function spellcastingRowActive(row, level, version, majorName) {
+  const sc = row?.spellcasting;
+  if (!sc || row.level > level) return false;
+  return !(version === '2024' && sc.required_major && sc.required_major !== majorName);
+}
+
 async function applyClassSpellSource(sources, formData, version) {
   const classes = await loadClassData(version);
   const classData = classes.find(c => c.name === formData.class.name);
 
-  sources.class.isSpellcaster = true;
+  const level = parseInt(formData.level, 10) || 1;
+  const majorName = formData.class.major?.name || formData.class.subclass?.name || null;
+  const subclassRows = (classData?.subclasses || [])
+    .find(s => s.name === majorName || s.index === majorName?.toLowerCase())?.class_levels || [];
+
+  sources.class.isSpellcaster = [...(classData?.class_levels || []), ...subclassRows]
+    .some(row => spellcastingRowActive(row, level, version, majorName));
   sources.class.spellList = classData ? [formData.class.name] : [];
 }
 

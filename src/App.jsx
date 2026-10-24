@@ -68,14 +68,14 @@ function handlePipelineKeyEvent(event, campaignName) {
   setRuntimeObject(actualKey, event.data, campaignName, true);
 }
 
-function redispatchSaveResult(promptId, data) {
+function redispatchSaveResult(promptId, data, campaignName) {
   const pending = peekPendingSavePrompt(promptId);
   if (pending) {
     console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: re-dispatching save-result for "${promptId}" with merged pending data`, { pendingKeys: Object.keys(pending) });
     window.dispatchEvent(new CustomEvent('save-result', { detail: { ...pending, ...data } }));
     return;
   }
-  const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || [];
+  const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []; // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198 — reader is arity-2 (useRuntimeState.js:63), scope = this campaign's SSE-mirrored store (applyStoreUpdate :90-93) until #1520
   if (listenerPrompts.includes(promptId)) {
     console.debug(`[saveDebug] App.handleRuntimeEvent SSE saveResult: re-dispatching save-result for pending listener prompt "${promptId}"`);
     window.dispatchEvent(new CustomEvent('save-result', { detail: data }));
@@ -105,7 +105,7 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
     console.debug(`[saveDebug] App.handleRuntimeEvent SSE change received`, { key: event.key, storeKey, data: event.data });
   }
   if (storeKey.startsWith('saveResult-') && event.data.promptId) {
-    redispatchSaveResult(event.data.promptId, event.data);
+    redispatchSaveResult(event.data.promptId, event.data, campaignName);
   }
   if ('biPrompt' in event.data) {
     pendingPromptIdRef.current = event.data.biPrompt?.promptId || null;

@@ -86,6 +86,11 @@ describe('turnState canon math (L5-001, §18 D1/D2)', () => {
         ['junk numerics floor to 0',
             { actionsUsed: 'x', bonusActionsUsed: NaN, reactionsUsed: 'x', movementUsedFeet: {} },
             { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0 }],
+        // #1070 fix#363: forged negative *Used values clamp to 0 (over-grant vector
+        // closed — Number(-5)||0 was -5, and -5 < cap would buy extra actions/reactions).
+        ['negative numeric *Used clamps to 0 (forged-store over-grant close)',
+            { actionsUsed: -5, bonusActionsUsed: -2, reactionsUsed: -1, movementUsedFeet: -100 },
+            { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0 }],
         ['truthiness on the two flags only', { hasMoved: 1, turnActive: 0 }, { hasMoved: true, turnActive: false }],
         ['junk reactionCap floors to 1 — unlimited is impossible', { reactionCap: 'lots' }, { reactionCap: 1 }],
         ['zero/negative caps floor to 1', { reactionCap: -2 }, { reactionCap: 1 }],

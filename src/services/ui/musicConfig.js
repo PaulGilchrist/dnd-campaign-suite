@@ -57,6 +57,23 @@ export const MOODS = [
 
 export const DEFAULT_VOLUME = 0.6;
 
+// fix#352(c): the shipped starter catalogue is immutable config — frozen deep
+// (track rows, tracks arrays, mood rows, then the MOODS array) so a consumer
+// mutation throws TypeError in strict ES-module scope instead of polluting the
+// catalogue for the whole session (stamp: catalogue entries are byte-law; the
+// only sanctioned personalization path is the per-campaign 'music' overrides
+// store, which builds NEW arrays via parseTrackList — consumer census:
+// MusicPlayer.jsx :45-51/:70-75/:96-97/:104-105/:127-128 are all read-only
+// .length/.map on getTracksForMood results; zero push/splice/index-write
+// sites repo-wide on returned arrays).
+for (const mood of MOODS) {
+  for (const track of mood.tracks) Object.freeze(track);
+  Object.freeze(mood.tracks);
+  Object.freeze(mood);
+}
+Object.freeze(MOODS);
+// DEFAULT_VOLUME is a primitive number — already immutable; no freeze needed.
+
 export function getMood(moodKey) {
   return MOODS.find(m => m.key === moodKey) || null;
 }
@@ -67,9 +84,15 @@ export function getMood(moodKey) {
  */
 export function getTracksForMood(moodKey, overrides) {
   const override = overrides && overrides[moodKey];
+  // Overrides are CALLER-owned runtime-store data: pass-through identity is
+  // pinned (musicConfig.test.js 'override arrays win by identity').
   if (Array.isArray(override) && override.length > 0) return override;
   const mood = getMood(moodKey);
-  return mood ? mood.tracks : [];
+  // fix#352(c): defensive COPY ([...spread] per the file/consumer idiom —
+  // MusicPlayer.jsx:114/:124 builds new arrays/spreads for every persist).
+  // Track rows are deep-frozen above, so the shallow copy is full isolation:
+  // neither the array nor its rows can be mutated through the returned ref.
+  return mood ? [...mood.tracks] : [];
 }
 
 /**

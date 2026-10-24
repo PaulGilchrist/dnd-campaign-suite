@@ -15,9 +15,10 @@
 // hand-rolled distance math lives here, so only the delegation boundary + the >=10 gate
 // in applyRangeBonus are pinned.
 // Quirk ledger (fresh scan, golden-pinned):
-//   - :21 cantrip gate reads spell.level only; upcast producer
-//     useSimpleSpellHandlers.js:168 stamps {level:slotLevel, baseLevel:0} -> upcast cantrip
-//     LOSES cantripRangeBonus here while computeBlessedStrikes:62 accepts baseLevel (T2/T4 pair).
+//   - fix#348(a) FIXED: :21 cantrip gate now mirrors computeBlessedStrikes :91
+//     (`spell.baseLevel === 0 || spell.level === 0`). Upcast producer
+//     useSimpleSpellHandlers.js:168 stamps {level:slotLevel, baseLevel:0} -> upcast
+//     cantrip KEEPS cantripRangeBonus (T2 row flipped from the honest MISS quirk).
 //   - fix#1469(b) :79/:95: null base no longer concatenates literally — appendBonusTerm
 //     logs console.error and returns the base unchanged (never interpolate raw null;
 //     callers still guarantee a formula via noSavePath early-return, module now guards too).
@@ -194,10 +195,14 @@ describe('computeRange — FT-087 Spell Sniper band arithmetic (damageCalculatio
       { label: 'leveled denied cantripRangeBonus', spell: CO24, metaCtx: {}, featEffects: { cantripRangeBonus: CANTRIP_BONUS }, target: at(200), expect: MISS('Out of range (200 ft > 180 ft)') },
       // same bonus, real cantrip: 30+300=330 -> 200 ft passes
       { label: 'cantrip gets cantripRangeBonus', spell: PS24, metaCtx: {}, featEffects: { cantripRangeBonus: CANTRIP_BONUS }, target: at(200), expect: {} },
-      // QUIRK: upcast producer useSimpleSpellHandlers.js:168 stamps {level:slotLevel, baseLevel:0} —
-      // computeRange:21 reads only spell.level, so the upcast cantrip LOSES the bonus
-      // (computeBlessedStrikes:62 accepts baseLevel — pin the asymmetry, reported as source quirk).
-      { label: 'upcast-cantrip shape loses cantripRangeBonus', spell: { ...PS24, level: 3, baseLevel: 0 }, metaCtx: {}, featEffects: { cantripRangeBonus: CANTRIP_BONUS }, target: at(200), expect: MISS('Out of range (200 ft > 60 ft)') },
+      // fix#348(a) FLIP of the honest quirk pin: upcast producer useSimpleSpellHandlers.js:168
+      // stamps {level:slotLevel, baseLevel:0} — computeRange:21 now accepts baseLevel (symmetric
+      // with computeBlessedStrikes :91), so the upcast cantrip KEEPS cantripRangeBonus
+      // (RAW: Fire Bolt disk row scales by damage_at_character_level, cantrip level not slot).
+      { label: 'upcast-cantrip shape keeps cantripRangeBonus', spell: { ...PS24, level: 3, baseLevel: 0 }, metaCtx: {}, featEffects: { cantripRangeBonus: CANTRIP_BONUS }, target: at(200), expect: {} },
+      // Falsifiability pair: a LEVELED spell wearing the same upcast shape {level:3, baseLevel:1}
+      // is NOT a cantrip — no baseLevel===0, no bonus (bound stays 90x2=180).
+      { label: 'leveled upcast shape still denied cantripRangeBonus', spell: { ...CO24, level: 3, baseLevel: 1 }, metaCtx: {}, featEffects: { cantripRangeBonus: CANTRIP_BONUS }, target: at(200), expect: MISS('Out of range (200 ft > 180 ft)') },
     ];
     for (const row of rows) {
       const before = cloneDeep(row.spell);
@@ -237,7 +242,7 @@ describe('computeBlessedStrikes — Wisdom-on-cantrip fold (damageCalculation.js
       { label: 'non-cantrip (Guiding Bolt lv1) skips before any read', spell: GB24, ps: cleric(5), chosen: 'Potent Spellcasting', formula: GB24.damage.damage_at_slot_level['1'], expect: '4d6', reads: 0 },
       { label: 'cantrip without damage (Spare the Dying) skips before any read', spell: SPD24, ps: cleric(5), chosen: 'Potent Spellcasting', formula: null, expect: null, reads: 0 },
       // upcast shape {level:3, baseLevel:0} (useSimpleSpellHandlers.js:168): baseLevel===0 IS honored here —
-      // counterpart of the computeRange:21 quirk row above.
+      // fix#348(a) made the computeRange:21 gate symmetric with this one (no longer a quirk pair).
       { label: 'upcast-cantrip shape keeps baseLevel gate', spell: { ...PS24, level: 3, baseLevel: 0 }, ps: cleric(3), chosen: 'Potent Spellcasting', expect: '1d12 + 3 [Blessed Strikes]', reads: 1 },
       // fix#1469(b): null formula logs once and passes through — pre-fix capture was
       // 'null + 5 [Blessed Strikes]' literal bytes (flipped honesty pin #1469)

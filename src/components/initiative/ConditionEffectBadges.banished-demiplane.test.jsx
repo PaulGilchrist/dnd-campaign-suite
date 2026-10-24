@@ -8,14 +8,14 @@
 // - Badge render mechanics / localhost gating / counts: CreatureBadge +
 //   ConditionEffectBadges.auras.test.jsx (#820).
 // - Wrong-target exclusion via findDirect: the generic machinery is covered
-//   by ConditionEffectBadges.control-spells.test.jsx:115-121 and
+//   by ConditionEffectBadges.control-spells.test.jsx:71-77 and
 //   auras.test.jsx:84-87 — banished_demiplane shares the identical
 //   findDirect shape (jsx:457), so no wrong-target pin here.
 // - Generic target_effect remove-click dispatch:
 //   ConditionEffectBadges.target-effect-removal.test.jsx:104-138 (tests
 //   'banishment' there; the banished_demiplane payload pin lives here).
 // - PC spell banishment permanent/concentration tooltips:
-//   ConditionEffectBadges.control-spells.test.jsx:180-195.
+//   ConditionEffectBadges.control-spells.test.jsx:143-159.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';

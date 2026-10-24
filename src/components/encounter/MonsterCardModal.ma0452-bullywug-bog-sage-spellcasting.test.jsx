@@ -13,11 +13,11 @@
 //
 // GENERIC legs cite-skipped (behavioral coverage lives in the spellcasting
 // family): cast-click logs / advisory records / row-DC-in-log →
-// MonsterCardModal.spellcasting.test.jsx:195/:403/:419, :639; save routing
-// with dc_success :226; 1/Day spend + second-cast refusal :281 (usage #571);
-// At Will ungated repeat casts :317; per-day counter on limited only :275;
-// extractSpellcastingSpellUses parsing :332/:340 + Cloud Giant tier split
-// :604; spell-attack seam routing (+bonus, isSpellDamage, never-save) →
+// MonsterCardModal.spellcasting.test.jsx:196/:377/:393, :601; save routing
+// with dc_success :227; 1/Day spend + second-cast refusal :282 (usage #571);
+// At Will ungated repeat casts :318; per-day counter on limited only :276;
+// extractSpellcastingSpellUses parsing :334/:341 + Cloud Giant tier split
+// :489; spell-attack seam routing (+bonus, isSpellDamage, never-save) →
 // MonsterCardModal.spell-attack.test.jsx:196/:331; no-armed-target refusal
 // :255; bone-naga save-pair byte-shape → ma0421-bone-naga-spellcasting.test.jsx:161.
 // Kept here: this monster's distinct row/spell bytes, the five-chip

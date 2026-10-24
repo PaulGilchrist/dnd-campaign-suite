@@ -252,7 +252,7 @@ describe('savePath.js — damageful AoE save path → saveAttackAoe payload + ov
       dcSuccess: 'half', // the half-damage-on-save key — exists on THIS popup, none on the condition popup (#1489)
       activeOverlay: null, // combat context is null → no overlay, no fetch
       metamagicCareful: false, // || false default byte (:142)
-      metamagicHeighten: undefined, // false || metaCtx?.metamagicHeighten (:143)
+      metamagicHeighten: false, // fix#358 (#1464) flip: strict boolean — !! folds false||undefined to false (was undefined pre-fix, :143)
       overchannelActive: false,
       overchannelUseCount: 0,
       overchannelSpellLevel: 3,

@@ -7,7 +7,7 @@
 //   player-only gating bytes (Majesty, Wrath of the Sea stay hidden on NPC cards)
 // NOT owned here (do not duplicate):
 //   removal dispatch payloads + non-localhost zero remove affordances → CreatureCard.badgeRemoval.test.jsx (#848)
-//   condition-break click :126 / concentration-break click :153 dispatch → CreatureCard.conditions.test.jsx
+//   condition-break click :121 / concentration-break click :149 dispatch → CreatureCard.conditions.test.jsx
 //   ConditionEffectBadges-hosted te badges → ConditionEffectBadges.* family (#820-#832)
 //   target-select / add-button / NPC-remove / HP / initiative faces → interactions + rendering + conditions siblings
 import { render, screen } from '@testing-library/react';

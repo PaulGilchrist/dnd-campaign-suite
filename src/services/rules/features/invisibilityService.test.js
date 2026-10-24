@@ -298,7 +298,7 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
     });
 
     it.each([null, undefined])(
-        'missing activeConditions (%s): logged TypeError aborts before latch clear; restRules-lane retry composes',
+        'missing activeConditions (%s): logged TypeError aborts with ZERO writes — validate-first (fix#349 #1382 flips the partial-removal pin); restRules-lane retry composes the FULL budget',
         (badValue) => {
             state.arm(CAMPAIGN, 'campaign', latchKey(TARGET), TARGET);
             state.arm(CAMPAIGN, TARGET, 'activeBuffs', [buff, SURVIVING_BUFF]);
@@ -307,15 +307,18 @@ describe.each(FAMILIES)('$label removal ($buffName)', ({
 
             expect(() => invoke(TARGET, CAMPAIGN)).toThrow(new Error(`Expected array, got ${badValue}`));
             expect(consoleSpy).toHaveBeenCalledWith('[invisibilityService] Missing array:', badValue);
-            // partial-write byte pin (#1360 class): buff strip already landed, latch STILL armed
-            expect(setRuntimeValue.mock.calls).toEqual([
-                [TARGET, 'activeBuffs', [SURVIVING_BUFF], CAMPAIGN],
-            ]);
+            // fix#349 validate-fails-no-mutation arm: the conditions-validate now
+            // PRECEDES the first store write (healService.js sibling refuse-shape,
+            // wardingBondService.js:36-43 family) — the old #1360 partial-write pin
+            // (buff strip landed, latch stayed armed) is retired: ABORT = ZERO writes.
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(state.peek(CAMPAIGN, TARGET, 'activeBuffs')).toEqual([buff, SURVIVING_BUFF]);
             expect(state.peek(CAMPAIGN, 'campaign', latchKey(TARGET))).toBe(TARGET);
             expect(addEntry).not.toHaveBeenCalled();
 
             // sequential strip composes (#1307/#1319): repair the store, retry via the
             // direct-call lane restRules-shortRest.js:413 / longRest.js:334 use
+            // — post-fix the retry pays the FULL removal budget (nothing was pre-spent)
             state.arm(CAMPAIGN, TARGET, 'activeConditions', ['invisible', 'blinded']);
             remove(TARGET, CAMPAIGN, 'target finished a rest');
 

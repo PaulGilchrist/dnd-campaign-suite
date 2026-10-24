@@ -4,7 +4,7 @@
 // conditionEffects.js adds te.value||10 to speedReduction, so the accumulator
 // guard builds the SAME label 'Speed -10' — dedupeByLabel first-wins keeps the
 // frozen_grip spec's badge (its §70 tooltip disambiguates). That collision is
-// this lane's canonical face, cited by #822 (old :47-63). Fixture shapes here
+// this lane's canonical face, cited by #822 (old :47-63, now :57-74). Fixture shapes here
 // mirror the real fold; storage.js is NOT imported by the component (dead mock
 // removed, REC #823). Generic first-wins machinery lives in common (#822),
 // click→store removal in the removal lanes (#825), wrong-target in #823.

@@ -136,10 +136,16 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
         expect(result.type).toBe('popup');
         expect(rollExpression).toHaveBeenCalledWith('2d8');
         expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
+        // fix#337S-LIVE(a): unscrambled contract options (applyDamage.js:1023) —
+        // campaign slot holds the campaign NAME string, characters slot the array,
+        // ignoreResistance floors at FALSE (resistance NOT bypassed), and the attacker
+        // name rides attackerName. Pre-fix bytes were {campaignName:[stats],
+        // characters:false, ignoreResistance:'TestHero'} — pinned-here honestly until flipped.
         expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Orc', 10, ['piercing'], {
-            campaignName: [stats],
-            characters: false,
-            ignoreResistance: 'TestHero',
+            campaignName: 'test-campaign',
+            characters: [stats],
+            ignoreResistance: false,
+            attackerName: 'TestHero',
         });
         // Full damage-roll log composition (payload of applyMissTurnedHitDamage).
         expect(damageLogEntries()).toEqual([
@@ -157,6 +163,45 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
                 finalDamage: 10,
             },
         ]);
+    });
+
+    it('AWAIT arm (fix#337S a): no damage log lands before applyDamageToTarget settles; finalDamage is the resolved read', async () => {
+        const stats = makePlayerStats();
+        mockLiveDamage(10);
+        let resolveApply;
+        vi.mocked(applyDamageToTarget).mockImplementationOnce(() => new Promise((resolve) => { resolveApply = resolve; }));
+        mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d8', damageType: 'piercing', targetName: 'Orc' });
+
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5 } });
+        const pending = handle(action, stats, 'test-campaign', 'map');
+        for (let i = 0; i < 20 && applyDamageToTarget.mock.calls.length === 0; i++) await Promise.resolve();
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        // Un-awaited (pre-fix) the truthy Promise would have logged finalDamage:
+        // undefined already — this zero-count while pending kills that byte.
+        expect(damageLogEntries()).toHaveLength(0);
+
+        resolveApply({ finalDamage: 7 });
+        const result = await pending;
+        expect(result.type).toBe('popup');
+        expect(damageLogEntries()).toEqual([
+            expect.objectContaining({ rollType: 'damage', targetName: 'Orc', total: 10, finalDamage: 7 }),
+        ]);
+    });
+
+    it('CATCH arm (fix#337S a): applyDamage rejection is caught loud, popup still lands, no damage log', async () => {
+        const stats = makePlayerStats();
+        mockLiveDamage(10);
+        vi.mocked(applyDamageToTarget).mockRejectedValueOnce(new Error('apply boom'));
+        mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d8', damageType: 'piercing', targetName: 'Orc' });
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5 } });
+        const result = await handle(action, stats, 'test-campaign', 'map');
+
+        expect(result.type).toBe('popup');
+        expect(spy).toHaveBeenCalledWith('[autoReroll] applyDamageToTarget failed:', expect.any(Error));
+        expect(damageLogEntries()).toHaveLength(0);
+        spy.mockRestore();
     });
 
     it('rolls the formula but applies nothing when damage total is 0', async () => {
@@ -217,9 +262,10 @@ describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonu
         expect(result.type).toBe('popup');
         expect(rollExpression).toHaveBeenCalledWith('1d8');
         expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Shade', 8, ['force'], {
-            campaignName: [stats],
-            characters: false,
-            ignoreResistance: 'TestHero',
+            campaignName: 'test-campaign',
+            characters: [stats],
+            ignoreResistance: false,
+            attackerName: 'TestHero',
         });
         expect(damageLogEntries()).toHaveLength(1);
         expect(damageLogEntries()[0]).toMatchObject({ characterName: 'TestHero', targetName: 'Shade', formula: '1d8' });
@@ -245,9 +291,10 @@ describe('autoRerollHandler - ally attack miss→hit damage payload (ranged-boos
         expect(rollExpression).toHaveBeenCalledWith('2d10');
         expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
         expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Demon', 12, ['radiant'], {
-            campaignName: [stats],
-            characters: false,
-            ignoreResistance: 'Ally',
+            campaignName: 'test-campaign',
+            characters: [stats],
+            ignoreResistance: false,
+            attackerName: 'Ally',
         });
         // Damage is logged under the ally, not the player who supplied the boost.
         expect(damageLogEntries()).toEqual([

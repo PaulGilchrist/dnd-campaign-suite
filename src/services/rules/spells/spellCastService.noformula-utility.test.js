@@ -53,17 +53,17 @@ import spells2024 from '../../../../public/data/2024/spells.json'
 /*                                                                    */
 /*  CONSUME-VS-DISCARD per row (#1458 sentinel-popup canon): swallow    */
 /*  rows (:75) resolve EXACTLY undefined (silent-null #1441 pinned per  */
-/*  row); forward rows (:74) wrap { automationPopup }; Tasha's is the   */
-/*  RAW-forward quirk row (triggerSpells.js:389 returns the service     */
-/*  payload UNWRAPPED — pinned res identity). Remove Curse is the #1404 */
-/*  :447 discard face: triggerRemoveCurse's return is discarded twice    */
-/*  (not captured at triggerSpells.js:447 AND { handled:true } carries   */
-/*  no value at index.js:354) — pinned with a sentinel; the CONSUMING   */
-/*  counterpart in this lane is the dispel fallback, consumed via the    */
-/*  window 'spell-result' side-channel (helpers.js:137) — positioned vs  */
-/*  #1404 triggerSpells:447 discard: hub-level gate-backstop cited      */
-/*  #1404 :244-251, pinned here at index.js:269-270 (null-target → zero  */
-/*  events).                                                              */
+/*  row); forward rows (:74) wrap { automationPopup }. Two quirks the  */
+/*  OLD header pinned are RETIRED by fix#358 (#1459): Tasha's RAW-      */
+/*  forward quirk row (triggerSpells.js :397-era unwrapped return) now */
+/*  wraps { automationPopup } per the faerie-sibling guard (:385-389),  */
+/*  and Remove Curse's #1404 :447 DOUBLE-DISCARD face is closed — the   */
+/*  host captured+wrapped at fix#353 (triggerSpells.js:463-467), the    */
+/*  hub now FORWARDS value (index.js fix#358), so both rows consume     */
+/*  'forward'. The CONSUMING counterpart pinned here stays the dispel   */
+/*  fallback via the window 'spell-result' side-channel (helpers.js:137 */
+/*  — hub-level gate-backstop cited #1404 :244-251, pinned at           */
+/*  index.js:269-270 null-target → zero events).                         */
 /*                                                                    */
 /*  Dead twins found in THIS lane (report + pin, never silently kept):   */
 /*  RAW disk heroism/longstrider-check: longstrider is CLEAN (no         */
@@ -324,7 +324,7 @@ const ROWS = [
   { spell: 'Stinking Cloud', span: ':311', rulesets: ['5e', '2024'], route: 'service', trigger: triggerStinkingCloud, shape: 'saveDc', consume: 'swallow' },
   { spell: 'Sleet Storm', span: ':312', rulesets: ['5e', '2024'], route: 'service', trigger: triggerSleetStorm, shape: 'saveDc', consume: 'swallow' },
   { spell: 'Faerie Fire', span: ':313', rulesets: ['5e', '2024'], route: 'service', trigger: triggerFaerieFire, shape: 'saveDc', consume: 'forward' },
-  { spell: "Tasha's Hideous Laughter", span: ':314', rulesets: ['2024'], route: 'service', trigger: triggerTashasHideousLaughter, shape: 'saveDc', consume: 'raw' },
+  { spell: "Tasha's Hideous Laughter", span: ':314', rulesets: ['2024'], route: 'service', trigger: triggerTashasHideousLaughter, shape: 'saveDc', consume: 'forward' }, // fix#358: raw-forward quirk retired — host wraps { automationPopup } per faerie template
   { spell: 'Imprisonment', span: ':315', rulesets: ['5e', '2024'], route: 'service', trigger: triggerImprisonment, shape: 'saveDc', consume: 'forward' },
   { spell: 'Heroism', span: ':316', rulesets: ['5e', '2024'], route: 'execute', arity: 5, action: (e) => ({ name: 'Heroism', spell: e, automation: { type: 'heroism' } }), consume: 'forward' },
   { spell: 'Holy Aura', span: ':317', rulesets: ['5e', '2024'], route: 'service', trigger: triggerHolyAura, shape: 'raw', consume: 'swallow' },
@@ -333,7 +333,7 @@ const ROWS = [
   { spell: 'Enhance Ability', span: ':320', rulesets: ['5e', '2024'], route: 'execute', arity: 5, action: (e, m) => ({ name: e.name, spell: e, automation: { type: 'enhance_ability', range: 'Touch' }, metaCtx: m }), consume: 'forward' },
   { spell: 'Protection from Energy', span: ':346', rulesets: ['2024'], route: 'execute', arity: 4, action: (e) => ({ name: 'Protection from Energy', spell: e, automation: e.automation ?? {} }), consume: 'swallow' },
   { spell: 'Protection from Poison', span: ':347', rulesets: ['5e', '2024'], route: 'execute', arity: 4, action: (e) => ({ name: 'Protection from Poison', spell: e, automation: e.automation ?? {} }), consume: 'swallow' },
-  { spell: 'Remove Curse', span: ':351', rulesets: ['5e', '2024'], route: 'service', trigger: triggerRemoveCurse, shape: 'raw', consume: 'swallow', dispelGate: true }, // #1404 :447 discard face
+  { spell: 'Remove Curse', span: ':351', rulesets: ['5e', '2024'], route: 'service', trigger: triggerRemoveCurse, shape: 'raw', consume: 'forward', dispelGate: true }, // fix#358: #1404 :447 DOUBLE-DISCARD completed — host wraps (fix#353), hub now forwards value
   { spell: 'Resistance', span: ':359', rulesets: ['5e', '2024'], route: 'execute', arity: 5, action: (e, m) => ({ name: 'Resistance', spell: e, automation: e.automation ?? {}, metaCtx: m }), consume: 'swallow' },
 ]
 
@@ -410,9 +410,7 @@ describe('executeSpellCast - noformula utility lane: no-damage-chain remainder s
     for (const row of ROWS) {
       const verb = row.consume === 'swallow'
         ? 'swallows the payload (handled:true discards, index.js:75/#1441 silent-null)'
-        : row.consume === 'raw'
-          ? 'forwards the service payload UNWRAPPED (triggerSpells.js:389 raw-return quirk)'
-          : 'forwards { automationPopup } (index.js:74)'
+        : 'forwards { automationPopup } (index.js:74)'
       it(`${row.spell} routes ${row.span} via ${row.route === 'execute' ? 'executeHandler' : 'feature service'} and ${verb} [${row.rulesets.join('+')}]`, async () => {
         for (const ruleset of row.rulesets) {
           vi.clearAllMocks()
@@ -453,9 +451,9 @@ describe('executeSpellCast - noformula utility lane: no-damage-chain remainder s
           }
 
           // Consume contract (#1404/#1441): swallow -> exactly undefined;
-          // forward -> wrapped; raw -> unwrapped identity.
+          // forward -> wrapped. The retired 'raw' (unwrapped identity) branch
+          // died with fix#358 (tasha host guard + hub remove-curse forward).
           if (row.consume === 'swallow') expect(res).toBeUndefined()
-          else if (row.consume === 'raw') expect(res).toBe(sentinel)
           else expect(res).toStrictEqual({ automationPopup: sentinel })
 
           // Duel side-route (triggerSpells.js:318) only on ray; silent on

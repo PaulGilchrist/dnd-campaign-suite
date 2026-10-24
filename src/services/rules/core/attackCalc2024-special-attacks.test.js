@@ -27,15 +27,24 @@
 //   as that file's :73 split records)
 // - Soulknife Psychic Blade rows → attackCalc2024-class-features.test.js:113-157
 // - Swift Quiver sheet rendering → CharBonusActions.swift-quiver.test.jsx
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
+import DISK_EQUIPMENT from '../../../../public/data/equipment.json';
 
 // Unavoidable mock only: SSE/runtime-backed combat summary.
 vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
   getCurrentCombatRound: vi.fn(() => 1),
 }));
+
+// Concentration is OFF by default every test: mockReturnValue persists across
+// tests in a file, and the Swift Quiver gate reads getCombatSummary on every
+// getAttacks call — without this reset, a concentration-returning test leaks
+// SQ rows into the Starry Form lane (ordering luck retired by fix#340).
+afterEach(() => {
+  vi.mocked(getCombatSummary).mockReturnValue(null);
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures — Longbow copied from public/data/equipment.json (index: longbow)
@@ -140,6 +149,121 @@ describe('attackCalc2024 - Swift Quiver', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Swift Quiver bow-finder match-set census (#595 category-never-match class,
+// fix#340). attackCalc2024.js findSwiftQuiverBow gated on
+// weapon_category === 'Ranged' — disk equipment.json weapon_category carries
+// ONLY Simple/Martial, so that clause NEVER matched; the name list kept the
+// lane alive on Longbow/Light Crossbow/Hand Crossbow while OMITTING Shortbow
+// and carrying dead comma-form entries ('Crossbow, Heavy'/'Crossbow, Light'
+// are disk 'Heavy Crossbow'/'Light Crossbow'). Fixed predicate:
+// weapon_range 'Ranged' + 'Ammunition' property + disk names — scoped by the
+// disk spell text (2024/spells.json 'Swift Quiver'): "two attacks with a
+// weapon that fires Arrows or Bolts, such as a Longbow or a Light Crossbow".
+// Weapon rows are read from disk BY-name, never transcribed.
+// ---------------------------------------------------------------------------
+
+const diskWeapon = (name) => DISK_EQUIPMENT.find(it => it.name === name);
+const ARROW_BOLT_NAMES = ['Longbow', 'Shortbow', 'Light Crossbow', 'Hand Crossbow', 'Heavy Crossbow'];
+// dexChar is scoped inside the SQ describe above; this lane equips one
+// disk-named weapon with DEX +3 (lv5, PB +3 -> to-hit 6).
+const sqChar = (name, level = 5, dexBonus = 3) => char({
+  level,
+  abilities: [{ name: 'Strength', bonus: 0 }, { name: 'Dexterity', bonus: dexBonus }],
+  equipped: [name],
+});
+
+describe('attackCalc2024 - Swift Quiver disk predicate census (#595 fix#340)', () => {
+  const diskWeapons = DISK_EQUIPMENT.filter(it => it.equipment_category === 'Weapon');
+
+  it('census: weapon_category NEVER equals Ranged on disk (Simple/Martial ONLY)', () => {
+    expect(diskWeapons.filter(it => it.weapon_category === 'Ranged')).toHaveLength(0);
+    expect([...new Set(diskWeapons.map(it => it.weapon_category))].sort()).toEqual(['Martial', 'Simple']);
+  });
+
+  it('census: old predicate match-set {Longbow, Light Crossbow, Hand Crossbow} — name-list only, Shortbow silently skipped', () => {
+    const oldMatch = diskWeapons.filter(it => {
+      const props = it.properties ?? [];
+      return (it.weapon_category === 'Ranged' && (props.includes('Ammunition') || props.includes('Heavy') || props.includes('Light')))
+        || ['Longbow', 'Light Crossbow', 'Hand Crossbow', 'Crossbow, Heavy', 'Crossbow, Light'].includes(it.name);
+    }).map(it => it.name).sort();
+
+    expect(oldMatch).toEqual(['Hand Crossbow', 'Light Crossbow', 'Longbow']);
+    // The comma-form list entries are dead — absent from disk entirely:
+    expect(['Crossbow, Heavy', 'Crossbow, Light'].every(n => !diskWeapon(n))).toBe(true);
+  });
+
+  it('census: new predicate match-set is EXACTLY the five disk arrow/bolt weapons', () => {
+    const newMatch = diskWeapons.filter(it =>
+      it.weapon_range === 'Ranged' && (it.properties ?? []).includes('Ammunition') && ARROW_BOLT_NAMES.includes(it.name)
+    ).map(it => it.name).sort();
+
+    expect(newMatch).toEqual([...ARROW_BOLT_NAMES].sort());
+    // Ammunition-ranged weapons OUTSIDE the arrows/bolts scope stay out:
+    for (const excluded of ['Blowgun', 'Sling', 'Dart', 'Net']) {
+      expect(newMatch).not.toContain(excluded);
+    }
+  });
+
+  it.each(ARROW_BOLT_NAMES.map(name => ({ name })))('$name equips two Swift Quiver rows threaded with its BY-name disk bytes', ({ name }) => {
+    vi.mocked(getCombatSummary).mockReturnValue(concentrateOn('Swift Quiver'));
+    const diskRow = diskWeapon(name);
+    expect(diskRow, `disk row '${name}' must exist`).toBeTruthy();
+
+    const result = getAttacks([diskRow], [], sqChar(name));
+
+    const names = result.map(a => a.name);
+    expect(names).toEqual([name, 'Swift Quiver (1st Attack)', 'Swift Quiver (2nd Attack)']);
+    // Fixer proof: the SQ rows carry the WEAPON's disk dice/range/type, not
+    // the resolver's 1d8/'80_ft' fallbacks.
+    const expectedDamage = `${diskRow.damage.damage_dice}+3`;
+    for (const sq of result.filter(a => a.isSwiftQuiver)) {
+      expect(sq.damage).toBe(expectedDamage);
+      expect(sq.damageFormula).toBe(`Damage Formula = ${diskRow.damage.damage_dice} + Dexterity Modifier (3)`);
+      expect(sq.damageType).toBe(diskRow.damage.damage_type);
+      expect(sq.range).toBe(diskRow.range.long || diskRow.range.normal);
+      expect(sq.type).toBe('Bonus Action');
+    }
+  });
+
+  // Out-of-scope weapons: findSwiftQuiverBow must MISS them, so the SQ rows
+  // carry the resolver's fallback bytes (1d8 / '80'), never the weapon's own
+  // disk dice. (Rows appearing at all while concentrating with no eligible
+  // bow is the pre-existing bow-missing fallback at :541-547 — not this
+  // row's scope.) NOTE: Net is excluded from this armed lane because its
+  // disk row carries NO damage object (equipment.json index net) — equipped
+  // Net throws at buildWeaponAttack attackCalc.js:109 BEFORE the finder
+  // runs. Pre-existing disk gap, reported, public/data is read-only here;
+  // Net's exclusion from the finder is pinned by the predicate census above.
+  it.each(['Blowgun', 'Sling', 'Dart'])('%s is OUTSIDE the arrows/bolts scope — finder misses it, SQ rows stay on fallback bytes', (name) => {
+    vi.mocked(getCombatSummary).mockReturnValue(concentrateOn('Swift Quiver'));
+    const diskRow = diskWeapon(name);
+
+    const result = getAttacks([diskRow], [], sqChar(name));
+
+    const sq = result.filter(a => a.isSwiftQuiver);
+    expect(sq).toHaveLength(2);
+    for (const row of sq) {
+      expect(row.damage).toBe('1d8+3');
+      expect(row.range).toBe('80');
+      expect(row.damage).not.toBe(`${diskRow.damage.damage_dice}+3`);
+    }
+  });
+
+  it('a Simple-category Shortbow now matches where the old Ranged-category gate never did (disk: Shortbow weapon_category Simple)', () => {
+    const shortbow = diskWeapon('Shortbow');
+    expect(shortbow.weapon_category).toBe('Simple');
+    expect(shortbow.weapon_range).toBe('Ranged');
+    expect(shortbow.properties).toEqual(['Ammunition', 'Two-Handed']);
+
+    vi.mocked(getCombatSummary).mockReturnValue(concentrateOn('Swift Quiver'));
+    const result = getAttacks([shortbow], [], sqChar('Shortbow'));
+
+    expect(result.filter(a => a.isSwiftQuiver)).toHaveLength(2);
+    expect(result.find(a => a.isSwiftQuiver).damage).toBe('1d6+3');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Starry Form — getAttacks wiring only (construction & level scaling live in
 // starryFormDamage.test.js:17-52)
 // ---------------------------------------------------------------------------
@@ -168,7 +292,11 @@ describe('attackCalc2024 - Starry Form Archer integration', () => {
       actionType: 'Bonus Action',
       hitBonus: 5,
       toHit: 5,
-      range: '120_ft',
+      // fix#351(a)(ii) #1348 flip: old honest '120_ft' pin follows the module
+      // constant to disk law — 2024/classes.json Circle of Stars 'Starry Form'
+      // BY-name: "within 60 feet of yourself" (sibling of the flip in
+      // starryFormDamage.test.js, same pass).
+      range: '60_ft',
     });
   });
 

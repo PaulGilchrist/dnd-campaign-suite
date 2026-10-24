@@ -89,6 +89,31 @@ describe('spellCalc2024-runtime', () => {
       expect(cleared.spells.map(s => s.name)).toEqual(['Shield']);
     });
 
+    it('fix#348(c): Spell Mastery store reads are gated by spell_mastery passive presence — stray store entries grant nothing to non-holders', () => {
+      const strayStore = (_key, prop) => (prop === 'SpellMastery_level1' ? 'Shield' : prop === 'SpellMastery_level2' ? 'Web' : null);
+      const allSpells = [makeSpell('Shield', 1), makeSpell('Web', 1)];
+
+      // Negative arm: store full of mastery picks but NO spell_mastery passive —
+      // pre-fix the ungated getRuntimeValue reads at :668-671 granted both rows.
+      const nonHolder = makePlayerStats();
+      nonHolder.automation = { passives: [{ type: 'elemental_adept' }] };
+      mockGetRuntimeValue.mockImplementation(strayStore);
+      const denied = getSpellAbilities(allSpells, nonHolder, { campaignName: 'test-campaign' });
+      expect(denied.spells).toEqual([]);
+      expect(mockGetRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'SpellMastery_level1', 'test-campaign');
+      expect(mockGetRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'SpellMastery_level2', 'test-campaign');
+
+      // Positive arm: same store, passive PRESENT (the disk wizard lv18 row lands in
+      // automation.passives — casting_time 'passive') — both picks grant as Always rows.
+      const holder = makePlayerStats();
+      holder.automation = { passives: [{ type: 'spell_mastery' }] };
+      const granted = getSpellAbilities(allSpells, holder, { campaignName: 'test-campaign' });
+      expect(mockGetRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'SpellMastery_level1', 'test-campaign');
+      expect(mockGetRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'SpellMastery_level2', 'test-campaign');
+      expect(granted.spells.filter(s => s.name === 'Shield')[0].prepared).toBe('Always');
+      expect(granted.spells.filter(s => s.name === 'Web')[0].prepared).toBe('Always');
+    });
+
     it('adds Savant and Signature school selections from runtime state, deduped across keys', () => {
       mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === '_Abjuration_Savant_selection') return ['Shield'];

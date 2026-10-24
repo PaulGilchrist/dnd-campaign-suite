@@ -10,9 +10,9 @@
 // mock serves the real DB, so 11d6 is proven twice from one authored byte).
 // DC arithmetic restatement removed (row dc bytes pinned once). Generic
 // lanes cited, not duplicated (identical spell-agnostic lane code): counter
-// badge render spellcasting.test.jsx:275, exhausted 1/Day spend + spell-named
-// refusal spellcasting.test.jsx:281-302, At Will repeat / null store
-// spellcasting.test.jsx:317, upcast prose parser MonsterCardHelpers
+// badge render spellcasting.test.jsx:276, exhausted 1/Day spend + spell-named
+// refusal spellcasting.test.jsx:282-303, At Will repeat / null store
+// spellcasting.test.jsx:318, upcast prose parser MonsterCardHelpers
 // spellCastLevelFromSpellcasting (owner ma1202-mummy-lord / barlgura),
 // Scorching Ray spell-attack seam scorching-ray.test.jsx, ancient-red
 // legendary + fabled-innate faces legendary-uses-ancient-red.test.jsx.
@@ -150,7 +150,7 @@ describe('MA-0237 MonsterCardModal Ancient Red Dragon Spellcasting chips + Fireb
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders five chips in authored order — (1/Day · 1 left) counter on Fireball and Scrying only, At Will chips bare (shape owner spellcasting.test.jsx:275)', () => {
+  it('renders five chips in authored order — (1/Day · 1 left) counter on Fireball and Scrying only, At Will chips bare (shape owner spellcasting.test.jsx:276)', () => {
     renderRedDragon();
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(CHIP_NAMES);
     expect(linkByText('Fireball').textContent).toMatch(/\(1\/Day · 1 left\)/);
@@ -184,7 +184,7 @@ describe('MA-0237 MonsterCardModal Ancient Red Dragon Spellcasting chips + Fireb
     expect(abilityUseEntries('Fireball')[0].description).toMatch(/1\/Day use spent — 0 remaining today/);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ Fireball: 1 });
 
-    // Exhausted-refuse shape owned by spellcasting.test.jsx:281-302 — this
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:282-303 — this
     // pins only that THIS row's parsed 1/Day Each header gates Fireball live.
     await act(async () => { fireEvent.click(linkByText('Fireball')); });
     await waitFor(() => expect(refusals('Fireball').length).toBe(1));

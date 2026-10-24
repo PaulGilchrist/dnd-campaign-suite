@@ -393,8 +393,18 @@ async function handleFaerieFire({ spell, metaCtx, spellSaveDc, playerStats, camp
 
 async function handleTashasHideousLaughter({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
     if (spell.name && (spell.name.toLowerCase() === "tasha's hideous laughter" || spell.name.toLowerCase() === 'hideous laughter')) {
+        // fix#358 (#1459): the retired RAW-forward (`return { handled:true, result }`)
+        // shipped the service's modal envelope UNWRAPPED — every consumer of the
+        // unified popup shape (.result.automationPopup) missed it. Now mirrors the
+        // faerie-sibling guard VERBATIM (handleFaerieFire :385-389, same law as
+        // handleImprisonment :414-418 and handleRemoveCurse :473-477 fix#353):
+        // truthy popup-payload -> { handled:true, result:{ automationPopup:<identity> } },
+        // falsy/declined -> bare { handled:true }. Zero-swallow: nothing dropped, nothing rebuilt.
         const result = await triggerTashasHideousLaughter(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
-        return { handled: true, result };
+        if (result) {
+            return { handled: true, result: { automationPopup: result } };
+        }
+        return { handled: true };
     }
     return { handled: false };
 }
@@ -452,7 +462,18 @@ async function handleFalseLife(spell, metaCtx, playerStats, campaignName, mapNam
 
 async function handleRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName) {
     if (spell.name && spell.name.toLowerCase() === 'remove curse') {
-        await triggerRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName);
+        // fix#353 (#1466/#1499): the popup payload returned by triggerRemoveCurse
+        // (removeCurseService.js:18 forwards removeCurseHandler.js:51-61's
+        // automation_info envelope verbatim; null only on the executeHandler throw
+        // at :21) is PROPAGATED, not discarded — exact sibling three-state shape
+        // at handleFaerieFire :385-389 / handleImprisonment :404-408 /
+        // handleGenericAutomation :470-474: truthy -> { handled:true,
+        // result:{ automationPopup:<verbatim identity> } }, falsy -> bare
+        // { handled:true }. Zero-swallow: the host never drops a popup.
+        const result = await triggerRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName);
+        if (result) {
+            return { handled: true, result: { automationPopup: result } };
+        }
         return { handled: true };
     }
     return { handled: false };

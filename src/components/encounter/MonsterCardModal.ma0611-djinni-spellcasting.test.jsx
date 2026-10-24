@@ -9,7 +9,7 @@
 // not.toContain negative, #653/#657): BY-name extraction + exact uses gate map
 // + save_dc pair + strip-tags byte-equality vs the pre-fix prose + positive
 // upcast/qualifier-outside-wrap pins (#656) — distinct bytes ONLY.
-// Cite-skip owners (NOT repeated here): chip render spellcasting.test.jsx:184;
+// Cite-skip owners (NOT repeated here): chip render spellcasting.test.jsx:185;
 // per-day counters :275; gated 1/Day + 2/Day spend/refusal wording :281/:317/
 // :518 + usage.test.js:16-38 (#571); At Will repeated-cast advisory class
 // :317/:552 + ma0524:222; quaggoth Claw guard → ma1363 file; Control Weather

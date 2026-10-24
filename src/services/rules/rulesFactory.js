@@ -119,13 +119,13 @@ const rulesFactory = {
                     throw new Error('Expected damageTypes to be an array');
                 }
                 if (p.name === 'Stormborn') {
-                    const wrathActive = getRuntimeValue(playerSummary.name, 'wrathOfTheSeaActive', playerSummary.campaignName);
+                    const wrathActive = getRuntimeValue(playerSummary.name, 'wrathOfTheSeaActive', playerSummary.campaignName); // fix#339 arity law: reader is arity-2 (useRuntimeState.js:63, stores=Map<characterKey,...>, no setCampaign seam/no campaign-variant reader exist) — campaignName threaded per fix#153/#198 channel idiom; resolves via the SSE-mirrored active-campaign store (App.jsx:87-96) until #1520 lands
                     if (!wrathActive) {
                         return [];
                     }
                 }
                 if (p.name === 'Full of Stars') {
-                    const activeBuffs = getRuntimeValue(playerSummary.name, 'activeBuffs', playerSummary.campaignName);
+                    const activeBuffs = getRuntimeValue(playerSummary.name, 'activeBuffs', playerSummary.campaignName); // fix#339 arity law: same contract as :122 (arity-2 reader useRuntimeState.js:63; threaded arg = channel vocabulary; scope = SSE-mirrored active campaign until #1520)
                     const starryFormActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Starry Form');
                     if (!starryFormActive) {
                         return [];
@@ -159,7 +159,7 @@ const rulesFactory = {
                     console.error('rulesFactory.getPlayerStats: expected class object');
                     throw new Error('Expected class to be an object');
                 }
-                const runtimeLandType = getRuntimeValue(playerSummary.name, '_circleOfTheLandType', playerSummary.campaignName) || '';
+                const runtimeLandType = getRuntimeValue(playerSummary.name, '_circleOfTheLandType', playerSummary.campaignName) || ''; // fix#339 arity law: same contract as :122 (arity-2 reader useRuntimeState.js:63; threaded arg = channel vocabulary; scope = SSE-mirrored active campaign until #1520)
                 const landType = (runtimeLandType || classData.major?.type || classData.subclass?.type || '').toLowerCase().trim();
                 return mappings[landType] ? [mappings[landType]] : [];
             });

@@ -12,9 +12,9 @@
 // DC arithmetic restatement removed (row dc bytes pinned once); sibling
 // field-shape cross-check removed — archpriest/archmage rows are owned at
 // their own files (#773/#772). Generic lanes cited, not duplicated:
-// counter badge render spellcasting.test.jsx:275, exhausted 1/Day spend +
-// spell-named refusal spellcasting.test.jsx:281-302, At Will repeat /
-// null store spellcasting.test.jsx:317, upcast prose parser
+// counter badge render spellcasting.test.jsx:276, exhausted 1/Day spend +
+// spell-named refusal spellcasting.test.jsx:282-303, At Will repeat /
+// null store spellcasting.test.jsx:318, upcast prose parser
 // MonsterCardHelpers spellCastLevelFromSpellcasting (owner ma1202/barlgura).
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
@@ -154,7 +154,7 @@ describe('MA-0328 MonsterCardModal Azer Pyromancer Spellcasting chips + Fireball
     const fireball = linkByText('Fireball');
     expect(fireball).toBeTruthy();
     expect(fireball.textContent).toMatch(/\(1\/Day · 1 left\)/);
-    // At Will cantrips stay bare (badge shape owner spellcasting.test.jsx:275).
+    // At Will cantrips stay bare (badge shape owner spellcasting.test.jsx:276).
     expect(linkByText('Elementalism').textContent).not.toMatch(/\/Day/);
 
     await act(async () => { fireEvent.click(fireball); });
@@ -173,7 +173,7 @@ describe('MA-0328 MonsterCardModal Azer Pyromancer Spellcasting chips + Fireball
     expect(abilityUseEntries('Fireball')[0].characterName).toBe(MONSTER_NAME);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ Fireball: 1 });
 
-    // Exhausted-refuse shape owned by spellcasting.test.jsx:281-302 — this
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:282-303 — this
     // pins only that THIS row's parsed 1/Day header gates live.
     await act(async () => { fireEvent.click(linkByText('Fireball')); });
     await waitFor(() => expect(refusals('Fireball').length).toBe(1));

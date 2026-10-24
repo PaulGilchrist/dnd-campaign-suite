@@ -112,6 +112,11 @@ const originalRandom = Math.random;
 
 afterEach(() => {
   // Intact-state teardown (#1161): restore real RNG + fetch for every subsequent test.
+  // fix#357: restoreAllMocks FIRST (unwinds console.error/Math vi.spyOn chains —
+  // vitest dedupes spyOn, so counts would otherwise leak across tests), THEN the raw
+  // pinRandom restore (raw assignments are invisible to restoreAllMocks — the #1161
+  // poison order this comment always warned about).
+  vi.restoreAllMocks();
   Math.random = originalRandom;
   vi.unstubAllGlobals();
 });
@@ -313,6 +318,39 @@ describe('generateNPC', () => {
     const npc = await mod.generateNPC(existing);
 
     expect(npc.name).toBe(name);
+  });
+
+  // fix#357 x7 trait-picks: absent-or-empty pool is LOUD (console.error) + refused
+  // (TypeError) at the pick site — never an `undefined` field riding onto the NPC
+  // record (name-hole class twin, fix#197 census). Producer census: disk
+  // npc-generator-traits.json ships races:15 classRoles:89 attitudes:5 appearances:101
+  // personalities:79 goals:57 secrets:55 — every pool non-empty TODAY, so the guard
+  // is unreachable on real data and all existing quiet pins stay byte-identical.
+  it.each(['races', 'classRoles', 'attitudes', 'appearances', 'personalities', 'goals', 'secrets'].flatMap(pool => [
+    { pool, traits: { ...TRAITS, [pool]: [] }, label: 'present-empty' },
+    { pool, traits: Object.fromEntries(Object.entries(TRAITS).filter(([k]) => k !== pool)), label: 'key absent' },
+  ]))('trait pool $pool $label: loud console.error + TypeError, no undefined field', async ({ traits }) => {
+    const { mod } = await loadGenerator({ traits });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    await expect(mod.generateNPC()).rejects.toThrow(TypeError);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('trait pool'));
+  });
+
+  // fix#357 preservation arm (authored-intent, pinned QUIET): a stat-block run —
+  // the :189/:203/:218-era template(names) picks draw from this file's own parallel
+  // non-empty literal tables — consumes ZERO console.error.
+  it('quiet preservation (fix#357): stat-block generateNPC logs zero console.error', async () => {
+    const { mod } = await loadGenerator();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    const npc = await mod.generateNPC();
+
+    expect(npc.armorClass).toBeGreaterThan(0); // stat block ran (templates consumed)
+    expect(typeof npc.actions[0].name).toBe('string');
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it('fetches each data table exactly once per module lifetime (exact-if-fetch + cache)', async () => {

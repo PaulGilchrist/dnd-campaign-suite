@@ -107,17 +107,65 @@ describe('modifyHitPoints — monster lane (combatSummary currentHp canonical)',
     expect(setRuntimeValue).not.toHaveBeenCalled(); // monsters never write the runtime store
   });
 
-  it('quirk byte-pin: maxHp missing poisons newHp with NaN, mutates it onto the summary, still dispatches', () => {
-    // Unguarded on purpose (vs the player lane's maxHp != null guard — asymmetric by code):
-    // Math.min(undefined, n) === NaN; NaN !== 0 so the event fires. Pinned as-is.
+  it('quirk pin FLIPPED (fix#352(a)): maxHp missing clamps nothing — finite HP, honest event (player-leg parity)', () => {
+    // Pre-fix quirk flipped (#1348): the NPC branch read Math.min(undefined, n)
+    // -> NaN onto the summary AND dispatched. Now the branch mirrors the player
+    // leg's guards (twin bytes :34 '?? 0', :36-38 'if (maxHp != null)'): no
+    // known max means NO upper clamp, never a NaN poison.
     const target = { name: 'Rug', type: 'npc', currentHp: 7 }; // maxHp absent
     const result = modifyHitPoints(summary(target), 'Rug', -2, CAMPAIGN);
 
     expect(result.maxHp).toBeUndefined();
-    expect(result.newHp).toBeNaN();
-    expect(result.delta).toBeNaN();
-    expect(target.currentHp).toBeNaN();
+    expect(result.newHp).toBe(5); // no upper clamp, finite
+    expect(result.delta).toBe(-2);
+    expect(target.currentHp).toBe(5);
+    expect(window.dispatchEvent).toHaveBeenCalledTimes(1); // honest finite dispatch
+  });
+
+  it('NPC absent currentHp coalesces to 0 like the player twin (:34) — NaN never lands, never dispatches', () => {
+    // fix#352(a) arm: absent HP is a zero (zero-is-data), so damaging an
+    // HP-less entry pins it at 0 with actualDelta 0 — the event gate stays shut.
+    const target = { name: 'Wisp', type: 'npc', maxHp: 15 }; // currentHp absent
+    const result = modifyHitPoints(summary(target), 'Wisp', -4, CAMPAIGN);
+
+    expect(result).toStrictEqual({
+      oldHp: 0, newHp: 0, delta: 0, isPlayer: false, creature: target, maxHp: 15,
+    });
+    expect(target.currentHp).toBe(0);
+    expect(window.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('NPC absent currentHp + heal rises from the coalesced zero, finite event', () => {
+    const target = { name: 'Wisp', type: 'npc', maxHp: 15 };
+    const result = modifyHitPoints(summary(target), 'Wisp', 5, CAMPAIGN);
+
+    expect(result.oldHp).toBe(0);
+    expect(result.newHp).toBe(5);
+    expect(target.currentHp).toBe(5);
     expect(window.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('non-finite delta is LOUD-refused: no NaN on the summary, no write, no dispatch, null result', () => {
+    // fix#352(a) refuse-leg: ?? catches null/undefined only; a NaN delta (or
+    // non-numeric currentHp) is caught by the Number.isFinite gate BEFORE the
+    // in-place write, so combatSummary can never carry NaN.
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const target = { name: 'Goblin', type: 'npc', currentHp: 7, maxHp: 15 };
+      expect(modifyHitPoints(summary(target), 'Goblin', NaN, CAMPAIGN)).toBeNull();
+      expect(target.currentHp).toBe(7); // entry untouched — write refused upstream of the assignment
+      expect(window.dispatchEvent).not.toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0]).toContain('non-finite HP for Goblin');
+      expect(spy.mock.calls[0][0]).toContain('no write, no dispatch');
+
+      const strTarget = { name: 'Rug', type: 'npc', currentHp: '7', maxHp: 15 }; // string HP never worked ('7'+-2 -> NaN pre-fix); now refused loudly
+      expect(modifyHitPoints(summary(strTarget), 'Rug', -2, CAMPAIGN)).toBeNull();
+      expect(strTarget.currentHp).toBe('7');
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

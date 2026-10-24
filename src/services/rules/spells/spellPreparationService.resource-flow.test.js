@@ -250,8 +250,8 @@ describe('prepareSpellCast — slot payment ledger (consumeBaseSlot/consumeUpcas
     { label: 'U-falsy-undefined: isUpcast without upcastLevel pays BASE lv3 (:966 ternary false-arm)', spell: diskFB5e, bank: { spell_slots_level_3: 3, spell_slots_level_5: 2 }, opts: { isUpcast: true, upcastLevel: undefined }, pays: ['spell_slots_level_3', 2] },
     { label: 'U-falsy-zero: upcastLevel 0 falsy pays BASE lv3', spell: diskFB5e, bank: { spell_slots_level_3: 3, spell_slots_level_5: 2 }, opts: { isUpcast: true, upcastLevel: 0 }, pays: ['spell_slots_level_3', 2] },
     { label: 'U-falsy-null: upcastLevel null falsy pays BASE lv3 (falsy triple)', spell: diskFB5e, bank: { spell_slots_level_3: 3, spell_slots_level_5: 2 }, opts: { isUpcast: true, upcastLevel: null }, pays: ['spell_slots_level_3', 2] },
-    { label: 'X-free-upcast: authorized free upcast rides no slot (:834 !isFreeCast gate)', spell: diskFB5e, bank: { spell_slots_level_5: 2 }, opts: { isUpcast: true, upcastLevel: 5, freeCastAuthorized: true }, pays: null, free: true },
-  ])('$label', async ({ spell, bank, max = wizardMax, opts, pays, free = false }) => {
+    { label: 'X-refuted-upcast: flagged-free but OFF-list lv5 upcast is REFUTED LOUD (fix#341(a)) — pays spell_slots_level_5 2->1, lv3 dark (:892 !isFreeCast gate)', spell: diskFB5e, bank: { spell_slots_level_5: 2 }, opts: { isUpcast: true, upcastLevel: 5, freeCastAuthorized: true }, pays: ['spell_slots_level_5', 1], errs: 1 },
+  ])('$label', async ({ spell, bank, max = wizardMax, opts, pays, free = false, errs = 0 }) => {
     const stats = casterStats(WIZARD, { rules: spell === diskFB24 ? '2024' : '5e', cls: 'Wizard', ability: 'Intelligence', max });
     seed(WIZARD, bank);
     const spellFrozen = JSON.stringify(spell);
@@ -279,17 +279,27 @@ describe('prepareSpellCast — slot payment ledger (consumeBaseSlot/consumeUpcas
     expect(addConcentration).toHaveBeenCalledTimes(0);
     expect(cleanupConcentrationEffects).toHaveBeenCalledTimes(0);
     expect(addEntry).toHaveBeenCalledTimes(0);
-    expect(errSpy).toHaveBeenCalledTimes(0);
+    // fix#341(a): the refuted-flag console.error is counted, never silent, never extra.
+    const refuted = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refuted.length).toBe(errs);
+    expect(errSpy).toHaveBeenCalledTimes(errs);
   });
 });
 
-describe('prepareSpellCast — generic free-path never touches spell slots', () => {
-  it('authorized free cast with 3 slots banked: zero writes, zero slot reads, no log', async () => {
+describe('prepareSpellCast — free-path slot integrity (fix#341(a) intersection)', () => {
+  // ON-LIST + flagged-free -> free legitimately. The Mantle of Majesty buff lane
+  // (FREE_CAST_CHECKS :324) grants Command slotless and this lane's consume side has
+  // NO write against it (no counter exists — the buff itself is the resource) —
+  // so the backed free cast is byte-identical to the old row's intent, now with the
+  // authorization PROVEN by the list instead of asserted by the param.
+  it('LIST-backed free cast (Mantle of Majesty -> Command): zero writes, zero slot reads, no log — the free branch is reached by the intersection, not the param', async () => {
+    const diskCommand = spells5e.find(s => s.name === 'Command');
+    if (!diskCommand) throw new Error('resource-flow-lane disk drift: Command missing from 5e spells.json');
     const stats = casterStats(WIZARD, { rules: '5e', cls: 'Wizard', ability: 'Intelligence', max: wizardMax });
-    seed(WIZARD, { spell_slots_level_3: 3 });
-    const spellFrozen = JSON.stringify(diskFB5e);
+    seed(WIZARD, { spell_slots_level_1: 2, activeBuffs: [{ name: 'Mantle of Majesty' }] });
+    const spellFrozen = JSON.stringify(diskCommand);
 
-    const result = await cast(diskFB5e, stats, { freeCastAuthorized: true });
+    const result = await cast(diskCommand, stats, { freeCastAuthorized: true });
 
     expect(result.freeCastUsed).toBe(true);
     expect(result.slotConsumed).toBe(false);
@@ -299,13 +309,37 @@ describe('prepareSpellCast — generic free-path never touches spell slots', () 
       slotConsumed: false,
       freeCastUsed: true,
     });
-    // consumeFreeCast found no free resource row (empty actions) -> the whole lane is write-silent.
+    // consumeFreeCast found no counter row (empty actions, favored ENEMY LEDGER absent
+    // :510 -> fix#341(b) read) -> the whole lane is write-silent.
     expect(setRuntimeValue.mock.calls).toEqual([]);
     // The base-slot read NEVER happens — consumeBaseSlot is unreachable behind the free branch.
     expect(getRuntimeValue.mock.calls.filter(c => /^spell_slots_level_/.test(String(c[1])))).toEqual([]);
     expect(addEntry).toHaveBeenCalledTimes(0);
-    expect(JSON.stringify(diskFB5e)).toBe(spellFrozen);
-    expect(errSpy).toHaveBeenCalledTimes(0);
+    expect(JSON.stringify(diskCommand)).toBe(spellFrozen);
+    expect(errSpy).toHaveBeenCalledTimes(0); // list-backed: NO refutation noise
+  });
+
+  // OFF-LIST + flagged-free -> LOUD + consumes normally (fail-safe toward payment).
+  it('OFF-list flagged-free is REFUTED LOUD and pays its slot (fix#341(a) falsifiability arm — pre-fix this sailed freeCastUsed:true consuming nothing)', async () => {
+    const stats = casterStats(WIZARD, { rules: '5e', cls: 'Wizard', ability: 'Intelligence', max: wizardMax });
+    seed(WIZARD, { spell_slots_level_3: 3 });
+
+    const result = await cast(diskFB5e, stats, { freeCastAuthorized: true });
+
+    expect(result.freeCastUsed).toBe(false);
+    expect(result.slotConsumed).toBe(true);
+    expect(result.metaCtx).toStrictEqual({
+      oldConcentrationSpell: null,
+      shouldSetConcentration: false,
+      slotConsumed: true,
+      freeCastUsed: false,
+    });
+    // Normal consumption LANDS: lv3 3->2 — nothing sails free.
+    expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, 'spell_slots_level_3', 2, CAMPAIGN]]);
+    expect(addEntry).toHaveBeenCalledTimes(0);
+    const refuted = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refuted.length).toBe(1); // exact-of-1, never silent
+    expect(refuted[0][1]).toEqual({ playerName: WIZARD, spellName: 'Fireball', spellLevel: 3 });
   });
 });
 
@@ -402,24 +436,42 @@ describe('prepareSpellCast — Psionic payment refusals fall through to the slot
     expect(errSpy).toHaveBeenCalledTimes(0);
   });
 
-  it('PS-free-exclusive: authorized free cast outranks SP payment — zero writes on every ledger', async () => {
+  it('PS + LIST-backed free (NR selection): free outranks SP — sorceryPoints never READ, slot never READ; the NR consume writes land (null + used true)', async () => {
     const stats = casterStats(SORCERER, { rules: '2024', cls: 'Sorcerer', ability: 'Charisma', passives: [psionicSorceryPassive], max: { spell_slots_level_1: 2 } });
-    seed(SORCERER, { sorceryPoints: 5, spell_slots_level_1: 2 });
+    seed(SORCERER, { sorceryPoints: 5, spell_slots_level_1: 2, naturalRecoveryFreeCast: ['Arms of Hadar'] });
 
     const result = await cast(diskAoH24, stats, { usePsionicPayment: true, freeCastAuthorized: true });
 
     expect(result.freeCastUsed).toBe(true);
     expect(result.slotConsumed).toBe(false);
-    expect(result.metaCtx).toStrictEqual({
-      oldConcentrationSpell: null,
-      shouldSetConcentration: false,
-      slotConsumed: false,
-      freeCastUsed: true,
-    });
-    expect(setRuntimeValue.mock.calls).toEqual([]);
+    // FREE_CAST_CHECKS[0] (runtimeSelectionFreeCast :279) grants via the NR list —
+    // the intersection is TRUE, no refutation noise, and the :1057 !isFreeCast gate
+    // keeps SP wholly dark.
+    expect(setRuntimeValue.mock.calls).toEqual([
+      [SORCERER, 'naturalRecoveryFreeCast', null, CAMPAIGN],
+      [SORCERER, 'naturalRecoveryFreeCastUsed', true, CAMPAIGN],
+    ]);
     expect(getRuntimeValue.mock.calls.filter(c => c[1] === 'sorceryPoints')).toEqual([]);
+    expect(getRuntimeValue.mock.calls.filter(c => /^spell_slots_level_/.test(String(c[1])))).toEqual([]);
     expect(addEntry).toHaveBeenCalledTimes(0);
     expect(errSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('PS + OFF-list flagged-free: flag REFUTED LOUD — SP payment then takes its normal precedence (fix#341(a): the param alone no longer outranks anything)', async () => {
+    const stats = casterStats(SORCERER, { rules: '2024', cls: 'Sorcerer', ability: 'Charisma', passives: [psionicSorceryPassive], max: { spell_slots_level_1: 2 } });
+    seed(SORCERER, { sorceryPoints: 5, spell_slots_level_1: 2 });
+
+    const result = await cast(diskAoH24, stats, { usePsionicPayment: true, freeCastAuthorized: true });
+
+    expect(result.freeCastUsed).toBe(false);
+    expect(result.slotConsumed).toBe(false); // SP paid it — no slot consumed
+    // The unbacked flag is refuted at the intersection seam, then the psionic lane
+    // runs with its RAW cost (lv1 = 1 SP, 5->4). Slot stays untouched.
+    expect(setRuntimeValue.mock.calls).toEqual([[SORCERER, 'sorceryPoints', 4, CAMPAIGN]]);
+    expect(result.metaCtx._psionicUsed).toBe(true);
+    const refuted = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refuted.length).toBe(1);
+    expect(addEntry).toHaveBeenCalledTimes(1); // the psionic payment log — its own row, not a free-cast one
   });
 });
 
@@ -449,19 +501,33 @@ describe('prepareSpellCast — #1516 campaign-arity pin (UNIFIED: reads carry ca
       [SORCERER, 'sorceryPoints', 4, CAMPAIGN],
     ]);
     expect(setRuntimeValue.mock.calls.map(w => [w.length, w[3]])).toEqual([[4, CAMPAIGN], [4, CAMPAIGN], [4, CAMPAIGN]]);
-    // Full read census of the three paid casts, byte-exact order: 9 reads, EVERY one arity-3
-    // carrying CAMPAIGN (per cast: WGB :982, quick-lane :922, then the payment read —
-    // the sorcerer's SP payment :753 precedes its quick probe; slot pays follow theirs).
+    // Full read census of the three paid casts, byte-exact order (fix#341(a): every
+    // cast now opens with the in-lane validator scan — isWgbSpell :1040, then the
+    // FREE_CAST_CHECKS reads runtimeSelection :279 x2, masteryOrSavant :293 x4,
+    // WGB :319, Mantle activeBuffs :324 — then the quick probe :1061 and the payment
+    // read). 11 arity-3 reads per cast, 33 total, EVERY one carrying CAMPAIGN — the
+    // intersection adds scan reads but the arity asymmetry stays gone.
     const histogram = getRuntimeValue.mock.calls.reduce((acc, c) => { acc[c.length] = (acc[c.length] || 0) + 1; return acc; }, {});
-    expect(histogram).toEqual({ 3: 9 });
+    expect(histogram).toEqual({ 3: 33 });
+    const scan = (who) => ([
+      [who, '_War_Gods_Blessing_active', CAMPAIGN],
+      [who, 'naturalRecoveryFreeCast', CAMPAIGN],
+      [who, '_Bewitching_Magic_freeCast', CAMPAIGN],
+      [who, 'SpellMastery_level1', CAMPAIGN],
+      [who, 'SpellMastery_level2', CAMPAIGN],
+      [who, 'SignatureSpells_selection', CAMPAIGN],
+      [who, '_Divination_Savant_selection', CAMPAIGN],
+      [who, '_War_Gods_Blessing_active', CAMPAIGN],
+      [who, 'activeBuffs', CAMPAIGN],
+    ]);
     expect(getRuntimeValue.mock.calls).toEqual([
-      [WIZARD, '_War_Gods_Blessing_active', CAMPAIGN],
+      ...scan(WIZARD),
       [WIZARD, '_Ritual_Master_quickRitualUsed', CAMPAIGN],
       [WIZARD, 'spell_slots_level_3', CAMPAIGN],
-      [WIZARD, '_War_Gods_Blessing_active', CAMPAIGN],
+      ...scan(WIZARD),
       [WIZARD, '_Ritual_Master_quickRitualUsed', CAMPAIGN],
       [WIZARD, 'spell_slots_level_5', CAMPAIGN],
-      [SORCERER, '_War_Gods_Blessing_active', CAMPAIGN],
+      ...scan(SORCERER),
       [SORCERER, 'sorceryPoints', CAMPAIGN],
       [SORCERER, '_Ritual_Master_quickRitualUsed', CAMPAIGN],
     ]);

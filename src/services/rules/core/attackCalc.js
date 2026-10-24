@@ -217,6 +217,19 @@ function buildRangedActionAttack(weapon, weaponName, ctx) {
         abilityName: 'Dexterity',
         proficiency: ctx.proficiency,
         actionType: 'Action',
+        // fix#348(d): stamp 'ranged' — mirrors the light-ranged off-hand sibling call in
+        // buildRangedAttacks :298 (`weaponType: 'ranged',`) and the melee main-hand twins
+        // :355/:412 (`weaponType: 'melee',`). Pre-fix this builder omitted the key and
+        // took the '' default (:102), so six consumers that filter weaponType==='ranged'
+        // misread main-hand bow rows: sneak-attack eligibility (contextBuilder-sync.js:547
+        // `hasFinesse || attack.weaponType === 'ranged'` — a non-finesse bow failed CLOSED,
+        // no sneak dice ever), superiority maneuver context (combatSuperiorityQueries.js:20
+        // isWeaponAttack — maneuvers never offered on bow attacks), War Priest weapon pick
+        // (bonusActionAttackHandler.js:24), ranged-hit reduction trigger
+        // (damageReductionHandler.js:68), and the Riposte / adjacent-reaction ranged
+        // refusals (executeActionManeuvers.js:471, reactionDamageHandler.js:151 — those two
+        // failed OPEN on '' , accepting ranged attacks into melee-only reactions).
+        weaponType: 'ranged',
         extraHitBonus: archeryBonus + thrownProfBonus,
         extraHitBonusLabel: [
             archeryBonus ? 'Archery Fighting Style (2)' : '',

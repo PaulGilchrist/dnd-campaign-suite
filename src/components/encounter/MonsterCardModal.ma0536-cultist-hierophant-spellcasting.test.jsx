@@ -12,9 +12,9 @@
 // "or be X" clause → CLA-325 advisory, console error-free — never a save
 // leg; hierophant has no save-leg spell, unlike the twin's Hold Person at
 // MA-0532). Cite-skip owners: chip render + per-day counters
-// spellcasting.test.jsx:184/:275; gated spend/refusal wording
-// spellcasting.test.jsx:281/:317/:518 + archpriest:198 (1/Day Each twin);
-// At Will ungated advisory record-only spellcasting.test.jsx:317/:552;
+// spellcasting.test.jsx:185/:276; gated spend/refusal wording
+// spellcasting.test.jsx:282/:318/:508 + archpriest:198 (1/Day Each twin);
+// At Will ungated advisory record-only spellcasting.test.jsx:318/:542;
 // usage-text format MonsterCardHelpers.usage.test.js:16-38 (MA-0049);
 // counter bytes ability-save-uses.test.jsx:127; damageless save-leg shape
 // MA-0348 owner damageless-spell-save-leg.test.js. diceRoller mock purged

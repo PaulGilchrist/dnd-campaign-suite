@@ -295,14 +295,21 @@ describe('prepareSpellCast — CLA-308 free-cast consumption ledger', () => {
     expect(addEntry).toHaveBeenCalledTimes(1);
     expect(addEntry.mock.calls[0][1].spellName).toBe('Silence');
 
-    // Already-spent Darkness cast (caller-lied authorization — upstream popup/oracle
-    // owns enforcing the gate): consume must NOT underflow to -1 and must not log.
+    // Already-spent Darkness cast (caller-lied authorization): fix#341(a) — the lie is
+    // REFUTED LOUD at the intersection seam (perSpellFreeCastAvailable :136-142 reads
+    // the spent 0 and denies); the cast pays normally (dry lv2 bank -> honest unpaid),
+    // consume never underflows to -1 and never logs.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const spentAgain = await prepareSpellCast(stampedSpell('Darkness'), {}, ctx);
-    expect(spentAgain.freeCastUsed).toBe(true);
-    expect(spentAgain.slotConsumed).toBe(false);
+    expect(spentAgain.freeCastUsed).toBe(false); // was true on the caller's word alone — FLIPPED
+    expect(spentAgain.slotConsumed).toBe(false); // lv2 bank unseeded -> nothing to pay with
     expect(setRuntimeValue).toHaveBeenCalledTimes(1); // still only the Silence write
     expect(addEntry).toHaveBeenCalledTimes(1); // only the Silence row
     expect(slotWrites()).toEqual([]);
+    const refuted = errSpy.mock.calls.filter(c => String(c[0]).includes('freeCastAuthorized flag REFUTED'));
+    expect(refuted.length).toBe(1); // exact-of-1, never silent
+    expect(refuted[0][1]).toEqual({ playerName: CASTER, spellName: 'Darkness', spellLevel: 2 });
+    errSpy.mockRestore();
   });
 });
 

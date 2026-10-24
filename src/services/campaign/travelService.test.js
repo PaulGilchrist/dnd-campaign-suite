@@ -39,6 +39,10 @@ describe('travelService', () => {
     it('should pin the movement scalars used across the travel domain', () => {
       expect(MAX_TRAVEL_HOURS_PER_DAY).toBe(8);
       expect(HORSEBACK_SPEED_MULTIPLIER).toBe(2);
+      // #1008 revisited fix#363: KEPT — this is the sole REAL-bytes pin of
+      // travelService.EXHAUSTION_LEVELS. useTravelManagement.js:246/:257 consume it
+      // but its lane mocks the constant (:19); exhaustionRules.test.js:40 pins the
+      // DISTINCT exhaustionRules.js:1 definition. Import-surface pin IS needed.
       expect(EXHAUSTION_LEVELS).toBe(6);
       // 5/6 speed per exhaustion stack (homebrew: forced-march hours stack as levels
       // in useTravelManagement, each costing 1/6 of remaining budget/speed)

@@ -16,26 +16,37 @@
 // Brass Dragon Wyrmling DC 11, Young Brass Dragon DC 14; Ancient Brass
 // Dragon DC 21 stages the identical shape (drives the takeover leg below).
 //
-// #1295 CLASS THIRD MEMBER (CONFIRMED): EVERY reader filters targetEffects by
-// effect+target and NEVER te.source — findSleepEffect (sleepService.js:22-25),
-// the stageSleepTargets existingIdx replace (128), the applySleepTurnEnd
-// findIndex (217), the wakeSleepTarget filter (269). Writers DO carry
-// te.source, so a second brass dragon re-staging the SAME target silently
-// takes over the first ladder's envelope (source/dc swap, one te per target
-// by design). Pinned honestly below; collateral on other targets survives.
+// #1295 CLASS THIRD MEMBER — fix#343 EXECUTED (was QUEUED-OWNER-LIVE #1337S):
+// readers NOW match effect+target+SOURCE (fix#112 weakeningBreath precedent,
+// registry identity law registerTargetEffect :1508-1509). findSleepEffects
+// returns ALL instances of the key on the target and every one adjudicates
+// its OWN ladder at its OWN dc/saveType; stageSleepTargets dedups on
+// target+effect+source (same-source re-cast resets ITS row; a second brass
+// dragon COEXISTS); the turn-END mutation + strip triple-match; wake stays
+// TARGET-wide BY RAW design ("ends early if the target takes damage" — any
+// wake ends every ladder on the target; callers carry no effect-source and
+// source-filtering would strand losing ladders), logging each retired
+// instance under its OWN source. Writers always carried te.source
+// (stageSleepEffect :108-census + expiration payload) — collision was PURELY
+// reader-side. Pinned honestly below: takeover legs flipped to coexistence.
 // Same te key 'sleep_staged' fronts BOTH producers by design (#1378): the
 // spell (WIS/concentration) and the breath (CON/staged_until_repeat_save) —
-// te.saveType is the only discriminator; the ladder itself is shared.
+// source now owns each ladder; saveType+duration stay the badge's FACE.
 //
-// Quirk pins: STRICT lowercase stage gate (applySleepTurnEnd:197) — a
-// capital-"Incapacitated" GM te is handled:false fully inert (OPPOSITE of the
-// paralyzing twin #1390, whose capital stage rides the escalate leg), while
-// condition filtering is case-INsensitive (lower(), :63/:70); sparse GM te
-// falls back dc ?? 10 / saveType WIS / unconsciousRounds ?? 10 / logLabel
-// "Sleep spell" — the SPELL shape leaks onto the DRAGON face (drift pin vs
-// disk Constitution/100-round); wakeSleepTarget's reason byte hardcodes
-// "Sleep ends (target took damage)" — the te's 'Sleep Breath' label NEVER
-// appears in wake logs; PC prompt ??0-swallow logs "rolled 0 + 0 = 0".
+// Quirk pins preserved per-instance: STRICT lowercase stage gate
+// (applySleepTurnEnd :197 — capital-"Incapacitated" GM te handled:false fully
+// inert, OPPOSITE of the paralyzing twin #1390 whose capital stage rides the
+// escalate leg), condition filtering case-INsensitive (lower()); sparse GM te
+// still defaults dc ?? 10 / saveType WIS / unconsciousRounds ?? 10 / logLabel
+// "Sleep spell" — the SPELL shape onto a sparse te is REGISTRY-CONSISTENT
+// (fix#343-C: the GM adder field set for sleep_staged is ['source','dc']
+// under label 'Sleep', targetEffectDefinitions.js:533, and every in-game
+// producer stamps the FULL CON shape, so a sparse te IS the spell face by
+// declared shape — breath-vs-GM intent beyond bytes stays owner UI lane);
+// wakeSleepTarget's reason byte still hardcodes "Sleep ends (...)" — the te
+// label never appears in wake logs; PC prompt ??0-swallow logs
+// "rolled 0 + 0 = 0". Turn-END returns { handled, results[] } — one row per
+// source instance; navigationHandlers ignores it (fire-and-forget .catch).
 // Key convention (test-maintain-bugs.md:222, pass #235): combat-summary save
 // bonuses are consumed under the ABBREVIATED saveBonuses.con key
 // (saveTypeAbbr), never a full-word 'constitution' key — pinned in the walk.
@@ -220,7 +231,7 @@ const dice = (...naturals) => rolls.push(...naturals);
 const tuples = (from = 0) => writes.slice(from).map(w => [w.owner, w.key, w.value, w.skipSync]);
 
 describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Breath)', () => {
-    it('stages a byte-exact disk-driven te per failed target (Constitution→CON live branch, concentrate:false short-circuits concentration + storage + combat-summary read); a same-target re-stage REPLACES — Ancient Brass DC 21 silently takes over the ladder (#1295-class third member)', async () => {
+    it('stages a byte-exact disk-driven te per failed target (Constitution→CON live branch, concentrate:false short-circuits concentration + storage + combat-summary read); a same-target re-stage by ANOTHER dragon COEXISTS as its own ladder — Ancient Brass DC 21 no longer takes over the Adult ladder (fix#343 flips the #1295-class takeover pin)', async () => {
         // Disk canon canaries — invented nothing (#1362): these are the REAL rows.
         expect(adultBreath.save_dc).toBe(18);
         expect(adultBreath.save_type).toBe('Constitution');
@@ -272,19 +283,40 @@ describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Brea
         expect(logs).toHaveLength(0);        // staging itself is silent (the modal lane owns roll/grant logs)
         expect(expirations).toHaveLength(0); // clocks register only at the escalation seam
 
-        // #1295 takeover leg: Ancient Brass DC 21 breathes the SAME target —
-        // existingIdx replace (sleepService.js:128-133) keys on effect+target
-        // ONLY, so T2's ladder silently changes owner 18→21 and CASTER→CASTER2.
+        // fix#343 takeover leg FLIPPED: Ancient Brass DC 21 breathes the SAME
+        // target — source-matched existingIdx (sleepIndex) misses CASTER2, so it
+        // APPENDS its own ladder. CASTER1's DC 18 te on T2 survives UNTOUCHED;
+        // two coexisting instances (two ladders, two DCs — registry law
+        // registerTargetEffect target+effect+source, fix#112 precedent).
         const w0 = writes.length;
         const restaged = await stageSleepTargets(campaignName, CASTER2, [T2], ANC_DC, options);
         expect(restaged).toEqual([T2]);
         expect(store.campaign.targetEffects).toEqual([
             breathTe(),
+            breathTe({ target: T2 }),
             breathTe({ target: T2, source: CASTER2, dc: ANC_DC }),
         ]);
         expect(tuples(w0)).toEqual([
             [T2, 'activeConditions', ['incapacitated'], false], // applyCondition always re-writes (lower()-filter, then append)
-            ['campaign', 'targetEffects', [breathTe(), breathTe({ target: T2, source: CASTER2, dc: ANC_DC })], undefined],
+            ['campaign', 'targetEffects', [
+                breathTe(),
+                breathTe({ target: T2 }),
+                breathTe({ target: T2, source: CASTER2, dc: ANC_DC }),
+            ], undefined],
+        ]);
+
+        // Same-source re-stage still REPLACES its OWN row (ladder reset at the
+        // new dc); the other dragon's row and the T1 row stay untouched.
+        const w1 = writes.length;
+        await stageSleepTargets(campaignName, CASTER, [T2], ANC_DC, options);
+        expect(store.campaign.targetEffects).toEqual([
+            breathTe(),
+            breathTe({ target: T2, dc: ANC_DC }),
+            breathTe({ target: T2, source: CASTER2, dc: ANC_DC }),
+        ]);
+        expect(tuples(w1).map(t => [t[0], t[2].length])).toEqual([
+            [T2, 1], // condition write
+            ['campaign', 3], // 3 tes total: T2's CASTER row replaced at idx 1, count unchanged
         ]);
     });
 
@@ -299,7 +331,7 @@ describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Brea
         // tie 9 + 9 = 18 ≥ DC 18 and falsely END the ladder right here.
         dice(9);
         const r1 = await applySleepTurnEnd(campaignName, T1);
-        expect(r1).toEqual({ handled: true, success: false, roll: 9, total: 10 });
+        expect(r1).toEqual({ handled: true, results: [{ source: CASTER, success: false, roll: 9, total: 10 }] });
         const escalated = breathTe({ stage: 'unconscious', condition: 'unconscious' });
         // navigationHandlers.js:187 calls applySleepTurnEnd campaign-wide WITHOUT
         // options → skipSync === false on every write (5-arg form at :243-245).
@@ -377,7 +409,7 @@ describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Brea
         dice(17); // 17 + 1 = 18 — exact DISK_DC tie, success on >=
         const r = await applySleepTurnEnd(campaignName, T1);
 
-        expect(r).toEqual({ handled: true, success: true, roll: 17, total: 18 });
+        expect(r).toEqual({ handled: true, results: [{ source: CASTER, success: true, roll: 17, total: 18 }] });
         expect(tuples()).toEqual([
             ['campaign', 'targetEffects', [weakening], false],
             [T1, 'activeConditions', [], false],
@@ -406,7 +438,7 @@ describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Brea
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         dice(17);
         const r2 = await applySleepTurnEnd(campaignName, T1);
-        expect(r2).toEqual({ handled: true, success: true, roll: 17, total: 18 });
+        expect(r2).toEqual({ handled: true, results: [{ source: CASTER, success: true, roll: 17, total: 18 }] });
         expect(consoleSpy.mock.calls).toEqual([
             ['[sleepService] Error logging repeat save result:', err],
             ['[sleepService] Error logging condition removal:', err],
@@ -434,7 +466,7 @@ describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Brea
                 dcSuccess: 'none', sourceName: CASTER, condition: 'Sleep Breath (repeat save)',
             },
         }]);
-        expect(result).toEqual({ handled: true, success: true, roll: 0, total: 0 });
+        expect(result).toEqual({ handled: true, results: [{ source: CASTER, success: true, roll: 0, total: 0 }] });
         expect(tuples()).toEqual([
             ['campaign', 'targetEffects', [], false],
             [PC, 'activeConditions', [], false],
@@ -477,7 +509,7 @@ describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Brea
         dice(1); // 1 + 0 (cs miss ?? 0) < DC 10 fallback → fail
         const result = await applySleepTurnEnd(campaignName, T1);
 
-        expect(result).toEqual({ handled: true, success: false, roll: 1, total: 1 });
+        expect(result).toEqual({ handled: true, results: [{ source: CASTER, success: false, roll: 1, total: 1 }] });
         const escalatedSparse = { ...sparse, stage: 'unconscious', condition: 'unconscious' };
         // Escalate spread (:241) preserves ONLY the authored keys — no
         // fabricated dc/saveType/label/unconsciousRounds bytes.
@@ -510,5 +542,130 @@ describe('MA-0068 sleepService staged-breath face (Adult Brass Dragon Sleep Brea
             },
         ]);
         expect(prompts).toHaveLength(0); // NPC auto-roll leg even with csCreature undefined
+    });
+
+    // fix#343 falsifiability arm (i): TWO dragons' breath ladders on the SAME
+    // target — turn-end adjudicates each at its OWN dc; the dc18 ladder
+    // SUCCEEDS (strips only its own row) while the dc21 ladder FAILS and
+    // escalates its OWN row with its OWN 100-round clock. Pre-fix: one
+    // source-blind find meant a single adjudication on the FIRST row and the
+    // sibling's ladder silently inherited/hijacked the outcome.
+    it('fix#343 two-dragon same-target walk: CASTER(dc18) succeeds on the 18-tie stripping ONLY its row while the guard HOLDS Incapacitated for the sibling; CASTER2(dc21) fails and escalates its OWN row with its OWN clock', async () => {
+        cs.creatures = [{ name: T1, type: 'npc', saveBonuses: { con: 0 } }];
+        const ladder1 = breathTe(); // CASTER, DC 18 (disk Adult)
+        const ladder2 = breathTe({ source: CASTER2, dc: ANC_DC }); // Ancient DC 21, SAME target
+        store.campaign.targetEffects = [ladder1, ladder2];
+        store[T1] = { activeConditions: ['incapacitated'] };
+
+        const w0 = writes.length;
+        dice(18, 10); // ladder1: 18+0=18 ≥18 SUCCESS; ladder2: 10+0=10 <21 FAIL
+        const r = await applySleepTurnEnd(campaignName, T1);
+        expect(r).toEqual({
+            handled: true,
+            results: [
+                { source: CASTER, success: true, roll: 18, total: 18 },
+                { source: CASTER2, success: false, roll: 10, total: 10 },
+            ],
+        });
+        const esc2 = breathTe({ source: CASTER2, dc: ANC_DC, stage: 'unconscious', condition: 'unconscious' });
+        expect(store.campaign.targetEffects).toEqual([esc2]); // NO collateral — only ladder1 stripped
+        expect(store[T1].activeConditions).toEqual(['unconscious']); // guard held Incapacitated through ladder1's end, then ladder2's escalate stripped it
+        expect(expirations).toHaveLength(1); // ONLY the escalated ladder clocks
+        expect(expirations[0]).toMatchObject({ attackerName: CASTER2, targetName: T1, rounds: DISK_ROUNDS });
+        expect(tuples(w0)).toEqual([
+            ['campaign', 'targetEffects', [ladder2], false], // ladder1 strip; guard holds the shared condition → NO condition write here
+            ['campaign', 'targetEffects', [esc2], false],     // ladder2 escalates its own row
+            ['Thug 1', 'activeConditions', [], false],         // guard released: strip Incapacitated
+            ['Thug 1', 'activeConditions', ['unconscious'], false],
+        ]);
+        expect(logs.map(l => [l.type, l.characterName ?? null, l.saveDc ?? null, l.sourceName ?? 'OMIT'])).toEqual([
+            ['save_result', CASTER, 18, 'OMIT'],
+            ['condition', T1, null, 'OMIT'], // endSleepOnSaveSuccess quirk: no sourceName (mirrors :395 pin)
+            ['save_result', CASTER2, 21, 'OMIT'],
+            ['condition', T1, null, CASTER2], // escalate log carries ITS OWN source
+        ]);
+    });
+
+    // fix#343 falsifiability arm (ii): SAME-source escalation end-to-end on
+    // the live store (stage → fail → Unconscious → damage wake): the composed
+    // walk lives above at the ladder-walk pin; this adds the PC DOUBLE-PROMPT
+    // corollary — a player under two sleep ladders gets TWO sequential queued
+    // prompts, each at its own dc/source, each waiting indefinitely
+    // (turn-based, no-clock law; fix#112 family precedent).
+    it('fix#343 PC under two ladders: two sequential prompts (dc18 then dc21, dragon-attributed); first fails → escalates its row with its own clock; second succeeds → strips only its row; shared Incapacitated stays held by the escalated sibling until released', async () => {
+        cs.creatures = [{ name: PC, type: 'player' }];
+        const ladder1 = breathTe({ target: PC }); // CASTER dc18
+        const ladder2 = breathTe({ target: PC, source: CASTER2, dc: ANC_DC });
+        store.campaign.targetEffects = [ladder1, ladder2];
+        store[PC] = { activeConditions: ['incapacitated'] };
+        const outcomes = [{ success: false }, { success: true }]; // ladder1 FAILS, ladder2 SUCCEEDS
+        let call = 0;
+        createSaveListener.mockImplementation((campaign, opts) => {
+            prompts.push({ campaign, opts });
+            const o = outcomes[call];
+            call += 1;
+            return { promptId: `ladder-${call}`, promise: Promise.resolve(o) };
+        });
+
+        const r = await applySleepTurnEnd(campaignName, PC);
+        expect(prompts.map(p => [p.opts.saveDc, p.opts.sourceName, p.opts.condition])).toEqual([
+            [DISK_DC, CASTER, 'Sleep Breath (repeat save)'],
+            [ANC_DC, CASTER2, 'Sleep Breath (repeat save)'],
+        ]);
+        expect(r).toEqual({
+            handled: true,
+            results: [
+                { source: CASTER, success: false, roll: 0, total: 0 },
+                { source: CASTER2, success: true, roll: 0, total: 0 },
+            ],
+        });
+        const esc1 = breathTe({ target: PC, stage: 'unconscious', condition: 'unconscious' });
+        expect(store.campaign.targetEffects).toEqual([esc1]); // ladder2 stripped; escalated ladder1 survives
+        expect(store[PC].activeConditions).toEqual(['unconscious']); // ladder1 holds it; ladder2's success must not wake the sibling's sleeper
+        expect(expirations).toHaveLength(1);
+        expect(expirations[0].attackerName).toBe(CASTER);
+        expect(expirations[0].rounds).toBe(DISK_ROUNDS);
+    });
+
+    // fix#343 wake adjudication (cited :269 row): the effect+target-wide strip
+    // STAYS — RAW "the effect ends early if the target takes damage" ends
+    // EVERY sleep instance on the target simultaneously, and callers carry no
+    // effect-source (applyDamage passes the sleeper only). Per-instance
+    // consequence pinned: each retired te logs its OWN source + stage word.
+    it('fix#343 wake stays TARGET-wide by RAW (any damage ends every sleep instance): multi-source strip in ONE te write, per-instance logs carry each te OWN source and stage word', async () => {
+        const ladder1 = breathTe(); // CASTER, stage1
+        const ladder2 = breathTe({ source: CASTER2, dc: ANC_DC, stage: 'unconscious', condition: 'unconscious' });
+        const bystander = { target: T1, effect: 'weakening_breath', source: 'Adult Gold Dragon 1' };
+        store.campaign.targetEffects = [ladder1, ladder2, bystander];
+        store[T1] = { activeConditions: ['incapacitated', 'unconscious'] };
+
+        expect(wakeSleepOnDamage(campaignName, T1, 5)).toBe(true);
+        expect(store.campaign.targetEffects).toEqual([bystander]); // BOTH sleep ladders retired, bystander intact
+        expect(store[T1].activeConditions).toEqual([]); // both conditions shed
+        const wakeLogs = logs.filter(l => l.action === 'removed');
+        expect(wakeLogs.map(l => [l.condition, l.sourceName])).toEqual([
+            ['Incapacitated', CASTER],   // ladder1's stage word + ITS source
+            ['Unconscious', CASTER2],    // ladder2's stage word + ITS source
+        ]);
+    });
+
+    // fix#343 falsifiability arm (iii): breath-face sourceless te — refused
+    // loudly at the turn-END, never absorbed by the staging dedup.
+    it('fix#343 sourceless breath te: turn-END REFUSES loudly (zero rolls/writes); staging beside the orphan APPENDS its own ladder', async () => {
+        const orphan = { target: T1, effect: SLEEP_TE_EFFECT, condition: 'incapacitated', stage: 'incapacitated', dc: ANC_DC, saveType: 'CON' }; // NO source
+        store.campaign.targetEffects = [orphan];
+        cs.creatures = [{ name: T1, type: 'npc', saveBonuses: { con: 0 } }];
+
+        const refused = await applySleepTurnEnd(campaignName, T1);
+        expect(refused).toEqual({ handled: false });
+        expect(store.campaign.targetEffects).toEqual([orphan]); // never edited
+        expect(writes).toHaveLength(0);
+        expect(expirations).toHaveLength(0);
+        expect(rolls).toEqual([]); // refused ladder never rolls
+
+        // Staging beside the orphan: strict === refuses the merge — APPEND.
+        const options = { saveType: 'Constitution', concentrate: false, label: 'Sleep Breath', logLabel: 'Sleep Breath', unconsciousRounds: DISK_ROUNDS };
+        await stageSleepTargets(campaignName, CASTER, [T1], ANC_DC, options);
+        expect(store.campaign.targetEffects).toEqual([orphan, breathTe({ dc: ANC_DC })]);
     });
 });

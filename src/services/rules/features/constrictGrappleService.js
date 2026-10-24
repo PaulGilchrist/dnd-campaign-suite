@@ -162,12 +162,20 @@ export async function applyConstrictGrappleTurnStart(activeName, campaignName) {
     const te = await resolveGrapplerAliveGate(tes[0], activeName, cs, campaignName);
     if (!te) return;
 
+    // fix#363 #1350 ORDER adjudication — guard BEFORE roll, pay-semantics unchanged:
+    // disk law public/data/monsters.json Apep 'Constrict': "takes 18 (4d8) Bludgeoning
+    // damage at the start of every turn until released" — the tick pays only while the
+    // grapple stands; this lane's dead-victim gate (currentHp > 0, the pinned
+    // 'dead victim pays nothing' law) is decided before the dice, so a roll that can
+    // never pay no longer burns a draw. Verified: zero log/store/event bytes between
+    // the old roll and this guard, so the reorder is zero-observable except die economy.
+    const currentHp = resolveVictimCurrentHp(csCreature, activeName, campaignName);
+    if (!(currentHp > 0)) return;
+
     const result = rollExpression(String(te.die || '4d8').toLowerCase());
     const damage = result ? Number(result.total) : 0;
     if (!(damage > 0)) return;
 
-    const currentHp = resolveVictimCurrentHp(csCreature, activeName, campaignName);
-    if (!(currentHp > 0)) return;
     const newHp = Math.max(0, currentHp - damage);
 
     await applyUntypedConstrictHpLoss(cs, csCreature, activeName, newHp, campaignName);

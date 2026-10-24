@@ -91,16 +91,23 @@ export async function grantSoulTomeTrap({ campaignName, attackerName, targetName
 
 // PCs get a queued save listener prompt at end of their own turn; NPCs
 // auto-roll inline (resolveFrightfulPresenceRepeatSave / MA-0248 shapes).
-async function resolveRepeatSave({ csCreature, targetName, attackerName, saveDc, campaignName, label }) {
+async function resolveRepeatSave({ csCreature, targetName, attackerName, saveDc, saveType, campaignName, label }) {
     if (csCreature?.type !== 'player') {
         const abbr = saveTypeAbbr(csCreature?.saveType);
         const saveBonus = csCreature?.saveBonuses?.[abbr] ?? 0;
         const roll = Math.floor(Math.random() * 20) + 1;
         return { roll, saveBonus, success: (roll + saveBonus) >= saveDc };
     }
+    // fix#353 (#1419): PC leg mirrors the NPC-leg law above (:96
+    // `saveTypeAbbr(csCreature?.saveType)` — whose fallback is saveTypeAbbr's
+    // OWN silent 'cha' default at :27/:29; no loud arm exists, none invented).
+    // saveType is threaded from the live te at :141/:146, so a WIS-stamped
+    // trap prompts WIS instead of the retired hardcoded 'CHA'. Prompt carries
+    // uppercase abbr — bane sibling bytes baneService.js:82 (saveType: 'CHA').
+    const abbr = saveTypeAbbr(saveType).toUpperCase();
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,
-        saveType: 'CHA',
+        saveType: abbr,
         saveDc,
         dcSuccess: 'none',
         sourceName: attackerName,
@@ -110,7 +117,7 @@ async function resolveRepeatSave({ csCreature, targetName, attackerName, saveDc,
         type: 'ability_use',
         characterName: attackerName,
         abilityName: label,
-        description: `${targetName} repeats its Charisma save (DC ${saveDc}) at the end of its turn to escape the Soul Tome.`,
+        description: `${targetName} repeats its ${abbr} save (DC ${saveDc}) at the end of its turn to escape the Soul Tome.`,
         promptId,
     }).catch((e) => { console.error('[soulTomeTrapService:repeat-prompt]', e); });
     const saveResult = await promise;
@@ -127,12 +134,16 @@ export async function applySoulTomeTrapTurnEnd(campaignName, targetName) {
 
     const attackerName = te.source;
     const saveDc = te.dc ?? 17;
-    const saveType = te.saveType || 'CHA';
+    // fix#353 (#1419): te-threading — saveType normalized by the SAME in-file
+    // idiom the NPC leg uses (:96 saveTypeAbbr; silent 'cha' fallback lives in
+    // saveTypeAbbr :27/:29, replacing the old `te.saveType || 'CHA'` which
+    // echoed malformed values verbatim into the log field).
+    const saveType = saveTypeAbbr(te.saveType).toUpperCase();
     const label = te.actionName || 'Banishing Claw (Requires Soul Tome)';
     const cs = getCombatSummary(campaignName);
     const csCreature = cs?.creatures?.find(c => c.name === targetName);
 
-    const { roll, saveBonus, success } = await resolveRepeatSave({ csCreature, targetName, attackerName, saveDc, campaignName, label });
+    const { roll, saveBonus, success } = await resolveRepeatSave({ csCreature, targetName, attackerName, saveDc, saveType, campaignName, label });
     const total = roll + saveBonus;
 
     await addEntry(campaignName, {
@@ -147,8 +158,8 @@ export async function applySoulTomeTrapTurnEnd(campaignName, targetName) {
         total,
         saveBonus,
         description: success
-            ? `${targetName} succeeded its repeat Charisma save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — escapes the Soul Tome, appearing in the space it left or the nearest unoccupied space (placement GM-enforced).`
-            : `${targetName} failed its repeat Charisma save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — remains trapped (Incapacitated); cumulative fails toward becoming bound to the tome (3) are GM-enforced — no fail-counter consumer.`,
+            ? `${targetName} succeeded its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — escapes the Soul Tome, appearing in the space it left or the nearest unoccupied space (placement GM-enforced).`
+            : `${targetName} failed its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — remains trapped (Incapacitated); cumulative fails toward becoming bound to the tome (3) are GM-enforced — no fail-counter consumer.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[soulTomeTrapService:repeat-result]', e); });
 
