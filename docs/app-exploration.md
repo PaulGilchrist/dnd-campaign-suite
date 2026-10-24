@@ -61,7 +61,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **Rename (verified 2026-10-10)**: inline row textbox (no modal) prefilled with name; Enter commits; empty rename silently reverts (safe); duplicate rename shows inline "A map with that name already exists" and keeps original; valid rename renames the file (test-map.json → qa-renamed-map.json) within ~12s debounce
 - **Editor + fog (verified 2026-10-13)**: map JSON model = `{displayName, name, gridSize, walls[], placedItems[], paintCells[], items[], players[], fog[], rooms[], terrain{}, pois[], zoom, panX, panY, revealed[]}`. Fog is COMPUTED (`useFogOfWar`): fog = cells neither in persistent `revealed[]` nor currently visible from tokens' line-of-sight; walls[] are the blockers; `revealed` monotonically grows on every client whenever tokens see new cells (auto-saved); "Reset Fog" (GM `button[title="Reset fog of war and view"]`) REFOGS — `revealed = current visible set only`. Grid size is an editable number input in the header (was 40, now 20 on Test Map → 20×20 cells; SVG renders viewBox 800×800). Wall painting persists within ~1.5s of pointerup.
 - **CROSS-TAB SYNC DEFECT (2026-10-13)**: manager-Open passes the raw filename WITH `.json` as `mapName` → editor SSE expectedKey never matches broadcast key → GM editor tabs are permanently deaf to live map updates (see `bug-map-editor-sse-key-mismatch-json-suffix.md`)
-- **Identifiers**: `button:has-text("Create Map")`, `button:has-text("Generate Dungeon")`, rows `li:has-text("<name>")`, delete confirm `.maps-manager-modal-overlay` ("Yes, Delete Permanently"), editor walls `svg.grid-svg rect.wall-cell`, grid extent `svg.grid-svg rect.grid-bg` (use its client rect /20 for cell px — viewBox does NOT span full svg element), tokens `g.creature-group`, `button[title="Reset fog of war and view"]`
+- **Identifiers**: `button:has-text("Create Map")`, `button:has-text("Generate Dungeon")`, rows `li:has-text("<name>")`, delete confirm `.maps-manager-modal-overlay` ("Yes, Delete Permanently"), editor cells `rect.grid-cell[data-cell="gx,gy"]` (machine-readable hitboxes), walls `svg.grid-svg rect.wall-cell[data-cell]`, grid extent `svg.grid-svg rect.grid-bg` (legacy), tokens `g.creature-group`, `button[title="Reset fog of war and view"]`
 
 ### 8. NPCs
 - **View state**: `npcs`
@@ -189,7 +189,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 | Dice buttons | `button:has-text("d20")`, `button:has-text("d4")`, etc. |
 | Short Rest | `button:has-text("Short Rest")` |
 | Long Rest | `button:has-text("Long Rest")` |
-| Map editor canvas | `svg.grid-svg` viewBox 800×800 BUT content spans only inner square — for cell px use `rect.grid-bg` client rect ÷ gridCols; wall cells `rect.wall-cell`; tokens `g.creature-group`; grid→client via `getScreenCTM()` + `DOMPoint(gx*CELL+CELL/2, …)` where CELL=viewBox/cols |
+| Map editor canvas | `svg.grid-svg` — cells now carry `data-cell="gx,gy"` (invisible `rect.grid-cell` hitboxes, full grid; walls `rect.wall-cell[data-cell]`, fog `rect.fog-cell*[data-cell]`); prefer `[data-cell]` center rect for paint/fog automation over legacy grid-bg÷cols viewBox math |
 | Map tools | `button:has-text("Paint"|"Erase"|"Select"|"Spell"|"Ruler"|"3D"|"Items")`; fog reset `button[title="Reset fog of war and view"]` (GM) / `"Reset view"` (player) |
 | Items panel | `button.items-panel-close`; draggable char chips in panel "Characters" section (`character:<name>` drag payload) |
 | Maps list rows | `li:has-text("<name>")` with `button:has-text("Open"|"Activate"|"Rename"|"Delete")`; delete confirm `.maps-manager-modal-overlay` ("Yes, Delete Permanently") |
@@ -246,7 +246,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **2026-10-13 — Map editor grid math exposed as raw viewBox:** painting cells requires measuring `rect.grid-bg` client rect (viewBox 800 does not span the svg element box; preserveAspectRatio none stretches). Expose a `data-cell` attribute or stable `aria-label` per cell for testability of paint/fog/token automation.
 - **2026-10-13 — `revealed` array can balloon:** Test Map carried 31,200 stale revealed strings (from an old larger grid) until Reset Fog compacted it to 400 — every save/SSE payload ships the whole array. Prune cells outside the current grid bounds on load or on grid-size change. File: `src/components/map/Map.jsx` merge path + server maps route.
 
 

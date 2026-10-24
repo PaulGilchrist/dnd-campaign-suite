@@ -9,6 +9,25 @@ const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
             {/* Grid background */}
             <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" style={{ fill: bgFill || '#1a1a1a' }} />
 
+            {/* Machine-readable cell hitboxes: data-cell="gx,gy" lets automation
+                locate a cell by id instead of measuring grid-bg viewBox math.
+                fill:none (see .grid-cell) — invisible, pointer-events pass through. */}
+            {Array.from({ length: gridSize * gridSize }, (_, i) => {
+                const gx = i % gridSize;
+                const gy = Math.floor(i / gridSize);
+                return (
+                    <rect
+                        key={`cell-${gx},${gy}`}
+                        x={gx * CELL_SIZE}
+                        y={gy * CELL_SIZE}
+                        width={CELL_SIZE}
+                        height={CELL_SIZE}
+                        className="grid-cell"
+                        data-cell={`${gx},${gy}`}
+                    />
+                );
+            })}
+
             {/* Vertical grid lines */}
             {Array.from({ length: gridSize + 1 }, (_, i) => (
                 <line
@@ -44,6 +63,7 @@ const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
                         width={CELL_SIZE}
                         height={CELL_SIZE}
                         className="wall-cell"
+                        data-cell={key}
                     />
                 );
             })}

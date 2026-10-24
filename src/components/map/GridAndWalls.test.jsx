@@ -135,4 +135,45 @@ describe('GridAndWalls', () => {
         expect(container.querySelectorAll('line.grid-line')).toHaveLength(4);
         expect(wallFacts(container).map((r) => `${r.x},${r.y}`)).toEqual(['0,0', '40,40']);
     });
+
+    describe('data-cell identifiers (automation affordance)', () => {
+        it('stamps data-cell="gx,gy" on every invisible background cell', () => {
+            const { container } = renderComponent({ gridSize: 3 });
+            const cells = Array.from(container.querySelectorAll('rect.grid-cell[data-cell]'));
+
+            expect(cells).toHaveLength(9);
+            // Row-major sweep, ids match geometry exactly.
+            expect(cells.map((r) => r.getAttribute('data-cell'))).toEqual([
+                '0,0', '1,0', '2,0',
+                '0,1', '1,1', '2,1',
+                '0,2', '1,2', '2,2',
+            ]);
+            const cell = container.querySelector('rect.grid-cell[data-cell="2,1"]');
+            expect(cell).toHaveAttribute('x', '80');
+            expect(cell).toHaveAttribute('y', '40');
+            expect(cell).toHaveAttribute('width', '40');
+            expect(cell).toHaveAttribute('height', '40');
+        });
+
+        it('keeps grid-bg and adds one cell id per column on a 20x20 map', () => {
+            const { container } = renderComponent({ gridSize: 20 });
+
+            expect(container.querySelector('rect.grid-bg')).toBeInTheDocument();
+            expect(container.querySelectorAll('rect.grid-cell[data-cell]')).toHaveLength(400);
+            expect(container.querySelector('rect.grid-cell[data-cell="19,19"]')).toHaveAttribute('x', '760');
+        });
+
+        it('stamps data-cell on wall rects so rect.wall-cell[data-cell="x,y"] locates them', () => {
+            const { container } = renderComponent({ gridSize: 8, walls: new Set(['2,3', '7,0']) });
+
+            const wall = container.querySelector('rect.wall-cell[data-cell="2,3"]');
+            expect(wall).toBeInTheDocument();
+            expect(wall).toHaveAttribute('x', '80');
+            expect(wall).toHaveAttribute('y', '120');
+            expect(container.querySelector('rect.wall-cell[data-cell="7,0"]')).toBeInTheDocument();
+            expect(container.querySelector('rect.wall-cell[data-cell="0,7"]')).toBeNull();
+            // Walls carry ids in addition to (not instead of) the background cells.
+            expect(container.querySelectorAll('rect[data-cell="2,3"]')).toHaveLength(2);
+        });
+    });
 });

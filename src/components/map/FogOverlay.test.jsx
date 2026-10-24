@@ -54,4 +54,13 @@ describe('FogOverlay', () => {
         rerender(<FogOverlay fog={new Set(['1,0', '2,1'])} isLocalhost={false} />);
         expect(rectFacts(container).map((r) => `${r.x},${r.y}`)).toEqual(['40,0', '80,40']);
     });
+
+    it('stamps data-cell="gx,gy" on fog rects for automation lookup', () => {
+        const { container } = render(<FogOverlay fog={new Set(['3,7'])} isLocalhost />);
+
+        const fogged = container.querySelector('rect.fog-cell[data-cell="3,7"]');
+        expect(fogged).toBeInTheDocument();
+        expect(fogged).toHaveAttribute('x', '120');
+        expect(fogged).toHaveAttribute('y', '280');
+    });
 });

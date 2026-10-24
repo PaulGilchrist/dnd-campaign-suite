@@ -95,6 +95,11 @@
     fill: #1a1a1a;
 }
 
+/* Invisible machine-readable cells (data-cell="gx,gy" for automation) */
+.map .grid-cell {
+    fill: none;
+}
+
 /* Grid lines */
 .map .grid-line {
     stroke: #333;

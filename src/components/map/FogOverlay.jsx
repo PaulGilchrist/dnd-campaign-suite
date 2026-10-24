@@ -21,6 +21,7 @@ const FogOverlay = ({ fog, isLocalhost }) => {
                         width={CELL_SIZE}
                         height={CELL_SIZE}
                         className={`no-print ${cellClass}`}
+                        data-cell={key}
                     />
                 );
             })}
