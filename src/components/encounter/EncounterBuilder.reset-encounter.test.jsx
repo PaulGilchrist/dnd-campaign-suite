@@ -217,8 +217,10 @@ describe('EncounterBuilder - Reset wipes state to defaults (handleReset)', () =>
 
     // In the loaded state a save would update in place (#399); prove the reset
     // severs that binding instead of merely hiding the Reset button.
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset encounter' }));
+    // Re-draft a monster after the wipe — an empty draft is gated by the
+    // save-validation and never reaches the name modal.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save encounter' }));
 
     expect(screen.getByRole('heading', { name: 'Save Encounter' })).toBeInTheDocument();

@@ -187,6 +187,8 @@ describe('EncounterBuilder - save/load toasts', () => {
 
   it('toasts an error instead of silence when the save POST fails', async () => {
     renderBuilder({ saveEncounter: vi.fn().mockRejectedValue(new Error('server unavailable')) });
+    // Draft must be non-empty — the empty-draft gate blocks the save flow itself.
+    fireEvent.click(screen.getByTestId('monster-checkbox-goblin'));
     await clickSaveThroughModal();
 
     await waitFor(() => {

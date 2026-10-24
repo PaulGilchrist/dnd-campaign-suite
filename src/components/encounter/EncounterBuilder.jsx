@@ -155,6 +155,12 @@ function stripMonsters(monsters) {
   }));
 }
 
+// Inline validate-with-error banner (empty-draft save gate) — extracted so
+// EncounterBuilder stays under the complexity cap.
+function EncounterValidationBanner({ message }) {
+  return message ? <div className="encounter-modal-error" role="alert">{message}</div> : null;
+}
+
 function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
   const { monsters, loading } = useMonstersData();
 
@@ -184,6 +190,17 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
 
   const [selectedMonsters, setSelectedMonsters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Empty-draft save gate: clicking Save with zero monsters shows a visible
+  // inline error instead of persisting an empty encounter (validate-with-error
+  // UX mirroring EncounterModal's "Encounter name is required" / MapsManager's
+  // "Map name cannot be empty"). Clears as soon as a monster is drafted.
+  const [saveError, setSaveError] = useState('');
+  useEffect(() => {
+    if (selectedMonsters.length > 0) {
+      setSaveError(prev => (prev ? '' : prev));
+    }
+  }, [selectedMonsters]);
 
   // Encounter save/load
   const {
@@ -336,6 +353,10 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
   };
 
   const handleSaveEncounter = async () => {
+    if (!selectedMonsters.length) {
+      setSaveError('Encounter has no monsters to save');
+      return;
+    }
     const data = {
       selectedMonsters: stripMonsters(selectedMonsters),
       description: description,
@@ -564,6 +585,8 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
               )}
            </div>
          </div>
+
+      <EncounterValidationBanner message={saveError} />
 
       {toast && (
         <div className={`encounter-toast${toast.isError ? ' encounter-toast-error' : ''}`} role="status">
