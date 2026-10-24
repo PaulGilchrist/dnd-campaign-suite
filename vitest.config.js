@@ -46,7 +46,7 @@ export default defineConfig({
                 '**/*.eot'
             ],
         },
-        include: ['src/**/*.{test,spec}.{js,jsx}', 'src/**/*.{test,spec}.*.{js,jsx}', 'server/**/*.{test,spec}.{js,jsx}', 'server/**/*.{test,spec}.*.{js,jsx}'],
+        include: ['src/**/*.{test,spec}.{js,jsx}', 'src/**/*.{test,spec}.*.{js,jsx}', 'server/**/*.{test,spec}.{js,jsx}', 'server/**/*.{test,spec}.*.{js,jsx}', 'vite.config.test.js'],
         exclude: ['node_modules', 'dist', '.git', '**/*.test.setup.js']
     },
 });

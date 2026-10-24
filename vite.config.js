@@ -29,21 +29,28 @@ export default defineConfig({
         emptyOutDir: true
     },
     server: {
+        // changeOrigin MUST stay false on every proxied lane: all server-side
+        // GM authority guards (notes.js, quests.js, maps.js, campaigns-admin.js,
+        // keyValidators.js validateAuthority, ...) read req.hostname. With
+        // changeOrigin:true the proxy rewrote Host to localhost:80 so every LAN
+        // client browsing :5173 was indistinguishable from the GM (private notes
+        // leaked, forged GM-only writes were accepted — bug-vite-proxy-localhost-guard-bypass).
+        // Express does not virtual-host on Host, so forwarding the real Host is safe.
         proxy: {
             '/api': {
                 target: 'http://localhost:80',
-                changeOrigin: true,
+                changeOrigin: false,
             },
             '/subscribe': {
                 target: 'http://localhost:80',
-                changeOrigin: true,
+                changeOrigin: false,
                 ws: false,
                 timeout: 0,
                 proxyTimeout: 0,
             },
             '/spell-overlay': {
                 target: 'http://localhost:80',
-                changeOrigin: true,
+                changeOrigin: false,
             },
         },
     }
