@@ -83,11 +83,11 @@ describe('PartyInventory rapid currency clicks', () => {
     // Every click lands immediately in the displayed balance: 50 + 3 = 53.
     expect(goldAmount()).toBe('53');
 
-    // A burst sends at most the in-flight snapshot plus ONE coalesced trailing POST of
-    // the latest value — never three identical collapsed POSTs.
+    // The burst sits behind the 400ms trailing debounce, then flushes as ONE POST of the
+    // latest snapshot — never three identical collapsed POSTs.
     await waitFor(() => {
-      const lastCall = mockSaveInventory.mock.calls[mockSaveInventory.mock.calls.length - 1];
-      expect(lastCall[1].currency.gp).toBe(53);
+      expect(mockSaveInventory).toHaveBeenCalledTimes(1);
+      expect(mockSaveInventory.mock.calls[0][1].currency.gp).toBe(53);
     });
     // Responses settling must not revert the display (stale echoes dropped).
     await waitFor(() => expect(goldAmount()).toBe('53'));
@@ -103,29 +103,40 @@ describe('PartyInventory rapid currency clicks', () => {
     });
     expect(goldAmount()).toBe('250');
     await waitFor(() => {
-      const lastCall = mockSaveInventory.mock.calls[mockSaveInventory.mock.calls.length - 1];
-      expect(lastCall[1].currency.gp).toBe(250);
+      expect(mockSaveInventory).toHaveBeenCalledTimes(1);
+      expect(mockSaveInventory.mock.calls[0][1].currency.gp).toBe(250);
     });
   });
 
-  it('drops a stale POST echo when newer local edits are already queued', async () => {
+  it('drops a stale POST echo when a newer local edit queues mid-flight', async () => {
+    mockLoadInventory.mockResolvedValueOnce({
+      currency: { pp: 0, gp: 50, sp: 0, cp: 0 },
+      items: [{ id: 'i1', name: 'Rope, Hempen', quantity: 1, description: '' }],
+    });
     await renderReady();
-    // First POST hangs; the +1×3 burst queues the latest snapshot behind it.
+    // The debounced +1-burst flush hangs in flight carrying gp 51.
     let resolveFirst;
     mockSaveInventory.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; }));
-    tripleClick('Add 1 gp');
-    expect(goldAmount()).toBe('53');
+    fireEvent.click(screen.getByTitle('Add 1 gp'));
+    await waitFor(() => expect(mockSaveInventory).toHaveBeenCalledTimes(1));
 
-    // The hung POST lands LAST with its OLD snapshot (gp 51) — a classic full-store
-    // replace-route reorder. It must be ignored, never resurrected over 53.
+    // A newer edit queues behind the hang (currency chips are disabled mid-flight,
+    // so the item stepper drives the queue).
+    fireEvent.click(screen.getByLabelText('Increase quantity'));
+    expect(goldAmount()).toBe('51');
+    expect(mockSaveInventory).toHaveBeenCalledTimes(1); // never posts early
+
+    // The hung POST lands LAST with its OLD full-store snapshot (gp 50 / qty 1) — a
+    // classic replace-route reorder. It must be ignored, never resurrected over 51/2.
     await act(async () => {
-      resolveFirst({ currency: { pp: 0, gp: 51, sp: 0, cp: 0 }, items: [] });
+      resolveFirst({ currency: { pp: 0, gp: 50, sp: 0, cp: 0 }, items: [{ id: 'i1', name: 'Rope, Hempen', quantity: 1, description: '' }] });
     });
     await waitFor(() => {
       expect(mockSaveInventory).toHaveBeenCalledTimes(2);
-      expect(mockSaveInventory.mock.calls[1][1].currency.gp).toBe(53);
+      expect(mockSaveInventory.mock.calls[1][1].currency.gp).toBe(51);
+      expect(mockSaveInventory.mock.calls[1][1].items[0].quantity).toBe(2);
     });
-    expect(goldAmount()).toBe('53');
+    expect(goldAmount()).toBe('51');
   });
 
   it('clamps subtract clicks at zero', async () => {

@@ -15,6 +15,14 @@ const CURRENCIES = [
 
 const AMOUNT_CHIPS = [1, 10, 100];
 
+// Trailing debounce for currency chip writes (backlog 2026-10-24): ~30 whole-store
+// POSTs per session collapsed to ONE per click-burst. Each click still updates the
+// optimistic local balance instantly; the network flush waits for a short quiet
+// window, so a burst POSTs the summed final snapshot (and SSE publishes once).
+// A lone click lands within ~debounce + flush time — writes are deferred, never
+// dropped or rate-limited. Benign network/save debounce (no-timers guard).
+const CURRENCY_PERSIST_DEBOUNCE_MS = 400;
+
 const EMPTY_FORM = { id: '', name: '', quantity: 1, description: '' };
 
 const sortByName = (items) => [...items].sort((a, b) => a.name.localeCompare(b.name));
@@ -418,9 +426,13 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
   // one in-flight request per endpoint; a burst of chip clicks coalesces into a single
   // follow-up POST carrying the latest snapshot. A revision stamp drops stale echoes so
   // out-of-order responses can never wipe landed edits (playbook §39).
+  // Currency chip clicks additionally sit behind a trailing debounce (CURRENCY_PERSIST_
+  // DEBOUNCE_MS): rapid clicks merge into ONE flush per burst with latest-snapshot
+  // semantics; items/save/delete stay immediate.
   const inventoryRef = useRef(inventory);
   const persistQueueRef = useRef({ saving: false, pending: null });
   const localRevRef = useRef(0);
+  const currencyDebounceRef = useRef(null);
 
   const applyInventory = useCallback((next, { ack = false } = {}) => {
     if (!ack) localRevRef.current += 1;
@@ -481,21 +493,61 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
       });
   }, [campaignName, applyInventory]);
 
+  // Trailing debounce (network/save debounce — permitted by no-timers guard): each chip
+  // click resets the timer, so a burst flushes once, ~CURRENCY_PERSIST_DEBOUNCE_MS after
+  // the last click. If a flush is already in flight the pending snapshot rides the
+  // existing finally-refill; the expired timer then harmlessly no-ops.
+  const scheduleCurrencyFlush = useCallback(() => {
+    if (currencyDebounceRef.current) clearTimeout(currencyDebounceRef.current);
+    currencyDebounceRef.current = setTimeout(() => {
+      currencyDebounceRef.current = null;
+      flushPersist();
+    }, CURRENCY_PERSIST_DEBOUNCE_MS);
+  }, [flushPersist]);
+
+  // Cancel any scheduled burst flush and POST now — used by atomic transfer/move so a
+  // debounced chip snapshot can never race the server-side /transfer ledger edit.
+  const flushCurrencyPersist = useCallback(() => {
+    if (currencyDebounceRef.current) {
+      clearTimeout(currencyDebounceRef.current);
+      currencyDebounceRef.current = null;
+    }
+    flushPersist();
+  }, [flushPersist]);
+
+  // Never leave a debounced burst stranded by navigation away from the page.
+  useEffect(() => {
+    const pendingRef = currencyDebounceRef;
+    const flush = flushCurrencyPersist;
+    return () => {
+      if (pendingRef.current) clearTimeout(pendingRef.current);
+      flush();
+    };
+  }, [flushCurrencyPersist]);
+
   const persist = useCallback((next) => {
     applyInventory(next);
     persistQueueRef.current.pending = next;
     flushPersist();
   }, [applyInventory, flushPersist]);
 
+  // Currency chip path: optimistic display is instant, the POST waits out the burst.
+  const persistCurrency = useCallback((next) => {
+    applyInventory(next);
+    persistQueueRef.current.pending = next;
+    scheduleCurrencyFlush();
+  }, [applyInventory, scheduleCurrencyFlush]);
+
   const handleCurrencyAdjust = (key, delta) => {
     const prev = inventoryRef.current;
-    persist({
+    persistCurrency({
       ...prev,
       currency: { ...prev.currency, [key]: Math.max(0, (prev.currency[key] || 0) + delta) },
     });
   };
 
   const handleCurrencyTransfer = (playerName, amounts) => {
+    flushCurrencyPersist();
     setSaving(true);
     transferInventory(campaignName, { direction: 'party-to-player', playerName, currency: amounts })
       .then(result => {
@@ -564,6 +616,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
 
   const handleConfirmMove = () => {
     if (!moveTarget || !movePlayer) return;
+    flushCurrencyPersist();
     setSaving(true);
     transferInventory(campaignName, {
       direction: 'party-to-player',
