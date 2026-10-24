@@ -103,9 +103,11 @@ describe('PartyInventory', () => {
 
   it('moves an item to a player through the move modal', async () => {
     await renderReady();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const row = screen.getByText('Torch').closest('tr');
     fireEvent.click(within(row).getByTitle('Move to player'));
     fireEvent.click(await screen.findByRole('button', { name: /Move to Player/ }));
+    expect(confirmSpy).toHaveBeenCalledWith('Move 5 × Torch to War Cleric?');
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
         direction: 'party-to-player',
@@ -114,16 +116,19 @@ describe('PartyInventory', () => {
         quantity: 5,
       });
     });
+    confirmSpy.mockRestore();
   });
 
   it('lists the player backpack and moves an item to the party with quantity from itemMeta', async () => {
     await renderReady();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     await selectPlayer('War Cleric');
     // Backpack entries without itemMeta still list, defaulting to ×1
     expect(await screen.findByText("Thieves' Tools")).toBeTruthy();
     expect(screen.getByText('×1')).toBeTruthy();
     const ropeRow = screen.getByText('Rope, Hempen').closest('li');
     fireEvent.click(within(ropeRow).getByRole('button', { name: /To Party/ }));
+    expect(confirmSpy).toHaveBeenCalledWith('Move 3 × Rope, Hempen from War Cleric to party inventory?');
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {
         direction: 'player-to-party',
@@ -132,6 +137,7 @@ describe('PartyInventory', () => {
         quantity: 3,
       });
     });
+    confirmSpy.mockRestore();
   });
 
   it('offers equipment suggestions while typing a new item name and fills its description', async () => {

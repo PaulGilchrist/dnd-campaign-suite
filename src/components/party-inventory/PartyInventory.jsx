@@ -353,6 +353,9 @@ function PlayersPanel({ characters, campaignName, onMoved }) {
 
   const handleMove = async (entry) => {
     if (!character) return;
+    // Native confirm naming qty + item + source player + party destination, mirroring
+    // the currency Give / Delete idioms (backlog 2026-10-24). Refuse = zero writes.
+    if (!window.confirm(`Move ${entry.quantity} × ${entry.name} from ${character.name} to party inventory?`)) return;
     setMoving(entry.name);
     try {
       await transferInventory(campaignName, {
@@ -616,6 +619,10 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
 
   const handleConfirmMove = () => {
     if (!moveTarget || !movePlayer) return;
+    // Native confirm composed from the modal's live qty/item/player state, mirroring
+    // the currency Give confirm ("Give 50 gp to War Cleric?"). Fires only on this
+    // final click — never on modal open or input changes. Refuse = zero writes.
+    if (!window.confirm(`Move ${moveQuantity} × ${moveTarget.name} to ${movePlayer}?`)) return;
     flushCurrencyPersist();
     setSaving(true);
     transferInventory(campaignName, {
