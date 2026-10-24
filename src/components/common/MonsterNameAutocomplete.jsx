@@ -2,6 +2,34 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadMonsters } from '../../services/ui/dataLoader.js';
 import './MonsterNameAutocomplete.css';
 
+// Ghost-list guard (bug-eb-autocomplete-ghost-blocks-initiative-clicks):
+// Initiative cards are keyed `${creature.name}-${runtimeStateTick}`, so every
+// rename keystroke POST + SSE echo REMOUNTS this component — any "user is
+// typing" signal must outlive the instance or the +NPC rename lane
+// ("rename it to a monster name…") loses its dropdown mid-word. The stamp
+// below records the exact text the field last typed upward; a list may only
+// (re)open while that intent is fresh and undismissed. Passive mounts — EB
+// Join auto-navigating to Initiative with pre-filled card names, turn re-keys —
+// never match, so no ghost dropdown can drape over card inputs and swallow
+// clicks. Benign UI intent only: no game state, cleared on blur/outside/pick.
+let lastTypedQuery = null;
+let lastTypedAt = 0;
+const TYPING_INTENT_MS = 2000;
+
+function markTyped(text) {
+    lastTypedQuery = text;
+    lastTypedAt = Date.now();
+}
+
+function clearTyped() {
+    lastTypedQuery = null;
+    lastTypedAt = 0;
+}
+
+function isTypingIntent(text) {
+    return !!text && lastTypedQuery === text && Date.now() - lastTypedAt < TYPING_INTENT_MS;
+}
+
 function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs }) {
     const [monsters, setMonsters] = useState([]);
     const [query, setQuery] = useState(value || '');
@@ -52,8 +80,14 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
 
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
+        // Open ONLY on live typing intent (or its value echo across a card
+        // re-key remount). Mount-time query seeds previously auto-opened this
+        // list, so a card that merely APPEARED — e.g. Join Encounter
+        // auto-navigating to Initiative — draped a ghost dropdown over
+        // neighboring HP inputs and swallowed the GM's clicks.
+        if (!isTypingIntent(query)) return;
         debounceRef.current = setTimeout(() => {
-            setShowSuggestions(suggestions().length > 0);
+            setShowSuggestions(document.activeElement === inputRef.current && suggestions().length > 0);
             setHighlightedIndex(-1);
              }, 150);
         return () => clearTimeout(debounceRef.current);
@@ -69,6 +103,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (!e.target.closest('.monster-autocomplete')) {
+                clearTyped();
                 setShowSuggestions(false);
                  }
             };
@@ -77,11 +112,14 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
          }, []);
 
     const handleInputChange = (e) => {
+        markTyped(e.target.value);
         setQuery(e.target.value);
         onChange(e.target.value);
          };
 
     const selectSuggestion = (name) => {
+        clearTyped();
+        if (debounceRef.current) clearTimeout(debounceRef.current);
         setQuery(name);
         setShowSuggestions(false);
         onChange(name);
@@ -90,6 +128,8 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
          };
 
     const handleBlur = () => {
+        clearTyped();
+        if (debounceRef.current) clearTimeout(debounceRef.current);
         setShowSuggestions(false);
         if (onCommit) onCommit(query);
          };
@@ -99,6 +139,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
         if (!showSuggestions || !list.length) {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                clearTyped();
                 if (onCommit) onCommit(query);
                  }
             return;
@@ -114,6 +155,9 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
             if (highlightedIndex >= 0 && list[highlightedIndex]) {
                 selectSuggestion(list[highlightedIndex].name);
             } else if (onCommit) {
+                clearTyped();
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                setShowSuggestions(false);
                 onCommit(query);
             }
         }

@@ -290,10 +290,12 @@ describe('MonsterNameAutocomplete', () => {
         });
         expect(getInput()).toHaveValue('Orc');
         expect(onChange).not.toHaveBeenCalled();
-        // An externally set query re-opens matching suggestions after the debounce.
+        // An externally set query must NOT re-open suggestions (bug-eb-autocomplete-ghost:
+        // mount seeds and SSE echoes auto-opening the list let it drape over other
+        // controls and swallow clicks). Only user keystrokes open it.
         act(() => {
             vi.advanceTimersByTime(DEBOUNCE_MS);
         });
-        expect(suggestionNames()).toEqual(['Orc']);
+        expect(suggestionNames()).toBeNull();
     });
 });
