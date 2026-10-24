@@ -203,6 +203,13 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
 
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
+  // Display-only save/load confirmation toast (mirrors .sessions-toast in Sessions.jsx)
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, isError = false) => {
+    setToast({ message, isError });
+    setTimeout(() => setToast(null), 2500); // toast auto-hide (display only, no game state)
+  };
   const [viewingMonster, setViewingMonster] = useSyncedState('campaign', 'encounter-viewingMonster', null, campaignName);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
@@ -328,14 +335,20 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
     }
   };
 
-  const handleSaveEncounter = () => {
+  const handleSaveEncounter = async () => {
     const data = {
       selectedMonsters: stripMonsters(selectedMonsters),
       description: description,
       effectiveXP,
       };
     if (currentEncounterName) {
-      updateEncounter(currentEncounterName, data);
+      try {
+        await updateEncounter(currentEncounterName, data);
+        showToast('Encounter saved');
+      } catch (error) {
+        console.error('Failed to update encounter:', error);
+        showToast('Failed to save encounter', true);
+      }
     } else {
       setPendingEncounterData(data);
       openSaveModal();
@@ -344,10 +357,16 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
 
   const handleModalSave = async (name) => {
     if (pendingEncounterData) {
-      await saveEncounter(name, pendingEncounterData);
-      setCurrentEncounterName(name);
-      setEncounterTitle(formatEncounterName(name));
-      setPendingEncounterData(null);
+      try {
+        await saveEncounter(name, pendingEncounterData);
+        setCurrentEncounterName(name);
+        setEncounterTitle(formatEncounterName(name));
+        setPendingEncounterData(null);
+        showToast('Encounter saved');
+      } catch (error) {
+        console.error('Failed to save encounter:', error);
+        showToast('Failed to save encounter', true);
+      }
     }
   };
 
@@ -393,9 +412,12 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
          }
        }
 
+        showToast('Encounter loaded');
+
          }
        } catch (error) {
       console.error('Failed to load encounter:', error);
+      showToast('Failed to load encounter', true);
      }
        };
 
@@ -542,6 +564,12 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
               )}
            </div>
          </div>
+
+      {toast && (
+        <div className={`encounter-toast${toast.isError ? ' encounter-toast-error' : ''}`} role="status">
+          {toast.message}
+        </div>
+      )}
 
         {/* Party Composition Summary */}
       {characters && characters.length > 0 && (

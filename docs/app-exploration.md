@@ -35,7 +35,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **Features**: Full encounter builder with monster database
 - **Buttons**: Save encounter (`button[title="Save encounter"]`), Load encounter (`button[title="Load encounter"]`), Generate (`button[title="Generate encounter from environments"]`)
 - **Components**: Party list (auto-populated from characters), Difficulty selector (Easy/Medium/Hard/Deadly), Monster search and filter (Type, Size, CR Min/Max), Monster table with checkboxes; checked rows get qty steppers `button.qty-btn` (− N +) in the qty cell + a `.encounter-selected` "Selected Monsters (N) <xp> XP" summary card with `.selected-item` rows and × removers
-- **Save/Load round-trip (verified 2026-10-13)**: Save → `.encounter-modal` with name input → POST persists (visible in `GET /api/campaigns/test-campaign/encounters` with `savedAt`+`effectiveXP`); Load → `.encounter-modal-load .encounter-list` rows "<name><X> effective XP" each with buttons [download-load, pen(×), trash(×)]; LOAD button restores checked rows + exact quantities + closes modal; TRASH deletes with NO confirm dialog (inconsistent with every other delete flow). No visible save/load confirmation toast at all (backlog).
+- **Save/Load round-trip (verified 2026-10-24)**: Save → `.encounter-modal` with name input → POST persists + `.encounter-toast` "Encounter saved" (auto-hides ~2.5s; errors toast in `.encounter-toast-error`); Load → `.encounter-modal-load .encounter-list` rows "<name><X> effective XP" each with buttons [download-load, pen(×), trash(×)]; LOAD button restores checked rows + exact quantities, closes modal, toasts "Encounter loaded"; TRASH deletes with confirm (`window.confirm`, leaf-owned in EncounterModal — NOT unguarded as earlier noted).
 - **Identifiers**: `heading:has-text("Encounter Builder")`, `.encounter-modal-save input`, `.encounter-list > *` rows, `.selected-item`, `button.qty-btn`
 
 ### 5. Factions
@@ -246,7 +246,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **2026-10-13 — Silent save/load confirmations:** encounter save/load, session quick-"Activate", music stop etc. produce no visible toast ("Saved"/"Loaded"/"Activated") — feedback is only the state change itself (+log entry). Add lightweight toasts; helps first-time GMs trust the app.
 - **2026-10-13 — Map editor grid math exposed as raw viewBox:** painting cells requires measuring `rect.grid-bg` client rect (viewBox 800 does not span the svg element box; preserveAspectRatio none stretches). Expose a `data-cell` attribute or stable `aria-label` per cell for testability of paint/fog/token automation.
 - **2026-10-13 — `revealed` array can balloon:** Test Map carried 31,200 stale revealed strings (from an old larger grid) until Reset Fog compacted it to 400 — every save/SSE payload ships the whole array. Prune cells outside the current grid bounds on load or on grid-size change. File: `src/components/map/Map.jsx` merge path + server maps route.
 
