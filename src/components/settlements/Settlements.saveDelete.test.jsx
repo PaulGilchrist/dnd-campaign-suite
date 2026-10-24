@@ -172,7 +172,7 @@ describe('Settlements - save and delete behavior', () => {
       openEditForm('Keep Me', false);
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-      expect(globalThis.window.confirm).toHaveBeenCalledWith('Delete this settlement?');
+      expect(globalThis.window.confirm).toHaveBeenCalledWith('Delete Settlement "Keep Me"?');
       expect(settlementMockStore.deleteItem).not.toHaveBeenCalled();
       expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
     });
@@ -187,7 +187,7 @@ describe('Settlements - save and delete behavior', () => {
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
 
-      expect(globalThis.window.confirm).toHaveBeenCalledWith('Delete this settlement?');
+      expect(globalThis.window.confirm).toHaveBeenCalledWith('Delete Settlement "Delete Me"?');
       expect(settlementMockStore.deleteItem).toHaveBeenCalledWith('Delete Me');
       expect(deleteBtn).toBeDisabled();
       expect(screen.getByText('Deleting…')).toBeInTheDocument();

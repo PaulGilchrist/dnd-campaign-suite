@@ -244,13 +244,26 @@ describe('Sessions — linked-resource automations', () => {
     expect(saveSession.mock.calls[1][1].links.maps).toEqual(['Cave']);
   });
 
-  it('deletes the edited session after confirm', () => {
+  it('deletes the edited session after confirm naming the session', () => {
     sessionMockStore.items = [makeSession('Session 7')];
-    vi.stubGlobal('confirm', () => true);
+    const confirmSpy = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirmSpy);
     renderSessions();
     openEditor('Session 7');
     fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(confirmSpy).toHaveBeenCalledWith('Delete Session Plan "Session 7"?');
     expect(sessionMockStore.deleteItem).toHaveBeenCalledWith('Session 7');
+  });
+
+  it('keeps the session when the delete confirmation is cancelled', () => {
+    sessionMockStore.items = [makeSession('Session 7')];
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmSpy);
+    renderSessions();
+    openEditor('Session 7');
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(confirmSpy).toHaveBeenCalledWith('Delete Session Plan "Session 7"?');
+    expect(sessionMockStore.deleteItem).not.toHaveBeenCalled();
   });
 
   it('marks a session as played and logs the recap to the campaign log', async () => {

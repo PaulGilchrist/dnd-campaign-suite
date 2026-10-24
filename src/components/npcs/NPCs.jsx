@@ -93,7 +93,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
   const handleDelete = async () => {
     if (!editingNPC) return;
-    if (!window.confirm('Delete this NPC?')) return;
+    if (!window.confirm(`Delete NPC "${editingNPC.name}"?`)) return;
     setDeleting(true);
     try {
       await deleteNPCAction(editingNPC.name);

@@ -71,7 +71,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- (2026-10-24) NPC delete + campaign tool confirms are generic ("Delete this NPC?") — align with Quests pattern that names the object (`Delete NPC "<name>"?`) to prevent wrong-row deletes.
 
 ## Coverage
 

@@ -255,16 +255,18 @@ describe('NPCs', () => {
   describe('Delete flow', () => {
     it('deletes the NPC and closes the modal when the confirmation is accepted', async () => {
       const { management } = renderNPCs();
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       clickDeleteOn();
+      expect(confirmSpy).toHaveBeenCalledWith('Delete NPC "Goblin"?');
       await waitFor(() => expect(management.deleteItem).toHaveBeenCalledWith('Goblin'));
       await waitFor(() => expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument());
     });
 
     it('does not delete the NPC when the confirmation is cancelled', async () => {
       const { management } = renderNPCs();
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
       clickDeleteOn();
+      expect(confirmSpy).toHaveBeenCalledWith('Delete NPC "Goblin"?');
       expect(management.deleteItem).not.toHaveBeenCalled();
       expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });

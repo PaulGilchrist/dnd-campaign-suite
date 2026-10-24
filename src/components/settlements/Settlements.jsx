@@ -591,7 +591,7 @@ function Settlements({ campaignName, onBack }) {
 
   const handleDelete = async () => {
     if (!editingSettlement) return;
-    if (!window.confirm('Delete this settlement?')) return;
+    if (!window.confirm(`Delete Settlement "${editingSettlement.name}"?`)) return;
     setDeleting(true);
     try {
       await deleteSettlementAction(editingSettlement.name);

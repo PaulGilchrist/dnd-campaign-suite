@@ -133,7 +133,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
 
   const handleDelete = async () => {
     if (!editingSession) return;
-    if (!window.confirm('Delete this session plan?')) return;
+    if (!window.confirm(`Delete Session Plan "${editingSession.name}"?`)) return;
     setDeleting(true);
     try {
       await deleteSessionAction(editingSession.name);
