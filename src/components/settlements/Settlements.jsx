@@ -439,7 +439,20 @@ function Settlements({ campaignName, onBack }) {
     openNew(getDefaultFormData());
   };
 
+  // Dirty-form guard: the generator replaces every form field, so warn before
+  // discarding user-entered content. size defaults to 'village' and is never
+  // itself a dirty marker; empty/default forms generate with zero friction.
+  const settlementFormHasUserInput = () => {
+    if (!formData) return false;
+    const textFields = ['name', 'description', 'atmosphere', 'government', 'population', 'tags', 'notes', 'threat'];
+    return textFields.some((field) => (formData[field] || '').trim() !== '') ||
+      (formData.services || []).length > 0 ||
+      (formData.notableNPCs || []).length > 0 ||
+      (formData.rumors || []).length > 0;
+  };
+
   const handleGenerateSettlement = async () => {
+    if (settlementFormHasUserInput() && !window.confirm('Generate will replace your entered settlement details?')) return;
     setGenerating(true);
     try {
       const generated = await generateSettlement(settlements);
