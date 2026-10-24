@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { applyTypeChoice } from '../../../services/automation/handlers/class-warlock/fiendishResilienceHandler.js';
 import '../CharSheet.css';
+import './SingleResistanceSelectionModal.css';
 
 function ResistanceHeader({ title, icon, action }) {
     return (
@@ -27,16 +28,22 @@ function ResistanceAppliedView({ title, icon, action, result, onClose }) {
 
 function ResistanceTypeRow({ type, isSelected, isExisting, hasSelection, setSelected }) {
     return (
-        <label style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : (isExisting ? 'rgba(100,200,255,0.1)' : 'transparent'), border: isSelected ? '1px solid var(--color-link)' : (isExisting ? '1px dashed var(--color-link)' : '1px solid transparent') }}>
+        // Dynamic-data exception (fix#313 precedent): background/border derive
+        // from selection/existing state and stay inline; static decoration is
+        // class-owned (.single-resistance-option in SingleResistanceSelectionModal.css).
+        <label
+            className="single-resistance-option"
+            style={{ background: isSelected ? 'rgba(255,255,255,0.15)' : (isExisting ? 'rgba(100,200,255,0.1)' : 'transparent'), border: isSelected ? '1px solid var(--color-link)' : (isExisting ? '1px dashed var(--color-link)' : '1px solid transparent') }}
+        >
             <input
                 type="radio"
                 name="resistanceSelectionOption"
                 checked={isSelected}
                 onChange={() => setSelected(type)}
-                style={{ marginRight: '8px' }}
+                className="single-resistance-input"
             />
             <strong>{type}</strong>
-            {isExisting && !hasSelection && <span style={{ marginLeft: '8px', opacity: 0.7, fontSize: '0.85em' }}>(current)</span>}
+            {isExisting && !hasSelection && <span className="single-resistance-current">(current)</span>}
         </label>
     );
 }
@@ -74,7 +81,7 @@ function SingleResistanceSelectionModal({ title, icon, action, playerStats, camp
                 <ResistanceHeader title={title} icon={icon} action={action} />
                 <div className="sp-body">
                     <p>{existingType ? 'Change damage type (currently ' + existingType + '):' : 'Choose one damage type (other than Force). You gain resistance to that type until you choose a different one.'}</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                    <div className="single-resistance-types">
                         {damageTypes.map((type) => (
                             <ResistanceTypeRow
                                 key={type}

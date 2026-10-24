@@ -22,11 +22,8 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
     const [pendingPrompts, setPendingPrompts] = useState([]);
     const [popup, setPopup] = useState(null);
 
-    useEffect(() => {
-        return () => {
-            setPendingPrompts([]);
-        };
-    }, []);
+    // fix#229 sweep: removed no-op unmount effect (local useState reset after
+    // unmount is a React no-op; no subscription inside).
 
     const handleSelectEffect = useCallback((effect) => {
         setSelectedEffect(effect);

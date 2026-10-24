@@ -1568,14 +1568,8 @@ function SaveAttackAoeModal({
     const allyList = isCarefulSpell ? getAllyList(playerStats.name) : null;
     const isCarefulAlly = useCallback((name) => allyList ? allyList.includes(name) : false, [allyList]);
 
-    useEffect(() => {
-        return () => {
-            setSummary(null);
-            setSelected(new Set());
-            setPendingPrompts([]);
-            setResults([]);
-        };
-    }, []);
+    // fix#229 sweep: removed no-op unmount effect resetting four LOCAL useState
+    // values (setState after unmount is a React no-op; no subscription inside).
 
     useEffect(() => {
         if (pendingPrompts.length === 0 && results.length > 0 && !summary) {

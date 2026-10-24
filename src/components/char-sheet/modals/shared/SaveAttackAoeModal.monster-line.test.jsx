@@ -74,26 +74,10 @@ vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
 
 const seenTargets = vi.hoisted(() => ({ current: [] }));
 
-vi.mock('./CreatureSelectionModal.jsx', () => ({
-  default: ({ title, targets, onConfirm, onSkip }) => {
-    seenTargets.current = targets;
-    return (
-      <div className="sp-overlay">
-        <div className="sp-header">{title}</div>
-        <div className="secondary-target-list">
-          {targets.map(t => (
-            <label key={t.name} className="secondary-target-row">
-              <input type="checkbox" data-name={t.name} />
-              {t.name}
-            </label>
-          ))}
-        </div>
-        <button className="sp-roll-btn" onClick={() => onConfirm(seenTargets.current.map(t => t.name))} type="button">Confirm</button>
-        <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-      </div>
-    );
-  },
-}));
+vi.mock('./CreatureSelectionModal.jsx', async () => {
+  const { createStaticPickerModal } = await import('./SaveAttackAoeModal.test-utils.jsx');
+  return { default: createStaticPickerModal(seenTargets, { listWrapper: true, dataName: true }) };
+});
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';

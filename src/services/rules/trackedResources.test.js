@@ -380,9 +380,10 @@ describe('computeTrackedResources', () => {
       ['monk lvl 5 = 0', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 5 }), 'wholenessofbodyUses', { current: 0, max: 0 }],
       ['warPriest WIS 3', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), abilities: [{ name: 'Wisdom', bonus: 3 }] }), 'warPriestUses', { current: 3, max: 3 }],
       ['warPriest WIS -2 clamps to 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), abilities: [{ name: 'Wisdom', bonus: -2 }] }), 'warPriestUses', { current: 1, max: 1 }],
-      // QUIRK (reported): warPriestUses seeds default 1 for EVERY character,
-      // even non-clerics — registry seeds it unconditionally.
-      ['warPriest quirk: wizard, no WIS -> 1', basePlayerStats(), 'warPriestUses', { current: 1, max: 1 }],
+      ['warPriest cleric no WIS entry -> 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }) }), 'warPriestUses', { current: 1, max: 1 }],
+      // GATED (fix#336S flip of the #1531 reported quirk): warPriestUses is a cleric
+      // pool — non-clerics now seed 0, no phantom {1,1} default.
+      ['warPriest gate: wizard, no WIS -> 0', basePlayerStats(), 'warPriestUses', { current: 0, max: 0 }],
     ];
     for (const [label, stats, key, expected] of rows) expectPool(stats, key, expected, label);
   });

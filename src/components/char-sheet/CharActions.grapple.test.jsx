@@ -172,9 +172,10 @@ vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
   default: vi.fn(() => <div data-testid="secondary-target-modal">SecondaryTargetModal</div>),
 }));
 
-vi.mock('./modals/TacticalMasterModal.jsx', () => ({
-  default: vi.fn(() => <div data-testid="tactical-master-modal">TacticalMasterModal</div>),
-}));
+vi.mock('./modals/TacticalMasterModal.jsx', async () => {
+  const { createTacticalMasterModalMock } = await import('./CharActions.test-utils.jsx');
+  return createTacticalMasterModalMock();
+});
 
 vi.mock('../../services/automation/handlers/combat/weaponMasteryHandler.js', () => ({
   applyMasteryEffect: vi.fn(() => Promise.resolve()),

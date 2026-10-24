@@ -137,6 +137,16 @@ function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featur
                     )}
                 </div>
                 <div className="sp-actions">
+                    {/* LIVE guard — rec #176 "always-true" refuted (it short-circuited the
+                        boolean algebra: trivially-true when hideConfirm is falsy, but three
+                        producers pass it truthy). Truth table (guard = confirm rendered):
+                          hideConfirm=F, targets>0 -> T   (default: every creature picker)
+                          hideConfirm=F, targets=0 -> T   (button shown, disabled below)
+                          hideConfirm=T, targets>0 -> T   (defensive; no producer reaches it)
+                          hideConfirm=T, targets=0 -> F   (REachable: GR/LR effect step with
+                            hideConfirm={!hasEffects} fed the same empty array as targets —
+                            GreaterRestorationHost / GreaterRestorationTargetPicker /
+                            LesserRestorationTargetPicker) */}
                     {!hideConfirm || targets.length > 0 ? (
                         <button
                             className="sp-roll-btn"

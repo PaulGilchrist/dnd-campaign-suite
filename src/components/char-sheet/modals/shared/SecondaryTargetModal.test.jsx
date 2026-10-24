@@ -4,7 +4,10 @@
 // mapping, chooser toggles, and distanceBadgeText copy are owned elsewhere).
 // Contract pinned here: map-badge rendering + lookup guard, radio/row selection
 // machine (confirm inert before selection, forwards selected key, Skip closes),
-// option ({value,label}) targets forwarding their value, and HP/size row metadata.
+// option ({value,label}) targets forwarding their value, HP/size row metadata,
+// and the live hideConfirm guard (ref rec #176 "dead conditional"): empty targets
+// with hideConfirm falsy still render a disabled confirm, empty targets with
+// hideConfirm=true suppress it entirely.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -159,5 +162,39 @@ describe('SecondaryTargetModal', () => {
         expect(npcRow).toHaveTextContent('(Small)');
         expect(npcRow).toHaveTextContent('20%');
         expect(npcRow).not.toHaveTextContent('7/35 HP');
+    });
+
+    // ref #176 adjudication: the `!hideConfirm || targets.length > 0` guard's false
+    // face (confirm suppressed) is REachable — restoration effect-step producers pass
+    // hideConfirm={!hasEffects} with targets derived from the same empty array.
+    it('suppresses the confirm button only when hideConfirm is set and targets are empty', () => {
+        // False-face row: hideConfirm=true, targets=[] -> no confirm, Skip remains to dismiss.
+        const hidden = render(
+            <SecondaryTargetModal
+                title="Greater Restoration"
+                targets={[]}
+                hideConfirm
+                onTargetSelected={vi.fn()}
+                onSkip={vi.fn()}
+                confirmLabel="Remove Effect"
+            />
+        );
+        expect(screen.queryByRole('button', { name: /Remove Effect/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
+        hidden.unmount();
+
+        // Contrast row: hideConfirm falsy, targets=[] -> confirm renders (disabled),
+        // so the guard — not just the disabled attr — is what hides the button above.
+        render(
+            <SecondaryTargetModal
+                title="Cure Wounds"
+                targets={[]}
+                onTargetSelected={vi.fn()}
+                onSkip={vi.fn()}
+                confirmLabel="Cast Cure Wounds"
+            />
+        );
+        const visibleConfirm = screen.getByRole('button', { name: /Cast Cure Wounds/ });
+        expect(visibleConfirm).toBeDisabled();
     });
 });

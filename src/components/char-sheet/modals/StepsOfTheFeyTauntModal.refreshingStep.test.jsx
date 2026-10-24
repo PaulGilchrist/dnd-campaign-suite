@@ -15,15 +15,29 @@ import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpService.js';
 
-// Honest savePrompt mock: source calls createSaveListener(campaignName, opts) —
-// capture opts (args[1]) and hand out a unique promptId per call.
+// Honest savePrompt mock of the REAL contract (savePrompt.js:105-145):
+// createSaveListener(campaignName, config) => { promptId, promise }. The real
+// promptId is utils.guid() — name-agnostic, unique per mint — so the mock
+// mints `save-guid-<n>` instead of prompt-<targetName>-<n> (name-based ids
+// latent-collide across listeners sharing a prompt name; fix#1426/#1431
+// family). The promise routes resolution BY its own promptId on a one-shot
+// 'save-result' window listener (savePrompt.js:121-131), matching arity+shape
+// (fix#215 fidelity law). This lane never dispatches saves (pinned below).
 const nextPrompt = vi.hoisted(() => ({ n: 0 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn((campaignName, opts) => ({
-        promptId: `prompt-${opts.targetName}-${nextPrompt.n++}`,
-        ...opts,
-    })),
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++nextPrompt.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({

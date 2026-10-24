@@ -1,0 +1,39 @@
+/* WeaponMasteryChoiceModal — scoped styles for WeaponMasteryChoiceModal.jsx
+   (fix#313 recipe: exact-value migration of the former inline styles at
+   :41/:45-50/:56-era, pin pass #278 "inline styles throughout").
+   Selection highlight rides the .selected modifier class (fix#328
+   shield-bash-option.selected precedent — same token values as the sibling
+   radio-row choice modals, own file to avoid cross-component coupling).
+   Family tokens sp-overlay/sp-modal/sp-header/sp-body/sp-actions/sp-roll-btn/
+   sp-dismiss-btn are reused from the globally-mounted sp-* family
+   (../../common/SavePromptModal.css) and ../CharSheet.css — not duplicated here. */
+
+/* Mastery-property list container — was style={{ textAlign: 'left', marginTop: '12px' }} (:41-era) */
+.weapon-mastery-options {
+    text-align: left;
+    margin-top: 12px;
+}
+
+/* Radio option row — static part of the former inline label style (:45-50-era);
+   the transparent base border lets .selected flip border-color without relayout. */
+.weapon-mastery-option {
+    display: block;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+/* Selected row — was inline background 'rgba(255,255,255,0.15)' / border
+   '1px solid var(--color-link)' ternaries (:48-49-era); enumerable state, class-owned per fix#328 */
+.weapon-mastery-option.selected {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--color-link);
+}
+
+/* Radio input offset — was style={{ marginRight: '8px' }} (:56-era) */
+.weapon-mastery-option-input {
+    margin-right: 8px;
+}

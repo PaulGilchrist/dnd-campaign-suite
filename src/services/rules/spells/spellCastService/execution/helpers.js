@@ -535,7 +535,10 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     await setRuntimeValue(targetName, 'regenerateActive', true, campaignName);
     await setRuntimeValue(targetName, 'regenerateSource', casterName, campaignName);
 
-    // Add expiration for combat: remove regenerate buff after 1 hour (3600 seconds / 6 = 600 rounds)
+    // Register the combat-scoped removal seam: the remove_regenerate_buff
+    // expiration clears on a new initiative roll / short-long rest (no
+    // fabricated hour→round countdown — §no-timers; the '1 hour' upper bound
+    // lives in the spell's prose, not in a stored clock — fix#336S/#1483).
     addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_regenerate_buff' }
     ], campaignName });

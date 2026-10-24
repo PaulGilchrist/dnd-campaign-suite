@@ -125,12 +125,12 @@ describe('useCharActionsModalHandlers', () => {
     vi.clearAllMocks();
   });
 
-  it('returns exactly the 27 named handler keys, all functions', () => {
+  it('returns exactly the 27 named handler keys', () => {
     const { handlers } = mount();
     expect(Object.keys(handlers).sort()).toEqual(EXPECTED_KEYS);
-    Object.values(handlers).forEach((value) => {
-      expect(typeof value).toBe('function');
-    });
+    // typeof-only loop cut (#245 sharpen): callable behavior of every key is
+    // call-pinned — the 3 unowned routes are invoked with asserted passthrough
+    // in the it.each directly below, the other 24 across the six family lanes.
   });
 
   it.each(UNOWNED_ROUTES.map(route => ({ desc: `${route.name} confirm`, route })))(

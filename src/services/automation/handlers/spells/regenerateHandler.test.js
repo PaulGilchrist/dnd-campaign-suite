@@ -10,7 +10,7 @@
 //                 regenerate_target_selection popup composition, purity guard.
 // NOT here (do not re-add): application internals (#1947), fix-clause pins (#1948),
 // predicate pins (#1946 retired), turn-seam 1 HP ticks (turnStartEffects.js lanes —
-// applyTurnStartEffects.test.js L241 cited). handle() never reads/writes the
+// applyTurnStartEffects.test.js L250-264 cited, cite-refreshed fix#336S/#1283). handle() never reads/writes the
 // regenerateActive flag; per #1946 handoff, no predicate or turn-tick pins here.
 //
 // Contract note: the trim queue brief listed "CON save prompt / save-outcome

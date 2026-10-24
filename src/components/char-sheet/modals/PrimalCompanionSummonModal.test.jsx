@@ -99,6 +99,10 @@ describe('PrimalCompanionSummonModal', () => {
     const body = screen.getByText('Choose a primal beast to bond with:').parentElement;
     expect(body.textContent).toContain('Peaceful Beast');
     expect(body.textContent).toContain('HP 10+3xRanger level');
+    // ledger :194 — absent acFormula omits the AC bit, never renders "AC undefined"
+    // (disk BY-name rows Beast of the Land/Sea/Sky all supply acFormula).
+    expect(body.textContent).not.toContain('undefined');
+    expect(body.textContent).not.toContain('AC');
     expect(body.textContent).not.toContain('Speed');
     expect(body.textContent).not.toContain('Attack');
     expect(body.textContent).not.toContain('Bite');

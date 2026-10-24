@@ -1,0 +1,60 @@
+/* WarMagicSpellModal — scoped styles for WarMagicSpellModal.jsx (fix#313 recipe:
+   exact-value migration of the former inline styles at :41/:45-52/:57/:60/:71-era).
+   Option rows became real <button>s (former plain divs had no role, pin pass #271);
+   selection highlight rides the .selected modifier class (fix#328
+   shield-bash-option.selected precedent; button-row house shape
+   ObjectTransformModal.css .object-type-btn.selected), so this modal keeps zero
+   inline style attributes. Family tokens sp-overlay/sp-modal/sp-header/sp-body/
+   sp-actions/sp-roll-btn/sp-dismiss-btn are reused from the globally-mounted
+   sp-* family (../../common/SavePromptModal.css) and ../CharSheet.css — not
+   duplicated here. */
+
+/* Scrollable spell list — was style={{ maxHeight: '300px', overflowY: 'auto' }} (:41-era) */
+.war-magic-spell-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Spell option row — static part of the former inline row style (:45-52-era), on the
+   div->button semantic upgrade. box-sizing/text-align/width/font/color neutralize
+   div->button rendering deltas: former block div filled the row with inherited font
+   (index.css global button sets padding .6em 1.2em, border-radius 8px,
+   background var(--background-color-button) and 500 weight — all overridden here to
+   the original div's exact values); the global button:hover border-color remains as a
+   free affordance of the new keyboard-reachable semantics, unselected rows only
+   (.selected (0,2,0) outranks button:hover (0,1,1)). */
+.war-magic-spell-option {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    padding: 8px 12px;
+    margin: 4px 0;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+/* Selected spell row — was inline border '2px solid #007bff' / backgroundColor
+   '#e8f0fe' ternaries (:49/:51-era); enumerable selection state, class-owned per fix#328 */
+.war-magic-spell-option.selected {
+    border: 2px solid #007bff;
+    background-color: #e8f0fe;
+}
+
+/* Level / casting-time meta spans — was style={{ marginLeft: '8px', color: '#666' }} (:57/:60-era) */
+.war-magic-spell-option-detail {
+    margin-left: 8px;
+    color: #666;
+}
+
+/* Pre-confirm inert styling — was style={!selected ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+   (:71-era); rides the native :disabled pseudo-state the button already carries
+   (disabled={!selected}), so no JS-side style fork is needed. */
+.war-magic-spell-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

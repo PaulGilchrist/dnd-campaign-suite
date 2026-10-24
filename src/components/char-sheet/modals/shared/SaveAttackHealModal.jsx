@@ -9,6 +9,7 @@ import { applyHealingToTarget } from '../../../../services/rules/combat/applyHea
 import { applyDamageToTarget, computeDamageAfterEvasion, hasEvasionForSave, normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import './SaveAttackHealModal.css';
 
 function computeHealEvasionDamage(combatSummary, targetName, rawDamage, success, saveType) {
     const targetChar = (combatSummary.creatures?.filter(c => c.type === 'player') || []).find(c => c.name === targetName);
@@ -281,7 +282,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                 </div>
                 {ctx.allResolved && (
                     <>
-                        <p className="sp-note" style={{ marginTop: '8px' }}>All targets resolved.</p>
+                        <p className="sp-note save-attack-heal-resolved-note">All targets resolved.</p>
                         <p>Select one creature to heal for {healExpression} HP:</p>
                         <div className="abjure-targets-list">
                             {ctx.results.map(r => (
@@ -292,7 +293,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                             ))}
                         </div>
                         {healResult && (
-                            <div className="abjure-result abjure-result-success" style={{ marginTop: '8px' }}>
+                            <div className="abjure-result abjure-result-success save-attack-heal-result">
                                 <strong>{healResult.targetName}</strong> healed for <strong>{healResult.healAmount}</strong> HP (actual: {healResult.actualHeal}). Current HP: {healResult.newHp} / {healResult.maxHp}.
                             </div>
                         )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { confirmWarMagicSpell } from '../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js';
 import '../CharSheet.css';
+import './WarMagicSpellModal.css';
 
 function WarMagicSpellModal({ action, playerStats, campaignName, options, optionDetails, maxSpellLevel, onClose }) {
     const [selected, setSelected] = useState(null);
@@ -38,37 +39,34 @@ function WarMagicSpellModal({ action, playerStats, campaignName, options, option
                 </div>
                 <div className="sp-body">
                     <p>Replace one attack with a Wizard spell of level 1–{maxSpellLevel} (casting time: action):</p>
-                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    <div className="war-magic-spell-list">
                         {options.map(name => (
-                            <div
+                            // Option row is a real <button>: the former plain div had no
+                            // role (pin pass #271). Selection rides the .selected modifier
+                            // class (fix#328 shield-bash-option.selected precedent; button-row
+                            // house shape ObjectTransformModal .object-type-btn.selected).
+                            <button
                                 key={name}
-                                style={{
-                                    padding: '8px 12px',
-                                    margin: '4px 0',
-                                    cursor: 'pointer',
-                                    border: selected === name ? '2px solid #007bff' : '1px solid #ccc',
-                                    borderRadius: '4px',
-                                    backgroundColor: selected === name ? '#e8f0fe' : '#fff',
-                                }}
+                                type="button"
+                                className={`war-magic-spell-option${selected === name ? ' selected' : ''}`}
                                 onClick={() => setSelected(name)}
                             >
-                            <strong>{name}</strong>
-                            {optionDetails?.[name]?.level && (
-                                    <span style={{ marginLeft: '8px', color: '#666' }}>Level {optionDetails?.[name]?.level}</span>
+                                <strong>{name}</strong>
+                                {optionDetails?.[name]?.level && (
+                                    <span className="war-magic-spell-option-detail">Level {optionDetails?.[name]?.level}</span>
                                 )}
                                 {optionDetails?.[name]?.casting_time && (
-                                    <span style={{ marginLeft: '8px', color: '#666' }}>({optionDetails?.[name]?.casting_time})</span>
+                                    <span className="war-magic-spell-option-detail">({optionDetails?.[name]?.casting_time})</span>
                                 )}
-                            </div>
+                            </button>
                         ))}
                     </div>
                 </div>
                 <div className="sp-actions">
                     <button
-                        className="sp-roll-btn"
+                        className="sp-roll-btn war-magic-spell-confirm"
                         disabled={!selected}
                         onClick={handleConfirm}
-                        style={!selected ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                     >
                         <i className="fa-solid fa-bolt"></i> Replace Attack
                     </button>

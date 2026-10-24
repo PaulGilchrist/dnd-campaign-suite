@@ -10,15 +10,30 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 
-// Honest savePrompt mock: source calls createSaveListener(campaignName, opts)
-// — capture opts (args[1]) and hand out unique promptIds per call.
-const saveListenerCalls = vi.hoisted(() => []);
+// Honest savePrompt mock of the REAL contract (savePrompt.js:105-145):
+// createSaveListener(campaignName, config) => { promptId, promise } — and
+// NOTHING else. The real promptId is utils.guid() (name-agnostic, unique per
+// mint), never a prompt-<targetName> string (shared name-based ids
+// latent-collide: two listeners on one id means resolving one misroutes the
+// other — fix#1426/#1431 family). The promise resolves with event.detail via
+// a one-shot 'save-result' listener routed BY its own minted id (the real
+// bytes: savePrompt.js:121-131). This lane never dispatches saves (pinned
+// below); the capture records any accidental dispatch.
+const saveState = vi.hoisted(() => ({ calls: [], n: 0 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn((campaignName, opts) => {
-        const promptId = `prompt-${opts.targetName}-${saveListenerCalls.length}`;
-        saveListenerCalls.push({ campaignName, ...opts, promptId });
-        return { promptId, ...opts };
+    createSaveListener: vi.fn((campaignName, config) => {
+        const promptId = `save-guid-${++saveState.n}`;
+        saveState.calls.push({ campaignName, ...config, promptId });
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
     }),
 }));
 
@@ -73,7 +88,7 @@ function makeProps(overrides) {
 describe('StepsOfTheFeyTauntModal - No Uses (newCount: 0)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        saveListenerCalls.length = 0;
+        saveState.calls.length = 0;
     });
 
     it('gates every step: shows the long-rest copy and keeps all four options inert — no advance, no dispatch', () => {
@@ -89,7 +104,7 @@ describe('StepsOfTheFeyTauntModal - No Uses (newCount: 0)', () => {
         }
         expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
         expect(createSaveListener).not.toHaveBeenCalled();
-        expect(saveListenerCalls).toHaveLength(0);
+        expect(saveState.calls).toHaveLength(0);
         expect(addEntry).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(setTempHp).not.toHaveBeenCalled();

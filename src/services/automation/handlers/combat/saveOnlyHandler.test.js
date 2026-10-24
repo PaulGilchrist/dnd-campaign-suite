@@ -70,9 +70,24 @@ function makeAction(automation = {}) {
 
 function setupMocks() {
   savePrompt.buildSaveDc.mockReturnValue(14);
-  savePrompt.createSaveListener.mockImplementation(() => ({
-    promptId: `prompt-${++promptCounter}`,
-  }));
+  savePrompt.createSaveListener.mockImplementation((_campaignName, _config) => {
+    // Real contract (savePrompt.js:105-145): returns { promptId, promise } —
+    // the old stub handed back promptId WITHOUT the promise the real service
+    // mints (a one-shot 'save-result' listener routed BY its own promptId,
+    // savePrompt.js:121-131). Ids stay unique-per-mint here (already true);
+    // the added promise self-resolves+removes exactly like the real seam so
+    // any future consumer awaiting it behaves as in prod.
+    const promptId = `save-guid-${++promptCounter}`;
+    const promise = new Promise((resolve) => {
+      const handleSaveResult = (event) => {
+        if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-result', handleSaveResult);
+        resolve(event.detail);
+      };
+      window.addEventListener('save-result', handleSaveResult);
+    });
+    return { promptId, promise };
+  });
   targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
   runtimeState.getRuntimeValue.mockReturnValue(undefined);
   runtimeState.setRuntimeValue.mockResolvedValue(undefined);

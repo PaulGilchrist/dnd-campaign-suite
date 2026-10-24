@@ -152,4 +152,53 @@ describe('ShieldBashChoiceModal', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /Apply Effect/ })).toBeInTheDocument();
   });
+
+  it('styles the choice list via scoped classes with zero inline styles (no-inline-styles convention)', () => {
+    // fix#313 recipe pin: the former inline styles on the options container,
+    // option labels, radio inputs, and effect spans (:50/:57/:63/:66-era) now
+    // live in ShieldBashChoiceModal.css (exact-value migration). Selection
+    // highlight rides the .selected modifier class (WarBondChooserModal
+    // precedent), so even the dynamic selection state needs no inline style.
+    render(<ShieldBashChoiceModal {...makeProps()} />);
+
+    const list = document.querySelector('.shield-bash-options');
+    expect(list).toBeTruthy();
+    expect(list.getAttribute('style')).toBeNull();
+
+    const rows = list.querySelectorAll('.shield-bash-option');
+    expect(rows).toHaveLength(2);
+    expect(list.querySelectorAll('.shield-bash-option-input')).toHaveLength(2);
+    expect(list.querySelectorAll('.shield-bash-option-effect')).toHaveLength(2);
+
+    // Choice view at rest AND after selecting Push: zero inline style attrs in the body.
+    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('radio', { name: /Push/ }));
+    expect(rows[0].className).toContain('selected');
+    expect(rows[1].className).not.toContain('selected');
+    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
+  });
+
+  it('derives Push copy from caller action.options value, falling back to the RAW 5 feet', () => {
+    // Copy-normalization lane: the RAW Shield Bash feat fixes the push at
+    // 5 feet (public/data/2024/feats.json:2633 "push the target 5 feet from
+    // you") and every current caller passes value: 5 (shieldBash.js:158), so
+    // the hardcoded copy was RULE-CORRECT (refuted with RAW cite). This pin
+    // guarantees the honest middle: options-driven copy when present, RAW
+    // default otherwise. Base-props lane (no options → "5 feet") is pinned
+    // by the first test above.
+    render(<ShieldBashChoiceModal {...makeProps({
+      action: {
+        name: 'Shield Bash',
+        options: [
+          { name: 'Push', effect: 'push', value: 10 },
+          { name: 'Prone', effect: 'prone' },
+        ],
+      },
+    })} />);
+
+    expect(screen.getByText(/Push target 10 feet away from you/)).toBeInTheDocument();
+    expect(screen.queryByText(/Push target 5 feet away from you/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Target gains Prone condition/)).toBeInTheDocument();
+    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
+  });
 });

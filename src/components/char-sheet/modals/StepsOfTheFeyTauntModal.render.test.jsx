@@ -8,13 +8,29 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 
-// Honest savePrompt mock matching the real signature createSaveListener(campaignName, opts).
-// This base-render lane never dispatches saves; the stub only isolates module import.
+const promptState = vi.hoisted(() => ({ n: 0 }));
+
+// Honest savePrompt mock matching the REAL contract (savePrompt.js:105-145):
+// createSaveListener(campaignName, config) => { promptId, promise } — the old
+// stub flattened `...opts` into the return (fields the real service never
+// returns) under a shared prompt-<targetName> id that latent-collides across
+// listeners (fix#1426/#1431 family). Ids here are name-agnostic and unique
+// per mint (mirrors utils.guid()); the promise routes event.detail BY its own
+// promptId on a one-shot 'save-result' listener (savePrompt.js:121-131).
+// This base-render lane never dispatches saves; the stub only isolates import.
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn((_campaignName, opts = {}) => ({
-        promptId: `prompt-${opts.targetName ?? 'unknown'}`,
-        ...opts,
-    })),
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++promptState.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -104,5 +120,49 @@ describe('StepsOfTheFeyTauntModal - base chooser render', () => {
         render(<StepsOfTheFeyTauntModal {...makeProps({ mode, title })} />);
         expect(screen.getByRole('button', { name: expected })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: other })).toBeNull();
+    });
+
+    it('styles the choice step via scoped classes with zero inline styles (no-inline-styles convention)', () => {
+        // fix#313 recipe pin (pass #254-era census): the former inline styles
+        // in renderChoiceStep — options container (:403-era), step cards
+        // (:410-417-era), card header (:419-era), icon (:420-era), description
+        // (:423-era), and no-uses note (:427-era) — now live in
+        // StepsOfTheFeyTauntModal.css (exact-value migration). The hasUses
+        // dimming state rides the .disabled modifier class. fix#254's
+        // vacuous-choice rec (bewitching lane) is untouched.
+        const { rerender } = render(<StepsOfTheFeyTauntModal {...makeProps()} />);
+
+        const body = document.querySelector('.sp-body');
+        expect(body.querySelectorAll('[style]')).toHaveLength(0);
+
+        const list = document.querySelector('.fey-taunt-options');
+        expect(list).toBeTruthy();
+        expect(list.getAttribute('style')).toBeNull();
+
+        const cards = list.querySelectorAll('.fey-taunt-option');
+        expect(cards).toHaveLength(4);
+        for (const card of cards) {
+            expect(card.getAttribute('style')).toBeNull();
+            expect(card.className).toContain('clickable');
+            expect(card.className).not.toContain('disabled');
+            expect(card.querySelector('.fey-taunt-option-icon')).toBeTruthy();
+            expect(card.querySelector('.fey-taunt-option-desc')).toBeTruthy();
+        }
+        // Uses available: no-uses note absent.
+        expect(list.querySelector('.fey-taunt-no-uses')).toBeNull();
+
+        // Zero-uses state: cards gain .disabled, lose .clickable — still zero inline.
+        rerender(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 0 })} />);
+        const dimmed = document.querySelectorAll('.fey-taunt-option');
+        expect(dimmed).toHaveLength(4);
+        for (const card of dimmed) {
+            expect(card.getAttribute('style')).toBeNull();
+            expect(card.className).toContain('disabled');
+            expect(card.className).not.toContain('clickable');
+        }
+        const note = document.querySelector('.fey-taunt-no-uses');
+        expect(note).toBeTruthy();
+        expect(note.getAttribute('style')).toBeNull();
+        expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
     });
 });

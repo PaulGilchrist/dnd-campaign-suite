@@ -141,12 +141,12 @@ describe('useCharActionsAutomation', () => {
             expect(deps.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns the two handler functions', () => {
-            const handlers = getHandlers(createDeps());
-
-            expect(typeof handlers.handleAutomationAction).toBe('function');
-            expect(typeof handlers.handleDivineInterventionCast).toBe('function');
-        });
+        // 'returns the two handler functions' typeof-only test cut (#245 sharpen):
+        // handleAutomationAction is invoked with asserted side-effect channels by the
+        // cannotAct early-return test above and the feature-choice gates below;
+        // handleDivineInterventionCast is invoked+asserted by the deps-seam suite
+        // below ('handleDivineInterventionCast deps seam') and by
+        // useCharActionsAutomation.test.divine-intervention.js.
     });
 
     describe('feature-choice gates (damage_bonus / defensive_tactics)', () => {

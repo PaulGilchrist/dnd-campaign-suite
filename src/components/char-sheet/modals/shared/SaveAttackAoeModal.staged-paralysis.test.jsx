@@ -81,27 +81,10 @@ vi.mock('../../../../services/rules/features/paralyzingBreathService.js', () => 
 
 const seenPicker = vi.hoisted(() => ({ current: null }));
 
-vi.mock('./CreatureSelectionModal.jsx', () => ({
-  default: ({ title, note, targets, onConfirm, onSkip }) => {
-    seenPicker.current = { title, note, targets };
-    return (
-      <div className="sp-overlay">
-        <div className="sp-header">{title}</div>
-        <div className="sp-note">{note}</div>
-        <div className="secondary-target-list">
-          {targets.map(t => (
-            <label key={t.name} className="secondary-target-row">
-              <input type="checkbox" data-name={t.name} />
-              {t.name}
-            </label>
-          ))}
-        </div>
-        <button className="sp-roll-btn" onClick={() => onConfirm(targets.map(t => t.name))} type="button">Confirm</button>
-        <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-      </div>
-    );
-  },
-}));
+vi.mock('./CreatureSelectionModal.jsx', async () => {
+  const { createStaticPickerModal } = await import('./SaveAttackAoeModal.test-utils.jsx');
+  return { default: createStaticPickerModal(seenPicker, { capturePicker: true, noteClass: 'sp-note', listWrapper: true, dataName: true, confirmFromParam: true }) };
+});
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';

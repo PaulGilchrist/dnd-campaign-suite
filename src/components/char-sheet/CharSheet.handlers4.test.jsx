@@ -245,7 +245,8 @@ describe('handleSavageAttacker', () => {
     expect(addEntry).toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].abilityName).toBe('Savage Attacker');
 
-    expect(result).toBeDefined();
+    // bare toDefined cut (#245 sharpen): subsumed — a dropped result makes
+    // the two property asserts below throw, and they pin the real outcome.
     expect(result.better).toBe(true);
     expect(result.awaitingChoice).toBe(true);
   });

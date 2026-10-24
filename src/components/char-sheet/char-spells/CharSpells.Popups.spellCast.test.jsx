@@ -242,7 +242,9 @@ describe('CharSpells - spell cast flow', () => {
 
   it('auto-damage from a spell attack resolves through the standalone damage pipeline', async () => {
     renderCharSpells();
-    expect(typeof seams.autoDamageRoll).toBe('function');
+    // typeof-only seam guard cut (#245 sharpen): the invocation below TypeErrors
+    // if the producer never wired seams.autoDamageRoll (captured at render by
+    // the useLoggedDiceRoll mock), and the pipeline passthrough is fully pinned.
 
     await seams.autoDamageRoll({ autoAttack: 'spell-hit-1' }, true);
 

@@ -270,7 +270,10 @@ function addClericDivineResources(resources, { playerStats }) {
   resources.preserveLifePool = { current: maxPL, max: maxPL }
 
   const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
-  const maxWP = wis ? Math.max(wis.bonus, 1) : 1
+  // War Priest is a cleric domain resource — gate like sibling pools above
+  // (fix#336S/#1531: was seeded for EVERY class, shadowing non-clerics with a
+  // phantom {current:1,max:1} pool).
+  const maxWP = isCleric ? (wis ? Math.max(wis.bonus, 1) : 1) : 0
   resources.warPriestUses = { current: maxWP, max: maxWP }
 }
 

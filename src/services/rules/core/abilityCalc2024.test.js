@@ -351,7 +351,8 @@ describe('abilityCalc2024', () => {
 
     it('folds static and expression max_hp_increase passives through the shared pipeline', () => {
       // Internals (missing amount, non-matching effect, fortified_health fold) are
-      // unit-tested at carryingCapacity.test.js:14-63; this pins the getHitPoints seam.
+      // unit-tested at carryingCapacity.test.js:15-59 (cite-refreshed post-#1245 —
+      // the retired :14-63 range drifted when the ladder fold landed); this pins the getHitPoints seam.
       expect(getHitPoints(makeStats({
         class: { hit_point_die: 'd8' },
         automation: { passives: [{ type: 'passive_rule', effect: 'max_hp_increase', amount: 3 }] },

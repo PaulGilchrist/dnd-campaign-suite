@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { applyWeaponMasteryChoice } from '../../../services/automation/index.js';
 import '../CharSheet.css';
+import './WeaponMasteryChoiceModal.css';
 
 function WeaponMasteryChoiceModal({ action: _action, playerStats, campaignName, masteryProperties, onClose, onConfirm }) {
     const [selected, setSelected] = useState(null);
@@ -38,22 +39,21 @@ function WeaponMasteryChoiceModal({ action: _action, playerStats, campaignName, 
                 </div>
                 <div className="sp-body">
                     <p>Choose a mastery property to activate with your weapon attacks:</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                    <div className="weapon-mastery-options">
                         {masteryProperties.map((m, i) => {
                             const isSelected = selected === m;
                             return (
-                                <label key={i} style={{
-                                    display: 'block', padding: '8px 12px', margin: '4px 0',
-                                    borderRadius: '6px', cursor: 'pointer',
-                                    background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent',
-                                    border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
-                                }}>
+                                // Static decoration is class-owned; the selected/unselected
+                                // ternaries were enumerable state, so they ride the .selected
+                                // modifier class (fix#328 shield-bash-option.selected precedent) —
+                                // zero inline styles remain (pin pass #278).
+                                <label key={i} className={`weapon-mastery-option${isSelected ? ' selected' : ''}`}>
                                     <input
                                         type="radio"
                                         name="weaponMasteryChoice"
                                         checked={isSelected}
                                         onChange={() => setSelected(m)}
-                                        style={{ marginRight: '8px' }}
+                                        className="weapon-mastery-option-input"
                                     />
                                     <strong>{m}</strong>
                                 </label>

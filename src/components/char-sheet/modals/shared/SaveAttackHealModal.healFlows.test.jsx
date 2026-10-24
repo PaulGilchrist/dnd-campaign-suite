@@ -204,4 +204,35 @@ describe('SaveAttackHealModal — heal flows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('resolved note and heal result render via scoped classes with zero inline style (no-inline-styles convention)', async () => {
+    // fix#313 recipe pin: the former style={{ marginTop: '8px' }} statics on
+    // renderBody's allResolved arm (:275/:286-era) now live as
+    // .save-attack-heal-resolved-note / .save-attack-heal-result in
+    // SaveAttackHealModal.css (exact-value migration). This component keeps no
+    // dynamic-data inline sites — the whole modal must stay style-free.
+    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
+    await resolveToHealSelection(getByRole, ['Goblin A']);
+
+    const note = screen.getByText('All targets resolved.');
+    expect(note.classList.contains('sp-note')).toBe(true);
+    expect(note.classList.contains('save-attack-heal-resolved-note')).toBe(true);
+    expect(note.getAttribute('style')).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(getHealRadio('Goblin A'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Heal Selected/ }));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.save-attack-heal-result')).toBeTruthy();
+    });
+    const result = document.querySelector('.save-attack-heal-result');
+    expect(result.textContent).toContain('Goblin A healed for');
+    expect(result.getAttribute('style')).toBeNull();
+    // Zero-inline census across the whole resolved/healed body.
+    expect(document.querySelector('.sp-body [style]')).toBeNull();
+  });
 });

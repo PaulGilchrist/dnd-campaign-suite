@@ -18,6 +18,12 @@ function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName,
         }
 
         const res = await applyOpenHandTechnique({ action, playerStats, campaignName, targetName, selectedOptionName: selected, saveDc });
+        // Null means the selected option vanished from the handler's list between
+        // render and click — a contract breach, never a silent re-render (fix# ledger :174).
+        if (!res) {
+            console.error(`OpenHandTechniqueModal: applyOpenHandTechnique returned no result for option "${selected}" — staying in selection mode`);
+            return;
+        }
         setResult(res);
         setApplied(true);
     };

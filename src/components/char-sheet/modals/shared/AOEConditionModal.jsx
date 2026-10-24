@@ -331,18 +331,11 @@ function AOEConditionModal({
     const [pendingPrompts, setPendingPrompts] = useState([]);
     const [showResults, setShowResults] = useState(false);
 
-    // fix#227 clone-debt (a): was TWO byte-identical unmount-reset useEffects (same
-    // empty-deps cleanup, so safe-merge not sequencing) plus a no-op shell between them
-    // whose if-branch body held only a comment — no state, no render, no subscription.
-    // One honest effect remains; fix#229's dead-cleanup-noop lane owns whether even
-    // this survivor is load-bearing.
-    useEffect(() => {
-        return () => {
-            setResults([]);
-            setPendingPrompts([]);
-            setShowResults(false);
-        };
-    }, []);
+    // fix#227 clone-debt (a): was TWO byte-identical unmount-reset useEffects plus a
+    // no-op shell. fix#229's dead-cleanup-noop lane adjudicated the survivor: local
+    // useState resets on unmount are React no-ops and this effect holds no
+    // subscription — removed with the pair (CreatureSelectionModal:47's cancelled-flag
+    // counterexample does NOT apply: no abort flag, no async write, local state only).
     const [heightenTarget, setHeightenTarget] = useState(null);
 
     const isCarefulSpell = metamagicCareful || false;

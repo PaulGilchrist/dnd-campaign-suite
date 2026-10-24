@@ -105,35 +105,9 @@ vi.mock('../../../../hooks/combat/loggedDiceRollUtils.js', () => ({
   clearSoulstitchStamp: vi.fn(),
 }));
 
-vi.mock('./CreatureSelectionModal.jsx', () => {
-  const { useState, useCallback } = require('react');
-  function MockCreatureSelectionModal({ targets, onConfirm, onSkip, confirmLabel }) {
-    const [selected, setSelected] = useState(new Set());
-    const toggleTarget = useCallback((name) => {
-      setSelected(prev => {
-        const next = new Set(prev);
-        next.has(name) ? next.delete(name) : next.add(name);
-        return next;
-      });
-    }, []);
-    return (
-      <div className="sp-overlay">
-        <div className="sp-modal">
-          {targets.map((t) => (
-            <label key={t.name} className="secondary-target-row">
-              <input type="checkbox" data-name={t.name} checked={selected.has(t.name)} onChange={() => toggleTarget(t.name)} />
-              {t.name}
-            </label>
-          ))}
-          <button className="sp-roll-btn" onClick={() => onConfirm(Array.from(selected))} disabled={selected.size === 0} type="button">
-            {confirmLabel} ({selected.size})
-          </button>
-          <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-        </div>
-      </div>
-    );
-  }
-  return { default: MockCreatureSelectionModal };
+vi.mock('./CreatureSelectionModal.jsx', async () => {
+  const { createInteractivePickerModal } = await import('./SaveAttackAoeModal.test-utils.jsx');
+  return { default: createInteractivePickerModal({ dataName: true }) };
 });
 
 // ── Re-import mocked modules ──

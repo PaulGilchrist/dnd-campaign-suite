@@ -9,8 +9,12 @@
 // condition-applied log on failed saves ONLY; successes take half damage and
 // grant zero push te / zero condition log. PC targets resolve at the
 // save-result listener seam.
-// Save-bonus lookup is NOT asserted here (the family pins raw-20 rolls);
-// numeric/uses data locks live in MonsterCardModal.legendary-uses.test.jsx.
+// Save-bonus lookup IS pinned here: the reader at SaveAttackAoeModal.jsx:47/
+// :138 consumes saveBonuses[normalizeSaveType(saveType).toLowerCase()] — with
+// prop saveType="Dexterity" (and this lane's identity-normalizeSaveType mock)
+// the canonical key is 'dexterity'; abbreviated { dex: N } mocks silently fold
+// to 0 via ?? 0 (fix#228/#233/#235/#237 family). numeric/uses data locks live
+// in MonsterCardModal.legendary-uses.test.jsx.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -53,9 +57,9 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Adult Silver Dragon 1', type: 'npc', currentHp: 216, maxHp: 216, saveBonuses: {}, resistances: [], immunities: [] },
-      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { dex: -1 }, resistances: [], immunities: [] },
-      { name: 'Guard 1', type: 'npc', currentHp: 55, maxHp: 55, saveBonuses: { dex: 7 }, resistances: [], immunities: [] },
-      { name: 'AberrantSorcerer', type: 'player', currentHp: 52, maxHp: 52, saveBonuses: { dex: -1 }, resistances: [], immunities: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { dexterity: -1 }, resistances: [], immunities: [] },
+      { name: 'Guard 1', type: 'npc', currentHp: 55, maxHp: 55, saveBonuses: { dexterity: 7 }, resistances: [], immunities: [] },
+      { name: 'AberrantSorcerer', type: 'player', currentHp: 52, maxHp: 52, saveBonuses: { dexterity: -1 }, resistances: [], immunities: [] },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -70,21 +74,10 @@ vi.mock('../../../../hooks/combat/handlers/handleOverchannelSelfDamage.js', () =
   handleOverchannelSelfDamage: vi.fn(async () => {}),
 }));
 const seenTargets = vi.hoisted(() => ({ current: [] }));
-vi.mock('./CreatureSelectionModal.jsx', () => ({
-  default: ({ title, description, note, targets, onConfirm, onSkip }) => {
-    seenTargets.current = targets;
-    return (
-      <div className="sp-overlay">
-        <div className="sp-header">{title}</div>
-        <div className="sp-desc">{description}</div>
-        <div className="sp-note-copy">{note}</div>
-        {targets.map(t => (<label key={t.name} className="secondary-target-row"><input type="checkbox" />{t.name}</label>))}
-        <button className="sp-roll-btn" onClick={() => onConfirm(seenTargets.current.map(t => t.name))} type="button">Confirm</button>
-        <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-      </div>
-    );
-  },
-}));
+vi.mock('./CreatureSelectionModal.jsx', async () => {
+  const { createStaticPickerModal } = await import('./SaveAttackAoeModal.test-utils.jsx');
+  return { default: createStaticPickerModal(seenTargets, { descClass: 'sp-desc', noteClass: 'sp-note-copy' }) };
+});
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
@@ -144,8 +137,12 @@ describe('MA-0138 Cold Gale — push-only fail clause producer', () => {
   });
 
   it('one confirm: NPC failed save takes FULL damage + instant push te (30) + push log; NPC successful save takes HALF, zero push, zero condition log', async () => {
-    // Draws: Thug raw1/2 low → roll 2 (<DC 19, fail); Guard raw1 high →
-    // roll 20 (success). Prompt id for AberrantSorcerer consumes the tail.
+    // Draws: Thug raw1/2 low → roll 2 + dexterity −1 = 1 (<DC 19, fail);
+    // Guard raw1 high → roll 20 + dexterity 7 = 27 (success). Prompt id for
+    // AberrantSorcerer consumes the tail. Pre-re-key these totals folded to
+    // the bare rolls (2 / 20) at the :47 ?? 0 miss — outcome unchanged, so no
+    // assertion rode the fold; the bonus bytes below now pin canonical-key
+    // consumption honestly.
     spyRandom([0.05, 0.05, 0.99, 0.99, 0.99]);
     const { getByText } = renderGale();
     await waitFor(() => expect(seenTargets.current.length).toBe(3));
@@ -164,6 +161,8 @@ describe('MA-0138 Cold Gale — push-only fail clause producer', () => {
     const thugDmg = loggedEntries().find(e => e.rollType === 'save-damage' && e.targetName === 'Thug 1');
     expect(thugDmg.finalDamage).toBe(10);
     expect(thugDmg.saveResult).toBe('failure');
+    expect(thugDmg.saveRoll).toBe(2);
+    expect(thugDmg.saveBonus).toBe(-1); // canonical 'dexterity' key consumed, not folded to 0
     const thugLog = loggedEntries().find(e => e.type === 'condition' && e.characterName === 'Thug 1');
     expect(thugLog.condition).toBe('Pushed');
     expect(thugLog.description).toMatch(/Thug 1 failed the Dexterity save \(DC 19\) in Adult Silver Dragon 1's Cold Gale — pushed up to 30 ft straight away/);
@@ -171,6 +170,8 @@ describe('MA-0138 Cold Gale — push-only fail clause producer', () => {
     // SUCCESS leg — Guard 1: half damage, no push te, no condition log.
     const guardDmg = loggedEntries().find(e => e.rollType === 'save-damage' && e.targetName === 'Guard 1');
     expect(guardDmg.saveResult).toBe('success');
+    expect(guardDmg.saveRoll).toBe(20);
+    expect(guardDmg.saveBonus).toBe(7); // canonical 'dexterity' key consumed, not folded to 0
     expect(guardDmg.finalDamage).toBe(5);
     expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Guard 1', 5, ['Cold'], expect.anything());
     expect((runtime.store['campaign.targetEffects'] || []).some(te => te.effect === 'push' && te.target === 'Guard 1')).toBe(false);

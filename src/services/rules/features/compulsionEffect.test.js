@@ -61,10 +61,17 @@ describe('applyCompulsionEffect (multi-target confirm lane)', () => {
     };
     const combatContext = { creatures: [{ name: 'Goblin' }, { name: 'Orc' }, { name: 'Troll' }] };
 
+    const promptSeq = { n: 0 };
+
     // Deterministic per-target save outcomes: listed targets fail, everyone else succeeds.
+    // Ids are unique-per-mint (mirrors the real utils.guid() issuance at
+    // savePrompt.js:106): the old prompt-<targetName> ids LATENT-COLLIDED —
+    // two listeners for one target in flight would share a single id and
+    // resolving one would misroute the other (fix#1426/#1431 family).
+    // Return shape stays the real { promptId, promise } (savePrompt.js:144).
     const seedSaves = (failures = []) => {
         createSaveListener.mockImplementation((_campaign, config) => ({
-            promptId: `prompt-${config.targetName}`,
+            promptId: `prompt-${config.targetName}-${++promptSeq.n}`,
             promise: Promise.resolve({ success: !failures.includes(config.targetName) }),
         }));
     };
@@ -116,6 +123,9 @@ describe('applyCompulsionEffect (multi-target confirm lane)', () => {
         seedSaves(['Goblin']);
 
         const result = await applyCompulsionEffect(spell, playerStats, campaignName, mapName, ['Goblin']);
+        // Pin the log against the id the mock actually minted (unique-per-mint,
+        // mirroring savePrompt.js:106) instead of a hardcoded shared name-id.
+        const goblinPromptId = createSaveListener.mock.results[0].value.promptId;
 
         expect(addEntry).toHaveBeenCalledTimes(4);
         const [castLog, saveLog, conditionLog, summaryLog] = addEntry.mock.calls.map(c => c[1]);
@@ -124,7 +134,7 @@ describe('applyCompulsionEffect (multi-target confirm lane)', () => {
             characterName: 'Wizard',
             abilityName: 'Compulsion',
             description: 'Wizard casts Compulsion on Goblin! Goblin must make a WIS save (DC 15) or become Charmed.',
-            promptId: 'prompt-Goblin',
+            promptId: goblinPromptId,
             timestamp: expect.any(Number),
         });
         expect(saveLog).toEqual({

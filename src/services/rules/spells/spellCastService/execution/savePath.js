@@ -164,7 +164,9 @@ function resolveAoeEmpoweredEvocationMod(playerStats, fullSpell, damageExpressio
 function resolveAoeDamageInfo(playerStats, fullSpell, spell, slotLevel, overchannelActive) {
     const damageAtSlotLevel = fullSpell.damage?.damage_at_slot_level || fullSpell.damage?.damage_at_character_level || spell.damage?.damage_at_slot_level || {};
     const damageExpression = resolveAoeDamageExpression(damageAtSlotLevel, slotLevel);
-    const hasDamage = !!damageExpression && damageExpression !== '0' && damageExpression !== '';
+    // '0' guard is load-bearing; the retired `!== ''` operand was a dead-twin of
+    // the !! coercion (fix#336S/#1492).
+    const hasDamage = !!damageExpression && damageExpression !== '0';
     const empoweredEvocationIntMod = resolveAoeEmpoweredEvocationMod(playerStats, fullSpell, damageExpression);
     const damageFormula = damageExpression || '0';
     const payloadDamage = overchannelActive ? `${damageFormula} [Overchannel Maximize]` : damageFormula;

@@ -420,7 +420,10 @@ describe('ElementalBurstModal', () => {
             expect(props.action).toBe(baseAction);
             expect(props.playerStats).toBe(basePlayerStats);
             expect(props.campaignName).toBe(CAMPAIGN);
-            expect(typeof props.onClose).toBe('function');
+            // typeof-only onClose pin cut (#245 sharpen): behavior-owned at
+            // 'AOE close forwards onClose EXACTLY ONCE with ZERO args' below —
+            // that test clicks the mock's onClick={onClose} wire and asserts the
+            // parent's fresh onClose fires (undefined prop would inert-fire and fail it).
         });
 
         it('characters defaults to null when the parent omits the prop', () => {

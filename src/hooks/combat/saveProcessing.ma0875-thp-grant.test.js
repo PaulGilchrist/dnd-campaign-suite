@@ -1,13 +1,16 @@
 // @maintained-by-ai: 2026-10-14
 // MA-0875: Gnoll Demoniac "Hunger of Yeenoghu" — INLINE block-save THP-grant
-// seam, authoritative home for the generic grant-on-save rules (replace-if-
-// larger, stacking; the MA-0275 animal-spirit lane explicitly delegates here).
-// context.tempHpGrant (parseTempHpGrantClause over the live monsters.json row,
-// forwarded by buildAbilitySaveRollContext) arms grantFailedSaveTempHp:
-// failed save → real tempHpService replace-if-larger on the ATTACKER
-// (MA-0275 Fortify producer twin, self-grant default, "creature of its choice"
-// chooser GM-enforced) + one temp_hp_granted log, no expiration clock;
-// successful save grants ZERO; clauseless contexts are byte-inert.
+// seam. context.tempHpGrant (parseTempHpGrantClause over the live monsters.json
+// row, forwarded by buildAbilitySaveRollContext) arms grantFailedSaveTempHp:
+// failed save → tempHpService channel on the ATTACKER (MA-0275 Fortify producer
+// twin, self-grant default, "creature of its choice" chooser GM-enforced) +
+// one temp_hp_granted log, no expiration clock; successful save grants ZERO;
+// clauseless contexts are byte-inert.
+// OWNERSHIP (coverage map): the replace-if-larger POOL semantics of
+// tempHpService.setTempHp are owned by tempHpBuffHandler.bolsteringTreats
+// .test.js:146/:159 and are NOT re-derived here — this lane proves only the
+// CONSUMER seam: the clause value RECEIVED via context.tempHpGrant flows
+// verbatim into the channel (fix#274 field-scope).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -120,7 +123,7 @@ function resetState() {
 beforeEach(resetState);
 
 describe('MA-0875 inline saveProcessing THP grant (Hunger of Yeenoghu clause)', () => {
-    it('failed save: full damage + replace-if-larger THP on the ATTACKER, grant log, no clock', async () => {
+    it('failed save: full damage + THP grant on the ATTACKER via the tempHpService channel, grant log, no clock', async () => {
         expect(GRANT_HP).toBe(10); // data pin: row still authors "gains 10 Temporary Hit Points"
         await resolveSave({ ...hungerContext }, false, 5);
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(26);
@@ -134,17 +137,13 @@ describe('MA-0875 inline saveProcessing THP grant (Hunger of Yeenoghu clause)', 
         expect(grant.description).toMatch(new RegExp(`gains ${GRANT_HP} temporary hit points \\(now ${GRANT_HP} THP, replace-if-larger\\)`));
     });
 
-    it('replace-if-larger stacking: standing 15 pool held (logged "now 15 THP"), standing 5 pool replaced up', async () => {
-        runtimeStore[`${GNOLL}.tempHp`] = 15;
-        await resolveSave({ ...hungerContext }, false, 5);
-        expect(runtimeStore[`${GNOLL}.tempHp`]).toBe(15);
-        expect(grantLog().description).toMatch(/now 15 THP/);
-
-        resetState();
-        runtimeStore[`${GNOLL}.tempHp`] = 5;
-        await resolveSave({ ...hungerContext }, false, 5);
-        expect(runtimeStore[`${GNOLL}.tempHp`]).toBe(GRANT_HP);
-        expect(grantLog().description).toMatch(/now 10 THP/);
+    it('clause-channel fidelity: the value RECEIVED via context.tempHpGrant flows verbatim to the channel (pool replace-if-larger owned by tempHpBuffHandler.bolsteringTreats.test.js:146/:159 — not re-derived here)', async () => {
+        // Distinctive-channel-value (7 ≠ live row's 10): proves the seam reads
+        // context.tempHpGrant, not a constant, from an EMPTY pool — zero
+        // standing-pool math (fresh store; resetState ran in beforeEach).
+        await resolveSave({ ...hungerContext, tempHpGrant: { tempHp: 7 } }, false, 5);
+        expect(runtimeStore[`${GNOLL}.tempHp`]).toBe(7);
+        expect(grantLog().description).toMatch(/gains 7 temporary hit points \(now 7 THP, replace-if-larger\)/);
     });
 
     it('successful save: ZERO THP, zero grant log', async () => {

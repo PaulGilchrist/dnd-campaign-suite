@@ -6,9 +6,8 @@ import MultiTargetPopup from './MultiTargetPopup.jsx';
 // This file covers ONLY MultiTargetPopup's own UI lane: its copy, the
 // second-target <select>, and the exact payload emitted on confirm.
 // Base-surface behavior inherited from TargetPopupBase (Escape → onSkip,
-// 'Spell' name fallback) is already pinned in sibling popup specs
-// (MetamagicPopup, MagicMissileTargetPopup, TargetWithCheckboxesPopup,
-// SingleTargetPopup) — no duplicate here until a dedicated base spec exists.
+// 'Spell' name fallback) is owned by the dedicated base spec
+// (TargetPopupBase.test.jsx, live since fix#163) — no duplicate here.
 // CharSpells → popup prop wiring is covered by CharSpells.Popups.popupWidgets.test.jsx.
 
 const mockSpell = { name: 'Create Water', level: 1 };

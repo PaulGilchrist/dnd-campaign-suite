@@ -47,9 +47,11 @@ describe('WarMagicSpellModal', () => {
 
         expect(screen.getByText('Improved War Magic')).toBeInTheDocument()
         expect(screen.getByText(/Replace one attack with a Wizard spell of level 1–2/)).toBeInTheDocument()
-        expect(screen.getByText('Burning Hands')).toBeInTheDocument()
-        expect(screen.getByText('Magic Missile')).toBeInTheDocument()
-        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Burning Hands/ })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Magic Missile/ })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Web/ })).toBeInTheDocument()
+        // Rows are real <button>s (semantic upgrade, fix pin pass #271): 3 spell rows + confirm + Cancel.
+        expect(screen.getAllByRole('button')).toHaveLength(5)
         expect(screen.queryAllByText('Level 1')).toHaveLength(2)
         expect(screen.queryAllByText('Level 2')).toHaveLength(1)
         expect(screen.queryAllByText('(1 action)')).toHaveLength(3)
@@ -74,17 +76,17 @@ describe('WarMagicSpellModal', () => {
             },
         })} />)
 
-        expect(screen.getByText('Burning Hands')).toBeInTheDocument()
-        expect(screen.getByText('Magic Missile')).toBeInTheDocument()
-        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Burning Hands/ })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Magic Missile/ })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Web/ })).toBeInTheDocument()
         expect(screen.queryAllByText('Level 1')).toHaveLength(1) // only Burning Hands has a level
         expect(screen.queryAllByText('Level 2')).toHaveLength(0)
         expect(screen.queryAllByText('(1 action)')).toHaveLength(1) // only Magic Missile has a casting time
         unmount()
 
         render(<WarMagicSpellModal {...makeProps({ optionDetails: null })} />)
-        expect(screen.getByText('Burning Hands')).toBeInTheDocument()
-        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Burning Hands/ })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Web/ })).toBeInTheDocument()
         expect(screen.queryAllByText(/Level \d/)).toHaveLength(0)
         expect(screen.queryAllByText('(1 action)')).toHaveLength(0)
     })
@@ -96,8 +98,8 @@ describe('WarMagicSpellModal', () => {
         })
 
         const { container } = render(<WarMagicSpellModal {...makeProps()} />)
-        fireEvent.click(screen.getByText('Burning Hands'))
-        fireEvent.click(screen.getByText('Web'))
+        fireEvent.click(screen.getByRole('button', { name: /Burning Hands/ }))
+        fireEvent.click(screen.getByRole('button', { name: /Web/ }))
         expect(replaceButton()).toBeEnabled()
         fireEvent.click(replaceButton())
 
@@ -114,6 +116,8 @@ describe('WarMagicSpellModal', () => {
         // Handler descriptions arrive with markup — it must render as HTML, not escaped text.
         // .sp-body is the contract class the modal uses for dangerouslySetInnerHTML.
         expect(container.querySelector('.sp-body').innerHTML).toContain('<b>Web</b>')
+        // Kept as a text query on purpose: this is the <b>Web</b> inside the result body,
+        // not an option row — the choice view (and its row buttons) is already gone here.
         expect(screen.getByText('Web')).toBeInTheDocument()
         expect(screen.queryByText(/Replace one attack with a Wizard spell/)).not.toBeInTheDocument()
 
@@ -125,7 +129,7 @@ describe('WarMagicSpellModal', () => {
         confirmWarMagicSpell.mockResolvedValue(null)
 
         render(<WarMagicSpellModal {...makeProps()} />)
-        fireEvent.click(screen.getByText('Web'))
+        fireEvent.click(screen.getByRole('button', { name: /Web/ }))
         fireEvent.click(replaceButton())
 
         await waitFor(() => {
@@ -133,7 +137,7 @@ describe('WarMagicSpellModal', () => {
         })
         expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument()
         expect(screen.getByText(/Replace one attack with a Wizard spell/)).toBeInTheDocument()
-        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /Web/ })).toBeInTheDocument()
         expect(mockOnClose).not.toHaveBeenCalled()
     })
 

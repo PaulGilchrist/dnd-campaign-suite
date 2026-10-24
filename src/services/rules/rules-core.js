@@ -1,5 +1,3 @@
-import utils from '../ui/utils.js';
-import { getSpellMaxLevel } from '../shared/spell-utils.js';
 import { is2024 } from './rules-helpers.js';
 import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e, getCarryingCapacity as getCarryingCapacity5e } from './core/abilityCalc.js';
 import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024, getCarryingCapacity as getCarryingCapacity2024 } from './core/abilityCalc2024.js';
@@ -32,49 +30,3 @@ export function getSubModules(playerStats, playerSummary) {
      };
  }
 
-const coreRules = {
-    getAbilityLongName: utils.getAbilityLongName,
-    getSpellMaxLevel,
-
-    getAbilities: async (playerStats, playerSummary) => {
-        if (is2024(playerStats, playerSummary)) {
-            return getAbilities2024(playerStats);
-         }
-        return getAbilities5e(playerStats);
-     },
-
-    getHitPoints: (playerStats, playerSummary) => {
-        if (is2024(playerStats, playerSummary)) {
-            return getHitPoints2024(playerStats);
-         }
-        return getHitPoints5e(playerStats);
-     },
-
-    getCarryingCapacity: (playerStats) => {
-        if (is2024(playerStats, null)) {
-            return getCarryingCapacity2024(playerStats);
-         }
-        return getCarryingCapacity5e(playerStats);
-     },
-
-    getSpellAbilities: (allSpells, playerStats, playerSummary) => {
-        if (is2024(playerStats, playerSummary)) {
-            return getSpellAbilities2024(allSpells, playerStats, playerSummary);
-         }
-        return getSpellAbilities5e(allSpells, playerStats);
-     },
-
-    getAttacks: (allEquipment, allSpells, playerStats, playerSummary) => {
-        if (is2024(playerStats, playerSummary)) {
-            return getAttacks2024(allEquipment, allSpells, playerStats);
-         }
-        return getAttacks5e(allEquipment, allSpells, playerStats);
-     },
-
-    getProficiencyChoiceCount: (playerStats, skills, playerSummary) => {
-        const { proficiencyUtils: pu } = getSubModules(playerStats, playerSummary);
-        return pu.getProficiencyChoiceCount(playerStats, skills);
-     },
-};
-
-export default coreRules;

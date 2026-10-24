@@ -71,18 +71,10 @@ vi.mock('../../../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 const seenTargets = vi.hoisted(() => ({ current: [] }));
-vi.mock('./CreatureSelectionModal.jsx', () => ({
-  default: ({ targets, onConfirm, onSkip }) => {
-    seenTargets.current = targets;
-    return (
-      <div className="sp-overlay">
-        {targets.map(t => (<label key={t.name} className="secondary-target-row"><input type="checkbox" />{t.name}</label>))}
-        <button className="sp-roll-btn" onClick={() => onConfirm(seenTargets.current.map(t => t.name))} type="button">Confirm</button>
-        <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-      </div>
-    );
-  },
-}));
+vi.mock('./CreatureSelectionModal.jsx', async () => {
+  const { createStaticPickerModal } = await import('./SaveAttackAoeModal.test-utils.jsx');
+  return { default: createStaticPickerModal(seenTargets, { header: false }) };
+});
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';

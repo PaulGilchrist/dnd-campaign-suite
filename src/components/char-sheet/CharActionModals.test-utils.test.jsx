@@ -47,7 +47,10 @@ describe('createBaseProps fixture contract', () => {
       handleDivinationSavantConfirm: expect.any(Function),
       handleIllusionSavantConfirm: expect.any(Function),
     });
-    expect(typeof setModalState).toBe('function');
+    // Call-and-assert (#245 sharpen): setModalState is live and its patch
+    // lands in this call's modalState — the write channel ~24 consumers use.
+    props.setModalState({ propShapeProbe: true });
+    expect(props.modalState).toEqual({ propShapeProbe: true });
 
     // Fresh state objects per call so consumer tests cannot leak into each other.
     const second = createBaseProps();

@@ -192,7 +192,8 @@ if (COLLECTED_DIRECTLY) {
 
             for (const name of ['Wisdom', 'Dexterity']) {
                 const ability = mockPlayerStats.abilities.find((a) => a.name === name);
-                expect(ability, `abilities entry "${name}"`).toBeDefined();
+                // bare toDefined cut (#245 sharpen): a missing entry makes the
+                // bonus assert below throw — coverage is subsumed, same failure.
                 expect(Number.isInteger(ability.bonus)).toBe(true);
             }
         });

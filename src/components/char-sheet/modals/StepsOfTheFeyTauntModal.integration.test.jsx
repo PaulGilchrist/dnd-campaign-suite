@@ -1,7 +1,9 @@
 // @maintained-by-ai
-// Integration lane: genuine cross-step seams only — overlay/content-click close behavior
-// spanning choice→result, the null freeCastCountKey guard on the decrement lane, the
-// mistyEscape free-cast skip log/result seam, and the taunting chooser→skip→result flow.
+// Integration lane: genuine cross-step seams only — overlay-click close behavior
+// spanning choice→result (non-interactive copy hosts are asserted, never clicked —
+// pass #261 rec), the null freeCastCountKey guard on the decrement lane (text renders
+// no count when no write lands — pass #258), the mistyEscape free-cast skip log/result
+// seam, and the taunting chooser→skip→result flow.
 // Copy is owned by render.test.jsx; exact step payloads by refreshingStep,
 // disappearingStep (#256), dreadfulStep (#257), and bewitching (#254).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -12,10 +14,28 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { addEntry } from '../../../services/ui/logService.js';
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
 
+const promptState = vi.hoisted(() => ({ n: 0 }));
+
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn((campaignName, opts) => ({
-        promptId: `prompt-${opts.targetName}-${Math.random().toString(36).slice(2, 8)}`,
-    })),
+    // Real contract (savePrompt.js:105-145): (campaignName, config) =>
+    // { promptId, promise }. Deterministic name-agnostic unique-per-mint ids
+    // (mirrors utils.guid() minting; the old Math.random suffix was
+    // non-deterministic, and prompt-<targetName> ids latent-collide across
+    // listeners sharing a prompt name — fix#1426/#1431 family). The promise
+    // routes event.detail BY its own promptId on a one-shot 'save-result'
+    // listener (savePrompt.js:121-131).
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++promptState.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -67,15 +87,17 @@ describe('StepsOfTheFeyTauntModal - Integration', () => {
         vi.clearAllMocks();
     });
 
-    it('never closes on overlay or modal-content clicks — holds the choice step, then the result view', async () => {
+    it('never closes on overlay clicks — holds the choice step, then the result view', async () => {
         const onClose = vi.fn();
         const { container } = render(<StepsOfTheFeyTauntModal {...makeProps({ onClose })} />);
 
-        // Choice step: clicking the overlay or inside the modal must not close or advance.
+        // Choice step: an overlay click must not close or advance. The prompt <p> is
+        // non-interactive — asserted present with its exact copy instead of clicked
+        // (the old fireEvent.click on it was no-op theater, pass #261 rec).
         fireEvent.click(container.firstChild);
-        fireEvent.click(screen.getByText(/Choose how you use/));
         expect(onClose).not.toHaveBeenCalled();
-        expect(screen.getByText(/Choose how you use/)).toBeInTheDocument();
+        expect(screen.getByText(/Choose how you use/).textContent)
+            .toBe('Choose how you use Steps of the Fey:');
 
         // Resolve the refreshing lane to reach the result view.
         fireEvent.click(screen.getByText('Refreshing Step'));
@@ -84,10 +106,12 @@ describe('StepsOfTheFeyTauntModal - Integration', () => {
             expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
 
-        // Result view: same click-through behavior — only Done closes.
+        // Result view: same click-through behavior — only Done closes. The bold
+        // 'Refreshing Step:' label lives in the non-interactive sp-body — asserted,
+        // not clicked (no-op theater removed, pass #261 rec).
         fireEvent.click(container.firstChild);
-        fireEvent.click(screen.getByText(/Refreshing Step:/));
         expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByText('Refreshing Step:')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
@@ -102,8 +126,13 @@ describe('StepsOfTheFeyTauntModal - Integration', () => {
 
         // Lane ran to completion — the temp-HP benefit landed...
         expect(setTempHp).toHaveBeenCalledWith('FeyTrickster', expect.any(Number), 'test-campaign');
-        // ...while the missing counter key wrote nothing to the runtime store.
+        // ...while the missing counter key wrote nothing to the runtime store...
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        // ...and the result copy renders NO remaining-count (pass #258: the
+        // '(N remaining)' suffix is returned by decrementCount only when a
+        // write lands; this branch previously claimed '(2 remaining)' unwritten).
+        const body = screen.getByRole('button', { name: 'Done' }).closest('.sp-modal').querySelector('.sp-body');
+        expect(body.textContent).not.toContain('remaining');
     });
 
     it('free-cast skip in mistyEscape mode logs the free cast, shows the remaining count, and consumes no uses', async () => {

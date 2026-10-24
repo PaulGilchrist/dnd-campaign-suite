@@ -1,12 +1,28 @@
 import { useState } from 'react';
 import { applyShieldBashEffect } from '../../../services/combat/steps/features/shieldBash.js';
 import '../CharSheet.css';
+import './ShieldBashChoiceModal.css';
 
 function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, saveDc, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+
+    // RAW default distance is 5 feet (public/data/2024/feats.json:2633/:2646,
+    // Shield Bash: "push the target 5 feet from you or cause it to have the
+    // Prone condition (your choice)"). Choice copy derives from caller
+    // action.options when present (every current caller passes value: 5 —
+    // shieldBash.js:158); 5 feet is the rules-defined fallback. `action` is
+    // still forwarded verbatim to apply/skip lanes below (:15/:76-era).
+    const RAW_PUSH_FEET = 5;
+    const choiceOptions = (action?.options?.length ? action.options : [{ name: 'Push' }, { name: 'Prone' }])
+        .map((opt) => ({
+            name: opt.name,
+            effect: opt.name === 'Push'
+                ? `Push target ${typeof opt.value === 'number' ? opt.value : RAW_PUSH_FEET} feet away from you`
+                : 'Target gains Prone condition',
+        }));
 
     const handleApply = async () => {
         if (!selected) return;
@@ -47,23 +63,20 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
                 <div className="sp-body">
                     {error && <p>{error}</p>}
                     <p>Choose an effect for <b>{targetName}</b> on failed STR save (DC {saveDc}):</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                        {[
-                            { name: 'Push', effect: 'Push target 5 feet away from you' },
-                            { name: 'Prone', effect: 'Target gains Prone condition' },
-                        ].map((opt, i) => {
+                    <div className="shield-bash-options">
+                        {choiceOptions.map((opt, i) => {
                             const isSelected = selected === opt.name;
                             return (
-                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                                <label key={i} className={`shield-bash-option${isSelected ? ' selected' : ''}`}>
                                     <input
                                         type="radio"
                                         name="shieldBashOption"
                                         checked={isSelected}
                                         onChange={() => setSelected(opt.name)}
-                                        style={{ marginRight: '8px' }}
+                                        className="shield-bash-option-input"
                                     />
                                     <strong>{opt.name}</strong>
-                                    <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {opt.effect}</span>
+                                    <span className="shield-bash-option-effect">— {opt.effect}</span>
                                 </label>
                             );
                         })}

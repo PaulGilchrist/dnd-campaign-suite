@@ -8,6 +8,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { getCombatContext } from '../../../services/rules/combat/damageUtils.js';
 import '../CharSheet.css';
+import './StepsOfTheFeyTauntModal.css';
 
 function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, campaignName, saveDc, featureName, newCount, freeCastCountKey, unlimited, onClose }) {
     const [applied, setApplied] = useState(false);
@@ -105,15 +106,24 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         setChoice(null);
     };
 
+    // Text-vs-write honesty (pin pass #258): decrementCount is the sole writer of the
+    // uses counter, so the '(N remaining)' display suffix is its RETURN value — lanes
+    // append the suffix only when a decrement write actually landed. With a null
+    // freeCastCountKey the lane resolves with NO count text (previously the result
+    // claimed '(newCount-1) remaining' while writing nothing). Defensive branch only
+    // today: both live producers always pass the key (stepsOfTheFeyHandler.js:69,
+    // mistyEscapeHandler.js:59) — latent display fix, zero live behavior change.
     const decrementCount = async () => {
         if (freeCastCountKey) {
             const remaining = newCount - 1;
             await setRuntimeValue(playerName, freeCastCountKey, remaining, campaignName);
+            return ` (${remaining} remaining)`;
         }
+        return '';
     };
 
     const applyRefreshingStep = async () => {
-        await decrementCount();
+        const remainingSuffix = await decrementCount();
         const tempHpRoll = Math.floor(Math.random() * 10) + 1;
         setTempHp(playerName, tempHpRoll, campaignName);
 
@@ -125,14 +135,13 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             timestamp: Date.now(),
         }).catch((e) => { console.error('[stepsOfTheFey] Error logging refreshing step:', e); });
 
-        const remaining = newCount - 1;
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.`;
         setResult({ description });
         setApplied(true);
     };
 
     const applyDisappearingStep = async () => {
-        await decrementCount();
+        const remainingSuffix = await decrementCount();
         const storedConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
         const conditions = Array.isArray(storedConditions) ? storedConditions : [];
         if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
@@ -151,8 +160,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             timestamp: Date.now(),
         }).catch((e) => { console.error('[stepsOfTheFey] Error logging disappearing step:', e); });
 
-        const remaining = newCount - 1;
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.`;
         setResult({ description });
         setApplied(true);
     };
@@ -205,7 +213,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     });
 
     const handleTauntConfirm = async (selectedTargets) => {
-        await decrementCount();
+        const remainingSuffix = await decrementCount();
         const promptIds = [];
 
         for (const target of selectedTargets) {
@@ -289,14 +297,13 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const remaining = newCount - 1;
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.`;
         setResult({ description });
         setApplied(true);
     };
 
     const handleDreadfulConfirm = async (selectedTargets) => {
-        await decrementCount();
+        const remainingSuffix = await decrementCount();
         const promptIds = [];
         const combatContext = await getCombatContext(campaignName);
         const characters = combatContext?.creatures || [];
@@ -366,8 +373,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const remaining = newCount - 1;
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.`;
         setResult({ description });
         setApplied(true);
     };
@@ -400,31 +406,23 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
                 </div>
                 <div className="sp-body">
                     <p>Choose how you use <b>{title || featureName}</b>:</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                    <div className="fey-taunt-options">
                         {options.map(option => (
                             <div
                                 key={option.key}
-                                className={hasUses ? "clickable" : ""}
+                                className={`fey-taunt-option${hasUses ? ' clickable' : ' disabled'}`}
                                 data-testid={`step-option-${option.key}`}
                                 onClick={hasUses ? () => handleChoice(option.key) : undefined}
-                                style={{
-                                    padding: '12px',
-                                    border: '1px solid #555',
-                                    borderRadius: '6px',
-                                    backgroundColor: '#1a1a2e',
-                                    opacity: hasUses ? 1 : 0.4,
-                                    cursor: hasUses ? 'pointer' : 'default',
-                                }}
                             >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                                    <i className={`fa-solid ${option.icon}`} style={{ fontSize: '1.2em', color: '#4fc3f7' }}></i>
+                                <div className="fey-taunt-option-header">
+                                    <i className={`fa-solid ${option.icon} fey-taunt-option-icon`}></i>
                                     <strong>{option.label}</strong>
                                 </div>
-                                <div style={{ fontSize: '0.9em', color: '#ccc' }}>{option.description}</div>
+                                <div className="fey-taunt-option-desc">{option.description}</div>
                             </div>
                         ))}
                         {!hasUses && (
-                            <p style={{ fontSize: '0.85em', color: '#999', textAlign: 'center', marginTop: '8px' }}>
+                            <p className="fey-taunt-no-uses">
                                 No uses remaining — finish a Long Rest to regain.
                             </p>
                         )}

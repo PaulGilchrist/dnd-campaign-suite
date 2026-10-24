@@ -350,16 +350,8 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
     const saveType = elementData?.saveType || 'DEX';
     const saveDc = computeAttunementSaveDc(playerStats);
 
-    useEffect(() => {
-        return () => {
-            setPhase('element');
-            setChosenElement(null);
-            setTargets([]);
-            setSelectedTargets(new Set());
-            setResults([]);
-            setPendingPrompts([]);
-        };
-    }, []);
+    // fix#229 sweep: removed no-op unmount effect resetting six LOCAL useState values
+    // (setState after unmount is a React no-op; phase transitions live in other effects).
 
     useEffect(() => {
         if (pendingPrompts.length === 0 && results.length > 0 && !phase.startsWith('summary')) {

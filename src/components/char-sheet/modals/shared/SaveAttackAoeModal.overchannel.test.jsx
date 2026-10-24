@@ -183,7 +183,11 @@ describe('SaveAttackAoeModal — CLA-244 overchannel consumer', () => {
     expect(casterName).toBe('TestWizard');
     expect(campaignName).toBe('test-campaign');
     expect(ctx).toEqual({ overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3 });
-    expect(typeof logFn).toBe('function');
+    // Call-and-assert (#245 sharpen): logFn is the addEntry write-channel
+    // wrapper (jsx:1650) — invoking it must log to the exact campaign verbatim.
+    const probe = { text: 'overchannel backlash probe' };
+    logFn(probe);
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', probe);
     expect(Array.isArray(characters)).toBe(true);
   });
 

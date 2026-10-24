@@ -25,7 +25,11 @@ describe('createDefaultProps', () => {
     const props = createDefaultProps();
     expect(props.campaignName).toBe('test-campaign');
     expect(props.playerSummary).toMatchObject({ name: 'Test Character', rules: '5e' });
-    expect(typeof props.onSaveClick).toBe('function');
+    // Call-and-assert (#245 sharpen): the default is a live, assertable mock —
+    // consumers spy on save clicks; a non-function or no-op default breaks this.
+    props.onSaveClick('save-click');
+    expect(props.onSaveClick).toHaveBeenCalledTimes(1);
+    expect(props.onSaveClick).toHaveBeenCalledWith('save-click');
     // Each call must mint independent mocks, or call-count assertions
     // in consumer tests would leak between tests.
     expect(props.onSaveClick).not.toBe(createDefaultProps().onSaveClick);

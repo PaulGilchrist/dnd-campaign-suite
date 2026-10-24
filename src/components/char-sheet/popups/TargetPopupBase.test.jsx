@@ -171,7 +171,10 @@ describe('TargetPopupBase', () => {
       // the base registers its own document listener exactly once per mount
       expect(keydownAdds).toHaveLength(1);
       handlers.push(keydownAdds[0][1]);
-      expect(typeof handlers[0]).toBe('function');
+      // typeof-only pin cut (#245 sharpen, fix#163/#240 verify-not-redo): the
+      // captured listener is call-pinned two lines below — :172 proves this is
+      // the ONLY keydown listener, so the Escape dispatch runs handlers[0]
+      // itself and :177 asserts the outcome; :183 byte-pairs the removal.
 
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(skipCalls).toBe(1);

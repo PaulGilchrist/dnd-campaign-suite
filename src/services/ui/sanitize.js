@@ -50,8 +50,9 @@ export function sanitizeHtml(html) {
              // For spans and other elements
              'class', 'style',
          ],
-         // Allow data attributes
-        ADD_ATTR: ['data-*'],
+         // data-* attributes pass via DOMPurify's ALLOW_DATA_ATTR default (true) —
+         // the retired ADD_ATTR:['data-*'] entry was inert (ADD_ATTR has no wildcard
+         // support; fix#336S / #1545, sanitize.test.js owns data-attr bytes).
     });
 }
 

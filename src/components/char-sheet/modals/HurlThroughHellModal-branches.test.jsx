@@ -421,7 +421,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     // hasUse short-circuits the pact else-if: the slot cell is never even read/written.
     expect(cells.has(`${PLAYER}|spell_slots_level_2`)).toBe(false);
     expect(sortKeys()).toEqual([`Throg|hurlThroughHellTurnUsed`, `Throg|hurlThroughHellUses`]);
-    expect(cells.get(`${PLAYER}|hurlThroughHellUses`)).toBe(1); // 0 + 1 through the live store
+    // uses VALUE stamp (0+1) is base-owned: HurlThroughHellModal.test.jsx:180 pins the
+    // increment on this same hasUse arm — re-stamping here duplicated it (ledger rec :161).
     expect(getCurrentCombatRound.mock.calls).toEqual([[CAMPAIGN]]);
     expect(createSaveListener.mock.calls).toEqual([[CAMPAIGN, { targetName: TARGET, attackerName: PLAYER, saveType: 'WIS', saveDc: 16 }]]);
     expect(addEntry.mock.calls).toStrictEqual([[CAMPAIGN, triggerRow(pid)]]);

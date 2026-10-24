@@ -6,8 +6,9 @@
 //   encounter #878 (LogEncounter.test.jsx), roll (LogRoll.test.jsx), loot (LogLoot.test.jsx),
 //   hp/healing (LogHpChange/LogHpHealing.test.jsx), spell (LogSpell.test.jsx),
 //   metamagic pool (LogMetamagicPool.test.jsx), rest/misc (LogMiscEntries.test.jsx),
-//   travel (LogTravel.test.jsx), note adding (LogNotes.test.jsx — no note byte lane exists,
-//   so the single NoteEntry byte check is retained here; migrate it when a lane appears).
+//   travel (LogTravel.test.jsx), note CONTENT census (LogNotes.test.jsx — canonical
+//   home since #885 absorbed the ex-#879 retained pin; the duplicate content test was
+//   dropped here fix#336S, this lane keeps only the .log-note routing marker byte :100).
 //
 // type → component → root-class marker (newest-first batch below pins all of these):
 //   roll→RollEntry .log-roll          note→NoteEntry .log-note
@@ -135,14 +136,6 @@ describe('Log container dispatch', () => {
     expect(document.querySelectorAll('.log-entry').length).toBe(0);
   });
 
-  // NoteEntry byte lane does not exist yet (LogNotes.test.jsx owns note *adding* only),
-  // so this consolidated check stays here until a leaf lane takes it over.
-  it('NoteEntry renders custom author, note text, time, and comment icon', () => {
-    setup(Log, [note({ characterName: 'Gandalf', noteText: 'Light!' })]);
-    expect(q('.log-entry.log-note')).toBeInTheDocument();
-    expect(q('.log-note-text')).toHaveTextContent('Light!');
-    expect(q('.log-note .log-character')).toHaveTextContent('Gandalf');
-    expect(q('.log-note .log-time')).toBeInTheDocument();
-    expect(q('.log-note i.fa-comment-dots')).toBeInTheDocument();
-  });
+  // NoteEntry content bytes are owned by LogNotes.test.jsx (canonical home, #885
+  // census absorbed here fix#336S); routing marker retained at :100 above.
 });

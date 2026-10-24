@@ -1,0 +1,32 @@
+/* Scoped styles for ShieldBashChoiceModal (fix#313 recipe: exact-value
+   migration of the former inline styles at :50/:57/:63/:66-era).
+   Selection highlight rides the .selected modifier class (WarBondChooserModal
+   precedent), so the choice view keeps zero inline style attributes. */
+.shield-bash-options {
+    text-align: left;
+    margin-top: 12px;
+}
+
+.shield-bash-option {
+    display: block;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.shield-bash-option.selected {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--color-link);
+}
+
+.shield-bash-option-input {
+    margin-right: 8px;
+}
+
+.shield-bash-option-effect {
+    opacity: 0.8;
+    margin-left: 8px;
+}

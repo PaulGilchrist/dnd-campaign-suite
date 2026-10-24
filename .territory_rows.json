@@ -1,0 +1,650 @@
+[
+ [
+  296,
+  "- \ud83d\udccc rec sleepService.staged-breath.test.js:125 \u2014 lane uses abbreviated .con key naming; audit key convention vs modal family (full keys). (pass #235)",
+  [
+   "src/services/rules/features/sleepService.staged-breath.test.js"
+  ]
+ ],
+ [
+  446,
+  "- \ud83d\udccc attackRollDamageSteps-automationBonuses.test.js heavily duplicates -weaponHitBonuses + -natural20-celestial + colossusSlayer step tests (~40 redundant step-level its) \u2014 queue merge consideration. (pass #300)",
+  [
+   "src/services/combat/steps/attackRollDamageSteps-automationBonuses.test.js"
+  ]
+ ],
+ [
+  726,
+  "- \ud83d\udccc REC cross-file: frightfulPresenceService.test.js :144-221 MA-0147/0163 row-mirror arms collapse to data-shape asserts (dracolich canonical :70-142 covers legs) (#711)",
+  [
+   "src/services/rules/features/frightfulPresenceService.test.js"
+  ]
+ ],
+ [
+  728,
+  "- \ud83d\udccc REC cross-file: add tiger Rend to handlePlainDamage.hitClause.test.js HIT_CLAUSE_ROWS (:224-282) \u2014 tiger landing unpinned in owner lane (#715)",
+  [
+   "src/hooks/combat/handlers/handlePlainDamage.hitClause.test.js"
+  ]
+ ],
+ [
+  729,
+  "- \ud83d\udccc REC cross-file: repeatSaveService.test.js vs saveProcessing.save-margin-rider.test.js deep-fail/strip-keep cycle overlap \u2014 consolidate roller branches into repeatSaveService at their turns (#713)",
+  [
+   "src/hooks/combat/saveProcessing.save-margin-rider.test.js",
+   "src/services/rules/features/repeatSaveService.test.js"
+  ]
+ ],
+ [
+  730,
+  "- \ud83d\udccc REC cross-file: monsterRecharge.test.js:203-207 + :231-236 (MA-0663/MA-1843) near-identical fresh/spent gate triples \u2014 one instance + :50-56 suffices (#736)",
+  [
+   "src/services/encounters/monsterRecharge.test.js"
+  ]
+ ],
+ [
+  766,
+  "- \ud83d\udccc REC batch cleanup: storage.js dead mock (not imported by render chain, verified x4 #820-#823) in spell-effects/no-oa-speedy/pass-without-trace/ma1012-frozen-grip/target-effect-removal/disadvantage-next-attack/effect-removal/save-ability badges files \u2014 delete at each own turn (#823)",
+  [
+   "src/services/ui/storage.js"
+  ]
+ ],
+ [
+  808,
+  "- \ud83d\udccc REC cross-file: LogHpHealing.test.jsx:12-30 damage-breakdown REMOVE (relocated to LogHpChange #880); #880 must claim 'Healed'/source-paren/note/maximize bytes (gap between lanes flagged)",
+  [
+   "src/components/log/LogHpHealing.test.jsx"
+  ]
+ ],
+ [
+  811,
+  "- \ud83d\udccc REC cross-file: LogNotes.test.jsx absorb retained NoteEntry byte check from LogEntryRendering #879 (lane now exists); LogEntryRendering can then drop retained note test (#884)",
+  [
+   "src/components/log/LogNotes.test.jsx"
+  ]
+ ],
+ [
+  812,
+  "- \ud83d\udccc REC cross-file: LogEntryRendering.test.jsx:140-147 retained NoteEntry content test superseded by LogNotes census #885 \u2014 drop at re-touch, keep :100 routing, update header migration note",
+  [
+   "src/components/log/LogEntryRendering.test.jsx"
+  ]
+ ],
+ [
+  838,
+  "- \ud83d\udccc REC cross-file: useLoggedDiceRollAttack.potent-cantrip.test.js school/zero-INT non-fold it.each legs duplicate #931 t3 owner \u2014 consolidate at its turn (#931)",
+  [
+   "src/hooks/combat/useLoggedDiceRollAttack.potent-cantrip.test.js"
+  ]
+ ],
+ [
+  847,
+  "- \ud83d\udccc REC: save.test-utils.js makeSaveDcTests ORPHANED (only consumer save.test.js #958 now loops) \u2014 delete in scoped pass; save.js:299 prismatic raw-damage no token-resolve (pinned as-authored, leaks if token data ships) (#958)",
+  [
+   "src/services/combat/automation/automationInfoBuilder/save.js",
+   "src/services/combat/automation/automationInfoBuilder/save.test-utils.js",
+   "src/services/combat/automation/automationInfoBuilder/save.test.js"
+  ]
+ ],
+ [
+  848,
+  "- \ud83d\udccc suspect spell.js:82 dragon_companion hardcodes noConcentration:false while free_spell:22 reads auto.noConcentration \u2014 pinned as-is drop-pin #960; summonSpiritHandler.js:366 ||10 despawn-clock + :304 1_minute mislabel confirmed earlier #951",
+  [
+   "src/services/automation/handlers/spells/summonSpiritHandler.js",
+   "src/services/combat/automation/automationInfoBuilder/spell.js"
+  ]
+ ],
+ [
+  849,
+  "- \ud83d\udccc REC cross-file: restoreBalance.test.js:49-57 collectSaveModifiers null/undefined legs dup automationModifiers guard (#964) \u2014 trim at ITS turn keeping 3 restore_balance legs",
+  [
+   "src/services/combat/conditions/restoreBalance.test.js"
+  ]
+ ],
+ [
+  853,
+  "- \ud83d\udccc REC cross-file: automationService.core.test.js:31-48 describe('getAutomationInfo') fully subsumed by buildAttackInfo facade lane guard-battery+transparency (#971) \u2014 delete block at core.test.js ITS turn, keep hasAutomation + expression lanes",
+  [
+   "src/services/combat/automation/automationService.core.test.js"
+  ]
+ ],
+ [
+  854,
+  "- \ud83d\udccc REC cross-file: automationCollector.types.test.js:216-217 arcane_apotheosis empties subsumable by full-envelope fingerprint \u2014 low-prio at ITS turn (#972); collection CITED-OWNER categorization faces PRESERVED (old:66-:280 folded into 21-feature golden #3)",
+  [
+   "src/services/combat/automation/automationCollector.types.test.js"
+  ]
+ ],
+ [
+  855,
+  "- \ud83d\udccc REC: automationService.modifiers.test.js unmarked lane \u2014 mark+trim at ITS turn (#973); automationExpressions.js:257\u2192:273 double warn+error on unresolvable token (noise, behavior correct) (#973)",
+  [
+   "src/services/combat/automation/automationExpressions.js",
+   "src/services/combat/automation/automationService.modifiers.test.js"
+  ]
+ ],
+ [
+  862,
+  "- \ud83d\udccc REC cross-file: assertCanAct.charge.test.js:120-122 bucketForAction classification examples dup base-lane #984 behind pure delegation \u2014 trim to one delegation example at ITS turn (#984)",
+  [
+   "src/services/combat/assertCanAct.charge.test.js"
+  ]
+ ],
+ [
+  863,
+  "- \ud83d\udccc REC cross-file: steps/attackRollBonuses-brutalStrike.test.js t3 ordering dupe #986 \u2014 fold into t1 keeping dice-application at ITS turn; improvedBrutalStrike clean keep-as-is",
+  [
+   "src/services/combat/steps/attackRollBonuses-brutalStrike.test.js"
+  ]
+ ],
+ [
+  864,
+  "- \ud83d\udccc NOTE buffService.js:29 idempotent re-activate writes unchanged array \u2192 redundant SSE broadcast (efficiency nit, correct) (#987)",
+  [
+   "src/services/combat/buffs/buffService.js"
+  ]
+ ],
+ [
+  872,
+  "- \ud83d\udccc REC cross-file: conditionEffects.test.js:330-337 clairvoyant-half dupes compute canon :263-272 (#997) \u2014 drop clairvoyant legs keep crusher at ITS turn; foresight :483 assign-vs-addUnique pending ITS lane face (#996)",
+  [
+   "src/services/combat/conditions/conditionEffects.test.js"
+  ]
+ ],
+ [
+  875,
+  "- \ud83d\udccc REC cross-file: restoreBalance.test.js:132/:144/:149 absent-false trio fold to one (#1000); conditionEffects.test.js:191 dodge-fold + :130-131 plain counts now duped by compute census \u2014 delete at base ITS turn w/ forwarding cite; :134/:135 fiend_undead byte-identical fixtures delete one (#1000)",
+  [
+   "src/services/combat/conditions/conditionEffects.test.js",
+   "src/services/combat/conditions/restoreBalance.test.js"
+  ]
+ ],
+ [
+  877,
+  "- \ud83d\udccc REC cross-file: npcFormUtils.test.js ABILITY_LABELS golden low-value (#1006); CharConditions.condition-saves.test.jsx re-implements getAbilityLabel in mock \u2014 shrink to vi.fn(abbr=>abbr), behavior owned conditionUtils #1006. NOTE conditionUtils.js CONDITION_SAVE_DC dead-but-exported (#1006)",
+  [
+   "src/services/combat/conditions/conditionUtils.js",
+   "src/services/npcs/npcFormUtils.test.js"
+  ]
+ ],
+ [
+  878,
+  "- \ud83d\udccc REC cross-file: travelService.test.js:42 EXHAUSTION_LEVELS re-pin removable at ITS turn unless import-surface pin needed (#1008); CharConditions exhaustion/condition-saves/rendering/logging/slow 5x hand-mirrored formula mocks \u2014 consolidate to shared factory at their turns (#1008)",
+  [
+   "src/services/campaign/travelService.test.js"
+  ]
+ ],
+ [
+  879,
+  "- \ud83d\udccc MA-1463 FORWARD: consumeGuardianProtection face belongs to attackPostProcessing lane (#932 -> adjudicated NOT restoreBalance #1009; guard-stamps at attackPostProcessing.js:261)",
+  [
+   "src/hooks/combat/attackPostProcessing.js"
+  ]
+ ],
+ [
+  881,
+  "- \ud83d\udccc REC cross-file: monsterGrantReaction.test.js:84 + monsterSelfBuff.test.js:83/:226 registration-exists checks subsumed by te golden census #1012 \u2014 trim to producer-contract assertions at ITS turns",
+  [
+   "src/services/encounters/monsterGrantReaction.test.js",
+   "src/services/encounters/monsterSelfBuff.test.js"
+  ]
+ ],
+ [
+  884,
+  "- \ud83d\udccc REC cross-file: attackRollDamageSteps-automationBonuses.test.js brutal-strike legs subsumed by steps/bs t1 exact bytes \u2014 keep inactive-guard only at ITS turn (#1022); cla048 sibling: add speed_reduction te + addExpiration clock gap on pipeline lane (#1022)",
+  [
+   "src/services/combat/steps/attackRollDamageSteps-automationBonuses.test.js"
+  ]
+ ],
+ [
+  890,
+  "- \ud83d\udccc REC cross-file: attackRollDamageSteps-weaponHitBonuses.test.js ENTIRE file dupes whb fold CANON #1029 \u2014 delete-or-stub at ITS turn; natural20-celestial byte-identical 1d6 legs fold + celestial-guard dupes trim (#1029); steps/bs:18 stale header clause refresh (#1029)",
+  [
+   "src/services/combat/steps/attackRollDamageSteps-weaponHitBonuses.test.js"
+  ]
+ ],
+ [
+  894,
+  "- \ud83d\udccc CITE refresh: #1027 mod-append/skip CANON now @ attackRollDamageSteps-damageRolling.test.js:152-165/:168-185 (#1032); :237-255 cite drift closed",
+  [
+   "src/services/combat/steps/attackRollDamageSteps-damageRolling.test.js"
+  ]
+ ],
+ [
+  895,
+  "- \ud83d\udccc REC cross-file: attackRollDamageSteps.test.js structural lane may add one-shot subscribe/emit chain assert (dmg_type:modified\u2192damage:ready\u2192damage:applied, steps 17/18) at ITS turn (#1033)",
+  [
+   "src/services/combat/steps/attackRollDamageSteps.test.js"
+  ]
+ ],
+ [
+  907,
+  "- \ud83d\udccc CITE refresh: useAttackDamageResolution.maneuvers.test.js:8-9 delegation stale since #1039 zero-body attackRollDamageSteps.test.js \u2014 retarget to attackRollRiders.test.js ITS turn (#1041)",
+  [
+   "src/services/combat/steps/attackRollDamageSteps.test.js",
+   "src/services/combat/steps/attackRollRiders.test.js"
+  ]
+ ],
+ [
+  908,
+  "- \ud83d\udccc REC cross-file: radiantSoul.test.js:91-101 spellRollDamage consumption-flag leg sits in wrong lane \u2014 consolidate into directSpellDamageSteps-rolling.test.js at ITS turn (#1042)",
+  [
+   "src/services/combat/steps/directSpellDamageSteps-rolling.test.js"
+  ]
+ ],
+ [
+  909,
+  "- \ud83d\udccc REC cross-file: directSpellDamageSteps-rolling.test.js:101-115 spellRollDamage condition trio fold (#1043); directSpellDamageSteps-overchannel.test.js:126-148 useCount >1 rows fold (#1043)",
+  [
+   "src/services/combat/steps/directSpellDamageSteps-overchannel.test.js",
+   "src/services/combat/steps/directSpellDamageSteps-rolling.test.js"
+  ]
+ ],
+ [
+  912,
+  "- \ud83d\udccc REC cross-file: steps/index.test.js:37-47 spell-pipeline toContain subsumed by structure golden #1048; :5-35 four run-toBeDefined smokes assert nothing \u2014 collapse at ITS turn (#1048)",
+  [
+   "src/services/automation/index.test.js"
+  ]
+ ],
+ [
+  921,
+  "- \ud83d\udccc REC cross-file: superiorHuntersPrey.test.js condition block 4->2 fold + round-0-latch case dupes same-round byte-path \u2014 fold at ITS turn (#1059)",
+  [
+   "src/services/combat/steps/features/superiorHuntersPrey.test.js"
+  ]
+ ],
+ [
+  924,
+  "- \ud83d\udccc REC cross-file: tavernBrawlerPush.test.js:111 weak find(includes)+any(Object) strengthen exact; :105 campaignName-threaded subsumed by te-write tests removable (#1061)",
+  [
+   "src/services/combat/steps/features/tavernBrawlerPush.test.js"
+  ]
+ ],
+ [
+  925,
+  "- \ud83d\udccc REC cross-file: useAttackDamageResolution.feats.test.js:533-541 seam latch-tuples soften to presence (byte-exactness @tavernBrawlerPush #1062) at ITS turn; \u26a0 tavernBrawlerPush.js:11 null-playerStats TypeError unguarded pinned honest (#1062)",
+  [
+   "src/services/combat/steps/features/tavernBrawlerPush.js"
+  ]
+ ],
+ [
+  933,
+  "- \ud83d\udccc REC cross-file: psychicTeleportationHandler.test.js:159-186 + tempTeleportHandler.test.js:620-633 semantics re-derivation via mocked applyTeleportTokenMove soften to toHaveBeenCalledWith+prose at ITS turns (#1068)",
+  [
+   "src/services/automation/handlers/class-sorcerer/psychicTeleportationHandler.test.js",
+   "src/services/automation/handlers/class-warlock/tempTeleportHandler.test.js"
+  ]
+ ],
+ [
+  934,
+  "- \ud83d\udccc turnState.js:58-61 defense-in-depth: negative numeric *Used passes unclamped (Number(-5)||0=-5) forged-store over-grant vector \u2014 Math.max(0,..) close on source pass; deliberately unpinned (#1070)",
+  [
+   "src/services/combat/turnState.js"
+  ]
+ ],
+ [
+  942,
+  "- \ud83d\udccc initiativeService.js:135 parseInt(initiative_details) vs :7 stricter regex parseInitBonus \u2014 latent divergence ('4 up'->4 vs 0), behaviorally consistent at 0, owner awareness (#1079)",
+  [
+   "src/services/encounters/initiativeService.js"
+  ]
+ ],
+ [
+  943,
+  "- \ud83d\udccc monsterAbilityUses family recs (#1080): dretch-fetid-cloud :33-44 route-through-spend; vrock :37-51 gate-overlap trim + :54-82 strongest ticket-cycle keep; succubus :74 + imp :102 synthetic unlimited-null trim to cites. FRAMEWORK OWNER = monsterAbilityUses.test.js (MA-0020) generics \u2014 tickets cite-only.",
+  [
+   "src/services/encounters/monsterAbilityUses.test.js"
+  ]
+ ],
+ [
+  948,
+  "- \ud83d\udccc advisory family (#1084): ma1285-uncanny-dodge MA-1290/1309/1313 blocks re-run byte-identical generic machinery (refire 4th-6th copies) consolidate to ticket-table ITS turn; base :TELEPORT/ETHEREAL_STRIDE/BATTLE_CRY one-press x3 collapse it.each ITS turn. FRAMEWORK OWNER = monsterActionAdvisory.test.js.",
+  [
+   "src/services/encounters/monsterActionAdvisory.test.js"
+  ]
+ ],
+ [
+  986,
+  "- \ud83d\udccc invisibility-twin lanes recs bundle (#1139): imp:105/quasit:111/sprite:113/wisp:108 byte-identical-twin mirrors delete (transitive via own pins + owner :216); SAME FOUR ender describes delete-citing monsterSelfBuff.test.js:371-417 (~8 tests); owner :289/:311 absorb into one double-press ITS pass; \u26a0 monsterSelfBuff.js:70/:108 else-copy says 'Enlarge' for green hag (no Enlarge) \u2014 owner-lane copy quirk",
+  [
+   "src/services/encounters/monsterSelfBuff.js",
+   "src/services/encounters/monsterSelfBuff.test.js"
+  ]
+ ],
+ [
+  990,
+  "- \ud83d\udccc selfBuff base cite refresh \u2014 new ranges: enders :322-368, duergar disks :102-112, enlarged twin :168-177+flow :195-282, refusal wording :179-192, invisible clauses :141-151. Card-lane headers stale :371-417/:216/:419 retarget ITS next touch; green-hag :151 simulated ender delete-citing base :322-368 ITS touch; \u26a0 monsterAbilityUses.js:55 getRV campaign-less read vs :63 campaign write \u2014 owner glance (#1146)",
+  [
+   "src/services/encounters/monsterAbilityUses.js"
+  ]
+ ],
+ [
+  992,
+  "- \ud83d\udccc monsterSummon.test.js :600-612 'MA-0648 twin byte-unchanged' re-drives drow-mage press owned :104-134 \u2014 delete ITS base pass (#1154)",
+  [
+   "src/services/encounters/monsterSummon.test.js"
+  ]
+ ],
+ [
+  997,
+  "- \ud83d\udccc lootGenerator-private.test.js \u2014 7 normalizeCurrency rounding rows near-dupe lootGenerator.test.js rounding legs; fold one it.each there + DELETE -private file ITS pass (#1162); dead-hp-filter lives in autoRewardService kills-forwarding, NOT lootFromCombatSummary (#1162 bridge map)",
+  [
+   "src/services/items/lootGenerator.test.js"
+  ]
+ ],
+ [
+  1000,
+  "- \ud83d\udccc giantAncestry.test.setup.js sidecar (vitest.config.js:50 EXCLUDES *.test.setup.js \u2014 fixture-only) #1164: cloudsJaunt :72-84 local fixture del-dup\u2192import sidecar; firesBurn/hillsTumble .regression adopt sidecar fixtures; 8-consumer 8-module mock boilerplate = setupFiles dedupe candidate (own adjudicated lane); CENSUS RULE UPDATED: marker sweep must use find *.test.* + xargs grep (irregular .test.<topic>.js names)",
+  [
+   "src/services/automation/handlers/class-other/giantAncestry.test.setup.js"
+  ]
+ ],
+ [
+  1003,
+  "- \ud83d\udccc adjacentDungeonGenerator.js:668-675 top/entrance forced onto wall ring (stairs unreachable by design), :334-337 torch-below-floor cosmetic byte, :524 unseeded top-of-file RNG outside seed-stream \u2014 byte pins honest per findings (#1167); lootSuggestions #1166 4 stale-ref scrubs still pending ITS lanes",
+  [
+   "src/services/maps/adjacentDungeonGenerator.js"
+  ]
+ ],
+ [
+  1011,
+  "- \ud83d\udccc effectiveWalls.test.js:7 stale reachability refs :57,64 drifted #1174 \u2014 comment refresh ITS touch (#1174)",
+  [
+   "src/services/maps/effectiveWalls.test.js"
+  ]
+ ],
+ [
+  1036,
+  "- \ud83d\udccc applyDamage.test.js :252-262 + :264-274 weak NPC concentration legs REMOVED per #1200 rec, canon npcConcentrationAdvanced :259-303 (#1207 recs consumed)",
+  [
+   "src/services/rules/combat/applyDamage.test.js"
+  ]
+ ],
+ [
+  1038,
+  "- \ud83d\udccc saveProcessing.infernal-wound.test.js:51-54 byte-mirrors BOTH compute helpers as mocks \u2014 save-full #1203 confirmed sole real-helper driver; keep mirror flagged in case of mock-theater review (#1203)",
+  [
+   "src/hooks/combat/saveProcessing.infernal-wound.test.js"
+  ]
+ ],
+ [
+  1039,
+  "- \ud83d\udccc applyDamage.js:1200 delta-0 hp_change suppression + immunity-entry sole record canon pinned at silence lane (#1204)",
+  [
+   "src/services/rules/combat/applyDamage.js"
+  ]
+ ],
+ [
+  1045,
+  "- \ud83d\udccc damageUtils.js:69-71 findCreatureByName miss returns undefined (raw Array#find) vs guarded null paths \u2014 benign, inconsistent (#1213)",
+  [
+   "src/services/rules/combat/damageUtils.js"
+  ]
+ ],
+ [
+  1046,
+  "- \ud83d\udccc evasionUtils.js:60-62 matchesSaveType byte-identical clone of applyDamage.js:118-122 hasEvasionForSave \u2014 reuse candidate (#1214)",
+  [
+   "src/services/rules/combat/applyDamage.js",
+   "src/services/rules/combat/evasionUtils.js"
+  ]
+ ],
+ [
+  1052,
+  "- \ud83d\udccc teleportService.test.js:180 self-compares distanceFeet vs getDistanceFeet \u2014 literal expected rec (#1224)",
+  [
+   "src/services/combat/teleportService.test.js"
+  ]
+ ],
+ [
+  1053,
+  "- \ud83d\udccc featRangeService.test.js:307-311/:321-325 keep strictly integration, don't extend computeRangeEffect re-drive (#1224)",
+  [
+   "src/services/character/featRangeService.test.js"
+  ]
+ ],
+ [
+  1067,
+  "- \ud83d\udccc attackWeaponUtils.js (parseDamageDice/pickHighestDamageWeapon/buildFallbackUnarmedAttacks) no dedicated lane \u2014 transitive only; cheap insurance candidate (#1234)",
+  [
+   "src/services/rules/core/attackWeaponUtils.js"
+  ]
+ ],
+ [
+  1069,
+  "- \ud83d\udccc stub-echo wholesale stubs remain in attackCalc2024.test.js (:331 combo) + attackCalc2024-special-attacks.test.js (invalid equipment_category 'Ranged' fixtures harmless only via stubbed finder) + light-ranged :174-206 Archery dup \u2014 cla225 conversion on own lanes (#1236/#1237/#1238)",
+  [
+   "src/services/rules/core/attackCalc2024-special-attacks.test.js",
+   "src/services/rules/core/attackCalc2024.test.js"
+  ]
+ ],
+ [
+  1090,
+  "- \ud83d\uddd1 rules-core.js:33-78 coreRules default export dead (all consumers use named getSubModules) (#1251)",
+  [
+   "src/services/rules/rules-core.js"
+  ]
+ ],
+ [
+  1091,
+  "- \ud83d\udccc REC rules.test.js: huge accumulated queue: :247-296 dup merge/sort (#1248); :295/:312/:328/:350/:360/:400/:420/:447 dup 5e AC rows citing armorClass 5e twin (#1250); :372/:386 BROKEN fixtures (armor mocks lack equipment_category Armor -> silently unarmored path) (#1250); :495 false-pin College of Dance armored (same missing-category defect) (#1249); :147-152 stub-echo getSpellMaxLevel + :179-219 vacuous type-smokes delete citing rules-core #1251 identity pins",
+  [
+   "src/services/rules/rules.test.js"
+  ]
+ ],
+ [
+  1092,
+  "- \ud83d\udccc REC rules.helpers.test.js:225-270 four 5e getActions not-array dupes fold to error-handling owner :38-61 (#1252); :203-223 fold to rules-actions #1248",
+  [
+   "src/services/rules/rules.helpers.test.js"
+  ]
+ ],
+ [
+  1093,
+  "- \ud83d\udccc CITED-RANGE SHIFTS: wm003-nick :87-97->:88-104 (#1244); carryingCapacity :14-63->:15-59, stale cite lives abilityCalc2024.test.js:342 (already-marked file \u2014 fix on any future touch) (#1245); attackCalc2024 base: edge :20/:108->:121-131, lr :12->:133-146, ec name-preserved :194-216 (#1243)",
+  [
+   "src/services/rules/core/abilityCalc2024.test.js"
+  ]
+ ],
+ [
+  1124,
+  "- \ud83d\udccc REC expirations_applyAuraDamage.test.js TRIPLE: delete :455-485 (direct applyAuraDamage dup of tick lanes #1282/#1283), strengthen-or-fold :355-385 not.toThrow, delete :517-545 regenerate dup (owner applyTurnStartEffects L250-264) (#1282/#1283)",
+  [
+   "src/services/rules/effects/expirations_applyAuraDamage.test.js"
+  ]
+ ],
+ [
+  1125,
+  "- \ud83d\udccc CITED-RANGE: applyTurnStartEffects regenerate lane cite L241->L250-264 (fix at regenerateHandler.test.js:13 + .active:52 on their touch); spellCalc2024 base cite-shift map per #1277 (:60->:71/:86->:93/:120->:117/:194->:173/:235->:205/:251->:215); starryForm cited-by special-attacks now maps :41-53",
+  [
+   "src/services/automation/handlers/spells/regenerateHandler.test.js"
+  ]
+ ],
+ [
+  1137,
+  "- \ud83d\udccc STALE CITES to fix on touch: regenerateHandler.active.test.js:53 L524 -> owner now applyTurnStartEffects L251-264 / expirations_additional :247/:268 (#1297 deleted 3rd pin); applyTurnStartEffects cite L241->L250-264 (#1283/#1286 pending at regenerateHandler.test.js:13)",
+  [
+   "src/services/automation/handlers/spells/regenerateHandler.active.test.js",
+   "src/services/automation/handlers/spells/regenerateHandler.test.js"
+  ]
+ ],
+ [
+  1157,
+  "- \ud83d\udccc restRules-shortRest.js:332-335 unconditional campaign targetEffects write+broadcast every short rest even when filter matched nothing \u2014 honest-pinned (#1319); collector turnStartEffects.js:52-61 forwards damageExpression/type/range overrides that consumer :147-152 hardcodes-ignores \u2014 canonical matches, latent asymmetry (#1325); :598 grapple_damage dispatchEvent in service code (observable, #1324-owned) (#1326 note)",
+  [
+   "src/services/rules/effects/restRules-shortRest.js",
+   "src/services/rules/effects/turnStartEffects.js"
+  ]
+ ],
+ [
+  1169,
+  "- \ud83d\udccc boonOfCombatProwess.js stamp ??0 vs consult ??1 asymmetry (unreachable \u2014 round never 0; noted #1342)",
+  [
+   "src/services/rules/features/boonOfCombatProwess.js"
+  ]
+ ],
+ [
+  1179,
+  "- \ud83d\udccc constrictGrappleService.js:165 roll fires before :169 dead-victim guard (die consumed, nothing paid \u2014 reorder candidate) (#1350); confusion d12->d10 RAW simplification (handler-owned, noted) (#1349); crownOfMadness getCombatContext x2 (#1351); applyDamage Death-Ward interceptor ordinal untested (rec to applyDamage lane) (#1353)",
+  [
+   "src/services/rules/features/constrictGrappleService.js"
+  ]
+ ],
+ [
+  1242,
+  "- \ud83d\udccc tool-integrity: phantom fabricated tool output (logService.js ~140ln invented) observed #1408 audit, disk truth verified by shell, no test depended on it; deterministic pins unaffected",
+  [
+   "src/services/ui/logService.js"
+  ]
+ ],
+ [
+  1260,
+  "- \ud83d\udccc caller-boundary GAP: noSavePath.js:51 activateSpiritualWeaponIfNeeded zero test-coverage in execution/*.test.js (#1420) \u2014 flagged for owner",
+  [
+   "src/services/rules/spells/spellCastService/execution/noSavePath.js"
+  ]
+ ],
+ [
+  1299,
+  "- \ud83d\udccc MEGA-QUEUE DISCHARGED: rules.test.js #199/#200/:935 sets fully folded w/ owner-cites (:935 unreproducible-historical-on-640ln-file); ledger/state 'mega-queue intact' markers can flip to discharged (owner: ledger)",
+  [
+   "src/services/rules/rules.test.js"
+  ]
+ ],
+ [
+  1311,
+  "- \ud83d\udccc QUEUE (fix#300-discovered, #1495-family owner): helpers.js:574 resolveIgnoreResistance throws post-dice at :589-:591 on passives==null \u2014 fix#126 hub-degrade law (damageCalculation.js:139 'missing passives DEGRADE loud, never die') now inconsistent with this first-loud-throw hub face post-un-shadow; guard stays (collector makes passives==null unreachable in practice, automationCollector.js:111) \u2014 reconcile throw->degrade-loud at MM-guard lane if a non-collector playerStats producer ever emerges.",
+  [
+   "src/services/combat/automation/automationCollector.js",
+   "src/services/rules/spells/spellCastService/execution/damageCalculation.js",
+   "src/services/rules/spells/spellCastService/execution/helpers.js"
+  ]
+ ],
+ [
+  1314,
+  "- \ud83d\udccc GAP ADOPTED: :328-332 orphan-span-mandate #1459->#1463 executed; cite-redirect-pending: compelledDuelService.test.js:9 (owner turn), special.test.js :208-255-comment->:269-341 (owner turn)",
+  [
+   "src/services/rules/features/compelledDuelService.test.js"
+  ]
+ ],
+ [
+  1341,
+  "- \ud83d\uddd1 helpers.js:566 \u2014 underscore-dead params getTargetInfo/mapName pinned dead (#1480)",
+  [
+   "src/services/rules/spells/spellCastService/execution/helpers.js"
+  ]
+ ],
+ [
+  1342,
+  "- \ud83d\udccc helpers.js:523 \u2014 shieldImmune: undefined (never false) in every non-shield log entry; JSON.stringify drops key (#1480)",
+  [
+   "src/services/rules/spells/spellCastService/execution/helpers.js"
+  ]
+ ],
+ [
+  1344,
+  "- \ud83d\udccc helpers.sp075-magicMissile-upcast.test.js \u2014 objectContaining + constant dice stub never throws on exhaustion; lacks marker; queue-honesty gap (#1480)",
+  [
+   "src/services/rules/spells/spellCastService/execution/helpers.sp075-magicMissile-upcast.test.js"
+  ]
+ ],
+ [
+  1368,
+  "- \ud83d\udccc savePath.js:167 !== '' operand dead-twin of !! (#1492)",
+  [
+   "src/services/rules/spells/spellCastService/execution/savePath.js"
+  ]
+ ],
+ [
+  1369,
+  "- \ud83d\udccc savePath.js:139 innate +1 NaN-latent if dc ever undefined (numeric today) (#1492)",
+  [
+   "src/services/rules/spells/spellCastService/execution/savePath.js"
+  ]
+ ],
+ [
+  1370,
+  "- \ud83d\udccc helpers.js:477 stale hour-comment, payload carries no duration (#1483)",
+  [
+   "src/services/rules/spells/spellCastService/execution/helpers.js"
+  ]
+ ],
+ [
+  1416,
+  "- \ud83d\udccc trackedResources.js:202/:316 \u2014 darkOnesLuckUses + _Star_Map_freeCastCount computed but ABSENT from ALL_TRACKED_RESOURCES (would shadow server-only pre-seed) (#1531)",
+  [
+   "src/services/rules/trackedResources.js"
+  ]
+ ],
+ [
+  1417,
+  "- \ud83d\udccc trackedResources.js:273-274 \u2014 warPriestUses seeds 1 for EVERY class not just cleric (#1531)",
+  [
+   "src/services/rules/trackedResources.js"
+  ]
+ ],
+ [
+  1448,
+  "- \ud83d\udccc sanitize.js:54 ADD_ATTR ['data-*'] inert (no wildcard support; ALLOW_DATA_ATTR default does work); :45 style allowed passes inert legacy CSS bytes (#1545)",
+  [
+   "src/services/ui/sanitize.js"
+  ]
+ ],
+ [
+  1449,
+  "- \ud83d\udccc logService server-side: server/routes/log.js:52 spreads ...entry AFTER id/timestamp -> client can override server stamp (convention-only) (#1543)",
+  [
+   "SERVER"
+  ]
+ ],
+ [
+  1450,
+  "- \ud83d\udccc hpModifier.js:29/:42 maxHp/max naming split runtime-vs-summary alias space systemic (arms pinned) (#1539)",
+  [
+   "src/services/shared/hpModifier.js"
+  ]
+ ],
+ [
+  1451,
+  "- \ud83d\udccc featFinder.js:10 allFeats?.slice vacuous chain (:4 pre-deref) (#1538)",
+  [
+   "src/services/shared/featFinder.js"
+  ]
+ ],
+ [
+  1460,
+  "- \ud83d\udccc youtubePlayer.js:59 post-stop handleError logs 'for video undefined' (queue cleared first) \u2014 benign pinned quirk (#1549)",
+  [
+   "src/services/ui/youtubePlayer.js"
+  ]
+ ],
+ [
+  1461,
+  "- \ud83d\udccc youtubePlayer.js:160-168 stop() preserves pendingVolumePct (volume intent survives stop) \u2014 likely intentional, pinned (#1549)",
+  [
+   "src/services/ui/youtubePlayer.js"
+  ]
+ ],
+ [
+  1462,
+  "- \ud83d\udccc youtubePlayer.js:52/:60/:66 defensive guards unreachable given queue-clearing invariants \u2014 owner cleanup candidates (#1549)",
+  [
+   "src/services/ui/youtubePlayer.js"
+  ]
+ ],
+ [
+  1544,
+  "- \ud83d\udccc fix#300-discovered (#1495-family owner): helpers.js resolveIgnoreResistance throws post-dice on passives==null \u2014 inconsistent with fix#126 degrade-loud law now guard is un-shadowed; collector stamps passives:[] unconditionally (automationCollector:111) so latent; reconcile throw->degrade if any non-collector playerStats producer appears.**",
+  [
+   "src/services/rules/spells/spellCastService/execution/helpers.js"
+  ]
+ ],
+ [
+  1547,
+  "- \ud83d\uddd1 additive-twin-candidate (fix#306 census, report-only so far): useWizardFeatBuffs.js:9-16 additive twin on copied abilities vs buffApplier.applyAbilityScoreIncreases \u2014 fold-candidate-at-wizard-lane-own-turn; :53-63 unapply/SUBTRACTION + :118-124 index-lookup MUST-NOT-fold (distinct semantics preserved).**",
+  [
+   "src/hooks/wizard/useWizardFeatBuffs.js"
+  ]
+ ]
+]

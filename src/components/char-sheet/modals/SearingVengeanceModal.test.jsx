@@ -3,7 +3,10 @@
 // (selection, gating, and map-overlay behavior are covered by shared/CreatureSelectionModal.test.jsx).
 // This file pins what is unique to this seam: the hardcoded Searing Vengeance copy (verified
 // against public/data/2024/classes.json), the `creatureTargets || []` guard, and the confirm/skip
-// payloads emitted through the REAL shared modal (no mock — ZealousPresenceModal precedent).
+// payloads emitted through the REAL shared modal — this lane real-mounts the modal with no vi.mock
+// (render(<SearingVengeanceModal .../>) at :36 et al. drives the actual CreatureSelectionModal DOM).
+// NOT "ZealousPresenceModal precedent" (that cite was stale): the sibling ZealousPresenceModal.test.jsx
+// MOCKS CreatureSelectionModal (:19-24) and captures props — it never renders the shared modal.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SearingVengeanceModal from './SearingVengeanceModal';

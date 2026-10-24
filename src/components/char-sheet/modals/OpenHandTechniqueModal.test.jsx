@@ -150,16 +150,19 @@ describe('OpenHandTechniqueModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('stays in selection mode when the handler returns null', async () => {
+  it('logs a loud error and stays in selection mode when the handler returns null', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     openHandHandler.applyOpenHandTechnique.mockResolvedValue(null);
 
     renderModal();
     await applyOption('Knock Down');
 
     expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Knock Down'));
     expect(screen.queryByText('Done')).not.toBeInTheDocument();
     expect(screen.getByText(/Choose an effect/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Apply Effect/ })).toBeEnabled();
+    errorSpy.mockRestore();
   });
 
   it('routes to onConfirm with the selected option and skips the handler', async () => {

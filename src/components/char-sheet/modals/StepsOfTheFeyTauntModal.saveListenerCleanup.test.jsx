@@ -26,15 +26,26 @@ const { promptState, store } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    // Real signature is (campaignName, { targetName, saveType, saveDc }).
-    // Unique promptId per call so unresolved listeners from one test can
-    // never match another test's save-result events.
-    createSaveListener: vi.fn((_campaignName, { targetName, saveType, saveDc }) => ({
-        promptId: `prompt-${targetName}-${++promptState.n}`,
-        targetName,
-        saveType,
-        saveDc,
-    })),
+    // Real contract (savePrompt.js:105-145): (campaignName, config) =>
+    // { promptId, promise }. Name-agnostic unique-per-mint ids (mirrors
+    // utils.guid(); prompt-<targetName>-n ids latent-collide — fix#1426/
+    // #1431 family). The promise registers its OWN one-shot 'save-result'
+    // routing listener and self-removes on arrival (savePrompt.js:121-131);
+    // the identity tag below lets the leak ledger separate the mock's honest
+    // routing listener from the MODAL handlers this lane exists to pin.
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++promptState.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            handleSaveResult.__mockSavePromptListener = true;
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -109,6 +120,14 @@ function trackSaveResultLedger() {
 
 const removesFor = (fn) => (ledger) => ledger.removes.filter((f) => f === fn);
 
+// The honest savePrompt mock registers its own one-shot routing listeners
+// (mirroring savePrompt.js:121-131). Tag-separate them so every ledger pin
+// below stays exact for the MODAL's listeners — the ones fix#159 tracks.
+const isModalHandler = (fn) => !fn.__mockSavePromptListener;
+const modalAdds = (ledger) => ledger.adds.filter(isModalHandler);
+const modalRemoves = (ledger) => ledger.removes.filter(isModalHandler);
+const modalOpen = (ledger) => modalAdds(ledger).length - modalRemoves(ledger).length;
+
 function flush() {
     return act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 }
@@ -146,18 +165,19 @@ describe('StepsOfTheFeyTauntModal - save-result listener leak ledger', () => {
         const view = render(<StepsOfTheFeyTauntModal {...makeProps()} />);
         const [goblinPrompt, orcPrompt] = await confirmStep('Taunting Step', /Taunt/);
 
-        // Two targets confirmed: exactly two 'save-result' registrations, both live.
-        expect(ledger.adds).toHaveLength(2);
-        expect(ledger.open).toBe(2);
+        // Two targets confirmed: exactly two MODAL 'save-result' registrations,
+        // both live (the mock's own honest routing listeners are tag-separated).
+        expect(modalAdds(ledger)).toHaveLength(2);
+        expect(modalOpen(ledger)).toBe(2);
         expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
 
         // Unmount BEFORE any save-result arrives (cancel/navigation/clobber path).
         view.unmount();
 
         // Drain: each added handler removed exactly once, ledger balanced to zero.
-        expect(ledger.open).toBe(0);
-        expect(ledger.removes).toHaveLength(2);
-        ledger.adds.forEach((fn) => {
+        expect(modalOpen(ledger)).toBe(0);
+        expect(modalRemoves(ledger)).toHaveLength(2);
+        modalAdds(ledger).forEach((fn) => {
             expect(removesFor(fn)(ledger)).toHaveLength(1);
         });
 
@@ -172,6 +192,9 @@ describe('StepsOfTheFeyTauntModal - save-result listener leak ledger', () => {
         expect(setRuntimeValue).toHaveBeenCalledTimes(1); // decrement only
         expect(addExpiration).not.toHaveBeenCalled();
         expect(consoleErrorSpy.mock.calls.flat().join(' ')).not.toMatch(/unmounted component/);
+        // The mock's honest routing listeners DO see their own ids post-unmount
+        // and self-remove (savePrompt.js:124) — without touching the modal.
+        expect(ledger.removes.filter((fn) => fn.__mockSavePromptListener)).toHaveLength(2);
     });
 
     it('dreadful twin: unmount with saves pending drains both handlers; late events deal no damage and log nothing', async () => {
@@ -181,14 +204,14 @@ describe('StepsOfTheFeyTauntModal - save-result listener leak ledger', () => {
         const view = render(<StepsOfTheFeyTauntModal {...makeProps()} />);
         const [goblinPrompt, orcPrompt] = await confirmStep('Dreadful Step', /Dreadful/);
 
-        expect(ledger.adds).toHaveLength(2);
-        expect(ledger.open).toBe(2);
+        expect(modalAdds(ledger)).toHaveLength(2);
+        expect(modalOpen(ledger)).toBe(2);
 
         view.unmount();
 
-        expect(ledger.open).toBe(0);
-        expect(ledger.removes).toHaveLength(2);
-        ledger.adds.forEach((fn) => {
+        expect(modalOpen(ledger)).toBe(0);
+        expect(modalRemoves(ledger)).toHaveLength(2);
+        modalAdds(ledger).forEach((fn) => {
             expect(removesFor(fn)(ledger)).toHaveLength(1);
         });
 
@@ -201,6 +224,9 @@ describe('StepsOfTheFeyTauntModal - save-result listener leak ledger', () => {
         expect(saveResultLogs()).toHaveLength(0);
         expect(addExpiration).not.toHaveBeenCalled();
         expect(consoleErrorSpy.mock.calls.flat().join(' ')).not.toMatch(/unmounted component/);
+        // Mock's own honest routing listeners drained by their own minted ids
+        // on the late dispatch (savePrompt.js:124) — the dead modal lane inert.
+        expect(ledger.removes.filter((fn) => fn.__mockSavePromptListener)).toHaveLength(2);
     });
 
     it('arrival then unmount: one removal per handler per path — arrival self-removal still works, unmount drain adds no extra removes', async () => {
@@ -208,29 +234,43 @@ describe('StepsOfTheFeyTauntModal - save-result listener leak ledger', () => {
 
         const view = render(<StepsOfTheFeyTauntModal {...makeProps()} />);
         const [goblinPrompt, orcPrompt] = await confirmStep('Taunting Step', /Taunt/);
-        expect(ledger.adds).toHaveLength(2);
+        expect(modalAdds(ledger)).toHaveLength(2);
 
         await dispatchSave(goblinPrompt, false);
+        // Routing arm (fix#215): Goblin's minted id fires ONLY Goblin's own
+        // subscriber — its modal handler self-removes on arrival (#1348
+        // one-shot), Orc1's handler stays open, and the Promise.all aggregate
+        // (StepsOfTheFeyTauntModal.jsx:230) keeps the lane unresolved: no
+        // Done, no save_result logs yet.
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+        expect(saveResultLogs()).toHaveLength(0);
+        expect(modalOpen(ledger)).toBe(1);
         await dispatchSave(orcPrompt, true);
         await waitFor(() => {
             expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
 
-        // Arrival path: each handler removed exactly once by its own event —
-        // pre-existing one-shot semantics preserved (#1348 exact pairs).
-        expect(ledger.removes).toHaveLength(2);
+        // Arrival path: each MODAL handler removed exactly once by its own event —
+        // pre-existing one-shot semantics preserved (#1348 exact pairs). The
+        // mock's tagged routing listeners self-remove on arrival too
+        // (savePrompt.js:124), so the raw ledger stays balanced overall.
+        expect(modalRemoves(ledger)).toHaveLength(2);
+        expect(modalOpen(ledger)).toBe(0);
         expect(ledger.open).toBe(0);
-        const removesAfterArrival = ledger.removes.length;
+        const removesAfterArrival = modalRemoves(ledger).length;
 
         // Unmount after full resolution: ref was spliced on arrival, so the
         // drain removes nothing further — no double-removal across the two paths.
         view.unmount();
-        expect(ledger.removes).toHaveLength(removesAfterArrival);
-        expect(ledger.open).toBe(0);
+        expect(modalRemoves(ledger)).toHaveLength(removesAfterArrival);
+        expect(modalOpen(ledger)).toBe(0);
 
-        // Re-dispatched duplicate events hit nothing: no duplicate save_result.
+        // Re-dispatched duplicate events hit nothing: no duplicate save_result,
+        // no extra removes on either side of the ledger.
         await dispatchSave(goblinPrompt, false);
         await flush();
         expect(saveResultLogs()).toHaveLength(2);
+        expect(modalRemoves(ledger)).toHaveLength(removesAfterArrival);
+        expect(ledger.removes.filter((fn) => fn.__mockSavePromptListener)).toHaveLength(2);
     });
 });

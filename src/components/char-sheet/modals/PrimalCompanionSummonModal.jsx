@@ -41,7 +41,13 @@ export default function PrimalCompanionSummonModal({ action, playerStats, campai
                 <div className="sp-body">
                     <p>Choose a primal beast to bond with:</p>
                     <div style={{ marginTop: '12px' }}>
-                        {companionTypes.map((ct, idx) => (
+                        {companionTypes.map((ct, idx) => {
+                            // Omit any stat absent from the row instead of rendering "AC undefined"
+                            // (ledger :194; disk BY-name rows Beast of the Land/Sea/Sky all supply both).
+                            const statBits = [];
+                            if (ct.acFormula) statBits.push(`AC ${ct.acFormula}`);
+                            if (ct.hpBase !== undefined) statBits.push(`HP ${ct.hpBase}+${ct.hpPerLevel}xRanger level`);
+                            return (
                             <label key={idx} style={{ display: 'block', marginBottom: '16px', cursor: 'pointer', padding: '8px', border: selectedType === ct.name ? '1px solid #4a9eff' : '1px solid transparent', borderRadius: '4px', background: selectedType === ct.name ? 'rgba(74, 158, 255, 0.1)' : 'transparent' }}>
                                 <input
                                     type="radio"
@@ -56,7 +62,7 @@ export default function PrimalCompanionSummonModal({ action, playerStats, campai
                                     {ct.description ? (
                                         <div dangerouslySetInnerHTML={{ __html: ct.description }} />
                                     ) : (
-                                        <>AC {ct.acFormula}, HP {ct.hpBase}+{ct.hpPerLevel}xRanger level</>
+                                        <>{statBits.join(', ')}</>
                                     )}
                                     {ct.speed && <><br/>Speed: {ct.speed}{ct.specialSpeed ? `, ${ct.specialSpeed}` : ''}</>}
                                     {ct.attacks && ct.attacks.length > 0 && (
@@ -64,7 +70,8 @@ export default function PrimalCompanionSummonModal({ action, playerStats, campai
                                     )}
                                 </div>
                             </label>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
                 <div className="sp-actions">

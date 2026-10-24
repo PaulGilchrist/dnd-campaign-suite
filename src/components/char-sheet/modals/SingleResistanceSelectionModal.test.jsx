@@ -201,4 +201,49 @@ describe('SingleResistanceSelectionModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('styles via scoped classes, keeping only dynamic selection colors inline (no-inline-styles convention)', () => {
+    // fix#313 recipe pin: statics from the former inline styles on the container,
+    // option label, radio input, and "(current)" marker (:30/:36/:39/:77-era) now
+    // live in SingleResistanceSelectionModal.css (exact-value migration); the only
+    // lawful inline is the selection-derived background/border on option labels
+    // (dynamic-data exception).
+    render(<SingleResistanceSelectionModal {...makeProps({ action: { ...baseAction, existingType: 'Fire' } })} />);
+
+    const list = document.querySelector('.single-resistance-types');
+    expect(list).toBeTruthy();
+    expect(list.getAttribute('style')).toBeNull();
+
+    const rows = list.querySelectorAll('.single-resistance-option');
+    expect(rows).toHaveLength(3);
+    const inputs = list.querySelectorAll('.single-resistance-input');
+    expect(inputs).toHaveLength(3);
+
+    // Rows at rest: inline attr carries ONLY background/border — no statics
+    // (display/padding/margin/cursor/border-radius are class-owned).
+    for (const row of rows) {
+      const inline = row.getAttribute('style') || '';
+      expect(inline).toMatch(/background/i);
+      expect(inline).toMatch(/border/i);
+      expect(inline).not.toMatch(/display|padding|margin|cursor|border-radius/i);
+    }
+    // Whole-body census at rest: exactly the three option labels are inline-styled.
+    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(3);
+
+    // Static-only sites are style-free.
+    for (const input of inputs) expect(input.getAttribute('style')).toBeNull();
+    const current = list.querySelector('.single-resistance-current');
+    expect(current).toBeTruthy();
+    expect(current.textContent).toBe('(current)');
+    expect(current.getAttribute('style')).toBeNull();
+
+    // Selecting flips only dynamic inline values: link-colored solid border on the
+    // chosen row; the untouched Cold row stays transparent.
+    selectDamageType('Acid');
+    const acidRow = screen.getByText('Acid').closest('.single-resistance-option');
+    expect(acidRow.getAttribute('style') || '').toMatch(/var\(--color-link\)/);
+    const coldRow = screen.getByText('Cold').closest('.single-resistance-option');
+    expect(coldRow.getAttribute('style') || '').toMatch(/transparent/);
+    expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(3);
+  });
 });

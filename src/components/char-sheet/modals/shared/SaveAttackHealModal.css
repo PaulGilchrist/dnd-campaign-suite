@@ -1,0 +1,19 @@
+/* SaveAttackHealModal — scoped styles for SaveAttackHealModal.jsx.
+   Static declarations migrated verbatim from former inline styles (exact values);
+   no dynamic-data sites remain inline in this component (both former sites were
+   static marginTop, per the fix#313 dynamic-data exception survey). Family tokens
+   sp-* are reused from ../../common/SavePromptModal.css and the abjure-* row
+   hooks from ../shared/AreaEffectTargetModalBase.utils.jsx markup — not duplicated
+   here. Cascade note: .sp-body p { margin: 8px 0 } (specificity 0-1-1) beats this
+   single-class p rule, but the migrated margin is exactly 8px, so computed values
+   are identical before and after the migration. */
+
+/* All-targets-resolved note — was style={{ marginTop: '8px' }} on the sp-note */
+.save-attack-heal-resolved-note {
+  margin-top: 8px;
+}
+
+/* Heal-success result row — was style={{ marginTop: '8px' }} on abjure-result-success */
+.save-attack-heal-result {
+  margin-top: 8px;
+}

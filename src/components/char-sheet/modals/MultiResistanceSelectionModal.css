@@ -1,0 +1,66 @@
+/* MultiResistanceSelectionModal — scoped styles for MultiResistanceSelectionModal.jsx
+   (fix#313 recipe, queued at ledger :1506 "same shape family as SingleResistance").
+   fix#327-twin-shape MIRROR, not cross-import: SingleResistanceSelectionModal.css owns
+   the single-selection twin's rows; importing it here would couple two sibling
+   components through one file's cascade (fix#318 two-CSS precedent keeps each modal's
+   file self-contained). Static token values are byte-similar by design (same visual
+   family); divergence is intentional where multi adds checkbox/(current)/capped rows.
+   Selection/existing/cap states ride modifier classes (fix#328 .selected precedent,
+   WarBondChooserModal.css .capped precedent), so this modal keeps zero inline styles.
+   Family tokens sp-overlay/sp-modal/sp-header/sp-body/sp-actions/sp-roll-btn/
+   sp-dismiss-btn are reused from the globally-mounted sp-* family
+   (../../common/SavePromptModal.css) and ../CharSheet.css — not duplicated here. */
+
+/* Damage-type list container — was style={{ textAlign: 'left', marginTop: '12px' }} (:58-era;
+   single-resistance-types twin value, fix#327) */
+.multi-resistance-types {
+    text-align: left;
+    margin-top: 12px;
+}
+
+/* Checkbox option row — static part of the former inline label style (:64-era);
+   transparent base border lets .selected/.existing flip without relayout. */
+.multi-resistance-option {
+    display: block;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+/* Selected row — was inline background 'rgba(255,255,255,0.15)' / border
+   '1px solid var(--color-link)' ternaries (:64-era); class-owned per fix#328 */
+.multi-resistance-option.selected {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--color-link);
+}
+
+/* Unselected existing-type row — was inline background 'rgba(100,200,255,0.1)' /
+   border '1px dashed var(--color-link)' ternaries (:64-era); emitted by the component
+   only when !isSelected, so it never competes with .selected (original ternary precedence preserved) */
+.multi-resistance-option.existing {
+    background: rgba(100, 200, 255, 0.1);
+    border: 1px dashed var(--color-link);
+}
+
+/* Cap-reached unselected row — was inline cursor 'not-allowed' / opacity 0.5
+   ternaries (:64-era); WarBondChooserModal .capped vocabulary */
+.multi-resistance-option.capped {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Checkbox input offset — was style={{ marginRight: '8px' }} (:70-era) */
+.multi-resistance-option-input {
+    margin-right: 8px;
+}
+
+/* Existing-type "(current)" marker — was style={{ marginLeft: '8px', opacity: 0.7, fontSize: '0.85em' }} (:73-era;
+   single-resistance-current twin value, fix#327) */
+.multi-resistance-current {
+    margin-left: 8px;
+    opacity: 0.7;
+    font-size: 0.85em;
+}

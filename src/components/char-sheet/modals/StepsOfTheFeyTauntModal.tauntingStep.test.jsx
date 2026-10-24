@@ -43,15 +43,25 @@ const { promptState, store } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    // Real signature is (campaignName, { targetName, saveType, saveDc }).
-    // Unique promptId per call so unresolved listeners from one test can
-    // never match another test's save-result events.
-    createSaveListener: vi.fn((_campaignName, { targetName, saveType, saveDc }) => ({
-        promptId: `prompt-${targetName}-${++promptState.n}`,
-        targetName,
-        saveType,
-        saveDc,
-    })),
+    // Real contract (savePrompt.js:105-145): (campaignName, config) =>
+    // { promptId, promise }. promptId is utils.guid() — name-agnostic, unique
+    // per mint, never prompt-<targetName> (shared name-based ids latent-
+    // collide; fix#1426/#1431 family). The promise routes event.detail BY its
+    // own promptId on a one-shot 'save-result' listener (savePrompt.js:121-131)
+    // and self-removes on arrival exactly like the real service. The modal
+    // consumes only promptId and waits on the same event (waitForSaveResult).
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++promptState.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -185,6 +195,12 @@ describe('StepsOfTheFeyTauntModal - Taunting Step', () => {
         expect(addExpiration).not.toHaveBeenCalled();
 
         await dispatchSave(goblinPrompt, false);
+        // Per-promptId routing arm (fix#215): answering Goblin's minted id
+        // resolves ONLY Goblin's own waitForSaveResult subscriber. The lane's
+        // aggregate is gated on Promise.all (StepsOfTheFeyTauntModal.jsx:230),
+        // so with Orc1 unanswered there is no Done and no save_result log yet.
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+        expect(addEntry.mock.calls.filter(([, e]) => e.type === 'save_result')).toHaveLength(0);
         await dispatchSave(orcPrompt, true);
 
         await waitFor(() => {

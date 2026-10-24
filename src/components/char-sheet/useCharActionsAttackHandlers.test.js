@@ -1,5 +1,4 @@
 // @maintained-by-ai
-// @improved-by-ai
 // Unit tests for the handleAttackClick lane of useCharActionsAttackHandlers.
 // Scope note: confirm/cancel chooser handlers are covered by
 // useCharActionsAttackHandlers-2.test.js and .brutalGate.test.js; CLA-143 /

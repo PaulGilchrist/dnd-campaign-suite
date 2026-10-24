@@ -16,13 +16,29 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../../services/ui/logService.js';
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
 
+const promptState = vi.hoisted(() => ({ n: 0 }));
+
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn(({ targetName, saveType, saveDc }) => ({
-        promptId: `prompt-${targetName}-${Date.now()}`,
-        targetName,
-        saveType,
-        saveDc,
-    })),
+    // Real contract (savePrompt.js:105): createSaveListener(campaignName, config)
+    // — ARITY 2, campaignName FIRST. The old mock destructured config fields off
+    // the FIRST arg (campaignName), yielding prompt-undefined-<ts> — the class-
+    // wide arg-destructure dishonesty (fix#215). Returns exactly
+    // { promptId, promise } with a name-agnostic unique-per-mint id (mirrors
+    // utils.guid(); prompt-<targetName> ids latent-collide — fix#1426/#1431)
+    // and a promise routed BY its own promptId on a one-shot 'save-result'
+    // listener (savePrompt.js:121-131). This lane rolls no saves.
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++promptState.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({

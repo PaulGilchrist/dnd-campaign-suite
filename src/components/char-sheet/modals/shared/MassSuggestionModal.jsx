@@ -57,11 +57,8 @@ function MassSuggestionModal({
     // SP-079: re-entry latch — a completed confirm pays once; a repeated click must not re-spend.
     const confirmStartedRef = useRef(false);
 
-    useEffect(() => {
-        return () => {
-            setPendingPrompts([]);
-        };
-    }, []);
+    // fix#229 sweep: removed no-op unmount effect (setState on local useState
+    // after unmount is a React no-op; this effect set up no subscription).
 
     const applyCharmedToTarget = useCallback((targetName, campaignName) => {
         const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];

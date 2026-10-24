@@ -8,13 +8,29 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 
+const promptState = vi.hoisted(() => ({ n: 0 }));
+
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn(({ targetName, saveType, saveDc }) => ({
-        promptId: `prompt-${targetName}`,
-        targetName,
-        saveType,
-        saveDc,
-    })),
+    // Real contract (savePrompt.js:105): createSaveListener(campaignName, config)
+    // — ARITY 2, campaignName FIRST. The old mock destructured config fields off
+    // the FIRST arg into a fully-shared prompt-<targetName> id: two listeners on
+    // one prompt name would resolve each other (fix#1426/#1431 collision family).
+    // Returns exactly { promptId, promise } with a name-agnostic unique-per-mint
+    // id (mirrors utils.guid(), savePrompt.js:106) and a one-shot 'save-result'
+    // promise routed BY its own promptId (savePrompt.js:121-131). This mode
+    // rolls no saves (pinned below).
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++promptState.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({

@@ -37,6 +37,12 @@ function StealthAttackModal({ action, playerStats, campaignName, costD6, availab
     // 2026-10-23: that key is authored nowhere in public/data or public/campaigns
     // (key census: 0 producers), so it always fell through to 6 — a fantasy-key read.
     // The real dice count arrives via the availableDice prop (stealthAttackHandler.js:9,:32).
+    // Cost face keep-with-cite (derive refuted — no disk variance): the app's ONLY two
+    // stealth_attack automation rows author "cost": "1d6" BY-name — Supreme Sneak at
+    // public/data/classes.json:9720-9722 and public/data/2024/classes.json:10270-10272 —
+    // and the handler parses that exact string via /^(\d+)d6$/ (stealthAttackHandler.js:6).
+    // {costD6} below is already derived from that parse; the d6 face is disk-constant,
+    // so there is nothing to derive (same shape as fix#328's push-5 keep-with-cite).
 
     return (
         <div className="sp-overlay">

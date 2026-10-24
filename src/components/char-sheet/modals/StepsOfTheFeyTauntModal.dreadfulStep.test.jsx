@@ -11,6 +11,7 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
@@ -21,15 +22,24 @@ const { combatContext, promptState } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    // Real signature is (campaignName, { targetName, saveType, saveDc }).
-    // Unique promptId per call so unresolved listeners from one test can
-    // never match another test's save-result events.
-    createSaveListener: vi.fn((_campaignName, { targetName, saveType, saveDc }) => ({
-        promptId: `prompt-${targetName}-${++promptState.n}`,
-        targetName,
-        saveType,
-        saveDc,
-    })),
+    // Real contract (savePrompt.js:105-145): (campaignName, config) =>
+    // { promptId, promise }. promptId is utils.guid() — name-agnostic, unique
+    // per mint, never prompt-<targetName> (shared name-based ids latent-
+    // collide; fix#1426/#1431 family). The promise routes event.detail BY its
+    // own promptId on a one-shot 'save-result' listener (savePrompt.js:121-131)
+    // and self-removes on arrival exactly like the real service.
+    createSaveListener: vi.fn((_campaignName, _config) => {
+        const promptId = `save-guid-${++promptState.n}`;
+        const promise = new Promise((resolve) => {
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                window.removeEventListener('save-result', handleSaveResult);
+                resolve(event.detail);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+        });
+        return { promptId, promise };
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -173,7 +183,10 @@ describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
 
     it('resolved saves apply 2d10 Psychic damage only to failures and summarize with a decremented count', async () => {
         vi.spyOn(Math, 'random').mockReturnValue(0.5); // each d10 rolls 6 → failed target takes 12
-        render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3 })} />);
+        // freeCastCountKey supplied so the '(2 remaining)' summary below mirrors
+        // an ACTUAL decrement write (matches tauntingStep:113 / disappearingStep:89
+        // sibling lanes; pass #258 text-vs-write honesty).
+        render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3, freeCastCountKey: 'stepsRemaining' })} />);
         openDreadfulSelection();
         checkTarget('Goblin1');
         checkTarget('Orc1');
@@ -225,5 +238,7 @@ describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
         expect(body.textContent).toContain('2 creature(s) targeted');
         expect(body.textContent).toContain('1 failed save — 12 Psychic damage. 1 saved.');
         expect(body.textContent).toContain('2 remaining');
+        // The '(2 remaining)' copy is backed by the real counter write: 3 → 2.
+        expect(setRuntimeValue).toHaveBeenCalledWith('FeyTrickster', 'stepsRemaining', 2, 'test-campaign');
     });
 });

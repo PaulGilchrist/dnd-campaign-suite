@@ -1,0 +1,47 @@
+/* Scoped styles for StepsOfTheFeyTauntModal renderChoiceStep (fix#313 recipe:
+   exact-value migration of the former inline styles at :403/:410-417/:419/:420/
+   :423/:427-era, pass #254 census). The hasUses dimming state rides the
+   .disabled modifier class, so the choice step keeps zero inline styles. */
+.fey-taunt-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.fey-taunt-option {
+    padding: 12px;
+    border: 1px solid #555;
+    border-radius: 6px;
+    background-color: #1a1a2e;
+    cursor: pointer;
+}
+
+.fey-taunt-option.disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.fey-taunt-option-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.fey-taunt-option-icon {
+    font-size: 1.2em;
+    color: #4fc3f7;
+}
+
+.fey-taunt-option-desc {
+    font-size: 0.9em;
+    color: #ccc;
+}
+
+.fey-taunt-no-uses {
+    font-size: 0.85em;
+    color: #999;
+    text-align: center;
+    margin-top: 8px;
+}

@@ -180,7 +180,9 @@ describe('useCharActionModals — integration', () => {
       // resumeRef is an internal pipeline ref (useState/useRef-owned); its
       // behavior is pinned by useAttackDamageResolution's own resume tests.
       const { resumeRef, ...rest } = adrArg;
-      expect(resumeRef).toBeDefined();
+      // sharpen (#245): pin the ref CONTAINER shape — a bare function or
+      // dropped seam instead of { current } must fail here, not just nullish.
+      expect('current' in resumeRef).toBe(true);
       expect(rest).toEqual({
         playerStats: args.playerStats,
         campaignName: args.campaignName,

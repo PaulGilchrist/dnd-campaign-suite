@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import '../CharSheet.css';
+import './MultiResistanceSelectionModal.css';
 
 function AppliedResultModal({ title, icon, result, onClose }) {
     return (
@@ -55,22 +56,29 @@ function MultiResistanceSelectionModal({ title, icon, action: _action, playerSta
                             : `Choose ${maxSelections} damage type${maxSelections > 1 ? 's' : ''} to gain resistance to:`
                         }
                     </p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                    <div className="multi-resistance-types">
                         {damageTypes.map((type, i) => {
                             const isSelected = selected.includes(type);
                             const isExisting = existingTypes && existingTypes.includes(type);
                             const isDisabled = !isSelected && selected.length >= maxSelections;
+                            // fix#327-twin-shape mirror (own CSS file, same static token
+                            // values as SingleResistanceSelectionModal.css — no cross-import
+                            // to avoid coupling sibling components). Selection/existing/cap
+                            // are enumerable states, so they ride modifier classes per fix#328
+                            // (.selected) and WarBondChooserModal (.capped) precedents;
+                            // .existing is emitted only when !isSelected, preserving the
+                            // original inline precedence where selected won both ternaries.
                             return (
-                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: isDisabled ? 'not-allowed' : 'pointer', opacity: isDisabled ? 0.5 : 1, background: isSelected ? 'rgba(255,255,255,0.15)' : (isExisting && !isSelected ? 'rgba(100,200,255,0.1)' : 'transparent'), border: isSelected ? '1px solid var(--color-link)' : (isExisting ? '1px dashed var(--color-link)' : '1px solid transparent') }}>
+                                <label key={i} className={'multi-resistance-option' + (isSelected ? ' selected' : '') + (isExisting && !isSelected ? ' existing' : '') + (isDisabled ? ' capped' : '')}>
                                     <input
                                         type="checkbox"
                                         checked={isSelected}
                                         onChange={() => handleToggle(type)}
                                         disabled={isDisabled}
-                                        style={{ marginRight: '8px' }}
+                                        className="multi-resistance-option-input"
                                     />
                                     <strong>{type}</strong>
-                                    {isExisting && !isSelected && <span style={{ marginLeft: '8px', opacity: 0.7, fontSize: '0.85em' }}>(current)</span>}
+                                    {isExisting && !isSelected && <span className="multi-resistance-current">(current)</span>}
                                 </label>
                             );
                         })}
