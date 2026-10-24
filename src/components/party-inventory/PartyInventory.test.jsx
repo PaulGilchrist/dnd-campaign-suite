@@ -101,6 +101,30 @@ describe('PartyInventory', () => {
     expect(screen.getByTitle('Remove 10 sp').disabled).toBe(false);
   });
 
+  it('gives item-row action buttons aria-labels matching their titles', async () => {
+    await renderReady();
+    const row = screen.getByText('Antitoxin').closest('tr');
+    // Multiple rows → multiple matches page-wide is expected; within(row) resolves one.
+    const edit = within(row).getByRole('button', { name: 'Edit item' });
+    const move = within(row).getByRole('button', { name: 'Move to player' });
+    const del = within(row).getByRole('button', { name: 'Delete item' });
+    for (const [btn, label] of [[edit, 'Edit item'], [move, 'Move to player'], [del, 'Delete item']]) {
+      expect(btn).toHaveAttribute('aria-label', label);
+      expect(btn).toHaveAttribute('title', label);
+    }
+    expect(screen.getAllByRole('button', { name: 'Edit item' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Delete item' })).toHaveLength(2);
+    // Icon-only Edit/Delete carry no visible text; accessible name comes from aria-label.
+    expect(edit.textContent).toBe('');
+    expect(del.textContent).toBe('');
+    // Click behavior unchanged: role+name click still opens the prefilled edit modal.
+    fireEvent.click(edit);
+    const modal = (await screen.findByText('Edit Antitoxin')).closest('.pi-modal');
+    expect(within(modal).getByDisplayValue('Antitoxin')).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByText('Edit Antitoxin')).not.toBeInTheDocument();
+  });
+
   it('moves an item to a player through the move modal', async () => {
     await renderReady();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);

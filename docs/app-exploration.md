@@ -90,7 +90,6 @@ Twelve fix/improve commits landed after the pm pass; every affected row re-deriv
 ## Improvement Backlog
 
 - *(2026-10-24 pm run — prior "leave music editor no-toast", "wizard no inline error", "generate-settlement destructive", "oembed cosmetic", "campaign-add 403 screen" items all RESOLVED by today's improve commits and were removed at fold.)*
-- *(2026-10-24 eve run —)* **Party-item row action buttons are icon-only with title** (`button[title="Edit item|Move to player|Delete item"]`, text is empty) — add aria-labels so `getByRole(name)` matches (parity with `Decrease/Increase quantity` which DO have aria-labels).
 - *(2026-10-24 eve run —)* **Dotted-key wildcard trap:** `POST /api/:c/<anything>.json` is captured by the change-data wildcard and persists an undeletable junk key (same URL GET/DELETE route to campaigns-character → 404). Restrict the change-data POST key pattern (reject keys ending `.json`) or extend the key DELETE route to cover them.
 
 ## Coverage

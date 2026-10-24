@@ -783,6 +783,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
                         type="button"
                         className="ct-btn"
                         title="Edit item"
+                        aria-label="Edit item"
                         onClick={() => setEditForm({ ...item })}
                       >
                         <i className="fa-solid fa-pen" />
@@ -791,6 +792,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
                         type="button"
                         className="ct-btn ct-btn-primary"
                         title="Move to player"
+                        aria-label="Move to player"
                         disabled={characters.length === 0}
                         onClick={() => openMoveModal(item)}
                       >
@@ -800,6 +802,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
                         type="button"
                         className="ct-btn ct-btn-danger"
                         title="Delete item"
+                        aria-label="Delete item"
                         onClick={() => handleDeleteItem(item)}
                       >
                         <i className="fa-solid fa-trash-can" />
