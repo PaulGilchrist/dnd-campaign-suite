@@ -488,7 +488,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
     const match = equipmentData.find(eq => eq.name.toLowerCase() === name.trim().toLowerCase());
     let description = form.description;
     if (match && (form.id === '' || !description)) {
-      description = Array.isArray(match.desc) ? match.desc.join('\n\n') : (match.desc || '');
+      description = Array.isArray(match.description) ? match.description.join('\n\n') : (match.description || '');
     }
     return { ...form, name, description };
   };
@@ -566,7 +566,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
     const lookup = (n) => equipmentData.find(eq => eq.name.toLowerCase().replace(/\s+/g, '-') === n.toLowerCase().replace(/\s+/g, '-'));
     const eq = lookup(item.name) || (item.name.endsWith('s') ? lookup(item.name.slice(0, -1)) : lookup(`${item.name}s`));
     if (eq) {
-      const desc = Array.isArray(eq.desc) ? eq.desc.join('<br/><br/>') : '';
+      const desc = Array.isArray(eq.description) ? eq.description.join('<br/><br/>') : (eq.description || '');
       setPopupHtml(`<b>${eq.name}</b><br/>${desc}`);
     } else {
       setPopupHtml(`<b>${item.name}</b><br/><br/>No description recorded.`);

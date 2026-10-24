@@ -28,8 +28,8 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadEquipment: vi.fn().mockResolvedValue([
-    { index: 'rope-hempen', name: 'Rope, Hempen', equipment_category: 'Adventuring Gear', desc: ['50 feet of hempen rope.'] },
-    { index: 'torch', name: 'Torch', equipment_category: 'Adventuring Gear', desc: ['Burns for 1 hour.'] },
+    { index: 'rope-hempen', name: 'Rope, Hempen', equipment_category: 'Adventuring Gear', description: ['50 feet of hempen rope.'] },
+    { index: 'torch', name: 'Torch', equipment_category: 'Adventuring Gear', description: ['Burns for 1 hour.'] },
   ]),
 }));
 
