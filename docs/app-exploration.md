@@ -68,7 +68,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **[2026-10-24] EB Load-modal stays open after in-modal Delete** — row disappears but modal persists (quest-edit-modal delete was fixed 752a00c43; this surface missed). Close or show "deleted" inline state. *(minor)*
 - **[2026-10-24] Equipment autofill is exact-name only** — "Rope, Hempen" (PHB sort-order style) yields empty desc while data carries "Hempen Rope"; consider case-insensitive + comma-inversion fuzzy match, or accept-miss toast "no equipment match — free text kept". *(nice-to-have)*
 - *(2026-10-24 pm run — prior "leave music editor no-toast", "wizard no inline error", "generate-settlement destructive", "oembed cosmetic", "campaign-add 403 screen" items all RESOLVED by today's improve commits and were removed at fold.)*
 

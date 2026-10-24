@@ -56,7 +56,17 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
 
   const handleDelete = async (encounterName) => {
     if (window.confirm(`Delete "${formatEncounterName(encounterName)}"?`)) {
-      await onDelete(encounterName);
+      try {
+        // Parent reloads the encounter list before resolving and throws on
+        // non-2xx/network failure, so a resolved await here is a true success.
+        await onDelete(encounterName);
+        setError('');
+        // Close the modal on success — mirrors the quest delete fix (752a00c43).
+        onClose();
+      } catch (err) {
+        console.error('Failed to delete encounter:', err);
+        setError(err.message || 'Failed to delete encounter');
+      }
     }
   };
 
