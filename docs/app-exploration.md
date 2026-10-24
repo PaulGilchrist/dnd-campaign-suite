@@ -68,7 +68,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **[2026-10-24] Equipment autofill is exact-name only** — "Rope, Hempen" (PHB sort-order style) yields empty desc while data carries "Hempen Rope"; consider case-insensitive + comma-inversion fuzzy match, or accept-miss toast "no equipment match — free text kept". *(nice-to-have)*
 - *(2026-10-24 pm run — prior "leave music editor no-toast", "wizard no inline error", "generate-settlement destructive", "oembed cosmetic", "campaign-add 403 screen" items all RESOLVED by today's improve commits and were removed at fold.)*
 
 ## Coverage

@@ -120,3 +120,98 @@ describe('PartyInventory equipment description autofill', () => {
     expect(await screen.findByText(/splash the contents of this vial/i)).toBeTruthy();
   });
 });
+
+// Backlog 2026-10-24: autofill was exact-name only, so PHB sort-order input
+// ("Rope, Hempen") kept an empty description while disk carries "Hempen Rope".
+// Matching is now case-insensitive + comma-inversion tolerant (single split outside
+// parens); the item name the user typed is still stored verbatim on create.
+describe('PartyInventory equipment autofill — inversion & case tolerance', () => {
+  const ropeRow = diskEquipment.find(eq => eq.name === 'Hempen Rope');
+  const ropeText = ropeRow.description.join('\n\n');
+
+  it('comma-inverted "Rope, Hempen" autofills the same description as exact "Hempen Rope"', async () => {
+    await renderReady();
+    const nameInput = await openAddModalAndType('Rope, Hempen');
+
+    const desc = screen.getByLabelText('Description');
+    await waitFor(() => expect(desc.value).toBe(ropeText));
+    expect(desc.value).toContain('hemp or silk');
+
+    // Case variants re-typed on the same form stay byte-identical.
+    fireEvent.change(nameInput, { target: { value: 'hempen rope' } });
+    expect(screen.getByLabelText('Description').value).toBe(ropeText);
+    fireEvent.change(nameInput, { target: { value: 'HEMPEN ROPE' } });
+    expect(screen.getByLabelText('Description').value).toBe(ropeText);
+
+    // Exact disk name still autofills byte-identically (no f23ce822e regression).
+    fireEvent.change(nameInput, { target: { value: 'Hempen Rope' } });
+    expect(screen.getByLabelText('Description').value).toBe(ropeText);
+  });
+
+  it('stores the typed name verbatim when a comma-inverted match autofills the description', async () => {
+    await renderReady();
+    await openAddModalAndType('Rope, Hempen');
+    await waitFor(() => expect(screen.getByLabelText('Description').value).toBe(ropeText));
+
+    fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+    await waitFor(() => {
+      expect(mockSaveInventory).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        items: expect.arrayContaining([
+          // Name is NEVER rewritten to the canonical "Hempen Rope" — only the description autofills.
+          expect.objectContaining({ name: 'Rope, Hempen', description: ropeText }),
+        ]),
+      }));
+    });
+  });
+
+  it('a non-matching name keeps the free text verbatim with an empty editable description', async () => {
+    await renderReady();
+    await openAddModalAndType('QA Nonsense Widget 9000');
+
+    const desc = screen.getByLabelText('Description');
+    expect(desc.value).toBe('');
+    expect(desc.disabled).toBe(false);
+
+    fireEvent.change(desc, { target: { value: 'nonsense made up whole' } });
+    expect(desc.value).toBe('nonsense made up whole');
+
+    const save = screen.getByRole('button', { name: /Save/ });
+    expect(save.disabled).toBe(false); // miss never blocks the save
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(mockSaveInventory).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'QA Nonsense Widget 9000',
+            description: 'nonsense made up whole',
+          }),
+        ]),
+      }));
+    });
+  });
+
+  it('does not substring-match: "Rope" alone autofills nothing (conservative normalization)', async () => {
+    await renderReady();
+    await openAddModalAndType('Rope');
+    expect(screen.getByLabelText('Description').value).toBe('');
+  });
+
+  it('parenthesized thousands-separator names stay verbatim keys: exact "Agate (1,000 gp)" still autofills', async () => {
+    const agateRow = diskEquipment.find(eq => eq.name === 'Agate (1,000 gp)');
+    await renderReady();
+    await openAddModalAndType('Agate (1,000 gp)');
+    await waitFor(() => expect(screen.getByLabelText('Description').value).toBe(agateRow.description.join('\n\n')));
+  });
+
+  it('resolves multiple entries normalizing to the same key deterministically — first in data order wins', async () => {
+    // Fabricated duplicate fixtures ON PURPOSE: real disk has zero normalization
+    // collisions (verified by python sweep), so the ordering rule is only exercisable here.
+    dataLoader.loadEquipment.mockResolvedValue([
+      { index: 'hempen-rope', name: 'Hempen Rope', description: ['FIRST in data order'] },
+      { index: 'rope-hempen-2', name: 'rope,  hempen', description: ['SECOND must lose'] },
+    ]);
+    await renderReady();
+    await openAddModalAndType('Rope, Hempen');
+    await waitFor(() => expect(screen.getByLabelText('Description').value).toBe('FIRST in data order'));
+  });
+});

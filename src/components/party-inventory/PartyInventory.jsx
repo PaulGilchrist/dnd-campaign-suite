@@ -27,6 +27,27 @@ const EMPTY_FORM = { id: '', name: '', quantity: 1, description: '' };
 
 const sortByName = (items) => [...items].sort((a, b) => a.name.localeCompare(b.name));
 
+// Equipment-name matching normalization (backlog 2026-10-24): lowercase, trim, collapse
+// whitespace, and PHB sort-order inversion — "Rope, Hempen" ≡ "Hempen Rope" via a single
+// comma split, but only when the comma sits outside parentheses so thousands separators
+// ("Agate (1,000 gp)") stay verbatim. Deliberately conservative: no substring or
+// edit-distance fuzzy matching — "Rope" alone must NOT match "Hempen Rope". When several
+// entries normalize to the same key, Array#find resolves to the first in data order
+// (deterministic; pinned by tests).
+function normalizeEquipmentName(name) {
+  const text = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const comma = text.indexOf(',');
+  if (comma === -1 || text.slice(0, comma).includes('(')) return text;
+  const head = text.slice(0, comma).trim();
+  const tail = text.slice(comma + 1).trim();
+  return head && tail ? `${tail} ${head}` : text;
+}
+
+function findEquipmentByName(equipmentData, name) {
+  const query = normalizeEquipmentName(name);
+  return equipmentData.find(eq => normalizeEquipmentName(eq.name) === query) || null;
+}
+
 function normalizeBackpack(backpack) {
   if (!Array.isArray(backpack)) return [];
   return backpack
@@ -572,7 +593,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
   const handleAddItem = () => setEditForm({ ...EMPTY_FORM });
 
   const handleNameChange = (form, name) => {
-    const match = equipmentData.find(eq => eq.name.toLowerCase() === name.trim().toLowerCase());
+    const match = findEquipmentByName(equipmentData, name);
     let description = form.description;
     if (match && (form.id === '' || !description)) {
       description = Array.isArray(match.description) ? match.description.join('\n\n') : (match.description || '');
@@ -660,8 +681,11 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
       setPopupHtml(`<b>${item.name}</b><br/><br/>${item.description}`);
       return;
     }
-    const lookup = (n) => equipmentData.find(eq => eq.name.toLowerCase().replace(/\s+/g, '-') === n.toLowerCase().replace(/\s+/g, '-'));
-    const eq = lookup(item.name) || (item.name.endsWith('s') ? lookup(item.name.slice(0, -1)) : lookup(`${item.name}s`));
+    // Same inversion-tolerant matcher as the Add Item autofill (shared helper above);
+    // the dash-fold comparison it replaces was semantically identical (both sides were
+    // transformed), so only trim/collapse/inversion behavior is added.
+    const eq = findEquipmentByName(equipmentData, item.name)
+      || (item.name.endsWith('s') ? findEquipmentByName(equipmentData, item.name.slice(0, -1)) : findEquipmentByName(equipmentData, `${item.name}s`));
     if (eq) {
       const desc = Array.isArray(eq.description) ? eq.description.join('<br/><br/>') : (eq.description || '');
       setPopupHtml(`<b>${eq.name}</b><br/>${desc}`);
