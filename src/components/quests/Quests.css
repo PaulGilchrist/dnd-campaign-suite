@@ -13,10 +13,99 @@
   white-space: nowrap;
 }
 
-/* Description subtitle */
+/* Description subtitle — sanitized markdown preview clamped to 2 lines
+   (mirrors .notes-list-description .markdown-preview in Notes.css) */
 .quests-list-subtitle {
   font-size: 0.82rem;
   color: var(--color-text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.quests-list-subtitle h1 {
+  font-size: 1rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.quests-list-subtitle h2 {
+  font-size: 0.95rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.quests-list-subtitle h3,
+.quests-list-subtitle h4,
+.quests-list-subtitle h5,
+.quests-list-subtitle h6 {
+  font-size: 0.9rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.quests-list-subtitle p {
+  margin: 0.25em 0;
+}
+
+.quests-list-subtitle ul,
+.quests-list-subtitle ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.quests-list-subtitle li {
+  margin: 0.1em 0;
+}
+
+.quests-list-subtitle blockquote {
+  border-left: 3px solid var(--border-color-light);
+  margin: 0.25em 0;
+  padding: 0.15em 0.75em;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.quests-list-subtitle code {
+  background: var(--code-bg, #f4f4f4);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: monospace;
+}
+
+.quests-list-subtitle pre {
+  background: var(--code-bg, #f4f4f4);
+  padding: 8px 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  margin: 0.3em 0;
+}
+
+.quests-list-subtitle pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.quests-list-subtitle hr {
+  border: none;
+  border-top: 1px solid var(--border-color-light);
+  margin: 0.5em 0;
+}
+
+.quests-list-subtitle a {
+  color: var(--link-color, #1a73e8);
+  text-decoration: underline;
+}
+
+.quests-list-subtitle strong {
+  font-weight: 700;
+}
+
+.quests-list-subtitle em {
+  font-style: italic;
 }
 
 

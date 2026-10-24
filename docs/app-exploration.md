@@ -81,7 +81,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### 10. Quests
 - **View state**: `quests`
 - **Features**: Quest tracking; empty/whitespace-name Save disabled; duplicate names rejected case-insensitively (inline `.sessions-form-error`-style error inside `.ct-modal quests-modal`); special characters in names stored fine (GUID-keyed); delete = `window.confirm("Delete quest \"<name>\"?")` (cancel respected, row stays)
-- **Status**: Active/Completed/Failed select; row badge updates immediately after save; list preview shows RAW markdown (`**text**`) unstyled
+- **Status**: Active/Completed/Failed select; row badge updates immediately after save; list preview renders sanitized markdown, clamped to 2 lines (shared `MarkdownPreview`, Notes-list pattern)
 - **Delete defect (2026-10-13)**: accepting delete removes the row but leaves the Edit modal open with the deleted quest's data — see `bug-quest-edit-modal-stays-open-after-delete.md`
 - **Buttons**: New Quest, Edit quest, Save, Cancel, Delete (`button.ct-btn-danger` in `.ct-modal-footer`)
 - **Identifiers**: `button:has-text("New Quest")`, `input[placeholder="Quest name"]`, rows `button[aria-label="Edit quest: <name>"]`, search `input[placeholder*="Search Quests"]`, empty state `No quests found matching “<q>”`
@@ -246,7 +246,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **2026-10-13 — Quest list preview prints RAW markdown** (`**bold**`, `[link](…)` literally) — render or strip markdown in row previews (unclamped open view already renders it). File: Quests list row.
 - **2026-10-13 — Silent save/load confirmations:** encounter save/load, session quick-"Activate", music stop etc. produce no visible toast ("Saved"/"Loaded"/"Activated") — feedback is only the state change itself (+log entry). Add lightweight toasts; helps first-time GMs trust the app.
 - **2026-10-13 — Map editor grid math exposed as raw viewBox:** painting cells requires measuring `rect.grid-bg` client rect (viewBox 800 does not span the svg element box; preserveAspectRatio none stretches). Expose a `data-cell` attribute or stable `aria-label` per cell for testability of paint/fog/token automation.
 - **2026-10-13 — `revealed` array can balloon:** Test Map carried 31,200 stale revealed strings (from an old larger grid) until Reset Fog compacted it to 400 — every save/SSE payload ships the whole array. Prune cells outside the current grid bounds on load or on grid-size change. File: `src/components/map/Map.jsx` merge path + server maps route.

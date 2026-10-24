@@ -3,9 +3,18 @@ import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
+import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import './Quests.css';
 
 const STATUS_OPTIONS = ['active', 'completed', 'failed'];
+
+// Truncate description for the row preview (mirrors Notes.jsx; markdown is
+// then rendered sanitized+clamped instead of printed raw).
+function truncateDescription(text, maxLength) {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
 
 // Mirrors server/utils/nameUniqueness.js output for quests (byte-identical),
 // so client- and server-surfaced duplicate errors clear the same way.
@@ -296,9 +305,10 @@ function Quests({ campaignName, isLocalhost, onBack }) {
                 </div>
                 {quest.description && (
                   <div className="ct-list-details">
-                    <span className="quests-list-subtitle">
-                      {quest.description.length > 100 ? quest.description.substring(0, 100) + '...' : quest.description}
-                    </span>
+                    <MarkdownPreview
+                      className="quests-list-subtitle"
+                      text={truncateDescription(quest.description, 100)}
+                    />
                   </div>
                 )}
               </li>
