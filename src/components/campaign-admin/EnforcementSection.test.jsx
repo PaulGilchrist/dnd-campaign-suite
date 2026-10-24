@@ -41,7 +41,8 @@ import EnforcementSection from './EnforcementSection.jsx';
 
 const CAMPAIGN = 'test-campaign';
 
-// Sub-flag labels as shown to the GM (serverDice is intentionally not surfaced here).
+// Sub-flag labels as shown to the GM (all 10 ENFORCEMENT_DEFAULTS sub-flags
+// are surfaced here, serverDice included since 2026-10-24).
 const SUB_FLAGS = [
     'Turn lock',
     'Action economy',
@@ -52,6 +53,7 @@ const SUB_FLAGS = [
     'Zones & areas',
     'Line of sight',
     'Opportunity attacks',
+    'Server dice',
 ];
 
 const masterSwitch = () => screen.getByRole('checkbox', { name: /Enforcement/ });
@@ -103,9 +105,9 @@ describe('EnforcementSection (L5-001)', () => {
         expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'off' });
     });
 
-    it('master-off zeroes every sub-flag in the written value (incl. unsurfaced serverDice) and master-on does not re-arm them', () => {
-        // Arm the master with live sub-flags, one of which (serverDice) has
-        // no UI row — the zeroing is blob-wide, not just what renders.
+    it('master-off zeroes every sub-flag in the written value and master-on does not re-arm them', () => {
+        // Arm the master with live sub-flags — every one of them now renders
+        // a row (serverDice included). The zeroing is blob-wide.
         store.seed = {
             enforcement: {
                 ...ENFORCEMENT_DEFAULTS,
@@ -118,10 +120,13 @@ describe('EnforcementSection (L5-001)', () => {
         render(<EnforcementSection campaignName={CAMPAIGN} />);
         expect(masterSwitch()).toBeChecked();
         expect(subFlag('Turn lock')).toBeChecked();
+        expect(subFlag('Server dice')).toBeChecked();
 
-        // ON→OFF: the persisted shape is mode:'off' with ALL sub-flags false.
+        // ON→OFF: the persisted shape is mode:'off' with ALL sub-flags false,
+        // and the surfaced Server dice checkbox visibly unchecks.
         fireEvent.click(masterSwitch());
         expect(flagsGroup()).toBeDisabled();
+        expect(subFlag('Server dice')).not.toBeChecked();
         expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'off' });
         Object.entries(lastWrite()).forEach(([key, value]) => {
             if (key !== 'mode') expect(value, `${key} must be zeroed on master-off`).toBe(false);
@@ -135,6 +140,28 @@ describe('EnforcementSection (L5-001)', () => {
         // Individual sub-flag toggling is unchanged: one flag flips per click.
         fireEvent.click(subFlag('Turn lock'));
         expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true });
+    });
+
+    it('surfaces serverDice with a label + hint row and toggling it writes only that flag', () => {
+        // §7.4 oracle flag (campaigns-roll.js / applyRuling.js) — surfaced so
+        // the GM can arm it without hand-editing runtime state.
+        store.seed = { enforcement: { mode: 'on', turnLock: true } };
+        render(<EnforcementSection campaignName={CAMPAIGN} />);
+
+        const row = subFlag('Server dice');
+        expect(row).not.toBeChecked();
+        // The hint <em> sits inside the label, so it rides the accessible name.
+        expect(row).toHaveAccessibleName(/SERVER oracle[\s\S]*cannot be forged client-side/);
+
+        // Check: serverDice:true rides on the stored state, others untouched.
+        fireEvent.click(row);
+        expect(row).toBeChecked();
+        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, serverDice: true });
+
+        // Uncheck: flips only serverDice back to false.
+        fireEvent.click(row);
+        expect(row).not.toBeChecked();
+        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true, serverDice: false });
     });
 
     it('gates every sub-flag behind the master switch: disabled while OFF, interactive once ON', () => {

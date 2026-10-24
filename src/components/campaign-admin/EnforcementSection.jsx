@@ -25,6 +25,11 @@ const FLAGS = [
     { key: 'zones', label: 'Zones & areas', hint: 'Zone automations arm real expiry clocks and turn-end damage (insect-cloud style); lair cadence matures at the initiative-count-20 wrap.' },
     { key: 'lineOfSight', label: 'Line of sight', hint: 'Attacks and spells behind walls or closed doors are denied before their slot is charged (active map only).' },
     { key: 'opportunityAttacks', label: 'Opportunity attacks', hint: 'Leaving a hostile creature\u2019s reach spends their reaction and prompts you to resolve the attack on their sheet.' },
+    // §7.4 server dice oracle — live consumers: server/routes/campaigns-roll.js
+    // (rolls + logs + broadcasts, 403s unless this flag is on) and
+    // src/services/ai/applyRuling.js ('dice' rulings route through the oracle
+    // when on, client diceRoller when off). Normal combat rolls stay client-side.
+    { key: 'serverDice', label: 'Server dice', hint: 'AI dice rulings are rolled by the SERVER oracle instead of your client roller \u2014 crypto-random, logged to the campaign log and broadcast via SSE, so results are auditable and cannot be forged client-side. Off: those dice roll client-side exactly as today.' },
 ]
 
 export default function EnforcementSection({ campaignName }) {
@@ -34,7 +39,7 @@ export default function EnforcementSection({ campaignName }) {
 
     const setFlag = (key, value) => setEnforcement({ ...flags, [key]: value })
 
-    // Master-off zeroes EVERY sub-flag (incl. serverDice) in the written blob:
+    // Master-off zeroes EVERY sub-flag in the written blob:
     // with the mode off nothing is gated, so a stale `true` riding along is
     // functionally inert but a confusing disk shape for harnesses. Flipping
     // back ON therefore starts from all-false — sub-flags never re-arm
