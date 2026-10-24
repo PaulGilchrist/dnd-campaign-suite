@@ -3,7 +3,10 @@
  * editor Save while stopped must not flip playing:true / surprise-autoplay other tabs).
  * Editor PATCH bodies carry { overrides } only → transport fields survive from stored
  * truth; transport writes (full music object, wrapped in { value } like useRuntimeState
- * sends for campaign keys) overwrite as the generic wildcard route always did. */
+ * sends for campaign keys) overwrite as the generic wildcard route always did.
+ * Save-time oEmbed title resolution rides the same route (backlog 2026-10-24, second
+ * block) — global fetch is stubbed offline by default so raw-ID titles survive untouched
+ * here except where a block wires an oEmbed responder. No real YouTube in tests. */
 import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
 
@@ -31,13 +34,19 @@ function seedMusic(music) {
 
 const STOPPED = { mood: null, playing: false, volume: 0.6, overrides: {} };
 
-describe('campaigns-changedata - POST music intent-split merge', () => {
-    beforeEach(() => {
-        vi.mocked(markDirty).mockClear();
-        vi.mocked(publish).mockClear();
-        characterChangeData.clear();
-    });
+// Default stub: oEmbed "unreachable" → resolveTrackTitles falls back to raw
+// IDs (which is what the merge-lane assertions below expect verbatim).
+let fetchMock;
+beforeEach(() => {
+    vi.mocked(markDirty).mockClear();
+    vi.mocked(publish).mockClear();
+    characterChangeData.clear();
+    fetchMock = vi.fn(async () => { throw Object.assign(new Error('offline in tests'), { name: 'TimeoutError' }); });
+    vi.stubGlobal('fetch', fetchMock);
+});
+afterEach(() => vi.unstubAllGlobals());
 
+describe('campaigns-changedata - POST music intent-split merge', () => {
     it('editor overrides PATCH while stopped keeps playing:false and persists overrides', async () => {
         seedMusic({ ...STOPPED });
         const res = await request(createTestApp())
@@ -116,5 +125,71 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
         expect(res.status).toBe(200);
         expect(res.body.music).toMatchObject({ mood: null, playing: false, volume: 0.6 });
         expect(res.body.music.overrides.town).toHaveLength(1);
+    });
+});
+
+/* Save-time oEmbed title resolution (backlog 2026-10-24 — editor stamps
+ * title = raw video ID; the route enriches before merge/store/publish). */
+describe('campaigns-changedata - POST music oEmbed title resolution', () => {
+    const oembedOk = (title) => ({ ok: true, status: 200, json: async () => ({ title }) });
+    const timeoutErr = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+
+    it('editor save resolves raw-ID titles into stored overrides and the echoed response', async () => {
+        seedMusic({ ...STOPPED });
+        fetchMock.mockImplementation(async (url) =>
+            url.includes('vyg5jJrZ42s') ? oembedOk('Medieval Fantasy Tavern (Daydreaming of Persephone)') : oembedOk('Medieval Tavern Ambience (Fantasy Music Studio)'));
+        const res = await request(createTestApp())
+            .post('/api/campaigns/test-campaign/music')
+            .send({ overrides: { tavern: [
+                { videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
+                { videoId: '2P8J7Cx1plA', title: '2P8J7Cx1plA' }
+            ] } });
+
+        expect(res.status).toBe(200);
+        const expected = [
+            { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
+            { videoId: '2P8J7Cx1plA', title: 'Medieval Tavern Ambience (Fantasy Music Studio)' }
+        ];
+        expect(characterChangeData.get('test-campaign').music.overrides.tavern).toEqual(expected);
+        expect(res.body.music.overrides.tavern).toEqual(expected);
+        expect(publish).toHaveBeenCalledWith('change-test-campaign-music', expect.objectContaining({ overrides: { tavern: expected } }), 'test-campaign');
+        // real oEmbed URL, bounded signal — never the browser hitting YouTube
+        expect(fetchMock.mock.calls[0][0]).toContain('https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dvyg5jJrZ42s');
+        expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('mixed save: one good, one timed-out → 200, good resolved, bad keeps raw ID, console.error logged', async () => {
+        seedMusic({ ...STOPPED });
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        fetchMock.mockImplementation(async (url) => {
+            if (url.includes('vyg5jJrZ42s')) return oembedOk('Medieval Fantasy Tavern (Daydreaming of Persephone)');
+            throw timeoutErr(); // invalid/unlisted id, or oEmbed down
+        });
+        const res = await request(createTestApp())
+            .post('/api/campaigns/test-campaign/music')
+            .send({ overrides: { tavern: [
+                { videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' },
+                { videoId: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' }
+            ] } });
+
+        expect(res.status).toBe(200);
+        expect(res.body.music.overrides.tavern).toEqual([
+            { videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' },
+            { videoId: 'aAAAAAAAAAA', title: 'aAAAAAAAAAA' } // graceful fallback, save never blocked
+        ]);
+        expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('aAAAAAAAAAA'), expect.anything());
+        consoleError.mockRestore();
+    });
+
+    it('re-save of an already-resolved videoId skips re-fetch (no oEmbed stampede)', async () => {
+        seedMusic({ ...STOPPED, overrides: { tavern: [{ videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }] } });
+        const res = await request(createTestApp())
+            .post('/api/campaigns/test-campaign/music')
+            .send({ overrides: { tavern: [{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
+
+        expect(res.status).toBe(200);
+        expect(fetchMock).not.toHaveBeenCalled();
+        // stored readable title survives the editor's raw-ID re-stamp
+        expect(res.body.music.overrides.tavern).toEqual([{ videoId: 'vyg5jJrZ42s', title: 'Medieval Fantasy Tavern (Daydreaming of Persephone)' }]);
     });
 });

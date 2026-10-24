@@ -1,6 +1,7 @@
 import express from 'express';
 import { publish, characterChangeData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { resolveOverrideTitles } from '../utils/resolveTrackTitles.js';
 import { validateRuntimeWrite } from '../validation/keyValidators.js';
 import { addEntry as addLogEntry } from './log.js';
 
@@ -85,9 +86,16 @@ router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
 // while stopped must never resurrect playing:true and surprise-autoplay other tabs
 // (backlog 2026-10-24). Response echoes the merged object so the editor can pin its
 // local store to server truth (skipSync).
-router.post('/api/campaigns/:campaign/music', asyncHandler((req, res) => {
+//
+// Unresolved track titles (editor stamps title = raw video ID) are enriched
+// server-side via YouTube oEmbed before the merge — browser cannot CORS-hit
+// oembed (backlog 2026-10-24). Bounded parallel fetches; any failure falls
+// back to the raw ID and NEVER blocks the save. Transport writes echo back
+// already-resolved overrides, so the stampede guard (reuse stored titles)
+// keeps play/pause instant — only new/changed videos cost a lookup.
+router.post('/api/campaigns/:campaign/music', asyncHandler(async (req, res) => {
     const { campaign } = req.params;
-    const incoming = ('value' in req.body ? req.body.value : req.body);
+    let incoming = ('value' in req.body ? req.body.value : req.body);
     if (!incoming || typeof incoming !== 'object') {
         return res.status(400).json({ error: 'music payload must be an object' });
     }
@@ -98,6 +106,9 @@ router.post('/api/campaigns/:campaign/music', asyncHandler((req, res) => {
     const base = (current && typeof current === 'object' && !Array.isArray(current))
         ? current
         : { mood: null, playing: false, volume: 0.6, overrides: {} };
+    if ('overrides' in incoming) {
+        incoming = { ...incoming, overrides: await resolveOverrideTitles(incoming.overrides, base.overrides) };
+    }
     const merged = { ...base, ...incoming };
 
     if (!characterChangeData.has(campaign)) {
