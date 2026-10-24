@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
 import { DEFAULT_FORM_DATA } from '../../config/constants.js';
-import { DUPLICATE_CHARACTER_NAME_ERROR } from '../../config/utils.js';
+import { DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR } from '../../config/utils.js';
 
 // Data-load boundary only: fixed arrays with the same shape the wizard
 // consumes, so the component tree below it stays fully real. The fixture
@@ -140,5 +140,48 @@ describe('CharacterCreationWizard - Integration', () => {
     const expected = cloneDeep(characterData);
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(onComplete).toHaveBeenCalledWith(expected);
+  });
+
+  it('edit flow: clearing the name shows a live inline required-hint and keeps ✓ Save disabled until a valid name is typed', async () => {
+    const characterData = {
+      ...cloneDeep(DEFAULT_FORM_DATA),
+      id: 'edgin-1',
+      name: 'Edgin',
+      rules: '5e',
+    };
+    renderWizard({ characterData, isEditing: true });
+
+    // Open prefilled: no hint, sidebar ✓ Save enabled.
+    const nameInput = await screen.findByDisplayValue('Edgin');
+    const saveBtn = () => document.querySelector('.sidebar-save');
+    await waitFor(() => expect(saveBtn()).toBeEnabled());
+    expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument();
+
+    // Whitespace-only counts as empty: hint appears next to the input,
+    // Save stays disabled (existing gate, unchanged).
+    fireEvent.change(nameInput, { target: { value: '   ' } });
+    expect(await screen.findByText(CHARACTER_NAME_REQUIRED_ERROR)).toBeInTheDocument();
+    expect(nameInput.closest('.form-group').querySelector('.error-message')).toHaveTextContent(CHARACTER_NAME_REQUIRED_ERROR);
+    expect(saveBtn()).toBeDisabled();
+
+    // Valid name → hint clears immediately, Save re-arms.
+    fireEvent.change(nameInput, { target: { value: 'Edgin' } });
+    await waitFor(() => expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument());
+    await waitFor(() => expect(saveBtn()).toBeEnabled());
+  });
+
+  it('create flow: empty name on the Basic step shows the same inline required-hint', async () => {
+    renderWizard();
+
+    fireEvent.click(screen.getByTestId('rules-option-5e'));
+    const nameInput = await screen.findByRole('textbox');
+
+    // Step 2 renders with an empty name: hint visible inline, Next blocked.
+    expect(await screen.findByText(CHARACTER_NAME_REQUIRED_ERROR)).toBeInTheDocument();
+    expect(nameInput).toHaveClass('error');
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+    fireEvent.change(nameInput, { target: { value: 'Aragorn' } });
+    await waitFor(() => expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument());
   });
 });

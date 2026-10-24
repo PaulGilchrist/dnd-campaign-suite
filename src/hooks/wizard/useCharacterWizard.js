@@ -68,6 +68,20 @@ export function useCharacterWizard(campaignName) {
     try {
       if (!campaignName) throw new Error('No campaign selected');
       const originalCharacter = originalCharacterRef.current;
+      // Destructive-edit guard (mirrors the Quests confirm that names the
+      // object): a level change re-derives proficiency, HP and every dependent
+      // modifier across the live campaign — name the change and confirm before
+      // the save PUT fires. Cancel aborts the save and keeps the wizard open.
+      const originalLevel = Number(originalCharacter?.level);
+      const newLevel = Number(characterData?.level);
+      if (
+        Number.isFinite(originalLevel) &&
+        Number.isFinite(newLevel) &&
+        originalLevel !== newLevel &&
+        !window.confirm(`Change ${characterData.name}'s level from ${originalLevel} to ${newLevel}? This updates the character in the live campaign.`)
+      ) {
+        return;
+      }
       const originalFileName = `${originalCharacter.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       const fileName = `${characterData.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);

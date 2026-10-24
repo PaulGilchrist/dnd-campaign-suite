@@ -71,7 +71,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- (2026-10-24) Wizard step-1 empty-name blocks Save with zero inline error text (others like NPCs also just disable — a `.{area}-form-error` hint "Name required" would match the shared pattern). Also Edit-save on level changes has no confirm despite being destructive across a live campaign.
 - (2026-10-24) `.pi-modal` Give defaults the focused currency amount to the ENTIRE party balance (205 gp prefill) — one accidental Enter transfers everything; safer default 0/1 + confirm sum.
 - (2026-10-24) Music Save/Reset give no toast/confirmation and editor close leaves no trace which mood was saved; `Save` while stopped also flips server `playing:true` (surprise-autoplay risk on other tabs). Add `.music-toast` per shared pattern + keep playing-state untouched by editor saves.
 - (2026-10-24) Music override tracks store `title` = raw video ID ("dQw4w9WgXcQ") — resolve real titles via YouTube oEmbed at save time for readable lists.

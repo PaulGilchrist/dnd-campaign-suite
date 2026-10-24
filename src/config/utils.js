@@ -151,6 +151,7 @@ export async function validateLevel(level, ruleset = '5e') {
 }
 
 export const DUPLICATE_CHARACTER_NAME_ERROR = 'A character with that name already exists';
+export const CHARACTER_NAME_REQUIRED_ERROR = 'Character name is required';
 
 /**
  * Case-insensitive duplicate-name lookup over existing character names
@@ -169,7 +170,7 @@ export function hasDuplicateCharacterName(name, existingNames = []) {
 const validateBasicsStep = async (formData, context) => {
   const newErrors = {};
   if (!formData.name?.trim()) {
-    newErrors.name = 'Character name is required';
+    newErrors.name = CHARACTER_NAME_REQUIRED_ERROR;
   } else if (hasDuplicateCharacterName(formData.name, context.existingNames)) {
     newErrors.name = DUPLICATE_CHARACTER_NAME_ERROR;
   }

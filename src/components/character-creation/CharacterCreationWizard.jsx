@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import './CharacterCreationWizard.css';
-import { validateStep, validateFinalFormData, validateAbilityTotals, hasDuplicateCharacterName, DUPLICATE_CHARACTER_NAME_ERROR } from '../../config/utils.js';
+import { validateStep, validateFinalFormData, validateAbilityTotals, hasDuplicateCharacterName, DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
 import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
@@ -212,15 +212,25 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
       .filter(n => n.trim() && (!isEditing || n.trim().toLowerCase() !== selfName));
   }, [existingCharacters, characterData, isEditing]);
 
-  // Live inline duplicate-name error on Step 2 (updateField clears errors.name
-  // on each keystroke — this re-arms it while the name still collides). Only
-  // writes when the state actually changes so the happy path stays untouched.
+  // Live inline name error on Step 2: blank/whitespace → required hint,
+  // collision → duplicate hint, valid → cleared. Mirrors NPCs/Quests/Factions
+  // (updateField clears errors.name on each keystroke — this re-arms it while
+  // the name is still invalid). Only writes when the message actually changes
+  // so the happy path stays untouched. Rendered inline by WizardStepBasic's
+  // existing `.error-message` span beneath the name input.
   useEffect(() => {
-    const dupe = hasDuplicateCharacterName(formData.name, existingNames);
-    if (dupe && errors.name !== DUPLICATE_CHARACTER_NAME_ERROR) {
-      setErrors({ ...errors, name: DUPLICATE_CHARACTER_NAME_ERROR });
-    } else if (!dupe && errors.name === DUPLICATE_CHARACTER_NAME_ERROR) {
-      setErrors({ ...errors, name: null });
+    const trimmedName = (formData.name || '').trim();
+    let expectedNameError = null;
+    if (!trimmedName) {
+      expectedNameError = CHARACTER_NAME_REQUIRED_ERROR;
+    } else if (hasDuplicateCharacterName(formData.name, existingNames)) {
+      expectedNameError = DUPLICATE_CHARACTER_NAME_ERROR;
+    }
+    // Write only to raise/change a live name message, or to clear one this
+    // guard owns — never churn errors owned by other validators.
+    const isLiveNameError = errors.name === DUPLICATE_CHARACTER_NAME_ERROR || errors.name === CHARACTER_NAME_REQUIRED_ERROR;
+    if (expectedNameError ? errors.name !== expectedNameError : isLiveNameError) {
+      setErrors({ ...errors, name: expectedNameError });
     }
   }, [formData.name, existingNames, errors, setErrors]);
 
