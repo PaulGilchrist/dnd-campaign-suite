@@ -34,7 +34,11 @@ import { loadCombatSummary } from '../encounters/combatData.js';
 import storage from '../ui/storage.js';
 import { addNPCToInitiative } from './npcCombatService.js';
 
-vi.mock('../encounters/npcStatBlockUtils.js', () => ({
+// resolveNPCHitPoints rides the REAL module (importActual) so the join lane
+// pins true dice-parsing bytes; only the gate predicates are stubbed here —
+// their internals are owned by npcStatBlockUtils.test.js.
+vi.mock('../encounters/npcStatBlockUtils.js', async (importActual) => ({
+  ...(await importActual()),
   npcHasStatBlock: vi.fn(),
   npcHasAttacks: vi.fn(),
 }));
@@ -232,6 +236,15 @@ describe('npcCombatService - addNPCToInitiative', () => {
         currentHp: 18,
         saveBonuses: {},
       });
+    });
+
+    it('joins dice-formatted HP "9 (2d8)" at its resolved total — never NaN maxHp/currentHp', async () => {
+      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), hitPoints: '9 (2d8)' });
+
+      const creature = storage.set.mock.calls[0][1].creatures[0];
+      expect(creature.maxHp).toBe(9);
+      expect(creature.currentHp).toBe(9);
+      expect(Number.isFinite(creature.maxHp)).toBe(true);
     });
 
     it('falls back to image when imagePath is absent', async () => {

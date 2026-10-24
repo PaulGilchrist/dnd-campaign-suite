@@ -45,6 +45,7 @@ import {
   npcHasAttacks,
   calculateAbilityModifier,
   npcToMonsterFormat,
+  resolveNPCHitPoints,
 } from './npcStatBlockUtils.js';
 
 afterEach(() => {
@@ -63,12 +64,17 @@ function makeNPC(overrides = {}) {
 }
 
 describe('npcHasStatBlock', () => {
-  // Combat-ready = tracker can run them: finite numeric AC + positive numeric HP.
+  // Combat-ready = tracker can run them: finite numeric AC + positive HP.
+  // Canonical block notation "9 (2d8)" IS combat-ready — the leading total is
+  // the resolved HP the tracker runs (bug: Number("9 (2d8)")=NaN kept gating).
   it.each([
     { label: 'numeric AC and HP', npc: { armorClass: 15, hitPoints: 20 }, expected: true },
     { label: 'AC 0 is data', npc: { armorClass: 0, hitPoints: 20 }, expected: true },
     { label: 'negative AC is data', npc: { armorClass: -5, hitPoints: 1 }, expected: true },
     { label: 'numeric-string HP', npc: { armorClass: 15, hitPoints: '7' }, expected: true },
+    { label: 'dice-formatted HP "9 (2d8)" resolves to its total', npc: { armorClass: 11, hitPoints: '9 (2d8)' }, expected: true },
+    { label: 'dice-formatted HP without space', npc: { armorClass: 11, hitPoints: '9(2d8)' }, expected: true },
+    { label: 'dice-formatted HP with padded spaces', npc: { armorClass: 11, hitPoints: ' 9 (2d8 + 1) ' }, expected: true },
     { label: 'null npc', npc: null, expected: false },
     { label: 'empty object', npc: {}, expected: false },
     { label: 'string AC', npc: { armorClass: '15', hitPoints: 20 }, expected: false },
@@ -79,11 +85,41 @@ describe('npcHasStatBlock', () => {
     { label: 'null HP', npc: { armorClass: 15, hitPoints: null }, expected: false },
     { label: 'empty-string HP', npc: { armorClass: 15, hitPoints: '' }, expected: false },
     { label: 'HP 0 is not alive', npc: { armorClass: 15, hitPoints: 0 }, expected: false },
+    { label: 'dice-formatted HP 0 "0 (0d8)" is not alive', npc: { armorClass: 15, hitPoints: '0 (0d8)' }, expected: false },
     { label: 'negative HP', npc: { armorClass: 15, hitPoints: -3 }, expected: false },
-    { label: 'dice-expression HP', npc: { armorClass: 15, hitPoints: '6d8+2' }, expected: false },
+    { label: 'bare dice-expression HP has no resolved total', npc: { armorClass: 15, hitPoints: '6d8+2' }, expected: false },
+    { label: 'trailing junk without dice parens', npc: { armorClass: 15, hitPoints: '9 apples' }, expected: false },
     { label: 'Infinity HP', npc: { armorClass: 15, hitPoints: Infinity }, expected: false },
   ])('$label → $expected', ({ npc, expected }) => {
     expect(npcHasStatBlock(npc)).toBe(expected);
+  });
+});
+
+describe('resolveNPCHitPoints', () => {
+  // One resolver for every NPC HP consumer (gate + initiative join): numbers
+  // pass through untouched, canonical "N (dice)" strings resolve to N,
+  // anything without a resolved total is NaN (callers gate it shut).
+  it.each([
+    { label: 'number passes through', hitPoints: 20, expected: 20 },
+    { label: 'zero is data', hitPoints: 0, expected: 0 },
+    { label: 'negative passes through', hitPoints: -3, expected: -3 },
+    { label: 'numeric string', hitPoints: '9', expected: 9 },
+    { label: 'canonical "9 (2d8)"', hitPoints: '9 (2d8)', expected: 9 },
+    { label: '"9 (2d8 + 1)" modifier inside parens', hitPoints: '9 (2d8 + 1)', expected: 9 },
+    { label: 'no space before parens', hitPoints: '9(2d8)', expected: 9 },
+    { label: 'padded', hitPoints: ' 9 (2d8) ', expected: 9 },
+    { label: 'zero total "0 (0d8)"', hitPoints: '0 (0d8)', expected: 0 },
+    { label: 'bare dice stays unresolvable', hitPoints: '6d8+2', expected: NaN },
+    { label: 'trailing junk', hitPoints: '9 apples', expected: NaN },
+    { label: 'empty string', hitPoints: '', expected: NaN },
+    { label: 'null', hitPoints: null, expected: NaN },
+    { label: 'undefined', hitPoints: undefined, expected: NaN },
+    { label: 'boolean', hitPoints: true, expected: NaN },
+    { label: 'Infinity number passes (caller gates finite)', hitPoints: Infinity, expected: Infinity },
+  ])('$label → $expected', ({ hitPoints, expected }) => {
+    const result = resolveNPCHitPoints(hitPoints);
+    if (Number.isNaN(expected)) expect(result).toBeNaN();
+    else expect(result).toBe(expected);
   });
 });
 

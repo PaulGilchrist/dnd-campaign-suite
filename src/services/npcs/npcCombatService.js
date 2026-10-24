@@ -1,4 +1,4 @@
-import { npcHasStatBlock, npcHasAttacks } from '../encounters/npcStatBlockUtils.js';
+import { npcHasStatBlock, npcHasAttacks, resolveNPCHitPoints } from '../encounters/npcStatBlockUtils.js';
 import { rollD20 } from '../dice/diceRoller.js';
 import { loadCombatSummary } from '../encounters/combatData.js';
 import utils from '../ui/utils.js';
@@ -35,6 +35,8 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
 
   const roll = rollD20();
   const total = roll + initBonus;
+  // Dice-formatted HP ("9 (2d8)") joins at its resolved total, never NaN.
+  const maxHp = resolveNPCHitPoints(npc.hitPoints);
 
   combatSummary.creatures.push({
     name: npc.name,
@@ -48,8 +50,8 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
     concentration: null,
     imagePath: npc.imagePath || npc.image || '',
     initiativeBonus: initBonus,
-    maxHp: Number(npc.hitPoints),
-    currentHp: Number(npc.hitPoints),
+    maxHp,
+    currentHp: maxHp,
     saveBonuses: {},
   });
 

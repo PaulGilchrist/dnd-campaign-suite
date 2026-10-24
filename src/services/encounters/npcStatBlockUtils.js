@@ -7,12 +7,26 @@ export function findNPCByName(npcName, npcs) {
   }) || null;
 }
 
+// Canonical D&D stat-block HP is a resolved total followed by its dice:
+// "9 (2d8)". The NPC Stats form persists that string verbatim, so the
+// combat lanes must resolve the leading integer — Number("9 (2d8)") is NaN.
+// A bare dice expression ("6d8+2") carries no resolved total and stays
+// unresolvable — the GM fills in the number then.
+export function resolveNPCHitPoints(hitPoints) {
+  if (typeof hitPoints === 'number') return hitPoints;
+  if (typeof hitPoints !== 'string') return NaN;
+  const match = hitPoints.match(/^\s*(\d+)(?:\s*\([^)]*\))?\s*$/);
+  return match ? Number(match[1]) : NaN;
+}
+
 export function npcHasStatBlock(npc) {
   if (!npc) return false;
-  // Combat-ready means the tracker can actually run them: numeric AC and positive HP.
+  // Combat-ready means the tracker can actually run them: numeric AC and positive HP
+  // (dice-formatted "9 (2d8)" resolves to its leading total via resolveNPCHitPoints).
+  const hitPoints = resolveNPCHitPoints(npc.hitPoints);
   return typeof npc.armorClass === 'number' && Number.isFinite(npc.armorClass)
-    && Number.isFinite(Number(npc.hitPoints))
-    && Number(npc.hitPoints) > 0;
+    && Number.isFinite(hitPoints)
+    && hitPoints > 0;
 }
 
 // An attack is an action the NPC can actually swing with: a name plus an
