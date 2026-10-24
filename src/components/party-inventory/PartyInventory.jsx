@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
@@ -412,16 +412,30 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
   const [popupHtml, setPopupHtml] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Serialize full-store POSTs (bug-party-inventory-currency-rapid-click-collapse):
+  // one in-flight request per endpoint; a burst of chip clicks coalesces into a single
+  // follow-up POST carrying the latest snapshot. A revision stamp drops stale echoes so
+  // out-of-order responses can never wipe landed edits (playbook §39).
+  const inventoryRef = useRef(inventory);
+  const persistQueueRef = useRef({ saving: false, pending: null });
+  const localRevRef = useRef(0);
+
+  const applyInventory = useCallback((next, { ack = false } = {}) => {
+    if (!ack) localRevRef.current += 1;
+    inventoryRef.current = next;
+    setInventory(next);
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
       const data = await loadInventory(campaignName);
-      setInventory(data);
+      applyInventory(data);
     } catch (error) {
       console.error('[PartyInventory] load failed:', error);
     } finally {
       setLoading(false);
     }
-  }, [campaignName]);
+  }, [campaignName, applyInventory]);
 
   useEffect(() => {
     refresh();
@@ -434,40 +448,56 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
   useEffect(() => {
     const unsubscribe = subscribeToSSE(campaignName, (event) => {
       if (event.key === `inventory-${campaignName}`) {
-        setInventory(normalizeInventory(event.data));
+        applyInventory(normalizeInventory(event.data));
       }
     });
     return unsubscribe;
-  }, [campaignName]);
+  }, [campaignName, applyInventory]);
 
-  const persist = useCallback(async (next) => {
+  const flushPersist = useCallback(function flushPersistQueue() {
+    const queue = persistQueueRef.current;
+    if (queue.saving || !queue.pending) return;
+    const snapshot = queue.pending;
+    const rev = localRevRef.current;
+    queue.pending = null;
+    queue.saving = true;
     setSaving(true);
-    try {
-      const saved = await saveInventory(campaignName, next);
-      if (saved) setInventory(saved);
-      else await refresh();
-    } catch (error) {
-      console.error('[PartyInventory] save failed:', error);
-      alert(`Save failed: ${error.message}`);
-    } finally {
-      setSaving(false);
-    }
-  }, [campaignName, refresh]);
+    saveInventory(campaignName, snapshot)
+      .then(saved => {
+        // Stale-response guard: a newer local edit superseded this snapshot.
+        if (localRevRef.current !== rev) return;
+        applyInventory(saved, { ack: true });
+      })
+      .catch(error => {
+        console.error('[PartyInventory] save failed:', error);
+        alert(`Save failed: ${error.message}`);
+      })
+      .finally(() => {
+        queue.saving = false;
+        setSaving(false);
+        flushPersistQueue();
+      });
+  }, [campaignName, applyInventory]);
+
+  const persist = useCallback((next) => {
+    applyInventory(next);
+    persistQueueRef.current.pending = next;
+    flushPersist();
+  }, [applyInventory, flushPersist]);
 
   const handleCurrencyAdjust = (key, delta) => {
-    const next = {
-      ...inventory,
-      currency: { ...inventory.currency, [key]: Math.max(0, (inventory.currency[key] || 0) + delta) },
-    };
-    setInventory(next);
-    persist(next);
+    const prev = inventoryRef.current;
+    persist({
+      ...prev,
+      currency: { ...prev.currency, [key]: Math.max(0, (prev.currency[key] || 0) + delta) },
+    });
   };
 
   const handleCurrencyTransfer = (playerName, amounts) => {
     setSaving(true);
     transferInventory(campaignName, { direction: 'party-to-player', playerName, currency: amounts })
       .then(result => {
-        setInventory(result.inventory);
+        applyInventory(result.inventory);
         const parts = Object.entries(amounts).map(([k, v]) => `${v} ${k}`).join(', ');
         addEntry(campaignName, {
           type: 'inventory_transfer',
@@ -496,28 +526,33 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
   const handleSaveItem = () => {
     const name = editForm.name.trim();
     if (!name) return;
+    const inv = inventoryRef.current;
     const existingIndex = editForm.id
-      ? inventory.items.findIndex(i => i.id === editForm.id)
-      : inventory.items.findIndex(i => i.name.toLowerCase() === name.toLowerCase());
-    const items = [...inventory.items];
+      ? inv.items.findIndex(i => i.id === editForm.id)
+      : inv.items.findIndex(i => i.name.toLowerCase() === name.toLowerCase());
+    const items = [...inv.items];
     if (existingIndex === -1) {
       items.push({ id: crypto.randomUUID(), name, quantity: editForm.quantity, description: editForm.description });
     } else {
       items[existingIndex] = { ...items[existingIndex], ...editForm, name, quantity: Math.max(1, editForm.quantity) };
     }
     setEditForm(null);
-    persist({ ...inventory, items });
+    persist({ ...inv, items });
   };
 
   const handleItemStep = (item, delta) => {
-    const quantity = Math.max(1, item.quantity + delta);
-    if (quantity === item.quantity) return;
-    persist({ ...inventory, items: inventory.items.map(i => i.id === item.id ? { ...i, quantity } : i) });
+    const inv = inventoryRef.current;
+    const current = inv.items.find(i => i.id === item.id);
+    if (!current) return;
+    const quantity = Math.max(1, current.quantity + delta);
+    if (quantity === current.quantity) return;
+    persist({ ...inv, items: inv.items.map(i => i.id === item.id ? { ...i, quantity } : i) });
   };
 
   const handleDeleteItem = (item) => {
     if (!window.confirm(`Delete "${item.name}" from party inventory?`)) return;
-    persist({ ...inventory, items: inventory.items.filter(i => i.id !== item.id) });
+    const inv = inventoryRef.current;
+    persist({ ...inv, items: inv.items.filter(i => i.id !== item.id) });
     addEntry(campaignName, {
       type: 'inventory_transfer',
       message: `Removed "${item.name}" from party inventory`,
@@ -535,7 +570,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
       quantity: moveQuantity,
     })
       .then(result => {
-        setInventory(result.inventory);
+        applyInventory(result.inventory);
         addEntry(campaignName, {
           type: 'inventory_transfer',
           message: `${moveQuantity} × ${moveTarget.name} moved from party inventory to ${movePlayer}`,
@@ -654,7 +689,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
                       <QuantityStepper
                         quantity={item.quantity}
                         onStep={(delta) => handleItemStep(item, delta)}
-                        onSet={(v) => persist({ ...inventory, items: inventory.items.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, v) } : i) })}
+                        onSet={(v) => persist({ ...inventoryRef.current, items: inventoryRef.current.items.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, v) } : i) })}
                       />
                     </td>
                     <td className="pi-actions-cell no-print">
