@@ -28,6 +28,7 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useLootHandlers } from './useLootHandlers.js';
 import { generateLootFromCombatSummary } from '../../services/items/lootGenerator.js';
+import { depositCurrency } from '../../services/campaign/inventoryService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
@@ -36,8 +37,20 @@ vi.mock('../../services/ui/logService.js', () => ({
     addEntry: vi.fn(async () => ({})),
 }));
 
-vi.mock('../../services/items/lootGenerator.js', () => ({
+vi.mock('../../services/items/lootGenerator.js', async (importOriginal) => ({
+    ...await importOriginal(),
     generateLootFromCombatSummary: vi.fn(async () => ({ lootEntries: [], totalEncounterXp: 0 })),
+}));
+
+// Deposit boundary: the award seam POSTs parsed currency to /inventory/deposit
+// and logs the credit. Never live (campaign lockdown), calls recorded verbatim.
+const { depositCalls } = vi.hoisted(() => ({ depositCalls: [] }));
+
+vi.mock('../../services/campaign/inventoryService.js', () => ({
+    depositCurrency: vi.fn(async (campaignName, currency) => {
+        depositCalls.push({ campaignName, currency });
+        return { currency, items: [] };
+    }),
 }));
 
 // The hook only touches getRuntimeValue/setRuntimeValue; mock the transport
@@ -61,6 +74,7 @@ describe('useLootHandlers', () => {
     beforeEach(() => {
         vi.clearAllMocks(); // preserves implementations, clears calls
         xpSeed.clear();
+        depositCalls.length = 0;
     });
 
     describe('handleGenerateLoot', () => {
@@ -288,6 +302,91 @@ describe('useLootHandlers', () => {
             expect(result.current.lootTextValue).toBe('Gold');
             expect(result.current.showAwardLoot).toBe(true);
             expect(result.current.awardingLoot).toBe(false);
+
+            consoleSpy.mockRestore();
+        });
+
+        it('deposits pp/gp/sp/cp parsed from currency lines into party inventory and logs the credit', async () => {
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            await act(async () => {
+                result.current.setLootData({ lootEntries: ['70 platinum pieces, 3 gold pieces, 2 silver coins'], totalEncounterXp: 200 });
+                result.current.setLootTextValue('70 platinum pieces, 3 gold pieces, 2 silver coins\n"Shield +1" (Rare, Shield)\nNo loot for these monsters');
+                result.current.setShowAwardLoot(true);
+            });
+
+            await act(async () => {
+                await result.current.handleAwardLoot();
+            });
+
+            // Currency credited once, exact amounts, through the server deposit route
+            expect(depositCurrency).toHaveBeenCalledTimes(1);
+            expect(depositCalls).toEqual([{
+                campaignName,
+                currency: { pp: 70, gp: 3, sp: 2, cp: 0 },
+            }]);
+
+            // Existing award logs untouched (loot + loot_awarded), deposit appended
+            expect(addEntry).toHaveBeenCalledTimes(3);
+            expect(addEntry).toHaveBeenNthCalledWith(1, campaignName, expect.objectContaining({ type: 'loot' }));
+            expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, expect.objectContaining({ type: 'encounter', action: 'loot_awarded' }));
+            const depositLog = addEntry.mock.calls[2][1];
+            expect(depositLog.type).toBe('inventory_transfer');
+            expect(depositLog.message).toContain('Loot currency deposited to party inventory');
+            expect(depositLog.message).toContain('70 pp');
+            expect(depositLog.message).toContain('3 gp');
+            expect(depositLog.message).toContain('2 sp');
+
+            // XP grant + panel clear preserved unchanged (criterion 3)
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+            expect(result.current.lootTextValue).toBe('');
+            expect(result.current.showAwardLoot).toBe(false);
+        });
+
+        it('writes zero currency change and no deposit log when loot text has no currency lines', async () => {
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            await act(async () => {
+                result.current.setLootData({ lootEntries: ['"Ring of Feather Falling" (Rare, Ring)'], totalEncounterXp: 100 });
+                result.current.setLootTextValue('"Ring of Feather Falling" (Rare, Ring)\nNo loot for these monsters');
+                result.current.setShowAwardLoot(true);
+            });
+
+            await act(async () => {
+                await result.current.handleAwardLoot();
+            });
+
+            expect(depositCurrency).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledTimes(2);
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+            expect(result.current.lootTextValue).toBe('');
+        });
+
+        it('completes the award and clears the panel when the deposit route fails', async () => {
+            depositCurrency.mockRejectedValueOnce(new Error('deposit down'));
+            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
+
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            await act(async () => {
+                result.current.setLootData({ lootEntries: ['50 gp'], totalEncounterXp: 100 });
+                result.current.setLootTextValue('50 gp');
+                result.current.setShowAwardLoot(true);
+            });
+
+            await act(async () => {
+                await result.current.handleAwardLoot();
+            });
+
+            // Award (logs + XP) still completes; failure is loud, not swallowed
+            expect(consoleSpy).toHaveBeenCalledWith('Failed to deposit loot currency to party inventory:', expect.any(Error));
+            expect(addEntry).toHaveBeenCalledTimes(2); // no phantom deposit log
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+            expect(result.current.showAwardLoot).toBe(false);
+            expect(result.current.lootTextValue).toBe('');
 
             consoleSpy.mockRestore();
         });

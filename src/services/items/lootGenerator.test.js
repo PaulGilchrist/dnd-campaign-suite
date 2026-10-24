@@ -1,6 +1,7 @@
 // @maintained-by-ai
-// Pure-helper lane (lootGenerator family map #1161/#1162): owns ONLY the three pure exports —
-// normalizeCurrency, formatCurrencyString, calculateEncounterXp. The combatSummary→suggestions
+// Pure-helper lane (lootGenerator family map #1161/#1162): owns ONLY the four pure exports —
+// normalizeCurrency, formatCurrencyString, parseCurrencyFromLootText, calculateEncounterXp.
+// The combatSummary→suggestions
 // bridge is owned by lootFromCombatSummary.test.js; generation internals (CR tiers, RNG, gems,
 // magic items) by lootSuggestions.test.js; the Clear-Combat gate by autoRewardService.test.js
 // — cited here, never re-driven.
@@ -28,6 +29,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeCurrency,
   formatCurrencyString,
+  parseCurrencyFromLootText,
   calculateEncounterXp,
 } from './lootGenerator.js';
 
@@ -92,5 +94,65 @@ describe('calculateEncounterXp', () => {
     ['negative qty subtracts (honest)', [{ name: 'Negative', xp: 50, qty: -2 }], -100],
   ])('%s', (_name, monsters, expected) => {
     expect(calculateEncounterXp(monsters)).toBe(expected);
+  });
+});
+
+describe('parseCurrencyFromLootText — pure-currency-line parser', () => {
+  it.each([
+    ['generator faces: platinum-only line', '70 platinum pieces', { pp: 70, gp: 0, sp: 0, cp: 0 }],
+    ['generator full join, all four denominations', '1 platinum piece, 3 gold pieces, 2 silver coins, 5 copper coins', { pp: 1, gp: 3, sp: 2, cp: 5 }],
+    ['zero denominations omitted', '5 gold pieces, 3 copper coins', { pp: 0, gp: 5, sp: 0, cp: 3 }],
+    ['abbreviations', '50 pp, 12 gp', { pp: 50, gp: 12, sp: 0, cp: 0 }],
+    ['thousands separators', '1,000 gp', { pp: 0, gp: 1000, sp: 0, cp: 0 }],
+    ['singular gold piece', '1 gold piece', { pp: 0, gp: 1, sp: 0, cp: 0 }],
+  ])('%s', (_name, text, expected) => {
+    expect(parseCurrencyFromLootText(text)).toEqual(expected);
+  });
+
+  it('sums multiple currency lines in one loot session', () => {
+    expect(parseCurrencyFromLootText('70 platinum pieces\n25 gold pieces\n10 silver coins')).toEqual({ pp: 70, gp: 25, sp: 10, cp: 0 });
+  });
+
+  it('round-trips every formatCurrencyString face back to its currency object', () => {
+    const faces = [
+      { pp: 1, gp: 3, sp: 2, cp: 5 },
+      { pp: 70, gp: 0, sp: 0, cp: 0 },
+      { pp: 0, gp: 5, sp: 0, cp: 3 },
+      { pp: 123, gp: 4, sp: 5, cp: 6 },
+    ];
+    for (const currency of faces) {
+      expect(parseCurrencyFromLootText(formatCurrencyString(currency))).toEqual(currency);
+    }
+  });
+
+  it.each([
+    ['empty text', ''],
+    ['no-loot sentinel', 'No loot for these monsters'],
+    ['item-value suffix stays an item, not cash', 'Pearl, 100 gp'],
+    ['equipment cost in parens is not cash', 'Scale Mail (15 gp)'],
+    ['magic item line', '"Ring of Feather Falling" (Rare, Ring)'],
+    ['pouch phrasing is an item line', 'a pouch of 25 gp'],
+  ])('%s credits zero', (_name, text) => {
+    expect(parseCurrencyFromLootText(text)).toEqual({ pp: 0, gp: 0, sp: 0, cp: 0 });
+  });
+
+  it('credits only the pure currency lines of a mixed loot block', () => {
+    const text = [
+      '70 platinum pieces, 3 gold pieces',
+      'Pearl, 100 gp',
+      '"Shield +1" (Rare, Shield)',
+      'Scale Mail (15 gp)',
+      '50 sp',
+    ].join('\n');
+    expect(parseCurrencyFromLootText(text)).toEqual({ pp: 70, gp: 3, sp: 50, cp: 0 });
+  });
+
+  it('falsy input resolves to the zero ledger', () => {
+    expect(parseCurrencyFromLootText(null)).toEqual({ pp: 0, gp: 0, sp: 0, cp: 0 });
+    expect(parseCurrencyFromLootText(undefined)).toEqual({ pp: 0, gp: 0, sp: 0, cp: 0 });
+  });
+
+  it('"and"-joined currency line is credited', () => {
+    expect(parseCurrencyFromLootText('10 gp and 5 sp')).toEqual({ pp: 0, gp: 10, sp: 5, cp: 0 });
   });
 });

@@ -338,4 +338,25 @@ router.post('/api/campaigns/:campaign/inventory/transfer', asyncHandler((req, re
     res.json({ success: true, inventory, character: { name: character.name, inventory: character.inventory } });
 }));
 
+// POST /api/campaigns/:campaign/inventory/deposit — atomic credit to the
+// party currency ledger. body: { currency: {pp,gp,sp,cp} }. The ledger is
+// re-read server-side before the add, so a stale client snapshot can never
+// overwrite items or existing balances (transfer-route pattern, no player leg).
+router.post('/api/campaigns/:campaign/inventory/deposit', asyncHandler((req, res) => {
+    const { campaign } = req.params;
+    const amount = sanitizeCurrency(req.body?.currency);
+    if (!CURRENCY_KEYS.some(key => amount[key] > 0)) {
+        return res.status(400).json({ error: 'currency with a positive amount is required' });
+    }
+
+    const inventory = loadInventory(campaign);
+    for (const key of CURRENCY_KEYS) {
+        inventory.currency[key] += amount[key];
+    }
+    saveInventory(campaign, inventory);
+    publish(`inventory-${campaign}`, inventory, campaign);
+
+    res.json({ success: true, inventory });
+}));
+
 export default router;

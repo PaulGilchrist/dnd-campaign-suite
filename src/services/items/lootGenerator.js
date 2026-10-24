@@ -73,6 +73,52 @@ export function formatCurrencyString(currency) {
   return parts.length ? parts.join(', ') : '0 platinum pieces';
 }
 
+// Matches one currency amount: "70 platinum pieces", "3 gold pieces",
+// "2 silver coins", "5 copper coins", "1,000 gp", "50 pp" — the shapes
+// formatCurrencyString emits plus the abbreviations a GM may type by hand.
+const CURRENCY_AMOUNT_RE = /(\d[\d,]*)\s*(platinum|gold|silver|copper|pp|gp|sp|cp)(?:\s+(?:pieces?|coins?))?\b/gi;
+
+const CURRENCY_UNIT_KEYS = {
+  platinum: 'pp', pp: 'pp',
+  gold: 'gp', gp: 'gp',
+  silver: 'sp', sp: 'sp',
+  copper: 'cp', cp: 'cp',
+};
+
+/**
+ * Parse party-depositable currency out of loot text — the inverse of
+ * formatCurrencyString. Only PURE currency lines are credited: a line is
+ * cash only when it is fully consumed by currency amounts (plus commas /
+ * "and" separators). Item-value suffixes like "Pearl, 100 gp" or
+ * "Scale Mail (25 gp)" leave residue and stay loot descriptions, never a
+ * phantom deposit. Amounts across all currency lines are summed.
+ * @param {string} text - loot textarea content
+ * @returns {{pp:number,gp:number,sp:number,cp:number}} zeroed when no currency lines exist
+ */
+export function parseCurrencyFromLootText(text) {
+  const currency = { pp: 0, gp: 0, sp: 0, cp: 0 };
+  if (!text) return currency;
+
+  for (const rawLine of String(text).split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const amounts = [];
+    const residue = line.replace(CURRENCY_AMOUNT_RE, (_match, num, unit) => {
+      amounts.push([CURRENCY_UNIT_KEYS[unit.toLowerCase()], parseInt(num.replace(/,/g, ''), 10)]);
+      return '';
+    });
+
+    if (amounts.length === 0 || residue.replace(/[.,\s]+/g, '').replace(/and/gi, '')) continue;
+
+    for (const [key, value] of amounts) {
+      if (key && Number.isFinite(value) && value > 0) currency[key] += value;
+    }
+  }
+
+  return currency;
+}
+
 export function calculateEncounterXp(selectedMonsters) {
   if (!selectedMonsters || !selectedMonsters.length) return 0;
   return selectedMonsters.reduce((sum, m) => sum + (m.xp || 0) * (m.qty || 1), 0);

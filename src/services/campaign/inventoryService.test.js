@@ -44,6 +44,7 @@ import {
   loadInventory,
   saveInventory,
   transferInventory,
+  depositCurrency,
   normalizeInventory,
 } from './inventoryService.js';
 
@@ -371,6 +372,54 @@ describe('inventoryService', () => {
       await expect(
         transferInventory('test-campaign', { direction: 'party-to-player', playerName: 'Mordai', itemName: 'Torch', quantity: 1 })
       ).rejects.toThrow('ENOTFOUND');
+    });
+  });
+
+  describe('depositCurrency', () => {
+    it('POSTs the exact deposit body to /inventory/deposit and returns the normalized inventory', async () => {
+      const currency = { pp: 70, gp: 3, sp: 0, cp: 0 };
+      // server truth: res.json({ success: true, inventory }) — credited server-side
+      fetchSpy.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          success: true,
+          inventory: { currency: { pp: 72, gp: 8, sp: 0, cp: 7 }, items: [] },
+        }),
+      });
+
+      const result = await depositCurrency('test-campaign', currency);
+
+      expect(result).toEqual({ currency: { pp: 72, gp: 8, sp: 0, cp: 7 }, items: [] });
+      expect(result).not.toHaveProperty('success');
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/inventory/deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency }),
+      });
+    });
+
+    it('rethrows the server-truth 400, its own generic fallback, and network errors', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        json: () => Promise.resolve({ error: 'currency with a positive amount is required' }),
+      });
+      await expect(depositCurrency('test-campaign', { pp: 0, gp: 0, sp: 0, cp: 0 }))
+        .rejects.toThrow('currency with a positive amount is required');
+
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: () => Promise.resolve({}),
+      });
+      await expect(depositCurrency('test-campaign', { gp: 1 }))
+        .rejects.toThrow('Failed to deposit party currency');
+
+      fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
+      await expect(depositCurrency('test-campaign', { gp: 1 })).rejects.toThrow('ENOTFOUND');
     });
   });
 });

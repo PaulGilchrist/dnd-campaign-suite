@@ -91,3 +91,25 @@ export async function transferInventory(campaignName, transfer) {
   const data = await response.json();
   return { ...data, inventory: normalizeInventory(data.inventory) };
 }
+
+/**
+ * Atomically credit currency to the party ledger (server-side increment —
+ * items and existing balances are merged on the server, never from a
+ * client snapshot). Used by the loot Award flow.
+ * @param {string} campaignName
+ * @param {Object} currency - { pp, gp, sp, cp } amounts to deposit
+ * @returns {Promise<Object>} the updated normalized inventory
+ */
+export async function depositCurrency(campaignName, currency) {
+  const response = await fetch(`${apiUrl(campaignName)}/deposit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currency }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to deposit party currency');
+  }
+  const data = await response.json();
+  return normalizeInventory(data.inventory);
+}

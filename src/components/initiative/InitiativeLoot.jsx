@@ -1,4 +1,5 @@
 import React from 'react'
+import { parseCurrencyFromLootText } from '../../services/items/lootGenerator.js'
 
 export default function InitiativeLoot({
     lootData,
@@ -15,6 +16,8 @@ export default function InitiativeLoot({
 }) {
     const hasLoot = lootData.lootEntries.length > 0 || lootTextValue.length > 0
     const xpPerCharacter = Math.floor(lootData.totalEncounterXp / (characters && characters.length > 0 ? characters.length : 1))
+    const depositParts = Object.entries(parseCurrencyFromLootText(lootTextValue)).filter(([, amount]) => amount > 0)
+    const depositNote = depositParts.map(([key, amount]) => `${amount} ${key}`).join(', ')
     return (
         <div className='initiative-loot-section'>
             <div className='initiative-loot-header'>
@@ -53,6 +56,14 @@ export default function InitiativeLoot({
                     </span>
                     {showAwardLoot && (
                       <div className='initiative-award-loot-actions'>
+                        {depositNote && (
+                          <span
+                            className='initiative-loot-deposit-note'
+                            title="Currency from the loot lines will be credited to party inventory"
+                          >
+                            <i className="fa-solid fa-sack-dollar"></i>&nbsp;+{depositNote} to party inventory
+                          </span>
+                        )}
                         <button
                           className='initiative-btn initiative-btn-complete'
                           onClick={handleAwardLoot}

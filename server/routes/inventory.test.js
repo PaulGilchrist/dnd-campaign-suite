@@ -310,3 +310,58 @@ describe('POST inventory transfer', () => {
         expect(readInventoryFile().currency.gp).toBe(3);
     });
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/campaigns/:campaign/inventory/deposit — atomic party credit
+// ---------------------------------------------------------------------------
+
+describe('POST inventory deposit', () => {
+    it('rejects an empty or non-positive currency body', async () => {
+        writeInventory({ currency: { pp: 0, gp: 5, sp: 0, cp: 0 }, items: [] });
+
+        const empty = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`).send({});
+        expect(empty.status).toBe(400);
+
+        const zero = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+            .send({ currency: { pp: 0, gp: 0, sp: -3, electrum: 9 } });
+        expect(zero.status).toBe(400);
+        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 5, sp: 0, cp: 0 });
+    });
+
+    it('credits currency onto the stored ledger, leaves items untouched, and broadcasts', async () => {
+        writeInventory({
+            currency: { pp: 2, gp: 5, sp: 0, cp: 7 },
+            items: [{ id: 'x', name: 'Torch', quantity: 3, description: '' }],
+        });
+
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+            .send({ currency: { pp: 70, gp: 3, sp: 0, cp: 0 } });
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.inventory.currency).toEqual({ pp: 72, gp: 8, sp: 0, cp: 7 });
+        expect(res.body.inventory.items).toEqual([{ id: 'x', name: 'Torch', quantity: 3, description: '' }]);
+
+        const saved = readInventoryFile();
+        expect(saved.currency).toEqual({ pp: 72, gp: 8, sp: 0, cp: 7 });
+        expect(publishSpy).toHaveBeenCalledWith(`inventory-${CAMPAIGN}`, saved, CAMPAIGN);
+    });
+
+    it('initializes a missing inventory file and deposits onto the empty ledger', async () => {
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+            .send({ currency: { gp: 25 } });
+
+        expect(res.status).toBe(200);
+        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 25, sp: 0, cp: 0 });
+    });
+
+    it('floors and drops non-numeric currency amounts', async () => {
+        writeInventory({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items: [] });
+
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+            .send({ currency: { gp: '10.9', sp: 'abc', cp: 4.5 } });
+
+        expect(res.status).toBe(200);
+        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 10, sp: 0, cp: 4 });
+    });
+});
