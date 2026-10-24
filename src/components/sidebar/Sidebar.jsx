@@ -78,16 +78,20 @@ function NavButton({ item, activeView, handlers, isLocalhost }) {
     );
 }
 
-function CharacterList({ characters, activeView, activeCharacter, onAddCharacter, onCharacterClick }) {
+function CharacterList({ characters, activeView, activeCharacter, onAddCharacter, onCharacterClick, isLocalhost }) {
     return (
         <div className="sidebar-section">
             <div className="sidebar-section-header sidebar-section-header-static">
                 Characters
             </div>
             <div className="sidebar-submenu">
-                <button className="sidebar-link add-character" onClick={onAddCharacter}>
-                    <i className="fa-solid fa-plus"></i> Add Character
-                </button>
+                {/* GM-only (mirrors the CampaignSelection Add gate): creating
+                    characters is a localhost write; players see the roster only. */}
+                {isLocalhost && (
+                    <button className="sidebar-link add-character" onClick={onAddCharacter}>
+                        <i className="fa-solid fa-plus"></i> Add Character
+                    </button>
+                )}
                 {characters.map((char, index) => (
                     <button
                         key={`${char.name}-${index}`}
@@ -153,6 +157,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     activeCharacter={activeCharacter}
                     onAddCharacter={onAddCharacter}
                     onCharacterClick={onCharacterClick}
+                    isLocalhost={isLocalhost}
                 />
 
                 {NAV_ITEMS.map((item) => (

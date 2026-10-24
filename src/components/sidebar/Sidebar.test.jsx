@@ -67,9 +67,14 @@ describe('Sidebar', () => {
       expect(screen.getByRole('button', { name: playerLabel || label })).toBeInTheDocument();
     });
 
-    it('renders Campaigns and Add Character regardless of localhost', () => {
+    it('renders Campaigns for players but hides Add Character on non-localhost', () => {
       renderSidebar({ isLocalhost: false });
       expect(screen.getByRole('button', { name: 'Campaigns' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add Character' })).not.toBeInTheDocument();
+    });
+
+    it('renders Add Character for the GM on localhost', () => {
+      renderSidebar({ isLocalhost: true });
       expect(screen.getByRole('button', { name: 'Add Character' })).toBeInTheDocument();
     });
 
@@ -88,13 +93,18 @@ describe('Sidebar', () => {
       expect(props[handler]).toHaveBeenCalledTimes(1);
     });
 
-    it.each([
-      ['onBackToCampaigns', 'Campaigns'],
-      ['onAddCharacter', 'Add Character'],
-    ])('calls %s when the %s button is clicked', (handler, label) => {
+    it('calls onBackToCampaigns when the Campaigns button is clicked (even for players)', async () => {
       const { props } = renderSidebar({ isLocalhost: false });
-      fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(props[handler]).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Campaigns' }));
+      await Promise.resolve();
+      expect(props.onBackToCampaigns).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onAddCharacter when the GM clicks Add Character on localhost', async () => {
+      const { props } = renderSidebar({ isLocalhost: true });
+      fireEvent.click(screen.getByRole('button', { name: 'Add Character' }));
+      await Promise.resolve();
+      expect(props.onAddCharacter).toHaveBeenCalledTimes(1);
     });
 
     it('calls onMapsClick when players click Map', () => {

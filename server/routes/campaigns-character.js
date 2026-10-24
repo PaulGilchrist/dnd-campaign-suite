@@ -8,6 +8,20 @@ import { campaignDir, campaignImagesDir } from '../utils/campaignPaths.js';
 
 const router = express.Router();
 
+// Authority (mirrors maps.js refuseUnlessGm / quests.js / campaigns-admin.js):
+// character creation is a GM-only write — network clients get a read-only
+// view (AGENTS.md). The client hides the sidebar "Add Character" affordance
+// (Sidebar.jsx CharacterList isLocalhost gate); this route guard is the
+// server seam that makes it structural (bug-player-view-can-create-characters).
+const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+function refuseUnlessGm(req, res) {
+    if (isLocalhost(req)) return true;
+    console.log(`[campaigns-character] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
+    res.status(403).json({ error: 'Access denied: GM-only feature' });
+    return false;
+}
+
 // API endpoint to get a specific character file in a campaign
 // NOTE: This wildcard route must be mounted AFTER all specific resource routes
 // (maps, encounters, notes, npcs, quests, factions) to avoid intercepting them
@@ -199,6 +213,8 @@ router.delete('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) =>
 
 // API endpoint to create a new character (generates filename from name)
 router.post('/api/campaigns/:campaign', asyncHandler((req, res) => {
+    if (!refuseUnlessGm(req, res)) return;
+
     const { campaign } = req.params;
     const { character } = req.body;
 
