@@ -1,4 +1,10 @@
 {
+  "_campaignNPC_residue": {
+    "Marta Copperkettle": "Campaign NPC (npcs.json), tavern keeper, AC 11, hitPoints '9 (2d8)' STRING dice-format. 2026-10-24 pm: linked into QA Explore Session (since deleted) to verify Sessions To-Initiative stat gate; HP temporarily rewritten to numeric '9' to prove the npcHasStatBlock NaN gate differential, RESTORED to '9 (2d8)' + disk-verified. Consequence: she is initiative-gate-blocked by design-bug (bug-npc-dice-formatted-hp-blocks-initiative-gate.md) until fixed — normalize HP to numeric when a harness needs her in combat."
+  },
+  "_snapshot_residue": {
+    "test-campaign-2026-10-24T19-19-05-711.zip": "Created by 2026-10-24 pm explore run via Admin Create Snapshot (endpoint verification). Contains MID-RUN state (Bandit initiative + pre-clear data) — newest = Rollback target. Pre-existing: test-campaign-2026-10-11..., test-campaign.zip (10-10)."
+  },
   "Pseudodragon": {
     "monsterIndex": "pseudodragon",
     "placedIn": "SP-020 2026-10-03 non-Humanoid wrongly buffed by Calm Emotions (filter absent). SP-021 2026-10-03: absent from charm-person picker (filter works). | test-campaign initiative via EB Join Encounter (Pseudodragon 1 CR0.25 AC14 HP10 init 8; victim Bandit AC12 clean piercing currentHp999 TRUSTED fill + blur li-unlock, armed on Pseudodragon own-card target-select)",
