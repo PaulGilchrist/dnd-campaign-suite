@@ -42,7 +42,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **View state**: `factions`
 - **Features**: Faction management, New Faction form
 - **Form fields**: Name*, Description, Goals, Influence slider (min=1 max=10 — DOM-enforced, 0 impossible), Notes; NO children/services UI (earlier doc note about "deep edit" is outdated — form is flat)
-- **Validation**: Duplicate names rejected — inline error appears only AFTER clicking Save ("A faction with that name already exists"), not while typing; error banner stays even after fixing the name (minor UX); empty name disables Save; Cancel discards all edits
+- **Validation**: Duplicate names rejected — derived guard now validates WHILE typing (Save disabled + inline "A faction with that name already exists", since 2026-10-24 run); server-400 duplicate error also clears on name edit; empty name disables Save; Cancel discards all edits
 - **Delete**: `window.confirm("Delete this faction?")` then removal persists (~10s debounce)
 - **Identifiers**: `button:has-text("New Faction")`, rows `li[aria-label="Edit faction: <name>"]`, slider `slider "Influence Level"`
 
@@ -246,7 +246,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **2026-10-13 — Duplicate-name error banner never clears while typing (Quests, and Factions per prior run):** after fixing the name the inline "…already exists" error stays visible until Save is pressed again. Clear the error on name change. Files: Quests + Factions edit modals.
 - **2026-10-13 — Quest list preview prints RAW markdown** (`**bold**`, `[link](…)` literally) — render or strip markdown in row previews (unclamped open view already renders it). File: Quests list row.
 - **2026-10-13 — Silent save/load confirmations:** encounter save/load, session quick-"Activate", music stop etc. produce no visible toast ("Saved"/"Loaded"/"Activated") — feedback is only the state change itself (+log entry). Add lightweight toasts; helps first-time GMs trust the app.
 - **2026-10-13 — Map editor grid math exposed as raw viewBox:** painting cells requires measuring `rect.grid-bg` client rect (viewBox 800 does not span the svg element box; preserveAspectRatio none stretches). Expose a `data-cell` attribute or stable `aria-label` per cell for testability of paint/fog/token automation.

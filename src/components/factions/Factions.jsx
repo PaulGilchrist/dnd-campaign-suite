@@ -117,8 +117,13 @@ function Factions({ campaignName, onBack }) {
     closeModal();
   };
 
-  // Handle form field changes
-  const handleFormChange = updateFormField;
+  // Handle form field changes. Name edits also clear a sticky duplicate-name
+  // error surfaced by a server 400 (the derived guard above only re-evaluates
+  // against the locally-loaded list); unrelated errors stay until Save/Close.
+  const handleFormChange = (field, value) => {
+    updateFormField(field, value);
+    if (field === 'name' && error === DUPLICATE_NAME_ERROR) setError(null);
+  };
 
   // Derived duplicate-name error: shown while typing, cleared as soon as the name changes
   const { visibleError, saveDisabled } = getDuplicateState({
@@ -129,7 +134,7 @@ function Factions({ campaignName, onBack }) {
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
     if (hasDuplicateName(factions, editingFaction?.id, formData.name)) {
-      setError('A faction with that name already exists');
+      setError(DUPLICATE_NAME_ERROR);
       return;
     }
 

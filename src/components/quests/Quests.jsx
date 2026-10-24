@@ -7,6 +7,10 @@ import './Quests.css';
 
 const STATUS_OPTIONS = ['active', 'completed', 'failed'];
 
+// Mirrors server/utils/nameUniqueness.js output for quests (byte-identical),
+// so client- and server-surfaced duplicate errors clear the same way.
+const DUPLICATE_NAME_ERROR = 'A quest with that name already exists';
+
 const STATUS_COLORS = {
   active: { bg: '#d1fae5', color: '#065f46', border: '#34d399' },
   completed: { bg: '#dbeafe', color: '#1e40af', border: '#60a5fa' },
@@ -165,7 +169,12 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
   };
 
-  const handleFormChange = updateFormField;
+  // Name edits clear a duplicate-name banner immediately (mirrors the derived
+  // clear in Factions.jsx); unrelated save/delete errors stay until Save/Close.
+  const handleFormChange = (field, value) => {
+    updateFormField(field, value);
+    if (field === 'name' && error === DUPLICATE_NAME_ERROR) setError(null);
+  };
 
   // Duplicate-name guard (mirrors NPCs.jsx / MapsManager.handleCreate)
   const hasDuplicateName = () => quests.some(q =>
@@ -175,7 +184,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   const handleSave = async () => {
     if (!formData.name?.trim()) return;
     if (hasDuplicateName()) {
-      setError('A quest with that name already exists');
+      setError(DUPLICATE_NAME_ERROR);
       return;
     }
     setSaving(true);
