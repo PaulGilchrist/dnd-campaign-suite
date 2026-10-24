@@ -160,7 +160,7 @@ function Factions({ campaignName, onBack }) {
   const handleDelete = async () => {
     if (!editingFaction) return;
 
-    if (!window.confirm('Delete this faction?')) return;
+    if (!window.confirm(`Delete Faction "${editingFaction.name}"?`)) return;
 
     setDeleting(true);
     try {

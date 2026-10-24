@@ -20,6 +20,25 @@ function truncateDescription(text, maxLength) {
   return text.slice(0, maxLength) + '…';
 }
 
+// Strip markdown syntax to plain text (notes render markdown in row previews,
+// so a raw description makes a noisy confirm/dialog label).
+function stripMarkdownSymbols(text) {
+  return text
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`~#>]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Identifier for the delete confirm: notes have no name field, so use the
+// party location, falling back to a plain-text shortened title derived from
+// the description.
+function noteDisplayName(note) {
+  const location = (note.partyLocation || '').trim();
+  if (location) return location;
+  return truncateDescription(stripMarkdownSymbols(note.description || ''), 40);
+}
+
 function NoteListItem({ note, onEdit }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -257,7 +276,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   const handleDelete = async () => {
     if (!editingNote) return;
 
-    if (!window.confirm('Delete this note?')) return;
+    if (!window.confirm(`Delete Note "${noteDisplayName(editingNote)}"?`)) return;
 
     setDeleting(true);
     try {

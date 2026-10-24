@@ -219,11 +219,12 @@ describe('Factions', () => {
       const deleteButton = screen.getByRole('button', { name: 'Delete' });
 
       fireEvent.click(deleteButton); // cancelled
-      expect(window.confirm).toHaveBeenCalledWith('Delete this faction?');
+      expect(window.confirm).toHaveBeenCalledWith('Delete Faction "ToDelete"?');
       expect(factionsState.deleteFactionAction).not.toHaveBeenCalled();
       expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Delete' })); // confirmed
+      expect(window.confirm).toHaveBeenLastCalledWith('Delete Faction "ToDelete"?');
       expect(factionsState.deleteFactionAction).toHaveBeenCalledWith('f1');
       expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
 

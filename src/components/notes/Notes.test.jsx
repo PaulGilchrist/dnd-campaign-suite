@@ -254,11 +254,37 @@ describe('Notes', () => {
       renderNotes();
       openEditNote();
       await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete' })));
+      // Named-confirm contract (mirrors Settlements/Sessions): the message
+      // carries a meaningful identifier, never the generic "this note".
+      expect(confirmMock).toHaveBeenCalledWith('Delete Note "Test"?');
       if (confirmed) {
         expect(deleteItem).toHaveBeenCalledWith('1');
       } else {
         expect(deleteItem).not.toHaveBeenCalled();
       }
+    });
+
+    it('names the note by its party location when one is set', () => {
+      mockHook({
+        items: [makeNote({ description: 'Some hidden details', partyLocation: 'Skull Creek Cave' })],
+      });
+      confirmMock.mockReturnValue(false);
+      renderNotes();
+      openEditNote();
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      expect(confirmMock).toHaveBeenCalledWith('Delete Note "Skull Creek Cave"?');
+    });
+
+    it('derives a plain-text shortened title from a markdown description when party location is empty', () => {
+      mockHook({
+        items: [makeNote({ description: '## The **Baron** wants revenge on the Emerald Enclave guildmasters for the raid' })],
+      });
+      confirmMock.mockReturnValue(false);
+      renderNotes();
+      openEditNote();
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      // Markdown syntax stripped, newlines collapsed, truncated at 40 chars + ellipsis
+      expect(confirmMock).toHaveBeenCalledWith('Delete Note "The Baron wants revenge on the Emerald E…"?');
     });
 
     it('disables delete button while deleting', async () => {

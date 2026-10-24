@@ -68,7 +68,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **[2026-10-24] Factions/Notes delete confirms don't name the entity** — Factions.jsx:163 `"Delete this faction?"`, Notes generic; Quests/Sessions/Settlements now `Delete X "<name>"?` (06efbfe2a skipped these two). Mirror the named pattern. *(minor)*
 - **[2026-10-24] Admin Create Snapshot is silent** — POST /admin/snapshot 200 with zero toast/state; list `/admin/snapshots` (filename+timestamp+size) exists server-side — render "last snapshot: …" + newest-N list + success/failure toast beside Create/Download buttons. *(minor UX)*
 - **[2026-10-24] Dice-tray popup blocks the whole page until dismissed** — `.dice-tray-popup-overlay` stays indefinitely, intercepting all clicks (GM rolls d20, navigates → EB clicks die). Auto-hide after N seconds (benign UI timer category) or non-blocking placement. *(UX friction)*
 - **[2026-10-24] Item Move legs have no confirm** — party→player and →party transfers execute silently while currency `Give` confirms named sums. Add matching "Move N ×item to <player>?" confirms (PartyInventory modals). *(consistency)*
