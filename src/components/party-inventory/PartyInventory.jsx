@@ -123,18 +123,20 @@ function QuantityStepper({ quantity, onStep, onSet }) {
 function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled }) {
   const [giveState, setGiveState] = useState(null);
 
+  // Positive whole-number amounts entered in the Give modal, in CURRENCIES order
+  // (all 0 → submit disabled, no accidental transfer on Enter). Confirm names the
+  // player + exact sums before the transfer POST.
+  const giveEntries = giveState
+    ? CURRENCIES
+        .map(({ key }) => [key, Math.floor(Number(giveState.amounts[key]))])
+        .filter(([, n]) => Number.isFinite(n) && n > 0)
+    : [];
+
   const applyGive = () => {
-    if (!giveState) return;
-    const amounts = {};
-    Object.entries(giveState.amounts).forEach(([k, v]) => {
-      const n = Math.floor(Number(v));
-      if (n > 0) amounts[k] = n;
-    });
-    if (Object.keys(amounts).length === 0) {
-      setGiveState(null);
-      return;
-    }
-    onTransfer(giveState.playerName, amounts);
+    if (!giveState || giveEntries.length === 0) return;
+    const parts = giveEntries.map(([k, v]) => `${v} ${k}`).join(', ');
+    if (!window.confirm(`Give ${parts} to ${giveState.playerName}?`)) return;
+    onTransfer(giveState.playerName, Object.fromEntries(giveEntries));
     setGiveState(null);
   };
 
@@ -173,7 +175,7 @@ function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled }) 
               className="ct-btn pi-give-btn"
               title={`Give ${label} to a player`}
               disabled={disabled || currency[key] <= 0}
-              onClick={() => setGiveState({ playerName: characters[0]?.name || '', amounts: { [key]: Math.min(1, currency[key]) } })}
+              onClick={() => setGiveState({ playerName: characters[0]?.name || '', amounts: {} })}
             >
               <i className="fa-solid fa-hand-holding-heart" /> Give
             </button>
@@ -219,7 +221,7 @@ function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled }) 
                 <button
                   className="ct-btn ct-btn-primary"
                   onClick={applyGive}
-                  disabled={!giveState.playerName}
+                  disabled={!giveState.playerName || giveEntries.length === 0}
                 >
                   <i className="fa-solid fa-hand-holding-heart" /> Give
                 </button>
