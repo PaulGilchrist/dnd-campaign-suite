@@ -171,6 +171,25 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
         );
     }
 
+    // Dotted-key wildcard trap (backlog 2026-10-24): character routes (mounted
+    // BEFORE this router) own every ".json" path — they consume GET/PUT/PATCH/
+    // DELETE but never POST, so POST /:campaign/<anything>.json used to fall
+    // through here and persist an undeletable junk key (the same URL GET/DELETE
+    // routes to campaigns-character → 404). Runtime store keys are never
+    // file-suffixed — refuse the write loudly instead of poisoning the store.
+    if (key.endsWith('.json')) {
+        console.error(
+            '[campaigns-changedata] Rejected POST to file-suffixed change-data key. ' +
+            `Campaign: "${campaign}", key: "${key}". ` +
+            `Character files are written via PUT /api/campaigns/${campaign}/<file>.json.`,
+            { campaign, key, stack: new Error().stack }
+        );
+        return res.status(400).json({
+            error: `Change-data keys cannot end in .json — "${key}" looks like a character file. ` +
+                `Save character files with PUT /api/campaigns/${campaign}/<file>.json.`,
+        });
+    }
+
     const value = 'value' in req.body ? req.body.value : req.body;
 
     warnDeprecatedLastAttack(campaign, key, value);
