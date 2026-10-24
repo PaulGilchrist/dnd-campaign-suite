@@ -103,6 +103,40 @@ describe('EnforcementSection (L5-001)', () => {
         expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'off' });
     });
 
+    it('master-off zeroes every sub-flag in the written value (incl. unsurfaced serverDice) and master-on does not re-arm them', () => {
+        // Arm the master with live sub-flags, one of which (serverDice) has
+        // no UI row — the zeroing is blob-wide, not just what renders.
+        store.seed = {
+            enforcement: {
+                ...ENFORCEMENT_DEFAULTS,
+                mode: 'on',
+                turnLock: true,
+                autoRewards: true,
+                serverDice: true,
+            },
+        };
+        render(<EnforcementSection campaignName={CAMPAIGN} />);
+        expect(masterSwitch()).toBeChecked();
+        expect(subFlag('Turn lock')).toBeChecked();
+
+        // ON→OFF: the persisted shape is mode:'off' with ALL sub-flags false.
+        fireEvent.click(masterSwitch());
+        expect(flagsGroup()).toBeDisabled();
+        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'off' });
+        Object.entries(lastWrite()).forEach(([key, value]) => {
+            if (key !== 'mode') expect(value, `${key} must be zeroed on master-off`).toBe(false);
+        });
+
+        // OFF→ON round trip: nothing re-arms without an individual click.
+        fireEvent.click(masterSwitch());
+        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on' });
+        SUB_FLAGS.forEach((label) => expect(subFlag(label)).not.toBeChecked());
+
+        // Individual sub-flag toggling is unchanged: one flag flips per click.
+        fireEvent.click(subFlag('Turn lock'));
+        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on', turnLock: true });
+    });
+
     it('gates every sub-flag behind the master switch: disabled while OFF, interactive once ON', () => {
         render(<EnforcementSection campaignName={CAMPAIGN} />);
 

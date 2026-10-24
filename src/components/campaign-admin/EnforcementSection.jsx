@@ -34,6 +34,15 @@ export default function EnforcementSection({ campaignName }) {
 
     const setFlag = (key, value) => setEnforcement({ ...flags, [key]: value })
 
+    // Master-off zeroes EVERY sub-flag (incl. serverDice) in the written blob:
+    // with the mode off nothing is gated, so a stale `true` riding along is
+    // functionally inert but a confusing disk shape for harnesses. Flipping
+    // back ON therefore starts from all-false — sub-flags never re-arm
+    // themselves without an individual click.
+    const setMaster = (on) => setEnforcement(on
+        ? { ...flags, mode: 'on' }
+        : { ...ENFORCEMENT_DEFAULTS, mode: 'off' })
+
     return (
         <div className="admin-section enforcement-section">
             <h3><i className="fas fa-gavel"></i> Enforcement</h3>
@@ -42,7 +51,7 @@ export default function EnforcementSection({ campaignName }) {
                     <input
                         type="checkbox"
                         checked={flags.mode === 'on'}
-                        onChange={(e) => setFlag('mode', e.target.checked ? 'on' : 'off')}
+                        onChange={(e) => setMaster(e.target.checked)}
                     />
                     <span>Enforcement {flags.mode === 'on' ? 'ON' : 'OFF'}</span>
                 </label>

@@ -90,7 +90,6 @@ Twelve fix/improve commits landed after the pm pass; every affected row re-deriv
 ## Improvement Backlog
 
 - *(2026-10-24 pm run — prior "leave music editor no-toast", "wizard no inline error", "generate-settlement destructive", "oembed cosmetic", "campaign-add 403 screen" items all RESOLVED by today's improve commits and were removed at fold.)*
-- *(2026-10-24 eve run —)* **Enforcement master-off leaves stale sub-flag values** in the `enforcement` key (`turnLock:true` persisted under `mode:'off'`). Functionally inert (fieldset disabled + master gates everything) but a confusing disk shape for harnesses. Suggest master-off writes all sub-flags false (`EnforcementSection.jsx` setFlag('mode',…)). Non-blocking.
 - *(2026-10-24 eve run —)* **`serverDice` enforcement flag has no UI row** — key persists in `enforcement` (default false) but the 9-FLAG list in `EnforcementSection.jsx:16-28` omits it; GM cannot see/set it except by hand-editing runtime state. Either surface it with a hint or drop the key.
 - *(2026-10-24 eve run —)* **EB Save accepts a completely empty encounter** (no monsters, 0 XP) and toast-confirms — consider disabling Save when the drafted table has zero rows, or confirming "empty encounter".
 - *(2026-10-24 eve run —)* **EB in-modal Rename leaves Load modal open** on the refreshed list (delete now closes it — d4da4ebc1). Slight inconsistency in the same modal's two mutation lanes; consider closing both or refreshing in place without the extra click to re-find the row.
