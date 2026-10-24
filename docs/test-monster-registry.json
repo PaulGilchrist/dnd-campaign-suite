@@ -1,9 +1,10 @@
 {
   "_campaignNPC_residue": {
-    "Marta Copperkettle": "Campaign NPC (npcs.json), tavern keeper, AC 11, hitPoints '9 (2d8)' STRING dice-format. 2026-10-24 pm: linked into QA Explore Session (since deleted) to verify Sessions To-Initiative stat gate; HP temporarily rewritten to numeric '9' to prove the npcHasStatBlock NaN gate differential, RESTORED to '9 (2d8)' + disk-verified. Consequence: she is initiative-gate-blocked by design-bug (bug-npc-dice-formatted-hp-blocks-initiative-gate.md) until fixed — normalize HP to numeric when a harness needs her in combat."
+    "Marta Copperkettle": "Campaign NPC (npcs.json), tavern keeper, AC 11, hitPoints '9 (2d8)' STRING dice-format. 2026-10-24 eve: dice-HP gate FIXED (3248119f7) live-verified — row chip `button[title=\"Add Marta Copperkettle to Initiative\"]` (title NOT aria-label) enabled, click arms new soft-warn confirm 'has no weapons or attacks… Cancel to add anyway (Unarmed Strike)', Cancel joins: cs {ac:11, currentHp:9, maxHp:9, initiative:'5', type:'npc', key 'ac' not 'armorClass'}. LEFT IN INITIATIVE at run end with top-level activeCreatureName=Marta round 1; npcs.json unchanged."
   },
   "_snapshot_residue": {
-    "test-campaign-2026-10-24T19-19-05-711.zip": "Created by 2026-10-24 pm explore run via Admin Create Snapshot (endpoint verification). Contains MID-RUN state (Bandit initiative + pre-clear data) — newest = Rollback target. Pre-existing: test-campaign-2026-10-11..., test-campaign.zip (10-10)."
+    "test-campaign-2026-10-24T22-05-35-985.zip": "Created 2026-10-24 eve explore run via Admin Create Snapshot (POST 200, new list-row + size shown — 625d9144b banner verified). Contains mid-run state — newest = rollback target.",
+    "test-campaign-2026-10-24T19-19-05-711.zip": "Created by 2026-10-24 pm explore run via Admin Create Snapshot (endpoint verification). Contains MID-RUN state (Bandit initiative + pre-clear data). Pre-existing: test-campaign-2026-10-11..., test-campaign.zip (10-10)."
   },
   "Pseudodragon": {
     "monsterIndex": "pseudodragon",
