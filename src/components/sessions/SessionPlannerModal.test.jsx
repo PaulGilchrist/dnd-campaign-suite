@@ -71,6 +71,34 @@ describe('SessionPlannerModal', () => {
     expect(props.onQuickAction).toHaveBeenCalledWith('npcs', 'Grixxa');
   });
 
+  it('disables the To Initiative chip when the linked NPC lacks stats (mirrors .npcs-init-btn gate)', () => {
+    const { props } = renderModal({
+      resourceOptions: {
+        maps: [], encounters: [], quests: [], settlements: [], notes: [],
+        npcs: [{ value: 'Grixxa', label: 'Grixxa', combatReady: false }],
+      },
+    });
+    const initBtn = screen.getByRole('button', { name: /to initiative/i });
+    expect(initBtn).toBeDisabled();
+    expect(initBtn).toHaveAttribute('title',
+      "Fill in Grixxa's AC and HP (Stats tab) before adding to Initiative");
+    fireEvent.click(initBtn);
+    expect(props.onQuickAction).not.toHaveBeenCalled();
+  });
+
+  it('keeps the To Initiative chip enabled when the linked NPC is combat-ready', () => {
+    const { props } = renderModal({
+      resourceOptions: {
+        maps: [], encounters: [], quests: [], settlements: [], notes: [],
+        npcs: [{ value: 'Grixxa', label: 'Grixxa', combatReady: true }],
+      },
+    });
+    const initBtn = screen.getByRole('button', { name: /to initiative/i });
+    expect(initBtn).not.toBeDisabled();
+    fireEvent.click(initBtn);
+    expect(props.onQuickAction).toHaveBeenCalledWith('npcs', 'Grixxa');
+  });
+
   it('moves and unlinks linked resources', () => {
     const { props } = renderModal();
     fireEvent.change(screen.getByLabelText(/move cave to another session/i), { target: { value: 'Session 8' } });

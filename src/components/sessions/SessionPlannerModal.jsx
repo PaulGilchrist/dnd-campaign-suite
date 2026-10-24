@@ -35,50 +35,58 @@ function LinkPicker({ linkType, options, linked, otherSessions, onAdd, onRemove,
           ))}
         </select>
       )}
-      {linked.map(name => (
-        <div key={name} className="sessions-link-row">
-          <span className="sessions-link-chip">{labelFor(name)}</span>
-          {linkType.key === 'maps' && (
+      {linked.map(name => {
+        const opt = (options || []).find(o => o.value === name);
+        // Mirror the NPCs-view .npcs-init-btn gate: block chips we know lack stats.
+        const initBlocked = linkType.key === 'npcs' && opt && opt.combatReady === false;
+        return (
+          <div key={name} className="sessions-link-row">
+            <span className="sessions-link-chip">{labelFor(name)}</span>
+            {linkType.key === 'maps' && (
+              <button
+                className="ct-btn ct-btn-sm"
+                onClick={() => onQuickAction(linkType.key, name)}
+                title={`Activate ${name} as the active map`}
+              >
+                <i className="fa-solid fa-map-pin" /> Activate
+              </button>
+            )}
+            {linkType.key === 'npcs' && (
+              <button
+                className="ct-btn ct-btn-sm"
+                onClick={() => onQuickAction(linkType.key, name)}
+                disabled={initBlocked}
+                title={initBlocked
+                  ? `Fill in ${name}'s AC and HP (Stats tab) before adding to Initiative`
+                  : `Add ${name} to initiative`}
+              >
+                <i className="fa-solid fa-shield-halved" /> To Initiative
+              </button>
+            )}
+            {otherSessions.length > 0 && (
+              <select
+                className="ct-select sessions-move-select"
+                value=""
+                onChange={(e) => e.target.value && onMove(linkType.key, name, e.target.value)}
+                aria-label={`Move ${labelFor(name)} to another session`}
+                title="Move to another session"
+              >
+                <option value="">Move to…</option>
+                {otherSessions.map(s => (
+                  <option key={s.name} value={s.name}>{s.name}</option>
+                ))}
+              </select>
+            )}
             <button
-              className="ct-btn ct-btn-sm"
-              onClick={() => onQuickAction(linkType.key, name)}
-              title={`Activate ${name} as the active map`}
+              className="ct-btn ct-btn-sm ct-btn-danger"
+              onClick={() => onRemove(linkType.key, name)}
+              title={`Unlink ${labelFor(name)}`}
             >
-              <i className="fa-solid fa-map-pin" /> Activate
+              <i className="fa-solid fa-link-slash" />
             </button>
-          )}
-          {linkType.key === 'npcs' && (
-            <button
-              className="ct-btn ct-btn-sm"
-              onClick={() => onQuickAction(linkType.key, name)}
-              title={`Add ${name} to initiative`}
-            >
-              <i className="fa-solid fa-shield-halved" /> To Initiative
-            </button>
-          )}
-          {otherSessions.length > 0 && (
-            <select
-              className="ct-select sessions-move-select"
-              value=""
-              onChange={(e) => e.target.value && onMove(linkType.key, name, e.target.value)}
-              aria-label={`Move ${labelFor(name)} to another session`}
-              title="Move to another session"
-            >
-              <option value="">Move to…</option>
-              {otherSessions.map(s => (
-                <option key={s.name} value={s.name}>{s.name}</option>
-              ))}
-            </select>
-          )}
-          <button
-            className="ct-btn ct-btn-sm ct-btn-danger"
-            onClick={() => onRemove(linkType.key, name)}
-            title={`Unlink ${labelFor(name)}`}
-          >
-            <i className="fa-solid fa-link-slash" />
-          </button>
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

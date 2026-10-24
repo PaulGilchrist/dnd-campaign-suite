@@ -50,6 +50,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 import { saveSession } from '../../services/campaign/sessionsService.js';
 import { loadMaps, activateMap } from '../../services/maps/mapsService.js';
+import { loadNPCs } from '../../services/npcs/npcsService.js';
 import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
 import { addEntry } from '../../services/ui/logService.js';
 
@@ -91,6 +92,7 @@ beforeEach(() => {
   sessionMockStore.items = [];
   sessionMockStore.loading = false;
   loadMaps.mockResolvedValue({ maps: [] });
+  loadNPCs.mockResolvedValue({ npcs: [] });
 });
 
 describe('Sessions — list rendering', () => {
@@ -159,7 +161,9 @@ describe('Sessions — linked-resource automations', () => {
     expect(screen.getByText(/1 of 4 ready/i)).toBeInTheDocument();
   });
 
-  it('quick actions activate a linked map and send an NPC to initiative', async () => {
+  it('quick actions activate a linked map and send a combat-ready NPC to initiative', async () => {
+    const grixxa = { name: 'Grixxa', armorClass: 15, hitPoints: 22 };
+    loadNPCs.mockResolvedValue({ npcs: [grixxa] });
     sessionMockStore.items = [makeSession('Session 7', {
       links: { ...emptyLinks(), maps: ['Cave'], npcs: ['Grixxa'] },
     })];
@@ -170,11 +174,60 @@ describe('Sessions — linked-resource automations', () => {
     await waitFor(() => expect(activateMap).toHaveBeenCalledWith('test-campaign', 'Cave'));
     expect(toastText()).toBe('Cave set as active map');
 
-    fireEvent.click(screen.getByRole('button', { name: /to initiative/i }));
+    const initBtn = screen.getByRole('button', { name: /to initiative/i });
+    expect(initBtn).not.toBeDisabled();
+    fireEvent.click(initBtn);
     await waitFor(() => expect(addNPCToInitiative).toHaveBeenCalled());
-    expect(addNPCToInitiative.mock.calls[0][1]).toEqual({ name: 'Grixxa' });
+    expect(addNPCToInitiative.mock.calls[0][1]).toEqual(grixxa);
     expect(addNPCToInitiative.mock.calls[0][2]).toBe(onViewInitiative);
     await waitFor(() => expect(toastText()).toBe('Grixxa added to initiative'));
+  });
+
+  it('disables the To Initiative chip for a statless NPC without touching the service', async () => {
+    loadNPCs.mockResolvedValue({ npcs: [{ name: 'Grixxa' }] }); // no AC, no HP
+    sessionMockStore.items = [makeSession('Session 7', {
+      links: { ...emptyLinks(), npcs: ['Grixxa'] },
+    })];
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderSessions();
+    openEditor('Session 7');
+
+    const initBtn = screen.getByRole('button', { name: /to initiative/i });
+    // chip starts enabled while the picker loads, becomes disabled once Grixxa's stats resolve
+    await waitFor(() => expect(initBtn).toBeDisabled());
+    expect(initBtn).toHaveAttribute('title',
+      "Fill in Grixxa's AC and HP (Stats tab) before adding to Initiative");
+    fireEvent.click(initBtn);
+    await waitFor(() => expect(loadNPCs).toHaveBeenCalled());
+    expect(addNPCToInitiative).not.toHaveBeenCalled();
+    expect(document.querySelector('.sessions-form-error')).toBeNull();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('toasts a friendly message when a stale enabled chip hits a statless NPC (no throw, no form error)', async () => {
+    // First load (modal picker) sees stats so the chip renders enabled;
+    // by click time the NPC has lost its stats (stale list scenario).
+    loadNPCs
+      .mockResolvedValueOnce({ npcs: [{ name: 'Grixxa', armorClass: 15, hitPoints: 22 }] })
+      .mockResolvedValueOnce({ npcs: [{ name: 'Grixxa' }] });
+    sessionMockStore.items = [makeSession('Session 7', {
+      links: { ...emptyLinks(), npcs: ['Grixxa'] },
+    })];
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderSessions();
+    openEditor('Session 7');
+
+    const initBtn = screen.getByRole('button', { name: /to initiative/i });
+    expect(initBtn).not.toBeDisabled();
+    fireEvent.click(initBtn);
+
+    await waitFor(() => expect(toastText())
+      .toBe('Grixxa needs AC and HP filled in (Stats tab) before joining initiative'));
+    expect(addNPCToInitiative).not.toHaveBeenCalled();
+    expect(document.querySelector('.sessions-form-error')).toBeNull();
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 
   it('moves a linked resource to another session, saving both', async () => {

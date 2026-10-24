@@ -15,6 +15,7 @@ import { loadSettlements } from '../../services/campaign/settlementsService.js';
 import { loadNotes } from '../../services/campaign/notesService.js';
 import { activateMap } from '../../services/maps/mapsService.js';
 import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
+import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js';
 import { addEntry } from '../../services/ui/logService.js';
 import SessionListItem from './SessionListItem.jsx';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
@@ -39,7 +40,7 @@ async function loadResourceOptions(campaignName) {
   return {
     maps: raw.maps.map(m => ({ value: m.name, label: m.name })),
     encounters: raw.encounters.map(e => ({ value: e.name, label: e.name })),
-    npcs: raw.npcs.map(n => ({ value: n.name, label: n.name })),
+    npcs: raw.npcs.map(n => ({ value: n.name, label: n.name, combatReady: npcHasStatBlock(n) })),
     quests: raw.quests.map(q => ({ value: q.name, label: q.name })),
     settlements: raw.settlements.map(s => ({ value: s.name, label: s.name })),
     notes: raw.notes.map(n => ({
@@ -197,7 +198,13 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
         await activateMap(campaignName, value);
         showToast(`${value} set as active map`);
       } else if (type === 'npcs') {
-        const npc = await findNpc(value) || { name: value };
+        const npc = await findNpc(value);
+        // Pre-validate like the NPCs view (.npcs-init-btn) — a statless NPC must
+        // never reach addNPCToInitiative, which throws instead of nudging.
+        if (!npcHasStatBlock(npc)) {
+          showToast(`${value} needs AC and HP filled in (Stats tab) before joining initiative`);
+          return;
+        }
         const status = await addNPCToInitiative(campaignName, npc, onViewInitiative);
         if (status === 'needs-weapon') {
           showToast(`${value} was not added — give them at least one weapon on the NPCs page`);

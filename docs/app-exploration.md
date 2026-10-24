@@ -246,7 +246,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- **2026-10-13 — Sessions quick-action "To Initiative" not stat-gated:** button is always clickable; a statless NPC throws a raw `Error` to console ("Failed to run session quick action") and dumps the service message into `.sessions-form-error`. Pre-validate (disable chip like the NPCs-view `.npcs-init-btn` gate) and surface a toast instead of a throw. Files: `src/components/sessions/Sessions.jsx` (`handleQuickAction`), reuse `npcCombatService` pre-check.
 - **2026-10-13 — Delete-guard inconsistency:** saved ENCOUNTER deletion (trash button in EB Load modal) and party-inventory item deletion fire with NO confirm, while Quests/Factions/NPCs use `window.confirm`, Maps uses a custom modal, Admin rollback uses `.ct-modal-overlay`. Pick one destructive-action guard convention (or at least confirm anything that deletes authored content). Files: EncounterBuilder load-modal, `PartyInventory.jsx`.
 - **2026-10-13 — Duplicate-name error banner never clears while typing (Quests, and Factions per prior run):** after fixing the name the inline "…already exists" error stays visible until Save is pressed again. Clear the error on name change. Files: Quests + Factions edit modals.
 - **2026-10-13 — Quest list preview prints RAW markdown** (`**bold**`, `[link](…)` literally) — render or strip markdown in row previews (unclamped open view already renders it). File: Quests list row.
