@@ -16,7 +16,7 @@ You are exploring the dnd-campaign-suite web app using the Playwright MCP browse
 ## Before you start
 
 1. Kill all running processes for this project: `pkill -9 -f "node.*server" 2>/dev/null; pkill -9 -f "vite" 2>/dev/null; pkill -9 -f "concurrently" 2>/dev/null; pkill -9 -f "dnd-campaign" 2>/dev/null; echo "all killed"` — then start fresh so you explore against current code.
-2. Check if `docs/app-exploration.md` already exists and read it first, so this run builds on and updates the existing map instead of starting cold and possibly contradicting it. If what you observe in the live app contradicts something in that file, trust the live app — the UI may have changed since it was last written.
+2. Check if `docs/app-exploration.md` already exists and read it first, so this run builds on and updates the existing map instead of starting cold and possibly contradicting it. If what you observe in the live app contradicts something in that file, trust the live app — the UI may have changed since it was last written. **Freshness discipline:** the map is a live-claims document, not a history file — every fact you carry forward or write must be re-derived live in THIS run and dated by the run that verified it (a `*(carried — unverified)*` marker is the most you may inherit from a prior cycle, and you must clear it this run or delete the claim). Facts that age into history belong in `docs/test-setup-playbook.md` (durable mechanics/rigs), never re-stated here. When the file is a freshly-folded stub (its header says so), its Priority Targets / Depth Seeds tables are your starting assignment.
 3. Read the shared test-setup files maintained by the verify commands — update them as you learn, don't fork them:
    - `docs/test-setup-playbook.md` — known-good setup recipes and the pitfalls list below.
    - `docs/test-character-registry.json` — existing test characters/NPCs in "test-campaign"; reuse via lookup, record new ones.
@@ -83,7 +83,7 @@ Do not attempt to fix the bug yourself during this session — just document it.
 - Known quirks or gotchas you ran into
 - A "Coverage" section: a checklist of every major feature/flow (NPCs, quests, encounters, maps, party members, initiative tracking, fog of war, SSE sync, and any others you find), each marked "not explored" / "shallow" / "deep", with a one-line note on what "deep" testing has covered so far (e.g. "edited existing NPC, deleted NPC, tried empty name field — not yet tried concurrent edit from two sessions"). Update this checklist every run so the next run knows exactly where to push further.
 - A "Blocked / not verified" section: anything you could not test or confirm, with the concrete blocker named (replaced each run).
-- The `## Improvement backlog` section in `docs/app-exploration.md` updated with this session's improvement opportunities (create the section if missing; append dated entries, never delete prior ones).
+- The `## Improvement backlog` section in `docs/app-exploration.md` updated with this session's improvement opportunities (create the section if missing; append dated entries — `e2e-implement-improvements` removes bullets once resolved, so this section stays a live open-items list only).
 
 Then clean up: clear the change-data cache and campaign log for "test-campaign" via the Admin panel, append any new setup recipes or pitfalls you hit to `docs/test-setup-playbook.md`, and record any characters/NPCs/monsters you left in the campaign in the two registry files.
 
