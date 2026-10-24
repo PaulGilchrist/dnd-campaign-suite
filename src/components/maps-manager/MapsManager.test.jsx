@@ -302,7 +302,7 @@ describe('MapsManager', () => {
             expect(activateButtons[0].closest('li')).toHaveTextContent('Inactive Map');
         });
 
-        it('calls onOpenMap with each map fileName', async () => {
+        it('calls onOpenMap with each suffix-free map name (SSE key match)', async () => {
             await renderWithMaps(
                 makeMap({ name: 'Map A', fileName: 'map-a.json' }),
                 makeMap({ name: 'Map B', fileName: 'map-b.json' }),
@@ -310,9 +310,9 @@ describe('MapsManager', () => {
 
             const openButtons = screen.getAllByRole('button', { name: 'Open' });
             fireEvent.click(openButtons[0]);
-            expect(props.onOpenMap).toHaveBeenCalledWith('map-a.json');
+            expect(props.onOpenMap).toHaveBeenCalledWith('map-a');
             fireEvent.click(openButtons[1]);
-            expect(props.onOpenMap).toHaveBeenCalledWith('map-b.json');
+            expect(props.onOpenMap).toHaveBeenCalledWith('map-b');
         });
     });
 

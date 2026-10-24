@@ -360,7 +360,11 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                 {map.isActive && <span className="maps-manager-active-badge">Active</span>}
                             </div>
                             <div className="maps-manager-item-actions">
-                                <button onClick={() => onOpenMap(map.fileName)}>Open</button>
+                                {/* Strip the .json suffix at this seam: the server publishes
+                                    map-data-<campaign>-<name> suffix-free (server/routes/maps.js:169),
+                                    so the editor's SSE expectedKey only matches a suffix-free mapName
+                                    (same normalization as App.jsx loadActiveMapAndOpen). */}
+                                <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''))}>Open</button>
                                 {!map.isActive && <button onClick={() => handleActivate(map.fileName)}>Activate</button>}
                                 <button onClick={() => handleStartRename(map.fileName, map.name)}>Rename</button>
                                 <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description"><i className="fa-solid fa-pen"></i></button>
