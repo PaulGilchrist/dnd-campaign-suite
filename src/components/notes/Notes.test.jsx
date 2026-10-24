@@ -101,6 +101,60 @@ describe('Notes', () => {
     });
   });
 
+  describe('row aria-label', () => {
+    it('labels a location-named row with its party location, not raw markdown', () => {
+      mockHook({
+        items: [makeNote({ partyLocation: 'QA Cave Note', description: '## Session hook\nThe **baron** arrives at dawn.' })],
+      });
+      renderNotes();
+      expect(
+        screen.getByRole('button', { name: 'Edit note: QA Cave Note' }),
+      ).toBeInTheDocument();
+    });
+
+    it('labels a description-titled row with a markdown-stripped plain title', () => {
+      mockHook({
+        items: [makeNote({ partyLocation: '', description: '## QA **bold hook**\nbody of the note' })],
+      });
+      renderNotes();
+      expect(
+        screen.getByRole('button', { name: 'Edit note: QA bold hook body of the note' }),
+      ).toBeInTheDocument();
+    });
+
+    it('every note row matches the Edit note: prefix and no label carries markdown syntax', () => {
+      mockHook({
+        items: [
+          makeNote({ id: '1', partyLocation: 'Skull Creek Cave', description: '## Plot `hook`\n- item [link](http://x)' }),
+          makeNote({ id: '2', partyLocation: '', description: '**Bold** _italic_ ~~strike~~\n> quote' }),
+        ],
+      });
+      renderNotes();
+      const rows = document.querySelectorAll('.ct-list-item');
+      expect(rows).toHaveLength(2);
+      const labelled = document.querySelectorAll('[aria-label^="Edit note: "]');
+      expect(labelled).toHaveLength(rows.length);
+      labelled.forEach((row) => {
+        expect(row.getAttribute('aria-label')).not.toMatch(/[#*`[\]>~_]/);
+      });
+    });
+
+    it('row label title and delete confirm title are derived identically', () => {
+      mockHook({
+        items: [makeNote({
+          description: '## Important Plot Hook\nThe **baron** wants revenge on the guildmasters for the raid on the village',
+        })],
+      });
+      confirmMock.mockReturnValue(false);
+      renderNotes();
+      const label = screen.getByRole('button', { name: /^Edit note: / }).getAttribute('aria-label');
+      const title = label.replace(/^Edit note: /, '');
+      openEditNote();
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      expect(confirmMock).toHaveBeenCalledWith(`Delete Note "${title}"?`);
+    });
+  });
+
   describe('search', () => {
     const searchable = [
       makeNote({ description: 'Fireball is a 3rd level spell' }),

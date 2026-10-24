@@ -30,9 +30,9 @@ function stripMarkdownSymbols(text) {
     .trim();
 }
 
-// Identifier for the delete confirm: notes have no name field, so use the
-// party location, falling back to a plain-text shortened title derived from
-// the description.
+// Display title for a note (row aria-label + delete confirm share this one
+// derivation): notes have no name field, so use the party location, falling
+// back to a plain-text shortened title derived from the description.
 function noteDisplayName(note) {
   const location = (note.partyLocation || '').trim();
   if (location) return location;
@@ -53,7 +53,7 @@ function NoteListItem({ note, onEdit }) {
       role="button"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      aria-label={`Edit note: ${truncateDescription(note.description, 50)}`}
+      aria-label={`Edit note: ${noteDisplayName(note)}`}
     >
       <div className="ct-list-item-header">
         <span className="notes-list-location">
