@@ -740,7 +740,13 @@
 }
 
 .initiative .hp-inline-input {
-    width: 36px;
+    /* size-to-content so 3-/4-digit HP (e.g. 178, 9999) render fully
+       without glyph clipping; min-width keeps a stable box for short
+       values and aligns the current- and max-HP siblings. Unsupported
+       browsers fall back to the UA intrinsic width (never clipped). */
+    width: auto;
+    min-width: 36px;
+    field-sizing: content;
     padding: 2px 3px;
     text-align: center;
     font-size: 0.8em;
@@ -754,10 +760,6 @@
 .initiative .hp-inline-input:focus {
     outline: 2px solid #ffcc00;
     border-color: #ffcc00;
-}
-
-.initiative .hp-inline-input.hp-max-input {
-    width: 30px;
 }
 
 .initiative .hp-status {

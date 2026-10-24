@@ -71,7 +71,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- (2026-10-24) Max-HP input on initiative cards clips 3-digit values at `width:38px` (displayed "171" for 178) — widen or size to content.
 - (2026-10-24) Party-currency +/- chip writes fire one full-store POST per click with no debounce/merge (≈30 POSTs in a short session on `/inventory`) — batch per burst, or server-side increment op (`{inc:+100}`) instead of whole-doc PUT.
 - (2026-10-24) EB generator suggestions panel labels tiers (EASY/MEDIUM) against party-wide target but has no per-row difficulty math display vs Target XP line; clicking Generate repeatedly only re-rolls with no "regenerate?"/history — keep last roll + Apply diff visible.
 - (2026-10-24) NPC delete + campaign tool confirms are generic ("Delete this NPC?") — align with Quests pattern that names the object (`Delete NPC "<name>"?`) to prevent wrong-row deletes.
