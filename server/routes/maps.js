@@ -64,6 +64,38 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
 
 const clampGridSize = (gridSize) => Math.max(5, Math.min(100, gridSize ?? 20));
 
+// revealed[] entries are "gx,gy" strings (see useFogOfWar / mergeNewlyRevealed).
+// Cells outside the current grid can never be rendered or matched by fog math
+// (fog iterates 0..gridSize-1), but they balloon the document when gridSize is
+// shrunk or a legacy larger-grid file is re-opened — every save/SSE payload
+// then ships the stale tail (31,200-entry case, 2026-10-13). Prune at this
+// single server seam so disk writes, broadcasts and every client load
+// (mapsService.loadMapData → GET) only ever carry in-bounds cells.
+// Returns the SAME object untouched when nothing needs pruning (clean maps
+// churn nothing), or a new object with a compacted revealed array.
+export function pruneRevealedToGrid(mapData) {
+  if (!mapData || !Array.isArray(mapData.revealed) || mapData.revealed.length === 0) {
+    return mapData;
+  }
+  const gridSize = mapData.gridSize;
+  if (!Number.isInteger(gridSize) || gridSize <= 0) {
+    // No trustworthy grid bounds — leave exploration memory untouched.
+    return mapData;
+  }
+  const inBounds = (key) => {
+    const parts = String(key).split(',');
+    if (parts.length !== 2) return false;
+    const gx = Number(parts[0]);
+    const gy = Number(parts[1]);
+    return Number.isInteger(gx) && Number.isInteger(gy) &&
+      gx >= 0 && gx < gridSize && gy >= 0 && gy < gridSize;
+  };
+  const kept = mapData.revealed.filter(inBounds);
+  if (kept.length === mapData.revealed.length) return mapData;
+  console.log(`[maps] pruned ${mapData.revealed.length - kept.length} out-of-bounds revealed cells (gridSize=${gridSize})`);
+  return { ...mapData, revealed: kept };
+}
+
 const buildOutdoorMapData = (name, body) => ({
   displayName: name.trim(),
   name: toKebabCase(name.trim()),
@@ -146,14 +178,14 @@ router.get('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
     return res.status(404).json({ error: 'Map not found' });
   }
 
-  const mapData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const mapData = pruneRevealedToGrid(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
   res.json(mapData);
 }));
 
 // PUT /api/campaigns/:campaign/maps/:mapname - Save map data
 router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
-  const mapData = req.body;
+  const mapData = pruneRevealedToGrid(req.body);
   const mapsDir = campaignMapsDir(campaign);
 
   if (!fs.existsSync(mapsDir)) {
@@ -295,7 +327,7 @@ router.put('/api/campaigns/:campaign/maps/:mapname/description', asyncHandler((r
     return res.status(404).json({ error: 'Map not found' });
   }
 
-  const mapData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const mapData = pruneRevealedToGrid(JSON.parse(fs.readFileSync(filePath, 'utf8')));
   mapData.description = description || '';
   fs.writeFileSync(filePath, JSON.stringify(mapData, null, 2));
 

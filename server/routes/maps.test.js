@@ -895,6 +895,126 @@ describe('maps - PUT /api/campaigns/:campaign/maps/:mapname', () => {
     });
 });
 
+// ─── revealed[] out-of-grid pruning (2026-10-13 balloon fix) ─────────────────
+
+describe('maps - revealed prune to grid bounds', () => {
+    afterEach(clearMocks);
+
+    it('PUT prunes out-of-bounds revealed cells before persisting', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/maps/test-map.json')
+            .send({
+                displayName: 'Test Map',
+                gridSize: 20,
+                revealed: ['0,0', '19,19', '19,20', '20,0', '-1,5', '199,199'],
+            });
+
+        expect(res.status).toBe(200);
+        const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/test-map.json`));
+        expect(saved.revealed).toEqual(['0,0', '19,19']);
+    });
+
+    it('PUT broadcasts the pruned snapshot so SSE payloads stay compact', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        const app = createTestApp();
+        await request(app)
+            .put('/api/campaigns/test-campaign/maps/test-map.json')
+            .send({ displayName: 'Test Map', gridSize: 20, revealed: ['5,5', '25,25'] });
+
+        expect(changeData.publish).toHaveBeenCalledWith(
+            'map-data-test-campaign-test-map',
+            expect.objectContaining({ revealed: ['5,5'] }),
+            'test-campaign'
+        );
+    });
+
+    it('PUT preserves clean revealed arrays untouched (no churn when nothing pruned)', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        const clean = ['0,0', '19,19', '3,7', '19,0', '0,19'];
+        const app = createTestApp();
+        await request(app)
+            .put('/api/campaigns/test-campaign/maps/test-map.json')
+            .send({ displayName: 'Test Map', gridSize: 20, revealed: clean, walls: ['1,1'] });
+
+        const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/test-map.json`));
+        expect(saved.revealed).toEqual(clean);
+        expect(saved.walls).toEqual(['1,1']);
+    });
+
+    it('GET serves in-bounds-only revealed from a stale bloated file without writing', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        // Legacy file: 400 in-bounds cells (gridSize 20) + stale tail from an
+        // old 200-wide grid — the 31,200-entry balloon scenario.
+        const inflated = [];
+        for (let gy = 0; gy < 20; gy++) {
+            for (let gx = 0; gx < 20; gx++) inflated.push(`${gx},${gy}`);
+        }
+        for (let gy = 20; gy < 176; gy++) {
+            for (let gx = 0; gx < 200; gx++) inflated.push(`${gx},${gy}`);
+        }
+        const originalDoc = { displayName: 'Test Map', gridSize: 20, revealed: inflated };
+        setupFs(`${mapsDir}/test-map.json`, originalDoc);
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/maps/test-map.json');
+
+        expect(res.status).toBe(200);
+        expect(res.body.revealed).toHaveLength(400);
+        // In-bounds fog memory preserved exactly, in order.
+        expect(res.body.revealed).toEqual(inflated.slice(0, 400));
+        // Read-only normalization: GET never writes the pruned doc back.
+        expect(MOCK_FS.get(`${mapsDir}/test-map.json`)).toBe(originalDoc);
+    });
+
+    it('leaves documents without revealed or with untrusted gridSize unchanged (outdoor/hex maps)', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        const outdoor = { displayName: 'Outdoor', type: 'outdoor', gridSize: 50, terrain: {} };
+        const app = createTestApp();
+        await request(app)
+            .put('/api/campaigns/test-campaign/maps/outdoor.json')
+            .send(outdoor);
+
+        expect(JSON.parse(MOCK_FS.get(`${mapsDir}/outdoor.json`))).toEqual(outdoor);
+
+        // revealed present but gridSize missing → never wipe exploration memory.
+        const noGrid = { displayName: 'No Grid', revealed: ['999,999'] };
+        await request(app)
+            .put('/api/campaigns/test-campaign/maps/no-grid.json')
+            .send(noGrid);
+        expect(JSON.parse(MOCK_FS.get(`${mapsDir}/no-grid.json`)).revealed).toEqual(['999,999']);
+    });
+
+    it('pruneRevealedToGrid is reference-stable for clean input and compacts stale input', async () => {
+        const { pruneRevealedToGrid } = await import('./maps.js');
+
+        expect(pruneRevealedToGrid(null)).toBe(null);
+        const noRevealed = { displayName: 'Map', gridSize: 10 };
+        expect(pruneRevealedToGrid(noRevealed)).toBe(noRevealed);
+        const clean = { gridSize: 10, revealed: ['0,0', '9,9'] };
+        expect(pruneRevealedToGrid(clean)).toBe(clean);
+        const empty = { gridSize: 10, revealed: [] };
+        expect(pruneRevealedToGrid(empty)).toBe(empty);
+
+        const stale = { gridSize: 10, revealed: ['0,0', '10,0', '0,10', '-1,-1', 'junk', '1.5,2'] };
+        const pruned = pruneRevealedToGrid(stale);
+        expect(pruned).not.toBe(stale);
+        expect(pruned.revealed).toEqual(['0,0']);
+        expect(stale.revealed).toHaveLength(6); // input never mutated
+    });
+});
+
 // ─── DELETE /api/campaigns/:campaign/maps/:mapname ─────────────────────────────
 
 describe('maps - DELETE /api/campaigns/:campaign/maps/:mapname', () => {
