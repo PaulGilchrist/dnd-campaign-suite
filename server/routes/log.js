@@ -3,7 +3,7 @@ import fs from 'fs';
 import guid from 'guid';
 import { publish } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
+import { campaignDataFile, campaignDir, ensureDataDir } from '../utils/campaignPaths.js';
 
 const router = express.Router();
 
@@ -32,6 +32,11 @@ function saveLogFile() {
   if (saveLogFile._timer) clearTimeout(saveLogFile._timer);
   saveLogFile._timer = setTimeout(() => {
     for (const campaign of logCache.keys()) {
+      if (!fs.existsSync(campaignDir(campaign))) {
+        console.error(`[log] Skipping persist for campaign "${campaign}" — its directory no longer exists on disk. Removing from memory to prevent phantom campaign regeneration.`);
+        logCache.delete(campaign);
+        continue;
+      }
       ensureDataDir(campaign);
       const file = campaignDataFile(campaign, 'campaign-log.json');
       try {

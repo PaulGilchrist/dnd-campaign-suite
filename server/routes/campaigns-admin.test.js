@@ -268,6 +268,46 @@ describe('campaignsAdmin - PUT /api/campaigns/:campaign', () => {
         expect(characterChangeData.has('old-campaign')).toBe(false);
         expect(characterChangeData.has('new-campaign')).toBe(false);
     });
+
+    it('should migrate logCache so post-rename flushes never recreate the old folder', async () => {
+        const app = createTestApp();
+        const { logCache } = await import('./log.js');
+        const { characterChangeData, spellOverlayData, activeMaps } = await import('../utils/changeData.js');
+        characterChangeData.clear();
+        spellOverlayData.clear();
+        activeMaps.clear();
+        logCache.clear();
+        ensureCampaign('old-campaign');
+        logCache.set('old-campaign', [{ type: 'test', message: 'Pre-rename entry', timestamp: 1000 }]);
+
+        const res = await request(app).put('/api/campaigns/old-campaign').send({ newName: 'new-campaign' });
+        expect(res.status).toBe(200);
+        // Old key gone → a saveLogFile sweep can never iterate it and
+        // ensureDataDir-resurrect the renamed-away folder with stale entries
+        expect(logCache.has('old-campaign')).toBe(false);
+        // Log data followed the rename under the new key
+        expect(logCache.has('new-campaign')).toBe(true);
+        expect(logCache.get('new-campaign')).toEqual([{ type: 'test', message: 'Pre-rename entry', timestamp: 1000 }]);
+        // Only the new folder exists; nothing wrote a file back under the old name
+        expect(mockFsState.exists.has('/mock/campaigns/old-campaign')).toBe(false);
+        expect(mockFsState.exists.has('/mock/campaigns/new-campaign')).toBe(true);
+        const fsMock = await import('fs');
+        for (const [p] of fsMock.default.writeFileSync.mock.calls) {
+            expect(String(p)).not.toContain('old-campaign');
+        }
+        logCache.clear();
+    });
+
+    it('should not create a logCache entry for campaigns without cached logs', async () => {
+        const app = createTestApp();
+        const { logCache } = await import('./log.js');
+        logCache.clear();
+        ensureCampaign('old-campaign');
+        const res = await request(app).put('/api/campaigns/old-campaign').send({ newName: 'new-campaign' });
+        expect(res.status).toBe(200);
+        expect(logCache.has('old-campaign')).toBe(false);
+        expect(logCache.has('new-campaign')).toBe(false);
+    });
 });
 
 describe('campaignsAdmin - DELETE /api/campaigns/:campaign', () => {

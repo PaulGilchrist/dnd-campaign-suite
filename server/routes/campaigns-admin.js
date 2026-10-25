@@ -109,6 +109,10 @@ function migrateCampaignMemoryMaps(oldName, newName) {
         activeMaps.set(newName, activeMaps.get(oldName));
         activeMaps.delete(oldName);
     }
+    if (logCache.has(oldName)) {
+        logCache.set(newName, logCache.get(oldName));
+        logCache.delete(oldName);
+    }
 }
 
 function isCharacterJsonFile(file) {

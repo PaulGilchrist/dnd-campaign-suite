@@ -28,6 +28,7 @@ vi.mock('fs', () => ({
 
 vi.mock('../utils/campaignPaths.js', () => ({
     campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
+    campaignDir: (campaign) => `/mock/campaigns/${campaign}`,
     ensureDataDir: vi.fn((name) => {
         mockFsState.exists.add(`/mock/campaigns/${name}/data`);
         return `/mock/campaigns/${name}/data`;
@@ -46,6 +47,9 @@ function createTestApp() {
 }
 
 function ensureCampaign(campaign) {
+    // Real campaigns always have the folder itself; the phantom guard in
+    // saveLogFile() checks it before persisting.
+    mockFsState.exists.add(`/mock/campaigns/${campaign}`);
     mockFsState.exists.add(`/mock/campaigns/${campaign}/data`);
 }
 
@@ -560,6 +564,53 @@ describe('File persistence', () => {
         const res = await request(app).get('/api/campaigns/test-campaign/log');
 
         expect(res.body).toHaveLength(500);
+    });
+});
+
+// ─── Phantom-campaign guard (saveLogFile) ───────────────────────────────────
+
+describe('Phantom-campaign guard in flush', () => {
+    it('should skip and purge a cache key whose campaign directory no longer exists', async () => {
+        const fsMock = await import('fs');
+        ensureCampaign('live-campaign');
+        // 'ghost-campaign' is in memory but its folder was renamed/deleted away
+        logModule.logCache.set('ghost-campaign', [{ type: 'test', message: 'Stale entry', timestamp: 1000 }]);
+
+        const app = createTestApp();
+        await request(app)
+            .post('/api/campaigns/live-campaign/log')
+            .send({ type: 'test', message: 'Live entry' });
+
+        await new Promise((r) => setTimeout(r, 1100));
+
+        // Ghost folder must never be re-created and no file written for it
+        expect(mockFsState.exists.has('/mock/campaigns/ghost-campaign')).toBe(false);
+        expect(mockFsState.exists.has('/mock/campaigns/ghost-campaign/data')).toBe(false);
+        for (const [path] of fsMock.default.writeFileSync.mock.calls) {
+            expect(path).not.toContain('ghost-campaign');
+        }
+        // Memory purged so later sweeps stay quiet
+        expect(logModule.logCache.has('ghost-campaign')).toBe(false);
+        // Live campaign still persisted normally
+        expect(logModule.logCache.has('live-campaign')).toBe(true);
+        expect(mockFsState.files.has('/mock/campaigns/live-campaign/data/campaign-log.json')).toBe(true);
+    });
+
+    it('should still write when the campaign folder exists but its data subfolder was removed', async () => {
+        const fsMock = await import('fs');
+        // Campaign folder exists, data dir missing (ensureDataDir legitimately recreates it)
+        mockFsState.exists.add('/mock/campaigns/partial-campaign');
+
+        const app = createTestApp();
+        await request(app)
+            .post('/api/campaigns/partial-campaign/log')
+            .send({ type: 'test', message: 'Recreate data dir' });
+
+        await new Promise((r) => setTimeout(r, 1100));
+
+        const writeCalls = fsMock.default.writeFileSync.mock.calls;
+        expect(writeCalls.some(([p]) => p === '/mock/campaigns/partial-campaign/data/campaign-log.json')).toBe(true);
+        expect(logModule.logCache.has('partial-campaign')).toBe(true);
     });
 });
 
