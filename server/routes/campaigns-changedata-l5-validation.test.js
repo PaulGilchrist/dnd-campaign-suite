@@ -40,12 +40,37 @@ describe('L5-001 change-data validation chokepoint', () => {
             expect(characterChangeData.get('test-campaign').combatSummary.round).toBe(2);
         });
 
-        it('enforcement writes that never engage pass freely from any origin while OFF', async () => {
-            // Criterion 4: sub-flag staging (mode stays 'off') is not an act of
-            // authority — the aiConfig "engaging counts" semantics keep this open.
+        it('enforcement sub-flag staging from a LAN origin is refused even while OFF (2026-10-25)', async () => {
+            // Previously open lane (backlog residual): mode:'off' blobs that never
+            // engaged passed freely from any origin. CLOSED by owner adjudication:
+            // a pre-seeded flag rides into the GM's next engage (the panel posts
+            // its live draft blob), so ANY enforcement state change is GM-only.
             const res = await request(createTestApp())
                 .post('/api/campaigns/test-campaign/enforcement')
                 .set('Host', '10.0.0.5')
+                .send({ value: { mode: 'off', turnLock: true, autoRewards: true } });
+            expect(res.status).toBe(400);
+            expect(res.body.error).toMatch(/only localhost \(the GM\)/);
+            expect(characterChangeData.get('test-campaign').enforcement).toBeUndefined();
+        });
+
+        it('LAN no-op re-post of byte-identical state stays 200 with zero state change', async () => {
+            // The one open LAN lane: an honest SSE-heal echo of the current blob.
+            // Canonical comparison is over the full flag set, so key order and
+            // partial shapes of the SAME state are no-ops too.
+            const app = createTestApp();
+            characterChangeData.get('test-campaign').enforcement = { mode: 'off', turnLock: false };
+            const res = await request(app)
+                .post('/api/campaigns/test-campaign/enforcement')
+                .set('Host', '10.0.0.5')
+                .send({ value: { turnLock: false, mode: 'off' } });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off', turnLock: false });
+        });
+
+        it('localhost keeps the full sub-flag staging lane while OFF (Admin panel unchanged)', async () => {
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/enforcement')
                 .send({ value: { mode: 'off', turnLock: true, autoRewards: true } });
             expect(res.status).toBe(200);
             expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off', turnLock: true, autoRewards: true });
@@ -91,7 +116,11 @@ describe('L5-001 change-data validation chokepoint', () => {
             expect(characterChangeData.get('test-campaign').enforcement.mode).toBe('on');
         });
 
-        it('non-localhost keep-off staging still passes after a denied engage (no over-tightening)', async () => {
+        it('sub-flag staging while OFF is also refused from LAN — no partial writes slip through', async () => {
+            // Was "keep-off staging still passes… (no over-tightening)" — the
+            // over-tightening became the fix (2026-10-25): every enforcement write
+            // that CHANGES the blob is GM-only, in either mode. Only a byte-
+            // identical no-op stays open (see pass-through suite above).
             const app = createTestApp();
             const engage = await request(app)
                 .post('/api/campaigns/test-campaign/enforcement')
@@ -103,8 +132,9 @@ describe('L5-001 change-data validation chokepoint', () => {
                 .post('/api/campaigns/test-campaign/enforcement')
                 .set('Host', '10.0.0.5')
                 .send({ value: { mode: 'off', autoRewards: true } });
-            expect(staging.status).toBe(200);
-            expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off', autoRewards: true });
+            expect(staging.status).toBe(400);
+            expect(staging.body.error).toMatch(/only localhost \(the GM\)/);
+            expect(characterChangeData.get('test-campaign').enforcement).toBeUndefined();
         });
     });
 

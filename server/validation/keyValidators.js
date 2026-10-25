@@ -115,9 +115,9 @@ function validateTurnState(value) {
  * engaged these may only come from localhost — the GM machine. There is no
  * assignable referee (removed 2026-10-13: the app runs on the GM's computer,
  * so localhost IS the referee; delegation via client ids was never wired to
- * a pairing mechanism). With enforcement off the surface stays exactly as
- * open as today. `engaged` may be overridden by the caller (e.g. aiConfig
- * engages on its own mode, not the enforcement master).
+ * a pairing mechanism). `engaged` may be overridden by the caller (e.g.
+ * aiConfig engages on its own mode; the enforcement lane is always engaged —
+ * see the keyValidators entry below).
  */
 function validateAuthority(key, ctx, engaged) {
     const { req, current } = ctx;
@@ -125,12 +125,40 @@ function validateAuthority(key, ctx, engaged) {
     const live = engaged !== undefined ? engaged
         : isPlainObject(enforcement) && enforcement.mode === 'on';
     if (!live) return { ok: true };
-    const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-    if (isLocalhost) return { ok: true };
+    if (isLocalhostReq(req)) return { ok: true };
+    // The enforcement lane is GM-owned in EVERY mode (caller passes blob-changed
+    // ⇒ engaged), so the literal engaged-mode suffix would be a lie on a
+    // mode:'off'/'absent' enforcement refusal. Other always-engaged keys
+    // (activeCreatureName, __map__) keep their byte-identical legacy copy.
+    const enforcementEngaged = isPlainObject(enforcement) && enforcement.mode === 'on';
+    const suffix = (key === 'enforcement' && !enforcementEngaged)
+        ? ' — enforcement is GM-owned in every mode'
+        : ' while it is engaged';
     return {
         ok: false,
-        reason: `only localhost (the GM) may change ${key} while it is engaged`,
+        reason: `only localhost (the GM) may change ${key}${suffix}`,
     };
+}
+
+function isLocalhostReq(req) {
+    return req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+}
+
+// Canonical state = the full ENFORCEMENT_FLAGS set (absent keys read as their
+// defaults: mode 'off', sub-flags false), so the comparison reports *state*
+// changes, not key ordering or partial-shape noise: a byte-identical re-post
+// is a no-op and stays open to every origin; ANY real change — master engage
+// or a single sub-flag while mode stays 'off' — is an act of authority.
+function enforcementBlobChanged(value, current) {
+    const canon = (blob) => JSON.stringify(Object.fromEntries(
+        [...ENFORCEMENT_FLAGS].map(flag => [
+            flag,
+            flag === 'mode'
+                ? (isPlainObject(blob) && blob.mode === 'on' ? 'on' : 'off')
+                : !!(isPlainObject(blob) && blob[flag]),
+        ]),
+    ));
+    return canon(value) !== canon(current);
 }
 
 /**
@@ -264,11 +292,19 @@ export const keyValidators = {
     // campaign could be silently turn-locked table-wide by any LAN client with a
     // curl (the grief window: the engaged guard then 400s the same client trying
     // to stop it, so only the GM tab can un-ring what a player client rang).
-    // Sub-flag staging that never engages (mode:'off') stays open exactly as
-    // today — enforcement's mode enum is 'off'|'on' (see MODES above).
+    // 2026-10-25 (owner-approved): the residual LAN lane CLOSED — sub-flag
+    // staging that never engages is authority too (see the guard comment below).
+    // enforcement's mode enum stays 'off'|'on' (see MODES above).
     enforcement: chain(validateEnforcement, (v, ctx) => validateAuthority('enforcement', ctx,
-        (isPlainObject(v) && v.mode === 'on')
-        || (isPlainObject(ctx.current?.enforcement) && ctx.current.enforcement.mode === 'on'))),
+        // GM-owned in EVERY mode (backlog 2026-10-25): a write that ENGAGES is
+        // itself an act of authority (0b6492583), and since that fix the residual
+        // was sub-flag staging with mode:'off' — accepted 200 from any origin, so
+        // a LAN client could pre-seed flags that the GM's next engage rides into
+        // (the panel posts its live draft blob, 161ee52c1 zeroes only on a GM
+        // master-off click). Engaged is therefore TRUE whenever the write would
+        // ALTER enforcement state; the only open LAN lane is the no-op re-post of
+        // byte-identical state (0 change, 200 — guard shape preserved).
+        enforcementBlobChanged(v, ctx.current?.enforcement))),
     turnState: validateTurnState,
     // L5 Phase 4 (§10.1): session orchestration truth — shape only, phase
     // enum pinned; unset ⇒ 'exploration' (today's implicit default).
