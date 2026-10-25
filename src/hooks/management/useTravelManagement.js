@@ -17,7 +17,7 @@ import {
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
-import { setSessionPhase } from '../../services/combat/sessionService.js';
+import { setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -72,7 +72,18 @@ export default function useTravelManagement({
     if (mode === MODES.TRAVELING) {
       setSessionPhase({ campaignName, phase: 'travel', changedBy: 'travel management', reason: 'travel started' }).catch((e) => { console.error('[useTravelManagement] session phase travel failed:', e); });
     } else if (mode === MODES.INACTIVE) {
-      setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'travel management', reason: 'travel ended' }).catch((e) => { console.error('[useTravelManagement] session phase exploration failed:', e); });
+      // L5 §10.1 phase ownership: travel returns the table to exploration ONLY
+      // while it owns the phase. An `encounter` phase armed by another engine
+      // action must survive — accepting a travel combat event with
+      // enforcement.autoEncounters on spawns its battle map, and opening that
+      // map transiently remounts HexMap, whose tool-sync cancelTravel lands
+      // here AFTER the auto-encounter wrote `encounter` (a blind write here
+      // clobbered it while monsters sat on the tracker). Initiative's Clear
+      // (createCreatureHandlers.handleClear) is the owner of
+      // encounter → exploration.
+      if (readSessionPhase(campaignName) === 'travel') {
+        setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'travel management', reason: 'travel ended' }).catch((e) => { console.error('[useTravelManagement] session phase exploration failed:', e); });
+      }
     }
   }, [campaignName, _setTravelModeRaw]);
   const [travelPace, setTravelPace] = useSyncedState('campaign', 'travel-pace', init.travelPace, campaignName);
