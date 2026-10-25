@@ -10,7 +10,7 @@
  * window alert/confirm/prompt mocks are exercised by the delete tests.
  * None of that is repeated here.
  */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
@@ -95,27 +95,27 @@ describe('CampaignAdmin - Rename Campaign', () => {
         expect(submit()).toBeDisabled();
     });
 
-    it('submits the trimmed name once via the Rename button, closes, and reopens with a cleared draft', () => {
+    it('submits the trimmed name once via the Rename button, closes, and reopens with a cleared draft', async () => {
         const { props, submit } = renderWithRenameModal();
         type('  test-campaign/2  ');
         fireEvent.click(submit());
 
         expect(props.onRenameCampaign).toHaveBeenCalledTimes(1);
         expect(props.onRenameCampaign).toHaveBeenCalledWith('test-campaign/2');
-        expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument());
 
         openModal();
         expect(screen.getByLabelText('New Campaign Name')).toHaveValue('');
     });
 
-    it('submits the trimmed name on Enter and never submits a blank name', () => {
+    it('submits the trimmed name on Enter and never submits a blank name', async () => {
         const { props, input } = renderWithRenameModal();
         type('  Frostpeak Winter  ');
         fireEvent.keyDown(input, { key: 'Enter' });
 
         expect(props.onRenameCampaign).toHaveBeenCalledTimes(1);
         expect(props.onRenameCampaign).toHaveBeenCalledWith('Frostpeak Winter');
-        expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument());
 
         // Enter is the only submit path for a blank name (the button is
         // disabled), so the guard in the key handler must hold.
@@ -124,6 +124,42 @@ describe('CampaignAdmin - Rename Campaign', () => {
         fireEvent.keyDown(screen.getByLabelText('New Campaign Name'), { key: 'Enter' });
 
         expect(props.onRenameCampaign).toHaveBeenCalledTimes(1);
+        expect(screen.getByLabelText('New Campaign Name')).toBeInTheDocument();
+    });
+
+    // Regression (bug-campaign-rename-double-prompt): the modal value must be
+    // the single input surface — the name is handed to onRenameCampaign and
+    // no native prompt() may fire behind the modal.
+    it('never fires a native prompt — the modal value is passed straight to onRenameCampaign', async () => {
+        const promptSpy = vi.spyOn(window, 'prompt');
+        const { props, submit } = renderWithRenameModal();
+        type('Solo Prompt Name');
+        fireEvent.click(submit());
+
+        expect(props.onRenameCampaign).toHaveBeenCalledWith('Solo Prompt Name');
+        expect(promptSpy).not.toHaveBeenCalled();
+        await waitFor(() => expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument());
+        promptSpy.mockRestore();
+    });
+
+    it('keeps the modal open with the draft and shows the server error when the rename fails', async () => {
+        const { props, submit } = renderWithRenameModal({
+            onRenameCampaign: vi.fn().mockRejectedValue(new Error('Campaign already exists')),
+        });
+        type('Frostpeak Winter');
+        fireEvent.click(submit());
+
+        await waitFor(() => expect(screen.getByText('Campaign already exists')).toBeInTheDocument());
+        expect(screen.getByLabelText('New Campaign Name')).toHaveValue('Frostpeak Winter');
+        expect(props.onRenameCampaign).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not submit a name identical (case-insensitively) to the current campaign name', () => {
+        const { props, submit } = renderWithRenameModal();
+        type('  Test-Campaign  ');
+        expect(submit()).toBeDisabled();
+        fireEvent.click(submit());
+        expect(props.onRenameCampaign).not.toHaveBeenCalled();
         expect(screen.getByLabelText('New Campaign Name')).toBeInTheDocument();
     });
 });

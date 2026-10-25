@@ -553,12 +553,18 @@ function App() {
        }
      };
 
-  const handleRenameCampaign = async () => {
+  const handleRenameCampaign = async (newName) => {
     try {
-      await handleRenameCampaignRaw();
+      await handleRenameCampaignRaw(newName);
     } catch (error) {
       console.error('Error renaming campaign:', error);
-      alert(`Failed to rename campaign: ${error.message}`);
+      if (!newName) {
+        // Legacy prompt-only caller (no modal) — surface via alert.
+        alert(`Failed to rename campaign: ${error.message}`);
+      } else {
+        // Modal caller — CampaignAdmin renders the error in-modal; rethrow so it knows.
+        throw error;
+      }
     }
   };
 

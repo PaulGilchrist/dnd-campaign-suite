@@ -163,5 +163,47 @@ describe('useCampaignManagement', () => {
         })
       ).rejects.toThrow('Rename failed');
     });
+
+    // Regression (bug-campaign-rename-double-prompt): when a name was already
+    // collected in the Admin modal, it must be used directly — never a second
+    // native prompt.
+    it('uses a pre-collected name without prompting again', async () => {
+      const promptSpy = vi.spyOn(window, 'prompt');
+      const reload = mockLocation();
+      const fetchSpy = mockFetch(okResponse);
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('Old Campaign', []);
+      });
+      await act(async () => {
+        await result.current.handleRenameCampaign('  Modal Name  ');
+      });
+      expect(promptSpy).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/Old%20Campaign', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newName: 'Modal Name' }),
+      });
+      expect(result.current.campaignName).toBe('Modal Name');
+      expect(reload).toHaveBeenCalled();
+    });
+
+    it('falls back to the native prompt when called with a blank pre-collected name', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue('Prompted Name');
+      mockLocation();
+      const fetchSpy = mockFetch(okResponse);
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('Old Campaign', []);
+      });
+      await act(async () => {
+        await result.current.handleRenameCampaign('   ');
+      });
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/Old%20Campaign', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newName: 'Prompted Name' }),
+      });
+    });
   });
 });

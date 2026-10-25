@@ -22,8 +22,12 @@ function useCampaignManagement() {
     }
   };
 
-  const handleRenameCampaign = async () => {
-    const newName = prompt('Enter new campaign name:', campaignName);
+  // Accepts an optional pre-collected name (e.g. from the Admin rename modal)
+  // so the user is never prompted a second time; falls back to a native
+  // prompt for legacy prompt-only callers (Sidebar prop wiring).
+  const handleRenameCampaign = async (preCollectedName) => {
+    const trimmed = typeof preCollectedName === 'string' ? preCollectedName.trim() : '';
+    const newName = trimmed || prompt('Enter new campaign name:', campaignName);
     if (!newName || newName.trim() === '') return;
 
     const response = await fetch(

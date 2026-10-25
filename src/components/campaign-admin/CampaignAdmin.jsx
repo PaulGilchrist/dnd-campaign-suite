@@ -74,7 +74,9 @@ function StatusDisplay({ status }) {
     );
 }
 
-function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit }) {
+function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit, error, isBusy }) {
+    const trimmed = newName.trim();
+    const isUnchanged = trimmed !== '' && trimmed.toLowerCase() === campaignName.toLowerCase();
     return (
         <div className="ct-modal-overlay">
             <div className="ct-modal">
@@ -99,10 +101,18 @@ function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit
                             if (e.key === 'Escape') onClose();
                         }}
                     />
+                    {isUnchanged && (
+                        <p className="admin-status admin-status--error">The campaign already has this name</p>
+                    )}
+                    {error && (
+                        <p className="admin-status admin-status--error">{error}</p>
+                    )}
                 </div>
                 <div className="ct-modal-footer">
                     <button className="ct-btn ct-btn-secondary" onClick={onClose}>Cancel</button>
-                    <button className="ct-btn ct-btn-primary" onClick={onSubmit} disabled={!newName.trim()}>Rename</button>
+                    <button className="ct-btn ct-btn-primary" onClick={onSubmit} disabled={!trimmed || isUnchanged || isBusy}>
+                        {isBusy ? 'Renaming...' : 'Rename'}
+                    </button>
                 </div>
             </div>
         </div>
@@ -159,6 +169,8 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
     const [newName, setNewName] = useState('');
+    const [renameError, setRenameError] = useState(null);
+    const [renaming, setRenaming] = useState(false);
     const [confirmModal, setConfirmModal] = useState(null);
     const [snapshots, setSnapshots] = useState([]);
 
@@ -239,10 +251,23 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
     };
 
     const handleRenameSubmit = async () => {
-        if (!newName.trim()) return;
-        setRenameModal(false);
-        setNewName('');
-        await onRenameCampaign(newName.trim());
+        const trimmed = newName.trim();
+        if (!trimmed || !campaignName || trimmed.toLowerCase() === campaignName.toLowerCase()) return;
+        setRenameError(null);
+        setRenaming(true);
+        try {
+            await onRenameCampaign(trimmed);
+            // Success reloads the page (or leaves the app renamed) — clear the draft.
+            setRenameModal(false);
+            setNewName('');
+        } catch (err) {
+            // Keep the modal open with the draft so the server error (e.g.
+            // "Campaign already exists") is surfaced in-context, like the
+            // maps-manager rename inline errors.
+            setRenameError(err.message || 'Failed to rename campaign');
+        } finally {
+            setRenaming(false);
+        }
     };
 
     const handleDeleteCampaign = async () => {
@@ -402,7 +427,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                     <div className="admin-action">
                         <h3>Rename Campaign</h3>
                         <p>Changes the display name. Character files, maps, and data are preserved.</p>
-                        <button className="ct-btn ct-btn-primary" onClick={() => setRenameModal(true)}>
+                        <button className="ct-btn ct-btn-primary" onClick={() => { setRenameError(null); setRenameModal(true); }}>
                             <i className="fas fa-pen"></i> Rename Campaign
                         </button>
                     </div>
@@ -489,6 +514,8 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                     onNewNameChange={setNewName}
                     onClose={() => setRenameModal(false)}
                     onSubmit={handleRenameSubmit}
+                    error={renameError}
+                    isBusy={renaming}
                 />
             )}
 
