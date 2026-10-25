@@ -136,11 +136,18 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
 
           {mode === 'load' && !renameTarget && (
             <div className="encounter-modal-load">
-              {loading ? (
-                <div className="encounter-modal-loading">Loading...</div>
-              ) : encounters.length === 0 ? (
-                <div className="encounter-modal-empty">No saved encounters yet.</div>
+              {encounters.length === 0 ? (
+                loading ? (
+                  <div className="encounter-modal-loading">Loading...</div>
+                ) : (
+                  <div className="encounter-modal-empty">No saved encounters yet.</div>
+                )
               ) : (
+                // QA 2026-10-24: rows render during a list refresh but every row
+                // action is natively `disabled` while `loading` — a stale-node or
+                // eager click in the reload window is absorbed by the browser
+                // (silent-close flake), mirroring the EB empty-save / Save-gate
+                // disable-until-ready precedent.
                 <ul className="encounter-list">
                   {[...encounters].sort((a, b) => (a.effectiveXP || 0) - (b.effectiveXP || 0)).map((enc) => (
                     <li key={enc.name} className="encounter-list-item">
@@ -162,6 +169,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                           className="encounter-btn encounter-btn-sm encounter-btn-primary"
                           onClick={() => onLoad(enc.name)}
                           aria-label={`Load ${enc.name}`}
+                          disabled={loading}
                         >
                           <i className="fa-solid fa-download" /> Load
                         </button>
@@ -169,6 +177,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                           className="encounter-btn encounter-btn-sm encounter-btn-secondary"
                           onClick={() => setRenameTarget(enc)}
                           aria-label={`Rename ${enc.name}`}
+                          disabled={loading}
                         >
                           <i className="fa-solid fa-pen" />
                         </button>
@@ -176,6 +185,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                           className="encounter-btn encounter-btn-sm encounter-btn-danger"
                           onClick={() => handleDelete(enc.name)}
                           aria-label={`Delete ${enc.name}`}
+                          disabled={loading}
                         >
                           <i className="fa-solid fa-trash-can" />
                         </button>

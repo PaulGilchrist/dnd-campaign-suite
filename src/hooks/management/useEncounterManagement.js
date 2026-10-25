@@ -18,11 +18,18 @@ function useEncounterManagement(campaignName) {
 
   const loadEncounterList = useCallback(async () => {
     if (!campaignName) return;
+    // QA 2026-10-24: list reloads (open/save/delete/rename) must expose a
+    // `loading` window so EncounterModal can disable stale row actions —
+    // a pen click landing between setEncounters and onClose silently closed
+    // the modal with zero feedback.
+    setLoading(true);
     try {
       const response = await loadEncounters(campaignName);
       setEncounters(response.encounters || []);
     } catch (error) {
       console.error('Failed to load encounter list:', error);
+    } finally {
+      setLoading(false);
     }
   }, [campaignName]);
 
@@ -32,9 +39,13 @@ function useEncounterManagement(campaignName) {
   }, []);
 
   const openLoadModal = useCallback(async () => {
-    await loadEncounterList();
+    // QA 2026-10-24: open first, then reload — the fetch window is made
+    // visible INSIDE the modal (rows disabled while `loading`) instead of
+    // landing fresh rows into an already-open modal the instant a stale
+    // node may have been captured (silent-close flake).
     setModalMode('load');
     setModalOpen(true);
+    await loadEncounterList();
   }, [loadEncounterList]);
 
   const closeModal = useCallback(() => {

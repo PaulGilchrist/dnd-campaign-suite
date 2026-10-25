@@ -137,6 +137,55 @@ describe('useEncounterManagement', () => {
       );
       expect(result.current.encounters).toEqual([]);
     });
+
+    // QA 2026-10-24 backlog: list reloads must expose the `loading` window so
+    // EncounterModal can disable stale row actions (silent-close flake gate).
+    it('raises loading during the fetch and clears it once the list lands', async () => {
+      let resolveList;
+      mockLoadEncounters.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveList = resolve;
+          })
+      );
+
+      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
+
+      let pending;
+      act(() => {
+        pending = result.current.loadEncounterList();
+      });
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        resolveList({ encounters: [{ name: 'goblin-ambush' }] });
+        await pending;
+      });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.encounters).toEqual([{ name: 'goblin-ambush' }]);
+    });
+
+    it('clears loading when the list fetch fails (no stuck-disabled rows)', async () => {
+      mockLoadEncounters.mockRejectedValue(new Error('Network error'));
+
+      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
+
+      await act(async () => {
+        await result.current.loadEncounterList();
+      });
+
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('does not raise loading when campaignName is empty', async () => {
+      const { result } = renderHook(() => useEncounterManagement(''));
+
+      await act(async () => {
+        await result.current.loadEncounterList();
+      });
+
+      expect(result.current.loading).toBe(false);
+    });
   });
 
   describe('modal state', () => {
@@ -174,6 +223,37 @@ describe('useEncounterManagement', () => {
       expect(result.current.encounters).toEqual(encountersData);
       expect(result.current.modalMode).toBe('load');
       expect(result.current.modalOpen).toBe(true);
+      expect(result.current.loading).toBe(false);
+    });
+
+    // QA 2026-10-24 backlog: the load list must fetch INSIDE the open modal
+    // (loading=true gates the rows) instead of landing fresh rows straight
+    // into an already-clickable surface (silent-close flake).
+    it('openLoadModal opens immediately with loading=true and stays loading until the list lands', async () => {
+      let resolveList;
+      mockLoadEncounters.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveList = resolve;
+          })
+      );
+
+      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
+
+      let pending;
+      act(() => {
+        pending = result.current.openLoadModal();
+      });
+      expect(result.current.modalOpen).toBe(true);
+      expect(result.current.modalMode).toBe('load');
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        resolveList({ encounters: [{ name: 'goblin-ambush' }] });
+        await pending;
+      });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.encounters).toEqual([{ name: 'goblin-ambush' }]);
     });
   });
 

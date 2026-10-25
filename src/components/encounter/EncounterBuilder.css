@@ -71,8 +71,16 @@
   transition: background 0.2s;
 }
 
-.encounter-builder .encounter-btn:hover {
+.encounter-builder .encounter-btn:hover:not(:disabled) {
   background: var(--background-color-button-secondary-hover);
+}
+
+/* Row actions stay visible but inert while the load list refreshes
+   (QA 2026-10-24 silent-close flake gate) — same disabled vocabulary as
+   .player-level-remove:disabled. */
+.encounter-builder .encounter-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .encounter-builder .encounter-btn-danger {
@@ -80,7 +88,7 @@
   border-color: var(--color-error);
 }
 
-.encounter-builder .encounter-btn-danger:hover {
+.encounter-builder .encounter-btn-danger:hover:not(:disabled) {
   background: var(--background-color-error);
 }
 
