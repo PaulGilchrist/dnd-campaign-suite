@@ -258,7 +258,17 @@ function chain(...validators) {
 }
 
 export const keyValidators = {
-    enforcement: chain(validateEnforcement, (v, ctx) => validateAuthority('enforcement', ctx)),
+    // Enforcement engages GM authority on its OWN master mode (§12), mirroring
+    // the aiConfig engage-guard below — and engaging counts: a WRITE that turns
+    // enforcement on is itself an act of authority. Without this, a disengaged
+    // campaign could be silently turn-locked table-wide by any LAN client with a
+    // curl (the grief window: the engaged guard then 400s the same client trying
+    // to stop it, so only the GM tab can un-ring what a player client rang).
+    // Sub-flag staging that never engages (mode:'off') stays open exactly as
+    // today — enforcement's mode enum is 'off'|'on' (see MODES above).
+    enforcement: chain(validateEnforcement, (v, ctx) => validateAuthority('enforcement', ctx,
+        (isPlainObject(v) && v.mode === 'on')
+        || (isPlainObject(ctx.current?.enforcement) && ctx.current.enforcement.mode === 'on'))),
     turnState: validateTurnState,
     // L5 Phase 4 (§10.1): session orchestration truth — shape only, phase
     // enum pinned; unset ⇒ 'exploration' (today's implicit default).

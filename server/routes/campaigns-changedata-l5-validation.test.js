@@ -40,13 +40,71 @@ describe('L5-001 change-data validation chokepoint', () => {
             expect(characterChangeData.get('test-campaign').combatSummary.round).toBe(2);
         });
 
-        it('enforcement writes pass freely while enforcement is OFF (default)', async () => {
+        it('enforcement writes that never engage pass freely from any origin while OFF', async () => {
+            // Criterion 4: sub-flag staging (mode stays 'off') is not an act of
+            // authority — the aiConfig "engaging counts" semantics keep this open.
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/enforcement')
+                .set('Host', '10.0.0.5')
+                .send({ value: { mode: 'off', turnLock: true, autoRewards: true } });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off', turnLock: true, autoRewards: true });
+        });
+    });
+
+    // Enforcement-master ENGAGE gate (mirrors the aiConfig engage-guard): a write
+    // that turns enforcement ON is itself an act of authority. Pre-fix, a LAN
+    // client could engage table-wide turn-lock from a curl while disengaged (200),
+    // then only the localhost GM tab could un-ring it (400) — the grief window.
+    describe('enforcement engage gate (engaging counts as authority)', () => {
+        it('ENGAGE from a non-localhost origin ⇒ 400, enforcement stays OFF on disk', async () => {
             const res = await request(createTestApp())
                 .post('/api/campaigns/test-campaign/enforcement')
                 .set('Host', '10.0.0.5')
                 .send({ value: VALID_ENFORCEMENT });
+            expect(res.status).toBe(400);
+            expect(res.body.error).toMatch(/localhost \(the GM\)/);
+            expect(characterChangeData.get('test-campaign').enforcement).toBeUndefined();
+            expect(publish).toHaveBeenCalledWith(
+                'denied-test-campaign-enforcement',
+                expect.objectContaining({ key: 'enforcement' }),
+                'test-campaign',
+            );
+        });
+
+        it('localhost (GM) ENGAGE ⇒ 200 — the Admin-panel lane is unchanged', async () => {
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/enforcement')
+                .send({ value: VALID_ENFORCEMENT });
             expect(res.status).toBe(200);
             expect(characterChangeData.get('test-campaign').enforcement).toEqual(VALID_ENFORCEMENT);
+        });
+
+        it('non-localhost cannot even stage sub-flags once engaged (existing gate preserved)', async () => {
+            const app = createTestApp();
+            characterChangeData.get('test-campaign').enforcement = VALID_ENFORCEMENT;
+            const res = await request(app)
+                .post('/api/campaigns/test-campaign/enforcement')
+                .set('Host', '10.0.0.5')
+                .send({ value: { mode: 'off' } });
+            expect(res.status).toBe(400);
+            expect(characterChangeData.get('test-campaign').enforcement.mode).toBe('on');
+        });
+
+        it('non-localhost keep-off staging still passes after a denied engage (no over-tightening)', async () => {
+            const app = createTestApp();
+            const engage = await request(app)
+                .post('/api/campaigns/test-campaign/enforcement')
+                .set('Host', '10.0.0.5')
+                .send({ value: VALID_ENFORCEMENT });
+            expect(engage.status).toBe(400);
+            expect(characterChangeData.get('test-campaign').enforcement).toBeUndefined();
+            const staging = await request(app)
+                .post('/api/campaigns/test-campaign/enforcement')
+                .set('Host', '10.0.0.5')
+                .send({ value: { mode: 'off', autoRewards: true } });
+            expect(staging.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off', autoRewards: true });
         });
     });
 
