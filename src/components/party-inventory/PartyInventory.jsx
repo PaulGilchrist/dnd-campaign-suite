@@ -149,7 +149,7 @@ function QuantityStepper({ quantity, onStep, onSet }) {
   );
 }
 
-function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled }) {
+function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled, isLocalhost }) {
   const [giveState, setGiveState] = useState(null);
 
   // Positive whole-number amounts entered in the Give modal, in CURRENCIES order
@@ -176,6 +176,9 @@ function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled }) 
         <div key={key} className="pi-currency-row">
           <span className="pi-currency-label"><i className={icon} /> {label}</span>
           <span className="pi-currency-amount">{currency[key]}</span>
+          {/* Adjust/Give chips are GM-only writes to the durable treasury — hidden on
+              network (player) views; the server refuses them too (inventory.js refuseUnlessGm). */}
+          {isLocalhost && (
           <span className="pi-currency-chips">
             {AMOUNT_CHIPS.map(amount => (
               <span key={amount} className="pi-chip-pair">
@@ -209,6 +212,7 @@ function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled }) 
               <i className="fa-solid fa-hand-holding-heart" /> Give
             </button>
           </span>
+          )}
         </div>
       ))}
       {giveState && (
@@ -434,7 +438,7 @@ function PlayersPanel({ characters, campaignName, onMoved }) {
   );
 }
 
-function PartyInventory({ campaignName, characters = [], onBack }) {
+function PartyInventory({ campaignName, characters = [], isLocalhost, onBack }) {
   const [inventory, setInventory] = useState({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -712,9 +716,11 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
         <h2 className="ct-title">
           <i className="fa-solid fa-boxes-stacked" /> Party Inventory
         </h2>
-        <button className="ct-new-btn" onClick={handleAddItem}>
-          <i className="fa-solid fa-plus" /> Add Item
-        </button>
+        {isLocalhost && (
+          <button className="ct-new-btn" onClick={handleAddItem}>
+            <i className="fa-solid fa-plus" /> Add Item
+          </button>
+        )}
       </div>
 
       <CurrencyCard
@@ -723,6 +729,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
         onAdjust={handleCurrencyAdjust}
         onTransfer={handleCurrencyTransfer}
         disabled={saving}
+        isLocalhost={isLocalhost}
       />
 
       <div className="pi-main">
@@ -746,7 +753,11 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
           {filteredItems.length === 0 ? (
             <div className="ct-empty-state">
               <i className="fa-solid fa-boxes-stacked" />
-              {searchQuery ? `No party items matching “${searchQuery}”` : 'No shared items yet. Click “Add Item” to record loot.'}
+              {searchQuery
+                ? `No party items matching “${searchQuery}”`
+                : isLocalhost
+                  ? 'No shared items yet. Click “Add Item” to record loot.'
+                  : 'No shared items yet.'}
             </div>
           ) : (
             <table className="pi-items-table">
@@ -754,7 +765,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
                 <tr>
                   <th>Name</th>
                   <th>Qty</th>
-                  <th className="pi-actions-col no-print">Actions</th>
+                  {isLocalhost && <th className="pi-actions-col no-print">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -772,12 +783,17 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
                       </span>
                     </td>
                     <td>
-                      <QuantityStepper
-                        quantity={item.quantity}
-                        onStep={(delta) => handleItemStep(item, delta)}
-                        onSet={(v) => persist({ ...inventoryRef.current, items: inventoryRef.current.items.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, v) } : i) })}
-                      />
+                      {isLocalhost ? (
+                        <QuantityStepper
+                          quantity={item.quantity}
+                          onStep={(delta) => handleItemStep(item, delta)}
+                          onSet={(v) => persist({ ...inventoryRef.current, items: inventoryRef.current.items.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, v) } : i) })}
+                        />
+                      ) : (
+                        <span>{item.quantity}</span>
+                      )}
                     </td>
+                    {isLocalhost && (
                     <td className="pi-actions-cell no-print">
                       <button
                         type="button"
@@ -808,6 +824,7 @@ function PartyInventory({ campaignName, characters = [], onBack }) {
                         <i className="fa-solid fa-trash-can" />
                       </button>
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

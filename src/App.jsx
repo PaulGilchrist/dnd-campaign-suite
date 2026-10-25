@@ -230,7 +230,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     settlements: <Settlements campaignName={campaignName} onBack={() => setActiveView(null)} />,
     sessions: <Sessions campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} onViewInitiative={() => setActiveView('initiative')} />,
     factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
-    partyInventory: <PartyInventory campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} />,
+    partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
     campaignRepair: (
       <CampaignAdmin

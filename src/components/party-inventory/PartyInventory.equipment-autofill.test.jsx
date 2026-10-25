@@ -39,6 +39,7 @@ const acidRow = diskEquipment.find(eq => eq.name === 'Acid (vial)');
 
 const defaultProps = {
   campaignName: 'test-campaign',
+  isLocalhost: true,
   characters: [],
   onBack: vi.fn(),
 };

@@ -37,6 +37,7 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 
 const defaultProps = {
   campaignName: 'test-campaign',
+  isLocalhost: true,
   characters: [
     {
       name: 'War Cleric',

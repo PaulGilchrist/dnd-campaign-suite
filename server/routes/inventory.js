@@ -8,6 +8,24 @@ import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
 
+// Authority (mirrors campaigns-character.js refuseUnlessGm / maps.js / quests.js /
+// campaigns-admin.js): party inventory is the durable campaign treasury — minting
+// currency (+/- chip grants, full-store overwrite, loot deposits) and disbursing it
+// (party→player transfers, item add/edit/delete) are GM-only writes; network clients
+// get a read-only view (AGENTS.md). The client hides the chip/button affordances on
+// PartyInventory; this route guard is the server seam (bug-player-clients-can-write-party-inventory).
+// Audited exception: player→party transfers stay open — a player may contribute from
+// their OWN resources; the server debits the character file atomically (409 when short),
+// so that lane can never mint treasury wealth.
+const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+function refuseUnlessGm(req, res) {
+    if (isLocalhost(req)) return true;
+    console.log(`[inventory] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
+    res.status(403).json({ error: 'Access denied: GM-only feature' });
+    return false;
+}
+
 const CURRENCY_KEYS = ['pp', 'gp', 'sp', 'cp'];
 
 const emptyInventory = () => ({
@@ -244,8 +262,9 @@ router.get('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
     res.json({ inventory: loadInventory(campaign) });
 }));
 
-// POST /api/campaigns/:campaign/inventory — full overwrite
+// POST /api/campaigns/:campaign/inventory — full overwrite (GM-only)
 router.post('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
+    if (!refuseUnlessGm(req, res)) return;
     const { campaign } = req.params;
     const body = req.body || {};
     const items = sanitizeItems(body.items);
@@ -296,9 +315,12 @@ function validateTransferRequest(body) {
 
 // POST /api/campaigns/:campaign/inventory/transfer — atomic party<->player move
 // body: { playerName, itemName, quantity } or { playerName, currency: {pp,gp,sp,cp} }
+// GM-only for party→player (disbursement); player→party contributions stay open to
+// every client (server-verified debit — see header audit note).
 router.post('/api/campaigns/:campaign/inventory/transfer', asyncHandler((req, res) => {
     const { campaign } = req.params;
     const { playerName, direction } = req.body || {};
+    if (direction !== 'player-to-party' && !refuseUnlessGm(req, res)) return;
 
     const validation = validateTransferTarget(req.body);
     if (validation.error) {
@@ -342,7 +364,9 @@ router.post('/api/campaigns/:campaign/inventory/transfer', asyncHandler((req, re
 // party currency ledger. body: { currency: {pp,gp,sp,cp} }. The ledger is
 // re-read server-side before the add, so a stale client snapshot can never
 // overwrite items or existing balances (transfer-route pattern, no player leg).
+// GM-only: the loot Award panel that calls it is already localhost-gated.
 router.post('/api/campaigns/:campaign/inventory/deposit', asyncHandler((req, res) => {
+    if (!refuseUnlessGm(req, res)) return;
     const { campaign } = req.params;
     const amount = sanitizeCurrency(req.body?.currency);
     if (!CURRENCY_KEYS.some(key => amount[key] > 0)) {
