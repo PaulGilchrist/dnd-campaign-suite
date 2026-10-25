@@ -6,7 +6,8 @@ import { addExpiration } from '../../../services/rules/effects/expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
-import { getCombatContext } from '../../../services/rules/combat/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
+import { applyTeleportTokenMove } from '../../../services/combat/teleportService.js';
 import '../CharSheet.css';
 import './StepsOfTheFeyTauntModal.css';
 
@@ -39,8 +40,45 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
 
     const remainingText = unlimited === true ? 'unlimited — no uses limit' : `${newCount} remaining`;
 
-    const logFreeCast = (extraNote) => {
-        const logDescription = `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned).`;
+    // L5-003 §8.1 teleport token-move seam, shared by EVERY committing leg
+    // (mirrors tempTeleportHandler.applyPlainTeleport): with enforcement +
+    // tokenMoving ON and the caster armed on a placed target token, Misty
+    // Step's 30-ft destination resolves honestly via teleportService and the
+    // move is broadcast to open maps. Enforcement off / gridless / no target
+    // ⇒ moved:false and each leg keeps its pre-seam "(GM-positioned)" prose
+    // byte-identical.
+    const applyMistyStepTokenMove = async (stepName) => {
+        const cs = await getCombatContext(campaignName);
+        const anchor = getTargetFromAttacker(cs, playerName);
+        const move = await applyTeleportTokenMove({
+            campaignName,
+            mapName: null,
+            creatureName: playerName,
+            anchorName: anchor?.name || null,
+            maxFeet: 30,
+        });
+        if (move.moved) {
+            addEntry(campaignName, {
+                type: 'automation',
+                characterName: playerName,
+                automationType: 'teleport_token_move',
+                name: stepName,
+                description: `${stepName}: token relocated (${move.from.gridX},${move.from.gridY}) → (${move.to.gridX},${move.to.gridY}) within 30 feet.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[stepsOfTheFey] Error logging token move:', e); });
+        }
+        return move;
+    };
+
+    const movedClause = (move) => `Token moved (${move.from.gridX},${move.from.gridY}) → (${move.to.gridX},${move.to.gridY}) — ${Math.round(move.distanceFeet)} ft.`;
+
+    const mistyStepProse = (move) => move.moved
+        ? `teleporting up to 30 feet to an unoccupied space they can see. ${movedClause(move)}`
+        : 'teleporting up to 30 feet to an unoccupied space they can see (GM-positioned).';
+
+    const logFreeCast = async (extraNote, stepName) => {
+        const move = await applyMistyStepTokenMove(stepName || featureName);
+        const logDescription = `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — ${mistyStepProse(move)}`;
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
@@ -49,11 +87,12 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             freeCastsUnlimited: unlimited === true || undefined,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[bewitchingMagic] Error logging free cast:', e); });
+        return move;
     };
 
-    const applyBewitchingFreeCast = () => {
-        logFreeCast('');
-        setResult({ description: `${featureName}: Cast Misty Step without expending a spell slot (${remainingText}). Teleport up to 30 feet — GM positions the token.` });
+    const applyBewitchingFreeCast = async () => {
+        const move = await logFreeCast('');
+        setResult({ description: `${featureName}: Cast Misty Step without expending a spell slot (${remainingText}). Teleport up to 30 feet${move.moved ? ` — ${movedClause(move)}` : ' — GM positions the token.'}` });
         setApplied(true);
     };
 
@@ -126,16 +165,17 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         const remainingSuffix = await decrementCount();
         const tempHpRoll = Math.floor(Math.random() * 10) + 1;
         setTempHp(playerName, tempHpRoll, campaignName);
+        const move = await applyMistyStepTokenMove('Refreshing Step');
 
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: 'Refreshing Step',
-            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned). Refreshing Step: ${playerName} gained ${tempHpRoll} Temporary Hit Points.`,
+            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — ${mistyStepProse(move)} Refreshing Step: ${playerName} gained ${tempHpRoll} Temporary Hit Points.`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[stepsOfTheFey] Error logging refreshing step:', e); });
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.${move.moved ? ` ${movedClause(move)}` : ''}`;
         setResult({ description });
         setApplied(true);
     };
@@ -152,15 +192,17 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             { type: 'condition', condition: 'invisible' }
         ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
+        const move = await applyMistyStepTokenMove('Disappearing Step');
+
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: 'Disappearing Step',
-            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned). Disappearing Step: ${playerName} has the Invisible condition until the start of ${playerName}'s next turn.`,
+            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — ${mistyStepProse(move)} Disappearing Step: ${playerName} has the Invisible condition until the start of ${playerName}'s next turn.`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[stepsOfTheFey] Error logging disappearing step:', e); });
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.${move.moved ? ` ${movedClause(move)}` : ''}`;
         setResult({ description });
         setApplied(true);
     };
@@ -175,17 +217,18 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         setApplied(true);
     };
 
-    const handleFreeCastSkip = () => {
+    const handleFreeCastSkip = async () => {
         // CLA-037: every resolution logs — the plain free-cast lane previously set
         // result text only, violating the app-wide "every automation must log" rule.
+        const move = await applyMistyStepTokenMove(featureName);
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerName,
             abilityName: featureName,
-            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned).`,
+            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — ${mistyStepProse(move)}`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[stepsOfTheFey] Error logging free cast:', e); });
-        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remainingText}).`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot (${remainingText}).${move.moved ? ` ${movedClause(move)}` : ''}`;
         setResult({ description });
         setApplied(true);
     };
@@ -214,6 +257,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
 
     const handleTauntConfirm = async (selectedTargets) => {
         const remainingSuffix = await decrementCount();
+        const move = await applyMistyStepTokenMove('Taunting Step');
         const promptIds = [];
 
         for (const target of selectedTargets) {
@@ -297,13 +341,14 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.${move.moved ? ` ${movedClause(move)}` : ''}`;
         setResult({ description });
         setApplied(true);
     };
 
     const handleDreadfulConfirm = async (selectedTargets) => {
         const remainingSuffix = await decrementCount();
+        const move = await applyMistyStepTokenMove('Dreadful Step');
         const promptIds = [];
         const combatContext = await getCombatContext(campaignName);
         const characters = combatContext?.creatures || [];
@@ -373,7 +418,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.${move.moved ? ` ${movedClause(move)}` : ''}`;
         setResult({ description });
         setApplied(true);
     };

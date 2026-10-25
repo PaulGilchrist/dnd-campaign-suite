@@ -4,7 +4,7 @@
 // Steps_of_the_Fey free-cast counter, and every resolution logs.
 // Payload shape (mode/unlimited flags) is owned by bewitchingMagicHandler.test.js;
 // this lane pins modal-side behavior only: the accept and decline resolutions.
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 
@@ -52,6 +52,7 @@ vi.mock('../../../services/automation/handlers/buffs/tempHpService.js', () => ({
 
 vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
+    getTargetFromAttacker: vi.fn(() => null),
 }));
 
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
@@ -76,7 +77,7 @@ describe('StepsOfTheFeyTauntModal — Bewitching Magic mode', () => {
         vi.clearAllMocks();
     });
 
-    it('resolves as an unlimited free cast: mode alone picks the lane (never the chooser, never uses-gated), logs the ability_use, never touches the Steps counter', () => {
+    it('resolves as an unlimited free cast: mode alone picks the lane (never the chooser, never uses-gated), logs the ability_use, never touches the Steps counter', async () => {
         // CLA-037 guardrail: even props suggesting zero uses cannot gate the lane.
         const gated = render(<StepsOfTheFeyTauntModal {...baseProps} unlimited={false} newCount={0} />);
         expect(screen.getByTestId('bewitching-free-cast-btn')).toBeInTheDocument();
@@ -89,13 +90,17 @@ describe('StepsOfTheFeyTauntModal — Bewitching Magic mode', () => {
         render(<StepsOfTheFeyTauntModal {...baseProps} />);
         fireEvent.click(screen.getByTestId('bewitching-free-cast-btn'));
 
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            type: 'ability_use',
-            characterName: 'HexWarlock',
-            abilityName: 'Bewitching Magic',
-            description: expect.stringContaining('cast Misty Step for free via Bewitching Magic — no spell slot consumed'),
-            freeCastsUnlimited: true,
-        }));
+        // §8.1 seam: the free-cast leg now awaits the (self-gating) token-move
+        // seam before logging/resolving — OFF degrade lands as microtasks.
+        await waitFor(() => {
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'HexWarlock',
+                abilityName: 'Bewitching Magic',
+                description: expect.stringContaining('cast Misty Step for free via Bewitching Magic — no spell slot consumed'),
+                freeCastsUnlimited: true,
+            }));
+        });
         // Declining is a separate lane — accepting must not log a decline entry.
         expect(addEntry.mock.calls.filter(([, e]) => e && e.automationDetail === 'bewitching_magic_declined')).toHaveLength(0);
         // Never the Steps_of_the_Fey free-cast counter, and bewitching rolls no saves.

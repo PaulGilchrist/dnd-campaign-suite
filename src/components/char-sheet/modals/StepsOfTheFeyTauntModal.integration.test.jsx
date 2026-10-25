@@ -57,6 +57,7 @@ vi.mock('../../../services/automation/handlers/buffs/tempHpService.js', () => ({
 
 vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
+    getTargetFromAttacker: vi.fn(() => null),
 }));
 
 const basePlayerStats = { name: 'FeyTrickster' };

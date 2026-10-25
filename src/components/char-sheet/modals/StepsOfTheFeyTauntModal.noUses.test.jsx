@@ -6,7 +6,7 @@
 // counter write). Gate-less chooser copy is owned by render.test.jsx; skip
 // seams with uses available by integration.test.jsx; bewitching lane by
 // bewitching.test.jsx.
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 
@@ -56,6 +56,7 @@ vi.mock('../../../services/automation/handlers/buffs/tempHpService.js', () => ({
 
 vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
+    getTargetFromAttacker: vi.fn(() => null),
 }));
 
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
@@ -112,12 +113,14 @@ describe('StepsOfTheFeyTauntModal - No Uses (newCount: 0)', () => {
         expect(baseProps.onClose).not.toHaveBeenCalled();
     });
 
-    it('keeps the free-cast Skip open at zero uses: logs the cast exactly once, shows "0 remaining", writes no counter', () => {
+    it('keeps the free-cast Skip open at zero uses: logs the cast exactly once, shows "0 remaining", writes no counter', async () => {
         render(<StepsOfTheFeyTauntModal {...makeProps()} />);
 
         fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+        // §8.1 seam: the skip leg now awaits the (self-gating) token-move seam
+        // before resolving — the OFF degrade lands as microtasks, not zero.
+        await waitFor(() => { expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument(); });
         expect(screen.getByText(/Cast Misty Step without expending a spell slot \(0 remaining\)/)).toBeInTheDocument();
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
