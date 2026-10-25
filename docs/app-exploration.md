@@ -66,7 +66,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- *(2026-10-25 pm)* Maps list row actions (Open/Activate/Rename/Delete) and the editor toolbar Back/Paint/Erase/Select/Spell/Ruler/3D/Items/Reset Fog are icon- or bare-text buttons with no aria-labels — add `aria-label` per action (cf. a0211afcb item-row precedent) so harnesses and screen-readers don't depend on `li:has-text` row scoping.
 - *(2026-10-25 pm)* Log view has no filter/search/type-facet and no entry cap/pagination — a long campaign log is one unbroken scroll; the author `<select>` row visually reads like a filter chip row (first-run confusion confirmed live).
 - *(2026-10-25 pm)* Travel panel closes silently on arrival mid-harness (mode chip gone, no "leg complete" toast) — keep the panel open in PLANNING with an explicit Done/Exit, or toast on auto-close; also surface `travel-rerollsRemaining` reset semantics ("per day") in the Re-roll title copy.
 - *(2026-10-25 pm)* Auto-encounter `Accept` also spawns a fresh `…---encounter-at-<q><r>` battle map per event with no UI hint linking it from the encounter — name/label these maps in the log entry (or offer "Open battle map") so GMs find the generated arena.

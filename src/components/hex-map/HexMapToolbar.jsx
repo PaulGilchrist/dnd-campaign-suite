@@ -1,5 +1,9 @@
 import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_TRAVEL, TOOL_ROAD } from '../../config/outdoorConfig';
 
+// One open/closed copy pair feeds title AND aria-label (a0211afcb pattern:
+// icon-only buttons mirror their title into the accessible name).
+const toggleLabel = (open, openLabel, closeLabel) => (open ? closeLabel : openLabel);
+
 function HexMapToolbar({
     onBack,
     mapName,
@@ -19,9 +23,11 @@ function HexMapToolbar({
     setMarchingOrderOpen,
     marchingOrder,
 }) {
+    const poiLabel = toggleLabel(poiPanelOpen, 'Open POI panel', 'Close POI panel');
+    const marchingLabel = toggleLabel(marchingOrderOpen, 'Manage marching order', 'Close marching order');
     return (
         <div className="hex-map-toolbar">
-            <button onClick={onBack} title="Back to maps" className="no-print">
+            <button onClick={onBack} title="Back to maps" aria-label="Back to maps" className="no-print">
                 <i className="fa-solid fa-arrow-left"></i>
             </button>
             <span className="hex-map-title">{displayName || mapName}</span>
@@ -31,6 +37,7 @@ function HexMapToolbar({
                 className={tool === TOOL_PAINT ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_PAINT ? TOOL_NONE : TOOL_PAINT)}
                 title="Paint terrain"
+                aria-label="Paint terrain"
             >
                 <i className="fa-solid fa-paint-brush"></i>
             </button>
@@ -38,6 +45,7 @@ function HexMapToolbar({
                 className={tool === TOOL_ERASE ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_ERASE ? TOOL_NONE : TOOL_ERASE)}
                 title="Erase terrain"
+                aria-label="Erase terrain"
             >
                 <i className="fa-solid fa-eraser"></i>
             </button>
@@ -62,6 +70,7 @@ function HexMapToolbar({
                 className={tool === TOOL_RIVER ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_RIVER ? TOOL_NONE : TOOL_RIVER)}
                 title="Paint rivers"
+                aria-label="Paint rivers"
             >
                 <i className="fa-solid fa-water"></i>
             </button>
@@ -70,6 +79,7 @@ function HexMapToolbar({
                 className={tool === TOOL_ROAD ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_ROAD ? TOOL_NONE : TOOL_ROAD)}
                 title="Connect cities and settlements with roads"
+                aria-label="Connect cities and settlements with roads"
             >
                 <i className="fa-solid fa-road"></i>
             </button>
@@ -79,6 +89,7 @@ function HexMapToolbar({
                 className={tool === TOOL_TRAVEL ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_TRAVEL ? TOOL_NONE : TOOL_TRAVEL)}
                 title="Travel mode — plan and execute overland travel"
+                aria-label="Travel mode — plan and execute overland travel"
             >
                 <i className="fa-solid fa-route"></i>
             </button>
@@ -86,7 +97,8 @@ function HexMapToolbar({
             {/* POI panel toggle */}
             <button
                 onClick={() => setPoiPanelOpen(!poiPanelOpen)}
-                title={poiPanelOpen ? 'Close POI panel' : 'Open POI panel'}
+                title={poiLabel}
+                aria-label={poiLabel}
                 className={poiPanelOpen ? 'active no-print' : 'no-print'}
             >
                 <i className="fa-solid fa-layer-group"></i>
@@ -95,7 +107,8 @@ function HexMapToolbar({
             {/* Marching order toggle */}
             <button
                 onClick={() => setMarchingOrderOpen(!marchingOrderOpen)}
-                title={marchingOrderOpen ? 'Close marching order' : 'Manage marching order'}
+                title={marchingLabel}
+                aria-label={marchingLabel}
                 className={marchingOrderOpen ? 'active no-print' : 'no-print'}
             >
                 <i className="fa-solid fa-people-group"></i>
@@ -105,20 +118,20 @@ function HexMapToolbar({
             </button>
 
             {/* Print */}
-            <button onClick={() => window.print()} title="Print map" className="no-print">
+            <button onClick={() => window.print()} title="Print map" aria-label="Print map" className="no-print">
                 <i className="fa-solid fa-print"></i>
             </button>
 
             {/* Zoom controls */}
             <div className="hex-map-zoom-controls no-print">
-                <button onClick={zoomIn} title="Zoom in">
+                <button onClick={zoomIn} title="Zoom in" aria-label="Zoom in">
                     <i className="fa-solid fa-plus"></i>
                 </button>
                 <span>{Math.round(zoom * 50)}%</span>
-                <button onClick={zoomOut} title="Zoom out">
+                <button onClick={zoomOut} title="Zoom out" aria-label="Zoom out">
                     <i className="fa-solid fa-minus"></i>
                 </button>
-                <button onClick={resetView} title="Reset view">
+                <button onClick={resetView} title="Reset view" aria-label="Reset view">
                     <i className="fa-solid fa-expand"></i>
                 </button>
             </div>

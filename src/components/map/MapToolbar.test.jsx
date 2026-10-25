@@ -124,6 +124,26 @@ describe('MapToolbar', () => {
             expect(screen.getByRole('button', { name: 'Spell' })).not.toHaveClass('active');
             expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
         });
+
+        it('gives every toolbar button an aria-label (GM census)', () => {
+            const { container } = renderMapToolbar({ onEnter3D: vi.fn() });
+            // Acceptance query: zero unlabelled buttons in the toolbar.
+            expect(container.querySelectorAll('.toolbar button:not([aria-label])')).toHaveLength(0);
+            expect(container.querySelector('.toolbar-back-btn')).toHaveAttribute('aria-label', 'Back');
+            // Texted buttons mirror their visible label; icon-only/3D carry functional ones.
+            for (const label of ['Paint', 'Erase', 'Select', 'Spell', 'Ruler', 'Items', 'Reset Fog']) {
+                expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-label', label);
+            }
+            expect(screen.getByRole('button', { name: 'View map in 3D' })).toHaveAttribute('aria-label', 'View map in 3D');
+            expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument();
+        });
+
+        it('labels every network-player toolbar button too (Reset View arm)', () => {
+            const { container } = renderMapToolbar({ isLocalhost: false });
+            expect(container.querySelectorAll('.toolbar button:not([aria-label])')).toHaveLength(0);
+            expect(screen.getByRole('button', { name: 'Reset View' })).toHaveAttribute('aria-label', 'Reset View');
+        });
     });
 
     describe('missing spellOverlayState arms — Spell click is inert, never throws (#928a)', () => {

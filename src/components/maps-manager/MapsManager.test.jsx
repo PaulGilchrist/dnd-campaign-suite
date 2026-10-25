@@ -1,5 +1,5 @@
 // @maintained-by-ai: 2026-10-14
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MapsManager from './MapsManager.jsx';
 
@@ -82,19 +82,20 @@ describe('MapsManager', () => {
     // Render and wait until the given maps appear in the list
     async function renderWithMaps(...maps) {
         mapsService.loadMaps.mockResolvedValue({ maps });
-        render(<MapsManager {...props} />);
+        const result = render(<MapsManager {...props} />);
         if (maps.length > 0) {
             await waitFor(() => expect(screen.getByText(maps[0].name)).toBeInTheDocument());
         }
+        return result;
     }
 
-    function startRename(currentName = 'Dungeon Level 1', index = 0) {
-        fireEvent.click(screen.getAllByRole('button', { name: 'Rename' })[index]);
+    function startRename(currentName = 'Dungeon Level 1') {
+        fireEvent.click(screen.getByRole('button', { name: `Rename "${currentName}"` }));
         return screen.getByDisplayValue(currentName);
     }
 
-    function openDeleteModal() {
-        fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    function openDeleteModal(name = 'Dungeon Level 1') {
+        fireEvent.click(screen.getByRole('button', { name: `Delete "${name}"` }));
     }
 
     async function openEditModal() {
@@ -297,8 +298,9 @@ describe('MapsManager', () => {
 
             expect(screen.getAllByText('Active')).toHaveLength(1);
             expect(screen.getByText('Active').closest('li')).toHaveTextContent('Active Map');
-            const activateButtons = screen.getAllByRole('button', { name: 'Activate' });
+            const activateButtons = screen.getAllByRole('button', { name: /^Activate/ });
             expect(activateButtons).toHaveLength(1);
+            expect(activateButtons[0]).toHaveAttribute('aria-label', 'Activate "Inactive Map"');
             expect(activateButtons[0].closest('li')).toHaveTextContent('Inactive Map');
         });
 
@@ -308,7 +310,9 @@ describe('MapsManager', () => {
                 makeMap({ name: 'Map B', fileName: 'map-b.json' }),
             );
 
-            const openButtons = screen.getAllByRole('button', { name: 'Open' });
+            const openButtons = ['Map A', 'Map B'].map(
+                name => screen.getByRole('button', { name: `Open "${name}"` }),
+            );
             fireEvent.click(openButtons[0]);
             expect(props.onOpenMap).toHaveBeenCalledWith('map-a');
             fireEvent.click(openButtons[1]);
@@ -322,7 +326,7 @@ describe('MapsManager', () => {
     describe('Activate Button', () => {
         it('calls activateMap and reloads the list', async () => {
             await renderWithMaps(makeMap({ name: 'Forest', fileName: 'forest.json' }));
-            fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Activate "Forest"' }));
 
             await waitFor(() => {
                 expect(mapsService.activateMap).toHaveBeenCalledWith('test-campaign', 'forest.json');
@@ -333,7 +337,7 @@ describe('MapsManager', () => {
         it('shows the activation error message', async () => {
             mapsService.activateMap.mockRejectedValue(new Error('Activation failed'));
             await renderWithMaps(makeMap({ name: 'Forest', fileName: 'forest.json' }));
-            fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Activate "Forest"' }));
 
             await waitFor(() => {
                 expect(screen.getByText('Activation failed')).toBeInTheDocument();
@@ -526,6 +530,49 @@ describe('MapsManager', () => {
                 expect(screen.getByText('Failed to save map description')).toBeInTheDocument();
             });
             expect(screen.getByRole('heading', { name: /Edit Description/ })).toBeInTheDocument();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Action aria-labels (a0211afcb party-item precedent: harnesses and
+    // screen-readers reach row actions by accessible name, no li-scoping)
+    // -----------------------------------------------------------------------
+    describe('Action aria-labels', () => {
+        it('names every row action after its map while visible rendering is unchanged', async () => {
+            const { container } = await renderWithMaps(
+                makeMap({ name: 'Battle Arena', fileName: 'battle-arena.json' }),
+                makeMap({ fileName: 'cave.json', name: 'Cave', isActive: true }),
+            );
+            // Acceptance query: zero unlabelled buttons inside the list.
+            expect(container.querySelectorAll('.maps-manager-list button:not([aria-label])')).toHaveLength(0);
+            // Manager-level buttons reachable by accessible name too.
+            expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('aria-label', 'Back');
+            expect(screen.getByRole('button', { name: 'Create Map' })).toHaveAttribute('aria-label', 'Create Map');
+
+            const row = screen.getByText('Battle Arena').closest('li');
+            const open = within(row).getByRole('button', { name: 'Open "Battle Arena"' });
+            within(row).getByRole('button', { name: 'Activate "Battle Arena"' });
+            within(row).getByRole('button', { name: 'Rename "Battle Arena"' });
+            const desc = within(row).getByRole('button', { name: 'Edit description for "Battle Arena"' });
+            const del = within(row).getByRole('button', { name: 'Delete "Battle Arena"' });
+            // Visible bytes unchanged; icon-only pen stays icon-only (name from aria).
+            expect(open.textContent).toBe('Open');
+            expect(del.textContent).toBe('Delete');
+            expect(desc.textContent).toBe('');
+            expect(desc).toHaveAttribute('title', 'Edit description');
+            // Active row keeps Rename/Delete but never renders Activate.
+            const activeRow = screen.getByText('Cave').closest('li');
+            within(activeRow).getByRole('button', { name: 'Rename "Cave"' });
+            within(activeRow).getByRole('button', { name: 'Delete "Cave"' });
+            expect(within(activeRow).queryByRole('button', { name: /^Activate/ })).not.toBeInTheDocument();
+        });
+
+        it('role+name clicks still dispatch the same handlers', async () => {
+            await renderWithMaps(makeMap({ name: 'Battle Arena', fileName: 'battle-arena.json' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Open "Battle Arena"' }));
+            expect(props.onOpenMap).toHaveBeenCalledWith('battle-arena');
+            fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
+            expect(screen.getByDisplayValue('Battle Arena')).toBeInTheDocument();
         });
     });
 

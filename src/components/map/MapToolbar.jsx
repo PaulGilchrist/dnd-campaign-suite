@@ -62,7 +62,7 @@ const MapToolbar = ({
         <>
             <div className="toolbar-row">
                 {onBack && (
-                    <button onClick={onBack} title="Back" className="toolbar-back-btn no-print">
+                    <button onClick={onBack} title="Back" aria-label="Back" className="toolbar-back-btn no-print">
                         <i className="fa-solid fa-arrow-left"></i>
                     </button>
                 )}
@@ -85,6 +85,7 @@ const MapToolbar = ({
                         <button
                             key={t}
                             className={tool === t ? 'active' : ''}
+                            aria-label={label}
                             onClick={() => setTool(tool === t ? 'none' : t)}
                         >
                             <i className={`fa-solid ${icon}`}></i> {label}
@@ -92,38 +93,40 @@ const MapToolbar = ({
                     ))}
                     <button
                         className={spellMode ? 'active' : ''}
+                        aria-label="Spell"
                         onClick={toggleSpellMode}
                     >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Spell
                     </button>
                     <button
                         className={rulerMode ? 'active' : ''}
+                        aria-label="Ruler"
                         onClick={() => setRulerMode(!rulerMode)}
                     >
                         <i className="fa-solid fa-ruler"></i> Ruler
                     </button>
                     {onEnter3D && (
-                        <button onClick={onEnter3D} title="View map in 3D">
+                        <button onClick={onEnter3D} title="View map in 3D" aria-label="View map in 3D">
                             <i className="fa-solid fa-cube"></i> 3D
                         </button>
                     )}
                     {isLocalhost && (
-                        <button onClick={() => setItemsPanelOpen(prev => !prev)}>
+                        <button onClick={() => setItemsPanelOpen(prev => !prev)} aria-label="Items">
                             <i className="fa-solid fa-box"></i> Items
                         </button>
                     )}
-                    <button onClick={zoomIn}>
+                    <button onClick={zoomIn} aria-label="Zoom in">
                         <i className="fa-solid fa-magnifying-glass-plus"></i>
                     </button>
-                    <button onClick={zoomOut}>
+                    <button onClick={zoomOut} aria-label="Zoom out">
                         <i className="fa-solid fa-magnifying-glass-minus"></i>
                     </button>
                     {isLocalhost ? (
-                        <button onClick={() => { resetView(); resetFog(); }} title="Reset fog of war and view">
+                        <button onClick={() => { resetView(); resetFog(); }} title="Reset fog of war and view" aria-label="Reset Fog">
                             <i className="fa-solid fa-rotate-left"></i> Reset Fog
                         </button>
                     ) : (
-                        <button onClick={resetView} title="Reset view">
+                        <button onClick={resetView} title="Reset view" aria-label="Reset View">
                             <i className="fa-solid fa-rotate-left"></i> Reset View
                         </button>
                     )}

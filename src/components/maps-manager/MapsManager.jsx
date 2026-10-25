@@ -283,7 +283,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
 
             <div className="maps-manager-header">
                 <h2>Maps</h2>
-                <button className="back-button" onClick={onBack}>
+                <button className="back-button" onClick={onBack} aria-label="Back">
                     <i className="fa-solid fa-arrow-left"></i> Back
                 </button>
             </div>
@@ -313,13 +313,14 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                         <i className="fa-solid fa-tree"></i> Outdoor
                     </label>
                 </div>
-                <button onClick={handleCreate} disabled={!createName.trim()}>
+                <button onClick={handleCreate} disabled={!createName.trim()} aria-label="Create Map">
                     Create Map
                 </button>
                 <button
                     className="generate-dungeon-btn"
                     onClick={() => generateModalOpeners[mapType](true)}
                     title={GENERATE_BUTTONS[mapType].title}
+                    aria-label={GENERATE_BUTTONS[mapType].label}
                 >
                     <i className={GENERATE_BUTTONS[mapType].icon}></i> {GENERATE_BUTTONS[mapType].label}
                 </button>
@@ -364,11 +365,11 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                     map-data-<campaign>-<name> suffix-free (server/routes/maps.js:169),
                                     so the editor's SSE expectedKey only matches a suffix-free mapName
                                     (same normalization as App.jsx loadActiveMapAndOpen). */}
-                                <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''))}>Open</button>
-                                {!map.isActive && <button onClick={() => handleActivate(map.fileName)}>Activate</button>}
-                                <button onClick={() => handleStartRename(map.fileName, map.name)}>Rename</button>
-                                <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description"><i className="fa-solid fa-pen"></i></button>
-                                <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)}>Delete</button>
+                                <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''))} aria-label={`Open "${map.name}"`}>Open</button>
+                                {!map.isActive && <button onClick={() => handleActivate(map.fileName)} aria-label={`Activate "${map.name}"`}>Activate</button>}
+                                <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
+                                <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i></button>
+                                <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)} aria-label={`Delete "${map.name}"`}>Delete</button>
                             </div>
                         </li>
                     ))}

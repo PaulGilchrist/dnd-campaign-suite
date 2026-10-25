@@ -63,7 +63,7 @@ describe('MapsManager open → editor SSE key (json-suffix regression)', () => {
         render(<MapsManager {...props} />);
         await waitFor(() => expect(screen.getByText('Test Map')).toBeInTheDocument());
 
-        fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Open "Test Map"' }));
         expect(props.onOpenMap).toHaveBeenCalledTimes(1);
 
         // The exact bug byte: 'test-map', never 'test-map.json'.
@@ -75,7 +75,7 @@ describe('MapsManager open → editor SSE key (json-suffix regression)', () => {
     it('manager-open mount + server map-data event updates the editor walls state', async () => {
         render(<MapsManager {...props} />);
         await waitFor(() => expect(screen.getByText('Test Map')).toBeInTheDocument());
-        fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Open "Test Map"' }));
         const [mapName] = props.onOpenMap.mock.calls[0];
 
         // Wire the editor sync exactly as Map.jsx:205-207 does, using the

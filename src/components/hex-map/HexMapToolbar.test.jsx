@@ -80,6 +80,27 @@ describe('HexMapToolbar', () => {
         expect(titles).toEqual(BUTTON_TITLE_ORDER);
     });
 
+    // a0211afcb precedent: icon-only tool buttons mirror their title into an
+    // aria-label so harnesses can reach them by accessible name.
+    it('gives every toolbar button an aria-label mirroring its title', () => {
+        renderToolbar();
+        const buttons = [...container.querySelectorAll('.hex-map-toolbar button')];
+        expect(buttons.length).toBe(BUTTON_TITLE_ORDER.length);
+        for (const button of buttons) {
+            expect(button.getAttribute('aria-label')).toBe(button.getAttribute('title'));
+        }
+        // Zero unlabelled buttons; a role+name click still dispatches.
+        expect(container.querySelectorAll('.hex-map-toolbar button:not([aria-label])')).toHaveLength(0);
+        fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+        expect(props.zoomIn).toHaveBeenCalledTimes(1);
+    });
+
+    it('mirrors open-state titles into aria-labels on the panel toggles', () => {
+        renderToolbar({ poiPanelOpen: true, marchingOrderOpen: true });
+        expect(screen.getByRole('button', { name: 'Close POI panel' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Close marching order' })).toBeInTheDocument();
+    });
+
     it('renders displayName in preference to mapName', () => {
         renderToolbar({ mapName: 'Northern Wilds' });
         expect(screen.getByText('Northern Wilds')).toBeInTheDocument();

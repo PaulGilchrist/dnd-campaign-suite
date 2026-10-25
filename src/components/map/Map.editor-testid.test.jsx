@@ -103,7 +103,7 @@ function NavHarness() {
     );
 }
 
-const openButton = () => screen.getByRole('button', { name: 'Open' });
+const openButton = () => screen.getByRole('button', { name: 'Open "Battle Arena"' });
 const editorTestids = () => screen.queryAllByTestId('map-editor');
 
 describe('map editor mount-proof testid (list → Open navigation)', () => {
