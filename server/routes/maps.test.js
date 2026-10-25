@@ -1,6 +1,6 @@
 import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
-import maps from './maps.js';
+import maps, { toKebabCase } from './maps.js';
 import * as changeData from '../utils/changeData.js';
 
 // ─── Mocks ─────────────────────────────────────────────────────────────────────
@@ -39,7 +39,9 @@ vi.mock('fs', () => ({
             if (content === undefined) {
                 throw new Error(`ENOENT: no such file or directory, open '${path}'`);
             }
-            return JSON.stringify(content);
+            // Pass raw strings through verbatim so a write→read round-trip
+            // (PUT guard reading its own writeFileSync bytes) stays honest.
+            return typeof content === 'string' ? content : JSON.stringify(content);
         }),
         writeFileSync: vi.fn((path, data) => {
             MOCK_FS.set(path, data);
@@ -811,7 +813,7 @@ describe('maps - GET /api/campaigns/:campaign/maps/:mapname', () => {
 describe('maps - PUT /api/campaigns/:campaign/maps/:mapname', () => {
     afterEach(clearMocks);
 
-    it('should save map data and return success', async () => {
+    it('should save map data and return success (authored names pinned by the guard)', async () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.set(mapsDir, []);
 
@@ -829,7 +831,10 @@ describe('maps - PUT /api/campaigns/:campaign/maps/:mapname', () => {
         expect(res.body).toHaveProperty('message', 'Map saved successfully');
 
         const savedData = JSON.parse(MOCK_FS.get(`${mapsDir}/test-map.json`));
-        expect(savedData.displayName).toBe('New Name');
+        // 2026-10-25 name guard: PUT to an EXISTING file can never rename it —
+        // the stored displayName/name win; all other fields update from body.
+        expect(savedData.displayName).toBe('Old Name');
+        expect(savedData.name).toBe('old-name');
         expect(savedData.gridSize).toBe(25);
     });
 
@@ -846,20 +851,22 @@ describe('maps - PUT /api/campaigns/:campaign/maps/:mapname', () => {
         expect(MOCK_FS.has(mapsDir)).toBe(true);
     });
 
-    it('should broadcast map-data change on save', async () => {
+    it('should broadcast map-data change on save, echoing the guarded doc', async () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.set(mapsDir, []);
 
-        setupFs(`${mapsDir}/test-map.json`, { displayName: 'Test Map' });
+        setupFs(`${mapsDir}/test-map.json`, { displayName: 'Test Map', name: 'test-map' });
 
         const app = createTestApp();
         await request(app)
             .put('/api/campaigns/test-campaign/maps/test-map.json')
-            .send({ displayName: 'Updated Map' });
+            .send({ displayName: 'Updated Map', name: 'hacked-name', gridSize: 20 });
 
+        // Criterion 4: the SSE echo carries the post-guard document, so a
+        // clobbered label can never be resurrected client-side via the echo.
         expect(changeData.publish).toHaveBeenCalledWith(
             'map-data-test-campaign-test-map',
-            expect.objectContaining({ displayName: 'Updated Map' }),
+            expect.objectContaining({ displayName: 'Test Map', name: 'test-map', gridSize: 20 }),
             'test-campaign'
         );
     });
@@ -1012,6 +1019,156 @@ describe('maps - revealed prune to grid bounds', () => {
         expect(pruned).not.toBe(stale);
         expect(pruned.revealed).toEqual(['0,0']);
         expect(stale.revealed).toHaveLength(6); // input never mutated
+    });
+});
+
+// ─── authored-name preservation guard (2026-10-25 pm backlog) ──────────────
+
+describe('maps - PUT authored-name preservation guard', () => {
+    afterEach(clearMocks);
+
+    it('PUT to an EXISTING file with a drifted slug name keeps stored name/displayName and the list label', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, [dirEntry('battle-arena.json', false)]);
+        setupFs(`${mapsDir}/battle-arena.json`, {
+            displayName: 'Battle Arena',
+            name: 'Battle Arena',
+            type: 'indoor',
+            gridSize: 20,
+            players: [{ name: 'Astar The Redeemed', gridX: 15, gridY: 9 }],
+        });
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/maps/battle-arena')
+            .send({
+                displayName: 'battle-arena', // the exact live-hit shape: slug drift
+                name: 'battle-arena',
+                type: 'indoor',
+                gridSize: 20,
+                players: [{ name: 'Astar The Redeemed', gridX: 16, gridY: 9 }],
+            });
+
+        expect(res.status).toBe(200);
+        const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/battle-arena.json`));
+        expect(saved.displayName).toBe('Battle Arena');
+        expect(saved.name).toBe('Battle Arena');
+        // positional data DID update from the body
+        expect(saved.players).toEqual([{ name: 'Astar The Redeemed', gridX: 16, gridY: 9 }]);
+
+        // Maps list display string unchanged
+        const list = await request(app).get('/api/campaigns/test-campaign/maps');
+        expect(list.body.maps[0].name).toBe('Battle Arena');
+    });
+
+    it('PUT to an EXISTING file with a hostile displayName keeps stored values, updates all other fields', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        setupFs(`${mapsDir}/test-map.json`, {
+            displayName: 'Authored Name',
+            name: 'authored-name',
+            type: 'indoor',
+            gridSize: 20,
+            walls: ['1,1'],
+            placedItems: [],
+            description: 'old desc',
+        });
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/maps/test-map')
+            .send({
+                displayName: 'Hacked Name',
+                name: 'hacked-name',
+                type: 'indoor',
+                gridSize: 30,
+                walls: ['2,2', '3,3'],
+                placedItems: [{ id: 'p1', gridX: 4, gridY: 4 }],
+                description: 'new desc',
+            });
+
+        expect(res.status).toBe(200);
+        const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/test-map.json`));
+        expect(saved.displayName).toBe('Authored Name');
+        expect(saved.name).toBe('authored-name');
+        expect(saved.gridSize).toBe(30);
+        expect(saved.walls).toEqual(['2,2', '3,3']);
+        expect(saved.placedItems).toEqual([{ id: 'p1', gridX: 4, gridY: 4 }]);
+        expect(saved.description).toBe('new desc');
+    });
+
+    it('create-via-PUT (no existing file) honors body name/displayName verbatim — auto-encounter spawn lane', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        // Exact shape useEncounterGeneration.js handleStartEncounter saves:
+        // readable displayName + kebab name authored in the body.
+        const encounterName = 'Test Map - Ambush from the Brush at (5,5)';
+        const app = createTestApp();
+        const res = await request(app)
+            .put(`/api/campaigns/test-campaign/maps/${encodeURIComponent(toKebabCase(encounterName))}`)
+            .send({
+                type: 'indoor',
+                gridSize: 30,
+                placedItems: [{ id: 'enc-monster-0', name: 'Gnoll Fang of Yeenoghu', gridX: 12, gridY: 15 }],
+                players: [],
+                fog: [],
+                walls: [],
+                displayName: encounterName,
+                name: toKebabCase(encounterName),
+            });
+
+        expect(res.status).toBe(200);
+        const fileName = `${toKebabCase(encounterName)}.json`;
+        const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/${fileName}`));
+        expect(saved.displayName).toBe(encounterName);
+        expect(saved.name).toBe(toKebabCase(encounterName));
+    });
+
+    it('stored field missing/null falls back to the body value (nothing authoritative to protect)', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        setupFs(`${mapsDir}/legacy.json`, { type: 'indoor', gridSize: 20, displayName: null });
+
+        const app = createTestApp();
+        await request(app)
+            .put('/api/campaigns/test-campaign/maps/legacy')
+            .send({ displayName: 'Backfilled Name', name: 'legacy', type: 'indoor', gridSize: 20 });
+
+        const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/legacy.json`));
+        expect(saved.displayName).toBe('Backfilled Name');
+        expect(saved.name).toBe('legacy');
+    });
+
+    it('the /rename route still renames despite the guard (fileName + names migrate)', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        setupFs(`${mapsDir}/battle-arena.json`, { displayName: 'Battle Arena', name: 'battle-arena', type: 'indoor', gridSize: 20 });
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/maps/battle-arena/rename')
+            .send({ newName: 'Grand Colosseum' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.map).toEqual({ name: 'Grand Colosseum', fileName: 'grand-colosseum.json' });
+        expect(MOCK_FS.has(`${mapsDir}/battle-arena.json`)).toBe(false);
+        const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/grand-colosseum.json`));
+        expect(saved.displayName).toBe('Grand Colosseum');
+        expect(saved.name).toBe('grand-colosseum');
+    });
+
+    it('preserveAuthoredNames is reference-stable when nothing is overridden', async () => {
+        const { preserveAuthoredNames } = await import('./maps.js');
+
+        expect(preserveAuthoredNames(null, { name: 'a' })).toEqual({ name: 'a' });
+        const matching = { displayName: 'Arena', name: 'arena', gridSize: 20 };
+        expect(preserveAuthoredNames({ displayName: 'Arena', name: 'arena' }, matching)).toBe(matching);
+        // stored doc without names → same object, body wins
+        expect(preserveAuthoredNames({ type: 'indoor' }, matching)).toBe(matching);
+
+        const clobbered = { displayName: 'battle-arena', name: 'battle-arena' };
+        const guarded = preserveAuthoredNames({ displayName: 'Battle Arena', name: 'Battle Arena' }, clobbered);
+        expect(guarded).not.toBe(clobbered);
+        expect(guarded).toEqual({ displayName: 'Battle Arena', name: 'Battle Arena' });
+        expect(clobbered.displayName).toBe('battle-arena'); // input never mutated
     });
 });
 

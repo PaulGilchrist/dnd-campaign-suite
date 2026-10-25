@@ -124,6 +124,45 @@ export function pruneRevealedToGrid(mapData) {
   return { ...mapData, revealed: kept };
 }
 
+// Positional autosaves (useMapLoader / hex travel lane / teleportService) echo
+// the whole document back through the general PUT — if their `name` copy
+// drifted to the kebab slug or a hostile body re-labelled the map, the write
+// silently renamed it in the Maps list (live-hit 2026-10-25 pm during harness
+// restore). Renames legitimately belong to the /rename route; here, when the
+// target file already exists, the stored document's authored `name` /
+// `displayName` win over the body. Stored field missing/null/blank → the body
+// value is kept (nothing authoritative on disk to protect; a legacy doc that
+// never carried `name` is back-filled by the client's echo, not rejected).
+// Unreadable stored bytes fail open to the body. New-file create-via-PUT (the
+// auto-encounter spawn lane in useEncounterGeneration.js authors readable
+// names in the body) is untouched — body verbatim, as today.
+// Returns the SAME object when nothing is overridden.
+export function preserveAuthoredNames(storedData, incomingData) {
+  if (!storedData || typeof storedData !== 'object') return incomingData;
+  const storedDisplayName = typeof storedData.displayName === 'string' && storedData.displayName.trim() !== ''
+    ? storedData.displayName
+    : null;
+  const storedName = typeof storedData.name === 'string' && storedData.name.trim() !== ''
+    ? storedData.name
+    : null;
+  if (!storedDisplayName && !storedName) return incomingData;
+  const displayName = storedDisplayName || incomingData.displayName;
+  const name = storedName || incomingData.name;
+  if (displayName === incomingData.displayName && name === incomingData.name) return incomingData;
+  console.log(`[maps] preserved authored map names on PUT (body had name=${JSON.stringify(incomingData.name)}, displayName=${JSON.stringify(incomingData.displayName)})`);
+  return { ...incomingData, displayName, name };
+}
+
+// Read the stored map document for the name guard; null when absent/unreadable.
+function readStoredMapDocument(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch (_e) {
+    return null;
+  }
+}
+
 const buildOutdoorMapData = (name, body) => ({
   displayName: name.trim(),
   name: toKebabCase(name.trim()),
@@ -219,7 +258,10 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
 
   if (!isOutdoorMapDocument(filePath, req.body) && !refuseUnlessGm(req, res)) return;
 
-  const mapData = pruneRevealedToGrid(req.body);
+  const mapData = preserveAuthoredNames(
+    readStoredMapDocument(filePath),
+    pruneRevealedToGrid(req.body)
+  );
 
   if (!fs.existsSync(mapsDir)) {
     fs.mkdirSync(mapsDir, { recursive: true });
