@@ -305,11 +305,17 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     const { npcImages, setNpcImages } = useNpcImageCache(placedItems, campaignName);
 
-    const handleRenameItem = useCallback((oldName, newName) => {
-        if (!newName || !newName.trim()) return;
+    // Rename by the token's stable id, never by name: duplicate-named tokens
+    // (every unnamed palette NPC displays "NPC") used to ALL rename together
+    // when one was edited (bug-map-rename-all-same-named-tokens). Mirrors the
+    // sibling id-matched ops in ItemContextMenu (delete/rotate/visibility).
+    // The npcImages reset stays keyed on the new name so a renamed token never
+    // inherits an image cached under that name from a different NPC.
+    const handleRenameItem = useCallback((id, newName) => {
+        if (!id || !newName || !newName.trim()) return;
         setPlacedItems(prev =>
             prev.map(item =>
-                item.name === oldName ? { ...item, name: newName.trim() } : item
+                item.id === id ? { ...item, name: newName.trim() } : item
             )
         );
         setRenamePopover(null);
@@ -372,7 +378,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         const domX = svgRect.left + (menuSvgX - vbX) * scaleX;
         const domY = svgRect.top + (menuSvgY - vbY) * scaleY + 80;
         setSelectedItem(null);
-        setRenamePopover({ itemName: placedItem?.name || defaultName || 'NPC', name: defaultName || placedItem?.name || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
+        // id is threaded straight through to the commit handler so the rename
+        // targets exactly this token even when other placedItems share its name.
+        setRenamePopover({ id: item.id, name: defaultName || placedItem?.name || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
     };
 
     useEffect(() => { placedItemsRef.current = placedItems; }, [placedItems, placedItemsRef]);
@@ -654,7 +662,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     key={renamePopover.name}
                     value={renamePopover.name}
                     position={renamePopover.position}
-                    onCommit={(newName) => handleRenameItem(renamePopover.itemName, newName)}
+                    onCommit={(newName) => handleRenameItem(renamePopover.id, newName)}
                 />
             )}
 

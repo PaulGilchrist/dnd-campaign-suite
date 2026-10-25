@@ -336,6 +336,33 @@ describe('Map container - context-menu wiring', () => {
         expect(container.querySelector('.monster-autocomplete-input')).not.toBeInTheDocument();
     });
 
+    // Regression (bug-map-rename-all-same-named-tokens): the palette drops
+    // every unnamed NPC with the display name 'NPC', so the old name-matched
+    // commit renamed ALL of them at once. Renaming by stable id must touch
+    // ONLY the right-clicked token.
+    it('Rename with duplicate names: Enter commits only to the right-clicked token id', async () => {
+        mockState.placedItems = [npc('npc-1', 'NPC', 5, 5), npc('npc-2', 'NPC', 8, 3), npc('npc-3', 'NPC', 2, 2)];
+        const { container } = await act(async () => renderMap());
+
+        // Right-click the MIDDLE token (npc-2 at cell 8,3) and rename it.
+        await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[1]); });
+        await act(async () => { fireEvent.click(screen.getByText('Rename')); });
+
+        const input = container.querySelector('.monster-autocomplete-input');
+        expect(input.value).toBe('NPC');
+        await act(async () => {
+            fireEvent.change(input, { target: { value: 'QA Solo Rename' } });
+            fireEvent.keyDown(input, { key: 'Enter' });
+        });
+
+        expect(mockState.placedItems.map(i => [i.id, i.name])).toEqual([
+            ['npc-1', 'NPC'],
+            ['npc-2', 'QA Solo Rename'],
+            ['npc-3', 'NPC'],
+        ]);
+        expect(container.querySelector('.monster-autocomplete-input')).not.toBeInTheDocument();
+    });
+
     it('View Stats opens the monster card with the bestiary match and closes back through the synced store', async () => {
         mockLoadMonsters.mockImplementation(() => Promise.resolve([{ name: 'Goblin', index: 'goblin' }]));
         mockState.placedItems = [npc('npcA', 'Goblin', 5, 5)];
