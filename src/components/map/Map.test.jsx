@@ -62,6 +62,7 @@ const mockState = {
     moveStartGrid: { current: null },
     painting: false,
     dragging: null,
+    snapToast: null,
     itemDragging: null,
     npcImages: {},
     rulerStart: null,
@@ -202,6 +203,7 @@ vi.mock('./hooks/useSpellHandlers.js', () => ({
 vi.mock('./hooks/usePlayerDragging.js', () => ({
     default: vi.fn(() => ({
         dragging: mockState.dragging,
+        snapToast: mockState.snapToast,
         handlePointerDown: vi.fn(),
         handlePointerMove: vi.fn(),
         handlePointerUp: vi.fn(),
@@ -297,6 +299,7 @@ const resetState = () => {
         moveOffset: null,
         painting: false,
         dragging: null,
+        snapToast: null,
         itemDragging: null,
         npcImages: {},
         rulerStart: null,
@@ -428,5 +431,26 @@ describe('Map container — availability & composition', () => {
         createMockSetMapData.mockClear();
         await act(async () => renderMap());
         expect(createMockSetMapData).not.toHaveBeenCalled();
+    });
+
+    it('T9: surfaces the enforcement snap-back toast from the drag hook, and nothing while idle', async () => {
+        // Idle: no toast chrome in the DOM at all.
+        const { container, rerender } = await act(async () => renderMap());
+        expect(container.querySelector('.map-toast')).toBeNull();
+
+        // The hook fires a snap (over-budget drop) → plain-English toast naming
+        // the creature + snapped distance renders on the board (role=status so
+        // it is announced but never blocks pointer input — CSS pins
+        // pointer-events:none).
+        await act(async () => {
+            mockState.snapToast = { id: 1, message: 'EvasiveFighter snapped back to 30 ft of movement.' };
+            rerender(<Map campaignName="test-campaign" characters={[]} isLocalhost
+                mapName="test-map.json" onBack={vi.fn()} onEncounterCreated={vi.fn()}
+                onPoiEntered={vi.fn()} />);
+        });
+        const toast = container.querySelector('.map-toast');
+        expect(toast).toBeTruthy();
+        expect(toast).toHaveAttribute('role', 'status');
+        expect(toast).toHaveTextContent('EvasiveFighter snapped back to 30 ft of movement.');
     });
 });

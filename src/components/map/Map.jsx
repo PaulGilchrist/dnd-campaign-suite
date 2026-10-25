@@ -45,6 +45,7 @@ import useFogOfWar from './hooks/useFogOfWar';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
 import RulerOverlay from './RulerOverlay.jsx';
+import MapSnapToast from './MapSnapToast.jsx';
 import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
@@ -211,7 +212,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleSpellOverlayEvent(event);
     }, [handleMapSSEEvent, handleSpellOverlayEvent]);
 
-    const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
+    const { dragging, snapToast, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
         svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
         isLocalhost, walls: getWalls(mapData), placedItems,
     });
@@ -548,6 +549,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     cellSize={CELL_SIZE}
                 />
             </svg>
+            {/* Enforcement snap-back toast (display-only visibility for the
+                movement-budget clamp — see MapSnapToast.jsx) */}
+            <MapSnapToast snapToast={snapToast} />
                 </>
             )}
 

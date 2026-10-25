@@ -184,6 +184,27 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
             }));
             expect(mocks.onTokenMoveLanded).toHaveBeenCalledWith(
                 expect.objectContaining({ toCell: { gridX: 7, gridY: 2 } }));
+            // ...AND the clamp is now visible on the board: a plain-English
+            // snap-back toast naming the creature + snapped distance.
+            expect(helpers.result.current.snapToast).toMatchObject({
+                message: 'Player1 snapped back to 30 ft of movement.',
+            });
+        });
+
+        it('auto-clears the snap-back toast on a display-only timer (~2.5s)', () => {
+            vi.useFakeTimers();
+            try {
+                enforce({ Player1: { movementUsedFeet: 0 } });
+                const helpers = press();
+                dropAt(helpers, 380, 80); // 40 ft over a 30 ft budget ⇒ snaps
+                expect(helpers.result.current.snapToast).not.toBeNull();
+                act(() => { vi.advanceTimersByTime(2600); });
+                expect(helpers.result.current.snapToast).toBeNull();
+                // The board stays live after the toast clears (state lane untouched):
+                expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 7, gridY: 2 });
+            } finally {
+                vi.useRealTimers();
+            }
         });
 
         it('an exact-budget drop fits without a snap log and charges exactly', () => {
@@ -193,6 +214,8 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
             expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 7, gridY: 2 });
             expect(mocks.addEntry).not.toHaveBeenCalled();
             expect(campaignStore().get('turnState').Player1.movementUsedFeet).toBe(30);
+            // No false-positive toast on a fitting drop:
+            expect(helpers.result.current.snapToast).toBeNull();
         });
     });
 
@@ -219,6 +242,10 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
             // Zero move ⇒ zero charge, zero stamps, zero trigger:
             expect(campaignStore().get('turnState').Player1.movementUsedFeet).toBe(30);
             expect(mocks.onTokenMoveLanded).not.toHaveBeenCalled();
+            // Visible snap-back naming the creature and the 0 ft:
+            expect(helpers.result.current.snapToast).toMatchObject({
+                message: 'Player1 snapped back to 0 ft of movement.',
+            });
         });
     });
 
@@ -232,6 +259,7 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
             expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 9, gridY: 2 });
             expect(mocks.addEntry).not.toHaveBeenCalled();
             expect(campaignStore().get('turnState')).toBeUndefined();
+            expect(helpers.result.current.snapToast).toBeNull();
         });
 
         it('movementBudget flag off ⇒ no pin even with enforcement on', () => {
@@ -253,6 +281,7 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
             dropAt(helpers, 380, 80);
             expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 9, gridY: 2 });
             expect(mocks.addEntry).not.toHaveBeenCalled();
+            expect(helpers.result.current.snapToast).toBeNull();
         });
     });
 });

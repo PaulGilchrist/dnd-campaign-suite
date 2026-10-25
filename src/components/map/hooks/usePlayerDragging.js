@@ -36,13 +36,15 @@ function findFreeSquare(startX, startY, occupiedSquares, gridSize) {
 
 /**
  * L5-002 (§7.3): clamp a drop to the creature's remaining movement budget.
- * Returns { targetX, targetY, moveCostFeet, budgetActive }. Enforcement off,
- * no campaign, or GM Shift unconstrained ⇒ budgetActive:false and the drop
- * passes through untouched (the L1–4 guarantee). Snapped drops log a reason.
+ * Returns { targetX, targetY, moveCostFeet, budgetActive, snapped, creatureName }.
+ * Enforcement off, no campaign, or GM Shift unconstrained ⇒ budgetActive:false and
+ * the drop passes through untouched (the L1–4 guarantee). Snapped drops log a
+ * reason and report snapped:true so the board can surface the clamp visually
+ * (the "snapped back" toast in Map.jsx) — UI-only fields, never persisted.
  */
 function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName }) {
     const enforcement = campaignName ? getRuntimeValue('campaign', 'enforcement') : null;
-    const passthrough = { targetX, targetY, moveCostFeet: 0, budgetActive: false };
+    const passthrough = { targetX, targetY, moveCostFeet: 0, budgetActive: false, snapped: false, creatureName: null };
     if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget || dragging.unconstrained) {
         return passthrough;
     }
@@ -60,7 +62,9 @@ function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData
     });
     let outX = targetX;
     let outY = targetY;
+    let snapped = false;
     if (clamped.target.gridX !== targetX || clamped.target.gridY !== targetY) {
+        snapped = true;
         addEntry(campaignName, {
             type: 'enforcement_denied',
             creature: creatureName,
@@ -71,7 +75,7 @@ function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData
         outX = clamped.target.gridX;
         outY = clamped.target.gridY;
     }
-    return { targetX: outX, targetY: outY, moveCostFeet: clamped.costFeet, budgetActive: true };
+    return { targetX: outX, targetY: outY, moveCostFeet: clamped.costFeet, budgetActive: true, snapped, creatureName };
 }
 
 /**
@@ -146,6 +150,17 @@ export default function usePlayerDragging({
     placedItems,
 }) {
     const [dragging, setDragging] = useState(null);
+    // Enforcement snap-back visibility (backlog 2026-10-25): the drop-side clamp
+    // repositions the token onto the snapped cell — silent reverts read as the
+    // drag "sticking", so surface a plain-English toast naming the creature and
+    // the budget it landed on. Display-only: mirrors the MusicPlayer toast
+    // pattern (state + auto-hide timer, no game state on the clock).
+    const [snapToast, setSnapToast] = useState(null);
+
+    const showSnapToast = useCallback((message) => {
+        setSnapToast({ id: Date.now(), message });
+        setTimeout(() => setSnapToast(null), 2500); // toast auto-hide (display only, no game state)
+    }, []);
 
     const handlePointerDown = useCallback((e, playerId) => {
         if (rulerMode || spellMode) return;
@@ -306,6 +321,11 @@ export default function usePlayerDragging({
         const budget = resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName });
         targetX = budget.targetX;
         targetY = budget.targetY;
+        // Visual counterpart of the enforcement_denied log: the token lands on
+        // the snapped cell, so say so before it reads as a stuck drag.
+        if (budget.snapped) {
+            showSnapToast(`${budget.creatureName} snapped back to ${budget.moveCostFeet} ft of movement.`);
+        }
 
         setMapData((prev) => ({
             ...prev,
@@ -317,7 +337,7 @@ export default function usePlayerDragging({
         setDragging(null);
 
         finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData });
-    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems]);
+    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems, showSnapToast]);
 
     const handlePointerLeave = useCallback((e) => {
         if (!dragging) return;
@@ -326,5 +346,5 @@ export default function usePlayerDragging({
         setDragging(null);
     }, [dragging, svgRef]);
 
-    return { dragging, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerLeave };
+    return { dragging, snapToast, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerLeave };
 }

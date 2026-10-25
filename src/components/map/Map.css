@@ -839,3 +839,32 @@
     border-color: #cc9900;
     color: #996600;
 }
+
+/* Enforcement snap-back toast — display-only visibility for the movement-budget
+   clamp (mirrors the .sessions-toast / .encounter-toast / .music-toast tokens;
+   amber = enforcement notice, not a success). Fixed + centered so it reads
+   beside the token wherever the board is scrolled; pointer-events:none keeps
+   the map fully clickable while it shows (auto-hides ~2.5s). */
+.map .map-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 152, 0, 0.15);
+    border: 1px solid #ff9800;
+    color: #ffcc80;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    pointer-events: none;
+    z-index: 30;
+}
+
+[data-theme="light"] .map .map-toast {
+    background: rgba(255, 152, 0, 0.12);
+    border-color: #cc8800;
+    color: #7a5200;
+}
