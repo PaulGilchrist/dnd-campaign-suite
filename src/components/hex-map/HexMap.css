@@ -1282,6 +1282,37 @@
     pointer-events: none;
 }
 
+/* ── Travel Toast ────────────────────────────────────────── */
+/* Arrival confirmation that survives the travel panel's auto-close on
+   arrival (backlog 2026-10-25 pm). Mirrors the .map-toast tokens in
+   Map.css — fixed + centered in the panel's slot, success-green since
+   it reports a completed route; pointer-events:none keeps the map fully
+   clickable while it shows (auto-hides ~2.5s, display only). */
+
+.hex-map .travel-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(76, 175, 80, 0.15);
+    border: 1px solid #4caf50;
+    color: #a5d6a7;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    pointer-events: none;
+    z-index: 30;
+}
+
+[data-theme="light"] .hex-map .travel-toast {
+    background: rgba(76, 175, 80, 0.12);
+    border-color: #2e7d32;
+    color: #1b5e20;
+}
+
 /* ── Print Styles ────────────────────────────────────────── */
 
 @media print {
@@ -1313,6 +1344,7 @@
     .marching-order-panel,
     .poi-panel,
     .travel-panel,
+    .travel-toast,
     .event-dialog-overlay {
         display: none;
     }

@@ -87,7 +87,9 @@ function EventDialog({ event, rerollsRemaining, onAccept, onSkip, onReroll }) {
             className="event-btn event-btn-reroll"
             onClick={onReroll}
             disabled={rerollsRemaining <= 0}
-            title={rerollsRemaining > 0 ? `Re-roll (${rerollsRemaining} remaining)` : 'No re-rolls remaining'}
+            title={rerollsRemaining > 0
+                ? `Re-roll (${rerollsRemaining} left today; resets when you Camp)`
+                : 'No re-rolls left today — Camp to start a new day'}
           >
             <i className="fa-solid fa-dice"></i> Re-roll
             {rerollsRemaining > 0 && <span className="reroll-count">({rerollsRemaining})</span>}

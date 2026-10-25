@@ -32,6 +32,7 @@ import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import TravelPanel from './TravelPanel.jsx';
+import TravelToast from './TravelToast.jsx';
 import TravelPathLayer from './TravelPathLayer.jsx';
 import useLog from '../../hooks/runtime/useLog.js';
 import WeatherOverlay from './WeatherOverlay.jsx';
@@ -151,6 +152,15 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         campaignName, mapName, terrain, marchingOrder, onEncounterCreated
     );
 
+    // ── Arrival toast (display-only) ──
+    // ARRIVAL flips travel-mode inactive and TravelPanel unmounts, taking its
+    // lastMessage with it — this top-level toast keeps "travel complete" legible
+    // when the panel auto-closes (backlog 2026-10-25 pm). Local ephemeral UI
+    // feedback (never game state); the timer only hides the display.
+    const [arrivalToast, setArrivalToast] = useState(null);
+    const arrivalToastTimerRef = useRef(null);
+    useEffect(() => () => clearTimeout(arrivalToastTimerRef.current), []);
+
     // ── Logging ──
     const { addEntry } = useLog(campaignName);
 
@@ -190,6 +200,16 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
             const action = result.event ? 'advance_with_event' : (result.arrived ? 'arrived' : 'advance');
             logTravel(action, nextHex, tileTerrain, weather, result.event);
+            if (result.arrived) {
+                // The panel just auto-closed (mode → inactive) — surface the
+                // completion where it stays visible (display only, no game state).
+                clearTimeout(arrivalToastTimerRef.current);
+                setArrivalToast('Arrived at destination — travel complete');
+                arrivalToastTimerRef.current = setTimeout(
+                    () => setArrivalToast(null), // toast auto-hide (display only, no game state)
+                    2500
+                );
+            }
         } else if (travelMgmt.dayExhausted) {
             logTravel('day_exhausted', null, null, weather);
         } else if (weather?.moveCostMod === null) {
@@ -584,6 +604,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     onSkip={handleEventSkip}
                     onReroll={handleEventReroll}
                 />
+
+                <TravelToast message={arrivalToast} />
             </div>
         </div>
     );

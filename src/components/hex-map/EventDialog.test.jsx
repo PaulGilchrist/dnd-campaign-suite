@@ -131,19 +131,21 @@ describe('EventDialog', () => {
         expect(rows[1].textContent).toContain('Goblin Boss');
     });
 
-    it('keeps re-roll enabled with count and tooltip while re-rolls remain', () => {
+    // Backlog 2026-10-25 (pm): the budget is per-day (reset by Camp, 3/day in
+    // useTravelManagement) — the tooltip must say so, not just the raw count.
+    it('keeps re-roll enabled with count and per-day tooltip while re-rolls remain', () => {
         renderDialog(baseEvent, 2);
         const reroll = screen.getByRole('button', { name: /re-roll/i });
         expect(reroll).not.toBeDisabled();
         expect(reroll).toHaveTextContent(/Re-roll\s*\(2\)/);
-        expect(reroll).toHaveAttribute('title', 'Re-roll (2 remaining)');
+        expect(reroll).toHaveAttribute('title', 'Re-roll (2 left today; resets when you Camp)');
     });
 
-    it('disables re-roll with no count and an explanatory tooltip when none remain', () => {
+    it('disables re-roll with no count and an explanatory per-day tooltip when none remain', () => {
         renderDialog(baseEvent, 0);
         const reroll = screen.getByRole('button', { name: /re-roll/i });
         expect(reroll).toBeDisabled();
         expect(reroll).toHaveTextContent(/^Re-roll$/);
-        expect(reroll).toHaveAttribute('title', 'No re-rolls remaining');
+        expect(reroll).toHaveAttribute('title', 'No re-rolls left today — Camp to start a new day');
     });
 });
