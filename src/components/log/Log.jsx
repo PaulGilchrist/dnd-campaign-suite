@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import useLog from '../../hooks/runtime/useLog.js';
 import './Log.css';
+import { filterLogEntries, formatEntryTypeLabel, LOG_WINDOW_SIZE } from './log-utils.js';
 import { RollEntry } from './LogRollEntry.jsx';
 import { NoteEntry } from './LogNoteEntry.jsx';
 import { LootEntry } from './LogLootEntry.jsx';
@@ -52,10 +53,70 @@ function LogEntryRenderer({ entry }) {
   return <div>{EntryComponent && <EntryComponent entry={entry}/>}</div>;
 }
 
+// Presentational filter toolbar (display-only; state lives in Log via useState).
+function LogFilterBar({ filters, typeOptions, characterOptions, visibleCount, filteredCount, totalCount, onFilterChange, onClear }) {
+  const hasActiveFilters = Boolean(filters.text || filters.type || filters.character);
+  return (
+    <div className="log-filters no-print">
+      <div className="log-filter-group log-filter-search-group">
+        <label className="log-filter-label" htmlFor="log-filter-text">Search</label>
+        <input
+          id="log-filter-text"
+          type="text"
+          className="log-filter-input"
+          placeholder="Search the log..."
+          value={filters.text}
+          onChange={(e) => onFilterChange('text', e.target.value)}
+        />
+      </div>
+      <div className="log-filter-group">
+        <label className="log-filter-label" htmlFor="log-filter-type">Type</label>
+        <select
+          id="log-filter-type"
+          className="log-filter-select"
+          value={filters.type}
+          onChange={(e) => onFilterChange('type', e.target.value)}
+        >
+          <option value="">All types</option>
+          {typeOptions.map(type => (
+            <option key={type} value={type}>{formatEntryTypeLabel(type)}</option>
+          ))}
+        </select>
+      </div>
+      <div className="log-filter-group">
+        <label className="log-filter-label" htmlFor="log-filter-character">Character</label>
+        <select
+          id="log-filter-character"
+          className="log-filter-select"
+          value={filters.character}
+          onChange={(e) => onFilterChange('character', e.target.value)}
+        >
+          <option value="">All characters</option>
+          {characterOptions.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
+      </div>
+      {hasActiveFilters && (
+        <button type="button" className="log-filter-clear" onClick={onClear}>
+          <i className="fas fa-xmark"></i> Clear filters
+        </button>
+      )}
+      <span className="log-filter-count">
+        Showing {visibleCount} of {filteredCount}
+        {filteredCount !== totalCount ? ` (of ${totalCount} total)` : ''}
+      </span>
+    </div>
+  );
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
   const [selectedCharacter, setSelectedCharacter] = useState('');
+  // Display-only filter + render-window state (local UI state per server-first policy)
+  const [filters, setFilters] = useState({ text: '', type: '', character: '' });
+  const [windowSize, setWindowSize] = useState(LOG_WINDOW_SIZE);
   const noteRef = useRef(null);
 
   const handleAddNote = async () => {
@@ -75,6 +136,29 @@ export default function Log({ campaignName, characters }) {
        }
      };
 
+  const filteredEntries = useMemo(() => filterLogEntries(logEntries, filters), [logEntries, filters]);
+  const typeOptions = useMemo(
+    () => [...new Set(logEntries.map(entry => entry.type))].sort(),
+    [logEntries]
+  );
+  const characterOptions = useMemo(
+    () => [...new Set(logEntries.map(entry => entry.characterName).filter(Boolean))].sort(),
+    [logEntries]
+  );
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setWindowSize(LOG_WINDOW_SIZE);
+  };
+
+  const clearFilters = () => {
+    setFilters({ text: '', type: '', character: '' });
+    setWindowSize(LOG_WINDOW_SIZE);
+  };
+
+  // Newest first, capped at the current render window; "Load older" extends it.
+  const visibleEntries = [...filteredEntries].reverse().slice(0, windowSize);
+  const hasOlderEntries = filteredEntries.length > windowSize;
+
   return (
     <div className="campaign-tool log-view">
       <div className="log-toolbar">
@@ -83,15 +167,19 @@ export default function Log({ campaignName, characters }) {
 
         <div className="log-add-note no-print">
             {characters.length > 0 && (
-              <select
-                value={selectedCharacter}
-                onChange={(e) => setSelectedCharacter(e.target.value)}
-              >
-                <option value="">Anonymous</option>
-                {characters.map(ch => (
-                  <option key={ch.name} value={ch.name}>{ch.name}</option>
-                ))}
-              </select>
+              <>
+                <label className="log-post-as-label" htmlFor="log-note-author">Post as:</label>
+                <select
+                  id="log-note-author"
+                  value={selectedCharacter}
+                  onChange={(e) => setSelectedCharacter(e.target.value)}
+                >
+                  <option value="">Anonymous</option>
+                  {characters.map(ch => (
+                    <option key={ch.name} value={ch.name}>{ch.name}</option>
+                  ))}
+                </select>
+              </>
             )}
             <textarea
               ref={noteRef}
@@ -103,16 +191,40 @@ export default function Log({ campaignName, characters }) {
             <button className="log-add-btn" onClick={handleAddNote}><i className="fas fa-plus"></i></button>
           </div>
 
+      {initialized && logEntries.length > 0 && (
+        <LogFilterBar
+          filters={filters}
+          typeOptions={typeOptions}
+          characterOptions={characterOptions}
+          visibleCount={visibleEntries.length}
+          filteredCount={filteredEntries.length}
+          totalCount={logEntries.length}
+          onFilterChange={handleFilterChange}
+          onClear={clearFilters}
+        />
+      )}
+
       {!initialized && <div className="log-loading no-print">Loading log...</div>}
       {initialized && logEntries.length === 0 && (
         <div className="log-empty no-print">No entries yet. Roll dice or add a note to get started.</div>
       )}
+      {initialized && logEntries.length > 0 && filteredEntries.length === 0 && (
+        <div className="log-empty no-print">No entries match the current filters.</div>
+      )}
 
       <div className="log-entries">
-        {!initialized ? null : [...logEntries].reverse().map(entry => (
+        {!initialized ? null : visibleEntries.map(entry => (
           <LogEntryRenderer key={entry.id} entry={entry}/>
         ))}
       </div>
+
+      {initialized && hasOlderEntries && (
+        <div className="log-load-older-row no-print">
+          <button type="button" className="log-load-older-btn" onClick={() => setWindowSize(size => size + LOG_WINDOW_SIZE)}>
+            <i className="fas fa-angle-double-down"></i> Load older entries
+          </button>
+        </div>
+      )}
     </div>
   );
 }

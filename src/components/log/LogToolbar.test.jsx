@@ -2,8 +2,8 @@
 // TOOLBAR lane — Log.jsx toolbar + note-add chrome presence contracts only.
 // Not owned here: add-note submit/keyboard/short-circuit dispatch (#885 LogNotes),
 // note/roll/etc entry content and container loading/empty states (#876-#887,
-// pins at LogEntryRendering.test.jsx), entry routing (#879). Source has no
-// filter, clear-log, or scroll controls — nothing to pin for those.
+// pins at LogEntryRendering.test.jsx), entry routing (#879). The filter bar,
+// render window, and "Post as:" author label are owned by LogFilters.test.jsx.
 //
 // old->new map (2 tests -> 2, both strengthened):
 //   "renders heading, textarea, add button, and character select" -> exact heading

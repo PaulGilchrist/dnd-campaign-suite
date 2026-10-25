@@ -30,3 +30,46 @@ const ROLL_ICON_TYPES = {
 export function getRollIconType(rollType) {
   return ROLL_ICON_TYPES[rollType] || 'fa-dice-d20';
 }
+
+// ── Client-side filtering + render windowing (display-only, never persisted) ──
+
+// Number of matching entries rendered per window; "Load older" extends by this amount.
+export const LOG_WINDOW_SIZE = 100;
+
+// Recursively collects all string values of an entry (skipping ids) so text
+// search matches the entry's content regardless of which per-type field holds it.
+function collectSearchableStrings(value, parts) {
+  if (typeof value === 'string') {
+    parts.push(value);
+  } else if (Array.isArray(value)) {
+    value.forEach(item => collectSearchableStrings(item, parts));
+  } else if (value && typeof value === 'object') {
+    Object.entries(value).forEach(([key, item]) => {
+      if (key === 'id') return;
+      collectSearchableStrings(item, parts);
+    });
+  }
+}
+
+export function getEntrySearchText(entry) {
+  const parts = [];
+  collectSearchableStrings(entry, parts);
+  return parts.join(' ').toLowerCase();
+}
+
+// AND-semantics facets over the already-fetched log array:
+// { text, type, character } — empty string means "no constraint" for that facet.
+export function filterLogEntries(entries, { text = '', type = '', character = '' } = {}) {
+  const needle = text.trim().toLowerCase();
+  return entries.filter(entry => {
+    if (type && entry.type !== type) return false;
+    if (character && entry.characterName !== character) return false;
+    if (needle && !getEntrySearchText(entry).includes(needle)) return false;
+    return true;
+  });
+}
+
+// 'death_save' -> 'Death save'
+export function formatEntryTypeLabel(type) {
+  return type.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+}

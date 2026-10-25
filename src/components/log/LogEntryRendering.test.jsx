@@ -29,7 +29,7 @@
 // "empty log"/"loading" → exact authored placeholder strings (#829); two NoteEntry
 // content tests consolidated into one with custom values (same legs, distinct strings).
 
-import { screen } from '@testing-library/react';
+import { within } from '@testing-library/react';
 import { beforeEach } from 'vitest';
 import {
   roll, note, travel, loot, cond, enc, hp, heal, ds, spell, meta,
@@ -121,7 +121,9 @@ describe('Log container dispatch', () => {
     const wrappers = Array.from(q('.log-entries').children);
     expect(wrappers.map(w => w.children.length)).toEqual([1, 0, 1]);
     expect(wrappers[1].textContent).toBe('');
-    expect(screen.queryByText(/unknown/i)).not.toBeInTheDocument();
+    // Scoped to the entries list: the filter bar's type facet legitimately
+    // surfaces 'Unknown' as an option once such entries exist — no entry text.
+    expect(within(q('.log-entries')).queryByText(/unknown/i)).toBeNull();
   });
 
   it('shows the exact loading placeholder when not initialized', () => {
