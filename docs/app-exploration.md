@@ -149,7 +149,7 @@ Twelve fix/improve commits landed after the pm pass; every affected row re-deriv
 
 ## Improvement Backlog
 
-- *(2026-10-25 day run)* **Placed-token delete is contextmenu-only:** `Delete` on a map token requires a right-click (no click-to-select then Delete-key/button lane; PC player tokens have the same contextmenu-only model). The named-confirm (f677853ee) is a good addition but the discovery affordance is still hidden behind right-click. Minor UX — consider a visible selected-item delete chip in a details popover, mirroring the party-inventory row buttons. `src/components/map/ItemContextMenu.jsx`.
+## Improvement Backlog
 
 ## Improvement Backlog
 

@@ -35,6 +35,7 @@ import GridAndWalls from './GridAndWalls.jsx';
 import Players from './Players.jsx';
 import FogOverlay from './FogOverlay.jsx';
 import ItemContextMenu from './ItemContextMenu.jsx';
+import ItemDetailsDock from './ItemDetailsDock.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import usePlayerDragging from './hooks/usePlayerDragging';
@@ -78,6 +79,40 @@ function getCursor({ panning, rulerMode, tool, moveOffset }) {
 function buildPendingOverlay(spellDraft, spellMode, shapeParams) {
     if (!spellDraft) return null;
     return { ...spellDraft, shape: spellMode, ...shapeParams, id: 'pending' };
+}
+
+// Click-select discriminator for placed items (backlog 2026-10-25: token
+// delete was contextmenu-only). A hit-area press records the item + cell +
+// pixel at pointerdown (PlacedItems.jsx forwards through the tracked handler);
+// browsers retarget the captured pointer's click to the svg root, so Map's
+// svg onClick consumes it here. Same cell + sub-5px movement → a click:
+// select the item (surfaces ItemDetailsDock). A drag repositions and NEVER
+// selects; paint/erase/ruler/spell lanes never record a press at all.
+const ITEM_CLICK_MOVE_PX = 5;
+
+function resolveItemClick(press, e, placedItems) {
+    if (!press) return null;
+    if (Math.hypot(e.clientX - press.clientX, e.clientY - press.clientY) > ITEM_CLICK_MOVE_PX) return null;
+    const item = (placedItems || []).find(i => i.id === press.itemId);
+    if (!item) return null;
+    if (item.gridX !== press.gridX || item.gridY !== press.gridY) return null;
+    return { id: item.id, gridX: item.gridX, gridY: item.gridY };
+}
+
+// Which affordance chrome the current selection renders (hoisted to keep Map
+// under the complexity cap). Two mutually exclusive lanes:
+//   via === 'click'  → visible ItemDetailsDock (2D + GM only), NO svg menu
+//   otherwise        → byte-identical right-click lane (svg menu, no dock)
+// The dock item is derived (id lookup in placedItems): delete or deselect
+// nulls it automatically — no stale control is possible.
+function selectionChromeFor(selectedItem, placedItems, viewMode, isLocalhost) {
+    const clickSelected = selectedItem?.via === 'click';
+    const placed = clickSelected ? (placedItems.find(i => i.id === selectedItem.id) || null) : null;
+    const chromeVisible = viewMode === '2d' && isLocalhost && placed;
+    return {
+        menuSelection: clickSelected ? null : selectedItem,
+        dockItem: chromeVisible ? placed : null,
+    };
 }
 
 function getWalls(mapData) {
@@ -221,6 +256,28 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName, mapData,
     });
 
+    // Click-select press recorder (see resolveItemClick): the left-button
+    // drag hook stopPropagations pointerdown, so a press on a token never
+    // routes to the pan/paint lanes — the wrapper records at the target phase
+    // BEFORE delegating. Recorded ONLY in the default (pan) mode: paint/erase/
+    // select tools and ruler/spell lanes record nothing, so their clicks can
+    // never select. The svg's own onClick (React bubble phase — click is NOT
+    // suppressed by the hook's pointerdown preventDefault/capture; verified
+    // live 2026-10-25) consumes-and-clears the press on every gesture, so a
+    // stale press can never select a different item later.
+    const itemPressRef = useRef(null);
+    const handleItemPointerDownTracked = useCallback((e, itemId) => {
+        if (e.button === 0 && tool === TOOL_NONE && !rulerMode && !spellMode) {
+            const item = (placedItems || []).find(i => i.id === itemId);
+            itemPressRef.current = item
+                ? { itemId, gridX: item.gridX, gridY: item.gridY, clientX: e.clientX, clientY: e.clientY }
+                : null;
+        } else {
+            itemPressRef.current = null;
+        }
+        handleItemPointerDown(e, itemId);
+    }, [tool, rulerMode, spellMode, placedItems, handleItemPointerDown]);
+
     // Exploration memory: merge newly revealed cells into the persisted set so
     // uncovered areas stay uncovered. GM (localhost) only — the write PUTs the
     // whole map document (useMapLoader autosave) and is idempotent ONLY when the
@@ -279,7 +336,28 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setSelectedItem(null);
         setSelectedPlayer(null);
         setRenamePopover(null);
+        itemPressRef.current = null;
     }, [setSelectedItem, setSelectedPlayer, setRenamePopover]);
+
+    // Left-click / tap on a placed item selects it (backlog 2026-10-25:
+    // delete was contextmenu-only). The captured pointer's click lands on the
+    // svg root (Playwright-verified 2026-10-25), so this single svg handler is
+    // the consumption seam: a same-cell, near-zero-movement press becomes a
+    // { id, gridX, gridY, via: 'click' } selection that surfaces the visible
+    // ItemDetailsDock; anything else (empty canvas, drag) keeps the existing
+    // close-on-click behavior. The `via` marker keeps the right-click lane
+    // byte-identical (no marker → SVG context menu exactly as before).
+    const handleSvgClick = useCallback((e) => {
+        if (e.button !== 0) return;
+        const press = itemPressRef.current;
+        itemPressRef.current = null;
+        const clicked = resolveItemClick(press, e, placedItems);
+        if (clicked) {
+            setSelectedItem({ ...clicked, via: 'click' });
+            return;
+        }
+        handleCloseMenu();
+    }, [placedItems, setSelectedItem, handleCloseMenu]);
 
     const handleRenameClicked = (event, item, defaultName) => {
         if (!svgRef.current) return;
@@ -365,6 +443,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const { players } = mapData;
     const effectiveWalls = computeEffectiveWalls(mapData.walls, placedItems);
 
+    // Click-select details dock / contextmenu menu split — see selectionChromeFor.
+    const { menuSelection, dockItem } = selectionChromeFor(selectedItem, placedItems, viewMode, isLocalhost);
+
     return (
         // data-testid: mount-proof hook for automation — present ONLY while an
         // indoor map editor is mounted (root renders null until mapData loads,
@@ -428,7 +509,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
-                onClick={(e) => { if (e.button === 0) handleCloseMenu(); }}
+                onClick={handleSvgClick}
                 style={{ cursor: getCursor({ panning, rulerMode, tool, moveOffset }) }}
             >
                 <defs>
@@ -488,7 +569,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     setSelectedItem={setSelectedItem}
                     npcImages={npcImages}
                     itemDragging={itemDragging}
-                    handleItemPointerDown={handleItemPointerDown}
+                    handleItemPointerDown={handleItemPointerDownTracked}
                 />
 
                 <SelectionPreviewRect visible={selectStart.current} rect={selectionRect} className="selection-preview" />
@@ -520,7 +601,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 />
 
                 <ItemContextMenu
-                    selectedItem={selectedItem}
+                    selectedItem={menuSelection}
                     placedItems={placedItems}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
@@ -558,6 +639,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             <MapSnapToast snapToast={snapToast} />
                 </>
             )}
+
+            {/* Click-select details dock — visible Delete affordance anchored
+                to the map chrome (backlog 2026-10-25). selectionChromeFor
+                already nulls it off the 2D/GM lanes and on deselect. */}
+            <ItemDetailsDock
+                item={dockItem}
+                handleDeleteItem={handleDeleteItem}
+                onDismiss={handleCloseMenu}
+            />
 
             {viewMode === '2d' && renamePopover && (
                 <MonsterNameAutocomplete

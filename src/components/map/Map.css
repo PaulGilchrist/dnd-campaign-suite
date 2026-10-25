@@ -868,3 +868,65 @@
     border-color: #cc8800;
     color: #7a5200;
 }
+
+/* Click-selected item details dock — the visible delete affordance that used
+   to hide behind a right-click (backlog 2026-10-25). Fixed + centered above
+   the map (same slot as the snap toast, one notch higher so a drag toast and
+   the dock can never collide); renders only while an item is click-selected
+   (derived from selectedItem in Map.jsx). Mirrors the .map-toast tokens;
+   interactive (pointer-events stays on). */
+.map .item-details-dock {
+    position: fixed;
+    bottom: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(74, 144, 217, 0.15);
+    border: 1px solid #4a90d9;
+    color: #e0e0e0;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    z-index: 30;
+}
+
+.map .item-details-dock-name {
+    font-weight: 600;
+}
+
+.map .item-details-dock-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #5a2a2a;
+    border: 1px solid #8a3a3a;
+    border-radius: 4px;
+    color: #e74c3c;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.map .item-details-dock-btn:hover {
+    background: #6a3030;
+}
+
+.map .item-details-dock-close {
+    background: transparent;
+    border: 1px solid #555;
+    color: #999;
+}
+
+.map .item-details-dock-close:hover {
+    border-color: #888;
+    color: #ccc;
+    background: transparent;
+}
+
+[data-theme="light"] .map .item-details-dock {
+    background: rgba(74, 144, 217, 0.12);
+    border-color: #2c5f8a;
+    color: #333;
+}

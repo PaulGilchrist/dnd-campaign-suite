@@ -1,6 +1,9 @@
 // Human label for a placed token's named-confirm: NPCs carry `name`,
 // furniture does not — its type key is the honest identifier there.
-function deleteLabel(item) {
+// Exported so the click-select details dock (ItemDetailsDock.jsx) names the
+// item with byte-identical bytes to the confirm it triggers — one label, one
+// source of truth.
+export function placedItemLabel(item) {
     return item?.name || item?.type || 'placed item';
 }
 
@@ -20,7 +23,7 @@ function usePlacedItems(setPlacedItems, setSelectedItem, placedItems) {
     // persists the filtered array via saveMapData (PUT /maps/:name).
     const handleDeleteItem = (itemId) => {
         const item = (placedItems || []).find(i => i.id === itemId);
-        if (!window.confirm(`Delete "${deleteLabel(item)}" from the map?`)) return;
+        if (!window.confirm(`Delete "${placedItemLabel(item)}" from the map?`)) return;
         setPlacedItems(prev => prev.filter(i => i.id !== itemId));
         setSelectedItem(null);
     };
