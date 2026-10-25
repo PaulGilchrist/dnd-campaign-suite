@@ -12,7 +12,7 @@
 //   Not pinned: toggling an item with missing `visible` flips it to true — `!undefined` JS-spec
 //   quirk, same precedent as the useMapDrops lane's removed quirk pins.
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import usePlacedItems from './usePlacedItems.js';
 
 describe('usePlacedItems', () => {
@@ -22,6 +22,7 @@ describe('usePlacedItems', () => {
   let placedItems;
   let setPlacedItems;
   let setSelectedItem;
+  let confirmSpy;
 
   beforeEach(() => {
     placedItems = [
@@ -35,9 +36,16 @@ describe('usePlacedItems', () => {
       placedItems = fn(placedItems);
       return placedItems;
     });
+    // Delete rides a named native confirm (house pattern). Accept by default;
+    // cancel-leg tests override to false.
+    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
-  const getHook = () => renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem)).result;
+  afterEach(() => {
+    confirmSpy.mockRestore();
+  });
+
+  const getHook = () => renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem, placedItems)).result;
 
   it('returns exactly the four mutation handlers', () => {
     expect(Object.keys(getHook().current)).toEqual([
@@ -142,5 +150,35 @@ describe('usePlacedItems', () => {
     expect(setSelectedItem).toHaveBeenCalledTimes(3);
     expect(setSelectedItem).toHaveBeenCalledWith(null);
     expect(setPlacedItems).toHaveBeenCalledTimes(5);
+  });
+
+  it('delete confirm NAMES the token: npc label is its name, furniture falls back to type', () => {
+    placedItems = [
+      { id: 'npc1', type: 'npc', name: 'Marta Copperkettle', gridX: 5, gridY: 5 },
+      { id: 'barrel1', type: 'barrel', gridX: 6, gridY: 6 },
+    ];
+    const result = getHook();
+    act(() => result.current.handleDeleteItem('npc1'));
+    expect(confirmSpy).toHaveBeenCalledWith('Delete "Marta Copperkettle" from the map?');
+    act(() => result.current.handleDeleteItem('barrel1'));
+    expect(confirmSpy).toHaveBeenLastCalledWith('Delete "barrel" from the map?');
+    // Unknown id still asks honestly with the generic fallback and writes an
+    // inert filter (selection clears — unchanged seam semantics).
+    act(() => result.current.handleDeleteItem('ghost'));
+    expect(confirmSpy).toHaveBeenLastCalledWith('Delete "placed item" from the map?');
+    expect(placedItems).toEqual([]);
+  });
+
+  it('canceling the delete confirm is fully inert: no write, no selection clear, token intact', () => {
+    confirmSpy.mockReturnValue(false);
+    placedItems = [{ id: 'npc1', type: 'npc', name: 'Marta', gridX: 5, gridY: 5 }];
+    const result = getHook();
+    const before = [...placedItems];
+    act(() => result.current.handleDeleteItem('npc1'));
+    expect(confirmSpy).toHaveBeenCalledWith('Delete "Marta" from the map?');
+    expect(setPlacedItems).not.toHaveBeenCalled();
+    expect(setSelectedItem).not.toHaveBeenCalled();
+    expect(placedItems).toEqual(before);
+    expect(placedItems[0]).toBe(before[0]);
   });
 });

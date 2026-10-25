@@ -265,7 +265,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleDeleteItem,
         handleToggleDoor,
         handleRotate,
-    } = usePlacedItems(setPlacedItems, setSelectedItem);
+    } = usePlacedItems(setPlacedItems, setSelectedItem, placedItems);
 
     const handleRemovePlayer = useCallback((playerId) => {
         setMapData(prev => ({
