@@ -8,7 +8,9 @@
  * audit log becomes trustworthy.
  *
  * Contract: no validator registered ⇒ the write passes through EXACTLY as today
- * (the L1–4 guarantee — every existing suite exercises those keys).
+ * (the L1–4 guarantee — every existing suite exercises those keys). A validator
+ * may additionally return a canonicalized `value` on success; the route persists
+ * that instead of the raw payload (enforcement never stores key-subset shapes).
  */
 
 const MODES = new Set(['off', 'on']);
@@ -50,6 +52,20 @@ function nonNegNumber(v) {
     return typeof v === 'number' && Number.isFinite(v) && v >= 0;
 }
 
+// Canonical state = the full ENFORCEMENT_FLAGS set with absent keys defaulted
+// (mode 'off', sub-flags false). This is the ONE canonicalizer: the authority
+// comparison below reads state through it, and validateEnforcement returns its
+// output so the route persists the full canonical blob — a valid key-subset
+// write can never clobber the stored shape (backlog 2026-10-25 subset-clobber).
+function canonicalizeEnforcement(blob) {
+    return Object.fromEntries([...ENFORCEMENT_FLAGS].map(flag => [
+        flag,
+        flag === 'mode'
+            ? (isPlainObject(blob) && blob.mode === 'on' ? 'on' : 'off')
+            : !!(isPlainObject(blob) && blob[flag]),
+    ]));
+}
+
 function validateEnforcement(value) {
     if (!isPlainObject(value)) return { ok: false, reason: 'enforcement must be an object' };
     if (!MODES.has(value.mode)) return { ok: false, reason: `enforcement.mode must be 'off' or 'on'` };
@@ -57,7 +73,7 @@ function validateEnforcement(value) {
         if (!ENFORCEMENT_FLAGS.has(flag)) return { ok: false, reason: `unknown enforcement flag: ${flag}` };
         if (flag !== 'mode' && typeof flagValue !== 'boolean') return { ok: false, reason: `enforcement.${flag} must be boolean` };
     }
-    return { ok: true };
+    return { ok: true, value: canonicalizeEnforcement(value) };
 }
 
 const TURN_STATE_NUMBER_FIELDS = ['actionsUsed', 'bonusActionsUsed', 'reactionsUsed', 'movementUsedFeet'];
@@ -150,15 +166,7 @@ function isLocalhostReq(req) {
 // is a no-op and stays open to every origin; ANY real change — master engage
 // or a single sub-flag while mode stays 'off' — is an act of authority.
 function enforcementBlobChanged(value, current) {
-    const canon = (blob) => JSON.stringify(Object.fromEntries(
-        [...ENFORCEMENT_FLAGS].map(flag => [
-            flag,
-            flag === 'mode'
-                ? (isPlainObject(blob) && blob.mode === 'on' ? 'on' : 'off')
-                : !!(isPlainObject(blob) && blob[flag]),
-        ]),
-    ));
-    return canon(value) !== canon(current);
+    return JSON.stringify(canonicalizeEnforcement(value)) !== JSON.stringify(canonicalizeEnforcement(current));
 }
 
 /**
@@ -275,13 +283,18 @@ function validateMonsterEconomyProps(value) {
     return { ok: true };
 }
 
+// Serial validators may refine the payload: a step returning { ok, value }
+// hands its canonicalized value to the next step and up to the route (the
+// enforcement lane persists the full canonical blob, never the raw subset).
 function chain(...validators) {
     return (value, ctx) => {
+        let current = value;
         for (const validator of validators) {
-            const result = validator(value, ctx);
+            const result = validator(current, ctx);
             if (!result.ok) return result;
+            if ('value' in result) current = result.value;
         }
-        return { ok: true };
+        return { ok: true, value: current };
     };
 }
 
@@ -331,7 +344,9 @@ export const keyValidators = {
 
 /**
  * Run the validator (if any) for a change-data key write.
- * @returns {{ ok: boolean, reason?: string }}
+ * @returns {{ ok: boolean, reason?: string, value?: any }} — `value` is the
+ * canonicalized payload to persist when a validator normalizes (enforcement);
+ * absent ⇒ the route stores the raw value exactly as before.
  */
 export function validateRuntimeWrite(key, value, ctx) {
     const validator = keyValidators[key];

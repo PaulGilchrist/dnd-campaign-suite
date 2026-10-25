@@ -87,10 +87,16 @@ describe('campaignsChangedata - POST pass-through of legitimate unsuffixed keys'
             .send({ value: { mode: 'off' } });
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Data saved successfully');
-        expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off' });
+        // enforcement is validated + canonicalized: the full 11-key blob stores
+        // and broadcasts (subset-clobber fix, backlog 2026-10-25) — the route's
+        // raw pass-through is proven by the character-store key below.
+        expect(characterChangeData.get('test-campaign').enforcement).toMatchObject({ mode: 'off' });
+        expect(Object.keys(characterChangeData.get('test-campaign').enforcement)).toHaveLength(11);
         expect(markDirty).toHaveBeenCalledWith('test-campaign');
         expect(publish).toHaveBeenCalledWith(
-            'change-test-campaign-enforcement', { mode: 'off' }, 'test-campaign'
+            'change-test-campaign-enforcement',
+            characterChangeData.get('test-campaign').enforcement,
+            'test-campaign',
         );
     });
 

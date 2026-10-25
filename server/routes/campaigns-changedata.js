@@ -218,11 +218,16 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
         return res.status(400).json({ error: validation.reason });
     }
 
-    characterChangeData.get(campaign)[key] = propertyValue;
+    // Validators may canonicalize the accepted payload (enforcement writes
+    // persist the full flag blob, backlog 2026-10-25 subset-clobber); keys
+    // without a normalized value store the raw payload exactly as before.
+    const storedValue = 'value' in validation ? validation.value : propertyValue;
+
+    characterChangeData.get(campaign)[key] = storedValue;
     markDirty(campaign);
 
     // Broadcast change
-    publish(`change-${campaign}-${key}`, propertyValue, campaign);
+    publish(`change-${campaign}-${key}`, storedValue, campaign);
 
     res.json({ message: 'Data saved successfully' });
 }));

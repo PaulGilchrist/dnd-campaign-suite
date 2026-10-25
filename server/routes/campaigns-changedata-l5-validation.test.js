@@ -20,6 +20,14 @@ function createTestApp() {
 }
 
 const VALID_ENFORCEMENT = { mode: 'on', turnLock: true, actionEconomy: true };
+// Canonical persisted shape for the flag set in `overrides` — every accepted
+// enforcement write stores the FULL 11-key blob (subset-clobber fix, backlog
+// 2026-10-25): absent keys default to mode 'off' / sub-flag false.
+const ALL_FLAGS = ['mode', 'turnLock', 'actionEconomy', 'movementBudget', 'tokenMoving',
+    'autoEncounters', 'autoRewards', 'zones', 'lineOfSight', 'opportunityAttacks', 'serverDice'];
+const canonical = (overrides = {}) => Object.fromEntries(
+    ALL_FLAGS.map(f => [f, overrides[f] ?? (f === 'mode' ? 'off' : false)]),
+);
 const VALID_TURN_STATE = {
     Rakan: { actionsUsed: 1, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 10, hasMoved: true, turnActive: true },
 };
@@ -54,10 +62,12 @@ describe('L5-001 change-data validation chokepoint', () => {
             expect(characterChangeData.get('test-campaign').enforcement).toBeUndefined();
         });
 
-        it('LAN no-op re-post of byte-identical state stays 200 with zero state change', async () => {
-            // The one open LAN lane: an honest SSE-heal echo of the current blob.
+        it('canonical-equal subset no-op re-post from a LAN origin stays 200 AND persists the full canonical blob', async () => {
+            // The one open LAN lane: an honest SSE-heal echo of the current state.
             // Canonical comparison is over the full flag set, so key order and
-            // partial shapes of the SAME state are no-ops too.
+            // partial shapes of the SAME state are no-ops too. The subset-clobber
+            // fix (backlog 2026-10-25): the no-op now RE-WRITES the canonical full
+            // blob instead of the raw subset — persisted shape is always 11 keys.
             const app = createTestApp();
             characterChangeData.get('test-campaign').enforcement = { mode: 'off', turnLock: false };
             const res = await request(app)
@@ -65,7 +75,7 @@ describe('L5-001 change-data validation chokepoint', () => {
                 .set('Host', '10.0.0.5')
                 .send({ value: { turnLock: false, mode: 'off' } });
             expect(res.status).toBe(200);
-            expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off', turnLock: false });
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual(canonical());
         });
 
         it('localhost keeps the full sub-flag staging lane while OFF (Admin panel unchanged)', async () => {
@@ -73,7 +83,8 @@ describe('L5-001 change-data validation chokepoint', () => {
                 .post('/api/campaigns/test-campaign/enforcement')
                 .send({ value: { mode: 'off', turnLock: true, autoRewards: true } });
             expect(res.status).toBe(200);
-            expect(characterChangeData.get('test-campaign').enforcement).toEqual({ mode: 'off', turnLock: true, autoRewards: true });
+            expect(characterChangeData.get('test-campaign').enforcement)
+                .toEqual(canonical({ turnLock: true, autoRewards: true }));
         });
     });
 
@@ -102,7 +113,8 @@ describe('L5-001 change-data validation chokepoint', () => {
                 .post('/api/campaigns/test-campaign/enforcement')
                 .send({ value: VALID_ENFORCEMENT });
             expect(res.status).toBe(200);
-            expect(characterChangeData.get('test-campaign').enforcement).toEqual(VALID_ENFORCEMENT);
+            expect(characterChangeData.get('test-campaign').enforcement)
+                .toEqual(canonical({ mode: 'on', turnLock: true, actionEconomy: true }));
         });
 
         it('non-localhost cannot even stage sub-flags once engaged (existing gate preserved)', async () => {
@@ -160,6 +172,54 @@ describe('L5-001 change-data validation chokepoint', () => {
                 .post('/api/campaigns/test-campaign/enforcement')
                 .send({ value: { mode: 'on', turnLock: 'true' } });
             expect(res.status).toBe(400);
+        });
+    });
+
+    // Backlog 2026-10-25: accepted enforcement writes persist the canonical
+    // FULL blob (mode + all 10 sub-flags, absent keys defaulted) — a valid
+    // key-subset used to REPLACE the stored 11-key blob with its 1-key shape.
+    describe('enforcement canonicalization (subset-clobber fix)', () => {
+        it('canonical-equal subset from localhost persists ALL 11 canonical keys', async () => {
+            const app = createTestApp();
+            const res = await request(app)
+                .post('/api/campaigns/test-campaign/enforcement')
+                .send({ value: { mode: 'off' } });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual(canonical());
+            expect(Object.keys(characterChangeData.get('test-campaign').enforcement)).toHaveLength(11);
+            // The SSE broadcast carries the same canonical truth the store holds.
+            expect(publish).toHaveBeenCalledWith(
+                'change-test-campaign-enforcement', canonical(), 'test-campaign',
+            );
+        });
+
+        it('non-canonical subset is applied AND persisted as the full 11-key shape', async () => {
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/enforcement')
+                .send({ value: { turnLock: true, mode: 'off' } });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual(canonical({ turnLock: true }));
+        });
+
+        it('canonical-equal subset no-op from any origin never clobbers a stored full blob', async () => {
+            const app = createTestApp();
+            characterChangeData.get('test-campaign').enforcement = canonical();
+            const res = await request(app)
+                .post('/api/campaigns/test-campaign/enforcement')
+                .set('Host', '100.92.171.80')
+                .send({ value: { mode: 'off' } });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual(canonical());
+        });
+
+        it('master-off subset disengage zeroes every flag into the full shape', async () => {
+            const app = createTestApp();
+            characterChangeData.get('test-campaign').enforcement = canonical({ mode: 'on', turnLock: true, zones: true });
+            const res = await request(app)
+                .post('/api/campaigns/test-campaign/enforcement')
+                .send({ value: { mode: 'off' } });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual(canonical());
         });
     });
 
@@ -231,7 +291,9 @@ describe('L5-001 change-data validation chokepoint', () => {
                 .post('/api/campaigns/test-campaign/enforcement')
                 .send({ value: { mode: 'off' } });
             expect(res.status).toBe(200);
-            expect(characterChangeData.get('test-campaign').enforcement.mode).toBe('off');
+            // Subset disengage is canonicalized: engage-era flags zero out and
+            // the FULL 11-key blob lands (no 1-key clobber, backlog 2026-10-25).
+            expect(characterChangeData.get('test-campaign').enforcement).toEqual(canonical());
         });
     });
 
