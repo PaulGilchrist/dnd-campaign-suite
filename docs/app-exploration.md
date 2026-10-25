@@ -117,7 +117,6 @@ Twelve fix/improve commits landed after the pm pass; every affected row re-deriv
 
 - *(2026-10-24 pm run — prior "leave music editor no-toast", "wizard no inline error", "generate-settlement destructive", "oembed cosmetic", "campaign-add 403 screen" items all RESOLVED by today's improve commits and were removed at fold. Eve "save-empty-encounter ungated" + "rename leaves Load modal open": RESOLVED 1ad97691a/fc903bfb9, night-verified, removed.)*
 - *(2026-10-24 night run — CLOSED same day by owner adjudication: BY DESIGN)* ~~Party currency survives Admin "Clear Change Data"~~ — **Doctrine (owner, 2026-10-24): party inventory is durable campaign treasury data, persists like the character sheets themselves, and deliberately NEVER clears with change-data; "Clear Change Data" is scoped to combat/effects state.** Harnesses restore inventory baselines via chips/PUT, not the admin clear. (Severity note kept where it belongs: because this store is durable, the open `bug-player-clients-can-write-party-inventory.md` forgery hole writes permanent data.)
-- *(2026-10-24 night run)* **`+ NPC` stamps ac:10/hp:10 defaults** while the NPC-page chip gates on authored AC/HP (Marta saga 3248119f7) — inconsistent spawn bar between the two NPC lanes; hide `+ NPC` or make defaults explicit in its confirm/UX.
 
 ## Coverage
 

@@ -410,10 +410,56 @@ describe('handleAddNpc', () => {
 
         handlers.handleAddNpc();
 
+        expect(window.confirm).toHaveBeenCalledWith('Add NPC with placeholder AC 10 / HP 10? Edit on the card.');
         expect(addNpc).toHaveBeenCalledWith(combatSummary);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
         expect(setCombatSummary).toHaveBeenCalledWith(expect.objectContaining({
             creatures: expect.arrayContaining([expect.objectContaining({ name: 'NPC 1', type: 'npc' })]),
+        }));
+    });
+
+    // Owner decision 2026-10-24: the +NPC lane stamps placeholder AC 10 / HP 10 — the
+    // confirm must name BOTH defaults and the card-edit remedy before any write runs.
+    it('confirm copy names AC 10, HP 10 as placeholders and points at the card', () => {
+        const { handlers } = makeHandlers([{ name: 'Alice', type: 'player', currentHp: 20 }]);
+
+        handlers.handleAddNpc();
+
+        const msg = window.confirm.mock.calls[0][0];
+        expect(msg).toMatch(/AC 10/);
+        expect(msg).toMatch(/HP 10/);
+        expect(msg).toMatch(/placeholder/i);
+        expect(msg).toMatch(/edit on the card/i);
+    });
+
+    it('declined confirm spawns nothing — zero writes', () => {
+        window.confirm = vi.fn(() => false);
+        const { handlers, combatSummary, setCombatSummary } = makeHandlers([
+            { name: 'Alice', type: 'player', currentHp: 20 },
+        ]);
+
+        handlers.handleAddNpc();
+
+        expect(window.confirm).toHaveBeenCalledTimes(1);
+        expect(addNpc).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
+        expect(setCombatSummary).not.toHaveBeenCalled();
+        expect(combatSummary.creatures.map(c => c.name)).toEqual(['Alice']);
+    });
+
+    it('accepted confirm runs addNpc with the ac:10/maxHp:10/currentHp:10 contract intact', () => {
+        const { handlers, combatSummary, setCombatSummary } = makeHandlers([
+            { name: 'Alice', type: 'player', currentHp: 20 },
+        ]);
+
+        handlers.handleAddNpc();
+
+        expect(window.confirm).toHaveBeenCalledTimes(1);
+        expect(addNpc).toHaveBeenCalledWith(combatSummary);
+        expect(setCombatSummary).toHaveBeenCalledWith(expect.objectContaining({
+            creatures: expect.arrayContaining([
+                expect.objectContaining({ name: 'NPC 1', ac: 10, maxHp: 10, currentHp: 10 }),
+            ]),
         }));
     });
 });

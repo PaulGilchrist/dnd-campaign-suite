@@ -179,6 +179,10 @@ export function createCreatureHandlers({
 
     const handleAddNpc = function handleAddNpc() {
         if (!combatSummary) return
+        // Owner decision 2026-10-24: this lane stamps placeholder AC 10 / HP 10 (unlike the
+        // NPC-page chip, which gates on authored stats) — name the defaults in a native
+        // confirm before spawning so the spawn bar is explicit. Cancel ⇒ zero writes.
+        if (!window.confirm('Add NPC with placeholder AC 10 / HP 10? Edit on the card.')) return
         addNpc(combatSummary)
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))

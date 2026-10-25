@@ -137,6 +137,8 @@ describe('Initiative window-event listeners', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // +NPC lane now confirms its placeholder AC/HP defaults (owner decision 2026-10-24).
+        window.confirm = vi.fn(() => true);
         props = {
             characters: [
                 { name: 'Alice', computedStats: { hitPoints: 20, currentHitPoints: 20, armorClass: 15 } },
@@ -311,6 +313,22 @@ describe('Initiative window-event listeners', () => {
             // Bob rides in via mergeCombatSummaryWithCharacters on adopt; the
             // '+' press then appends NPC 1 and the mutated summary persists verbatim.
             expect(latestStoredSummary().creatures.map(c => c.name)).toEqual(['Alice', 'Bob', 'NPC 1']);
+        });
+
+        // Owner decision 2026-10-24: +NPC must state its placeholder defaults in a
+        // native confirm; Cancel spawns nothing (accept leg covered in
+        // createCreatureHandlers.test.jsx — factory lane owns the write asserts).
+        it('clicking + NPC opens the explicit-defaults confirm; declined spawns nothing', async () => {
+            await renderWithSummary({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] }, 'Alice');
+            window.confirm.mockReturnValueOnce(false);
+
+            fireEvent.click(screen.getByText('+ NPC'));
+
+            const msg = window.confirm.mock.calls[0][0];
+            expect(msg).toMatch(/AC 10/);
+            expect(msg).toMatch(/HP 10/);
+            expect(addNpc).not.toHaveBeenCalled();
+            expect((latestStoredSummary()?.creatures ?? []).map(c => c.name)).not.toContain('NPC 1');
         });
     });
 });
