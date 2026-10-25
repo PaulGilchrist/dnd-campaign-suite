@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { applyBonusActionChoice } from '../../../../services/automation/handlers/combat/bonusActionChoiceHandler.js';
+import { chargeSlot } from '../../../../services/combat/chargeEconomy.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import '../../CharSheet.css';
 
@@ -26,6 +27,15 @@ function BonusActionChoiceModal({ action, options: optionsProp, playerStats, cam
         const res = await applyBonusActionChoice(action, playerStats, campaignName, selected);
         setResult(res);
         setApplied(true);
+        // L5-002: deferred chooser-modal charge — useCharActionsAutomation gated
+        // this row at click and deferred the economy stamp to this confirm seam
+        // ('modal' results defer, plan §7.2; mirror of handleHordeBreakerTargetSelected).
+        // No-op while enforcement/actionEconomy is off; Cancel never reaches here,
+        // so an abandoned chooser still spends nothing. A no-result apply resolves
+        // nothing — no charge, the chooser stays open for retry.
+        if (res) {
+            chargeSlot({ creatureName: playerStats.name, bucket: 'bonusAction', campaignName });
+        }
 
         await addEntry(campaignName, {
             type: 'ability_use',
@@ -78,20 +88,21 @@ function BonusActionChoiceModal({ action, options: optionsProp, playerStats, cam
                 </div>
                 <div className="sp-body">
                     <p>Choose a Bonus Action:</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                    <div className="choice-list">
                         {options.map((opt, i) => {
                             const isSelected = selected === opt.name;
                             return (
-                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                                <label key={i} className={`choice-option${isSelected ? ' choice-selected' : ''}`}>
                                     <input
                                         type="radio"
                                         name="bonusActionChoice"
                                         checked={isSelected}
                                         onChange={() => setSelected(opt.name)}
-                                        style={{ marginRight: '8px' }}
                                     />
-                                    <strong>{opt.name}</strong>
-                                    <span style={{ opacity: 0.8, marginLeft: '8px' }}>— {opt.description}</span>
+                                    <span className="choice-label">
+                                        <strong>{opt.name}</strong>
+                                        <span className="choice-description">— {opt.description}</span>
+                                    </span>
                                 </label>
                             );
                         })}
