@@ -5,8 +5,8 @@ import { computeMovementObstacles,
     computeReachable,
     findNearestValid,
 } from '../../../services/maps/reachability.js';
-import { clampMovementDrop } from '../../../services/combat/movementBudget.js';
-import { DEFAULT_SPEED_FEET } from '../../../services/combat/turnState.js';
+import { clampMovementDrop, reachableWithinBudget } from '../../../services/combat/movementBudget.js';
+import { DEFAULT_SPEED_FEET, remainingMovement } from '../../../services/combat/turnState.js';
 import { chargeMovement } from '../../../services/combat/chargeEconomy.js';
 import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 import { addEntry } from '../../../services/ui/logService.js';
@@ -99,6 +99,38 @@ function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, 
     }).catch((e) => { console.error('[usePlayerDragging:opportunity-trigger]', e); });
 }
 
+/**
+ * L5-002 persistence-race fix: press-time budget-pinned ghost region — the
+ * cells this creature can still pay for this turn, or null when the lane is
+ * inactive (enforcement off / no campaign / GM Shift unconstrained ⇒ the
+ * drag lane stays byte-identical to pre-L5, the L1–4 guarantee).
+ *
+ * Raw over-budget ghost cells were reaching disk through autosave and the
+ * save's own map-data SSE echo then overwrote the clamped pointerUp commit —
+ * the snap billed + logged while the token persisted past budget. Gating the
+ * live move to this set keeps EVERY persistence lane legal; the press-time
+ * snapshot is intentional: mid-drag turnState churn is re-adjudicated at
+ * drop by resolveMovementBudgetDrop, which stays the billing/logging
+ * authority (snapToBudget cells are a subset of this same-budget BFS region,
+ * so the drop-side clamped write is always inside the pinned region too).
+ */
+function pressBudgetRegion({ campaignName, unconstrained, player, obstacles, mapData, gridSize }) {
+    if (unconstrained || !campaignName) return null;
+    const enforcement = getRuntimeValue('campaign', 'enforcement');
+    if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget) return null;
+    return reachableWithinBudget({
+        from: { gridX: player.gridX, gridY: player.gridY },
+        obstacles,
+        terrain: mapData.terrain,
+        gridSize,
+        budgetFeet: remainingMovement(
+            getRuntimeValue('campaign', 'turnState') || {},
+            player.name || player.id,
+            Number(player.speedFeet) > 0 ? Number(player.speedFeet) : DEFAULT_SPEED_FEET,
+        ),
+    });
+}
+
 export default function usePlayerDragging({
     svgRef,
     mapData,
@@ -135,9 +167,13 @@ export default function usePlayerDragging({
         // (narrative teleports); everyone else may only drag the token
         // through cells it could actually walk through.
         const unconstrained = Boolean(isLocalhost && e.shiftKey);
+        const obstacles = computeMovementObstacles(walls, placedItems);
         const reachable = unconstrained
             ? null
-            : computeReachable(player.gridX, player.gridY, computeMovementObstacles(walls, placedItems), gridSize);
+            : computeReachable(player.gridX, player.gridY, obstacles, gridSize);
+
+        // L5-002: movement-budget pinned region (null ⇒ enforcement off).
+        const budgetReachable = pressBudgetRegion({ campaignName, unconstrained, player, obstacles, mapData, gridSize });
 
         // #910: capture only once the drag has verifiably started (house pattern:
         // useRuler.js guards, validates, then captures; mirrors the #883 fix in
@@ -154,12 +190,14 @@ export default function usePlayerDragging({
             offsetY: svgPt.y - cy,
             unconstrained,
             reachable,
+            // L5-002: budget-pinned ghost cells (null ⇒ enforcement off).
+            budgetReachable,
             // L5-002: mapData.players mutates live during pointermove, so the
             // turn-start cell must be captured at press time for budget clamping.
             startX: player.gridX,
             startY: player.gridY,
         });
-    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize]);
+    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize, campaignName]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;
@@ -182,8 +220,15 @@ export default function usePlayerDragging({
 
         if (!dragging.unconstrained) {
             // Keep the token inside its walkable region so the fog of war
-            // cannot be lifted across walls or closed doors.
-            const valid = dragging.reachable.has(`${clampedGridX},${clampedGridY}`);
+            // cannot be lifted across walls or closed doors. On the L5-002
+            // enforcement lane the region is additionally intersected with the
+            // cells its remaining speed can pay for (budgetReachable) — a RAW
+            // over-budget commit would ride autosave to disk and its SSE echo
+            // would overwrite the clamped pointerUp write (the token persisting
+            // past budget while the log claims a snap).
+            const key = `${clampedGridX},${clampedGridY}`;
+            const valid = dragging.reachable.has(key)
+                && (!dragging.budgetReachable || dragging.budgetReachable.has(key));
             if (!valid) {
                 setDragging((prev) => (prev && !prev.invalid ? { ...prev, invalid: true } : prev));
                 return;

@@ -100,6 +100,19 @@ export function snapToBudget({ from, to, budgetFeet, obstacles, terrain, gridSiz
 }
 
 /**
+ * Set of "x,y" cells reachable from `from` within `budgetFeet` (cost-weighted,
+ * same Dijkstra as snapToBudget; origin cost 0 always included). The
+ * budget-active token-drag lane lives in usePlayerDragging.js: enforcement
+ * on ⇒ the live ghost pins to this set so raw over-budget cells NEVER enter
+ * mapData — autosave snapshots live mapData, and a persisted raw drop's
+ * SSE echo would overwrite the pointerUp clamped commit (the snap was then
+ * billed + logged while the token sat past budget on disk).
+ */
+export function reachableWithinBudget({ from, obstacles, terrain, gridSize, budgetFeet }) {
+    return new Set(traverseGrid({ from, obstacles, terrain, gridSize, budgetFeet }).keys())
+}
+
+/**
  * Clamp a drag drop to the creature's remaining movement budget.
  * Returns { target: { gridX, gridY }, costFeet, snapped }.
  */

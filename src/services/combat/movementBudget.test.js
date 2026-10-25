@@ -9,6 +9,7 @@
  *
  * Consumers (run this math REAL, tested in their own lanes — wiring only, not re-done here):
  *  - usePlayerDragging.js  → clampMovementDrop (token-drop clamp + enforcement_denied log)
+ *                            + reachableWithinBudget (press-time budget-pinned ghost gate)
  *  - useSelectMove.js      → clampSelectionOffset (GM multi-select rigid clamp)
  *
  * Math is the SUT: exact foot-feet bytes, hand-derived once per leg; boundary
@@ -19,6 +20,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
     computePathCost,
     snapToBudget,
+    reachableWithinBudget,
     clampMovementDrop,
     clampSelectionOffset,
     terrainMultiplier,
@@ -84,6 +86,36 @@ describe('snapToBudget (L5-002)', () => {
 
     it('zero budget leaves the creature at the origin', () => {
         expect(snapToBudget({ from: { gridX: 4, gridY: 4 }, to: { gridX: 9, gridY: 4 }, budgetFeet: 0, obstacles: open(), terrain: {}, gridSize: GRID })).toEqual({ x: 4, y: 4, costFeet: 0, steps: 0 });
+    });
+});
+
+describe('reachableWithinBudget (L5-002 drag-pinning set)', () => {
+    it('returns every cell whose cheapest cost fits the budget — origin always in, cost+5 out', () => {
+        // Open grid from (4,4) with 10 ft (2 steps): diamond of costs ≤ 10.
+        const set = reachableWithinBudget({ from: { gridX: 4, gridY: 4 }, obstacles: open(), terrain: {}, gridSize: GRID, budgetFeet: 10 });
+        expect(set.has('4,4')).toBe(true);  // origin cost 0
+        expect(set.has('6,4')).toBe(true);  // 2 steps = 10 ft exact
+        expect(set.has('5,5')).toBe(true);  // diagonal via (5,4): 10 ft
+        expect(set.has('7,4')).toBe(false); // 15 ft — over
+        expect(set.has('4,7')).toBe(false); // 15 ft — over
+    });
+
+    it('difficult terrain shrinks the region: 15 ft of swamp pays only 5 cells of progress', () => {
+        const terrain = { '5,4': 'difficult' };
+        const set = reachableWithinBudget({ from: { gridX: 4, gridY: 4 }, obstacles: open(), terrain, gridSize: GRID, budgetFeet: 10 });
+        expect(set.has('5,4')).toBe(true);  // entering swamp costs 10 — exact fit
+        expect(set.has('6,4')).toBe(false); // 15 ft — over
+    });
+
+    it('zero budget yields exactly the origin (token pinned)', () => {
+        const set = reachableWithinBudget({ from: { gridX: 4, gridY: 4 }, obstacles: open(), terrain: {}, gridSize: GRID, budgetFeet: 0 });
+        expect(set).toEqual(new Set(['4,4']));
+    });
+
+    it('walls prune the region to the walkable side', () => {
+        const walls = new Set(['6,0', '6,1', '6,2', '6,3', '6,4', '6,5']);
+        const set = reachableWithinBudget({ from: { gridX: 5, gridY: 4 }, obstacles: walls, terrain: {}, gridSize: GRID, budgetFeet: 10 });
+        expect(set.has('6,4')).toBe(false); // wall — never affordable, never reachable
     });
 });
 

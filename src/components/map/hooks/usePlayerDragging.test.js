@@ -13,7 +13,8 @@
 // Do NOT duplicate here: useItemDragging.test.js — placedItems lane (commit contract #905);
 // useMapDrops.test.js — external drop-target lane; Map*.test.jsx — consume this hook fully mocked;
 // movementBudget.test.js / chargeEconomy.test.js — budget clamp math (every drop here runs with
-// enforcement absent ⇒ passthrough, verified implicitly by each commit row).
+// enforcement absent ⇒ passthrough, verified implicitly by each commit row — the budget-ON lane
+// lives in usePlayerDragging.movement-budget.test.js).
 // Snap/reachability math is NOT mocked: pointer coords fed, exact cell bytes pinned.
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
