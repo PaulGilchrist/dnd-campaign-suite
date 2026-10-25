@@ -2,7 +2,7 @@
 // Seam: computeTargetAc — the single AC math consumed by hitResolution.js and
 // useLoggedDiceRollAttack.js at the attack-roll seam: player/NPC base-AC
 // resolution, the SP-013 Barkskin min-17 FLOOR (2024; floor semantics, NOT an
-// additive buff), and the L5-003 half-cover −2 stamp stacking ON TOP of the
+// additive buff), and the L5-003 half-cover +2 stamp stacking ON TOP of the
 // floor. Channel stamp read/write/matching lives in coverService.test.js;
 // buff application in barkskinHandler.test.js; display pinning in
 // CharSummary-BadgesAndAC.test.jsx.
@@ -87,14 +87,14 @@ describe('computeTargetAc', () => {
     });
 
     describe('L5-003 §8.3 half cover', () => {
-        it('stacks the stamped −2 on top of the Barkskin floor', () => {
+        it('stacks the stamped +2 on top of the Barkskin floor', () => {
             barkskin('DruidTarget');
-            store['campaign._cover_shot'] = { attackerName: 'Hero', targetName: 'DruidTarget', ac: -2, round: 1 };
+            store['campaign._cover_shot'] = { attackerName: 'Hero', targetName: 'DruidTarget', ac: 2, round: 1 };
             const ctx = { ...ATTACK, attackerName: 'Hero' };
             const target = { name: 'DruidTarget', type: 'player' };
             const characters = [{ name: 'DruidTarget', computedStats: { armorClass: 9 } }];
-            // floor 17 is a base-AC rule; the −2 circumstance penalty rides on top.
-            expect(computeTargetAc(ctx, target, characters, CAMPAIGN)).toBe(15);
+            // floor 17 is a base-AC rule; the +2 circumstance bonus rides on top.
+            expect(computeTargetAc(ctx, target, characters, CAMPAIGN)).toBe(19);
         });
     });
 });

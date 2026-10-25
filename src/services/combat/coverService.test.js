@@ -1,5 +1,5 @@
 // @maintained-by-ai
-// L5-003 §8.3 lane — combat/coverService.js: intervening-CREATURE half cover (−2 AC).
+// L5-003 §8.3 lane — combat/coverService.js: intervening-CREATURE half cover (+2 AC).
 //
 // Contract here (GEOMETRY + CHANNEL, not the items/walls rules-table):
 //   isCoverEnforced  — gate predicate: enforcement on + zones + genuinely ranged (> 8 ft touch).
@@ -9,7 +9,7 @@
 //
 // Family map — owned ELSEWHERE, cited not re-driven:
 //   rules/combat/coverService.test.js   — computeCover items/walls table (half/¾/full, doors).
-//   hooks/combat/targetAcComputation.test.js — AC-seam APPLICATION: −2 stacking on Barkskin floor.
+//   hooks/combat/targetAcComputation.test.js — AC-seam APPLICATION: +2 stacking on Barkskin floor.
 //   combat/lineOfSightGate.test.js      — wall DENY at the §8.2 seam (runs this module live but
 //                                          its enforcement store is off — cover branch never fires).
 //   char-sheet/useCharActionsAttackHandlers* / useSpellCastExecutor — gate CALLERS (mocked there).
@@ -111,7 +111,7 @@ describe('findInterveningCreature — ray interior (pure)', () => {
 });
 
 describe('stampCoverShot / readCoverShot channel', () => {
-    it('stamp writes ONE exact −2 value, campaign-pinned; read-back matches attacker+target+round', () => {
+    it('stamp writes ONE exact +2 value, campaign-pinned; read-back matches attacker+target+round', () => {
         const stamp = stampCoverShot({ campaignName: 'test-campaign', attackerName: 'Hero', targetName: 'Mage', blocker, round: 4 });
         expect(stamp).toEqual({ attackerName: 'Hero', targetName: 'Mage', ac: HALF_COVER_AC, blocker: 'Goblin', cell: '3,0', round: 4 });
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
@@ -125,7 +125,7 @@ describe('stampCoverShot / readCoverShot channel', () => {
     it('wrong target / attacker / stale round ⇒ null; roundless stamp never expires; empty store ⇒ null', () => {
         const stamp = stampCoverShot({ campaignName: 'test-campaign', attackerName: 'Hero', targetName: 'Mage', blocker, round: 4 });
         const timeless = stampCoverShot({ campaignName: 'test-campaign', attackerName: 'Hero', targetName: 'Mage', blocker });
-        expect(timeless).toEqual({ attackerName: 'Hero', targetName: 'Mage', ac: -2, blocker: 'Goblin', cell: '3,0', round: null });
+        expect(timeless).toEqual({ attackerName: 'Hero', targetName: 'Mage', ac: 2, blocker: 'Goblin', cell: '3,0', round: null });
         const store = { [COVER_SHOT_KEY]: null };
         getRuntimeValue.mockImplementation((name, key) => (name === 'campaign' && key === COVER_SHOT_KEY ? store[key] : null));
 
@@ -160,7 +160,7 @@ describe('stampCoverShot / readCoverShot channel', () => {
 });
 
 describe('adjudicateCoverShot (gate-side)', () => {
-    it('intervener ⇒ exact −2 stamp with round from combatData + ONE enforcement_cover log (exact bytes)', () => {
+    it('intervener ⇒ exact +2 stamp with round from combatData + ONE enforcement_cover log (exact bytes)', () => {
         getRuntimeValue.mockImplementation((name, key) => (name === 'campaign' && key === 'enforcement' ? ZONES_ON : null));
         const stamp = adjudicateCoverShot({
             campaignName: 'test-campaign',
@@ -170,7 +170,7 @@ describe('adjudicateCoverShot (gate-side)', () => {
             to,
             players: [{ name: 'Stray', gridX: 3, gridY: 4 }, blocker, { name: 'Ghost', gridX: null, gridY: null }],
         });
-        expect(stamp).toEqual({ attackerName: 'Hero', targetName: 'Mage', ac: -2, blocker: 'Goblin', cell: '3,0', round: 1 });
+        expect(stamp).toEqual({ attackerName: 'Hero', targetName: 'Mage', ac: 2, blocker: 'Goblin', cell: '3,0', round: 1 });
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('campaign', COVER_SHOT_KEY, stamp, 'test-campaign');
         expect(addEntry).toHaveBeenCalledTimes(1);
@@ -178,7 +178,7 @@ describe('adjudicateCoverShot (gate-side)', () => {
             type: 'enforcement_cover',
             creature: 'Hero',
             target: 'Mage',
-            description: 'Half cover (−2 AC): Goblin interposes at (3,0) between Hero and Mage (enforcement: zones).',
+            description: 'Half cover (+2 AC): Goblin interposes at (3,0) between Hero and Mage (enforcement: zones).',
             timestamp: expect.any(Number),
         });
     });

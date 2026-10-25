@@ -124,7 +124,7 @@ export async function checkLineOfSight(ctx) {
 
     // §8.3 cover: an intervening COMBATANT (creature token, never a wall —
     // walls denied above or are the GM's fiction while LoS is unenforced)
-    // grants the target half cover −2, stamped for computeTargetAc to read
+    // grants the target half cover +2, stamped for computeTargetAc to read
     // back at the roll seam.
     if (coverLive) {
         adjudicateCoverShot({ campaignName, attackerName, targetName, from, to, players: data.players });

@@ -2,7 +2,7 @@
 // L5-003 §8.2 lane — combat/lineOfSightGate.js: the enforcement-mode GATE WRAPPER for
 // ranged attacks/casts (master switch campaign.enforcement.lineOfSight, consulted at the
 // attack/spell seams). Distinct from the §8.3 cover CHANNEL, owned by coverService.test.js
-// (#_cover_shot stamp, bresenham scan, −2 half cover — #1013): every fixture here omits
+// (#_cover_shot stamp, bresenham scan, +2 half cover — #1013): every fixture here omits
 // `zones`, so the cover branch never fires and this lane never writes the store.
 //
 // Contract here (gate truth table + denial plumbing, not ray math):

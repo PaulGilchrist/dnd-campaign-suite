@@ -35,9 +35,9 @@ export function computeTargetAc(context, target, characters, campaignName) {
     }
     // L5-003 §8.3 cover: half-cover stamp armed by the LoS/cover gate at
     // this shot's click (sync cached read). Covers stack ON TOP of the
-    // Barkskin floor (floor is a base-AC rule; −2 is a circumstance
-    // penalty). Matched by attacker + target + round; clear shots write
-    // null so a clean line is never taxed. Zones off ⇒ stamp never
+    // Barkskin floor (floor is a base-AC rule; +2 is a circumstance
+    // bonus). Matched by attacker + target + round; clear shots write
+    // null so a clean line never gains the bonus. Zones off ⇒ stamp never
     // written ⇒ byte-parity.
     const cover = readCoverShot(context, target.name, campaignName, getCurrentCombatRound(campaignName));
     if (cover) {

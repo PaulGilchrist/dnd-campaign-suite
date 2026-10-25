@@ -6,16 +6,16 @@
  *    through them, so walls never become a cover bonus here (a wall is never
  *    "half" of anything in this engine).
  *  - What the engine genuinely lacked: an INTERVENING CREATURE. RAW grants
- *    the target half cover (−2 AC) when at least one combatant other than
+ *    the target half cover (+2 AC) when at least one combatant other than
  *    attacker and target interposes on the line — and since creatures are
  *    not obstacles in `computeMovementObstacles`, ranged shots previously
  *    sailed through friendly bodies at full AC.
- *  - Three-quarters (−5) requires measuring 75% body obscuration — NOT
+ *  - Three-quarters (+5) requires measuring 75% body obscuration — NOT
  *    computable from a token grid, so it is never fabricated here
- *    (MA-1215 discipline); stacked interveners stay −2, advisory says so.
+ *    (MA-1215 discipline); stacked interveners stay +2, advisory says so.
  *
  * Channel: the gate runs async at the attack/cast click (§8.2 seam), so the
- * −2 is STAMPED to `campaign/_cover_shot` {attacker, target, round} there
+ * +2 is STAMPED to `campaign/_cover_shot` {attacker, target, round} there
  * and read back SYNC by `computeTargetAc` (cached runtime read, Barkskin-
  * style) plus logged once as `enforcement_cover`. Enforcement off or zones
  * flag off ⇒ no stamp, no map consult at the seam, AC math byte-identical.
@@ -27,7 +27,10 @@ import { getCurrentCombatRound } from '../encounters/combatData.js';
 import { addEntry } from '../ui/logService.js';
 
 export const COVER_SHOT_KEY = '_cover_shot';
-export const HALF_COVER_AC = -2;
+// RAW (PHB 2024 ch.9 / basic rules "Cover"): half cover RAISES the target's
+// AC by +2 (and +2 Dex saves) — a defense bonus, matching the sign the
+// items/walls cover lanes use (coverAcBonus: +2 / +5).
+export const HALF_COVER_AC = 2;
 
 // Same touch/diagonal constant the §8.2 gate uses (rangeToFeet('touch')).
 const TOUCH_RANGE_FT = rangeToFeet('touch');
@@ -63,7 +66,7 @@ export function findInterveningCreature({ from, to, tokens, attackerName, target
 
 /** Stamp the enforced half-cover onto the campaign store (ONE write, §39;
  *  replaced by the next stamped shot). A CLEAR shot writes null — wiping any
- *  stale stamp from earlier in the round so −2 never rides a clean line.
+ *  stale stamp from earlier in the round so +2 never rides a clean line.
  *  Returns the stamp, or null when nothing is covered. */
 export function stampCoverShot({ campaignName, attackerName, targetName, blocker, round }) {
     if (!campaignName || !attackerName || !targetName) return null;
@@ -97,7 +100,7 @@ export function readCoverShot(context, targetName, campaignName, currentRound) {
 
 /** Gate-side adjudication (called only when isCoverEnforced is true): the
  *  players array carries every placed combat token (PCs and NPCs alike);
- *  placed items never interpose. Stamps −2 (or clears the stamp on a clear
+ *  placed items never interpose. Stamps +2 (or clears the stamp on a clear
  *  line) and logs once per adjudicated shot. */
 export function adjudicateCoverShot({ campaignName, attackerName, targetName, from, to, players }) {
     const creatureTokens = (players || []).filter(hasPosition);
@@ -114,7 +117,7 @@ export function adjudicateCoverShot({ campaignName, attackerName, targetName, fr
             type: 'enforcement_cover',
             creature: attackerName,
             target: targetName,
-            description: `Half cover (−2 AC): ${blocker.name} interposes at (${stamp.cell}) between ${attackerName} and ${targetName} (enforcement: zones).`,
+            description: `Half cover (+2 AC): ${blocker.name} interposes at (${stamp.cell}) between ${attackerName} and ${targetName} (enforcement: zones).`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[coverService:cover-log] failed:', e); });
     }

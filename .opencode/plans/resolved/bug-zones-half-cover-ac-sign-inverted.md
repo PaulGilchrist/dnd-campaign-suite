@@ -43,3 +43,23 @@ and change the `enforcement_cover` description to `Half cover (+2 AC): …` plus
 
 ## Severity
 Data integrity risk — a live rules-enforcement lane inverts a core defense rule and flips hit/miss outcomes (with applied damage) whenever `zones` is engaged. Scope is gated behind opt-in enforcement, but the numbers written to the campaign log/lastAttack are machine truth other systems read.
+
+## Resolution
+FIXED 2026-10-25 (live-verified in test-campaign before/after + regression tests).
+
+**Root cause — original diagnosis confirmed byte-explicit.** The black-box guess was exactly right: the zones enforcement lane's producer constant `HALF_COVER_AC = -2` (`coverService.js:30`) was stamped into `campaign/_cover_shot.ac` and added verbatim by the sole reader `targetAcComputation.js` (`targetAc += cover.ac`). RAW half cover is a **+2 AC defense bonus** to the target (5e and 2024), and the app's other cover lanes already model it positively (`MonsterCardModal.jsx` `coverAcBonus: 2`, half=+2 / three-quarters=+5; `DiceRollResult.computed.js` adds it). No reader change was needed — only the sign at the producer plus the copy/comments that baked in the "−2" direction. The secondary nat-1 auto-miss observation was **left untouched per instruction** (owner adjudication owed; `showFumble` stays display-only). Note: the lane models the AC leg only; the +2 Dex-save leg of half cover was never claimed by this stamp channel and remains unmodeled (unchanged by this fix).
+
+**Files changed:**
+- `src/services/combat/coverService.js` — `HALF_COVER_AC = 2` (with RAW sign comment); header doc comments "−2/−5" → "+2/+5"; `enforcement_cover` log description now `Half cover (+2 AC): …`.
+- `src/hooks/combat/targetAcComputation.js` — comment-only ("+2 circumstance bonus", "clean line never gains the bonus"); `targetAc += cover.ac` math unchanged (correct for the positive bonus).
+- `src/services/combat/lineOfSightGate.js` — comment-only ("grants the target half cover +2").
+- `src/services/combat/coverService.test.js`, `src/hooks/combat/targetAcComputation.test.js`, `src/services/combat/lineOfSightGate.test.js` — stale pins inverted same-pass: stamp fixture/literals `ac:-2` → `ac:2`, log string `"(−2 AC)"` → `"(+2 AC)"`, Barkskin-floor stacking expectation `15` → `19` (floor 17 + 2), header comments.
+- `src/services/combat/coverService.half-cover-sign.test.js` — NEW regression lock: pins `HALF_COVER_AC === 2`, stamp `ac:2` (positive), end-to-end `computeTargetAc` AC 10 ⇒ **12** (not 8), and the exact `"(+2 AC)"` log bytes.
+- Dual-ruleset check: `coverService.js`/`targetAcComputation.js` are ruleset-agnostic shared modules (no 2024 twin exists; half cover is +2 in both rulesets) — no sibling-module change needed.
+
+**Verification:**
+1. **Pre-fix live repro** (test-campaign, zones-only enforcement, Battle Arena, FeyRanger (9,8) → NPC 1 (15,8) bare-init ac:10, EvasiveFighter dragged onto the ray at (12,8)): popup `✓ HIT (20 vs AC 8)`, log `enforcement_cover` "Half cover (−2 AC): EvasiveFighter interposes at (12,8) …", roll `targetAc:8, effectiveAc:8, hit:true`, damage applied — bug reproduced 1/1 exactly as filed.
+2. **Post-fix live re-verify** (same rig): popup `vs AC 12`; logs `targetAc:12, effectiveAc:12`; a total-9 shot (nat 1 +8) resolved `✗ MISS (9 vs AC 12)` with `hit:false` and zero damage; `enforcement_cover` reads `Half cover (+2 AC): EvasiveFighter interposes at (12,8) between FeyRanger and NPC 1 (enforcement: zones).`
+3. **Adjacent sanity** (control): EvasiveFighter dragged back to (1,8) → clear-line shot resolved `✓ HIT (16 vs AC 10)` (`targetAc:10`, stamp null-wiped, no new `enforcement_cover` entry) — the clear-line leg still works.
+4. **Tests:** `npx vitest run` on the new sign-lock (4/4) → the three touched suites (26/26) → full touched folders `src/services/combat` + `src/hooks/combat` (398 files, 4871 passed, 3 expected-fail pre-existing) → full `npm run test:run` green → `npm run lint` zero warnings.
+5. **Cleanup:** placed "NPC 1" map token deleted (named confirm), Battle Arena disk restored to baseline (players SA@15,9 FR@9,8 EF@1,8, walls/placedItems empty); change-data `{}` and log `[]` via admin clears from a quiet state, GET-verified.
