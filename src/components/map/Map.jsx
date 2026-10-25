@@ -366,7 +366,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const effectiveWalls = computeEffectiveWalls(mapData.walls, placedItems);
 
     return (
-        <div className="map">
+        // data-testid: mount-proof hook for automation — present ONLY while an
+        // indoor map editor is mounted (root renders null until mapData loads,
+        // and HexMap carries the same id for outdoor maps). Proves the maps
+        // list "Open" click actually navigated, without polling for tokens.
+        <div className="map" data-testid="map-editor">
             <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
             {viewMode === '3d' ? (
                 <Map3D

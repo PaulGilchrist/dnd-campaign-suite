@@ -354,7 +354,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }, [pois, getHexFromEvent, hexCols, hexRows, setMarchingOrder, setPartyPosition, setPois]);
 
     return (
-        <div className="hex-map">
+        // data-testid: outdoor twin of the Map.jsx mount-proof hook — the maps
+        // list "Open" lane asserts [data-testid="map-editor"] for any mounted
+        // map editor, indoor or outdoor.
+        <div className="hex-map" data-testid="map-editor">
             <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
             <HexMapToolbar
                 onBack={onBack}
