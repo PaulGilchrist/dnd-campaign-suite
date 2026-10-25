@@ -258,6 +258,9 @@ describe('placed-item click-select → visible delete dock', () => {
         const btn = deleteDockButton();
         expect(btn.tagName).toBe('BUTTON');
         expect(container.querySelector('.item-details-dock')).toBeInTheDocument();
+        // Named token: plain name everywhere, no coord suffix.
+        expect(container.querySelector('.item-details-dock')).toHaveAttribute('aria-label', 'Selected item: QA Marta');
+        expect(container.querySelector('.item-details-dock-name').textContent).toBe('QA Marta');
         // click lane never opens the right-click menu
         expect(container.querySelectorAll('.item-context-menu')).toHaveLength(0);
         // confirm not yet asked — selection alone is inert
@@ -298,6 +301,32 @@ describe('placed-item click-select → visible delete dock', () => {
         mapsService.saveMapData.mock.calls.forEach(([, , payload]) =>
             expect(payload.placedItems).toEqual([expect.objectContaining({ id: 'npc-qa' })])
         );
+    });
+
+    it('GM: palette-default NPC (name "NPC") is cell-anchored in dock text, both aria-labels, and the confirm', async () => {
+        // Backlog 2026-10-25 pm: every unnamed palette token read "NPC" —
+        // ambiguous with several on one map. Unnamed + numeric cell ⇒ `NPC (x,y)`
+        // through the ONE placedItemLabel source (dock name, both arias, confirm).
+        mapsService.loadMapData.mockResolvedValue({
+            players: [],
+            walls: [],
+            revealed: [],
+            gridSize: 30,
+            placedItems: [{ id: 'npc-anon', type: 'npc', name: 'NPC', gridX: 5, gridY: 5, visible: true }],
+        });
+        const { container } = await act(async () => renderMap());
+        await settleAutosave();
+
+        await clickToken(container);
+
+        const dock = container.querySelector('.item-details-dock');
+        expect(dock).toHaveAttribute('aria-label', 'Selected item: NPC (5,5)');
+        expect(dock.querySelector('.item-details-dock-name').textContent).toBe('NPC (5,5)');
+        const btn = screen.getByRole('button', { name: 'Delete "NPC (5,5)"' });
+        expect(btn).toBeInTheDocument();
+
+        await act(async () => { fireEvent.click(btn); });
+        expect(confirmSpy).toHaveBeenCalledWith('Delete "NPC (5,5)" from the map?');
     });
 
     it('GM: click on empty canvas deselects — the dock unmounts, no stale control', async () => {

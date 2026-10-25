@@ -66,7 +66,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- *(2026-10-25 pm)* Click-select dock names items "NPC" for every unnamed placed token (palette default), making the dock/delete confirm ambiguous with multiple NPCs on a map — show cell coords in the label (e.g. `NPC (12,8)`) until the token is renamed; pairs with the rename-collision fix (`bug-map-rename-all-same-named-tokens`).
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT.)*
 
 ## Coverage

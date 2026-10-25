@@ -13,7 +13,7 @@
 //   quirk, same precedent as the useMapDrops lane's removed quirk pins.
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import usePlacedItems from './usePlacedItems.js';
+import usePlacedItems, { placedItemLabel } from './usePlacedItems.js';
 
 describe('usePlacedItems', () => {
   // Honest stateful harness (#906): the setter applies updaters to live state, so every
@@ -161,7 +161,9 @@ describe('usePlacedItems', () => {
     act(() => result.current.handleDeleteItem('npc1'));
     expect(confirmSpy).toHaveBeenCalledWith('Delete "Marta Copperkettle" from the map?');
     act(() => result.current.handleDeleteItem('barrel1'));
-    expect(confirmSpy).toHaveBeenLastCalledWith('Delete "barrel" from the map?');
+    // Unnamed furniture is anchored by its cell too (same ambiguity family
+    // as the 'NPC' palette default).
+    expect(confirmSpy).toHaveBeenLastCalledWith('Delete "barrel (6,6)" from the map?');
     // Unknown id still asks honestly with the generic fallback and writes an
     // inert filter (selection clears — unchanged seam semantics).
     act(() => result.current.handleDeleteItem('ghost'));
@@ -180,5 +182,42 @@ describe('usePlacedItems', () => {
     expect(setSelectedItem).not.toHaveBeenCalled();
     expect(placedItems).toEqual(before);
     expect(placedItems[0]).toBe(before[0]);
+  });
+});
+
+// Label semantics (backlog 2026-10-25 pm): every palette NPC token arrives
+// named 'NPC', so several unnamed tokens share one ambiguous dock/confirm
+// label. Unnamed + numeric cell coords ⇒ `NPC (12,8)`; a real rename wins.
+describe('placedItemLabel', () => {
+  it('anchors the palette-default NPC name to its grid cell', () => {
+    expect(placedItemLabel({ id: 'a', type: 'npc', name: 'NPC', gridX: 12, gridY: 8 }))
+      .toBe('NPC (12,8)');
+    expect(placedItemLabel({ id: 'b', type: 'npc', name: 'NPC', gridX: 0, gridY: 0 }))
+      .toBe('NPC (0,0)');
+  });
+
+  it('a real rename wins: plain name, no coords', () => {
+    expect(placedItemLabel({ id: 'a', type: 'npc', name: 'Marta', gridX: 12, gridY: 8 }))
+      .toBe('Marta');
+  });
+
+  it('nameless items fall back to their type key, still cell-anchored', () => {
+    expect(placedItemLabel({ id: 'a', type: 'barrel', gridX: 6, gridY: 6 }))
+      .toBe('barrel (6,6)');
+  });
+
+  it('never renders undefined coords: missing/non-numeric gridX/gridY keep the plain label', () => {
+    expect(placedItemLabel({ id: 'a', type: 'npc', name: 'NPC' })).toBe('NPC');
+    expect(placedItemLabel({ id: 'a', type: 'npc', name: 'NPC', gridX: 3 })).toBe('NPC');
+    expect(placedItemLabel({ id: 'a', type: 'npc', name: 'NPC', gridY: 3 })).toBe('NPC');
+    expect(placedItemLabel({ id: 'a', type: 'npc', name: 'NPC', gridX: NaN, gridY: 3 })).toBe('NPC');
+    expect(placedItemLabel({ id: 'a', type: 'npc', name: 'NPC', gridX: '3', gridY: '4' })).toBe('NPC');
+  });
+
+  it('nameless AND typeless items keep the generic fallback, cell-anchored only when coords exist', () => {
+    expect(placedItemLabel({ id: 'a' })).toBe('placed item');
+    expect(placedItemLabel({ id: 'a', gridX: 1, gridY: 2 })).toBe('placed item (1,2)');
+    expect(placedItemLabel(null)).toBe('placed item');
+    expect(placedItemLabel(undefined)).toBe('placed item');
   });
 });
