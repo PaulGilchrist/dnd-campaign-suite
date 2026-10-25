@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../../services/encounters/outdoorEncounterGenerator.js';
+import { buildEncounterMapDisplayName } from '../../../services/encounters/encounterMapNaming.js';
 
 function useEncounterGeneration(campaignName, mapName, terrain, marchingOrder, onEncounterCreated) {
     const generateMonsterPlacements = useCallback((monsters, gridSize) => {
@@ -40,12 +41,15 @@ function useEncounterGeneration(campaignName, mapName, terrain, marchingOrder, o
         return items;
     }, []);
 
-    const handleStartEncounter = useCallback(async (q, r, extraPlacedItems = []) => {
+    const handleStartEncounter = useCallback(async (q, r, extraPlacedItems = [], eventTitle = null) => {
         const terrainType = terrain[hexKey(q, r)] || 'plains';
         const grid = 30;
         const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
-        const baseMapName = mapName.replace(/\.json$/, '');
-        const encounterName = `${baseMapName} - Encounter at ${q},${r}`;
+        // Readable display label ("Test Map - Ambush from the Brush at (5,5)")
+        // — shared with the auto-encounter log copy so the Maps list and the
+        // log name the arena identically (backlog 2026-10-25 pm). The server
+        // still slugs this into the on-disk fileName unchanged in kind.
+        const encounterName = buildEncounterMapDisplayName({ parentMapName: mapName, q, r, eventTitle });
 
         if (extraPlacedItems.length > 0) {
             encounterData.placedItems = [...encounterData.placedItems, ...extraPlacedItems];
@@ -65,14 +69,25 @@ function useEncounterGeneration(campaignName, mapName, terrain, marchingOrder, o
             });
 
             if (!result?.alreadyExists) {
-                await mapsService.saveMapData(campaignName, encounterName, encounterData);
+                // The PUT route persists the body verbatim, so the authored
+                // display metadata must ride IN the save payload or the label
+                // created above is wiped and the Maps list falls back to the
+                // raw kebab slug (2026-10-25 backlog).
+                await mapsService.saveMapData(campaignName, encounterName, {
+                    ...encounterData,
+                    displayName: encounterName,
+                    name: mapsService.toKebabCase(encounterName),
+                });
             }
 
             if (onEncounterCreated) {
                 onEncounterCreated(encounterName);
             }
+
+            return encounterName;
         } catch (err) {
             console.error('[handleStartEncounter] FAILED:', err);
+            return null;
         }
     }, [campaignName, mapName, terrain, marchingOrder, onEncounterCreated]);
 

@@ -97,7 +97,10 @@ describe('autoEncounters armed', () => {
     });
 
     it('armed Accept: hydrates, dispatches once, moves phase, audits — exact bytes', async () => {
-        const r = await autoStartEncounterFromEvent({ campaignName: CN, event: EVENT, characters: CHARACTERS });
+        const r = await autoStartEncounterFromEvent({
+            campaignName: CN, event: EVENT, characters: CHARACTERS,
+            battleMapName: 'Test Map - Ambush on the road at (15,8)',
+        });
         expect(r).toEqual({ started: true });
         // ONE dispatch (#951), campaign pinned (#934), full hydrated stat block.
         expect(trackerCalls).toHaveLength(1);
@@ -110,6 +113,8 @@ describe('autoEncounters armed', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'sessionState',
             expect.objectContaining({ phase: 'encounter', changedBy: 'auto-encounter' }), CN);
         // Audit entry, description hand-derived once (#815): 1 player + 2 goblins = 3.
+        // The line names the spawned battle map by its readable label (Maps-list
+        // parity, backlog 2026-10-25 pm) so the GM can find the arena.
         const auto = logs.find((l) => l.automationType === 'auto_encounter_started');
         expect(logs.filter((l) => l.automationType === 'auto_encounter_started')).toHaveLength(1);
         expect(auto).toEqual({
@@ -117,6 +122,22 @@ describe('autoEncounters armed', () => {
             automationType: 'auto_encounter_started',
             difficulty: 'Medium',
             totalXP: 200,
+            battleMap: 'Test Map - Ambush on the road at (15,8)',
+            description: 'Auto-encounter started: 2x Goblin (3 on the tracker, initiative rolled by the engine).'
+                + ' Battle map spawned: "Test Map - Ambush on the road at (15,8)" — find it in the Maps list.',
+        });
+    });
+
+    it('audit keeps the legacy copy when no battle map spawned (e.g. no position)', async () => {
+        const r = await autoStartEncounterFromEvent({ campaignName: CN, event: EVENT, characters: CHARACTERS });
+        expect(r).toEqual({ started: true });
+        const auto = logs.find((l) => l.automationType === 'auto_encounter_started');
+        expect(auto).toEqual({
+            type: 'automation',
+            automationType: 'auto_encounter_started',
+            difficulty: 'Medium',
+            totalXP: 200,
+            battleMap: null,
             description: 'Auto-encounter started: 2x Goblin (3 on the tracker, initiative rolled by the engine).',
         });
     });

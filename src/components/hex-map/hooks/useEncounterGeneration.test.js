@@ -5,10 +5,12 @@ import useEncounterGeneration from './useEncounterGeneration.js';
 import { createMap, saveMapData } from '../../../services/maps/mapsService.js';
 import { generateOutdoorEncounter } from '../../../services/encounters/outdoorEncounterGenerator.js';
 
-vi.mock('../../../services/maps/mapsService.js', () => ({
-    createMap: vi.fn(),
-    saveMapData: vi.fn(),
-}));
+// Use the REAL pure helpers (toKebabCase / formatMapName) so the display-name
+// and slug assertions match production bytes; only the fetch transport is mocked.
+vi.mock('../../../services/maps/mapsService.js', async () => {
+    const actual = await vi.importActual('../../../services/maps/mapsService.js');
+    return { ...actual, createMap: vi.fn(), saveMapData: vi.fn() };
+});
 
 vi.mock('../../../services/encounters/outdoorEncounterGenerator.js', () => ({
     generateOutdoorEncounter: vi.fn(),
@@ -93,7 +95,7 @@ describe('useEncounterGeneration', () => {
     });
 
     describe('handleStartEncounter', () => {
-        it('runs the full pipeline: generates from hex terrain, creates the map with the exact payload, saves the generated data, and notifies the caller', async () => {
+        it('runs the full pipeline: generates from hex terrain, creates the map with the exact payload, saves the generated data plus readable display metadata, and notifies the caller', async () => {
             const generated = {
                 placedItems: [{ id: 'item-1', type: 'bush' }],
                 players: [
@@ -107,10 +109,14 @@ describe('useEncounterGeneration', () => {
 
             await result.current.handleStartEncounter(1, 0);
 
+            // Readable authored label (event-less manual spawn keeps the
+            // "Encounter" wording); the label — not the raw slug — is what
+            // the Maps list shows, and it must survive the verbatim PUT save.
+            const label = 'Dungeon Exploration - Encounter at (1,0)';
             expect(generateOutdoorEncounter).toHaveBeenCalledTimes(1);
             expect(generateOutdoorEncounter).toHaveBeenCalledWith('forest', 30, ['Alice', 'Bob'], 1, 0);
             expect(createMap).toHaveBeenCalledTimes(1);
-            expect(createMap).toHaveBeenCalledWith('test-campaign', 'dungeon-exploration - Encounter at 1,0', {
+            expect(createMap).toHaveBeenCalledWith('test-campaign', label, {
                 type: 'indoor',
                 gridSize: 30,
                 placedItems: [{ id: 'item-1', type: 'bush' }],
@@ -125,15 +131,34 @@ describe('useEncounterGeneration', () => {
                 bgFill: '#2D5E37',
             });
             expect(saveMapData).toHaveBeenCalledTimes(1);
-            expect(saveMapData).toHaveBeenCalledWith(
-                'test-campaign',
-                'dungeon-exploration - Encounter at 1,0',
-                generated
-            );
-            // Save receives the generator result untouched (pass-through identity).
-            expect(saveMapData.mock.calls[0][2]).toBe(generated);
+            expect(saveMapData).toHaveBeenCalledWith('test-campaign', label, {
+                ...generated,
+                displayName: label,
+                name: 'dungeon-exploration---encounter-at-10',
+            });
             expect(onEncounterCreated).toHaveBeenCalledTimes(1);
-            expect(onEncounterCreated).toHaveBeenCalledWith('dungeon-exploration - Encounter at 1,0');
+            expect(onEncounterCreated).toHaveBeenCalledWith(label);
+        });
+
+        it('names the map after the travel event when an event title is passed', async () => {
+            const { result, onEncounterCreated } = setup({ mapName: 'test-map.json' });
+
+            await result.current.handleStartEncounter(5, 5, [], 'Ambush from the Brush');
+
+            const label = 'Test Map - Ambush from the Brush at (5,5)';
+            expect(createMap).toHaveBeenCalledWith(
+                'test-campaign',
+                label,
+                expect.objectContaining({
+                    parentTerrain: 'plains',
+                    parentHex: { q: 5, r: 5 },
+                })
+            );
+            expect(saveMapData).toHaveBeenCalledWith('test-campaign', label, expect.objectContaining({
+                displayName: label,
+                name: 'test-map---ambush-from-the-brush-at-55',
+            }));
+            expect(onEncounterCreated).toHaveBeenCalledWith(label);
         });
 
         it('falls back to plains terrain when the hex key is missing', async () => {
@@ -144,13 +169,13 @@ describe('useEncounterGeneration', () => {
             expect(generateOutdoorEncounter).toHaveBeenCalledWith('plains', 30, ['Alice', 'Bob'], 5, 5);
             expect(createMap).toHaveBeenCalledWith(
                 'test-campaign',
-                'test-map - Encounter at 5,5',
+                'Test Map - Encounter at (5,5)',
                 expect.objectContaining({
                     parentTerrain: 'plains',
                     parentHex: { q: 5, r: 5 },
                 })
             );
-            expect(onEncounterCreated).toHaveBeenCalledWith('test-map - Encounter at 5,5');
+            expect(onEncounterCreated).toHaveBeenCalledWith('Test Map - Encounter at (5,5)');
         });
 
         it('appends extra placed items after the generated ones', async () => {
@@ -168,7 +193,7 @@ describe('useEncounterGeneration', () => {
 
             expect(createMap).toHaveBeenCalledWith(
                 'test-campaign',
-                'test-map - Encounter at 0,0',
+                'Test Map - Encounter at (0,0)',
                 expect.objectContaining({
                     placedItems: [
                         { id: 'enc-item-1' },
@@ -186,7 +211,7 @@ describe('useEncounterGeneration', () => {
             await result.current.handleStartEncounter(0, 0);
 
             expect(saveMapData).not.toHaveBeenCalled();
-            expect(onEncounterCreated).toHaveBeenCalledWith('test-map - Encounter at 0,0');
+            expect(onEncounterCreated).toHaveBeenCalledWith('Test Map - Encounter at (0,0)');
         });
 
         it.each([
@@ -202,7 +227,7 @@ describe('useEncounterGeneration', () => {
             }
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-            await expect(result.current.handleStartEncounter(0, 0)).resolves.toBeUndefined();
+            await expect(result.current.handleStartEncounter(0, 0)).resolves.toBeNull();
 
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[handleStartEncounter] FAILED:',
@@ -231,7 +256,7 @@ describe('useEncounterGeneration', () => {
         it('completes the map work without an onEncounterCreated callback', async () => {
             const { result } = setup({ onEncounterCreated: undefined });
 
-            await expect(result.current.handleStartEncounter(0, 0)).resolves.toBeUndefined();
+            await expect(result.current.handleStartEncounter(0, 0)).resolves.toBe('Test Map - Encounter at (0,0)');
 
             expect(createMap).toHaveBeenCalledTimes(1);
             expect(saveMapData).toHaveBeenCalledTimes(1);

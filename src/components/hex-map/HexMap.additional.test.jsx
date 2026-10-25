@@ -109,6 +109,12 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 vi.mock('../../services/campaign/weatherService.js', () => ({
     generateWeather: vi.fn(() => ({ condition: 'clear', label: 'Clear', icon: 'sun', moveCostMod: 1, budgetMod: 1, encounterMod: 0, description: 'Clear skies' })),
 }));
+// Auto-encounter audit seam — captured so the accept-wiring tests can pin the
+// battleMapName threaded from the spawn result (backlog 2026-10-25 pm).
+const { autoEncounterCalls } = vi.hoisted(() => ({ autoEncounterCalls: [] }));
+vi.mock('../../services/encounters/autoEncounterService.js', () => ({
+    autoStartEncounterFromEvent: vi.fn(async (args) => { autoEncounterCalls.push(args); return { started: false }; }),
+}));
 
 import useMapLoader from './hooks/useMapLoader.js';
 import useZoomPan from './hooks/useZoomPan.js';
@@ -245,6 +251,7 @@ describe('HexMap event & command wiring', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         poiLayerProps.current = null;
+        autoEncounterCalls.length = 0;
         setupDefaultMocks();
     });
 
@@ -333,11 +340,14 @@ describe('HexMap event & command wiring', () => {
     });
 
     describe('Event accept', () => {
-        it('accepting a combat event with monsters generates placements and starts the encounter at the travel hex', () => {
+        it('accepting a combat event with monsters generates placements and starts the encounter at the travel hex', async () => {
             const placements = [{ id: 'mon-1', name: 'goblin' }];
-            const encounter = { generateMonsterPlacements: vi.fn(() => placements), handleStartEncounter: vi.fn() };
+            const encounter = {
+                generateMonsterPlacements: vi.fn(() => placements),
+                handleStartEncounter: vi.fn(async () => 'Test Map - Goblin Raid at (15,8)'),
+            };
             const { tm } = renderEventAccept({
-                pendingEvent: { type: 'combat', encounter: { monsters: [{ name: 'goblin', qty: 2 }] } },
+                pendingEvent: { type: 'combat', title: 'Goblin Raid', encounter: { monsters: [{ name: 'goblin', qty: 2 }] } },
                 travelOverrides: { currentPosition: { q: 15, r: 8 } },
                 mapOverrides: { partyPosition: { q: 15, r: 8 }, terrain: { '15,8': 'plains' } },
                 encounter,
@@ -345,13 +355,21 @@ describe('HexMap event & command wiring', () => {
             fireEvent.click(screen.getByTestId('event-accept'));
             expect(tm.acceptEvent).toHaveBeenCalledTimes(1);
             expect(encounter.generateMonsterPlacements).toHaveBeenCalledWith([{ name: 'goblin', qty: 2 }], 30);
-            expect(encounter.handleStartEncounter).toHaveBeenCalledWith(15, 8, placements);
+            expect(encounter.handleStartEncounter).toHaveBeenCalledWith(15, 8, placements, 'Goblin Raid');
+            // The spawned arena's readable label rides into the auto-encounter
+            // audit so the log names the map the Maps list shows.
+            await vi.waitFor(() => expect(autoEncounterCalls).toHaveLength(1));
+            expect(autoEncounterCalls[0]).toEqual(expect.objectContaining({
+                campaignName: 'test',
+                battleMapName: 'Test Map - Goblin Raid at (15,8)',
+            }));
+            expect(autoEncounterCalls[0].event).toEqual(expect.objectContaining({ title: 'Goblin Raid' }));
         });
 
         it.each([
             { scenario: 'starts a bare encounter when the event has no monsters', pos: { q: 15, r: 8 }, expectStart: true },
             { scenario: 'starts no encounter when there is no position', pos: null, expectStart: false },
-        ])('$scenario', ({ pos, expectStart }) => {
+        ])('$scenario', async ({ pos, expectStart }) => {
             const encounter = { generateMonsterPlacements: vi.fn(), handleStartEncounter: vi.fn() };
             const { tm } = renderEventAccept({
                 pendingEvent: { type: 'combat' },
@@ -363,9 +381,14 @@ describe('HexMap event & command wiring', () => {
             expect(tm.acceptEvent).toHaveBeenCalledTimes(1);
             expect(encounter.generateMonsterPlacements).not.toHaveBeenCalled();
             if (expectStart) {
-                expect(encounter.handleStartEncounter).toHaveBeenCalledWith(15, 8);
+                expect(encounter.handleStartEncounter).toHaveBeenCalledWith(15, 8, [], undefined);
+                await vi.waitFor(() => expect(autoEncounterCalls).toHaveLength(1));
+                // Spawn mock resolved with no label ⇒ audit degrades to naming-free copy.
+                expect(autoEncounterCalls[0].battleMapName).toBeNull();
             } else {
                 expect(encounter.handleStartEncounter).not.toHaveBeenCalled();
+                await vi.waitFor(() => expect(autoEncounterCalls).toHaveLength(1));
+                expect(autoEncounterCalls[0].battleMapName).toBeNull();
             }
         });
 

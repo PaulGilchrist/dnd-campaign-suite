@@ -28,6 +28,9 @@ import { addEntry } from '../ui/logService.js';
  * Start combat from an accepted travel event. Idempotence: running it twice
  * for the same event would reset the tracker again — callers fire it once
  * per Accept click, the human gesture that arms it.
+ * @param {string|null} [battleMapName] readable display name of the battle
+ *   map the Accept spawn lane generated for this event (null when none);
+ *   echoed in the audit line so GMs can find the arena in the Maps list.
  * @returns {Promise<{started:boolean, reason?:string}>}
  */
 // Hydrate index → full monster stat blocks (loadEncounterToInitiative
@@ -46,7 +49,7 @@ async function hydrateRoster(groups) {
     return selected;
 }
 
-export async function autoStartEncounterFromEvent({ campaignName, event, characters = [] }) {
+export async function autoStartEncounterFromEvent({ campaignName, event, characters = [], battleMapName = null }) {
     if (!campaignName || !event) return { started: false, reason: 'no campaign/event' };
     const flags = resolveEnforcement(getRuntimeValue('campaign', 'enforcement', campaignName));
     if (!flags.autoEncounters) return { started: false, reason: 'autoEncounters off' };
@@ -68,8 +71,12 @@ export async function autoStartEncounterFromEvent({ campaignName, event, charact
         automationType: 'auto_encounter_started',
         difficulty: event.encounter.difficultyLabel || null,
         totalXP: event.encounter.totalXP ?? null,
+        battleMap: battleMapName || null,
         description: `Auto-encounter started: ${selected.map((m) => `${m.qty}x ${m.name}`).join(', ')}`
-            + ` (${combatSummary.creatures.length} on the tracker, initiative rolled by the engine).`,
+            + ` (${combatSummary.creatures.length} on the tracker, initiative rolled by the engine).`
+            // Display name already embeds the hex coords, e.g.
+            // "Test Map - Ambush from the Brush at (5,5)".
+            + (battleMapName ? ` Battle map spawned: "${battleMapName}" — find it in the Maps list.` : ''),
     }).catch((e) => { console.error('[autoEncounter] log failed:', e); });
     return { started: true };
 }

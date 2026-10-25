@@ -300,17 +300,26 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const evt = travelMgmt.acceptEvent();
         const pos = travelMgmt.currentPosition || partyPosition;
         if (evt?.type === 'combat') {
+            // The spawn seam resolves with the authored battle-map display name
+            // (null when nothing spawned) so the auto-encounter audit can name
+            // the arena the GM is about to fight on (backlog 2026-10-25 pm).
+            let mapSpawn = null;
             if (pos && evt.encounter?.monsters) {
                 const monsterItems = generateMonsterPlacements(evt.encounter.monsters, 30);
-                handleStartEncounter(pos.q, pos.r, monsterItems);
+                mapSpawn = handleStartEncounter(pos.q, pos.r, monsterItems, evt.title);
             } else if (pos) {
-                handleStartEncounter(pos.q, pos.r);
+                mapSpawn = handleStartEncounter(pos.q, pos.r, [], evt.title);
             }
             // L5 §10.2: with enforcement.autoEncounters on, the accepted
             // combat event also starts the initiative tracker (engine rolls)
             // and moves the session phase to `encounter`. Off ⇒ zero writes;
-            // the map-only behavior above is unchanged.
-            autoStartEncounterFromEvent({ campaignName, event: evt, characters })
+            // the map-only behavior above is unchanged. Chained after the map
+            // spawn (fire-and-forget overall) purely so the audit line can
+            // carry the map's readable label.
+            Promise.resolve(mapSpawn)
+                .then((battleMapName) => autoStartEncounterFromEvent({
+                    campaignName, event: evt, characters, battleMapName: battleMapName || null,
+                }))
                 .catch((e) => { console.error('[handleEventAccept] auto-encounter failed:', e); });
         }
         if (evt?.type === 'weatherChange') {
