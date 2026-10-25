@@ -20,6 +20,24 @@ function truncateDescription(text, maxLength) {
 // so client- and server-surfaced duplicate errors clear the same way.
 const DUPLICATE_NAME_ERROR = 'A quest with that name already exists';
 
+// Duplicate-name guard + derived modal state (mirrors Factions.jsx verbatim):
+// the banner and Save-disable are DERIVED on every render, so a duplicate
+// blocks LIVE while typing, not just on the Save press.
+const hasDuplicateName = (quests, editingId, name) => quests.some(q =>
+  q.id !== editingId && (q.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+);
+
+function getDuplicateState({ modalOpen, formData, quests, editingQuest, saving, error }) {
+  if (!formData) return { visibleError: error, saveDisabled: true };
+  const duplicateNameError = modalOpen && hasDuplicateName(quests, editingQuest?.id, formData.name)
+    ? DUPLICATE_NAME_ERROR
+    : null;
+  return {
+    visibleError: duplicateNameError || error,
+    saveDisabled: saving || !formData.name.trim() || !!duplicateNameError,
+  };
+}
+
 const STATUS_COLORS = {
   active: { bg: '#d1fae5', color: '#065f46', border: '#34d399' },
   completed: { bg: '#dbeafe', color: '#1e40af', border: '#60a5fa' },
@@ -44,7 +62,7 @@ function QuestEmptyState({ searchQuery }) {
   );
 }
 
-function QuestFormModal({ editingQuest, formData, saving, deleting, error, onChange, onClose, onSave, onDelete }) {
+function QuestFormModal({ editingQuest, formData, saving, deleting, error, saveDisabled, onChange, onClose, onSave, onDelete }) {
   return (
     <div className="ct-modal-overlay">
       <div className="ct-modal quests-modal">
@@ -137,7 +155,7 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, onCha
             <button
               className="ct-btn ct-btn-primary"
               onClick={onSave}
-              disabled={saving || !formData.name.trim()}
+              disabled={saveDisabled}
             >
               <i className="fa-solid fa-floppy-disk" />{' '}
               {saving ? 'Saving\u2026' : 'Save'}
@@ -178,21 +196,25 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
   };
 
-  // Name edits clear a duplicate-name banner immediately (mirrors the derived
-  // clear in Factions.jsx); unrelated save/delete errors stay until Save/Close.
+  // Name edits clear a sticky duplicate-name banner surfaced by a server 400
+  // (the derived guard below re-evaluates live while typing); unrelated
+  // save/delete errors stay until Save/Close. Mirrors Factions.jsx.
   const handleFormChange = (field, value) => {
     updateFormField(field, value);
     if (field === 'name' && error === DUPLICATE_NAME_ERROR) setError(null);
   };
 
-  // Duplicate-name guard (mirrors NPCs.jsx / MapsManager.handleCreate)
-  const hasDuplicateName = () => quests.some(q =>
-    q.id !== editingQuest?.id && (q.name || '').trim().toLowerCase() === formData.name.trim().toLowerCase()
-  );
+  // Derived duplicate-name error: shown live while typing, cleared as soon as
+  // the name is unique again; Save stays disabled while it persists.
+  const { visibleError, saveDisabled } = getDuplicateState({
+    modalOpen, formData, quests, editingQuest, saving, error,
+  });
 
+  // Save quest (create or update); duplicate-name guard remains as backstop
+  // for programmatic/edge paths (server check is the final authority).
   const handleSave = async () => {
     if (!formData.name?.trim()) return;
-    if (hasDuplicateName()) {
+    if (hasDuplicateName(quests, editingQuest?.id, formData.name)) {
       setError(DUPLICATE_NAME_ERROR);
       return;
     }
@@ -323,7 +345,8 @@ function Quests({ campaignName, isLocalhost, onBack }) {
           formData={formData}
           saving={saving}
           deleting={deleting}
-          error={error}
+          error={visibleError}
+          saveDisabled={saveDisabled}
           onChange={handleFormChange}
           onClose={handleCloseModal}
           onSave={handleSave}

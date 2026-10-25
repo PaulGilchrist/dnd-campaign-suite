@@ -1,13 +1,14 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai: 2026-10-25
 // Duplicate-name banner lifecycle for the Quests modal (backlog 2026-10-13:
-// banner never cleared while typing). Contract: a duplicate-name Save click
-// shows the inline error without persisting; EDITING the name clears the
-// banner immediately (before any Save press); resubmitting the duplicate
-// re-shows it (guard not weakened); fixing the name saves normally; a
-// server-surfaced duplicate error clears on name change too, while unrelated
-// save failures stay until Save/Close. Click-guard semantics are owned by
-// Quests.test.jsx's "duplicate-name guard" block — this file owns the
-// clear-on-name-change arc.
+// banner never cleared while typing; 2026-10-25: aligned to the Factions
+// LIVE-typing pattern). Contract: typing a duplicate name shows the inline
+// error banner LIVE (no Save press needed) and disables Save while it
+// persists; editing the name to a unique value clears the banner and
+// re-enables Save in the same tick; clicking the disabled Save never
+// persists; the save-press guard stays as backstop via the server-surfaced
+// error lane (stale-list race). Edit flow: renaming onto ANOTHER quest's
+// name blocks live; an edit keeping its OWN name never collides.
+// Save-disabled-on-empty-name semantics are owned by Quests.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Quests from './Quests.jsx';
@@ -41,13 +42,13 @@ const defaultProps = {
 
 const nameInput = () => screen.getByRole('textbox', { name: /Name/ });
 const saveButton = () => screen.getByRole('button', { name: 'Save' });
+const banner = () => document.querySelector('.quests-form-error');
 
 function renderWithQuests(quests, managementOverrides = {}) {
   const mockSave = vi.fn().mockResolvedValue(undefined);
   useEntityManagement.mockReturnValue({
     items: quests,
     loading: false,
-    loadItems: vi.fn(),
     saveItems: mockSave,
     deleteItem: vi.fn(),
     ...managementOverrides,
@@ -67,57 +68,78 @@ const quest = (overrides = {}) => ({
 
 const openNewModal = () => fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
 
-describe('Quests duplicate-name error clears on name change', () => {
+describe('Quests live duplicate-name guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('duplicate Save shows the error, editing the name clears it instantly, and resubmitting the duplicate re-shows it', async () => {
+  it('shows the banner LIVE while typing a duplicate, disables Save, and clears both in the same tick on a unique name', async () => {
     const { mockSave } = renderWithQuests([quest()]);
 
     openNewModal();
+    expect(banner()).toBeNull();
+    expect(saveButton()).toBeDisabled(); // empty name (existing gate)
+
+    // Typing a case-insensitive duplicate blocks WITHOUT any Save press.
     fireEvent.change(nameInput(), { target: { value: 'the lost artifact' } });
-    fireEvent.click(saveButton());
-
+    expect(banner()).not.toBeNull();
     expect(screen.getByText(DUPLICATE_ERROR)).toBeInTheDocument();
-    expect(mockSave).not.toHaveBeenCalled();
+    expect(saveButton()).toBeDisabled();
 
-    // Fixing the name clears the banner immediately — no Save press needed.
+    // A disabled Save never persists, banner or not.
+    fireEvent.click(saveButton());
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(screen.getByText(DUPLICATE_ERROR)).toBeInTheDocument();
+
+    // Editing to a unique value clears banner + re-enables Save same tick.
     fireEvent.change(nameInput(), { target: { value: 'the lost artifact II' } });
-    expect(screen.queryByText(DUPLICATE_ERROR)).not.toBeInTheDocument();
+    expect(banner()).toBeNull();
     expect(saveButton()).not.toBeDisabled();
 
-    // Retyping the duplicate keeps the banner gone until the next Save press…
+    // Retyping the duplicate re-blocks LIVE (derived, no sticky one-shot).
     fireEvent.change(nameInput(), { target: { value: 'THE LOST ARTIFACT' } });
-    expect(screen.queryByText(DUPLICATE_ERROR)).not.toBeInTheDocument();
-
-    // …and resubmitting re-shows it, still without persisting.
-    fireEvent.click(saveButton());
     expect(screen.getByText(DUPLICATE_ERROR)).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+    fireEvent.click(saveButton());
     expect(mockSave).not.toHaveBeenCalled();
 
     // A unique name then saves cleanly.
     fireEvent.change(nameInput(), { target: { value: 'Unique Rescue Quest' } });
+    expect(banner()).toBeNull();
     fireEvent.click(saveButton());
     await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(1));
     expect(screen.queryByText(DUPLICATE_ERROR)).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
   });
 
-  it('clears the banner on name change when renaming an existing quest onto another quest', () => {
-    renderWithQuests([
+  it('edit flow: renaming onto another quest blocks live; keeping its own name never collides', async () => {
+    const { mockSave } = renderWithQuests([
       quest({ id: 'quest-1', name: 'The Lost Artifact' }),
       quest({ id: 'quest-2', name: 'QA Parity Quest' }),
     ]);
 
+    // Opening an edit on its own name is NOT a self-collision.
     fireEvent.click(screen.getByRole('button', { name: 'Edit quest: QA Parity Quest' }));
-    fireEvent.change(nameInput(), { target: { value: 'the lost artifact' } });
-    fireEvent.click(saveButton());
-    expect(screen.getByText(DUPLICATE_ERROR)).toBeInTheDocument();
-
-    fireEvent.change(nameInput(), { target: { value: 'QA Parity Quest Renamed' } });
-    expect(screen.queryByText(DUPLICATE_ERROR)).not.toBeInTheDocument();
+    expect(banner()).toBeNull();
     expect(saveButton()).not.toBeDisabled();
+
+    // Renaming onto another quest's name blocks live, before any Save press.
+    fireEvent.change(nameInput(), { target: { value: 'the lost artifact' } });
+    expect(screen.getByText(DUPLICATE_ERROR)).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+    fireEvent.click(saveButton());
+    expect(mockSave).not.toHaveBeenCalled();
+
+    // Renaming back to its own current name clears the guard (no false positive).
+    fireEvent.change(nameInput(), { target: { value: 'QA Parity Quest' } });
+    expect(banner()).toBeNull();
+    expect(saveButton()).not.toBeDisabled();
+
+    // And a fresh unique rename saves normally.
+    fireEvent.change(nameInput(), { target: { value: 'QA Parity Quest Renamed' } });
+    expect(banner()).toBeNull();
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(1));
   });
 
   it('clears a server-surfaced duplicate error on name change but keeps unrelated save failures visible', async () => {
