@@ -4,6 +4,7 @@ import { renderHook } from '@testing-library/react';
 import useEncounterGeneration from './useEncounterGeneration.js';
 import { createMap, saveMapData } from '../../../services/maps/mapsService.js';
 import { generateOutdoorEncounter } from '../../../services/encounters/outdoorEncounterGenerator.js';
+import { stageEventEncounterMap } from '../../../services/encounters/encounterStagingService.js';
 
 // Use the REAL pure helpers (toKebabCase / formatMapName) so the display-name
 // and slug assertions match production bytes; only the fetch transport is mocked.
@@ -14,6 +15,15 @@ vi.mock('../../../services/maps/mapsService.js', async () => {
 
 vi.mock('../../../services/encounters/outdoorEncounterGenerator.js', () => ({
     generateOutdoorEncounter: vi.fn(),
+}));
+
+// Staging lane (backlog 2026-10-26 run E): the accepted-event branch defers
+// entirely to encounterStagingService — its own test file owns create-once/
+// reuse-wipe semantics; here only the ROUTING (eventTitle ⇒ staging, manual
+// ⇒ per-encounter arena) is pinned.
+vi.mock('../../../services/encounters/encounterStagingService.js', () => ({
+    STAGING_MAP_NAME: 'Travel Encounter Stage',
+    stageEventEncounterMap: vi.fn(async () => ({ label: 'Travel Encounter Stage', reused: false })),
 }));
 
 const TERRAIN = { '0,0': 'plains', '1,0': 'forest' };
@@ -32,6 +42,7 @@ const setup = ({
     });
     createMap.mockResolvedValue({});
     saveMapData.mockResolvedValue({});
+    stageEventEncounterMap.mockResolvedValue({ label: 'Travel Encounter Stage', reused: false });
 
     const { result } = renderHook(() =>
         useEncounterGeneration({
@@ -148,39 +159,82 @@ describe('useEncounterGeneration', () => {
             expect(onEncounterCreated).toHaveBeenCalledWith(label);
         });
 
-        it('names the map after the travel event when an event title is passed', async () => {
-            const { result, onEncounterCreated } = setup({ mapName: 'test-map.json' });
+        describe('accepted-event staging lane (backlog 2026-10-26 run E)', () => {
+            it('routes an event-titled spawn to the shared staging map — no per-event arena', async () => {
+                const generated = {
+                    placedItems: [{ id: 'bush-0', type: 'bush', gridX: 3, gridY: 20, visible: true }],
+                    players: [{ id: 'alice', name: 'Alice', gridX: 14, gridY: 14 }],
+                    bgFill: '#7A9B6A',
+                };
+                const { result, onEncounterCreated } = setup({ mapName: 'test-map.json' });
+                generateOutdoorEncounter.mockReturnValue(generated);
+                const monsters = [{ id: 'enc-monster-0', type: 'npc', name: 'Wolf', gridX: 9, gridY: 15 }];
 
-            await result.current.handleStartEncounter(5, 5, [], 'Ambush from the Brush');
+                const label = await result.current.handleStartEncounter(5, 5, monsters, 'Ambush from the Brush');
 
-            const label = 'Test Map - Ambush from the Brush at (5,5)';
-            expect(createMap).toHaveBeenCalledWith(
-                'test-campaign',
-                label,
-                expect.objectContaining({
-                    parentTerrain: 'plains',
-                    parentHex: { q: 5, r: 5 },
-                })
-            );
-            expect(saveMapData).toHaveBeenCalledWith('test-campaign', label, expect.objectContaining({
-                displayName: label,
-                name: 'test-map---ambush-from-the-brush-at-55',
-            }));
-            expect(onEncounterCreated).toHaveBeenCalledWith(label);
+                // One staging write with THIS event's roster; the per-event
+                // arena POST/PUT lane is never touched (AC1/AC2 routing).
+                expect(stageEventEncounterMap).toHaveBeenCalledTimes(1);
+                expect(stageEventEncounterMap).toHaveBeenCalledWith(expect.objectContaining({
+                    campaignName: 'test-campaign',
+                    terrainType: 'plains',
+                    q: 5,
+                    r: 5,
+                    gridSize: 30,
+                    decorItems: generated.placedItems,
+                    monsterItems: monsters,
+                    players: generated.players,
+                    bgFill: '#7A9B6A',
+                }));
+                expect(createMap).not.toHaveBeenCalled();
+                expect(saveMapData).not.toHaveBeenCalled();
+                // Navigation + audit label carry the STABLE staging name — never
+                // a "…- <Event> at (q,r)" orphan label.
+                expect(label).toBe('Travel Encounter Stage');
+                expect(onEncounterCreated).toHaveBeenCalledWith('Travel Encounter Stage');
+            });
+
+            it('reuses the SAME label on repeat accepts (create-once lives in the service)', async () => {
+                const { result } = setup({ mapName: 'test-map.json' });
+                stageEventEncounterMap.mockResolvedValue({ label: 'Travel Encounter Stage', reused: true });
+
+                await expect(result.current.handleStartEncounter(7, 2, [], 'Wolves on the Hunt'))
+                    .resolves.toBe('Travel Encounter Stage');
+                await expect(result.current.handleStartEncounter(9, 4, [], 'Orc Patrol'))
+                    .resolves.toBe('Travel Encounter Stage');
+                expect(stageEventEncounterMap).toHaveBeenCalledTimes(2);
+                expect(createMap).not.toHaveBeenCalled();
+            });
+
+            it('logs the staging failure and skips the callback', async () => {
+                const { result, onEncounterCreated } = setup();
+                const error = new Error('Staging save failed');
+                stageEventEncounterMap.mockRejectedValue(error);
+                const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+                await expect(result.current.handleStartEncounter(0, 0, [], 'Ambush'))
+                    .resolves.toBeNull();
+
+                expect(consoleSpy).toHaveBeenCalledWith(
+                    '[handleStartEncounter] FAILED:',
+                    expect.objectContaining({ message: 'Staging save failed' })
+                );
+                expect(onEncounterCreated).not.toHaveBeenCalled();
+            });
         });
 
-        it('inherits the parent\'s authored displayName verbatim — no slug re-title-casing (backlog 2026-10-25 eve)', async () => {
+        it('keeps the readable arena label on MANUAL (event-less) spawns — parent displayName verbatim', async () => {
             const { result, onEncounterCreated } = setup({
                 mapName: 'qa-hex-2.json',
                 parentDisplayName: 'QA Hex 2',
             });
 
-            await result.current.handleStartEncounter(25, 10, [], 'Giant Eagle');
+            await result.current.handleStartEncounter(25, 10);
 
-            // Maps-list label, saved displayName metadata, and the
-            // onEncounterCreated → auto_encounter_started audit label all
-            // carry the parent's authored bytes.
-            const label = 'QA Hex 2 - Giant Eagle at (25,10)';
+            // The 583458652 label lane (authored bytes win verbatim) now only
+            // governs the manual party-marker arena; staging took the
+            // event-titled labels out of it (backlog 2026-10-26 run E).
+            const label = 'QA Hex 2 - Encounter at (25,10)';
             expect(label).not.toContain('Qa Hex');
             expect(createMap).toHaveBeenCalledWith(
                 'test-campaign',
@@ -189,17 +243,18 @@ describe('useEncounterGeneration', () => {
             );
             expect(saveMapData).toHaveBeenCalledWith('test-campaign', label, expect.objectContaining({
                 displayName: label,
-                name: 'qa-hex-2---giant-eagle-at-2510',
+                name: 'qa-hex-2---encounter-at-2510',
             }));
             expect(onEncounterCreated).toHaveBeenCalledWith(label);
+            expect(stageEventEncounterMap).not.toHaveBeenCalled();
         });
 
-        it('falls back to the title-cased slug when the caller has no parent displayName', async () => {
+        it('falls back to the title-cased slug on manual spawns without a parent displayName', async () => {
             const { result, onEncounterCreated } = setup({ mapName: 'qa-hex-2.json' });
 
-            await result.current.handleStartEncounter(25, 10, [], 'Giant Eagle');
+            await result.current.handleStartEncounter(25, 10);
 
-            const label = 'Qa Hex 2 - Giant Eagle at (25,10)';
+            const label = 'Qa Hex 2 - Encounter at (25,10)';
             expect(createMap).toHaveBeenCalledWith('test-campaign', label, expect.anything());
             expect(onEncounterCreated).toHaveBeenCalledWith(label);
         });
