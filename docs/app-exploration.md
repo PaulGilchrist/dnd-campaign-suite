@@ -67,7 +67,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT.)*
-- **(2026-10-26)** Travel: clicking the destination hex ON the party's own cell (e.g. stale coords after the party moved) silently no-ops with the panel stuck in `planning` — a tiny inline "select a hex away from the party" hint would remove the dead-click confusion. File: `src/components/hex-map/`.
 
 ## Coverage
 

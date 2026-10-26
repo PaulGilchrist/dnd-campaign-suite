@@ -50,6 +50,19 @@ function TravelWeatherSection({ weather, onReRollWeather }) {
   );
 }
 
+function TravelOwnHexHint({ visible }) {
+  if (!visible) return null;
+  // Own-hex dead-click hint (backlog 2026-10-26): the destination click on
+  // the party's current hex is a silent no-op — guide the GM to a valid hex.
+  // Pure display flag owned by HexMap (never game state).
+  return (
+    <div className="travel-panel-hint">
+      <i className="fa-solid fa-circle-info"></i>
+      <span>Select a hex away from the party to set your destination</span>
+    </div>
+  );
+}
+
 function TravelPanel({
   travelPace,
   path,
@@ -63,6 +76,7 @@ function TravelPanel({
   pendingEvent,
   terrain,
   eventFrequency,
+  showOwnHexHint,
   onChangePace,
   onAdvance,
   onCancel,
@@ -139,6 +153,8 @@ function TravelPanel({
           <i className="fa-solid fa-xmark"></i>
         </button>
       </div>
+
+      <TravelOwnHexHint visible={showOwnHexHint} />
 
       <TravelExhaustedBanner
         exhausted={dayExhausted}

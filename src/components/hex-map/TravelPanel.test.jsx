@@ -35,6 +35,7 @@ const makeProps = (overrides = {}) => ({
   pendingEvent: null,
   terrain: { '0,0': 'plains' },
   eventFrequency: 'normal',
+  showOwnHexHint: false,
   onChangePace: vi.fn(),
   onAdvance: vi.fn(),
   onCancel: vi.fn(),
@@ -61,6 +62,33 @@ describe('TravelPanel', () => {
   it('renders nothing until travel is active', () => {
     renderPanel({ isTravelActive: false });
     expect(screen.queryByText('Travel Mode')).not.toBeInTheDocument();
+  });
+
+  describe('own-hex dead-click hint', () => {
+    // Render condition for the backlog-2026-10-26 hint: HexMap flips the
+    // showOwnHexHint flag on an own-hex click (wired in HexMap.travel.test.jsx);
+    // the panel shows the inline line ONLY while that prop is true.
+    const HINT = 'Select a hex away from the party to set your destination';
+
+    it('is absent by default (every normal planning/travelling render)', () => {
+      renderPanel();
+      expect(screen.queryByText(HINT)).not.toBeInTheDocument();
+      expect(document.querySelector('.travel-panel-hint')).toBeNull();
+    });
+
+    it('renders the muted inline line when HexMap arms the flag', () => {
+      renderPanel({ showOwnHexHint: true });
+      const hint = document.querySelector('.travel-panel-hint');
+      expect(hint).not.toBeNull();
+      expect(hint).toHaveTextContent(HINT);
+    });
+
+    it('disappears again when the flag clears (valid destination set)', () => {
+      const { rerender } = renderPanel({ showOwnHexHint: true });
+      expect(screen.getByText(HINT)).toBeInTheDocument();
+      rerender(<TravelPanel {...makeProps({ showOwnHexHint: false })} />);
+      expect(screen.queryByText(HINT)).not.toBeInTheDocument();
+    });
   });
 
   describe('state variants', () => {

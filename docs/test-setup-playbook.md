@@ -1012,3 +1012,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 ## 2026-10-26 improve run — dice-tray-aria (uniform accessible names)
 - Tray buttons now carry `aria-label="Roll dN"` (from the `dice` config, mirroring the pre-existing `title`) — target dice via `getByRole('button', { name: 'Roll d20' })`, the pip-glyph textContent problem is retired for the sidebar tray. Exact-text discipline still applies to sheet/monster chips.
 - Tray result popup auto-hides after 4s (`DICE_POPUP_AUTO_HIDE_MS`); full-page `.dice-tray-popup-overlay`. A second `browser_evaluate` round-trip usually misses it — click AND assert inside one page-side Promise, or judge by `rollType:'dice'` log delta (durable proof).
+
+## 2026-10-26 improve run — travel-own-hex-hint (dead-click feedback)
+- HexMap (outdoor) toolbar exit button aria-label is **"Back to maps"** — `button[aria-label="Back"]` is the INDOOR editor only; waiting on it in a hex map times out.
+- TravelPanel Cancel lane has TWO matches (header-X `Cancel travel` + body `Cancel`) — `getByRole('button', { name: 'Cancel', exact: true })` targets the body button.
+- Own-hex destination click remains a machine no-op BY DESIGN (hex click handler `handleTravelHexClick` in HexMap.jsx); it now only flips a local display flag rendering `.travel-panel-hint` in TravelPanel — hint clears on valid destination, travel-inactive, or tool switch, no timer.

@@ -162,6 +162,19 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const arrivalToastTimerRef = useRef(null);
     useEffect(() => () => clearTimeout(arrivalToastTimerRef.current), []);
 
+    // ── Own-hex dead-click hint (display-only) ──
+    // Clicking the destination on the party's CURRENT hex (e.g. stale coords
+    // after the party moved) is a deliberate no-op — without feedback the
+    // panel just sits in planning (backlog 2026-10-26). This flag surfaces a
+    // muted inline hint in the panel. Ephemeral per-client UI state only
+    // (never game state, never change-data); no timer — it clears when a
+    // valid destination is set, when travel goes inactive (cancel/arrive),
+    // and whenever the travel tool is not selected.
+    const [ownHexHint, setOwnHexHint] = useState(false);
+    useEffect(() => {
+        if (!travelMgmt.isTravelActive || tool !== TOOL_TRAVEL) setOwnHexHint(false);
+    }, [travelMgmt.isTravelActive, tool]);
+
     // ── Logging ──
     const { addEntry } = useLog(campaignName);
 
@@ -354,6 +367,23 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         logTravel('forced_march', pos, null, weather);
     }, [travelMgmt, partyPosition, weather, logTravel]);
 
+    // ── Travel destination selection (SVG click) ──
+    // Own-hex clicks stay a machine-lane no-op (zero change-data/log writes);
+    // they only flip the local hint flag so the panel explains the dead click.
+    const handleTravelHexClick = useCallback((hex) => {
+        if (!partyPosition || !hex) return;
+        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
+        if (hex.q === partyPosition.q && hex.r === partyPosition.r) {
+            if (travelMgmt.isTravelActive) setOwnHexHint(true);
+            return;
+        }
+        setOwnHexHint(false);
+        if (!travelMgmt.isTravelActive) {
+            travelMgmt.startPlanning();
+        }
+        travelMgmt.setDestinationAndPath(hex);
+    }, [partyPosition, hexCols, hexRows, travelMgmt]);
+
     // ── POI drop from panel ──
     const handleDrop = useCallback((e) => {
         e.preventDefault();
@@ -455,15 +485,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                                 setPartyContextMenu(null);
                                 if (tool === TOOL_ROAD) {
                                     setRoadStartPoiId(null);
-                                } else if (tool === TOOL_TRAVEL && partyPosition) {
-                                    const hex = getHexFromEvent(e);
-                                    if (!hex) return;
-                                    if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
-                                    if (hex.q === partyPosition.q && hex.r === partyPosition.r) return;
-                                    if (!travelMgmt.isTravelActive) {
-                                        travelMgmt.startPlanning();
-                                    }
-                                    travelMgmt.setDestinationAndPath(hex);
+                                } else if (tool === TOOL_TRAVEL) {
+                                    handleTravelHexClick(getHexFromEvent(e));
                                 }
                             }
                         }}
@@ -597,6 +620,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     pendingEvent={travelMgmt.pendingEvent}
                     terrain={terrain}
                     eventFrequency={travelMgmt.eventFrequency}
+                    showOwnHexHint={ownHexHint}
                     onChangePace={travelMgmt.changePace}
                     onAdvance={handleAdvance}
                     onCancel={travelMgmt.cancelTravel}

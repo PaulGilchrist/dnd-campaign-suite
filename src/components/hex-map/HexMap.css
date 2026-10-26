@@ -533,6 +533,21 @@
     text-align: center;
 }
 
+/* Own-hex dead-click hint (backlog 2026-10-26) — muted inline line matching
+   the panel chrome; mirrors the .event-dialog-hint icon+text pattern in a
+   smaller, borderless style. */
+.travel-panel-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #9ab4cc;
+    font-size: 11px;
+    font-style: italic;
+    text-align: center;
+    padding: 2px 0;
+}
+
 .travel-panel-close {
     margin-left: auto;
     background: none;

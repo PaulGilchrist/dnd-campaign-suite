@@ -36,9 +36,13 @@ vi.mock('./WeatherOverlay.jsx', () => ({ default: () => <div data-testid="weathe
 // EventDialog / camp-command buttons inside TravelPanel are owned by HexMap.additional.test.jsx (#792).
 vi.mock('./EventDialog.jsx', () => ({ default: () => <div data-testid="event-dialog" /> }));
 vi.mock('./TravelPanel.jsx', () => ({
-    default: ({ isTravelActive, onAdvance }) =>
+    default: ({ isTravelActive, onAdvance, onCancel, showOwnHexHint }) =>
         <div data-testid="travel-panel">
             {isTravelActive && <button data-testid="btn-advance" onClick={onAdvance}>Advance</button>}
+            {isTravelActive && <button data-testid="btn-cancel" onClick={onCancel}>Cancel</button>}
+            {/* Hint marker keys off the FLAG alone (real panel also self-gates on
+                isTravelActive) so tests can observe HexMap's flag lifecycle directly. */}
+            {showOwnHexHint ? <span data-testid="own-hex-hint">Select a hex away from the party to set your destination</span> : null}
         </div>,
 }));
 vi.mock('./TravelPathLayer.jsx', () => ({ default: () => <g data-testid="travel-path-layer" /> }));
@@ -162,11 +166,12 @@ const mapSvg = () => screen.getByTestId('hex-svg');
 function renderWithTravelTool({ tmOverrides = {}, hoverOverrides = {}, mapOverrides = {} }) {
     const tm = makeTravelMgmt(tmOverrides);
     useTravelManagement.mockReturnValue(tm);
-    useHexHover.mockReturnValue(makeHexHover(hoverOverrides));
+    const hover = makeHexHover(hoverOverrides);
+    useHexHover.mockReturnValue(hover);
     useMapLoader.mockReturnValue(makeMapLoader(mapOverrides));
-    render(<HexMap campaignName="test" mapName="test-map" />);
+    const utils = render(<HexMap campaignName="test" mapName="test-map" />);
     fireEvent.click(screen.getByTestId('tool-travel'));
-    return tm;
+    return { tm, hover, rerender: utils.rerender };
 }
 
 const PARTY = { q: 15, r: 8 };
@@ -190,7 +195,7 @@ describe('HexMap travel', () => {
             { label: 'does nothing when the click resolves to the party hex', isTravelActive: false, partyPosition: PARTY, hex: PARTY, button: 0, expectStartPlanning: false, expectDestination: false },
             { label: 'does nothing on a right-click', isTravelActive: false, partyPosition: PARTY, hex: DEST, button: 2, expectStartPlanning: false, expectDestination: false },
         ])('$label', ({ isTravelActive, partyPosition, hex, button, expectStartPlanning, expectDestination }) => {
-            const tm = renderWithTravelTool({
+            const { tm } = renderWithTravelTool({
                 tmOverrides: { isTravelActive },
                 hoverOverrides: { getHexFromEvent: vi.fn(() => hex) },
                 mapOverrides: { partyPosition },
@@ -207,6 +212,87 @@ describe('HexMap travel', () => {
             } else {
                 expect(tm.setDestinationAndPath).not.toHaveBeenCalled();
             }
+            // Every silent branch (party-hex included) while the panel is CLOSED
+            // shows no hint either — the flag only arms on a live dead-click.
+            expect(screen.queryByTestId('own-hex-hint')).not.toBeInTheDocument();
+        });
+
+        it('still writes nothing when the live panel gets an own-hex click', () => {
+            const { tm } = renderWithTravelTool({
+                tmOverrides: { isTravelActive: true },
+                hoverOverrides: { getHexFromEvent: vi.fn(() => PARTY) },
+                mapOverrides: { partyPosition: PARTY },
+            });
+            fireEvent.click(mapSvg());
+            expect(tm.startPlanning).not.toHaveBeenCalled();
+            expect(tm.setDestinationAndPath).not.toHaveBeenCalled();
+            expect(tm.cancelTravel).not.toHaveBeenCalled();
+            expect(tm.changePace).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('own-hex dead-click hint lifecycle', () => {
+        // Backlog 2026-10-26: a destination click that lands on the party's own
+        // hex used to be a pure silent no-op (panel stuck in planning). The
+        // click must STILL write nothing, but the panel now shows an inline
+        // hint — armed only by that dead-click, cleared by the next valid
+        // destination, by cancel (travel → inactive), and by tool deactivation.
+        const LIVE = { tmOverrides: { isTravelActive: true }, mapOverrides: { partyPosition: PARTY } };
+
+        it('appears when a planning-panel click lands on the party hex', () => {
+            renderWithTravelTool({
+                ...LIVE,
+                hoverOverrides: { getHexFromEvent: vi.fn(() => PARTY) },
+            });
+            expect(screen.queryByTestId('own-hex-hint')).not.toBeInTheDocument();
+            fireEvent.click(mapSvg());
+            expect(screen.getByTestId('own-hex-hint')).toBeInTheDocument();
+        });
+
+        it('never appears on a successful away-hex plan click', () => {
+            renderWithTravelTool({
+                ...LIVE,
+                hoverOverrides: { getHexFromEvent: vi.fn(() => DEST) },
+            });
+            fireEvent.click(mapSvg());
+            expect(screen.queryByTestId('own-hex-hint')).not.toBeInTheDocument();
+        });
+
+        it('clears when a valid destination is subsequently set', () => {
+            const { hover } = renderWithTravelTool({
+                ...LIVE,
+                hoverOverrides: { getHexFromEvent: vi.fn(() => PARTY) },
+            });
+            fireEvent.click(mapSvg());
+            expect(screen.getByTestId('own-hex-hint')).toBeInTheDocument();
+            hover.getHexFromEvent.mockReturnValue(DEST);
+            fireEvent.click(mapSvg());
+            expect(screen.queryByTestId('own-hex-hint')).not.toBeInTheDocument();
+        });
+
+        it('clears when travel goes inactive (cancel/arrive) even with the flag armed', () => {
+            const { rerender } = renderWithTravelTool({
+                ...LIVE,
+                hoverOverrides: { getHexFromEvent: vi.fn(() => PARTY) },
+            });
+            fireEvent.click(mapSvg());
+            expect(screen.getByTestId('own-hex-hint')).toBeInTheDocument();
+            // Cancel flips travel-mode inactive; the mock panel keeps rendering
+            // the hint from the raw flag, so its removal proves HexMap's own
+            // effect cleared it (not just the panel unmounting).
+            useTravelManagement.mockReturnValue(makeTravelMgmt({ isTravelActive: false }));
+            rerender(<HexMap campaignName="test" mapName="test-map" />);
+            expect(screen.queryByTestId('own-hex-hint')).not.toBeInTheDocument();
+        });
+
+        it('shows nothing for an own-hex click while the panel is closed', () => {
+            renderWithTravelTool({
+                tmOverrides: { isTravelActive: false },
+                hoverOverrides: { getHexFromEvent: vi.fn(() => PARTY) },
+                mapOverrides: { partyPosition: PARTY },
+            });
+            fireEvent.click(mapSvg());
+            expect(screen.queryByTestId('own-hex-hint')).not.toBeInTheDocument();
         });
     });
 
