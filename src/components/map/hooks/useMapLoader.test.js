@@ -10,11 +10,14 @@
  * useMapLoader.js; prior-pass refs :161/:188-210/:178/:210 map to these seams):
  *   :37    loadedMapNameRef guard keyed on mapName only — campaignName/characters
  *          changes never reload → stale outdoor map (#799) ... pinned below
- *   :78-92 autosave effect re-saves a freshly loaded map with zero edits →
- *          mount-save scheduling race (#800) ... pinned below
  *   :60-62 silent catch — a failed GET falls through to overwriting the map
  *          with an empty one ... pinned below
  *   :50-57 reconciliation only ever runs at load time (stale-ref) ... pinned below
+ *
+ * FIXED here (backlog 2026-10-26): the #800 mount re-save — a zero-edit open
+ * now dirties nothing (loaded document seeds the last-saved baseline; the
+ * autosave effect deep-compares each candidate payload and skips clean ones,
+ * also absorbing the own-write SSE echo re-post), so open+back ⇒ zero PUTs.
  *
  * Old→new: initialization(4)+empty-create→1; existing-data(6)→2+3;
  * reconciliation(6)→4+5+7; error-handling(2)→6; re-render(4)→7+8;
@@ -69,10 +72,11 @@ describe('useMapLoader', () => {
       { initialProps: { campaignName, characters, mapName } },
     );
 
-  // Settle the mount load, flush its debounced mount re-save (see pin table),
-  // then clear so later assertions see only stroke-driven traffic.
+  // Settle the mount load; the flushSave call is a defensive no-op now (the
+  // dirty gate leaves no pending save after a clean load), then clear so later
+  // assertions see only stroke-driven traffic.
   const loadAndClearSaves = async ({ result }) => {
-    await act(async () => {});
+    await act(async () => { vi.advanceTimersByTime(1500); });
     act(() => result.current.flushSave());
     saveMapDataSpy.mockClear();
   };
@@ -100,7 +104,7 @@ describe('useMapLoader', () => {
     });
   });
 
-  it('adopts an existing map exactly and — FIXME(#800, useMapLoader.js:78-92) — re-saves it unchanged once the debounce elapses', async () => {
+  it('adopts an existing map exactly and — dirty gate (#800 fix, backlog 2026-10-26) — writes NOTHING when zero edits elapse the debounce', async () => {
     const existing = {
       players: [{ name: 'Thorin' }],
       walls: ['1,1', '2,2'],
@@ -119,17 +123,108 @@ describe('useMapLoader', () => {
     expect(result.current.gridSize).toBe(50);
     expect(saveMapDataSpy).not.toHaveBeenCalled();
 
-    // Pin: a fresh load with ZERO edits schedules a full round-trip write.
-    // Bug-pinned intentionally pending the #800 mount-save fix.
+    // A fresh load with ZERO edits dirties nothing: the loaded document seeds
+    // the last-saved baseline, so the debounced autosave skips the PUT.
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not re-PUT when a byte-identical state churn (SSE echo shape) lands after load', async () => {
+    const existing = {
+      players: [{ name: 'Thorin' }],
+      walls: ['1,1'],
+      placedItems: [{ id: 'a', gridX: 1, gridY: 2 }],
+      gridSize: 40,
+      revealed: ['3,3'],
+    };
+    loadMapDataSpy.mockResolvedValue(existing);
+
+    const { result } = renderLoader();
+    await act(async () => {});
+
+    // Mirrors useSSESync's own-echo merge: fresh object graph, same values.
+    act(() => result.current.setMapData((prev) => ({
+      ...prev,
+      players: prev.players.map(({ ...rest }) => rest),
+      walls: new Set(Array.from(prev.walls)),
+      revealed: [...prev.revealed],
+    })));
+    act(() => result.current.setPlacedItems(prev => prev.map(({ ...rest }) => rest)));
+    await act(async () => { vi.advanceTimersByTime(3000); });
+
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+  });
+
+  it('cancels a queued write when an edit reverts to the loaded baseline before the debounce fires', async () => {
+    loadMapDataSpy.mockResolvedValue({ players: [], walls: ['1,1'], placedItems: [], gridSize: 40, revealed: [] });
+
+    const { result } = renderLoader();
+    await act(async () => {});
+
+    act(() => result.current.setMapData((prev) => ({ ...prev, walls: new Set([...prev.walls, '9,9']) })));
+    await act(async () => { vi.advanceTimersByTime(300); });
+    act(() => result.current.setMapData((prev) => {
+      const walls = new Set(prev.walls);
+      walls.delete('9,9');
+      return { ...prev, walls };
+    }));
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    act(() => result.current.flushSave());
+
+    // The undo (or an equal-bytes round trip) writes nothing at all.
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+  });
+
+  it('absorbs the own-write SSE echo after a real edit — no byte-identical replay PUT', async () => {
+    loadMapDataSpy.mockResolvedValue({ players: [], walls: [], placedItems: [], gridSize: 40, revealed: [] });
+
+    const { result } = renderLoader();
+    await act(async () => {});
+
+    // Real edit: drop a barrel exactly as useMapDrops authors it — the
+    // rotation key is PRESENT but undefined for non-rotatable types.
+    act(() => result.current.setPlacedItems([
+      { id: 'b1', type: 'barrel', gridX: 16, gridY: 4, visible: true, rotation: undefined },
+    ]));
     await act(async () => { vi.advanceTimersByTime(1000); });
     expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
-    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, {
-      players: [{ name: 'Thorin' }],
-      walls: ['1,1', '2,2'],
-      placedItems: [{ id: 'a', gridX: 1, gridY: 2 }],
-      gridSize: 50,
-      revealed: ['3,3'],
-    });
+    // Payload byte-shape matches what the server stores: undefined keys gone.
+    expect(Object.keys(saveMapDataSpy.mock.calls[0][2].placedItems[0])).not.toContain('rotation');
+
+    // The echo lands with the stored (undefined-stripped) bytes — the dirty
+    // gate must see zero dirt and replay nothing.
+    act(() => result.current.setPlacedItems([
+      { id: 'b1', type: 'barrel', gridX: 16, gridY: 4, visible: true },
+    ]));
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('PUTs the moment a field genuinely mutates after a quiet open, and again after the flush baseline moves', async () => {
+    loadMapDataSpy.mockResolvedValue({ players: [], walls: ['1,1'], placedItems: [], gridSize: 40, revealed: [] });
+
+    const { result } = renderLoader();
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+
+    act(() => result.current.setMapData((prev) => ({ ...prev, walls: new Set([...prev.walls, '7,7']) })));
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+    expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual(['1,1', '7,7']);
+
+    // The flush moved the baseline — quiet time again writes nothing…
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+
+    // …and the reversal of the edit is itself a real mutation: it must persist.
+    act(() => result.current.setMapData((prev) => {
+      const walls = new Set(prev.walls);
+      walls.delete('7,7');
+      return { ...prev, walls };
+    }));
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(2);
+    expect(saveMapDataSpy.mock.calls[1][2].walls).toEqual(['1,1']);
   });
 
   it('defaults missing fields of an existing map (empty walls Set, revealed [], placedItems [], gridSize fallback)', async () => {
@@ -218,12 +313,14 @@ describe('useMapLoader', () => {
     loadMapDataSpy.mockClear();
 
     rerender({ campaignName: 'other-campaign', characters: [{ name: 'Newbie' }], mapName: MAP });
-    await act(async () => {});
+    await act(async () => { vi.advanceTimersByTime(3000); });
 
     expect(loadMapDataSpy).not.toHaveBeenCalled();
     expect(result.current.mapData.walls).toEqual(new Set(['1,1']));
-    // pending mount-save is flushed under the PREVIOUS campaign, never the new one
-    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, expect.any(Object));
+    // dirty gate (backlog 2026-10-26): zero edits ⇒ zero writes, under the old
+    // campaign or any other. (An edit made before the switch would still be
+    // flushed under its original campaign/map target by the switch branch.)
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
   });
 
   it('flushes pending edits under the previous map name and loads the new map exactly once when mapName switches', async () => {

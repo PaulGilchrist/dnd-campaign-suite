@@ -1,15 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService';
 import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig';
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
+
+// Drop undefined-valued keys so the payload byte-matches what the server
+// stores and echoes back (JSON.stringify omits them). Without this, a fresh
+// drop's `rotation: undefined` (useMapDrops.js:83) made the own-write SSE
+// echo compare deep-UNEQUAL to the last-saved payload and slip past the
+// dirty gate as a byte-identical replay PUT.
+function jsonSafeEntry(entry) {
+    const out = {};
+    for (const [key, value] of Object.entries(entry)) {
+        if (value !== undefined) out[key] = value;
+    }
+    return out;
+}
 
 function buildSavePayload(mapData, gridSize, placedItems) {
     return {
         ...mapData,
         gridSize,
         walls: Array.from(mapData.walls || []),
-        placedItems,
+        placedItems: (placedItems || []).map(jsonSafeEntry),
     };
 }
 
@@ -20,6 +34,18 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
     const loadedMapNameRef = useRef(null);
     const pendingSaveRef = useRef(null);
     const saveTimerRef = useRef(null);
+    // Dirty-tracking baseline: the last document bytes this instance is known
+    // to have given the server (adopted on load, claimed on every flush). The
+    // autosave effect compares each candidate payload against it and skips
+    // zero-edit writes (mount re-save #800 + SSE-echo re-post churn).
+    const lastSavedRef = useRef(null);
+
+    const clearSaveTimer = () => {
+        if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+    };
 
     const flushSave = useCallback(() => {
         // Read-only (network) clients never author the map document — flushSave
@@ -31,19 +57,14 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
         // 403s indoor-map writes from non-localhost as defense-in-depth.
         if (!isLocalhost) {
             pendingSaveRef.current = null;
-            if (saveTimerRef.current) {
-                clearTimeout(saveTimerRef.current);
-                saveTimerRef.current = null;
-            }
+            clearSaveTimer();
             return;
         }
-        if (saveTimerRef.current) {
-            clearTimeout(saveTimerRef.current);
-            saveTimerRef.current = null;
-        }
+        clearSaveTimer();
         const pending = pendingSaveRef.current;
         if (!pending) return;
         pendingSaveRef.current = null;
+        lastSavedRef.current = pending.dataToSave;
         mapsService.saveMapData(pending.campaignName, pending.mapName, pending.dataToSave)
             .catch(err => console.error('Failed to save map data:', err));
     }, [isLocalhost]);
@@ -58,13 +79,19 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                 const existing = await mapsService.loadMapData(campaignName, mapName);
                 if (existing) {
                     const walls = existing.walls ? new Set(existing.walls) : new Set();
-                    setMapData({ ...existing, walls, revealed: existing.revealed || [] });
-                    setGridSize(existing.gridSize || DEFAULT_GRID_SIZE);
-                    setPlacedItems(existing.placedItems || []);
+                    const loadedData = { ...existing, walls, revealed: existing.revealed || [] };
+                    const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
+                    const loadedPlacedItems = existing.placedItems || [];
+                    setMapData(loadedData);
+                    setGridSize(loadedGridSize);
+                    setPlacedItems(loadedPlacedItems);
+                    // The loaded document IS the server's bytes — seed the dirty
+                    // baseline so the autosave effect sees a zero-edit open as clean.
+                    lastSavedRef.current = buildSavePayload(loadedData, loadedGridSize, loadedPlacedItems);
 
                     if (characters && characters.length > 0) {
                         const charNames = new Set(characters.map(c => c.name));
-                        const existingPlayers = existing.players || [];
+                        const existingPlayers = loadedData.players || [];
                         const reconciled = existingPlayers.filter(p => charNames.has(p.name));
                         if (reconciled.length !== existingPlayers.length) {
                             setMapData(prev => ({ ...prev, players: reconciled }));
@@ -90,6 +117,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                     walls: [],
                     placedItems: [],
                 };
+                lastSavedRef.current = dataToSave;
                 mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
             }
         };
@@ -104,11 +132,22 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
         }
         if (!mapData) return;
         if (svgLoadInProgressRef.current) return;
-        pendingSaveRef.current = {
-            campaignName,
-            mapName,
-            dataToSave: buildSavePayload(mapData, gridSize, placedItems),
-        };
+        const dataToSave = buildSavePayload(mapData, gridSize, placedItems);
+        const queued = pendingSaveRef.current;
+        if (queued && queued.mapName === mapName && queued.campaignName === campaignName
+            && isEqual(queued.dataToSave, dataToSave)) {
+            return; // identical document already scheduled (e.g. SSE echo of own
+                    // write re-set state) — let the existing debounce fire once
+        }
+        if (isEqual(dataToSave, lastSavedRef.current)) {
+            // Zero-edit state churn (fresh load, echo, undone stroke): nothing
+            // is dirtied against the server — drop any stale queue, write
+            // nothing (backlog 2026-10-26: mount + echo emitted 2 no-op PUTs).
+            pendingSaveRef.current = null;
+            clearSaveTimer();
+            return;
+        }
+        pendingSaveRef.current = { campaignName, mapName, dataToSave };
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(flushSave, AUTOSAVE_DEBOUNCE_MS);
     }, [mapData, campaignName, gridSize, placedItems, mapName, flushSave]);

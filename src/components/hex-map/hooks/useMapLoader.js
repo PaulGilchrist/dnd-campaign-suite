@@ -1,8 +1,32 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
+
+// The one envelope shape the persistence effect writes; load paths seed the
+// dirty baseline with this SAME builder so a zero-edit open compares equal and
+// skips the full-document PUT (backlog 2026-10-26 write-amplification twin of
+// the indoor lane — outdoor emitted six no-op PUTs per open).
+function buildHexEnvelope({ displayName, gridSize, terrain, rivers, roads, pois, zoom, panX, panY, marchingOrder, partyPosition, weather, travelState }) {
+    return {
+        type: 'outdoor',
+        displayName,
+        gridSize,
+        terrain,
+        rivers,
+        roads,
+        pois,
+        zoom,
+        panX,
+        panY,
+        marchingOrder,
+        partyPosition,
+        weather,
+        travelState,
+    };
+}
 
 function normalizeExistingView(existing) {
     const loadedZoom = existing.zoom != null ? Math.max(MIN_ZOOM, existing.zoom) : MIN_ZOOM;
@@ -67,9 +91,29 @@ function applyExistingMap(existing, mapName, characters, ctx) {
         (characters.length > 0 ? characters.map(c => c.name) : []);
     ctx.setMarchingOrder(loadOrder);
 
-    ctx.setPartyPosition(existing.partyPosition || {
+    const loadedPartyPos = existing.partyPosition || {
         q: Math.floor((loadedGridSize * GRID_COLS_MULTIPLIER) / 2),
         r: Math.floor(loadedGridSize / 2),
+    };
+    ctx.setPartyPosition(loadedPartyPos);
+
+    // Seed the dirty baseline with the normalized loaded snapshot (same
+    // builder the persistence effect uses) so opening a map without edits
+    // writes nothing.
+    ctx.lastSavedRef.current = buildHexEnvelope({
+        displayName: existing.displayName || mapName,
+        gridSize: loadedGridSize,
+        terrain: loadedTerrain,
+        rivers: loadedRivers,
+        roads: loadedRoads,
+        pois: loadedPois,
+        zoom: loadedZoom,
+        panX: loadedPanX,
+        panY: loadedPanY,
+        marchingOrder: loadOrder,
+        partyPosition: loadedPartyPos,
+        weather: existing.weather || null,
+        travelState: ctx.travelStateRef.current,
     });
 
     // Claim the held-bytes name BEFORE setLoading(false): the persistence
@@ -132,7 +176,30 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
 
     try {
         await mapsService.saveMapData(campaignName, mapName, newData);
+        // Create landed: seed the persistence effect's envelope shape as the
+        // dirty baseline so the loading-flip commit does NOT schedule a
+        // second, normalization-only re-PUT of the same document
+        // (backlog 2026-10-26). Envelope extras (displayName/pan/weather/
+        // travelState) ride along with the next real edit.
+        ctx.lastSavedRef.current = buildHexEnvelope({
+            displayName: mapName,
+            gridSize: DEFAULT_GRID_SIZE,
+            terrain: initialTerrain,
+            rivers: [],
+            roads: [],
+            pois: [],
+            zoom: MIN_ZOOM,
+            panX: 0,
+            panY: 0,
+            marchingOrder: initialOrder,
+            partyPosition: initialPartyPos,
+            weather: null,
+            travelState: ctx.travelStateRef.current,
+        });
     } catch (err) {
+        // Create failed — keep the baseline null so the loading-flip
+        // persistence pass retries the full envelope (no silent data loss).
+        ctx.lastSavedRef.current = null;
         console.error('Failed to save initial hex map data:', err);
     }
 
@@ -174,6 +241,10 @@ function useMapLoader(campaignName, mapName, characters) {
     const hexMapNameRef = useRef(null);
     const hexMapDisplayNameRef = useRef(mapName);
     const travelStateRef = useRef(null);
+    // Dirty baseline: last envelope known to be on the server (seeded at load,
+    // claimed on every write). The persistence effect PUTs only when its
+    // envelope differs from this.
+    const lastSavedRef = useRef(null);
 
     const setTravelStateRef = useCallback((ts) => {
         travelStateRef.current = ts;
@@ -196,6 +267,7 @@ function useMapLoader(campaignName, mapName, characters) {
             setZoom, setPanX, setPanY, setWeather, setTravelInit,
             setMarchingOrder, setPartyPosition, setLoading,
             hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
+            travelStateRef, lastSavedRef,
         };
 
         const loadMap = async () => {
@@ -218,24 +290,28 @@ function useMapLoader(campaignName, mapName, characters) {
     }, [campaignName, mapName, characters]);
 
     // Persistence effect. The guards are: `loading` STATE (skip pre-load —
-    // flushing there would clobber server data with empty defaults) and the
-    // mapName-vs-held-bytes check below. The ref guard is CROSS-MAP
-    // prevention, not de-dup: the save addresses the LIVE mapName, so it may
-    // only fire while that live name is the name whose bytes are in state.
+    // flushing there would clobber server data with empty defaults), the
+    // mapName-vs-held-bytes check below, and the DIRTY gate: the envelope is
+    // deep-compared against the last document known to be on the server
+    // (seeded from the normalized load snapshot), so a zero-edit open — and
+    // the echo of this tab's own write — never re-PUTs the whole document
+    // (backlog 2026-10-26: this lane emitted six no-op PUTs per open+back).
+    // The ref guard is CROSS-MAP prevention, not de-dup: the save addresses
+    // the LIVE mapName, so it may only fire while that live name is the name
+    // whose bytes are in state.
     // On an in-place A→B switch it therefore skips (A's bytes must never be
     // written to B's URL), the load effect reloads B with `loading` back
-    // true, and the load-completion batch re-claims hexMapNameRef.current
-    // and re-runs this effect exactly once with B's snapshot (#800
-    // determinism, #801 stale-ref death). `loading` stays in the deps so
-    // the flush cannot miss; a ref flipped after an await seam (old
-    // hasLoaded.current) left flush-vs-passive-effect ordering to the
+    // true, and the load-completion batch re-claims hexMapNameRef.current,
+    // re-seeds the baseline, and re-runs this effect exactly once with B's
+    // snapshot (#800 determinism, #801 stale-ref death). `loading` stays in
+    // the deps so the flush cannot miss; a ref flipped after an await seam
+    // (old hasLoaded.current) left flush-vs-passive-effect ordering to the
     // scheduler — mount snapshot flushed once-or-not-at-all (#800).
     useEffect(() => {
         if (loading) return;
         if (mapName !== hexMapNameRef.current) return;
 
-        const dataToSave = {
-            type: 'outdoor',
+        const dataToSave = buildHexEnvelope({
             displayName: hexMapDisplayNameRef.current,
             gridSize,
             terrain,
@@ -249,7 +325,9 @@ function useMapLoader(campaignName, mapName, characters) {
             partyPosition,
             weather,
             travelState: travelStateRef.current,
-        };
+        });
+        if (isEqual(dataToSave, lastSavedRef.current)) return;
+        lastSavedRef.current = dataToSave;
         mapsService.saveMapData(campaignName, mapName, dataToSave)
             .catch(err => console.error('Failed to save hex map data:', err));
     }, [campaignName, mapName, loading, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion]);

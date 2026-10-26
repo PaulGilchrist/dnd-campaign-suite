@@ -103,13 +103,11 @@ describe('useMapLoader - API & persistence', () => {
     it('exposes setters whose changes persist to saveMapData as one exact full snapshot', async () => {
         const { result } = await renderLoadedHook();
 
-        // Loading a map flushes the loaded state through the save envelope
-        // exactly once — deterministic: the persistence effect's guard is the
-        // `loading` STATE (in its deps), flipped in the same update batch as
-        // the loaded state, so the flush cannot miss (#800).
-        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
-        expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, MAP, savedSnapshot());
-        mapsService.saveMapData.mockClear();
+        // Zero-edit open dirties nothing: the loaded snapshot seeds the
+        // persistence baseline, so no write fires until a real mutation
+        // (backlog 2026-10-26 write-amplification fix; the determinism of the
+        // FIRST real write still rides the `loading`-state guard, #800).
+        expect(mapsService.saveMapData).not.toHaveBeenCalled();
 
         act(() => {
             result.current.setMapData({ type: 'cave' });
@@ -165,19 +163,34 @@ describe('useMapLoader - API & persistence', () => {
         }));
     });
 
-    // #800 RACE-DETERMINISTIC pin: every fresh mount of an existing map
-    // flushes EXACTLY ONE save with the exact loaded snapshot — across
-    // repeated mounts in this single invocation, no once-or-not-at-all.
-    it('flushes exactly one loaded snapshot on each of 5 repeated mounts', async () => {
+    // #800 determinism, inverted by the dirty gate (backlog 2026-10-26): zero
+    // edits means zero writes — across repeated mounts a fresh load stays quiet.
+    it('saves NOTHING on each of 5 zero-edit repeated mounts of an existing map', async () => {
         for (let i = 0; i < 5; i++) {
             mapsService.saveMapData.mockClear();
             const { unmount } = await renderLoadedHook();
 
-            const calls = mapsService.saveMapData.mock.calls;
-            expect(calls, `mount ${i} save count`).toHaveLength(1);
-            expect(calls[0], `mount ${i} loaded snapshot envelope`).toEqual([CAMPAIGN, MAP, savedSnapshot()]);
+            expect(mapsService.saveMapData.mock.calls, `mount ${i} save count`).toHaveLength(0);
             unmount();
         }
+    });
+
+    // A byte-identical envelope re-computation (SSE echo of this tab's own
+    // write landing back in state) must not re-PUT.
+    it('does not re-save when state churn produces a byte-identical envelope', async () => {
+        const { result } = await renderLoadedHook();
+        expect(mapsService.saveMapData).not.toHaveBeenCalled();
+
+        act(() => { result.current.setTerrain({ '1,1': 'hills' }); });   // same value, new object
+        act(() => { result.current.setPois([{ name: 'Watchtower' }]); }); // same value, new object
+        act(() => { result.current.setZoom(3); });                        // same primitive
+
+        await act(async () => {});
+        expect(mapsService.saveMapData).not.toHaveBeenCalled();
+
+        // A real deep change still lands exactly once.
+        act(() => { result.current.setPois([{ name: 'Watchtower' }, { name: 'Camp' }]); });
+        await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
     });
 
     // #801 IN-PLACE mapName switch lane: the persistence guard (:201) compares
@@ -217,14 +230,13 @@ describe('useMapLoader - API & persistence', () => {
                 { initialProps: { mapName: MAP } },
             );
             await waitFor(() => expect(utils.result.current.loading).toBe(false));
-            expect(mapsService.saveMapData).toHaveBeenCalledTimes(1); // mount flush of A
-            mapsService.saveMapData.mockClear();
+            expect(mapsService.saveMapData).not.toHaveBeenCalled(); // zero-edit mount is quiet
             // Delegate through a function: spread would snapshot the placeholder
             // before the map-b request assigns the real resolver.
             return { ...utils, resolveLoadB: (m) => resolveB(m) };
         };
 
-        it('never writes map A bytes to map B URL, then reloads B and saves under B exactly once', async () => {
+        it('never writes map A bytes to map B URL, then reloads B and saves its edits under B', async () => {
             const { result, rerender, resolveLoadB } = await renderSwitchableHook();
 
             rerender({ mapName: 'map-b' });
@@ -236,13 +248,17 @@ describe('useMapLoader - API & persistence', () => {
             await act(async () => { resolveLoadB(loadedMapB()); });
             await waitFor(() => expect(result.current.loading).toBe(false));
 
-            // Save guard reopened exactly once, addressed to B with B's bytes.
-            expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
+            // B's zero-edit load re-arms the guard but writes nothing; a real
+            // edit lands under B exactly once with B's full envelope (#801).
+            expect(mapsService.saveMapData).not.toHaveBeenCalled();
+            expect(result.current.hexMapNameRef.current).toBe('map-b');
+            act(() => { result.current.setTerrain({ '9,9': 'bog', '1,0': 'forest' }); });
+            await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
             expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, 'map-b', {
                 type: 'outdoor',
                 displayName: 'The Marshlands',
                 gridSize: 14,
-                terrain: { '9,9': 'bog' },
+                terrain: { '9,9': 'bog', '1,0': 'forest' },
                 rivers: [],
                 roads: [],
                 pois: [{ name: 'Fen Shrine' }],
@@ -254,14 +270,6 @@ describe('useMapLoader - API & persistence', () => {
                 weather: 'clear',
                 travelState: null,
             });
-            expect(result.current.hexMapNameRef.current).toBe('map-b');
-
-            // Post-switch edits land under B too (no silent-save death).
-            mapsService.saveMapData.mockClear();
-            act(() => { result.current.setTerrain({ '9,9': 'bog', '1,0': 'forest' }); });
-            await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
-            expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, 'map-b',
-                expect.objectContaining({ terrain: { '9,9': 'bog', '1,0': 'forest' } }));
         });
 
         it('drops A edits attempted during B load instead of smuggling them into B', async () => {

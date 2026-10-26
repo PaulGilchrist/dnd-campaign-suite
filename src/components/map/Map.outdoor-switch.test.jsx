@@ -13,7 +13,8 @@
 //     the flip settles into the UNMOUNTED old instance (setState no-op) —
 //     it must not repaint the new map nor persist the old map's bytes.
 //   • single-mount unchanged: same mapName across re-renders loads exactly
-//     once and flushes exactly one save snapshot (guard bytes untouched).
+//     once and — dirty gate (backlog 2026-10-26) — flushes ZERO saves with no
+//     edits (envelope exactness on real edits owned by useMapLoader.api).
 //
 // Cited to owners (never re-driven here):
 //   outdoor dispatch props-down / mount census ..... Map.test.jsx #922 T4
@@ -373,11 +374,12 @@ describe('Map — outdoor mapName switch (#798)', () => {
         // toolbar MOUNTED, not merely re-rendered with a new prop.
         expect(H.toolbarMounts).toEqual([MAP_A, MAP_B]);
 
-        // Save sanity: B's mount flush persists B's loaded snapshot at B's
-        // address; no save ever writes A's bytes into B's URL.
-        await waitFor(() => expect(saveCallsFor(MAP_B).length).toBeGreaterThanOrEqual(1));
-        expect(saveCallsFor(MAP_B).every(c => c[2].displayName === 'Vale of B')).toBe(true);
-        expect(saveCallsFor(MAP_B).filter(c => c[2].displayName === 'Vale of A')).toHaveLength(0);
+        // Save sanity (dirty gate, backlog 2026-10-26): a zero-edit A→B flip
+        // persists NOTHING — no mount flush at either address, and no save
+        // ever writes A's bytes into B's URL.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(saveCallsFor(MAP_B)).toHaveLength(0);
+        expect(saveCallsFor(MAP_A)).toHaveLength(0);
     });
 
     it('late-resolving A load after the flip cannot repaint or persist B', async () => {
@@ -403,7 +405,7 @@ describe('Map — outdoor mapName switch (#798)', () => {
         expect(saveCallsFor(MAP_A)).toHaveLength(0);
     });
 
-    it('single-mount flow is byte-identical: stable mapName loads once and flushes one snapshot', async () => {
+    it('single-mount flow is quiet: stable mapName loads once and writes nothing without edits', async () => {
         const { rerender } = render(mapEl(MAP_A));
         await waitFor(() => expect(screen.getByTestId('hex-display-name')).toHaveTextContent('Vale of A'));
 
@@ -415,24 +417,11 @@ describe('Map — outdoor mapName switch (#798)', () => {
         expect(loadCallsFor(MAP_B)).toHaveLength(0);
         expect(H.toolbarMounts).toEqual([MAP_A]);
 
-        // One mount-flush save of the loaded snapshot (api lane envelope;
-        // travelState serializes as null until a travel session publishes).
-        await waitFor(() => expect(saveCallsFor(MAP_A)).toHaveLength(1));
-        expect(saveCallsFor(MAP_A)[0][2]).toEqual({
-            type: 'outdoor',
-            displayName: 'Vale of A',
-            gridSize: 12,
-            terrain: payloadA().terrain,
-            rivers: [],
-            roads: [],
-            pois: payloadA().pois,
-            zoom: 3,
-            panX: 40,
-            panY: 60,
-            marchingOrder: ['Thorin'],
-            partyPosition: { q: 7, r: 3 },
-            weather: 'fog',
-            travelState: null,
-        });
+        // Dirty gate (backlog 2026-10-26): the loaded snapshot seeds the
+        // persistence baseline — re-renders of a stable, unedited map emit
+        // ZERO saves (previously one mount-flush envelope save; envelope
+        // exactness on real edits stays pinned in the hook api lane).
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(saveCallsFor(MAP_A)).toHaveLength(0);
     });
 });
