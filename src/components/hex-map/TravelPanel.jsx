@@ -67,10 +67,20 @@ const FM_MAX_EXHAUSTION_TITLE = 'Cannot forced march — a party member has reac
 const frequencyChance = (f) => `${Math.round((f ? f.chance : 0) * 100)}% chance per hex`;
 const lookupFrequency = (key) => EVENT_FREQUENCIES[key] || EVENT_FREQUENCIES.none;
 
+// Advance-button label + disabled tooltip (backlog 2026-10-26-E): a fresh tool
+// mount has an EMPTY path, and `pathIndex >= path.length` is vacuously true —
+// so without the empty-path branch the button falsely read "Arrived" before a
+// destination was ever chosen. Hoisted to keep TravelPanel under the
+// complexity cap.
+const NO_DESTINATION_TITLE = 'Select a destination hex on the map to plan a route';
+const advanceLabel = (path, pathIndex) => {
+  if (path.length === 0) return 'Select a destination';
+  return pathIndex >= path.length ? 'Arrived' : 'Advance One Hex';
+};
 // Disabled-button explanations (hover tooltips); undefined leaves the button
-// bare when the gate is not what blocks it. Hoisted to keep TravelPanel under
-// the complexity cap.
-const advanceTitle = (maxed) => (maxed ? MAX_EXHAUSTION_HINT : undefined);
+// bare when the gate is not what blocks it.
+const advanceTitle = (maxed, noDestination) =>
+  (maxed ? MAX_EXHAUSTION_HINT : (noDestination ? NO_DESTINATION_TITLE : undefined));
 const forcedMarchTitle = (maxed) => (maxed ? FM_MAX_EXHAUSTION_TITLE : undefined);
 
 function TravelMaxExhaustionHint({ visible }) {
@@ -283,10 +293,10 @@ function TravelPanel({
           className="travel-btn-advance"
           onClick={onAdvance}
           disabled={advanceDisabled}
-          title={advanceTitle(partyHasMaxExhaustion)}
+          title={advanceTitle(partyHasMaxExhaustion, path.length === 0)}
         >
           <i className="fa-solid fa-person-walking"></i>
-          {pathIndex >= path.length ? 'Arrived' : 'Advance One Hex'}
+          {advanceLabel(path, pathIndex)}
         </button>
         <button className="travel-btn-cancel" onClick={onCancel}>
           <i className="fa-solid fa-ban"></i>

@@ -182,6 +182,16 @@ describe('TravelPanel', () => {
         disabled: ['Arrived'],
       },
       {
+        // Backlog 2026-10-26-E: fresh mount has path=[] and pathIndex=0, so the
+        // old `pathIndex >= path.length` test vacuously read "Arrived" before a
+        // destination existed — the empty path must prompt instead.
+        label: 'empty path prompts for a destination, never claims Arrived',
+        props: { path: [], hexesRemaining: 0 },
+        visible: ['Select a destination'],
+        absentText: ['Arrived', 'Advance One Hex', 'Next hex'],
+        disabled: ['Select a destination'],
+      },
+      {
         label: 'forced march status shows stacks and speed bytes',
         // 3 stacks → 58% is the real multiplier ((5/6)^3, travelService).
         props: { forcedMarchHours: 3, exhaustionMultiplier: 58 },
@@ -194,6 +204,36 @@ describe('TravelPanel', () => {
       disabled.forEach((name) => expect(screen.getByRole('button', { name })).toBeDisabled());
       absentText.forEach((text) => expect(screen.queryByText(text)).not.toBeInTheDocument());
       absentButtons.forEach((name) => expect(screen.queryByRole('button', { name })).not.toBeInTheDocument());
+    });
+  });
+
+  describe('advance button label/tooltip across route states', () => {
+    // Backlog 2026-10-26-E lock: one role-query per state pins label text,
+    // disabled byte, and tooltip together — fresh mount (empty path), live
+    // route, and route end.
+    const NO_DEST_TITLE = 'Select a destination hex on the map to plan a route';
+
+    it('locks Select a destination / Advance One Hex / Arrived with sensible tooltips', () => {
+      const { rerender } = renderPanel({ path: [], hexesRemaining: 0 });
+      const prompt = screen.getByRole('button', { name: 'Select a destination' });
+      expect(prompt).toBeDisabled();
+      expect(prompt).toHaveAttribute('title', NO_DEST_TITLE);
+
+      rerender(<TravelPanel {...makeProps()} />);
+      const live = screen.getByRole('button', { name: 'Advance One Hex' });
+      expect(live).toBeEnabled();
+      expect(live).not.toHaveAttribute('title');
+
+      rerender(<TravelPanel {...makeProps({ pathIndex: 3 })} />);
+      const ended = screen.getByRole('button', { name: 'Arrived' });
+      expect(ended).toBeDisabled();
+      expect(ended).not.toHaveAttribute('title');
+    });
+
+    it('keeps the max-exhaustion tooltip winning over the no-destination tooltip', () => {
+      renderPanel({ path: [], hexesRemaining: 0, partyHasMaxExhaustion: true });
+      expect(screen.getByRole('button', { name: 'Select a destination' }))
+        .toHaveAttribute('title', 'A party member is at maximum exhaustion — rest required');
     });
   });
 
