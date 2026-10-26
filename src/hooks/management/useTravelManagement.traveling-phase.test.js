@@ -1,0 +1,232 @@
+// @maintained-by-ai
+// Lane: useTravelManagement's L5 §10.1 session-phase producer (bug-travel-phase-
+// traveling-never-set). The phase-OWNERSHIP seam (who may clobber an armed
+// phase) is owned by useTravelManagement.session-phase.test.js; the phase state
+// machine internals by sessionService.test.js. THIS file pins the missing
+// producer itself: a successful mid-route `Advance One Hex` must write
+// travel-mode 'traveling' (the ONLY call site of MODES.TRAVELING) and arm
+// sessionState.phase='travel' with its session_phase audit line, and the
+// arrival/cancel INACTIVE branches must then restore 'exploration' with an
+// entry of its own. Pre-fix: travel ran entirely in 'planning'/'paused', the
+// key never existed, and the whole cycle logged ZERO session_phase entries.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import useTravelManagement from './useTravelManagement.js';
+
+vi.mock('../../services/campaign/travelService.js', () => ({
+  calculatePath: vi.fn(() => [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }]),
+  getDailyHexBudget: vi.fn(() => 6),
+  getHexMoveCostWithRoad: vi.fn(() => 1),
+  HORSEBACK_SPEED_MULTIPLIER: 2,
+  TRAVEL_PACES: [
+    { id: 'slow', name: 'Slow' },
+    { id: 'normal', name: 'Normal' },
+    { id: 'fast', name: 'Fast' },
+  ],
+  EXHAUSTION_LEVELS: 6,
+  applyExhaustionSpeedPenaltyToBudget: vi.fn((budget) => budget),
+  getExhaustionMultiplierPercent: vi.fn((hours) => Math.round(Math.pow(5 / 6, hours) * 100)),
+}));
+
+vi.mock('../../services/campaign/randomEventService.js', () => ({
+  shouldTriggerEvent: vi.fn(() => false),
+  generateRandomEvent: vi.fn(() => ({ type: 'encounter', title: 'Random Event' })),
+}));
+
+vi.mock('../../services/encounters/encounterGenerator.js', () => ({
+  generateEncounterSuggestions: vi.fn(() => []),
+}));
+
+vi.mock('../../services/combat/automation/automationService.js', () => ({
+  hasSelfRestoration: vi.fn(() => false),
+}));
+
+// Runtime store mock (same shape as the sibling files): getRuntimeValue is the
+// read readSessionPhase consults; setRuntimeValue calls are the assertions.
+var _stores;
+var _listeners;
+
+vi.mock('../runtime/useRuntimeState.js', () => {
+  if (!_stores) {
+    _stores = new Map();
+    _listeners = new Map();
+  }
+  return {
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
+      const store = _stores.get(characterKey);
+      if (store) store.set(propertyName, value);
+    }),
+    getStore: vi.fn((key) => {
+      if (!_stores.has(key)) {
+        _stores.set(key, new Map());
+      }
+      return _stores.get(key);
+    }),
+    listeners: _listeners,
+  };
+});
+
+// sessionService's audit transport — the hook stays REAL through
+// sessionService so the producer → phase → audit chain is exercised
+// end-to-end.
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(async () => {}),
+}));
+
+const { getRuntimeValue, setRuntimeValue } = await import('../runtime/useRuntimeState.js');
+const { addEntry } = await import('../../services/ui/logService.js');
+const { calculatePath } = await import('../../services/campaign/travelService.js');
+
+const CN = 'test-campaign';
+
+// Seed the sessionState runtime key the way a prior phase move would leave it
+// (null ⇒ key unset ⇒ readSessionPhase defaults to 'exploration').
+const phaseIs = (phase) => {
+  getRuntimeValue.mockImplementation((who, key) =>
+    who === 'campaign' && key === 'sessionState' && phase ? { phase } : null
+  );
+};
+
+const phaseWrites = () =>
+  setRuntimeValue.mock.calls.filter(([who, key]) => who === 'campaign' && key === 'sessionState');
+
+const modeWrites = (value) =>
+  setRuntimeValue.mock.calls.filter(
+    ([who, key, v]) => who === 'campaign' && key === 'travel-mode' && (value === undefined || v === value)
+  );
+
+describe('useTravelManagement — MODES.TRAVELING producer arms the travel phase (bug-travel-phase-traveling-never-set)', () => {
+  const baseArgs = {
+    hexCols: 10,
+    hexRows: 10,
+    terrain: { '1,0': 'plains', '2,0': 'plains', '3,0': 'plains' },
+    partyPosition: { q: 0, r: 0 },
+    onPartyMove: vi.fn(),
+    weather: null,
+    monsters: [],
+    playerLevels: [19],
+    roads: [],
+    characters: [{ name: 'Hero' }],
+    campaignName: CN,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _stores.clear();
+    _listeners.clear();
+    phaseIs(null);
+    calculatePath.mockReturnValue([{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }]);
+    setRuntimeValue.mockReturnValue(undefined);
+    addEntry.mockResolvedValue(undefined);
+  });
+
+  it('mid-route advance writes travel-mode traveling and arms phase travel + session_phase audit', async () => {
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    let res;
+    await act(async () => { res = result.current.advanceOneHex(); });
+
+    expect(res).toEqual({ moved: true });
+    // The broken fingerprint: this write NEVER happened (mode stayed planning).
+    expect(result.current.travelMode).toBe('traveling');
+    expect(modeWrites('traveling')).toEqual([['campaign', 'travel-mode', 'traveling', CN]]);
+    // …and neither did the phase arm: sessionState never existed app-wide.
+    expect(phaseWrites()).toEqual([
+      ['campaign', 'sessionState', expect.objectContaining({ phase: 'travel', changedBy: 'travel management' }), CN],
+    ]);
+    expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+      type: 'session_phase',
+      phase: 'travel',
+      previousPhase: 'exploration',
+      changedBy: 'travel management',
+      description: 'Session phase: exploration → travel (travel started) — travel management.',
+    }));
+  });
+
+  it('repeated mid-route advances churn travel-mode exactly once (same-value guard, phase deduped)', async () => {
+    calculatePath.mockReturnValue([{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }]);
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 3, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    await act(async () => { result.current.advanceOneHex(); }); // idx 1 — traveling armed
+    await act(async () => { result.current.advanceOneHex(); }); // idx 2 — still mid-route
+
+    expect(result.current.travelMode).toBe('traveling');
+    expect(modeWrites('traveling')).toHaveLength(1);
+    expect(phaseWrites()).toHaveLength(1);
+  });
+
+  it('arrival from traveling restores exploration with its own session_phase entry', async () => {
+    phaseIs('travel');
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    await act(async () => { result.current.advanceOneHex(); }); // idx 1 — mid-route
+    let res;
+    await act(async () => { res = result.current.advanceOneHex(); }); // idx 2 — arrival
+
+    expect(res.arrived).toBe(true);
+    expect(result.current.travelMode).toBe('inactive');
+    expect(phaseWrites()).toEqual([
+      ['campaign', 'sessionState', expect.objectContaining({ phase: 'exploration', changedBy: 'travel management' }), CN],
+    ]);
+    expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+      type: 'session_phase',
+      phase: 'exploration',
+      previousPhase: 'travel',
+      changedBy: 'travel management',
+      description: 'Session phase: travel → exploration (travel ended) — travel management.',
+    }));
+  });
+
+  it('cancel from traveling restores exploration (phase-ownership guard now reachable)', async () => {
+    phaseIs('travel');
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    await act(async () => { result.current.advanceOneHex(); }); // mid-route → traveling
+    await act(async () => { result.current.cancelTravel(); });
+
+    expect(result.current.travelMode).toBe('inactive');
+    expect(phaseWrites()).toEqual([
+      ['campaign', 'sessionState', expect.objectContaining({ phase: 'exploration', changedBy: 'travel management' }), CN],
+    ]);
+    expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+      type: 'session_phase',
+      phase: 'exploration',
+      previousPhase: 'travel',
+    }));
+  });
+
+  it('event advance stays a single mode write (paused, no traveling churn, phase untouched)', async () => {
+    const { shouldTriggerEvent } = await import('../../services/campaign/randomEventService.js');
+    shouldTriggerEvent.mockReturnValue(true);
+    phaseIs('travel');
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    let res;
+    await act(async () => { res = result.current.advanceOneHex(); });
+
+    expect(res.event).toBeTruthy();
+    expect(result.current.travelMode).toBe('paused');
+    // One mode write for the whole advance — never TRAVELING-then-PAUSED in
+    // the same tick (same-endpoint POSTs race, see advanceOneHex comment).
+    expect(setRuntimeValue.mock.calls.filter(([who, key]) => who === 'campaign' && key === 'travel-mode'))
+      .toEqual([['campaign', 'travel-mode', 'paused', CN]]);
+    expect(phaseWrites()).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+});

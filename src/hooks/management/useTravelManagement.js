@@ -236,8 +236,18 @@ export default function useTravelManagement({
       return { moved: true, event };
     }
 
+    // L5 §10.1: the party is now MOVING along a planned route (this advance
+    // neither arrived nor stopped for an event) — the missing producer for
+    // MODES.TRAVELING. The setter wrapper arms sessionState.phase='travel'
+    // exactly once (sessionService dedupes same-phase writes) and arrival /
+    // cancel below return it to exploration through the phase-ownership
+    // guard. Placed AFTER both early returns so an advance never double-writes
+    // travel-mode in one tick (same-endpoint POSTs can race); one mode write
+    // per advance, and the guard skips same-value churn.
+    if (travelMode !== MODES.TRAVELING) setTravelMode(MODES.TRAVELING);
+
     return { moved: true };
-  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback, travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const forceCamp = useCallback(() => {
     setAccruedCost(0);
