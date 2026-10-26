@@ -21,10 +21,10 @@ describe('useTravelToolSync', () => {
     // Threads every hook argument through props (like the real HexMap.jsx:141),
     // so rerender can change any single input while keeping the others stable.
     // hasPersistedWeather defaults false (a map file with no weather object).
-    const renderSync = ({ tool, travelMgmt, handleGenerateWeather = vi.fn(), setTool = vi.fn(), hasPersistedWeather = false }) => {
-        const initialProps = { tool, travelMgmt, weatherHandler: handleGenerateWeather, setTool, hasPersistedWeather };
+    const renderSync = ({ tool, travelMgmt, handleGenerateWeather = vi.fn(), setTool = vi.fn(), hasPersistedWeather = false, hasLoadedTrip = false }) => {
+        const initialProps = { tool, travelMgmt, weatherHandler: handleGenerateWeather, setTool, hasPersistedWeather, hasLoadedTrip };
         const utils = renderHook(
-            (p) => useTravelToolSync(p.tool, p.travelMgmt, p.weatherHandler, p.setTool, p.hasPersistedWeather),
+            (p) => useTravelToolSync(p.tool, p.travelMgmt, p.weatherHandler, p.setTool, { hasPersistedWeather: p.hasPersistedWeather, hasLoadedTrip: p.hasLoadedTrip }),
             { initialProps }
         );
         const rerender = (changes) => utils.rerender({ ...initialProps, ...changes });
@@ -189,6 +189,30 @@ describe('useTravelToolSync', () => {
         noCalls(advancedTravelMgmt, freshWeather, freshSetTool);
     });
 
+    it('is session-sticky resume-aware when the loaded file carries a trip', () => {
+        // Improve 2026-10-26-D: the file trip materializes into change-data a
+        // beat AFTER mount (async loader → adoption effect), and per-value
+        // SSE echoes keep re-churning it. In a session that LOADED a file
+        // trip, no-press activations survive; only leaving the tool cancels.
+        const handleGenerateWeather = vi.fn();
+        const setTool = vi.fn();
+        const idle = createTravelMgmt('inactive');
+        const { rerender } = renderSync({ tool: TOOL_NONE, travelMgmt: idle, handleGenerateWeather, setTool, hasLoadedTrip: true });
+
+        const adopted = createTravelMgmt('traveling');
+        rerender({ travelMgmt: adopted });
+        const echoed = createTravelMgmt('traveling');
+        rerender({ travelMgmt: echoed });
+        expect(adopted.cancelTravel).not.toHaveBeenCalled();
+        expect(echoed.cancelTravel).not.toHaveBeenCalled();
+        expect(adopted.startPlanning).not.toHaveBeenCalled();
+
+        // Intent still cancels: select then leave the travel tool.
+        rerender({ tool: TOOL_TRAVEL, travelMgmt: adopted });
+        rerender({ tool: TOOL_PAINT, travelMgmt: adopted });
+        expect(adopted.cancelTravel).toHaveBeenCalledTimes(1);
+    });
+
     it('cancels externally-started travel when a non-travel tool is selected', () => {
         // Same cancel branch, but triggered by travelMgmt identity (SSE-driven
         // travel start) rather than a tool switch.
@@ -206,6 +230,34 @@ describe('useTravelToolSync', () => {
         expect(initialTravelMgmt.cancelTravel).not.toHaveBeenCalled();
         expect(handleGenerateWeather).not.toHaveBeenCalled();
         expect(setTool).not.toHaveBeenCalled();
+    });
+
+    it('never cancels a trip that was already live at mount (reopen-resume), across post-load churn', () => {
+        // Improve 2026-10-26-D live repro: mid-trip map reopen / page reload
+        // mounts with tool NONE + an active trip (change-data or file travelState
+        // resume). Post-load re-renders hand in fresh travelMgmt identities —
+        // none of them may cancel the reopened trip.
+        const handleGenerateWeather = vi.fn();
+        const setTool = vi.fn();
+        const mountMgmt = createTravelMgmt('traveling');
+        const { rerender } = renderSync({ tool: TOOL_NONE, travelMgmt: mountMgmt, handleGenerateWeather, setTool });
+
+        const afterLoad = createTravelMgmt('traveling');
+        rerender({ travelMgmt: afterLoad });
+        const echoed = createTravelMgmt('planning');
+        rerender({ travelMgmt: echoed });
+
+        expect(mountMgmt.cancelTravel).not.toHaveBeenCalled();
+        expect(afterLoad.cancelTravel).not.toHaveBeenCalled();
+        expect(echoed.cancelTravel).not.toHaveBeenCalled();
+        expect(mountMgmt.startPlanning).not.toHaveBeenCalled();
+        expect(handleGenerateWeather).not.toHaveBeenCalled();
+        expect(setTool).not.toHaveBeenCalled();
+
+        // Intent still cancels: selecting then leaving the travel tool.
+        rerender({ tool: TOOL_TRAVEL, travelMgmt: afterLoad });
+        rerender({ tool: TOOL_PAINT, travelMgmt: afterLoad });
+        expect(afterLoad.cancelTravel).toHaveBeenCalledTimes(1);
     });
 
     it('re-arms across a full travel -> paint -> travel -> road lifecycle with exact totals', () => {

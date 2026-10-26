@@ -93,7 +93,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-C's three travel/stamp backlog items were resolved by 7eb824531/a2ff18611/466c36814 and live-proven run D.)*
-- *(2026-10-26-D)* Map-file `travelState` write-back timing unclear: mid-day after camp+forced-march the map file still read `travelState: null` while change-data held the live travel keys — if the file lane is the reload-resume source (`useMapLoader.js:80 buildTravelInit(existing.travelState)`), a debounced/arrival-only write leaves noon state (hours/accrued) resumable only from change-data. Confirm intended lane; if the file is meant to carry live state, check the `travelSaveVersion` bump sites.
 - *(2026-10-26-D)* Arrival leaves a stale `travel-destination` key in change-data after `travel-mode:inactive` — cosmetic, but a "resume planning" affordance (or clearing the key) would make the post-arrival state self-explanatory.
 - *(2026-10-26-D)* Event dialogs appeared on 3 advances although the panel's Events row was never touched — default frequency is NOT "None" as the chip list order suggests; a short "Events: <active>" emphasis (active chip is subtle) would help GMs predict interruption rate.
 

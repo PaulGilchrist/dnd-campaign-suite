@@ -5,6 +5,10 @@ import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
 
+// Coalescing window for the autosave chokepoint (mirrors the indoor lane's
+// AUTOSAVE_DEBOUNCE_MS in src/components/map/hooks/useMapLoader.js).
+const HEX_AUTOSAVE_DEBOUNCE_MS = 1000;
+
 // The one envelope shape the persistence effect writes; load paths seed the
 // dirty baseline with this SAME builder so a zero-edit open compares equal and
 // skips the full-document PUT (backlog 2026-10-26 write-amplification twin of
@@ -46,6 +50,11 @@ function buildTravelInit(loadedTravel) {
         destination: loadedTravel.destination || null,
         path: Array.isArray(loadedTravel.path) ? loadedTravel.path : [],
         pathIndex: typeof loadedTravel.pathIndex === 'number' ? loadedTravel.pathIndex : 0,
+        // Noon's exhausted flag is part of the resumable snapshot the write
+        // back publishes (improve 2026-10-26-D); dropping it here desynced
+        // the file lane from change-data and re-dirtied the document on the
+        // first quiet reload after an over-budget reject.
+        dayExhausted: !!loadedTravel.dayExhausted,
     };
 }
 
@@ -79,8 +88,17 @@ function applyExistingMap(existing, mapName, characters, ctx) {
 
     const travelInitData = buildTravelInit(existing.travelState || {});
     const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
+    ctx.resumedTripRef.current = hasActiveTravel;
     if (hasActiveTravel) {
         ctx.setTravelInit(travelInitData);
+        // The file carries a live trip: adopt it into the save ref BEFORE the
+        // baseline seed below (which reads it) so the bytes are exactly what
+        // the publisher re-emits on resume (deep-equal ⇒ a quiet resume emits
+        // zero PUTs) while a later unrelated edit (pan, terrain) re-writes the
+        // same travelState instead of clobbering it back to null
+        // (improve 2026-10-26-D).
+        ctx.travelStateRef.current = travelInitData;
+        ctx.resumedTripRef.current = true;
     }
 
     if (isOldDefault) {
@@ -173,6 +191,7 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
     // in-place switch cannot carry the previous map's displayName into the
     // new map's save envelope (#801).
     ctx.hexMapDisplayNameRef.current = mapName;
+    ctx.resumedTripRef.current = false;
 
     try {
         await mapsService.saveMapData(campaignName, mapName, newData);
@@ -241,14 +260,49 @@ function useMapLoader(campaignName, mapName, characters) {
     const hexMapNameRef = useRef(null);
     const hexMapDisplayNameRef = useRef(mapName);
     const travelStateRef = useRef(null);
+    // True when a LOADED map file carried a live trip (improve 2026-10-26-D):
+    // lets useTravelToolSync distinguish the reopen/adoption resume from an
+    // external (other-tab) travel start. Set only by the load path, never by
+    // SSE echoes.
+    const resumedTripRef = useRef(false);
     // Dirty baseline: last envelope known to be on the server (seeded at load,
     // claimed on every write). The persistence effect PUTs only when its
     // envelope differs from this.
     const lastSavedRef = useRef(null);
+    // Coalescing autosave (improve 2026-10-26-D): one travel mutation lands
+    // across TWO commits (partyPosition state + the publisher's
+    // travelSaveVersion bump), which PUT the full document twice. The indoor
+    // map lane (src/components/map/hooks/useMapLoader.js) already collapses
+    // that churn with a 1s debounce + pending queue — copied verbatim here so
+    // each real mutation flushes at most ONE PUT. Benign network/save debounce
+    // (no-timers-guard category), never game state.
+    const pendingSaveRef = useRef(null);
+    const saveTimerRef = useRef(null);
 
     const setTravelStateRef = useCallback((ts) => {
         travelStateRef.current = ts;
         setTravelSaveVersion(prev => prev + 1);
+    }, []);
+
+    const clearSaveTimer = () => {
+        if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+    };
+
+    // Sole save chokepoint (mirrors the indoor lane): the debounce flush, the
+    // map-switch flush and the unmount flush all route through here. Writes
+    // the name captured at QUEUE time under the bytes held at FLUSH time —
+    // the cross-map guard lives in the queue step below.
+    const flushSave = useCallback(() => {
+        clearSaveTimer();
+        const pending = pendingSaveRef.current;
+        if (!pending) return;
+        pendingSaveRef.current = null;
+        lastSavedRef.current = pending.dataToSave;
+        mapsService.saveMapData(pending.campaignName, pending.mapName, pending.dataToSave)
+            .catch(err => console.error('Failed to save hex map data:', err));
     }, []);
 
     useEffect(() => {
@@ -267,7 +321,7 @@ function useMapLoader(campaignName, mapName, characters) {
             setZoom, setPanX, setPanY, setWeather, setTravelInit,
             setMarchingOrder, setPartyPosition, setLoading,
             hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
-            travelStateRef, lastSavedRef,
+            travelStateRef, lastSavedRef, resumedTripRef,
         };
 
         const loadMap = async () => {
@@ -326,11 +380,29 @@ function useMapLoader(campaignName, mapName, characters) {
             weather,
             travelState: travelStateRef.current,
         });
-        if (isEqual(dataToSave, lastSavedRef.current)) return;
-        lastSavedRef.current = dataToSave;
-        mapsService.saveMapData(campaignName, mapName, dataToSave)
-            .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, loading, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion]);
+        const queued = pendingSaveRef.current;
+        if (queued && queued.mapName === mapName && queued.campaignName === campaignName
+            && isEqual(queued.dataToSave, dataToSave)) {
+            return; // identical document already scheduled (e.g. mid-debounce
+                    // re-render) — let the single pending flush cover it
+        }
+        if (isEqual(dataToSave, lastSavedRef.current)) {
+            // Zero-edit state churn (fresh load, echo, byte-identical publish):
+            // nothing is dirtied against the server — drop any stale queue.
+            pendingSaveRef.current = null;
+            clearSaveTimer();
+            return;
+        }
+        pendingSaveRef.current = { campaignName, mapName, dataToSave };
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(flushSave, HEX_AUTOSAVE_DEBOUNCE_MS);
+    }, [campaignName, mapName, loading, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion, flushSave]);
+
+    // Unmount / dep-change flush: a mutation inside the debounce window (GM
+    // advances then immediately leaves the map) still lands — indoor lane's
+    // chokepoint contract, copied. No timers advance GAME state; the POSTed
+    // data already lives in the runtime store + change-data.
+    useEffect(() => flushSave, [flushSave]);
 
     return {
         loading, mapData, setMapData,
@@ -345,6 +417,7 @@ function useMapLoader(campaignName, mapName, characters) {
         travelInit, setTravelInit,
         travelSaveVersion,
         travelStateRef, setTravelStateRef,
+        resumedTripRef,
         zoom, setZoom,
         panX, setPanX,
         panY, setPanY,

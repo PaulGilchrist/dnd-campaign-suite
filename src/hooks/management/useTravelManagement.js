@@ -1,4 +1,5 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { isEqual } from 'lodash';
 import { useSyncedState } from '../runtime/useSyncedState.js';
 import {
   calculatePath,
@@ -15,7 +16,7 @@ import {
   generateRandomEvent,
 } from '../../services/campaign/randomEventService.js';
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
-import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, hasRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
 import { setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js';
 
@@ -39,6 +40,33 @@ const TERRAIN_TO_ENVIRONMENT = {
 
 const lazyDailyBudget = () => getDailyHexBudget('normal');
 
+// Map-file write-back snapshot (improve 2026-10-26-D). null = "no trip" —
+// the pristine/cancelled/idle shape, kept byte-identical to the null the
+// loader lanes seed so a quiet open never dirties the document. Everything
+// else (planning, traveling, paused, AND the post-arrival final state, which
+// mirrors change-data's retained travel-destination/-path keys) publishes in
+// full so buildTravelInit can resume from the file exactly as from change-data.
+const buildPublishSnapshot = (s) => {
+  if (s.travelMode === MODES.INACTIVE && !s.destination && (!s.path || s.path.length === 0)) {
+    return null;
+  }
+  // dailyBudget is the hook's SYNCED value — resolveInitialTravelState parks
+  // the lazy getter there while no value exists, so resolve it before the
+  // snapshot reaches JSON (a function byte would break the round-trip).
+  const budget = typeof s.dailyBudget === 'function' ? s.dailyBudget() : s.dailyBudget;
+  return {
+    travelMode: s.travelMode,
+    travelPace: s.travelPace,
+    destination: s.destination,
+    path: s.path,
+    pathIndex: s.pathIndex,
+    accruedCost: s.accruedCost,
+    dailyBudget: budget,
+    dayExhausted: s.dayExhausted,
+    forcedMarchHours: s.forcedMarchHours,
+  };
+};
+
 const resolveInitialTravelState = (initialTravelState) => {
   const init = initialTravelState || {};
   return {
@@ -58,6 +86,7 @@ export default function useTravelManagement({
   hexCols, hexRows, terrain, partyPosition, onPartyMove, weather,
   monsters, playerLevels, roads = [], characters = [], campaignName = '',
   initialTravelState,
+  onTravelStateChange,
 }) {
   const init = resolveInitialTravelState(initialTravelState);
 
@@ -101,8 +130,75 @@ export default function useTravelManagement({
   const [rerollsRemaining, setRerollsRemaining] = useSyncedState('campaign', 'travel-rerollsRemaining', 3, campaignName);
   const [horseback, setHorseback] = useSyncedState('campaign', 'travel-horseback', false, campaignName);
 
-  const pathRef = useRef([]);
-  const pathIndexRef = useRef(0);
+  // Seeded from the mount-time SYNCED path (change-data resume): advanceOneHex
+  // drives off these refs, so a trip restored into the store (reload resume)
+  // must repopulate them or every advance silently no-ops. The file-adoption
+  // lane repopulates them again when travelInit arrives post-mount.
+  const pathRef = useRef(path);
+  const pathIndexRef = useRef(pathIndex);
+
+  // ── Map-file write-back (improve 2026-10-26-D) ──
+  // The file lane is the reload-resume source: useMapLoader reads the saved
+  // document's travelState through buildTravelInit at open. The server-first
+  // refactor (4497e99ad) moved live state to the change-data keys above but
+  // dropped the old onTravelStateChange publisher with it, leaving the file's
+  // travelState stuck at null all trip (only arrival-side bytes rode along
+  // via partyPosition edits). Restore the publisher: every committed travel
+  // mutation publishes one snapshot; setTravelStateRef (HexMap) bumps
+  // travelSaveVersion and the loader's deep dirty-gate writes at most one PUT.
+  // The isEqual guard against the last-published snapshot keeps SSE echo
+  // re-renders (new array identities, same bytes) from bumping, and seeding
+  // from the mount snapshot keeps a quiet open — resume included — silent.
+  const publishedTravelRef = useRef(buildPublishSnapshot(init));
+  useEffect(() => {
+    if (!onTravelStateChange) return;
+    const snapshot = buildPublishSnapshot({
+      travelMode, travelPace, destination, path, pathIndex,
+      accruedCost, dailyBudget, dayExhausted, forcedMarchHours,
+    });
+    if (isEqual(snapshot, publishedTravelRef.current)) return;
+    publishedTravelRef.current = snapshot;
+    onTravelStateChange(snapshot);
+  }, [travelMode, travelPace, destination, path, pathIndex, accruedCost,
+      dailyBudget, dayExhausted, forcedMarchHours, onTravelStateChange]);
+
+  // File→store adoption (improve 2026-10-26-D, second half of the lane).
+  // The loader resolves the map document ASYNC, so on a cold mount the
+  // useSyncedState hooks above bake their idle defaults long before
+  // initialTravelState (buildTravelInit of the file's travelState) arrives —
+  // a trip persisted in the map file could therefore never resume. When the
+  // file carries an active trip AND change-data holds no live travel-mode
+  // (change-data is the authority whenever it speaks), materialize the file
+  // bytes into the campaign bucket with ONE merged setRuntimeObject (#18
+  // multi-POST race avoided). The useSyncedState listeners pick the values
+  // up via the store notify; the publisher above then re-confirms them
+  // byte-identical against the loader's dirty gate (zero extra PUTs).
+  const fileResumeAppliedRef = useRef(false);
+  useEffect(() => {
+    if (fileResumeAppliedRef.current || !initialTravelState) return;
+    fileResumeAppliedRef.current = true;
+    if (hasRuntimeValue('campaign', 'travel-mode')) return;
+    // init = resolveInitialTravelState(initialTravelState): every field is
+    // concrete, so a legacy file missing keys still materializes complete
+    // live state. The mode goes through the RAW setter: this is materializing
+    // an existing trip, not travel starting — the §10.1 phase arm (wrapper)
+    // must stay reserved for user-initiated transitions
+    // (bug-autoencounter-travel-phase-clobber contract).
+    _setTravelModeRaw(init.travelMode);
+    setTravelPace(init.travelPace);
+    setDestination(init.destination);
+    setPath(init.path);
+    setPathIndex(init.pathIndex);
+    setAccruedCost(init.accruedCost);
+    setDailyBudget(typeof init.dailyBudget === 'function' ? init.dailyBudget() : init.dailyBudget);
+    setDayExhausted(init.dayExhausted);
+    setForcedMarchHours(init.forcedMarchHours);
+    // advanceOneHex reads the REFS, not the synced state — a resumed trip
+    // must repopulate them too, or every advance silently no-ops on the
+    // empty mount-time ref.
+    pathRef.current = init.path;
+    pathIndexRef.current = init.pathIndex;
+  }, [initialTravelState, campaignName, init]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isTravelActive = travelMode !== MODES.INACTIVE;
 

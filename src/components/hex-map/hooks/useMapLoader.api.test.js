@@ -43,6 +43,12 @@ import * as mapsService from '../../../services/maps/mapsService.js';
 const CAMPAIGN = 'test-campaign';
 const MAP = 'test-map';
 
+// Autosave coalescing window (1s) + margin — mirrors settleAutosave in the
+// indoor map tests (PlacedItems.delete.test.jsx).
+const settleAutosave = async () => {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1300)); });
+};
+
 const characters = [
     { name: 'Thorin' },
     { name: 'Gandalf' },
@@ -125,7 +131,8 @@ describe('useMapLoader - API & persistence', () => {
             result.current.setPanY(50);
         });
 
-        await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
+        await settleAutosave();
+        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
         expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, MAP, savedSnapshot({
             gridSize: 20,
             terrain: { '5,5': 'mountain' },
@@ -157,10 +164,49 @@ describe('useMapLoader - API & persistence', () => {
         expect(result.current.travelSaveVersion).toBe(initialVersion + 1);
         expect(result.current.travelStateRef.current).toEqual({ travelMode: 'active', destination: 'City A' });
 
-        await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
+        await settleAutosave();
+        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
         expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, MAP, savedSnapshot({
             travelState: { travelMode: 'active', destination: 'City A' },
         }));
+    });
+
+    // Improve 2026-10-26-D (file-lane half): a loaded trip is ADOPTED into the
+    // save ref + baseline (normalized via buildTravelInit), so a quiet reload
+    // mid-trip writes nothing, and the first unrelated edit CARRIES the trip
+    // instead of clobbering travelState back to null.
+    describe('live trip loaded from the file', () => {
+        const midTripBytes = {
+            travelMode: 'traveling',
+            travelPace: 'normal',
+            destination: { q: 14, r: 10 },
+            path: [{ q: 18, r: 10 }, { q: 17, r: 10 }, { q: 16, r: 10 }],
+            pathIndex: 2,
+            accruedCost: 3,
+            dailyBudget: 4,
+            dayExhausted: true,
+            forcedMarchHours: 1,
+        };
+
+        it('stays quiet on the resumed load, then carries the trip on the first real edit', async () => {
+            const tripMap = { ...loadedMap(), travelState: midTripBytes };
+            mapsService.loadMapData.mockResolvedValue(tripMap);
+            const { result } = renderHook(() => useMapLoader(CAMPAIGN, MAP, characters));
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            // Quiet resume: zero PUTs, ref adopts the normalized trip.
+            expect(mapsService.saveMapData).not.toHaveBeenCalled();
+            expect(result.current.travelStateRef.current).toEqual(midTripBytes);
+
+            // An unrelated edit (weather roll) re-PUTs the SAME travelState.
+            act(() => { result.current.setWeather('rain'); });
+            await settleAutosave();
+        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
+            expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, MAP, savedSnapshot({
+                weather: 'rain',
+                travelState: midTripBytes,
+            }));
+        });
     });
 
     // #800 determinism, inverted by the dirty gate (backlog 2026-10-26): zero
@@ -190,7 +236,8 @@ describe('useMapLoader - API & persistence', () => {
 
         // A real deep change still lands exactly once.
         act(() => { result.current.setPois([{ name: 'Watchtower' }, { name: 'Camp' }]); });
-        await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
+        await settleAutosave();
+        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
     });
 
     // #801 IN-PLACE mapName switch lane: the persistence guard (:201) compares
@@ -253,7 +300,8 @@ describe('useMapLoader - API & persistence', () => {
             expect(mapsService.saveMapData).not.toHaveBeenCalled();
             expect(result.current.hexMapNameRef.current).toBe('map-b');
             act(() => { result.current.setTerrain({ '9,9': 'bog', '1,0': 'forest' }); });
-            await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
+            await settleAutosave();
+        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
             expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, 'map-b', {
                 type: 'outdoor',
                 displayName: 'The Marshlands',

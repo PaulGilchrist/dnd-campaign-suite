@@ -79,6 +79,7 @@ describe('useMapLoader - travel state', () => {
                 destination: 'City A',
                 path: [{ q: 0, r: 0 }],
                 pathIndex: 3,
+                dayExhausted: true,
             },
         });
 
@@ -92,6 +93,7 @@ describe('useMapLoader - travel state', () => {
             destination: 'City A',
             path: [{ q: 0, r: 0 }],
             pathIndex: 3,
+            dayExhausted: true,
         });
     });
 
@@ -110,6 +112,7 @@ describe('useMapLoader - travel state', () => {
             destination: 'City',
             path: [],
             pathIndex: 0,
+            dayExhausted: false,
         });
     });
 
@@ -133,6 +136,7 @@ describe('useMapLoader - travel state', () => {
             destination: null,
             path: [],
             pathIndex: 0,
+            dayExhausted: false,
         }],
         ['inactive with a destination', { travelMode: 'inactive', destination: 'Distant City' }, {
             travelMode: 'inactive',
@@ -143,6 +147,7 @@ describe('useMapLoader - travel state', () => {
             destination: 'Distant City',
             path: [],
             pathIndex: 0,
+            dayExhausted: false,
         }],
     ])('surfaces an exact travelInit when the trip is %s', async (_label, travelState, expected) => {
         const result = await renderLoadedMap({ travelState });
@@ -175,6 +180,7 @@ describe('useMapLoader - travel state', () => {
             destination: null,
             path: [],
             pathIndex: 0,
+            dayExhausted: false,
         });
     });
 

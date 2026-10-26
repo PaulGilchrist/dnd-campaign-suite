@@ -139,7 +139,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // hasPersistedWeather (backlog 2026-10-26-C): a map file that already
     // carries weather keeps it across tool presses — the hook only auto-rolls
     // on activation when weather is absent (first travel).
-    useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, weather != null);
+    useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, {
+        hasPersistedWeather: weather != null,
+        hasLoadedTrip: mapLoader.resumedTripRef?.current === true,
+    });
 
     // ── POI management ──
     const poiMgmt = usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHexFromEvent, tool });

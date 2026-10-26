@@ -162,7 +162,9 @@ describe('useMapLoader - creating new map', () => {
 
         const { result } = renderNewMap();
         await waitForLoad(result);
-        await act(async () => {});
+        // Envelope retry rides the 1s coalescing autosave window (improve
+        // 2026-10-26-D) — settle past it before counting calls.
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 1300)); });
 
         expect(errorSpy).toHaveBeenCalledTimes(1);
         expect(errorSpy).toHaveBeenCalledWith('Failed to save initial hex map data:', expect.any(Error));

@@ -53,6 +53,19 @@ vi.mock('../runtime/useRuntimeState.js', () => {
   }
   return {
     getRuntimeValue: vi.fn(() => null),
+    // File-resume seam (improve 2026-10-26-D): merged object write + key probe.
+    setRuntimeObject: vi.fn((characterKey, properties) => {
+      if (!properties || typeof properties !== 'object') return;
+      if (!_stores.has(characterKey)) _stores.set(characterKey, new Map());
+      const store = _stores.get(characterKey);
+      Object.entries(properties).forEach(([k, v]) => store.set(k, v));
+      const set = _listeners.get(characterKey);
+      if (set) set.forEach(fn => fn());
+    }),
+    hasRuntimeValue: vi.fn((characterKey, propertyName) => {
+      const store = _stores.get(characterKey);
+      return !!store && store.has(propertyName);
+    }),
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
       const store = _stores.get(characterKey);
       if (store) store.set(propertyName, value);
