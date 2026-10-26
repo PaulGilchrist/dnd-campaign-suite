@@ -78,7 +78,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT.)*
-- 2026-10-26-C: **Travel-tool mount silently re-rolls persisted weather** (`HexMap.jsx:133` via `useTravelToolSync` → `handleGenerateWeather`) — map-file `weather` (incl. deliberate GM state) mutates + autosaves on every tool press, while the panel ALREADY offers a manual re-roll affordance; suggest rolling only on camp/new-day or gating behind the existing manual control.
 - 2026-10-26-C: **`__campaign__` re-stamps an identical POST on every `activeMapName` transition** (MapContextSync effect dep change; two value-identical POSTs per session: select + open) — value-unchanged dedupe via module last-stamped cache like `__map__`'s transition gate would trim the last bit of open-lane chatter.
 
 ## Coverage

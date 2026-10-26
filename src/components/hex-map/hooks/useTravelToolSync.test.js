@@ -18,12 +18,13 @@ describe('useTravelToolSync', () => {
         cancelTravel: vi.fn(),
     });
 
-    // Threads every hook argument through props (like the real HexMap.jsx:135),
+    // Threads every hook argument through props (like the real HexMap.jsx:141),
     // so rerender can change any single input while keeping the others stable.
-    const renderSync = ({ tool, travelMgmt, handleGenerateWeather = vi.fn(), setTool = vi.fn() }) => {
-        const initialProps = { tool, travelMgmt, weatherHandler: handleGenerateWeather, setTool };
+    // hasPersistedWeather defaults false (a map file with no weather object).
+    const renderSync = ({ tool, travelMgmt, handleGenerateWeather = vi.fn(), setTool = vi.fn(), hasPersistedWeather = false }) => {
+        const initialProps = { tool, travelMgmt, weatherHandler: handleGenerateWeather, setTool, hasPersistedWeather };
         const utils = renderHook(
-            (p) => useTravelToolSync(p.tool, p.travelMgmt, p.weatherHandler, p.setTool),
+            (p) => useTravelToolSync(p.tool, p.travelMgmt, p.weatherHandler, p.setTool, p.hasPersistedWeather),
             { initialProps }
         );
         const rerender = (changes) => utils.rerender({ ...initialProps, ...changes });
@@ -66,6 +67,58 @@ describe('useTravelToolSync', () => {
         expect(handleGenerateWeather).toHaveBeenCalledTimes(1);
         expect(travelMgmt.cancelTravel).not.toHaveBeenCalled();
         expect(setTool).not.toHaveBeenCalled();
+    });
+
+    // Backlog 2026-10-26-C: persisted (map-file) weather is deliberate GM state.
+    // Tool activation must surface it unchanged, never silently re-roll it.
+    it('starts planning WITHOUT re-rolling when the travel tool activates over persisted weather', () => {
+        const travelMgmt = createTravelMgmt('inactive');
+        const handleGenerateWeather = vi.fn();
+        const setTool = vi.fn();
+
+        const { rerender } = renderSync({
+            tool: TOOL_PAINT, travelMgmt, handleGenerateWeather, setTool, hasPersistedWeather: true,
+        });
+
+        rerender({ tool: TOOL_TRAVEL });
+
+        expect(travelMgmt.startPlanning).toHaveBeenCalledTimes(1);
+        expect(handleGenerateWeather).not.toHaveBeenCalled();
+        expect(travelMgmt.cancelTravel).not.toHaveBeenCalled();
+        expect(setTool).not.toHaveBeenCalled();
+    });
+
+    it('survives a full close-tool/reopen-tool cycle with persisted weather without ever rolling', () => {
+        const travelMgmt = createTravelMgmt('inactive');
+        const handleGenerateWeather = vi.fn();
+        const setTool = vi.fn();
+
+        const { rerender } = renderSync({
+            tool: TOOL_NONE, travelMgmt, handleGenerateWeather, setTool, hasPersistedWeather: true,
+        });
+
+        rerender({ tool: TOOL_TRAVEL });
+        rerender({ tool: TOOL_NONE });
+        rerender({ tool: TOOL_TRAVEL });
+
+        expect(travelMgmt.startPlanning).toHaveBeenCalledTimes(2);
+        expect(handleGenerateWeather).not.toHaveBeenCalled();
+    });
+
+    it('re-arms the first-travel auto-roll when the persisted-weather flag flips back to absent', () => {
+        // Map reloaded without a weather object (e.g. fresh file) while the
+        // travel tool stays selected — activation on the next press must roll.
+        const travelMgmt = createTravelMgmt('inactive');
+        const handleGenerateWeather = vi.fn();
+        const setTool = vi.fn();
+
+        const { rerender } = renderSync({
+            tool: TOOL_NONE, travelMgmt, handleGenerateWeather, setTool, hasPersistedWeather: true,
+        });
+        rerender({ tool: TOOL_TRAVEL, hasPersistedWeather: false });
+
+        expect(travelMgmt.startPlanning).toHaveBeenCalledTimes(1);
+        expect(handleGenerateWeather).toHaveBeenCalledTimes(1);
     });
 
     it('does not restart planning when the travel tool activates while travel is already in progress', () => {
