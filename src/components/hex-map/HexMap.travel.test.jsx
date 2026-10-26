@@ -192,6 +192,15 @@ describe('HexMap travel', () => {
             { label: 'does nothing when there is no party position', isTravelActive: false, partyPosition: null, hex: DEST, button: 0, expectStartPlanning: false, expectDestination: false },
             { label: 'does nothing when the click resolves to no hex', isTravelActive: false, partyPosition: PARTY, hex: null, button: 0, expectStartPlanning: false, expectDestination: false },
             { label: 'does nothing when the hex is outside the grid bounds', isTravelActive: false, partyPosition: PARTY, hex: { q: -1, r: 5 }, button: 0, expectStartPlanning: false, expectDestination: false },
+            // Backlog 2026-10-26-E (mid-trip navigation guard): the owner's exact
+            // scenario — a plan-click whose coordinates resolve off-grid WHILE a
+            // trip is live (party near the map-left edge, negative-x destination)
+            // must be a clean no-op: no re-plan, no destination write, nothing
+            // cancelled. The click handler lives on the SVG, so the only way an
+            // off-map click reaches it is an in-SVG but off-GRID coordinate.
+            { label: 'does nothing for an off-grid click mid-trip (negative q)', isTravelActive: true, partyPosition: PARTY, hex: { q: -4, r: 5 }, button: 0, expectStartPlanning: false, expectDestination: false },
+            { label: 'does nothing for an off-grid click mid-trip (past the far edge)', isTravelActive: true, partyPosition: PARTY, hex: { q: 61, r: 5 }, button: 0, expectStartPlanning: false, expectDestination: false },
+            { label: 'does nothing for an off-grid click mid-trip (negative r)', isTravelActive: true, partyPosition: PARTY, hex: { q: 10, r: -2 }, button: 0, expectStartPlanning: false, expectDestination: false },
             { label: 'does nothing when the click resolves to the party hex', isTravelActive: false, partyPosition: PARTY, hex: PARTY, button: 0, expectStartPlanning: false, expectDestination: false },
             { label: 'does nothing on a right-click', isTravelActive: false, partyPosition: PARTY, hex: DEST, button: 2, expectStartPlanning: false, expectDestination: false },
         ])('$label', ({ isTravelActive, partyPosition, hex, button, expectStartPlanning, expectDestination }) => {
@@ -212,6 +221,9 @@ describe('HexMap travel', () => {
             } else {
                 expect(tm.setDestinationAndPath).not.toHaveBeenCalled();
             }
+            // Silent branches must never disturb a live trip either (navigation-
+            // guard backlog: an off-grid click mid-trip may not cancel it).
+            expect(tm.cancelTravel).not.toHaveBeenCalled();
             // Every silent branch (party-hex included) while the panel is CLOSED
             // shows no hint either — the flag only arms on a live dead-click.
             expect(screen.queryByTestId('own-hex-hint')).not.toBeInTheDocument();
