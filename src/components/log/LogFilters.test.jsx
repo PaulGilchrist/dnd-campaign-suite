@@ -93,6 +93,115 @@ describe('Log filter toolbar', () => {
   });
 });
 
+describe('Log Roll type sub-facet', () => {
+  beforeEach(() => {
+    beforeEachSetup();
+  });
+
+  const varied = () => [
+    note({ id: 'n1' }),
+    roll({ id: 'r1', rollType: 'attack', name: 'LS Attack' }),
+    roll({ id: 'r2', rollType: 'damage', name: 'Crush', noteText: undefined }),
+    roll({ id: 'r3', rollType: 'save-fireball', name: 'Fireball Save', noteText: undefined }),
+    roll({ id: 'r4', rollType: undefined, name: 'Dice Tray', noteText: undefined }),
+  ];
+
+  it('is hidden until Type=Roll, then appears with derived, humanized, sorted options', () => {
+    setup(Log, varied());
+    expect(screen.queryByLabelText('Roll type')).not.toBeInTheDocument();
+    expect(q('#log-filter-rolltype')).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    const rollSelect = screen.getByLabelText('Roll type');
+    expect(rollSelect.id).toBe('log-filter-rolltype');
+    // Options derived from the rollType values present on type:'roll' entries
+    // (dynamic save-<spell-slug> included), sorted, humanized via the same
+    // label format as the Type facet; entries lacking rollType add no option.
+    const options = within(rollSelect).getAllByRole('option');
+    expect(options.map(o => o.value)).toEqual(['', 'attack', 'damage', 'save-fireball']);
+    expect(options.map(o => o.textContent)).toEqual(
+      ['All roll types', 'Attack', 'Damage', 'Save-fireball']
+    );
+    expect(rollSelect).toHaveValue('');
+  });
+
+  it('is hidden again when Type moves away from Roll', () => {
+    setup(Log, varied());
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    expect(screen.getByLabelText('Roll type')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'note' } });
+    expect(screen.queryByLabelText('Roll type')).not.toBeInTheDocument();
+  });
+
+  it('narrowing a rollType AND-combines with the Type facet and updates the count line', () => {
+    setup(Log, varied());
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    expect(renderedEntries()).toHaveLength(4);
+    expect(q('.log-filter-count').textContent).toContain('Showing 4 of 4 (of 5 total)');
+    fireEvent.change(screen.getByLabelText('Roll type'), { target: { value: 'save-fireball' } });
+    const entries = renderedEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].textContent).toContain('Fireball Save');
+    expect(q('.log-filter-count').textContent).toContain('Showing 1 of 1 (of 5 total)');
+    // All roll types keeps roll entries lacking a rollType field
+    fireEvent.change(screen.getByLabelText('Roll type'), { target: { value: '' } });
+    expect(renderedEntries()).toHaveLength(4);
+  });
+
+  it('AND-combines with the text and character facets', () => {
+    setup(Log, [
+      roll({ id: 'r1', characterName: 'Frodo', rollType: 'attack', name: 'Alpha Strike' }),
+      roll({ id: 'r2', characterName: 'Aragorn', rollType: 'attack', name: 'Bravo Strike' }),
+      roll({ id: 'r3', characterName: 'Frodo', rollType: 'damage', name: 'Alpha Crunch', noteText: undefined }),
+    ]);
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    fireEvent.change(screen.getByLabelText('Roll type'), { target: { value: 'attack' } });
+    expect(renderedEntries()).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText('Character'), { target: { value: 'Frodo' } });
+    expect(renderedEntries()).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bravo' } });
+    expect(renderedEntries()).toHaveLength(0);
+    expect(q('.log-empty').textContent).toContain('No entries match the current filters');
+  });
+
+  it('switching Type away from Roll resets the sub-facet (no stale narrowing)', () => {
+    setup(Log, varied());
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    fireEvent.change(screen.getByLabelText('Roll type'), { target: { value: 'damage' } });
+    expect(renderedEntries()).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'note' } });
+    expect(renderedEntries()).toHaveLength(1); // the one note, un-narrowed
+    // Rolling back shows the sub-facet cleared, listing every roll again
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    expect(screen.getByLabelText('Roll type')).toHaveValue('');
+    expect(renderedEntries()).toHaveLength(4);
+  });
+
+  it('Clear filters resets all four facets and the dirty button disappears', () => {
+    setup(Log, varied());
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'save' } });
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    fireEvent.change(screen.getByLabelText('Roll type'), { target: { value: 'save-fireball' } });
+    expect(renderedEntries()).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /clear filters/i }));
+    expect(renderedEntries()).toHaveLength(5);
+    expect(screen.getByLabelText('Search')).toHaveValue('');
+    expect(screen.getByLabelText('Type')).toHaveValue('');
+    expect(screen.getByLabelText('Character')).toHaveValue('');
+    expect(screen.queryByLabelText('Roll type')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument();
+  });
+
+  it('a rollType-only selection still marks the bar dirty for Clear', () => {
+    setup(Log, varied());
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'roll' } });
+    expect(screen.queryByRole('button', { name: /clear filters/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: '' } });
+    // type cleared but nothing else — with rollType '' the bar is clean again
+    expect(screen.queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('Log composer disambiguation', () => {
   beforeEach(() => {
     beforeEachSetup();

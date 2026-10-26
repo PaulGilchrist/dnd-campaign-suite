@@ -7,6 +7,7 @@ import {
   filterLogEntries,
   formatEntryTypeLabel,
   getEntrySearchText,
+  getRollTypeOptions,
   LOG_WINDOW_SIZE
 } from './log-utils.js';
 
@@ -63,6 +64,78 @@ describe('log-utils filter helpers', () => {
     it('returns an empty array when nothing matches', () => {
       expect(filterLogEntries(entries, { text: 'zzz-no-match' })).toEqual([]);
       expect(filterLogEntries(entries, { type: 'loot' })).toEqual([]);
+    });
+  });
+
+  describe('filterLogEntries rollType sub-facet', () => {
+    const rollEntries = [
+      entry({ id: 'ra', type: 'roll', noteText: undefined, name: 'Attack', rollType: 'attack' }),
+      entry({ id: 'rd', type: 'roll', noteText: undefined, name: 'Damage', rollType: 'damage' }),
+      entry({ id: 'rs', type: 'roll', noteText: undefined, name: 'Save', rollType: 'save-fireball' }),
+      entry({ id: 'rn', type: 'roll', noteText: undefined, name: 'Legacy roll' }), // no rollType field
+      entry({ id: 'rb', type: 'note', noteText: 'A note', rollType: 'attack' }),  // rollType on a non-roll
+    ];
+
+    it('passes everything when no rollType filter is set (default)', () => {
+      expect(filterLogEntries(rollEntries)).toHaveLength(5);
+      expect(filterLogEntries(rollEntries, { rollType: '' })).toHaveLength(5);
+    });
+
+    it('keeps only matching type:roll entries (other types pass unconditionally)', () => {
+      // 'rb' is a note carrying rollType:'attack' — notes pass under any rollType
+      // selection by spec ("other types pass regardless").
+      expect(filterLogEntries(rollEntries, { rollType: 'attack' }).map(e => e.id)).toEqual(['ra', 'rb']);
+      expect(filterLogEntries(rollEntries, { rollType: 'save-fireball' }).map(e => e.id)).toEqual(['rs', 'rb']);
+      // Narrowing among rolls is achieved by pairing with the type facet.
+      expect(filterLogEntries(rollEntries, { type: 'roll', rollType: 'attack' }).map(e => e.id)).toEqual(['ra']);
+    });
+
+    it('rolls without a rollType field are dropped under a specific rollType', () => {
+      expect(filterLogEntries(rollEntries, { rollType: 'damage' }).map(e => e.id)).not.toContain('rn');
+      // ...but pass under "All roll types" (empty selection)
+      expect(filterLogEntries(rollEntries, { type: 'roll' }).map(e => e.id))
+        .toEqual(['ra', 'rd', 'rs', 'rn']);
+    });
+
+    it('non-roll entries pass regardless of the rollType selection', () => {
+      const result = filterLogEntries(rollEntries, { rollType: 'damage' });
+      // the note 'rb' survives even a rollType it does not carry
+      expect(result.map(e => e.id)).toEqual(['rd', 'rb']);
+    });
+
+    it('AND-combines with the text/type/character facets', () => {
+      expect(filterLogEntries(rollEntries, { type: 'roll', rollType: 'attack' }).map(e => e.id)).toEqual(['ra']);
+      expect(filterLogEntries(rollEntries, { type: 'note', rollType: 'attack' }).map(e => e.id)).toEqual(['rb']);
+      expect(filterLogEntries(rollEntries, { rollType: 'attack', character: 'Frodo' }).map(e => e.id)).toEqual(['ra', 'rb']);
+      expect(filterLogEntries(rollEntries, { rollType: 'attack', character: 'Aragorn' })).toEqual([]);
+      expect(filterLogEntries(rollEntries, { rollType: 'attack', text: 'attack' }).map(e => e.id)).toEqual(['ra', 'rb']);
+      expect(filterLogEntries(rollEntries, { rollType: 'damage', character: 'Aragorn' })).toEqual([]);
+    });
+  });
+
+  describe('getRollTypeOptions', () => {
+    it('derives distinct sorted rollTypes from type:roll entries only', () => {
+      const entries = [
+        entry({ type: 'roll', noteText: undefined, rollType: 'save' }),
+        entry({ type: 'roll', noteText: undefined, rollType: 'attack' }),
+        entry({ type: 'roll', noteText: undefined, rollType: 'save' }), // dupe
+        entry({ type: 'roll', noteText: undefined }),                   // no rollType
+        entry({ type: 'note', rollType: 'initiative' }),                // non-roll — ignored
+      ];
+      expect(getRollTypeOptions(entries)).toEqual(['attack', 'save']);
+    });
+
+    it('includes dynamic save-<spell-slug> values present in the data', () => {
+      const entries = [
+        entry({ type: 'roll', noteText: undefined, rollType: 'save-ottos-dance' }),
+        entry({ type: 'roll', noteText: undefined, rollType: 'initiative' }),
+      ];
+      expect(getRollTypeOptions(entries)).toEqual(['initiative', 'save-ottos-dance']);
+    });
+
+    it('returns an empty array when no roll entries carry rollType', () => {
+      expect(getRollTypeOptions([entry()])).toEqual([]);
+      expect(getRollTypeOptions([])).toEqual([]);
     });
   });
 

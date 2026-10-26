@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef } from 'react';
 import useLog from '../../hooks/runtime/useLog.js';
 import './Log.css';
-import { filterLogEntries, formatEntryTypeLabel, LOG_WINDOW_SIZE } from './log-utils.js';
+import { filterLogEntries, formatEntryTypeLabel, getRollTypeOptions, LOG_WINDOW_SIZE } from './log-utils.js';
 import { RollEntry } from './LogRollEntry.jsx';
 import { NoteEntry } from './LogNoteEntry.jsx';
 import { LootEntry } from './LogLootEntry.jsx';
@@ -54,8 +54,9 @@ function LogEntryRenderer({ entry }) {
 }
 
 // Presentational filter toolbar (display-only; state lives in Log via useState).
-function LogFilterBar({ filters, typeOptions, characterOptions, visibleCount, filteredCount, totalCount, onFilterChange, onClear }) {
-  const hasActiveFilters = Boolean(filters.text || filters.type || filters.character);
+// The Roll type control is a contextual sub-facet: shown only while Type === 'roll'.
+function LogFilterBar({ filters, typeOptions, rollTypeOptions, characterOptions, visibleCount, filteredCount, totalCount, onFilterChange, onClear }) {
+  const hasActiveFilters = Boolean(filters.text || filters.type || filters.character || filters.rollType);
   return (
     <div className="log-filters no-print">
       <div className="log-filter-group log-filter-search-group">
@@ -83,6 +84,22 @@ function LogFilterBar({ filters, typeOptions, characterOptions, visibleCount, fi
           ))}
         </select>
       </div>
+      {filters.type === 'roll' && (
+        <div className="log-filter-group">
+          <label className="log-filter-label" htmlFor="log-filter-rolltype">Roll type</label>
+          <select
+            id="log-filter-rolltype"
+            className="log-filter-select"
+            value={filters.rollType}
+            onChange={(e) => onFilterChange('rollType', e.target.value)}
+          >
+            <option value="">All roll types</option>
+            {rollTypeOptions.map(rollType => (
+              <option key={rollType} value={rollType}>{formatEntryTypeLabel(rollType)}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="log-filter-group">
         <label className="log-filter-label" htmlFor="log-filter-character">Character</label>
         <select
@@ -115,7 +132,7 @@ export default function Log({ campaignName, characters }) {
   const [noteText, setNoteText] = useState('');
   const [selectedCharacter, setSelectedCharacter] = useState('');
   // Display-only filter + render-window state (local UI state per server-first policy)
-  const [filters, setFilters] = useState({ text: '', type: '', character: '' });
+  const [filters, setFilters] = useState({ text: '', type: '', character: '', rollType: '' });
   const [windowSize, setWindowSize] = useState(LOG_WINDOW_SIZE);
   const noteRef = useRef(null);
 
@@ -141,17 +158,24 @@ export default function Log({ campaignName, characters }) {
     () => [...new Set(logEntries.map(entry => entry.type))].sort(),
     [logEntries]
   );
+  const rollTypeOptions = useMemo(() => getRollTypeOptions(logEntries), [logEntries]);
   const characterOptions = useMemo(
     () => [...new Set(logEntries.map(entry => entry.characterName).filter(Boolean))].sort(),
     [logEntries]
   );
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters(prev => {
+      const next = { ...prev, [key]: value };
+      // Switching Type away from Roll clears the sub-facet so no stale
+      // rollType silently AND-narrows the new view.
+      if (key === 'type' && value !== 'roll') next.rollType = '';
+      return next;
+    });
     setWindowSize(LOG_WINDOW_SIZE);
   };
 
   const clearFilters = () => {
-    setFilters({ text: '', type: '', character: '' });
+    setFilters({ text: '', type: '', character: '', rollType: '' });
     setWindowSize(LOG_WINDOW_SIZE);
   };
 
@@ -195,6 +219,7 @@ export default function Log({ campaignName, characters }) {
         <LogFilterBar
           filters={filters}
           typeOptions={typeOptions}
+          rollTypeOptions={rollTypeOptions}
           characterOptions={characterOptions}
           visibleCount={visibleEntries.length}
           filteredCount={filteredEntries.length}

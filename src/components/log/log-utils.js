@@ -58,15 +58,27 @@ export function getEntrySearchText(entry) {
 }
 
 // AND-semantics facets over the already-fetched log array:
-// { text, type, character } — empty string means "no constraint" for that facet.
-export function filterLogEntries(entries, { text = '', type = '', character = '' } = {}) {
+// { text, type, character, rollType } — empty string means "no constraint" for
+// that facet. rollType only constrains type:'roll' entries (rollType-less rolls
+// pass only under "All roll types"); all other entry types pass regardless.
+export function filterLogEntries(entries, { text = '', type = '', character = '', rollType = '' } = {}) {
   const needle = text.trim().toLowerCase();
   return entries.filter(entry => {
     if (type && entry.type !== type) return false;
     if (character && entry.characterName !== character) return false;
+    if (rollType && entry.type === 'roll' && entry.rollType !== rollType) return false;
     if (needle && !getEntrySearchText(entry).includes(needle)) return false;
     return true;
   });
+}
+
+// Distinct rollType values actually present on type:'roll' entries, sorted —
+// derived from data (dynamic values like `save-<spell-slug>` exist), never a
+// hardcoded list. Used for the Roll type sub-facet options.
+export function getRollTypeOptions(entries) {
+  return [...new Set(
+    entries.filter(entry => entry.type === 'roll' && entry.rollType).map(entry => entry.rollType)
+  )].sort();
 }
 
 // 'death_save' -> 'Death save'

@@ -955,3 +955,11 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - FAST COMBAT-EVENT RIG (no UI map-create): `POST /api/campaigns/:c/maps {name, type:'outdoor'}` + seed `terrain` bytes directly into the fixture map file (server reads map files per-request, no restart) + `POST /api/campaigns/:c/enforcement {value:{mode:'on',autoEncounters:true}}` (canonicalizes) → Frequent events yielded a COMBAT dialog within ~2 `Advance One Hex` clicks (the ~7.5%/hex estimate understates Frequent).
 - USEENCOUNTERGENERATION is now an OPTIONS-OBJECT hook (`{campaignName, mapName, terrain, marchingOrder, onEncounterCreated, parentDisplayName}`) — 5-positional-param calls break; the max-params lint rule forces the object shape.
 - Arena audit parity: `auto_encounter_started` `battleMap` + log copy reuse the exact string `handleStartEncounter` returned (HexMap `handleEventAccept` → `autoStartEncounterFromEvent({battleMapName})`) — one source of truth, no separate threading needed for label changes.
+
+## 2026-10-25 eve improve run — log-rolltype-subfacet
+- browser_evaluate `function`-string wrapper chokes on nested-arrow/async bodies — build multi-step walks as browser_run_code_unsafe with REAL closures passed to page.evaluate (stringified arrow sources are treated as expressions and never invoked → silent no-op).
+- browser_evaluate right after reload runs PRE-hydration — re-select campaign first (`.campaign-button` guard, never header deref) or it throws null.
+- browser_take_screenshot on this build requires `scale` ('css'); a `filename` arg writes relative to the REPO cwd (stray PNG lands in git status — prefer no filename → gitignored `.playwright-mcp/`).
+- MCP auto-intercepts native confirms even with a page.on('dialog') listener attached — after Admin clear clicks, verify via API; a later browser_handle_dialog "no modal state" error means already handled.
+- Log POST body `id` wins over the server-generated guid (spread order in addEntry) — deterministic seed/verify corpora are possible.
+- Roll sub-facet landed: `#log-filter-rolltype` visible only while Type=roll; options = getRollTypeOptions (data-derived distinct rollTypes on type:'roll' entries — dynamic save-<slug> values appear); filters stay display-only useState.
