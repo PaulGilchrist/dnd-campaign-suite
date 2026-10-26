@@ -257,6 +257,50 @@ describe('TravelPanel', () => {
     });
   });
 
+  describe('active event-frequency readout', () => {
+    // Backlog 2026-10-26-D: the default is 'normal' (useTravelManagement), not
+    // 'None', and the active chip's styling was too subtle to predict
+    // interruption rate. The Events row now renders label + active value +
+    // chance description (Weather-row pattern).
+    const READOUT = [
+      { frequency: 'none', label: 'None', desc: '0% chance per hex' },
+      { frequency: 'sparse', label: 'Sparse', desc: '5% chance per hex' },
+      { frequency: 'normal', label: 'Normal', desc: '12% chance per hex' },
+      { frequency: 'frequent', label: 'Frequent', desc: '25% chance per hex' },
+    ];
+
+    it.each(READOUT)('renders "$label" active beside the Events label', ({ frequency, label, desc }) => {
+      renderPanel({ eventFrequency: frequency });
+      const row = document.querySelector('.travel-panel-frequency');
+      expect(row).not.toBeNull();
+      // Active word is adjacent to the "Events:" label (label span → active span).
+      expect(row.textContent).toMatch(new RegExp(`Events:\\s*${label}`));
+      expect(row.querySelector('.travel-frequency-active')).toHaveTextContent(label);
+      expect(row.querySelector('.travel-frequency-desc')).toHaveTextContent(desc);
+      // The matching chip keeps its active class (chip lane unchanged).
+      // Scoped: pace chips share the "Normal" name.
+      const chip = row.querySelectorAll('.travel-frequency-btn');
+      expect([...chip].find(b => b.textContent === label)).toHaveClass('active');
+    });
+
+    it('falls back to None for an unknown frequency key', () => {
+      renderPanel({ eventFrequency: 'bogus' });
+      expect(document.querySelector('.travel-frequency-active')).toHaveTextContent('None');
+    });
+
+    it('tracks the prop as the GM picks a different chip (readout + write payload)', () => {
+      const { props, rerender } = renderPanel();
+      expect(document.querySelector('.travel-frequency-active')).toHaveTextContent('Normal');
+      // Chip click still routes the same runtime-store write through the parent.
+      fireEvent.click(screen.getByRole('button', { name: 'Sparse' }));
+      expect(props.onSetEventFrequency).toHaveBeenCalledWith('sparse');
+      // Parent echoes the stored value back down — readout flips immediately.
+      rerender(<TravelPanel {...makeProps({ eventFrequency: 'sparse' })} />);
+      expect(document.querySelector('.travel-frequency-active')).toHaveTextContent('Sparse');
+      expect(document.querySelector('.travel-frequency-desc')).toHaveTextContent('5% chance per hex');
+    });
+  });
+
   describe('next-hex ETA is wired to terrain, pace, and the plains fallback', () => {
     // Default (plains @ normal → 1h 30m) and horseback (→ 45 min) are pinned in the
     // variants/mount tests above; these rows pin the remaining inputs.

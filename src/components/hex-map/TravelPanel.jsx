@@ -61,6 +61,12 @@ function TravelWeatherSection({ weather, onReRollWeather }) {
 const MAX_EXHAUSTION_HINT = 'A party member is at maximum exhaustion — rest required';
 const FM_MAX_EXHAUSTION_TITLE = 'Cannot forced march — a party member has reached maximum exhaustion';
 
+// Active-frequency readout (backlog 2026-10-26-D): the chip row's `.active`
+// styling is too subtle to predict interruption rate, so the Events row mirrors
+// the Weather row — label + bold active value + chance description.
+const frequencyChance = (f) => `${Math.round((f ? f.chance : 0) * 100)}% chance per hex`;
+const lookupFrequency = (key) => EVENT_FREQUENCIES[key] || EVENT_FREQUENCIES.none;
+
 // Disabled-button explanations (hover tooltips); undefined leaves the button
 // bare when the gate is not what blocks it. Hoisted to keep TravelPanel under
 // the complexity cap.
@@ -170,6 +176,7 @@ function TravelPanel({
   const currentHex = path[pathIndex];
   const currentTerrain = currentHex ? terrain[`${currentHex.q},${currentHex.r}`] || 'plains' : null;
   const currentTravelTime = currentTerrain ? getHexTravelTime(currentTerrain, travelPace, horseback) : null;
+  const activeFrequency = lookupFrequency(eventFrequency);
 
   return (
     <div className="travel-panel" ref={panelRef}>
@@ -205,13 +212,15 @@ function TravelPanel({
 
       <div className="travel-panel-frequency">
         <span className="travel-panel-label">Events:</span>
+        <span className="travel-frequency-active">{activeFrequency.label}</span>
+        <span className="travel-frequency-desc">{frequencyChance(activeFrequency)}</span>
         <div className="travel-frequency-buttons">
           {Object.entries(EVENT_FREQUENCIES).map(([key, f]) => (
             <button
               key={key}
               className={`travel-frequency-btn ${eventFrequency === key ? 'active' : ''}`}
               onClick={() => onSetEventFrequency(key)}
-              title={`${f.label}: ${Math.round(f.chance * 100)}% chance per hex`}
+              title={`${f.label}: ${frequencyChance(f)}`}
             >
               {f.label}
             </button>
