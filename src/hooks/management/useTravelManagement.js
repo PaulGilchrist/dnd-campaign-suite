@@ -110,12 +110,17 @@ export default function useTravelManagement({
     setHorseback(prev => !prev);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const effectiveBudgetForPace = useCallback((paceId, w) => {
+  // Takes the forced-march hours EXPLICITLY: every call site writes
+  // travel-forcedMarchHours in the same tick it writes the budget, and the
+  // closure value is always the pre-write one (stale-closure bug — FM paid an
+  // un-penalized budget, Camp resurrected yesterday's penalty). Callers pass
+  // the post-write hours: forcedMarch → hours + 1, forceCamp/changePace → 0.
+  const effectiveBudgetForPace = useCallback((paceId, w, hours) => {
     const base = getDailyHexBudget(paceId);
     const mod = w?.budgetMod ?? 1;
     const weatherAdjusted = Math.floor(base * mod);
-    return applyExhaustionSpeedPenaltyToBudget(weatherAdjusted, forcedMarchHours);
-  }, [forcedMarchHours]);
+    return applyExhaustionSpeedPenaltyToBudget(weatherAdjusted, hours);
+  }, []);
 
   const effectiveHexCost = useCallback((terrainType, q, r, w, hb) => {
     const base = getHexMoveCostWithRoad(terrainType, q, r, roads);
@@ -182,7 +187,7 @@ export default function useTravelManagement({
 
   const changePace = useCallback((paceId) => {
     setTravelPace(paceId);
-    setDailyBudget(effectiveBudgetForPace(paceId, weather));
+    setDailyBudget(effectiveBudgetForPace(paceId, weather, 0));
     setDayExhausted(false);
     setForcedMarchHours(0);
   }, [effectiveBudgetForPace, weather]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -252,7 +257,7 @@ export default function useTravelManagement({
   const forceCamp = useCallback(() => {
     setAccruedCost(0);
     setDayExhausted(false);
-    setDailyBudget(effectiveBudgetForPace(travelPace, weather));
+    setDailyBudget(effectiveBudgetForPace(travelPace, weather, 0));
     setRerollsRemaining(3);
     setPendingEvent(null);
     setForcedMarchHours(0);
@@ -287,11 +292,12 @@ export default function useTravelManagement({
       return false;
     }
     addExhaustionToAll();
-    setForcedMarchHours(prev => prev + 1);
+    const nextHours = forcedMarchHours + 1;
+    setForcedMarchHours(nextHours);
     setDayExhausted(false);
     setAccruedCost(0);
-    setDailyBudget(effectiveBudgetForPace(travelPace, weather));
-    setLastMessage(`Forced march — 1 exhaustion added to all party members. Speed reduced to ${getExhaustionMultiplierPercent(forcedMarchHours + 1)}%.`);
+    setDailyBudget(effectiveBudgetForPace(travelPace, weather, nextHours));
+    setLastMessage(`Forced march — 1 exhaustion added to all party members. Speed reduced to ${getExhaustionMultiplierPercent(nextHours)}%.`);
     return true;
   }, [partyHasMaxExhaustion, addExhaustionToAll, effectiveBudgetForPace, travelPace, weather, forcedMarchHours]); // eslint-disable-line react-hooks/exhaustive-deps
 

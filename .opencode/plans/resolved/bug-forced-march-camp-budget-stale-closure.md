@@ -39,3 +39,20 @@ and in `forceCamp`/`changePace` pass explicit `0`. Alternatively add an effect r
 
 ## Severity
 Data integrity risk — game state (daily travel economy) silently advances with wrong numbers on two surfaces; the displayed "83%" badge and the budget bar materially disagree, and exhaustion tax lands on the wrong day.
+
+## Resolution
+FIXED — diagnosis in "Likely location" confirmed exactly; no divergence found.
+
+**What was actually wrong:** `effectiveBudgetForPace` (`useTravelManagement.js:113`) closed over render-scope `forcedMarchHours` (deps `[forcedMarchHours]`), while `forcedMarch()` / `forceCamp()` / `changePace()` write `travel-forcedMarchHours` in the same tick they write `travel-dailyBudget` — so the budget always used the PRE-write hours. FM paid a full un-penalized budget (4 instead of floor(4×5/6)=3) and Camp/changePace stamped the dying day's penalty onto the fresh day (3 instead of 4).
+
+**Fix (suggested-fix pattern adopted — direct explicit value, no new effect):** `effectiveBudgetForPace(paceId, w, hours)` now takes the post-write hours as an explicit third argument (deps `[]`, closure removed). Call sites pass the value they are simultaneously writing: `forcedMarch` → `nextHours` (= `forcedMarchHours + 1`, also reused for the function-form `setForcedMarchHours(prev=>prev+1)` → literal and the 83% message, single source of truth), `forceCamp` → `0`, `changePace` → `0`. Logging untouched — the `travel/forced_march` and `travel/camp` log rows continue to fire from the HexMap caller. No 2024 twin exists for this hook (travel is ruleset-agnostic); `applyExhaustionSpeedPenalty` (per-hex variant) still has zero non-test consumers.
+
+**Files changed:**
+- `src/hooks/management/useTravelManagement.js` — explicit-hours parameter + 3 call sites.
+- `src/hooks/management/useTravelManagement.forced-march-budget.test.js` — NEW regression suite. Pins exact budgets with the REAL penalty formula (the sibling `.test.js` mocks the penalty as identity and structurally cannot see this bug): FM 0→1 ⇒ budget 3; FM 1→2 ⇒ 2; Camp from hours=1 ⇒ 4; changePace from hours=2 ⇒ un-penalized new-pace budget.
+
+**Verification:**
+- Live repro (pre-fix, test-campaign, :5173): created outdoor map, armed route, advanced to exhausted branch. FM ⇒ panel `0.0 / 4`, disk `{"travel-forcedMarchHours":1,"travel-dailyBudget":4}`. Camp ⇒ panel `0.0 / 3`, disk `{"travel-forcedMarchHours":0,"travel-dailyBudget":3,"travel-lastMessage":"A new day dawns. Travel budget refreshed."}` — both wrong sides of the off-by-one, matching the bug report verbatim.
+- Live re-verify (post-fix): changePace chip rewrote stale 3 ⇒ clean 4; FM from exhausted ⇒ panel `0.0 / 3` + disk `{hours:1, budget:3}` ✓; exhausted again ⇒ Camp ⇒ panel `0.0 / 4` + disk `{hours:0, budget:4}` ✓. Adjacent sanity: per-char `exhaustionLevel` still increments (1→2 across the two FMs), `advance`/`arrived`/`forced_march`/`camp`/`session_phase` log rows all present, event-dialog Skip lane unaffected.
+- Tests: new file 4/4 pass; `src/hooks/management/` 95/95 pass; `src/components/hex-map/` + `travelService.test.js` + `Map.outdoor-switch.test.jsx` 398/398 pass; `npm run lint` zero warnings.
+- Cleanup: QA map "Bug Test Hex" deleted (maps back to [Battle Arena, Test Map]); change-data `{}` and log `[]` API-verified from quiet campaign-select page, stable after debounce.
