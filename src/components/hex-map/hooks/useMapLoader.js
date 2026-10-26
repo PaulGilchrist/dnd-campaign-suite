@@ -40,11 +40,18 @@ function normalizeExistingView(existing) {
     return { loadedZoom, loadedPanX, loadedPanY, isOldDefault };
 }
 
-function buildTravelInit(loadedTravel) {
+// Weather (improve 2026-10-26-E budget-at-mount): a legacy file travelState
+// missing a numeric dailyBudget re-derives from pace AND the persisted
+// weather's budgetMod, so an adopted trip never carries the un-modded base.
+// An explicit numeric dailyBudget in the file still wins untouched.
+function buildTravelInit(loadedTravel, weather) {
+    const baseBudget = getDailyHexBudget(loadedTravel.travelPace || 'normal');
     return {
         forcedMarchHours: typeof loadedTravel.forcedMarchHours === 'number' ? loadedTravel.forcedMarchHours : 0,
         accruedCost: typeof loadedTravel.accruedCost === 'number' ? loadedTravel.accruedCost : 0,
-        dailyBudget: typeof loadedTravel.dailyBudget === 'number' ? loadedTravel.dailyBudget : getDailyHexBudget(loadedTravel.travelPace || 'normal'),
+        dailyBudget: typeof loadedTravel.dailyBudget === 'number'
+            ? loadedTravel.dailyBudget
+            : Math.floor(baseBudget * (weather?.budgetMod ?? 1)),
         travelMode: loadedTravel.travelMode || 'inactive',
         travelPace: loadedTravel.travelPace || 'normal',
         destination: loadedTravel.destination || null,
@@ -86,7 +93,7 @@ function applyExistingMap(existing, mapName, characters, ctx) {
     ctx.hexMapDisplayNameRef.current = existing.displayName || mapName;
     if (existing.weather) ctx.setWeather(existing.weather);
 
-    const travelInitData = buildTravelInit(existing.travelState || {});
+    const travelInitData = buildTravelInit(existing.travelState || {}, existing.weather || null);
     const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
     ctx.resumedTripRef.current = hasActiveTravel;
     if (hasActiveTravel) {

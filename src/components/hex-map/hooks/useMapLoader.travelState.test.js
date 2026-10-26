@@ -5,7 +5,7 @@
  * Owns here: the loaded map's travelState block → travelInit exact shape —
  * verbatim restore, fresh defaults, the inactive/destination gate, junk/null
  * field coercion, and dailyBudget resolution (explicit wins, zero preserved,
- * junk/missing recomputed from pace).
+ * junk/missing recomputed from pace × persisted-weather budgetMod).
  *
  * Lane map (do NOT duplicate across these files):
  * - mount/load args + loaded-field application  -> useMapLoader.loadExisting.test.js
@@ -194,5 +194,29 @@ describe('useMapLoader - travel state', () => {
 
         // Zero survives the typeof guard (fast-derived would be 5).
         expect(result.current.travelInit.dailyBudget).toBe(expectedBudget);
+    });
+
+    // Budget-at-mount weather seed (improve 2026-10-26-E): a legacy file
+    // trip missing a numeric dailyBudget re-derives from pace AND the
+    // persisted weather's budgetMod, so adoption never stamps the un-modded
+    // base. An explicit numeric budget still wins untouched.
+    it('derives a missing dailyBudget weather-modded from the persisted file weather', async () => {
+        const result = await renderLoadedMap({
+            weather: { condition: 'storm', label: 'Storm', budgetMod: 0.75 },
+            travelState: { travelMode: 'active', destination: 'City', travelPace: 'normal' },
+        });
+
+        // floor(4 × 0.75) = 3, not the un-modded 4 (run-E one-frame-off fix).
+        expect(result.current.travelInit.dailyBudget).toBe(3);
+    });
+
+    it('keeps an explicit dailyBudget even when the file weather mod would change it', async () => {
+        const result = await renderLoadedMap({
+            weather: { condition: 'storm', label: 'Storm', budgetMod: 0.75 },
+            travelState: { travelMode: 'active', destination: 'City', dailyBudget: 12 },
+        });
+
+        // The stamped day survives (resume authority), weather never re-derives.
+        expect(result.current.travelInit.dailyBudget).toBe(12);
     });
 });
