@@ -7,6 +7,18 @@ You are the primary agent coordinating implementation of improvement opportuniti
 
 This command pairs with `e2e-explore`: explore appends dated bullets to the `## Improvement backlog` section of `docs/app-exploration.md`; this command consumes them. Consumed bullets are REMOVED from the backlog once resolved (DONE, blocked, or skipped by the user) — the backlog holds only open items, so a future run never re-attempts resolved work. Do not leave `DONE:` or `WON'T DO:` markers behind. The final run summary is the durable record of what was delivered, blocked, or skipped this run.
 
+## Bounded Executions (MANDATORY — no exceptions)
+
+**No execution is ever allowed to run without an explicit, SHORT timeout.** Most commands here finish in milliseconds, not minutes — a missing timeout is a bug in the command, not an optimization. This binds the primary agent AND every subagent prompt you dispatch (paste this section into each subagent's task text verbatim):
+
+- **Shell tool calls**: always pass an explicit `timeout` — ≤15s for inspection/probe commands (`curl`, `git`, `ls`, API GETs/POSTs), ≤60s for lint/test runs, ≤90s for builds. Anything that must keep running (dev servers, watchers) runs ONLY with `background: true`; probe its port/log in bounded follow-ups instead. Never pass `timeout: 0`.
+- **curl**: always `--max-time 5` (state probes) or `--max-time 10` (downloads/uploads). Never against streaming endpoints (`/subscribe`, SSE) without `--max-time`.
+- **Code Mode (`execute`)**: the runtime has NO `AbortController`/`AbortSignal`/`setTimeout` — a `fetch` there CANNOT self-bound, so only fetch fast plain-REST endpoints (`/api/...` GET/POST/PUT) and NEVER streaming or unknown URLs; a hung fetch is an unkillable hang. Poll loops get a hard iteration cap (≤20) AND a `Date.now()` wall-clock deadline (≤30s). No `about:blank`/non-HTTP fetches. If a result might be large, slice before returning.
+- **Playwright MCP**: every `waitFor*` inside `browser_run_code_unsafe` gets an explicit `{ timeout: ≤5000 }`; cap in-page `await` sleeps so one run totals ≤ 20s; handle any dialog the step opens inside the SAME call (`waitForEvent('dialog')` + accept/dismiss) — never leave a dialog pending across tool calls.
+- **Waiting on another process/subagent**: if a call returns nothing useful within ~60s, STOP, take a state probe (screenshot / GET), and decide — retry once with adjusted params or report the stall. Never sit idle.
+
+If a bounded attempt times out, treat it as missing information, not a failure to brute-force: shrink the probe, re-read state, and move on. Repeated timeouts must be recorded in `docs/test-setup-playbook.md` as a pitfall.
+
 ## Support files
 
 - `docs/app-exploration.md` — the backlog lives in its `## Improvement backlog` section; read the whole file before any subagent touches the running app. The map is folded by **coverage, not cadence**: only when descent is complete — backlog empty AND the Coverage table has no "not explored"/"shallow" rows left AND at least one full `e2e-explore` cycle has run over the map since it was created (never fold the map you just deepened — it is peak-value working memory for the next cycle). At the fold seam the full prior map moves to `docs/app-exploration-archive-<YYYY-MM-DD>.md` (date-stamped so same-month folds can't collide) and the live file restarts as a stub carrying only Priority Targets / Depth Seeds (claims to beat, marked *(carried — unverified)*) — if its header says freshly-folded, warn subagents that per-section details must be re-derived live, not trusted from the archive.
@@ -45,6 +57,8 @@ You are implementing a single improvement from the QA backlog of dnd-campaign-su
 {acceptance_criteria}
 
 Read `docs/app-exploration.md` and `docs/test-setup-playbook.md` (if present) before touching the running app.
+
+**Bounded Executions (MANDATORY): no execution without an explicit SHORT timeout.** Shell calls get `timeout` ≤15s (probes) / ≤60s (lint/tests) / ≤90s (build); never `timeout: 0`; long-running processes only via `background: true`. curl always `--max-time 5` (10 for uploads). Inside `browser_run_code_unsafe` every `waitFor*` gets `{ timeout: ≤5000 }`, one run totals ≤20s of awaits, and any dialog you open is accepted/dismissed in the SAME call. In Code Mode `execute`, fetch ONLY fast `/api/...` REST endpoints (no AbortSignal exists there — a hung fetch is unkillable) and give every poll loop an iteration cap (≤20) plus a `Date.now()` deadline ≤30s; never fetch non-HTTP schemes. A timeout means shrink the probe and move on — never retry unbounded.
 
 ### Scope — read this before doing anything
 

@@ -5,6 +5,18 @@ description: exploring the dnd-campaign-suite web app using the Playwright MCP b
 
 You are exploring the dnd-campaign-suite web app using the Playwright MCP browser tools to learn how it works and find bugs. This is exploratory QA, not scripted testing — click around, fill in forms, try edge cases, and reason about what you observe at each step.
 
+## Bounded Executions (MANDATORY — no exceptions)
+
+**No execution is ever allowed to run without an explicit, SHORT timeout.** Most commands here finish in milliseconds, not minutes — a missing timeout is a bug in the command, not an optimization. Apply to every shell call, every subagent you dispatch, and every browser step you take:
+
+- **Shell tool calls**: always pass an explicit `timeout` — ≤15s for inspection/probe commands (`curl`, `git`, `ls`, API GETs/POSTs), ≤60s for lint/test runs, ≤90s for builds. Anything that must keep running (dev servers, watchers) runs ONLY with `background: true`; probe its port/log in bounded follow-ups instead. Never pass `timeout: 0`.
+- **curl**: always `--max-time 5` (state probes) or `--max-time 10` (downloads/uploads). Never against streaming endpoints (`/subscribe`, SSE) without `--max-time`.
+- **Code Mode (`execute`)**: the runtime has NO `AbortController`/`AbortSignal`/`setTimeout` — a `fetch` there CANNOT self-bound, so only fetch fast plain-REST endpoints (`/api/...` GET/POST/PUT) and NEVER streaming or unknown URLs; a hung fetch is an unkillable hang. Poll loops get a hard iteration cap (≤20) AND a `Date.now()` wall-clock deadline (≤30s). No `about:blank`/non-HTTP fetches. If a result might be large, slice before returning.
+- **Playwright MCP**: every `waitFor*` inside `browser_run_code_unsafe` gets an explicit `{ timeout: ≤5000 }`; cap in-page `await` sleeps so one run totals ≤ 20s; handle any dialog the step opens inside the SAME call (`waitForEvent('dialog')` + accept/dismiss) — never leave a dialog pending across tool calls.
+- **Waiting on another process/subagent**: if a call returns nothing useful within ~60s, STOP, take a state probe (screenshot / GET), and decide — retry once with adjusted params or report the stall. Never sit idle.
+
+If a bounded attempt times out, treat it as missing information, not a failure to brute-force: shrink the probe, re-read state, and move on. Repeated timeouts must be recorded in `docs/test-setup-playbook.md` as a pitfall.
+
 ## Scope — read this before doing anything
 
 - You may ONLY create, edit, or delete data inside the campaign named "test-campaign". This is a sandbox campaign that exists specifically for you to use freely.

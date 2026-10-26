@@ -7,6 +7,18 @@ You are the primary agent coordinating fixes for bugs found during exploratory Q
 
 This command pairs with `e2e-explore`: explore produces the bug files in `.opencode/plans/bug-<slug>.md`; this command consumes them. A bug file only disappears when it is fixed or disproved.
 
+## Bounded Executions (MANDATORY — no exceptions)
+
+**No execution is ever allowed to run without an explicit, SHORT timeout.** Most commands here finish in milliseconds, not minutes — a missing timeout is a bug in the command, not an optimization. This binds the primary agent AND every subagent prompt you dispatch (paste this section into each subagent's task text verbatim):
+
+- **Shell tool calls**: always pass an explicit `timeout` — ≤15s for inspection/probe commands (`curl`, `git`, `ls`, API GETs/POSTs), ≤60s for lint/test runs, ≤90s for builds. Anything that must keep running (dev servers, watchers) runs ONLY with `background: true`; probe its port/log in bounded follow-ups instead. Never pass `timeout: 0`.
+- **curl**: always `--max-time 5` (state probes) or `--max-time 10` (downloads/uploads). Never against streaming endpoints (`/subscribe`, SSE) without `--max-time`.
+- **Code Mode (`execute`)**: the runtime has NO `AbortController`/`AbortSignal`/`setTimeout` — a `fetch` there CANNOT self-bound, so only fetch fast plain-REST endpoints (`/api/...` GET/POST/PUT) and NEVER streaming or unknown URLs; a hung fetch is an unkillable hang. Poll loops get a hard iteration cap (≤20) AND a `Date.now()` wall-clock deadline (≤30s). No `about:blank`/non-HTTP fetches. If a result might be large, slice before returning.
+- **Playwright MCP**: every `waitFor*` inside `browser_run_code_unsafe` gets an explicit `{ timeout: ≤5000 }`; cap in-page `await` sleeps so one run totals ≤ 20s; handle any dialog the step opens inside the SAME call (`waitForEvent('dialog')` + accept/dismiss) — never leave a dialog pending across tool calls.
+- **Waiting on another process/subagent**: if a call returns nothing useful within ~60s, STOP, take a state probe (screenshot / GET), and decide — retry once with adjusted params or report the stall. Never sit idle.
+
+If a bounded attempt times out, treat it as missing information, not a failure to brute-force: shrink the probe, re-read state, and move on. Repeated timeouts must be recorded in `docs/test-setup-playbook.md` as a pitfall.
+
 ## Support files
 
 - `docs/app-exploration.md` — read before any subagent touches the running app.
@@ -35,6 +47,8 @@ This command pairs with `e2e-explore`: explore produces the bug files in `.openc
 You are fixing a single bug described in the file at: `{bug_file_path}`
 
 Read `docs/app-exploration.md` and `docs/test-setup-playbook.md` (if present) before touching the running app.
+
+**Bounded Executions (MANDATORY): no execution without an explicit SHORT timeout.** Shell calls get `timeout` ≤15s (probes) / ≤60s (lint/tests) / ≤90s (build); never `timeout: 0`; long-running processes only via `background: true`. curl always `--max-time 5` (10 for uploads). Inside `browser_run_code_unsafe` every `waitFor*` gets `{ timeout: ≤5000 }`, one run totals ≤20s of awaits, and any dialog you open is accepted/dismissed in the SAME call. In Code Mode `execute`, fetch ONLY fast `/api/...` REST endpoints (no AbortSignal exists there — a hung fetch is unkillable) and give every poll loop an iteration cap (≤20) plus a `Date.now()` deadline ≤30s; never fetch non-HTTP schemes. A timeout means shrink the probe and move on — never retry unbounded.
 
 ### Scope — read this before doing anything
 
