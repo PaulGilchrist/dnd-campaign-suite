@@ -347,6 +347,70 @@ describe('useItemDragging', () => {
     });
   });
 
+  // Synthetic/assistive pointerdown (evaluate-dispatched PointerEvents, some AT
+  // input) has no active pointer, so setPointerCapture throws NotFoundError.
+  // The down lane must swallow it and complete drag-start; the items lane keeps
+  // working (capture loss only degrades event routing, #883 companion).
+  describe('throwing setPointerCapture (synthetic pointer guard)', () => {
+    const notFound = () => {
+      const err = new Error('No active pointer with the given id is found.');
+      err.name = 'NotFoundError';
+      return err;
+    };
+
+    it('completes drag-start without throwing when capture fails', () => {
+      const svg = svgMock();
+      svg.setPointerCapture = vi.fn(() => {
+        throw notFound();
+      });
+      svgRef.current = svg;
+      const { result } = getHook();
+      const event = mockEvent();
+      expect(() => {
+        act(() => {
+          result.current.handleItemPointerDown(event, 'item1');
+        });
+      }).not.toThrow();
+      expect(svg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.setPointerCapture).toHaveBeenCalledWith(1);
+      // Drag-start logic ran to completion: full ghost bytes, not a partial state.
+      expect(result.current.itemDragging).toMatchObject({
+        itemId: 'item1',
+        pointerId: 1,
+        offsetX: 40, // point 100 - center(1) 60
+        offsetY: 40,
+        startGridX: 1,
+        startGridY: 1,
+        moverName: 'PlayerToken',
+        moverIsPlayer: true,
+      });
+    });
+
+    it('the whole drag lane (down, move, commit) still runs when capture throws', () => {
+      const svg = svgMock();
+      svg.setPointerCapture = vi.fn(() => {
+        throw notFound();
+      });
+      svgRef.current = svg;
+      const { result, rerender } = getHook();
+      act(() => {
+        result.current.handleItemPointerDown(mockEvent(), 'item1');
+      });
+      expect(result.current.itemDragging).not.toBeNull();
+      moveTokenTo(result, 150, 150); // cell (2,2)
+      expect(itemsHolder.current[0]).toMatchObject({ gridX: 2, gridY: 2 });
+      act(() => rerender());
+      act(() => {
+        result.current.handleItemPointerUp(mockEvent());
+      });
+      expect(result.current.itemDragging).toBeNull();
+      expect(mocks.onTokenMoveLanded).toHaveBeenCalledTimes(1);
+      expect(mocks.onTokenMoveLanded).toHaveBeenCalledWith(
+        expect.objectContaining({ toCell: { gridX: 2, gridY: 2 } })
+      );
+    });
+  });
+
   describe('opportunity-trigger commit (drop landed)', () => {
     it('calls onTokenMoveLanded exactly once with exact payload when dropped on a new cell', () => {
       const { result, rerender } = setupDrag('item1');

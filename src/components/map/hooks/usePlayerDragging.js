@@ -195,8 +195,16 @@ export default function usePlayerDragging({
         // useItemDragging.js). Capturing before the ctm/player guards stranded the
         // pointer on failed starts — up/leave bail on null dragging, so release never
         // ran and the implicit capture swallowed every later click. dragging !== null
-        // now strictly implies captured.
-        svg.setPointerCapture(e.pointerId);
+        // now strictly implies a capture attempt.
+        // Synthetic/assistive pointer events (evaluate-dispatched PointerEvents, some
+        // AT input) carry no active pointer, so setPointerCapture throws
+        // NotFoundError there. Swallow it: losing capture only degrades event
+        // routing — it must not abort drag-start mid-tick.
+        try {
+            svg.setPointerCapture(e.pointerId);
+        } catch (err) {
+            console.debug('[usePlayerDragging] setPointerCapture failed (drag continues)', err);
+        }
 
         setDragging({
             playerId,

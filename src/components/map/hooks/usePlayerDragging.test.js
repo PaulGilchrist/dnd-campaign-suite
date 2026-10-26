@@ -446,6 +446,68 @@ describe('usePlayerDragging', () => {
     });
   });
 
+  // Synthetic/assistive pointerdown (evaluate-dispatched PointerEvents, some AT
+  // input) has no active pointer, so setPointerCapture throws NotFoundError.
+  // The down lane must swallow it and complete drag-start; move/up keep working
+  // (capture loss only degrades event routing, it must not abort drag-start).
+  describe('throwing setPointerCapture (synthetic pointer guard)', () => {
+    const notFound = () => {
+      const err = new Error('No active pointer with the given id is found.');
+      err.name = 'NotFoundError';
+      return err;
+    };
+
+    it('completes drag-start without throwing when capture fails', () => {
+      const svg = svgAt(60, 80);
+      svg.setPointerCapture = vi.fn(() => {
+        throw notFound();
+      });
+      svgRef.current = svg;
+      const helpers = getHook();
+      const ev = mockEvent({ pointerId: 42 });
+      expect(() => {
+        act(() => {
+          helpers.result.current.handlePointerDown(ev, 'p1');
+        });
+      }).not.toThrow();
+      expect(svg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.setPointerCapture).toHaveBeenCalledWith(42);
+      // Drag-start logic ran to completion: full ghost bytes, not a partial state.
+      expect(helpers.result.current.dragging).toMatchObject({
+        playerId: 'p1',
+        pointerId: 42,
+        offsetX: 0,
+        offsetY: -20,
+        unconstrained: false,
+        startX: 1,
+        startY: 2,
+      });
+      expect(helpers.result.current.dragging.reachable).toBeInstanceOf(Set);
+    });
+
+    it('the whole drag lane (down, move, drop-commit) still runs when capture throws', () => {
+      const svg = svgAt(60, 80);
+      svg.setPointerCapture = vi.fn(() => {
+        throw notFound();
+      });
+      svgRef.current = svg;
+      const helpers = getHook();
+      act(() => {
+        helpers.result.current.handlePointerDown(mockEvent(), 'p1');
+      });
+      expect(helpers.result.current.dragging).not.toBeNull();
+      moveTo(helpers, 150, 150); // ghost cell (3,4)
+      expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 3, gridY: 4 });
+      dropAt(helpers, 150, 150); // commit (3,4)
+      expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 3, gridY: 4 });
+      expect(helpers.result.current.dragging).toBeNull();
+      expect(mocks.onTokenMoveLanded).toHaveBeenCalledTimes(1);
+      expect(mocks.onTokenMoveLanded).toHaveBeenCalledWith(
+        expect.objectContaining({ toCell: { gridX: 3, gridY: 4 } })
+      );
+    });
+  });
+
   describe('movement constraints (walls, closed doors, reachability)', () => {
     it('flags invalid across a wall and clears the flag on the walkable side', () => {
       const helpers = press('p1', { hook: { walls: fullWallX(3) } });

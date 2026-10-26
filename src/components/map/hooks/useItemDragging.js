@@ -43,8 +43,16 @@ export default function useItemDragging({
         // useRuler.js guards, validates, then captures). Capturing before these
         // guards stranded the pointer on failed starts — up/leave bail on null
         // itemDragging, so release never ran and the implicit capture swallowed
-        // every later click. itemDragging !== null now strictly implies captured.
-        svg.setPointerCapture(e.pointerId);
+        // every later click. itemDragging !== null now strictly implies a capture
+        // attempt. Synthetic/assistive pointer events (evaluate-dispatched
+        // PointerEvents, some AT input) carry no active pointer, so
+        // setPointerCapture throws NotFoundError there. Swallow it: losing capture
+        // only degrades event routing — it must not abort drag-start mid-tick.
+        try {
+            svg.setPointerCapture(e.pointerId);
+        } catch (err) {
+            console.debug('[useItemDragging] setPointerCapture failed (drag continues)', err);
+        }
 
         setItemDragging({
             itemId,
