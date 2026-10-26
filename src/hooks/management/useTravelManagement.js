@@ -142,6 +142,14 @@ export default function useTravelManagement({
   const pathRef = useRef(path);
   const pathIndexRef = useRef(pathIndex);
 
+  // Improve 2026-10-26 (run-E backlog): the mode an event interrupted. Events
+  // only fire on advance, so mid-route the party was MODES.TRAVELING (set by
+  // prior advances); an event on the FIRST advance interrupts MODES.PLANNING.
+  // skipEvent restores THIS mode so a mid-trip skip stays 'traveling' instead
+  // of mislabelling the party as 'planning'. Ephemeral UI-flow state — same
+  // lifecycle as pendingEvent — so a ref, never a persisted key.
+  const modeBeforePauseRef = useRef(MODES.PLANNING);
+
   // ── Map-file write-back (improve 2026-10-26-D) ──
   // The file lane is the reload-resume source: useMapLoader reads the saved
   // document's travelState through buildTravelInit at open. The server-first
@@ -391,6 +399,15 @@ export default function useTravelManagement({
     setForcedMarchHours(0);
   }, [effectiveBudgetForPace, weather]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Park travel for a spawned event: remember the mode it interrupts (skip
+  // resumes it — mid-route events restore TRAVELING) without pushing the
+  // already max-complex advanceOneHex over the ESLint ceiling.
+  const pauseForEvent = useCallback((event) => {
+    if (travelMode !== MODES.PAUSED) modeBeforePauseRef.current = travelMode;
+    setPendingEvent(event);
+    setTravelMode(MODES.PAUSED);
+  }, [travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const advanceOneHex = useCallback(() => {
     const currentPath = pathRef.current;
     const currentIdx = pathIndexRef.current;
@@ -439,8 +456,7 @@ export default function useTravelManagement({
     if (shouldTriggerEvent(tileTerrain, weather, eventFrequency)) {
       let event = generateRandomEvent(tileTerrain);
       event = enhanceCombatEvent(event, tileTerrain);
-      setPendingEvent(event);
-      setTravelMode(MODES.PAUSED);
+      pauseForEvent(event);
       setLastMessage(`⚡ ${event.title}`);
       return { moved: true, event };
     }
@@ -456,7 +472,7 @@ export default function useTravelManagement({
     if (travelMode !== MODES.TRAVELING) setTravelMode(MODES.TRAVELING);
 
     return { moved: true };
-  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback, travelMode, clearCompletedTripKeys]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback, travelMode, pauseForEvent, clearCompletedTripKeys]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // weatherOverride: see changePace above — Camp regenerates weather in the
   // same tick, so the caller passes the NEW day's roll for the budget write.
@@ -517,22 +533,29 @@ export default function useTravelManagement({
 
   const hexesRemaining = Math.max(0, path.length - 1 - pathIndex);
 
-  const clearEvent = useCallback(() => {
+  // resumePausedMode: the SKIP leg re-joins the in-progress route, so it
+  // restores the mode the event interrupted (traveling mid-route, planning on
+  // the first advance). The ACCEPT leg navigates away (encounter map / weather
+  // regen ends the movement lane), so it keeps the legacy PLANNING restore —
+  // do not fold the two together.
+  const clearEvent = useCallback((resumePausedMode) => {
     setPendingEvent(null);
     if (travelMode === MODES.PAUSED) {
-      setTravelMode(MODES.PLANNING);
+      setTravelMode(resumePausedMode
+        ? (modeBeforePauseRef.current || MODES.PLANNING)
+        : MODES.PLANNING);
     }
     setLastMessage(null);
   }, [travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const acceptEvent = useCallback(() => {
     const evt = pendingEvent;
-    clearEvent();
+    clearEvent(false);
     return evt;
   }, [pendingEvent, clearEvent]);
 
   const skipEvent = useCallback(() => {
-    clearEvent();
+    clearEvent(true);
   }, [clearEvent]);
 
   const rerollEvent = useCallback(() => {

@@ -4,7 +4,8 @@
 // phase) is owned by useTravelManagement.session-phase.test.js; the phase state
 // machine internals by sessionService.test.js. THIS file pins the missing
 // producer itself: a successful mid-route `Advance One Hex` must write
-// travel-mode 'traveling' (the ONLY call site of MODES.TRAVELING) and arm
+// travel-mode 'traveling' (the producer call site of MODES.TRAVELING; the
+// skip-after-mid-route-event restore below is the second) and arm
 // sessionState.phase='travel' with its session_phase audit line, and the
 // arrival/cancel INACTIVE branches must then restore 'exploration' with an
 // entry of its own. Pre-fix: travel ran entirely in 'planning'/'paused', the
@@ -239,6 +240,104 @@ describe('useTravelManagement — MODES.TRAVELING producer arms the travel phase
     // the same tick (same-endpoint POSTs race, see advanceOneHex comment).
     expect(setRuntimeValue.mock.calls.filter(([who, key]) => who === 'campaign' && key === 'travel-mode'))
       .toEqual([['campaign', 'travel-mode', 'paused', CN]]);
+    expect(phaseWrites()).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+
+  // Improve 2026-10-26 (run-E backlog): an event that fires MID-ROUTE must not
+  // demote the party to 'planning' when it is skipped — it restores the mode
+  // the pause interrupted (TRAVELING) with zero session_phase churn (the phase
+  // is already 'travel'; sessionService dedupes same-phase writes).
+  it('mid-route event → skip restores traveling with zero session_phase churn, next advance moves on', async () => {
+    const { shouldTriggerEvent } = await import('../../services/campaign/randomEventService.js');
+    // beforeEach uses clearAllMocks, which KEEPS implementations — disarm
+    // explicitly (a prior test leaves shouldTriggerEvent → true).
+    shouldTriggerEvent.mockReturnValue(false);
+    calculatePath.mockReturnValue([{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }, { q: 4, r: 0 }]);
+    phaseIs('travel');
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 4, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    // Advance 1: plain move — arms TRAVELING (phase write deduped by phaseIs).
+    await act(async () => { result.current.advanceOneHex(); });
+    // Advance 2: fires the event — parks PAUSED.
+    shouldTriggerEvent.mockReturnValue(true);
+    let res;
+    await act(async () => { res = result.current.advanceOneHex(); });
+    expect(res.event).toBeTruthy();
+    expect(result.current.travelMode).toBe('paused');
+
+    // Skip: pre-fix landed PLANNING mid-trip (the cosmetic defect).
+    act(() => { result.current.skipEvent(); });
+    expect(result.current.pendingEvent).toBeNull();
+    expect(result.current.travelMode).toBe('traveling');
+    expect(result.current.hexesRemaining).toBe(2);
+    expect(modeWrites()).toEqual([
+      ['campaign', 'travel-mode', 'traveling', CN],
+      ['campaign', 'travel-mode', 'paused', CN],
+      ['campaign', 'travel-mode', 'traveling', CN],
+    ]);
+    // AC2: no spurious phase churn anywhere in the cycle.
+    expect(phaseWrites()).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
+
+    // AC1: the next Advance moves the party normally — traveling guard skips a
+    // redundant mode write.
+    shouldTriggerEvent.mockReturnValue(false);
+    let next;
+    await act(async () => { next = result.current.advanceOneHex(); });
+    expect(next).toEqual({ moved: true });
+    expect(modeWrites('traveling')).toHaveLength(2);
+  });
+
+  it('first-advance event → skip restores planning (planning-stays-planning edge)', async () => {
+    const { shouldTriggerEvent } = await import('../../services/campaign/randomEventService.js');
+    shouldTriggerEvent.mockReturnValue(true);
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    await act(async () => { result.current.advanceOneHex(); });
+    expect(result.current.travelMode).toBe('paused');
+    act(() => { result.current.skipEvent(); });
+
+    // Mode was PLANNING when the event paused travel — skip keeps it there and
+    // never writes TRAVELING (no session_phase arm either).
+    expect(result.current.travelMode).toBe('planning');
+    expect(modeWrites('traveling')).toHaveLength(0);
+    expect(phaseWrites()).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+
+  it('accept leg keeps its PLANNING restore (skip-only mode resume)', async () => {
+    const { shouldTriggerEvent } = await import('../../services/campaign/randomEventService.js');
+    shouldTriggerEvent.mockReturnValue(false); // clearAllMocks keeps impls
+    calculatePath.mockReturnValue([{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }, { q: 4, r: 0 }]);
+    phaseIs('travel');
+    const { result } = renderHook(() => useTravelManagement(baseArgs));
+    act(() => { result.current.setDestinationAndPath({ q: 4, r: 0 }); });
+    setRuntimeValue.mockClear();
+    addEntry.mockClear();
+
+    await act(async () => { result.current.advanceOneHex(); }); // traveling
+    shouldTriggerEvent.mockReturnValue(true);
+    await act(async () => { result.current.advanceOneHex(); }); // paused (event)
+    shouldTriggerEvent.mockReturnValue(false);
+
+    // The accept leg navigates away to the encounter map — its mode handling
+    // is a separate lane and must NOT resume TRAVELING (unchanged bytes).
+    let evt;
+    await act(async () => { evt = result.current.acceptEvent(); });
+    expect(evt).toBeTruthy();
+    expect(result.current.travelMode).toBe('planning');
+    expect(modeWrites()).toEqual([
+      ['campaign', 'travel-mode', 'traveling', CN],
+      ['campaign', 'travel-mode', 'paused', CN],
+      ['campaign', 'travel-mode', 'planning', CN],
+    ]);
     expect(phaseWrites()).toHaveLength(0);
     expect(addEntry).not.toHaveBeenCalled();
   });
