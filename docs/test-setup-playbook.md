@@ -1087,3 +1087,7 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Char-bucket seed AND un-seed of per-char runtime keys (`exhaustionLevel`) do NOT re-render an already-open Travel panel — `partyHasMaxExhaustion` is a render-time `getRuntimeValue` read with no subscription; reload is the reliable observation lane (extends the run-C "state applies at mount" row to char buckets).
 - Fresh-campaign bucket rig: with change-data `{}`, the char bucket doesn't exist; POST `{value:{exhaustionLevel:6}}` creates it cleanly and admin-clear restores the absent state exactly (no merge needed on a new campaign).
 - Shell curl `-d` JSON must be single-quote wrapped; `\"` passthrough yields body-parser 400 (probe artifact, not an app defect).
+
+## 2026-10-26 improve run — dedupe-campaign-estamp (MapContextSync value-gate)
+- Map-open sanity leg: re-opening the SAME map emits no `__map__` POST (back-nav leaves `activeMapName` unchanged app-side, effect never re-runs) — exercise the transition gate by reopening a DIFFERENT map.
+- Module-level test seams (`_resetForTests`) in JSX component files trip `react-refresh/only-export-components` — the MonsterCardModal inline-disable idiom is sanctioned; call the seam in `beforeEach` of every file that touches the module cache (cache is file-scoped per vitest worker).

@@ -19,13 +19,34 @@ import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
  * and now also 400'd server-side.
  *
  * Single server writer per key (improvement-map-open-double-writes): the local
- * mirror always runs with skipSync=true, so the unconditional force-stamp below
- * is the ONLY lane that POSTs. Previously the GM branch also let setRuntimeObject
- * POST the same bucket, emitting a same-tick IDENTICAL pair (guarded store POST +
+ * mirror always runs with skipSync=true, so the force-stamp below is the ONLY
+ * lane that POSTs. Previously the GM branch also let setRuntimeObject POST the
+ * same bucket, emitting a same-tick IDENTICAL pair (guarded store POST +
  * force-stamp) on every map open — pure network/save chatter. The force-stamp
  * lane is the one that must survive (its guard-free POST re-seeds the server
  * after an admin change-data wipe), so it absorbs the deduped writes.
  */
+
+// Last-stamped '__campaign__' value (improvement-2026-10-26-C): the effect
+// re-runs on every activeMapName transition (campaign-select stamp + map-open
+// dep-change re-stamp), previously emitting two value-identical POSTs per
+// session. Gate the campaign stamp the way the map lane is gated on its
+// transition: only POST when the campaign value ACTUALLY changes. A module
+// reload (SPA re-init) resets this cache, so a fresh session always stamps.
+// Caveat: a stale cache also suppresses the admin-wipe heal-re-stamp for
+// '__campaign__' until the value changes — acceptable, the documented
+// resurrection lanes (admin clear + full-store POSTs) already cover that; a
+// FAILED stamp self-heals by clearing the cache so the next transition retries.
+let lastCampaignStamp = null;
+
+/** Test seam (youtubePlayer.js `_resetForTests` precedent): forget the
+ *  last-stamped campaign so the next mount re-stamps, simulating a fresh
+ *  module load. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function _resetForTests() {
+  lastCampaignStamp = null;
+}
+
 function MapContextSync({ campaignName, activeMapName, isLocalhost = true }) {
   useEffect(() => {
     if (!campaignName) return;
@@ -38,8 +59,15 @@ function MapContextSync({ campaignName, activeMapName, isLocalhost = true }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value }),
-    }).catch(err => console.error(`[MapContextSync] Failed to stamp ${key}:`, err));
-    stamp('__campaign__', { campaignName });
+    }).catch(err => {
+      console.error(`[MapContextSync] Failed to stamp ${key}:`, err);
+      // Failed stamps must not poison the dedupe cache — retry next transition.
+      if (key === '__campaign__') lastCampaignStamp = null;
+    });
+    if (campaignName !== lastCampaignStamp) {
+      lastCampaignStamp = campaignName;
+      stamp('__campaign__', { campaignName });
+    }
     if (mapKey) {
       setRuntimeObject('__map__', { activeMapName: mapKey }, campaignName, true);
       // Read-only clients mirror locally only (zero server writes).

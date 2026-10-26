@@ -2,7 +2,7 @@
 // @improved-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MapContextSync from './MapContextSync.jsx';
+import MapContextSync, { _resetForTests } from './MapContextSync.jsx';
 import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -32,6 +32,9 @@ describe('MapContextSync', () => {
   let fetchMock;
 
   beforeEach(() => {
+    // Fresh-session state per test: the module-level __campaign__ last-stamped
+    // cache survives the file-level module registry (improvement-2026-10-26-C).
+    _resetForTests();
     setRuntimeObject.mockClear();
     fetchMock = vi.fn(() => Promise.resolve({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);

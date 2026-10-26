@@ -10,7 +10,7 @@
  */
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MapContextSync from './MapContextSync.jsx';
+import MapContextSync, { _resetForTests } from './MapContextSync.jsx';
 import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -37,6 +37,7 @@ describe('MapContextSync — read-only client (non-localhost)', () => {
   let fetchMock;
 
   beforeEach(() => {
+    _resetForTests(); // fresh module-cache state per test (improvement-2026-10-26-C)
     setRuntimeObject.mockClear();
     fetchMock = vi.fn(() => Promise.resolve({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
