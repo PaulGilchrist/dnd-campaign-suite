@@ -16,7 +16,7 @@ import {
   generateRandomEvent,
 } from '../../services/campaign/randomEventService.js';
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
-import { getRuntimeValue, setRuntimeValue, hasRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, hasRuntimeValue, setRuntimeObject } from '../runtime/useRuntimeState.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
 import { setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js';
 
@@ -43,9 +43,13 @@ const lazyDailyBudget = () => getDailyHexBudget('normal');
 // Map-file write-back snapshot (improve 2026-10-26-D). null = "no trip" —
 // the pristine/cancelled/idle shape, kept byte-identical to the null the
 // loader lanes seed so a quiet open never dirties the document. Everything
-// else (planning, traveling, paused, AND the post-arrival final state, which
-// mirrors change-data's retained travel-destination/-path keys) publishes in
-// full so buildTravelInit can resume from the file exactly as from change-data.
+// else (planning, traveling, paused) publishes in full so buildTravelInit
+// can resume from the file exactly as from change-data. Arrival clears the
+// completed-trip keys (COMPLETED_TRIP_KEYS below), so the post-arrival
+// snapshot falls through to null and the map file sheds the finished trip
+// too (improve 2026-10-26-D arrival-stale-destination).
+const COMPLETED_TRIP_KEYS = ['travel-destination', 'travel-path', 'travel-pathIndex'];
+
 const buildPublishSnapshot = (s) => {
   if (s.travelMode === MODES.INACTIVE && !s.destination && (!s.path || s.path.length === 0)) {
     return null;
@@ -268,6 +272,34 @@ export default function useTravelManagement({
     setLastMessage(null);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Arrival clears the finished trip (improve 2026-10-26-D): destination/
+  // path/pathIndex describe the trip that just COMPLETED — retaining them
+  // left the post-arrival bucket self-contradictory (travel-mode:inactive
+  // next to a live destination, backlog 2026-10-26-D). They are REMOVED
+  // from change-data via the proven per-key DELETE lane (same as
+  // savePromptService; a null-POST would only leave `key: null` behind).
+  // The local store parks on idle bytes with skipSync=true: the DELETEs
+  // are the only server writes for these keys, so there is no same-tick
+  // POST→DELETE ordering hazard, and null/[] (vs the mount-time defaults
+  // a bare store.delete would expose) keeps the publisher's snapshot null
+  // even after a reload-resumed trip arrives. Day-state keys (pace,
+  // accruedCost, dailyBudget, dayExhausted, forcedMarchHours) survive
+  // arrival exactly as they survive cancelTravel.
+  const clearCompletedTripKeys = useCallback(() => {
+    setRuntimeObject('campaign', {
+      'travel-destination': null,
+      'travel-path': [],
+      'travel-pathIndex': 0,
+    }, campaignName, true);
+    pathRef.current = [];
+    pathIndexRef.current = 0;
+    if (!campaignName) return;
+    COMPLETED_TRIP_KEYS.forEach((key) => {
+      fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`, { method: 'DELETE' })
+        .catch((e) => console.error('[useTravelManagement] Failed to clear completed-trip key:', key, e));
+    });
+  }, [campaignName]);
+
   const setDestinationAndPath = useCallback((to) => {
     if (!partyPosition) return;
     const newPath = calculatePath(partyPosition, to, { hexCols, hexRows, terrain, roads });
@@ -321,18 +353,23 @@ export default function useTravelManagement({
       return { moved: false };
     }
 
+    const arrived = nextIdx >= currentPath.length - 1;
+
     if (onPartyMove) onPartyMove(nextHex);
     setAccruedCost(newAccrued);
+
+    if (arrived) {
+      // Single lastMessage write (no prior null): two POSTs to the same
+      // endpoint in one tick can reorder and strand the arrival prose.
+      setTravelMode(MODES.INACTIVE);
+      setLastMessage('The party has arrived at their destination.');
+      clearCompletedTripKeys();
+      return { moved: true, arrived: true };
+    }
+
     setPathIndex(nextIdx);
     pathIndexRef.current = nextIdx;
     setLastMessage(null);
-
-    const arrived = nextIdx >= currentPath.length - 1;
-    if (arrived) {
-      setTravelMode(MODES.INACTIVE);
-      setLastMessage('The party has arrived at their destination.');
-      return { moved: true, arrived: true };
-    }
 
     if (shouldTriggerEvent(tileTerrain, weather, eventFrequency)) {
       let event = generateRandomEvent(tileTerrain);
@@ -354,7 +391,7 @@ export default function useTravelManagement({
     if (travelMode !== MODES.TRAVELING) setTravelMode(MODES.TRAVELING);
 
     return { moved: true };
-  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback, travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback, travelMode, clearCompletedTripKeys]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // weatherOverride: see changePace above — Camp regenerates weather in the
   // same tick, so the caller passes the NEW day's roll for the budget write.

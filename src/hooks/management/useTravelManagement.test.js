@@ -98,7 +98,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 const { calculatePath, getDailyHexBudget, getHexMoveCostWithRoad, applyExhaustionSpeedPenaltyToBudget, getExhaustionMultiplierPercent } = await import('../../services/campaign/travelService.js');
 const { shouldTriggerEvent, generateRandomEvent } = await import('../../services/campaign/randomEventService.js');
 const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
-const { getRuntimeValue, setRuntimeValue } = await import('../runtime/useRuntimeState.js');
+const { getRuntimeValue, setRuntimeValue, setRuntimeObject, getStore } = await import('../runtime/useRuntimeState.js');
 const { hasSelfRestoration } = await import('../../services/combat/automation/automationService.js');
 
 const defaultPath = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
@@ -338,6 +338,68 @@ describe('useTravelManagement', () => {
       expect(res.arrived).toBe(true);
       expect(result.current.travelMode).toBe('inactive');
       expect(result.current.lastMessage).toBe('The party has arrived at their destination.');
+    });
+
+    it('arrival clears the completed-trip planning keys (improve 2026-10-26-D)', async () => {
+      // Pre-fix fingerprint: completing a trip left travel-destination/-path/
+      // -pathIndex in the campaign bucket beside travel-mode:inactive.
+      // Post-fix: the three trip keys are parked on idle bytes locally AND
+      // DELETEd from change-data (null-POSTs would leave `key: null` behind).
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      calculatePath.mockReturnValue([{ q: 0, r: 0 }, { q: 1, r: 0 }]);
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      act(() => { result.current.setDestinationAndPath({ q: 1, r: 0 }); });
+      setRuntimeValue.mockClear();
+
+      let res;
+      await act(async () => { res = result.current.advanceOneHex(); });
+
+      expect(res.arrived).toBe(true);
+      // Arrived state still self-consistent: mode inactive + arrival prose.
+      expect(result.current.travelMode).toBe('inactive');
+      expect(result.current.lastMessage).toBe('The party has arrived at their destination.');
+      // Trip keys cleared from hook state and the campaign store…
+      expect(result.current.destination).toBeNull();
+      expect(result.current.path).toEqual([]);
+      expect(result.current.pathIndex).toBe(0);
+      const store = getStore('campaign');
+      expect(store.get('travel-destination')).toBeNull();
+      expect(store.get('travel-path')).toEqual([]);
+      expect(store.get('travel-pathIndex')).toBe(0);
+      // …via ONE merged skipSync object write (no resurrecting POST)…
+      expect(setRuntimeObject).toHaveBeenCalledWith('campaign', {
+        'travel-destination': null,
+        'travel-path': [],
+        'travel-pathIndex': 0,
+      }, 'test-campaign', true);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'travel-destination', expect.anything(), expect.anything());
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'travel-path', expect.anything(), expect.anything());
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'travel-pathIndex', expect.anything(), expect.anything());
+      // …plus one key-removal DELETE per completed-trip key.
+      const deleteUrls = fetchSpy.mock.calls
+        .filter(([, opts]) => opts?.method === 'DELETE')
+        .map(([url]) => url);
+      expect(deleteUrls).toEqual([
+        '/api/campaigns/test-campaign/travel-destination',
+        '/api/campaigns/test-campaign/travel-path',
+        '/api/campaigns/test-campaign/travel-pathIndex',
+      ]);
+      fetchSpy.mockRestore();
+    });
+
+    it('mid-trip cancel never DELETEs change-data keys (clear stays null-write)', () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+      act(() => { result.current.advanceOneHex(); });
+      fetchSpy.mockClear();
+
+      act(() => { result.current.cancelTravel(); });
+
+      // Cancel's contract (reload-resume mid-trip depends on the keys'
+      // presence semantics) is untouched by the arrival clearing lane.
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result.current.destination).toBeNull();
     });
 
     it('does not advance when accruedCost would exceed dailyBudget', () => {

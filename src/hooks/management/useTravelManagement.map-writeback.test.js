@@ -13,8 +13,9 @@
  *   exact buildTravelInit round-trip shape (null = no-trip);
  * - value churn that produces identical bytes (SSE echoes re-rendering with
  *   new array identities) never re-publishes;
- * - cancel/arrive semantics: cancel clears to null, arrival keeps the final
- *   trip bytes (mirroring change-data's retained travel-destination/-path).
+ * - cancel/arrive semantics: both clear to null (arrival clears the
+ *   completed-trip planning keys from change-data, improve 2026-10-26-D,
+ *   so the map file sheds the finished trip too).
  * Lane map: change-data key writes are owned by useTravelManagement.test.js;
  * the loader ref/bump/persistence half by useMapLoader.api.test.js.
  */
@@ -176,7 +177,7 @@ describe('useTravelManagement — map-file write-back publisher', () => {
     }));
   });
 
-  it('publishes the post-arrival final bytes once (change-data keeps destination/path after arrival)', () => {
+  it('publishes null once on arrival (completed-trip keys cleared, file sheds the trip)', () => {
     const { result, onTravelStateChange } = renderPublishing();
     act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
     act(() => { result.current.advanceOneHex(); });
@@ -185,13 +186,10 @@ describe('useTravelManagement — map-file write-back publisher', () => {
     act(() => { result.current.advanceOneHex(); });   // final hex → arrived
 
     expect(onTravelStateChange).toHaveBeenCalledTimes(1);
-    expect(onTravelStateChange).toHaveBeenCalledWith(snapshot({
-      travelMode: 'inactive',
-      destination: { q: 2, r: 0 },
-      path: [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }],
-      pathIndex: 2,
-      accruedCost: 2,
-    }));
+    // buildPublishSnapshot null-gate (inactive AND no destination AND no
+    // path) fires because the arrival branch parks the keys on idle bytes —
+    // the map file drops the stale trip exactly like change-data does.
+    expect(onTravelStateChange).toHaveBeenCalledWith(null);
   });
 
   it('clears the file back to null on cancel after a started trip', () => {

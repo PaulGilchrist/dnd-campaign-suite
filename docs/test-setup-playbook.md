@@ -1112,3 +1112,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - PITFALL: `advanceOneHex` drives off `pathRef`/`pathIndexRef` — any resume lane that fills only synced state leaves advances silent no-ops; seed refs at mount AND on file-adoption.
 - PITFALL: eslint `server-first/no-local-game-state` flags useRef names containing game keywords ("active" etc.) — name refs accordingly.
 - Outdoor map writes now settle in ~1s (1000ms coalescing debounce, `flushSave` chokepoint + unmount flush) — disk GET authoritative well before the 10s changeData debounce; unit tests need ≥1.3s settle (mirrors indoor `settleAutosave`).
+
+## 2026-10-26 improve run — arrival-destination-cleanup (orchestrator live re-verify)
+- Key-REMOVAL lane for change-data: per-key `DELETE /api/campaigns/:c/<key>` (campaigns-changedata.js:236, same as savePromptService); a null-POST only leaves `key: null` behind. Verify removal by GET — campaign keys sit TOP-LEVEL in the change-data dump (not nested under 'campaign').
+- Arrival now clears travel-destination/-path/-pathIndex (mode/lastMessage/accrued/day keys survive, mirroring cancelTravel); map-file travelState goes null with them.
+- PITFALL: a bare `.sidebar-link` first-click probe can land on "Add Character" and pop the 12-step wizard, silently swallowing map-plan clicks into its <li> list — target sidebar entries by text, and screenshot when a hex-plan click "succeeds" but REMAINING stays 0.
