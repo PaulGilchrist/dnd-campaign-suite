@@ -41,7 +41,7 @@ describe('MapContextSync', () => {
     render(<MapContextSync campaignName="test-campaign" activeMapName={null} />);
 
     expect(setRuntimeObject).toHaveBeenCalledWith(
-      '__campaign__', { campaignName: 'test-campaign' }, 'test-campaign',
+      '__campaign__', { campaignName: 'test-campaign' }, 'test-campaign', true,
     );
     const campaignStamps = stampsFor(fetchMock, '__campaign__');
     expect(campaignStamps).toHaveLength(1);
@@ -65,7 +65,7 @@ describe('MapContextSync', () => {
     render(<MapContextSync campaignName="test-campaign" activeMapName="battle-arena.json" />);
 
     expect(setRuntimeObject).toHaveBeenCalledWith(
-      '__map__', { activeMapName: 'battle-arena' }, 'test-campaign',
+      '__map__', { activeMapName: 'battle-arena' }, 'test-campaign', true,
     );
     const mapStamps = stampsFor(fetchMock, '__map__');
     expect(mapStamps).toHaveLength(1);
@@ -76,11 +76,34 @@ describe('MapContextSync', () => {
     });
   });
 
+  // Single-write-on-open lock (improvement-map-open-double-writes): the real
+  // setRuntimeObject issues its own POST when its equality guard sees a change,
+  // so a mount that transitions the map (null -> battle-arena) used to emit a
+  // same-tick IDENTICAL pair (store POST + force-stamp). The store mirror must
+  // stay skipSync=true so the guard-free stamp is the ONLY server write — one
+  // POST per key per mount scenario, while still surviving an admin wipe.
+  it('mount-then-resolve emits exactly one __map__ POST (no double-writer pair)', () => {
+    const { rerender } = render(
+      <MapContextSync campaignName="test-campaign" activeMapName={null} />,
+    );
+    expect(stampsFor(fetchMock, '__map__')).toHaveLength(0);
+
+    rerender(<MapContextSync campaignName="test-campaign" activeMapName="battle-arena.json" />);
+
+    const mapPosts = fetchMock.mock.calls
+      .map(([url, init]) => ({ url: String(url), method: init?.method }))
+      .filter((req) => req.url.endsWith('/__map__') && req.method === 'POST');
+    expect(mapPosts).toHaveLength(1);
+    const mapStoreCalls = storeCallsFor('__map__');
+    expect(mapStoreCalls).toHaveLength(1);
+    expect(mapStoreCalls[0][3]).toBe(true); // skipSync — stamp owns the server lane
+  });
+
   it('leaves map names without a .json suffix unchanged', () => {
     render(<MapContextSync campaignName="test-campaign" activeMapName="wilds" />);
 
     expect(setRuntimeObject).toHaveBeenCalledWith(
-      '__map__', { activeMapName: 'wilds' }, 'test-campaign',
+      '__map__', { activeMapName: 'wilds' }, 'test-campaign', true,
     );
     expect(stampsFor(fetchMock, '__map__')[0].value).toEqual({ activeMapName: 'wilds' });
   });
@@ -96,7 +119,7 @@ describe('MapContextSync', () => {
     expect(stampsFor(fetchMock, '__map__')).toHaveLength(1);
     expect(stampsFor(fetchMock, '__map__')[0].value).toEqual({ activeMapName: 'new-arena' });
     expect(storeCallsFor('__map__')).toEqual([
-      ['__map__', { activeMapName: 'new-arena' }, 'test-campaign'],
+      ['__map__', { activeMapName: 'new-arena' }, 'test-campaign', true],
     ]);
   });
 

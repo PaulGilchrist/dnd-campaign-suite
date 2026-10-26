@@ -3,9 +3,10 @@
  * Regression lock for bug-player-clients-clobber-fog-reset (the '__map__'
  * co-writer lane): a read-only (network) client must NEVER POST '__map__' —
  * the server owns that key via the activate route and every client mirrors it
- * through SSE. Read-only clients now populate their LOCAL runtime store with
- * skipSync=true so grid distances still work, but issue zero server writes.
- * GM (localhost) behaviour is byte-unchanged (see MapContextSync.null-stamp).
+ * through SSE. Clients populate their LOCAL runtime store with skipSync=true
+ * so grid distances still work. GM (localhost) writes exactly ONE '__map__'
+ * POST per sync via the guard-free force-stamp lane (see MapContextSync.null-stamp
+ * + the single-writer lock in this file).
  */
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -53,7 +54,7 @@ describe('MapContextSync — read-only client (non-localhost)', () => {
     ]);
   });
 
-  it('POSTs __map__ on localhost (GM) — the gate is role-scoped', () => {
+  it('POSTs __map__ on localhost (GM) — exactly once via the force-stamp lane', () => {
     render(
       <MapContextSync campaignName="test-campaign" activeMapName="test-map.json" isLocalhost={true} />,
     );
@@ -61,9 +62,12 @@ describe('MapContextSync — read-only client (non-localhost)', () => {
     const mapStamps = stampsFor(fetchMock, '__map__');
     expect(mapStamps).toHaveLength(1);
     expect(mapStamps[0]).toEqual({ method: 'POST', key: '__map__', value: { activeMapName: 'test-map' } });
-    // GM mirror is NOT skipSync (server-write path)
+    // Single server writer (improvement-map-open-double-writes): the GM store
+    // mirror is skipSync too — the force-stamp above is the ONLY __map__ POST.
+    // (The real setRuntimeObject POSTs whenever its guard sees a change, so a
+    // non-skipSync call here would re-introduce the same-tick identical pair.)
     expect(storeCallsFor('__map__')).toEqual([
-      ['__map__', { activeMapName: 'test-map' }, 'test-campaign'],
+      ['__map__', { activeMapName: 'test-map' }, 'test-campaign', true],
     ]);
   });
 });

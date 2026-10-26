@@ -71,7 +71,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT.)*
-- **2026-10-26-B map open emits a paired `POST /change-data __map__`** (×2 same-tick, identical payload) on every editor entry (network/save chatter; likely full-store double-write family playbook §41). Dedupe to one.
 - **2026-10-26-B dice-tray result popup not dismissable by backdrop** — close affordance exists (`.dice-tray-popup-close`) but generic `.popup-close-btn`/backdrop probes miss; minor consistency item for popup chrome unification (`src/components/sidebar/DiceTray.jsx`).
 
 ## Coverage
