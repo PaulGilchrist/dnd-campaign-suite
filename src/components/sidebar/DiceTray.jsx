@@ -67,7 +67,18 @@ function DicePopup({ result, onClose }) {
       };
 
     return (
-            <div className="dice-tray-popup-overlay">
+            <div
+                className="dice-tray-popup-overlay"
+                role="presentation"
+                onClick={(e) => {
+                    // Backdrop dismiss mirrors the arcane-modal popup-overlay
+                    // convention (e.g. SignatureSpellsModal): clicks that
+                    // bubble from inside the modal are inert; a backdrop click
+                    // is pure onClose — no re-roll, no logging, no state write.
+                    if (e.target.closest('.dice-tray-popup-modal')) return;
+                    onClose?.();
+                }}
+            >
                 <div className="dice-tray-popup-modal">
                    <button className="dice-tray-popup-close" onClick={onClose} aria-label="Close">
                        <i className="fa-solid fa-xmark"></i>

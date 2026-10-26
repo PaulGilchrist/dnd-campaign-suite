@@ -82,9 +82,18 @@ describe('DicePopup', () => {
     }
   });
 
-  it('does not close when the overlay is clicked', () => {
+  it('closes when the backdrop (overlay outside the modal) is clicked', () => {
     const { container, onClose } = renderPopup();
     fireEvent.click(container.querySelector('.dice-tray-popup-overlay'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not close when the modal itself or its contents are clicked', () => {
+    const { container, onClose } = renderPopup();
+    fireEvent.click(container.querySelector('.dice-tray-popup-modal'));
+    // Clicks on children bubble through the overlay handler too — the
+    // closest('.dice-tray-popup-modal') guard must keep them inert.
+    fireEvent.click(container.querySelector('.dice-tray-result-value'));
     expect(onClose).not.toHaveBeenCalled();
     expect(container.querySelector('.dice-tray-popup-modal')).toBeInTheDocument();
   });

@@ -3,7 +3,8 @@
  * .dice-tray-popup-overlay stayed up indefinitely and intercepted every
  * page click). Timer lives in Sidebar (owner of diceResult state), hides
  * the popup ~4s after it appears, restarts on re-roll, and is cleared on
- * early close (× / Escape) and unmount. Display-only: never game state. */
+ * early close (× / Escape / backdrop) and unmount. Display-only: never game
+ * state. */
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Sidebar from './Sidebar.jsx';
@@ -151,6 +152,36 @@ describe('Sidebar dice popup auto-hide', () => {
     advance(AUTO_HIDE_MS + 1000);
     expect(popup()).not.toBeInTheDocument();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('closes immediately on a backdrop click and clears the pending timer', () => {
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
+    renderSidebar();
+    fireEvent.click(screen.getByTitle('Roll d20'));
+    advance(1000);
+
+    // Backdrop lane matches × / Escape: pure dismissal, timer cleaned up,
+    // still exactly one log entry (the roll itself — no extra dismissal row).
+    fireEvent.click(popup());
+    expect(popup()).not.toBeInTheDocument();
+    expect(clearSpy).toHaveBeenCalled();
+
+    advance(AUTO_HIDE_MS + 1000);
+    expect(popup()).not.toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(mockAddEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not close early when a click lands inside the modal', () => {
+    renderSidebar();
+    fireEvent.click(screen.getByTitle('Roll d20'));
+
+    fireEvent.click(document.querySelector('.dice-tray-popup-modal'));
+    expect(popup()).toBeInTheDocument();
+
+    advance(AUTO_HIDE_MS);
+    expect(popup()).not.toBeInTheDocument();
+    expect(mockAddEntry).toHaveBeenCalledTimes(1);
   });
 
   it('clears the timer on unmount — no state update after unmount', () => {
