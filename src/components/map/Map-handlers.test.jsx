@@ -298,16 +298,21 @@ describe('Map container - player context menu', () => {
             ],
             walls: new Set(),
         };
+        // Removal rides a named native confirm (backlog 2026-10-26 parity with
+        // the placed-item lane) — accept it to reach the removal path.
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = await act(async () => renderMap());
 
         await act(async () => { fireEvent.contextMenu(playerCircles(container)[0]); });
         expect(screen.getByText('Remove from Map')).toBeInTheDocument();
 
         await act(async () => { fireEvent.click(screen.getByText('Remove from Map')); });
+        expect(confirmSpy).toHaveBeenCalledWith('Remove "Thorin" from the map?');
 
         // Exact remaining players — only the right-clicked one is gone
         expect(mockState.mapData.players.map(p => p.id)).toEqual(['player2', 'player3']);
         expect(menus(container)).toHaveLength(0);
         expect(playerCircles(container)).toHaveLength(2);
+        confirmSpy.mockRestore();
     });
 });
