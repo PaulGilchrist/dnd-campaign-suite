@@ -17,6 +17,7 @@ import {
 } from '../../services/campaign/randomEventService.js';
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
 import { getRuntimeValue, setRuntimeValue, hasRuntimeValue, setRuntimeObject } from '../runtime/useRuntimeState.js';
+import { hexNeighbors } from '../../services/maps/hexMapUtils.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
 import { setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js';
 
@@ -256,6 +257,44 @@ export default function useTravelManagement({
     const cost = base * (mod ?? 1);
     return hb ? cost / HORSEBACK_SPEED_MULTIPLIER : cost;
   }, [roads]);
+
+  // Over-budget mount flag (improve 2026-10-26-E backlog): a stale accruedCost
+  // survives arrival BY DESIGN (same-day trips share the day's budget pool),
+  // so the panel could mount (map open, or re-press after an arrival that
+  // landed on an exhausted day) into a state where EVERY advance would
+  // reject — disabled Advance with no exhausted banner, Camp/Forced-March
+  // unreachable, until a cancel/re-press or a wasted reject-click flagged
+  // dayExhausted. Mirror the advance reject-and-flag producer at the mount
+  // seam: accrued + the cheapest affordable adjacent-hex entry cost > budget
+  // means no legal move remains today, so flag dayExhausted through the SAME
+  // synced lane (server-first — change-data + SSE + the publisher's null
+  // snapshot gate keep the store and the render byte-consistent). Then the
+  // existing TravelPanel gates (banner :exhausted, advanceDisabled) light up
+  // together with no panel change. Neighbor economics mirror the engine
+  // exactly — advanceOneHex/calculatePath read `terrain[key] || 'plains'`
+  // for in-bounds hexes (API-created maps ship an EMPTY terrain dict; the
+  // whole grid plays as plains), and out-of-bounds hexes are not legal
+  // steps. Conservative by construction:
+  // - some adjacent hex still affordable (accrued + minCost <= budget) →
+  //   NEVER flags (a fresh day at accrued 0 cannot trip it either);
+  // - extreme weather (effectiveHexCost null everywhere) leaves no affordable
+  //   cost to compare — the travel-impossible message lane keeps its lane;
+  // - never CLEARS the flag — camp / forced march / pace change own that.
+  // Event-driven (deps churn), no game timers.
+  useEffect(() => {
+    if (dayExhausted || !partyPosition || typeof dailyBudget !== 'number') return;
+    const neighborCosts = [];
+    for (const nb of hexNeighbors(partyPosition.q, partyPosition.r)) {
+      if (nb.q < 0 || nb.q >= hexCols || nb.r < 0 || nb.r >= hexRows) continue;
+      const cost = effectiveHexCost(terrain[`${nb.q},${nb.r}`] || 'plains', nb.q, nb.r, weather, horseback);
+      if (cost !== null) neighborCosts.push(cost);
+    }
+    if (neighborCosts.length === 0) return;
+    if (accruedCost + Math.min(...neighborCosts) > dailyBudget) {
+      setDayExhausted(true);
+    }
+  }, [dayExhausted, partyPosition, terrain, weather, horseback,
+      hexCols, hexRows, accruedCost, dailyBudget, effectiveHexCost, setDayExhausted]);
 
   const enhanceCombatEvent = useCallback((event, terrainType) => {
     if (event.type !== 'combat' || !monsters || monsters.length === 0 || !playerLevels || playerLevels.length === 0) {

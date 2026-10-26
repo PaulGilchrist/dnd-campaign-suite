@@ -109,7 +109,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-D's stale-weather-budget bug + three travel backlog items are closed + live-proven run E.)*
-- *(2026-10-26 run E)* After an arrival on an exhausted day, the next plan-mount can strand the panel with disabled Advance + no exhausted banner until a cancel/re-press cycle mount-flags `dayExhausted` — consider flagging at init when `accrued + nextCost > budget`. File: `useTravelManagement.js` (init/advanceDisabled seam, TravelPanel.jsx:174).
 - *(2026-10-26 run E)* Event-accept auto-encounters create a permanent named map per event ("QA Events Readout - Wolves on the Hunt at (11,10)") — two such orphans sat in test-campaign from improve-run verifications. Consider a single reusable staging map or an auto-cleanup/labeling affordance so GM campaigns don't accrete encounter maps. Files: `src/services/combat/autoEncounterService.js` (or the event-accept handler in `HexMap.jsx handleEventAccept`).
 - *(2026-10-26 run E)* Cosmetic: skipping an event mid-trip lands mode `planning` instead of `traveling` (advance still works, label/phase machine slightly off). File: `useTravelManagement.js` skip handler.
 
