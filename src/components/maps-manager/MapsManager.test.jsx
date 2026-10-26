@@ -555,11 +555,16 @@ describe('MapsManager', () => {
             within(row).getByRole('button', { name: 'Rename "Battle Arena"' });
             const desc = within(row).getByRole('button', { name: 'Edit description for "Battle Arena"' });
             const del = within(row).getByRole('button', { name: 'Delete "Battle Arena"' });
-            // Visible bytes unchanged; icon-only pen stays icon-only (name from aria).
+            // Sibling consistency (2026-10-25 tooltip-discoverability walk): the pen
+            // button carries the same visible word label as Open/Rename/Delete — a
+            // hover-only title is not enough for players. title + aria-label remain
+            // for the native tooltip and screen readers.
             expect(open.textContent).toBe('Open');
             expect(del.textContent).toBe('Delete');
-            expect(desc.textContent).toBe('');
+            expect(desc.textContent.trim()).toBe('Description');
+            expect(desc.querySelector('i.fa-solid.fa-pen')).not.toBeNull();
             expect(desc).toHaveAttribute('title', 'Edit description');
+            expect(desc).toHaveAttribute('aria-label', 'Edit description for "Battle Arena"');
             // Active row keeps Rename/Delete but never renders Activate.
             const activeRow = screen.getByText('Cave').closest('li');
             within(activeRow).getByRole('button', { name: 'Rename "Cave"' });

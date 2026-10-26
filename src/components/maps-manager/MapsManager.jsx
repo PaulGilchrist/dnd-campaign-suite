@@ -368,7 +368,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                 <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''))} aria-label={`Open "${map.name}"`}>Open</button>
                                 {!map.isActive && <button onClick={() => handleActivate(map.fileName)} aria-label={`Activate "${map.name}"`}>Activate</button>}
                                 <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
-                                <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i></button>
+                                <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>
                                 <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)} aria-label={`Delete "${map.name}"`}>Delete</button>
                             </div>
                         </li>

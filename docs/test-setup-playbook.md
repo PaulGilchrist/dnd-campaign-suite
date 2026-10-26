@@ -976,3 +976,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - `force: true` clicks on a disabled button are the safe no-op proof (Playwright's normal click hangs on the enabled-check; modalCount decides).
 - browser_click in this MCP build wants `target:` (ref/selector), not `ref:`. Admin Rename card anchor: Campaign Management section `:has(button:has-text("Rename Campaign"))` — `.admin-actions-grid >> nth=0` is the Appearance grid.
 - dev:locked smoke: `vite.config.js` proxies /api so `curl -s --max-time 5 http://localhost:5173/api/server-config` is the fast lock-state probe without opening a browser.
+
+## 2026-10-25 eve improve run — maps-edit-desc-tooltip (flow FIRST walk)
+- Maps row buttons ALL carry visible word labels (Open/Activate/Rename/Delete); edit-desc was the odd icon-only one — now `pen + "Description"` (title + aria kept). Row-scoped click: `.maps-manager-item:has-text("<name>") .edit-desc-btn`.
+- Map DESCRIPTION route is SYNCHRONOUS (server/routes/maps.js:394-413 fs.writeFileSync in-request) — disk proof immediately after Save, no 10s debounce wait. No-description canonical state = `"description": ""` (route writes `desc || ''`; key never disappears).
+- Edit-desc modal = `.maps-manager-modal` (h3 `Edit Description — <name>`; textarea id `#map-description` PreviewToggle: `Switch to preview mode` renders markdown; Cancel `.ct-btn-secondary` = zero network, typed text discarded on reopen; Save `.ct-btn-primary`). Overlay click keeps it open (by design).
+- Maps-view nav poll target: header is `<h2>Maps</h2>` — poll `.maps-manager` mount, not 'Manage Maps' text.
