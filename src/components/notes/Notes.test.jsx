@@ -4,6 +4,13 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import Notes from './Notes.jsx';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
+// Notes mounts <Subscriber> (live factions-style list sync). Mock the shared
+// SSE client so this file's afterEach `vi.unstubAllGlobals()` — which also
+// drops setup.js's global EventSource stub — cannot break later mounts.
+vi.mock('../../services/ui/sseClient.js', () => ({
+  subscribeToSSE: () => () => {},
+}));
+
 vi.mock('../../hooks/useEntityManagement.js', () => ({
   useEntityManagement: vi.fn(),
 }));

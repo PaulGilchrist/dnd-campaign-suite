@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
+import Subscriber from '../common/Subscriber.jsx';
 import './Quests.css';
 
 const STATUS_OPTIONS = ['active', 'completed', 'failed'];
@@ -168,7 +169,7 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, saveD
 }
 
 function Quests({ campaignName, isLocalhost, onBack }) {
-  const { items: quests, loading, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest });
+  const { items: quests, loading, loadItems: loadQuestsList, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest });
   const {
     searchQuery, setSearchQuery, filteredItems: filteredQuests,
     modalOpen, editingItem: editingQuest, formData, setFormData,
@@ -177,6 +178,15 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   } = useCrudList(quests, ['name']);
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState(null);
+
+  // SSE handler — re-fetch quest list on quests-list events (another GM tab
+  // created/updated/deleted a quest). Skipped while the edit modal is open so
+  // an in-progress draft is never squashed mid-edit. Mirrors NPCs.jsx.
+  const handleSSEEvent = useCallback((event) => {
+    if (!event || event.key !== `quests-list-${campaignName}`) return;
+    if (modalOpen) return;
+    loadQuestsList();
+  }, [campaignName, modalOpen, loadQuestsList]);
 
   if (!isLocalhost) return null;
 
@@ -252,6 +262,8 @@ function Quests({ campaignName, isLocalhost, onBack }) {
 
   return (
     <div className="ct-container">
+      <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back

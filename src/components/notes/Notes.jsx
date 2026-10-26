@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadNotes, saveNotes, deleteNote } from '../../services/campaign/notesService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
+import Subscriber from '../common/Subscriber.jsx';
 import './Notes.css';
 
 // Format date for display
@@ -218,6 +219,15 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
     }
   }, [campaignName, loadNotesList]);
 
+  // SSE handler — re-fetch note list on notes-list events (another GM tab
+  // created/updated/deleted a note). Skipped while the edit modal is open so
+  // an in-progress draft is never squashed mid-edit. Mirrors NPCs.jsx.
+  const handleSSEEvent = useCallback((event) => {
+    if (!event || event.key !== `notes-list-${campaignName}`) return;
+    if (modalOpen) return;
+    loadNotesList();
+  }, [campaignName, modalOpen, loadNotesList]);
+
   // Auto-calculated party level
   const partyLevel = useMemo(() => {
     if (!characters || characters.length === 0) return 1;
@@ -293,6 +303,8 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
   return (
     <div className="ct-container notes-container">
+      <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+
       {/* Header */}
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>

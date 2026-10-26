@@ -1,10 +1,18 @@
 import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import { publish } from '../utils/changeData.js';
 
 const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+// Mirrors broadcastNPCsList (routes/npcs.js): every list mutation publishes a
+// `notes-list-<campaign>` SSE event so other GM tabs re-fetch live.
+const broadcastNotesList = (action, campaign, payload = {}) => {
+  publish(`notes-list-${campaign}`, { action, ...payload }, campaign);
+};
 
 export default createJsonEntityRouter('notes', {
   pluralDisplayName: 'notes',
   singularDisplayName: 'note',
+  broadcast: broadcastNotesList,
   transformList: (entities, req) => {
     if (!isLocalhost(req)) {
       return entities.filter(note => !note.isPrivate);

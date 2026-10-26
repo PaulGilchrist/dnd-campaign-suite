@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadFactions, saveFactions, deleteFaction } from '../../services/campaign/factionsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
+import Subscriber from '../common/Subscriber.jsx';
 import './Factions.css';
 
 const INFLUENCE_COLORS = {
@@ -92,6 +93,15 @@ function Factions({ campaignName, onBack }) {
     }
   }, [campaignName, loadFactionsList]);
 
+  // SSE handler — re-fetch faction list on factions-list events (another GM
+  // tab created/updated/deleted a faction). Skipped while the edit modal is
+  // open so an in-progress draft is never squashed mid-edit. Mirrors NPCs.jsx.
+  const handleSSEEvent = useCallback((event) => {
+    if (!event || event.key !== `factions-list-${campaignName}`) return;
+    if (modalOpen) return;
+    loadFactionsList();
+  }, [campaignName, modalOpen, loadFactionsList]);
+
   // Open modal for new faction
   const handleNewFaction = () => {
     setError(null);
@@ -175,6 +185,8 @@ function Factions({ campaignName, onBack }) {
 
   return (
     <div className="ct-container">
+      <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+
       {/* Header */}
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>
