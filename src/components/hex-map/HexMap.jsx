@@ -130,7 +130,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const handleGenerateWeather = useCallback(() => {
         const terrainKey = partyPosition ? hexKey(partyPosition.q, partyPosition.r) : null;
         const currentTerrain = terrainKey ? terrain[terrainKey] || 'plains' : 'plains';
-        setWeather(generateWeather(currentTerrain));
+        const newWeather = generateWeather(currentTerrain);
+        setWeather(newWeather);
+        return newWeather;
     }, [partyPosition, terrain, setWeather]);
 
     // ── Travel tool sync ──
@@ -194,16 +196,20 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }, [addEntry]);
 
     const handleForceCamp = useCallback(() => {
-        travelMgmt.forceCamp();
-        handleGenerateWeather();
+        // Roll the new day's weather FIRST and hand it to forceCamp explicitly
+        // — setWeather above is not visible to the hook's weather closure in
+        // this tick, and a budget computed from the pre-roll weather lands one
+        // weather generation stale (camp-reroll-stale-weather-budget bug).
+        const newWeather = handleGenerateWeather();
+        travelMgmt.forceCamp(newWeather);
         const pos = travelMgmt.currentPosition || partyPosition;
         logTravel('camp', pos, null, weather);
     }, [travelMgmt, handleGenerateWeather, partyPosition, weather, logTravel]);
 
     const handleReRollWeather = useCallback(() => {
-        handleGenerateWeather();
+        const newWeather = handleGenerateWeather();
         if (travelMgmt.isTravelActive) {
-            travelMgmt.changePace(travelMgmt.travelPace);
+            travelMgmt.changePace(travelMgmt.travelPace, newWeather);
         }
     }, [handleGenerateWeather, travelMgmt]);
 
@@ -340,9 +346,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 .catch((e) => { console.error('[handleEventAccept] auto-encounter failed:', e); });
         }
         if (evt?.type === 'weatherChange') {
-            handleGenerateWeather();
+            // Same stale-closure lane as camp/manual re-roll: budget must be
+            // re-derived from the NEW roll, not the pre-event weather.
+            const newWeather = handleGenerateWeather();
             if (travelMgmt.isTravelActive) {
-                travelMgmt.changePace(travelMgmt.travelPace);
+                travelMgmt.changePace(travelMgmt.travelPace, newWeather);
             }
         }
         const terrainKey = pos ? hexKey(pos.q, pos.r) : null;

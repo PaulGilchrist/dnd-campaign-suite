@@ -150,4 +150,66 @@ describe('useTravelManagement forced-march budget math (stale-closure regression
     expect(result.current.forcedMarchHours).toBe(0);
     expect(result.current.dailyBudget).toBe(6); // fast base, no stale 2-stack penalty
   });
+
+  // ── weather-regen seams (camp-reroll-stale-weather-budget regression) ──
+  // The hook's `weather` closure is the PRE-roll value whenever a regen seam
+  // (camp / manual re-roll / weatherChange event) rolls fresh weather in the
+  // same tick. Budgets must be computed from the passed override, not the
+  // stale closure — otherwise the new day runs one weather-generation stale.
+  describe('weatherOverride param (stale pre-roll weather regression)', () => {
+    const storm = { label: 'Storm', moveCostMod: 1.5, budgetMod: 0.75 };
+    const cloudy = { label: 'Cloudy', moveCostMod: 1.0, budgetMod: 1.0 };
+
+    it('forceCamp(STORM) over a closure Cloudy day writes 3 (=floor(4×0.75)), not the closure 4', () => {
+      const { result } = renderHook(() => useTravelManagement({
+        ...baseArgs,
+        campaignName: 'test-campaign-wx-budget-camp',
+        initialTravelState: { travelMode: 'traveling', accruedCost: 4, dayExhausted: true },
+      }));
+
+      act(() => { result.current.forceCamp(storm); });
+
+      // Closure weather is Cloudy (mod 1.0) — the pre-fix budget. The fresh
+      // Storm roll must own the new day: floor(4 × 0.75) = 3.
+      expect(result.current.dailyBudget).toBe(3);
+    });
+
+    it('forceCamp without override keeps the current closure weather (pace-tick parity)', () => {
+      const { result } = renderHook(() => useTravelManagement({
+        ...baseArgs,
+        campaignName: 'test-campaign-wx-budget-camp-stale',
+        initialTravelState: { travelMode: 'traveling', accruedCost: 4, dayExhausted: true },
+      }));
+
+      act(() => { result.current.forceCamp(); });
+
+      expect(result.current.dailyBudget).toBe(4); // Cloudy mod 1.0 — unchanged lane
+    });
+
+    it('changePace(NORMAL, STORM) writes 3 while the closure weather stays Cloudy (manual re-roll lane)', () => {
+      const { result } = renderHook(() => useTravelManagement({
+        ...baseArgs,
+        campaignName: 'test-campaign-wx-budget-reroll',
+        initialTravelState: { travelMode: 'traveling', travelPace: 'slow', dailyBudget: 2 },
+      }));
+
+      act(() => { result.current.changePace('normal', storm); });
+
+      expect(result.current.travelPace).toBe('normal');
+      expect(result.current.dailyBudget).toBe(3); // floor(4 × 0.75), NOT closure-Cloudy 4
+    });
+
+    it('changePace(NORMAL, CLOUDY) after a stale-storm closure still honors the explicit override (4)', () => {
+      const { result } = renderHook(() => useTravelManagement({
+        ...baseArgs,
+        campaignName: 'test-campaign-wx-budget-reroll-back',
+        weather: storm, // pre-roll Storm closure
+        initialTravelState: { travelMode: 'traveling', travelPace: 'slow', dailyBudget: 1 },
+      }));
+
+      act(() => { result.current.changePace('normal', cloudy); });
+
+      expect(result.current.dailyBudget).toBe(4); // override Cloudy wins over storm closure
+    });
+  });
 });

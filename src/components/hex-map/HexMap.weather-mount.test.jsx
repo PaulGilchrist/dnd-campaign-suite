@@ -220,6 +220,8 @@ describe('HexMap weather persistence (tool-mount gate)', () => {
         // unconditionally rolls from the party terrain and re-applies the pace.
         expect(generateWeather).toHaveBeenCalledWith('plains');
         expect(loader.setWeather).toHaveBeenCalledWith(ROLLED);
-        expect(tm.changePace).toHaveBeenCalledWith('fast');
+        // Budget re-derivation must ride the FRESH roll, not the SEEDED
+        // closure weather (camp-reroll-stale-weather-budget regression).
+        expect(tm.changePace).toHaveBeenCalledWith('fast', ROLLED);
     });
 });

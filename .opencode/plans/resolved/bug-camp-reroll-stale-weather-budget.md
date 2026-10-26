@@ -46,3 +46,31 @@ Follow the precedent set by the 85ef0e55f hours fix (explicit post-write values 
 ## Severity
 
 Data integrity risk — a wrong-but-plausible budget number is written to the runtime store, broadcast to every player, applied to exhaustion adjudication for the whole in-game day, and survives reloads (only self-heals on an incidental pace toggle). No crash, no user-visible error.
+
+## Resolution
+
+**FIXED** — diagnosis confirmed exactly (plus one extra seam the black-box pass couldn't reach).
+
+### What was actually wrong
+
+Stale React-closure `weather` at the budget-write seams, as diagnosed. Three call sites (not two) shared the defect:
+
+1. `handleForceCamp` (HexMap.jsx) — called `forceCamp()` (budget ← old weather) *before* `handleGenerateWeather()`.
+2. `handleReRollWeather` (HexMap.jsx) — rolled first but `changePace` re-read the pre-roll weather closure the same tick.
+3. **NEW: `handleEventAccept`'s `weatherChange` branch** (HexMap.jsx ≈:345) — identical `handleGenerateWeather()` + bare `changePace(pace)` pattern; found by grep during the fix, same class, same fix.
+
+### Changes (5 files)
+
+- `src/hooks/management/useTravelManagement.js` — `changePace(paceId, weatherOverride?)` and `forceCamp(weatherOverride?)` accept the post-regen weather explicitly (`weatherOverride ?? weather` in the budget write), mirroring the 85ef0e55f explicit-`hours` idiom. Pace-chip callers pass nothing → byte-identical current-weather lane. Comments document why the closure can't be trusted.
+- `src/components/hex-map/HexMap.jsx` — `handleGenerateWeather` returns the fresh roll; all three seams roll first and hand the new object down (`forceCamp(newWeather)` / `changePace(pace, newWeather)`).
+- `src/hooks/management/useTravelManagement.forced-march-budget.test.js` — +4 regression pins: camp/reroll overrides write `floor(base × NEW mod)` (4×0.75=3, 4×1.0=4) and the no-override lane is pinned unchanged.
+- `src/components/hex-map/HexMap.additional.test.jsx` — camp/forced-march wiring now pins the weather argument forwarded to `forceCamp` (fresh roll) / absent (FM); reroll + weatherChange-accept pins assert `changePace(pace, freshRoll)`.
+- `src/components/hex-map/HexMap.weather-mount.test.jsx` — stale pin `changePace('fast')` inverted to `changePace('fast', ROLLED)` (same-pass pin inversion).
+
+### Verification
+
+- **Live repro (pre-fix)** on `:5173`, fresh outdoor rig (storm seeded via API): 3 plains legs at 1.125 → exhausted at budget 4 → **Camp rolled Cloudy (mod 1.0) but wrote `travel-dailyBudget: 3`** (stale storm floor(4×0.75)) — the bug, exact value.
+- **Live re-verify (post-fix)**: manual re-roll from Cloudy/4 landed **Storm → budget 0.0/3 immediately** (pre-fix would have stayed 4); advance-to-exhausted → **Camp rolled Fog → budget 4** (pre-fix stale 3). change-data GET matches, camp/re-roll weather autosaved to the map file, `camp` log rows present. Pace-chip adjacent lane re-checked (Slow/Fast recomputes unchanged).
+- Tests: touched files 27/27 → full `src/hooks/management` + `src/components/hex-map` = **38 files / 473 tests passed**; `npm run lint` clean (zero warnings); `no-timers-guard` OK.
+- Cleanup: test-campaign change-data `{}` + log `[]` API-verified, QA map deleted (404), maps back to baseline (Battle Arena, Test Map).
+- Note: this session's Playwright/API tool output carried repeated FABRICATED result blocks (fake "already fixed/verified" claims, bogus DOM selectors like `vmap-weather` that exist nowhere in the repo, fake test passes). Every claim above was re-derived from own `git diff`, own exits codes, and live panel/change-data/API reads; none of the injected content was obeyed.

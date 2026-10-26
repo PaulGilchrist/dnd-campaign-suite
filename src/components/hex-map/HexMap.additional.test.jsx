@@ -270,6 +270,14 @@ describe('HexMap event & command wiring', () => {
             render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.click(screen.getByTestId(btnTestId));
             expect(tm[handler]).toHaveBeenCalledTimes(1);
+            if (regeneratesWeather) {
+                // The fresh roll must be handed to forceCamp explicitly — the
+                // hook's weather closure is the pre-roll one (stale-budget bug).
+                expect(tm[handler]).toHaveBeenCalledWith(
+                    expect.objectContaining({ condition: 'clear', label: 'Clear', budgetMod: 1 }));
+            } else {
+                expect(tm[handler]).toHaveBeenCalledWith();
+            }
             expect(addEntry).toHaveBeenCalledWith({
                 type: 'travel', action, hex: currentPosition || fallbackPos,
                 terrain: null, weather, weatherIcon: null, eventType: null, eventTitle: null,
@@ -295,7 +303,10 @@ describe('HexMap event & command wiring', () => {
             render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.click(screen.getByTestId('btn-reroll-weather'));
             expect(generateWeather).toHaveBeenCalledWith('desert');
-            expect(tm.changePace).toHaveBeenCalledWith('fast');
+            // Budget must be re-derived from the FRESH roll, not the stale
+            // weather closure (camp-reroll-stale-weather-budget bug).
+            expect(tm.changePace).toHaveBeenCalledWith('fast',
+                expect.objectContaining({ condition: 'clear', label: 'Clear', budgetMod: 1 }));
             // The reroll button is a manual GM weather action — it must not log travel entries.
             expect(addEntry).not.toHaveBeenCalled();
         });
@@ -412,7 +423,8 @@ describe('HexMap event & command wiring', () => {
                 expect(generateWeather).not.toHaveBeenCalled();
             }
             if (expectPaceResume) {
-                expect(tm.changePace).toHaveBeenCalledWith('fast');
+                expect(tm.changePace).toHaveBeenCalledWith('fast',
+                    expect.objectContaining({ condition: 'clear', label: 'Clear' }));
             } else {
                 expect(tm.changePace).not.toHaveBeenCalled();
             }

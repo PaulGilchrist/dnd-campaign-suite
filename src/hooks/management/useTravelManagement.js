@@ -185,9 +185,15 @@ export default function useTravelManagement({
     setTravelMode(MODES.PLANNING);
   }, [partyPosition, hexCols, hexRows, terrain, roads]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const changePace = useCallback((paceId) => {
+  // Takes the post-regen weather EXPLICITLY (same idiom as the hours param
+  // above): the weather-regen seams (camp / manual re-roll / weatherChange
+  // event) roll a new weather and re-derive economics in the SAME tick, and
+  // the closure `weather` is always the pre-roll one — the budget landed one
+  // weather generation out of date. Callers pass the fresh roll; pace-chip
+  // toggles pass nothing and legitimately ride the current closure weather.
+  const changePace = useCallback((paceId, weatherOverride) => {
     setTravelPace(paceId);
-    setDailyBudget(effectiveBudgetForPace(paceId, weather, 0));
+    setDailyBudget(effectiveBudgetForPace(paceId, weatherOverride ?? weather, 0));
     setDayExhausted(false);
     setForcedMarchHours(0);
   }, [effectiveBudgetForPace, weather]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -254,10 +260,12 @@ export default function useTravelManagement({
     return { moved: true };
   }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback, travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const forceCamp = useCallback(() => {
+  // weatherOverride: see changePace above — Camp regenerates weather in the
+  // same tick, so the caller passes the NEW day's roll for the budget write.
+  const forceCamp = useCallback((weatherOverride) => {
     setAccruedCost(0);
     setDayExhausted(false);
-    setDailyBudget(effectiveBudgetForPace(travelPace, weather, 0));
+    setDailyBudget(effectiveBudgetForPace(travelPace, weatherOverride ?? weather, 0));
     setRerollsRemaining(3);
     setPendingEvent(null);
     setForcedMarchHours(0);
