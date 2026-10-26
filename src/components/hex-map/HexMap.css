@@ -1125,6 +1125,26 @@
     font-style: italic;
 }
 
+/* Non-combat npc events: advisory-only accept hint (backlog 2026-10-25 eve).
+   Mirrors the .event-encounter-info panel chrome in a neutral info tone. */
+.event-dialog-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #1f2733;
+    border: 1px solid #34445a;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 10px 0;
+    color: #9ab4cc;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.event-dialog-hint .fa-circle-info {
+    margin-top: 2px;
+}
+
 .event-encounter-info {
     background: #2a1520;
     border: 1px solid #4a2a35;

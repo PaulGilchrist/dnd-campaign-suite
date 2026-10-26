@@ -70,7 +70,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT.)*
-- 2026-10-25 eve: accepting a non-combat `NPC ENCOUNTER` event logs only `travel/event_accept` — zero guidance on what Accept "did" (no popup/note/state; ambiguous even to a GM whether it spawned anything off-screen); add a "GM adjudicates off-map" hint line to the dialog or the accept toast — `src/components/hex-map/EventDialog.jsx`, `randomEventService.js`.
 - 2026-10-25 eve: under `dev:locked` the Admin `Rename Campaign` affordance still renders but the revert PUT 403s opaquely mid-flow (in-modal error carries the raw server string) — when `CAMPAIGN_LOCK` is engaged, hide/disable Rename Campaign with a "disabled while campaign is locked" note — `server/routes/campaigns-*` + `CampaignAdmin.jsx`.
 - 2026-10-25 eve: Maps row `Edit description for "<name>"` affordance exists but has no discoverable label text (icon-only button) — fine for agents via aria, worth a tooltip check for players *(not walked this run)*.
 

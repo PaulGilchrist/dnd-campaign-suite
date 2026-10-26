@@ -963,3 +963,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - MCP auto-intercepts native confirms even with a page.on('dialog') listener attached — after Admin clear clicks, verify via API; a later browser_handle_dialog "no modal state" error means already handled.
 - Log POST body `id` wins over the server-generated guid (spread order in addEntry) — deterministic seed/verify corpora are possible.
 - Roll sub-facet landed: `#log-filter-rolltype` visible only while Type=roll; options = getRollTypeOptions (data-derived distinct rollTypes on type:'roll' entries — dynamic save-<slug> values appear); filters stay display-only useState.
+
+## 2026-10-25 eve improve run — npc-encounter-accept-hint
+- Travel rigs need an OUTDOOR map (baseline Battle Arena + Test Map are both indoor); `POST /api/campaigns/:c/maps {type:'outdoor'}` + activate is the fast, cleanup-safe provisioning lane.
+- `Advance One Hex` stays VISIBLE but disabled on budget exhaustion (panel swaps in Camp/Forced-March banner) — gate harnesses on isEnabled(), not isVisible().
+- After a COMBAT event Accept the app auto-opens the spawned arena editor — click toolbar `Back` before continuing any travel leg (else next click 30s-intercepts).
+- EventDialog accept auto-effects (HexMap.jsx handleEventAccept): ONLY combat (arena+monsters) and weatherChange (weather re-roll); npc/discovery/hazard/navigation are advisory-only — `.event-dialog-hint` copy now tells the GM on npc rows.

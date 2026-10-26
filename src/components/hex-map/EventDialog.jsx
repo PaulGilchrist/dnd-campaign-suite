@@ -67,6 +67,17 @@ function EventDialog({ event, rerollsRemaining, onAccept, onSkip, onReroll }) {
               </ul>
             </div>
           )}
+          {/* Backlog 2026-10-25 (eve): accepting a non-combat npc event only logs
+              travel/event_accept — no popup/state/spawn (HexMap.jsx handleEventAccept
+              auto-effects combat + weatherChange only). Scope kept to `npc` per the
+              backlog; discovery/hazard/navigation share the advisory-only lane but the
+              copy below is encounter-specific. */}
+          {event.type === 'npc' && (
+            <p className="event-dialog-hint">
+              <i className="fa-solid fa-circle-info"></i>
+              <span>Accepting only records this encounter — the GM adjudicates it off-map. Nothing spawns automatically.</span>
+            </p>
+          )}
           <span className="event-dialog-terrain">Terrain: {event.terrain}</span>
         </div>
 

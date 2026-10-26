@@ -148,4 +148,29 @@ describe('EventDialog', () => {
         expect(reroll).toHaveTextContent(/^Re-roll$/);
         expect(reroll).toHaveAttribute('title', 'No re-rolls left today — Camp to start a new day');
     });
+
+    // Backlog 2026-10-25 (eve): accepting a non-combat npc event only logs
+    // travel/event_accept (advisory-only), while combat spawns an arena +
+    // monsters — the dialog must tell the GM the difference.
+    it('shows the GM-adjudicates-off-map hint on npc events with both clauses', () => {
+        const { container } = renderDialog({ ...baseEvent, type: 'npc' });
+        const hint = container.querySelector('.event-dialog-hint');
+        expect(hint).toBeInTheDocument();
+        // Clause 1: accepting only records it — the GM adjudicates off-map.
+        expect(hint.textContent).toMatch(/accepting only records/i);
+        expect(hint.textContent).toMatch(/GM adjudicates .*off-map/i);
+        // Clause 2: nothing spawns automatically.
+        expect(hint.textContent).toMatch(/nothing spawns automatically/i);
+        expect(hint.querySelector('.fa-circle-info')).toBeInTheDocument();
+    });
+
+    it('does not show the off-map hint on combat events (they spawn an arena on Accept)', () => {
+        const { container } = renderDialog(baseEvent);
+        expect(container.querySelector('.event-dialog-hint')).toBeNull();
+    });
+
+    it('does not show the off-map hint on weatherChange events (they regenerate weather on Accept)', () => {
+        const { container } = renderDialog({ ...baseEvent, type: 'weatherChange' });
+        expect(container.querySelector('.event-dialog-hint')).toBeNull();
+    });
 });
