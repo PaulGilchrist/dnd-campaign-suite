@@ -1082,3 +1082,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Cross-tab broadcast proof (post-8964e5aab): passive tab plants `window.__noReload='x'` on the target view, actor tab writes; passive rows change with marker INTACT = live mirror. Faction/Quest inputs `input[placeholder="Faction name"|"Quest name"]`; Notes = textarea "Write your note here…" placeholder via native setter+input event then Save. Faction delete confirm is NAMED `Delete Faction "X"?`.
 - Two-tab cleanup: `browser_tabs close` BOTH tabs before admin API clears (kills full-store resurrection POSTs); then POST clears + GET verify `{}`/`[]` — re-proven identical to run B.
 - `elementFromPoint` backdrop probe for dice-tray popup: overlay rect starts x≈180 (content-only); modal x≈902 w≈104 — point (190, midY) is inside overlay/outside modal; assert elementFromPoint===overlay + dispatch mousedown/up/click + assert unmount, ALL in one evaluate (4s auto-hide).
+
+## 2026-10-26 improve run — max-exhaustion-travel-hint (TravelPanel hint lane)
+- Char-bucket seed AND un-seed of per-char runtime keys (`exhaustionLevel`) do NOT re-render an already-open Travel panel — `partyHasMaxExhaustion` is a render-time `getRuntimeValue` read with no subscription; reload is the reliable observation lane (extends the run-C "state applies at mount" row to char buckets).
+- Fresh-campaign bucket rig: with change-data `{}`, the char bucket doesn't exist; POST `{value:{exhaustionLevel:6}}` creates it cleanly and admin-clear restores the absent state exactly (no merge needed on a new campaign).
+- Shell curl `-d` JSON must be single-quote wrapped; `\"` passthrough yields body-parser 400 (probe artifact, not an app defect).

@@ -11,7 +11,12 @@ function TravelExhaustedBanner({ exhausted, partyHasMaxExhaustion, onForceCamp, 
       <button onClick={onForceCamp} className="travel-btn-camp">
         <i className="fa-solid fa-campground"></i> Camp
       </button>
-      <button onClick={onForcedMarch} className="travel-btn-march" disabled={partyHasMaxExhaustion}>
+      <button
+        onClick={onForcedMarch}
+        className="travel-btn-march"
+        disabled={partyHasMaxExhaustion}
+        title={forcedMarchTitle(partyHasMaxExhaustion)}
+      >
         <i className="fa-solid fa-person-running"></i> Forced March
       </button>
     </div>
@@ -46,6 +51,32 @@ function TravelWeatherSection({ weather, onReRollWeather }) {
       <button className="travel-weather-reroll" onClick={onReRollWeather} title="Re-roll weather">
         <i className="fa-solid fa-dice"></i>
       </button>
+    </div>
+  );
+}
+
+// Max-exhaustion travel gate copy (backlog 2026-10-26-C). The hook's
+// forcedMarch() refusal uses the same wording (FM_MAX_EXHAUSTION_TITLE) so the
+// tooltip, hint lane, and any programmatic refusal agree.
+const MAX_EXHAUSTION_HINT = 'A party member is at maximum exhaustion — rest required';
+const FM_MAX_EXHAUSTION_TITLE = 'Cannot forced march — a party member has reached maximum exhaustion';
+
+// Disabled-button explanations (hover tooltips); undefined leaves the button
+// bare when the gate is not what blocks it. Hoisted to keep TravelPanel under
+// the complexity cap.
+const advanceTitle = (maxed) => (maxed ? MAX_EXHAUSTION_HINT : undefined);
+const forcedMarchTitle = (maxed) => (maxed ? FM_MAX_EXHAUSTION_TITLE : undefined);
+
+function TravelMaxExhaustionHint({ visible }) {
+  if (!visible) return null;
+  // Advance is hard-blocked while any PC sits at exhaustion 6 (useTravelManagement
+  // partyHasMaxExhaustion) — without this line the button just greys out with no
+  // explanation, and the exhausted banner (which needs an advance to fire) never
+  // appears mid-day. Pure derived render state — no new flags, no timers.
+  return (
+    <div className="travel-panel-hint">
+      <i className="fa-solid fa-circle-info"></i>
+      <span>{MAX_EXHAUSTION_HINT}</span>
     </div>
   );
 }
@@ -154,6 +185,7 @@ function TravelPanel({
         </button>
       </div>
 
+      <TravelMaxExhaustionHint visible={partyHasMaxExhaustion} />
       <TravelOwnHexHint visible={showOwnHexHint} />
 
       <TravelExhaustedBanner
@@ -242,6 +274,7 @@ function TravelPanel({
           className="travel-btn-advance"
           onClick={onAdvance}
           disabled={advanceDisabled}
+          title={advanceTitle(partyHasMaxExhaustion)}
         >
           <i className="fa-solid fa-person-walking"></i>
           {pathIndex >= path.length ? 'Arrived' : 'Advance One Hex'}

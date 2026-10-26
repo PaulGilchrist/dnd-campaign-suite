@@ -91,6 +91,57 @@ describe('TravelPanel', () => {
     });
   });
 
+  describe('max-exhaustion travel gate', () => {
+    // Backlog 2026-10-26-C: when any PC's exhaustionLevel >= 6 the hook sets
+    // partyHasMaxExhaustion, advanceDisabled hard-blocks Advance, and without
+    // this lane the GM saw only a dead button (the exhausted banner needs an
+    // advance to fire, which is blocked). Pin hint + tooltips present when
+    // maxed, absent otherwise; the own-hex hint lane must not regress.
+    const MAX_HINT = 'A party member is at maximum exhaustion — rest required';
+    const FM_TITLE = 'Cannot forced march — a party member has reached maximum exhaustion';
+    const OWN_HEX_HINT = 'Select a hex away from the party to set your destination';
+
+    it('blocks advance and explains the block when a party member is maxed', () => {
+      renderPanel({ partyHasMaxExhaustion: true });
+      const advance = screen.getByRole('button', { name: 'Advance One Hex' });
+      expect(advance).toBeDisabled();
+      expect(advance).toHaveAttribute('title', MAX_HINT);
+      const hints = [...document.querySelectorAll('.travel-panel-hint')];
+      expect(hints).toHaveLength(1);
+      expect(hints[0]).toHaveTextContent(MAX_HINT);
+    });
+
+    it('pins the exhausted-banner forced-march tooltip to the refusal wording', () => {
+      renderPanel({ dayExhausted: true, partyHasMaxExhaustion: true });
+      const march = screen.getByRole('button', { name: 'Forced March' });
+      expect(march).toBeDisabled();
+      expect(march).toHaveAttribute('title', FM_TITLE);
+      // Camp stays available (rest is the way out).
+      expect(screen.getByRole('button', { name: 'Camp' })).toBeEnabled();
+    });
+
+    it('shows no max-exhaustion hint and no advance tooltip otherwise', () => {
+      const { props, rerender } = renderPanel({ partyHasMaxExhaustion: false });
+      expect(screen.queryByText(MAX_HINT)).not.toBeInTheDocument();
+      expect(document.querySelector('.travel-panel-hint')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Advance One Hex' })).not.toHaveAttribute('title');
+      // Un-seeding re-enables advance with the gate fully cleared.
+      rerender(<TravelPanel {...makeProps({ partyHasMaxExhaustion: false })} />);
+      expect(screen.getByRole('button', { name: 'Advance One Hex' })).toBeEnabled();
+      expect(props.onAdvance).not.toHaveBeenCalled();
+    });
+
+    it('coexists with the own-hex hint without regressing it', () => {
+      const first = renderPanel({ partyHasMaxExhaustion: true, showOwnHexHint: true });
+      expect(screen.getByText(MAX_HINT)).toBeInTheDocument();
+      expect(screen.getByText(OWN_HEX_HINT)).toBeInTheDocument();
+      // Max-exhaustion alone must not fake the own-hex line.
+      first.unmount();
+      renderPanel({ partyHasMaxExhaustion: true, showOwnHexHint: false });
+      expect(screen.queryByText(OWN_HEX_HINT)).not.toBeInTheDocument();
+    });
+  });
+
   describe('state variants', () => {
     // One row per visible panel state; every disabled guard of advanceDisabled
     // (dayExhausted | path end | pendingEvent | partyHasMaxExhaustion) is pinned as a
