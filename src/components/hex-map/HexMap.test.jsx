@@ -116,7 +116,7 @@ import HexMap from './HexMap.jsx';
 
 function makeMapLoader(overrides = {}) {
     return {
-        loading: false, setMapData: vi.fn(),
+        loading: false, mapData: null, setMapData: vi.fn(),
         gridSize: 30, setGridSize: vi.fn(),
         terrain: {}, setTerrain: vi.fn(),
         rivers: [], setRivers: vi.fn(),
@@ -251,6 +251,31 @@ describe('HexMap', () => {
         expect(screen.queryByText('Loading map...')).not.toBeInTheDocument();
         expect(mapSvg()).toBeInTheDocument();
         expect(screen.getByText('1 hex = 6 miles')).toBeInTheDocument();
+    });
+
+    // ── Read-only description panel (backlog 2026-10-26; indoor twin pinned
+    // in Map.description-panel.test.jsx, panel internals in
+    // ../common/MapDescriptionPanel.test.jsx) ──
+    it('renders the header description panel when the loaded document has a description', () => {
+        useMapLoader.mockReturnValue(makeMapLoader({ mapData: { description: '**frozen** pass' } }));
+        renderMap();
+
+        const panel = screen.getByTestId('map-description-panel');
+        expect(panel.querySelector('.map-description-panel-body strong')?.textContent).toBe('frozen');
+    });
+
+    it('omits the description panel while loading and for empty/missing descriptions', () => {
+        useMapLoader.mockReturnValue(makeMapLoader({ loading: true }));
+        const { rerender } = render(<HexMap campaignName="test" mapName="test-map" />);
+        expect(screen.queryByTestId('map-description-panel')).toBeNull();
+
+        useMapLoader.mockReturnValue(makeMapLoader({ mapData: { description: '' } }));
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+        expect(screen.queryByTestId('map-description-panel')).toBeNull();
+
+        useMapLoader.mockReturnValue(makeMapLoader({ mapData: { displayName: 'No Desc' } }));
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+        expect(screen.queryByTestId('map-description-panel')).toBeNull();
     });
 
     it('calls onBack when the back button is clicked', () => {

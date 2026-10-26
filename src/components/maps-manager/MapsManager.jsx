@@ -261,6 +261,9 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
         setSavingDescription(true);
         try {
             await mapsService.updateMapDescription(campaignName, editingMap.fileName, editDescription);
+            // The dedicated description route broadcasts map-data-<campaign>-<slug>,
+            // never maps-list — re-fetch so row tooltips show the new description.
+            await loadMapsList();
             setEditModalOpen(false);
             setEditingMap(null);
             setEditDescription('');
@@ -337,7 +340,11 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
             {maps.length > 0 && (
                 <ul className="maps-manager-list">
                     {maps.map(map => (
-                        <li key={map.fileName} className={`maps-manager-item ${map.isActive ? 'active' : ''}`}>
+                        <li
+                            key={map.fileName}
+                            className={`maps-manager-item ${map.isActive ? 'active' : ''}`}
+                            title={map.description || undefined}
+                        >
                             <div className="maps-manager-item-info">
                                 {renamingMap === map.fileName ? (
                                 <input

@@ -1,0 +1,93 @@
+/* MapDescriptionPanel — read-only markdown panel in the map editor header.
+   Component-scoped (mounted by both .map and .hex-map roots); tokens from
+   the global theme in index.css. Compact markdown typography mirrors
+   .notes-list-description in Notes.css. */
+
+.map-description-panel {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--background-color-surface);
+  color: var(--color-text);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  max-height: 160px;
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+.map-description-panel-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.map-description-panel-body {
+  font-size: inherit;
+}
+
+.map-description-panel-body h1 {
+  font-size: 1.1rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.map-description-panel-body h2 {
+  font-size: 1rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.map-description-panel-body h3 {
+  font-size: 0.95rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.map-description-panel-body h4 {
+  font-size: 0.9rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.map-description-panel-body h5,
+.map-description-panel-body h6 {
+  font-size: 0.88rem;
+  margin: 0.3em 0 0.15em;
+}
+
+.map-description-panel-body p {
+  margin: 0.25em 0;
+}
+
+.map-description-panel-body ul,
+.map-description-panel-body ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.map-description-panel-body li {
+  margin: 0.1em 0;
+}
+
+.map-description-panel-body blockquote {
+  border-left: 3px solid var(--border-color-light);
+  margin: 0.25em 0;
+  padding: 0.15em 0.75em;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.map-description-panel-body code {
+  background: var(--code-bg, #f4f4f4);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.map-description-panel-body strong {
+  color: var(--color-text);
+}

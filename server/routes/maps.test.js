@@ -134,6 +134,27 @@ describe('maps - GET /api/campaigns/:campaign/maps', () => {
         expect(res.body.maps.map(m => m.fileName)).toEqual(['dungeon-1.json', 'forest-clearing.json', 'town-square.json']);
     });
 
+    it('carries saved description through the list rows (empty/missing canonicalizes to "")', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, [
+            dirEntry('with-desc.json', false),
+            dirEntry('empty-desc.json', false),
+            dirEntry('no-desc-key.json', false),
+        ]);
+        setupFs(`${mapsDir}/with-desc.json`, { displayName: 'With', type: 'indoor', description: 'A misty ruined keep.' });
+        setupFs(`${mapsDir}/empty-desc.json`, { displayName: 'Empty', type: 'indoor', description: '' });
+        setupFs(`${mapsDir}/no-desc-key.json`, { displayName: 'Missing', type: 'indoor' });
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/maps');
+
+        expect(res.status).toBe(200);
+        const byFile = Object.fromEntries(res.body.maps.map(m => [m.fileName, m]));
+        expect(byFile['with-desc.json'].description).toBe('A misty ruined keep.');
+        expect(byFile['empty-desc.json'].description).toBe('');
+        expect(byFile['no-desc-key.json'].description).toBe('');
+    });
+
     it('should return maps sorted alphabetically by filename', async () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.set(mapsDir, [

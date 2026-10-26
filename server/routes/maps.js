@@ -73,16 +73,21 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   const maps = mapFiles.map(f => {
     let mapType = 'indoor';
     let displayName = f.replace(/\.json$/, '');
+    // Carried through so the manager list can surface read-only descriptions
+    // (row hover tooltip) without a per-row document fetch (backlog 2026-10-26).
+    let description = '';
     try {
       const mapContent = JSON.parse(fs.readFileSync(path.join(mapsDir, f), 'utf-8'));
       mapType = mapContent.type || 'indoor';
       if (mapContent.displayName) displayName = mapContent.displayName;
+      description = mapContent.description || '';
     } catch (_e) { /* ignore */ }
 
     return {
       name: displayName,
       fileName: f,
       type: mapType,
+      description,
       isActive: f.replace(/\.json$/, '') === activeMap
     };
   });

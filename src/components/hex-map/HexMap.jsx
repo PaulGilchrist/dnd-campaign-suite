@@ -11,6 +11,7 @@ import { hexKey, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtil
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
+import MapDescriptionPanel from '../common/MapDescriptionPanel.jsx';
 import POILayer from './POILayer.jsx';
 import POIPanel from './POIPanel.jsx';
 import POIContextMenu from './POIContextMenu.jsx';
@@ -402,6 +403,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 marchingOrderOpen={marchingOpen} setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
             />
+            {/* Read-only header description panel (backlog 2026-10-26) —
+                indoor twin in Map.jsx; the panel self-gates on empty/missing
+                description (and while mapData is still loading), so this
+                call site adds zero branches. */}
+            <MapDescriptionPanel mapData={mapLoader.mapData} />
 
             {loading ? (
                 <div className="hex-map-loading">Loading map...</div>

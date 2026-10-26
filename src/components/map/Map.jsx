@@ -36,6 +36,7 @@ import Players from './Players.jsx';
 import FogOverlay from './FogOverlay.jsx';
 import ItemContextMenu from './ItemContextMenu.jsx';
 import ItemDetailsDock from './ItemDetailsDock.jsx';
+import MapDescriptionPanel from '../common/MapDescriptionPanel.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import usePlayerDragging from './hooks/usePlayerDragging';
@@ -522,6 +523,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     clearOverlays,
                 }}
             />
+            {/* Read-only header description panel (backlog 2026-10-26) — the
+                panel self-gates on empty/missing description, so this call
+                site adds zero branches. */}
+            <MapDescriptionPanel mapData={mapData} />
             <svg
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
