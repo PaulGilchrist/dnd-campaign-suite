@@ -23,6 +23,7 @@ const setup = ({
     terrain = TERRAIN,
     marchingOrder = ['Alice', 'Bob'],
     onEncounterCreated = vi.fn(),
+    parentDisplayName = undefined,
 } = {}) => {
     generateOutdoorEncounter.mockReturnValue({
         placedItems: [],
@@ -33,7 +34,14 @@ const setup = ({
     saveMapData.mockResolvedValue({});
 
     const { result } = renderHook(() =>
-        useEncounterGeneration('test-campaign', mapName, terrain, marchingOrder, onEncounterCreated)
+        useEncounterGeneration({
+            campaignName: 'test-campaign',
+            mapName,
+            terrain,
+            marchingOrder,
+            onEncounterCreated,
+            parentDisplayName,
+        })
     );
     return { result, onEncounterCreated };
 };
@@ -158,6 +166,41 @@ describe('useEncounterGeneration', () => {
                 displayName: label,
                 name: 'test-map---ambush-from-the-brush-at-55',
             }));
+            expect(onEncounterCreated).toHaveBeenCalledWith(label);
+        });
+
+        it('inherits the parent\'s authored displayName verbatim — no slug re-title-casing (backlog 2026-10-25 eve)', async () => {
+            const { result, onEncounterCreated } = setup({
+                mapName: 'qa-hex-2.json',
+                parentDisplayName: 'QA Hex 2',
+            });
+
+            await result.current.handleStartEncounter(25, 10, [], 'Giant Eagle');
+
+            // Maps-list label, saved displayName metadata, and the
+            // onEncounterCreated → auto_encounter_started audit label all
+            // carry the parent's authored bytes.
+            const label = 'QA Hex 2 - Giant Eagle at (25,10)';
+            expect(label).not.toContain('Qa Hex');
+            expect(createMap).toHaveBeenCalledWith(
+                'test-campaign',
+                label,
+                expect.objectContaining({ parentHex: { q: 25, r: 10 } })
+            );
+            expect(saveMapData).toHaveBeenCalledWith('test-campaign', label, expect.objectContaining({
+                displayName: label,
+                name: 'qa-hex-2---giant-eagle-at-2510',
+            }));
+            expect(onEncounterCreated).toHaveBeenCalledWith(label);
+        });
+
+        it('falls back to the title-cased slug when the caller has no parent displayName', async () => {
+            const { result, onEncounterCreated } = setup({ mapName: 'qa-hex-2.json' });
+
+            await result.current.handleStartEncounter(25, 10, [], 'Giant Eagle');
+
+            const label = 'Qa Hex 2 - Giant Eagle at (25,10)';
+            expect(createMap).toHaveBeenCalledWith('test-campaign', label, expect.anything());
             expect(onEncounterCreated).toHaveBeenCalledWith(label);
         });
 

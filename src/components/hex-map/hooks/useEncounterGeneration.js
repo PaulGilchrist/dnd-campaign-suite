@@ -4,7 +4,14 @@ import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../../services/encounters/outdoorEncounterGenerator.js';
 import { buildEncounterMapDisplayName } from '../../../services/encounters/encounterMapNaming.js';
 
-function useEncounterGeneration(campaignName, mapName, terrain, marchingOrder, onEncounterCreated) {
+function useEncounterGeneration({
+    campaignName,
+    mapName,
+    terrain,
+    marchingOrder,
+    onEncounterCreated,
+    parentDisplayName,
+}) {
     const generateMonsterPlacements = useCallback((monsters, gridSize) => {
         const center = Math.floor(gridSize / 2);
         const items = [];
@@ -47,9 +54,12 @@ function useEncounterGeneration(campaignName, mapName, terrain, marchingOrder, o
         const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
         // Readable display label ("Test Map - Ambush from the Brush at (5,5)")
         // — shared with the auto-encounter log copy so the Maps list and the
-        // log name the arena identically (backlog 2026-10-25 pm). The server
-        // still slugs this into the on-disk fileName unchanged in kind.
-        const encounterName = buildEncounterMapDisplayName({ parentMapName: mapName, q, r, eventTitle });
+        // log name the arena identically (backlog 2026-10-25 pm). The parent's
+        // AUTHORED displayName wins verbatim when the caller knows it, so a
+        // map like "QA Hex 2" is never re-title-cased into "Qa Hex 2"
+        // (backlog 2026-10-25 eve). The server still slugs this into the
+        // on-disk fileName unchanged in kind.
+        const encounterName = buildEncounterMapDisplayName({ parentMapName: mapName, q, r, eventTitle, parentDisplayName });
 
         if (extraPlacedItems.length > 0) {
             encounterData.placedItems = [...encounterData.placedItems, ...extraPlacedItems];
@@ -89,7 +99,7 @@ function useEncounterGeneration(campaignName, mapName, terrain, marchingOrder, o
             console.error('[handleStartEncounter] FAILED:', err);
             return null;
         }
-    }, [campaignName, mapName, terrain, marchingOrder, onEncounterCreated]);
+    }, [campaignName, mapName, terrain, marchingOrder, onEncounterCreated, parentDisplayName]);
 
     return { generateMonsterPlacements, handleStartEncounter };
 }

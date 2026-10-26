@@ -68,7 +68,7 @@ function HexHoverPreview({ hoveredHex, tool, rivers }) {
     return null;
 }
 
-function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
+function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName }) {
     const svgRef = useRef(null);
 
     // ── Core map data (load/init/save) ──
@@ -148,9 +148,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     } = poiMgmt;
 
     // ── Encounter generation ──
-    const { generateMonsterPlacements, handleStartEncounter } = useEncounterGeneration(
-        campaignName, mapName, terrain, marchingOrder, onEncounterCreated
-    );
+    const { generateMonsterPlacements, handleStartEncounter } = useEncounterGeneration({
+        campaignName, mapName, terrain, marchingOrder, onEncounterCreated, parentDisplayName
+    });
 
     // ── Arrival toast (display-only) ──
     // ARRIVAL flips travel-mode inactive and TravelPanel unmounts, taking its

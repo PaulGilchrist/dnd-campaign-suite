@@ -12,8 +12,22 @@
  */
 import { formatMapName } from '../maps/mapsService.js';
 
-export function buildEncounterMapDisplayName({ parentMapName, q, r, eventTitle = null }) {
-    const parent = formatMapName(String(parentMapName || '').replace(/\.json$/i, '')) || 'Battle Map';
+export function buildEncounterMapDisplayName({
+    parentMapName,
+    q,
+    r,
+    eventTitle = null,
+    parentDisplayName = null,
+}) {
+    // The parent map's authored displayName wins verbatim so the arena label
+    // inherits the author's bytes ("QA Hex 2" never renders as "Qa Hex 2").
+    // Slug-only callers keep the legacy title-cased fallback (backlog
+    // 2026-10-25 eve).
+    const authored = String(parentDisplayName ?? '').trim();
+    const parent =
+        authored
+        || formatMapName(String(parentMapName || '').replace(/\.json$/i, ''))
+        || 'Battle Map';
     const event = String(eventTitle || '').trim();
     return event
         ? `${parent} - ${event} at (${q},${r})`

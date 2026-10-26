@@ -441,11 +441,28 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     if (!mapData) return null;
 
+    // Outdoor hex maps render entirely through HexMap (everything below is the
+    // indoor branch). The loaded document's authored displayName flows to the
+    // arena-spawn naming so "QA Hex 2" never re-title-cases into "Qa Hex 2"
+    // (backlog 2026-10-25 eve); a blank one falls back inside
+    // buildEncounterMapDisplayName to the title-cased slug.
+    // key={mapName} (#798): an outdoor→outdoor flip must remount HexMap so
+    // its useMapLoader guard resets and reloads — without the key the same
+    // instance keeps the previous map's terrain/pois on screen.
     if (mapData.type === 'outdoor') {
-        // key={mapName} (#798): an outdoor→outdoor flip must remount HexMap so
-        // its useMapLoader guard resets and reloads — without the key the same
-        // instance keeps the previous map's terrain/pois on screen.
-        return <HexMap key={mapName} campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} isLocalhost={isLocalhost} onPoiEntered={onPoiEntered} />;
+        return (
+            <HexMap
+                key={mapName}
+                campaignName={campaignName}
+                mapName={mapName}
+                parentDisplayName={mapData.displayName}
+                onBack={onBack}
+                characters={characters}
+                onEncounterCreated={onEncounterCreated}
+                isLocalhost={isLocalhost}
+                onPoiEntered={onPoiEntered}
+            />
+        );
     }
 
     const { players } = mapData;
