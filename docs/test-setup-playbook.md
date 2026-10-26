@@ -1063,3 +1063,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Dual-writer discriminator recipe: wrap `window.fetch` via `addInitScript` before navigation, record `new Error().stack` per matching POST — identical stacks ⇒ double-invoke artifact; distinct stacks ⇒ two writer code-paths. Mocked-`setRuntimeObject` component tests are BLIND to the hook's internal POST (double-writers hide there); lock single-write behavior against unmocked fetch (stampsFor-style counting) or live capture.
 - `browser_network_requests` `filter` matches URL ONLY — a "PUT" method filter returns nothing; filter by path and read methods off the listing.
 - Campaign-select map fetch with no `isActive` map ⇒ `activeMapName=null`, so the `__map__` write lands on first editor OPEN (value transition), not on select.
+
+## 2026-10-26 improve run — dice-tray-backdrop-dismiss (popup chrome parity)
+- Dice-tray popup backdrop NOW dismisses: overlay `role="presentation"` + `e.target.closest('.dice-tray-popup-modal')` guard → pure `onClose` (mirrors the arcane-modal `SignatureSpellsModal` convention — the generic `common/Popup.jsx` lane is Done-button-only and was NOT the pattern). Escape already existed; auto-hide 4s timer coexists (dismiss unmount clears it via effect cleanup).
+- PITFALL: `.dice-tray-popup-overlay` does NOT cover the sidebar — rect starts x≈180 (content area only); left-edge backdrop probes hit `.sidebar-link` and NAVIGATE. Click inside `overlay.getBoundingClientRect()` but outside the modal rect, and prove `elementFromPoint === overlay` in the SAME evaluate.
+- PITFALL: the 4s auto-hide races multi-call probes — roll→click→verify must be atomic in ONE run_code_unsafe call or the popup self-hides and fakes a backdrop pass.
+- `DiceTray.test.jsx` formerly locked the OPPOSITE behavior (overlay click did NOT close, 2026-10-14 vintage) — now pinned close:true; treat as settled.
