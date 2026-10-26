@@ -1008,3 +1008,7 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - `globalThis` does NOT persist between `browser_run_code_unsafe` calls — attach `page.on('request')` inside the same call, or read `browser_network_requests` (log is per-page-load, numbering session-continuous).
 - Maps manager inline create row shows a visible `input[placeholder="New map name..."]` — a generic `input` selector in a rename rig can POST-CREATE instead of rename (happened live; stray map then needs the named delete modal). Scope rename rigs to the row's rename input, not page-wide.
 - First outdoor open of a legacy map may legitimately make 1 self-heal write (stored `zoom:1` clamps to MIN_ZOOM 2 + stale pan re-clamps — genuinely different bytes); second open is quiet. Don't mistake the self-heal for a dirty-gate leak.
+
+## 2026-10-26 improve run — dice-tray-aria (uniform accessible names)
+- Tray buttons now carry `aria-label="Roll dN"` (from the `dice` config, mirroring the pre-existing `title`) — target dice via `getByRole('button', { name: 'Roll d20' })`, the pip-glyph textContent problem is retired for the sidebar tray. Exact-text discipline still applies to sheet/monster chips.
+- Tray result popup auto-hides after 4s (`DICE_POPUP_AUTO_HIDE_MS`); full-page `.dice-tray-popup-overlay`. A second `browser_evaluate` round-trip usually misses it — click AND assert inside one page-side Promise, or judge by `rollType:'dice'` log delta (durable proof).

@@ -123,6 +123,7 @@ function DiceTray({ onRoll }) {
                      key={die.label}
                      className="dice-btn"
                      onClick={() => handleRoll(die)}
+                     aria-label={`Roll ${die.label}`}
                      title={`Roll ${die.label}`}
                   >
                       {getIcon(die.label)}

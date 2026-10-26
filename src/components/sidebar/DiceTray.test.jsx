@@ -39,12 +39,29 @@ describe('DiceTray', () => {
     }
   });
 
+  it('every die button carries a uniform aria-label="Roll dN" matching its die', () => {
+    const { container } = render(<DiceTray />);
+    const buttons = [...container.querySelectorAll('.dice-tray button')];
+    // Complete die set present, no unlabeled buttons in the tray.
+    expect(buttons).toHaveLength(DICE.length);
+    for (const button of buttons) {
+      const label = button.getAttribute('aria-label');
+      expect(label, 'every tray button has an aria-label').not.toBeNull();
+      expect(label).toMatch(/^Roll d\d+$/);
+    }
+    // Each die is reachable by its accessible name and the name matches its text.
+    for (const { label } of DICE) {
+      const button = screen.getByRole('button', { name: `Roll ${label}` });
+      expect(button).toHaveTextContent(label);
+    }
+  });
+
   it('clicking each die calls onRoll with its label and rolled value', () => {
     const onRoll = vi.fn();
     vi.spyOn(diceRoller, 'rollDie').mockReturnValue(MOCK_ROLL_VALUE);
     render(<DiceTray onRoll={onRoll} />);
     DICE.forEach(({ label }, i) => {
-      fireEvent.click(screen.getByTitle(`Roll ${label}`));
+      fireEvent.click(screen.getByRole('button', { name: `Roll ${label}` }));
       expect(onRoll).toHaveBeenNthCalledWith(i + 1, { label, value: MOCK_ROLL_VALUE });
     });
   });
