@@ -969,3 +969,10 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - `Advance One Hex` stays VISIBLE but disabled on budget exhaustion (panel swaps in Camp/Forced-March banner) — gate harnesses on isEnabled(), not isVisible().
 - After a COMBAT event Accept the app auto-opens the spawned arena editor — click toolbar `Back` before continuing any travel leg (else next click 30s-intercepts).
 - EventDialog accept auto-effects (HexMap.jsx handleEventAccept): ONLY combat (arena+monsters) and weatherChange (weather re-roll); npc/discovery/hazard/navigation are advisory-only — `.event-dialog-hint` copy now tells the GM on npc rows.
+
+## 2026-10-25 eve improve run — locked-rename-campaign-guard
+- GET /api/server-config now exposes `{campaignLocked, lockedCampaign?}` (server/routes/server-config.js factory, lock name passed from server.js). CampaignAdmin fails OPEN (enabled until config says locked) and disables Rename Campaign + shows `.admin-lock-note` while locked.
+- Restart-walk console trap: after pkill + vite restart, console `all: true` pulls carry ERR_INCOMPLETE_CHUNKED_ENCODING SSE noise from the dead-connection window — judge cleanliness with the since-navigation default instead.
+- `force: true` clicks on a disabled button are the safe no-op proof (Playwright's normal click hangs on the enabled-check; modalCount decides).
+- browser_click in this MCP build wants `target:` (ref/selector), not `ref:`. Admin Rename card anchor: Campaign Management section `:has(button:has-text("Rename Campaign"))` — `.admin-actions-grid >> nth=0` is the Appearance grid.
+- dev:locked smoke: `vite.config.js` proxies /api so `curl -s --max-time 5 http://localhost:5173/api/server-config` is the fast lock-state probe without opening a browser.

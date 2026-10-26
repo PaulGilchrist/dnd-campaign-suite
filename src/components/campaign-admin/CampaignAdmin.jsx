@@ -173,8 +173,31 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
     const [renaming, setRenaming] = useState(false);
     const [confirmModal, setConfirmModal] = useState(null);
     const [snapshots, setSnapshots] = useState([]);
+    // Campaign-lock state from GET /api/server-config. Fail-open default:
+    // the Rename button stays enabled until the server explicitly reports a
+    // lock (mirrors the snapshots pattern — a failed GET never blocks the
+    // normal unlocked flow). Under CAMPAIGN_LOCK the revert PUT of a rename
+    // targets the renamed folder and 403s opaquely mid-flow, so we disable
+    // the affordance up front instead.
+    const [campaignLocked, setCampaignLocked] = useState(false);
 
     const isBusy = status && typeof status === 'string';
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/server-config');
+                const data = await res.json();
+                if (!cancelled && res.ok) {
+                    setCampaignLocked(data.campaignLocked === true);
+                }
+            } catch (err) {
+                console.error('Failed to load server config:', err.message);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     const loadSnapshots = useCallback(async () => {
         try {
@@ -427,9 +450,16 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                     <div className="admin-action">
                         <h3>Rename Campaign</h3>
                         <p>Changes the display name. Character files, maps, and data are preserved.</p>
-                        <button className="ct-btn ct-btn-primary" onClick={() => { setRenameError(null); setRenameModal(true); }}>
+                        <button
+                            className="ct-btn ct-btn-primary"
+                            onClick={() => { setRenameError(null); setRenameModal(true); }}
+                            disabled={campaignLocked}
+                        >
                             <i className="fas fa-pen"></i> Rename Campaign
                         </button>
+                        {campaignLocked && (
+                            <p className="admin-lock-note">Disabled while campaign is locked</p>
+                        )}
                     </div>
                     <div className="admin-action admin-action--danger">
                         <h3>Delete Campaign</h3>

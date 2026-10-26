@@ -100,6 +100,16 @@
     font-size: 0.83em;
 }
 
+/* Visible note under the disabled Rename Campaign button while the
+   server's CAMPAIGN_LOCK is engaged (button chrome comes from the global
+   .ct-btn:disabled styles in App.css). */
+.campaign-admin .admin-lock-note {
+    margin: 8px 0 0 0;
+    color: var(--color-text-muted);
+    font-size: 0.83em;
+    font-style: italic;
+}
+
 .campaign-admin .admin-snapshots-list {
     list-style: none;
     margin: 0;

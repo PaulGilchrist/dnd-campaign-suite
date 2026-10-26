@@ -24,6 +24,7 @@ import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
 import pipelineEventsRoutes from './server/routes/pipeline-events.js';
+import createServerConfigRouter from './server/routes/server-config.js';
 
 const PORT = process.env.PORT || 80;
 
@@ -122,6 +123,10 @@ const server = app.listen(PORT, () => {
     server.headersTimeout = 120000;
 });
 // ====== API ROUTES (mounted in original order) ======
+
+// Server meta: GET /api/server-config exposes the campaign-lock state.
+// Mounted first so it answers before any campaign-scoped route.
+app.use(createServerConfigRouter(CAMPAIGN_LOCK));
 
 // Map routes (must be before wildcard :campaign route)
 app.use(mapsRoutes);
