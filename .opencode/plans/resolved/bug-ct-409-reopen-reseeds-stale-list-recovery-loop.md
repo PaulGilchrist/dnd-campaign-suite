@@ -26,3 +26,23 @@ Cheapest correct: in `handleCloseModal`, if a save conflict error was shown (or 
 
 ## Severity
 Minor UX issue — server authority holds (nothing is lost or clobbered; the guard is honest), but the fix's own guided recovery path is a dead-end loop in normal two-tab use.
+
+## Resolution
+FIXED 2026-10-27 (subagent run). Root cause confirmed exactly as diagnosed: the SSE list handler in each `.ct-*` manager returns early while `modalOpen` (draft protection) but nothing ever applied the skipped refresh, and `handleEditNPC` re-seeded the form from the stale in-memory `npcs` list — so close→reopen→save repeated the SAME 409 forever.
+
+**Fix (suggested `missedBroadcast` approach, implemented in all four skip-while-editing components):** a `missedListBroadcast` ref is set in the SSE handler whenever a list broadcast is skipped while the editor is open, and also in the save-catch (a server-rejected save proves the on-screen list is stale). `handleCloseModal` consumes the flag and re-fetches the list — the first safe moment — so a reopen always seeds the fresh row (current `updatedAt`) and the re-applied edit saves 200. Success/delete paths clear the flag after their existing reload so the editor's own SSE echo never causes a redundant refetch/flicker. No changes to hooks, server, or SSE transport.
+
+**Files changed:**
+- `src/components/npcs/Npcs.jsx`
+- `src/components/notes/Notes.jsx`
+- `src/components/factions/Factions.jsx`
+- `src/components/quests/Quests.jsx`
+- New regression test `src/components/npcs/NPCs.stale-list-recovery.test.jsx` (3 tests: close-after-skipped-broadcast → refetch → reopen seeds FRESH row; close-after-409 → refetch with no visible echo; clean close / successful save → no redundant fetches)
+- Updated the four `*.sse-sync.test.jsx` "skips while open" tests to the new contract (missed event is applied ON CLOSE, live refresh with modal closed unchanged)
+
+**Verified live (test-campaign, :5173, 2026-10-27):** reproduced the loop first (409 verbatim → close = ZERO refetches → reopen seeded stale `""` notes vs disk `TAB-B-EDIT…` → same 409 again). Post-fix re-run: 409 verbatim → close → `GET /npcs 200` immediately → reopen seeds the other tab's fresh notes → re-apply appearance → **PUT 200**, modal closes, disk holds BOTH edits coexisting (`appearance:"FIXCHECK appearance"`, `notes:"TAB-B2-EDIT…"`). Adjacent sanity: external PUT with the editor CLOSED still live-mirrors via SSE (`GET:200` unprompted). Marta probe fields cleared back to `""`; change-data `{}` + log `[]` API-verified from closed-tab quiet state.
+
+**Tests/lint:** `npx vitest run` on npcs/notes/factions/quests/hooks → 299 files / 2752 passed (3 pre-existing expected-fail); `npm run lint` clean (zero warnings); `node .opencode/plans/no-timers-guard.mjs` OK.
+
+## Summary
+Fixed the 409-recovery dead-end loop: closing a `.ct-*` entity editor (NPCs/Notes/Factions/Quests) now consumes any SSE list broadcast skipped while the modal was open — plus marks a save-rejection as staleness — and re-fetches the list, so the next reopen seeds the fresh row and the prescribed "close, reopen, re-apply" recovery saves 200 instead of repeating the same 409 forever.

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
@@ -85,6 +85,10 @@ function Factions({ campaignName, onBack }) {
   } = useCrudList(factions, ['name']);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
+  // the on-screen list is stale; consumed in handleCloseModal so a reopen
+  // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
+  const missedListBroadcast = useRef(false);
 
   // Load factions on mount
   useEffect(() => {
@@ -95,10 +99,14 @@ function Factions({ campaignName, onBack }) {
 
   // SSE handler — re-fetch faction list on factions-list events (another GM
   // tab created/updated/deleted a faction). Skipped while the edit modal is
-  // open so an in-progress draft is never squashed mid-edit. Mirrors NPCs.jsx.
+  // open so an in-progress draft is never squashed mid-edit; the miss is
+  // applied on close (see handleCloseModal). Mirrors NPCs.jsx.
   const handleSSEEvent = useCallback((event) => {
     if (!event || event.key !== `factions-list-${campaignName}`) return;
-    if (modalOpen) return;
+    if (modalOpen) {
+      missedListBroadcast.current = true;
+      return;
+    }
     loadFactionsList();
   }, [campaignName, modalOpen, loadFactionsList]);
 
@@ -125,6 +133,12 @@ function Factions({ campaignName, onBack }) {
   const handleCloseModal = () => {
     setError(null);
     closeModal();
+    // A broadcast skipped while editing, or a rejected save, means the rows
+    // are stale — refresh so the next reopen seeds fresh (mirrors NPCs.jsx).
+    if (missedListBroadcast.current) {
+      missedListBroadcast.current = false;
+      loadFactionsList();
+    }
   };
 
   // Handle form field changes. Name edits also clear a sticky duplicate-name
@@ -157,9 +171,11 @@ function Factions({ campaignName, onBack }) {
 
       await saveFactionsList(updatedFactions);
       setError(null);
+      missedListBroadcast.current = false;
       flushSync(handleCloseModal);
     } catch (err) {
       console.error('Failed to save faction:', err);
+      missedListBroadcast.current = true;
       setError(err.message || 'Failed to save factions');
     } finally {
       setSaving(false);
@@ -175,6 +191,7 @@ function Factions({ campaignName, onBack }) {
     setDeleting(true);
     try {
       await deleteFactionAction(editingFaction.id);
+      missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {
       console.error('Failed to delete faction:', error);

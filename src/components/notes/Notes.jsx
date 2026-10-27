@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadNotes, saveNotes, deleteNote } from '../../services/campaign/notesService.js';
@@ -218,6 +218,10 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   // Server-surfaced save/delete errors (e.g. 409 concurrent-edit conflict) —
   // mirrors the error state in NPCs.jsx / Factions.jsx.
   const [error, setError] = useState(null);
+  // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
+  // the on-screen list is stale; consumed in handleCloseModal so a reopen
+  // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
+  const missedListBroadcast = useRef(false);
 
   // Load notes on mount
   useEffect(() => {
@@ -228,10 +232,14 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
   // SSE handler — re-fetch note list on notes-list events (another GM tab
   // created/updated/deleted a note). Skipped while the edit modal is open so
-  // an in-progress draft is never squashed mid-edit. Mirrors NPCs.jsx.
+  // an in-progress draft is never squashed mid-edit; the miss is applied on
+  // close (see handleCloseModal). Mirrors NPCs.jsx.
   const handleSSEEvent = useCallback((event) => {
     if (!event || event.key !== `notes-list-${campaignName}`) return;
-    if (modalOpen) return;
+    if (modalOpen) {
+      missedListBroadcast.current = true;
+      return;
+    }
     loadNotesList();
   }, [campaignName, modalOpen, loadNotesList]);
 
@@ -266,6 +274,12 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   const handleCloseModal = () => {
     setError(null);
     closeModal();
+    // A broadcast skipped while editing, or a rejected save, means the rows
+    // are stale — refresh so the next reopen seeds fresh (mirrors NPCs.jsx).
+    if (missedListBroadcast.current) {
+      missedListBroadcast.current = false;
+      loadNotesList();
+    }
   };
 
   // Handle form field changes
@@ -287,11 +301,13 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
       await saveNotesList(updatedNotes);
       setError(null);
+      missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {
       console.error('Failed to save note:', error);
       // Server-side conflicts (409 "changed elsewhere") and failures surface
       // verbatim in the modal so a stale tab never silently loses its edit.
+      missedListBroadcast.current = true;
       setError(error.message || 'Failed to save note');
     } finally {
       setSaving(false);
@@ -307,6 +323,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
     setDeleting(true);
     try {
       await deleteNoteAction(editingNote.id);
+      missedListBroadcast.current = false;
       setError(null);
       handleCloseModal();
     } catch (error) {

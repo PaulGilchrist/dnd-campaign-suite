@@ -3,8 +3,10 @@
 // SSE event (per server/routes/factions.js broadcast hook: replaced/deleted)
 // must re-fetch and re-render the list, events for other keys are ignored,
 // and re-fetches are skipped while the edit modal is open so a draft in
-// progress is never disturbed. Mirrors NPCs.sse-sync.test.jsx. Connects
-// through the ONE shared SSE client (subscribeToSSE), never a raw EventSource.
+// progress is never disturbed — but the missed broadcast is applied on close
+// so a reopened editor never re-seeds a stale row. Mirrors
+// NPCs.sse-sync.test.jsx. Connects through the ONE shared SSE client
+// (subscribeToSSE), never a raw EventSource.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Factions from './Factions';
@@ -95,7 +97,7 @@ describe('Factions live SSE sync', () => {
     expect(loadCallCount).toBe(1);
   });
 
-  it('skips re-fetches while the edit form is open, then applies the next event after closing', async () => {
+  it('skips re-fetches while the edit form is open, then applies the missed event on close', async () => {
     const { findByText } = renderFactions();
     await findByText('The Iron Consortium');
 
@@ -109,10 +111,16 @@ describe('Factions live SSE sync', () => {
     expect(nameInput.value).toBe('Draft Faction');
     expect(loadCallCount).toBe(1);
 
+    // Closing consumes the skipped broadcast immediately — the list must never
+    // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    capturedHandler({ key: 'factions-list-test-campaign', data: { action: 'replaced' } });
-
     await findByText('Cult of the Deep');
     expect(loadCallCount).toBe(2);
+
+    // Events arriving with the modal closed keep refreshing live.
+    factionsFixture = [...factionsFixture, { id: 'f3', name: 'Silver Covenant', influence: 2 }];
+    capturedHandler({ key: 'factions-list-test-campaign', data: { action: 'replaced' } });
+    await findByText('Silver Covenant');
+    expect(loadCallCount).toBe(3);
   });
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
@@ -24,6 +24,12 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   const [error, setError] = useState(null);
   const [modalInitialTab, setModalInitialTab] = useState('roleplay');
   const [modalKey, setModalKey] = useState(0);
+  // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
+  // the on-screen list is stale: a reopened editor would re-seed the old row
+  // (stale updatedAt) and its next save would repeat the SAME 409 forever.
+  // Consumed in handleCloseModal — the first safe moment to re-sync — so the
+  // conflict guidance ("reload the list and re-apply") actually works in-view.
+  const missedListBroadcast = useRef(false);
 
   useEffect(() => {
     if (campaignName) {
@@ -32,11 +38,16 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   }, [campaignName, loadNPCsList]);
 
   // SSE handler — re-fetch NPC list on npcs-list events (another GM tab
-  // created/deleted an NPC). Skipped while the edit modal is open so an
-  // in-progress draft is never squashed mid-edit.
+  // created/updated/deleted an NPC). Skipped while the edit modal is open so
+  // an in-progress draft is never squashed mid-edit — but the miss is noted
+  // and applied on close, so a reopen never re-seeds a stale row.
   const handleSSEEvent = useCallback((event) => {
     if (!event || event.key !== `npcs-list-${campaignName}`) return;
-    if (modalOpen) return;
+    if (modalOpen) {
+      // Note the miss — handleCloseModal will re-fetch so a reopen seeds fresh.
+      missedListBroadcast.current = true;
+      return;
+    }
     loadNPCsList();
   }, [campaignName, modalOpen, loadNPCsList]);
 
@@ -63,6 +74,13 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   const handleCloseModal = () => {
     setError(null);
     closeModal();
+    // A broadcast skipped while editing, or a save the server rejected, means
+    // the list rows are stale — refresh now so the next reopen seeds a fresh
+    // row (and a re-applied edit saves clean) instead of looping on 409.
+    if (missedListBroadcast.current) {
+      missedListBroadcast.current = false;
+      loadNPCsList();
+    }
   };
 
   // Duplicate-name guard (mirrors MapsManager.handleCreate)
@@ -82,9 +100,13 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       await saveNPC(campaignName, cleaned, editingNPC?.name);
       setError(null);
       await loadNPCsList();
+      missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
       console.error('Failed to save NPC:', err);
+      // A rejected save means the server row moved on without us — the list
+      // is stale; closing refreshes it (see handleCloseModal).
+      missedListBroadcast.current = true;
       setError(err.message || 'Failed to save NPC');
     } finally {
       setSaving(false);
@@ -97,6 +119,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     setDeleting(true);
     try {
       await deleteNPCAction(editingNPC.name);
+      missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {
       console.error('Failed to delete NPC:', error);
@@ -137,6 +160,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       };
       setError(null);
       await loadNPCsList();
+      missedListBroadcast.current = false;
       const status = await addNPCToInitiative(campaignName, npcForInitiative, onViewInitiative);
       if (status === 'needs-weapon') {
         setError(`${npcForInitiative.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
@@ -148,6 +172,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       handleCloseModal();
     } catch (err) {
       console.error('Failed to save NPC:', err);
+      missedListBroadcast.current = true;
       setError(err.message || 'Failed to save NPC');
     } finally {
       setSaving(false);

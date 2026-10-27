@@ -3,8 +3,9 @@
 // event (per server/routes/npcs.js: created/updated/deleted/replaced) must
 // re-fetch and re-render the list, events for other keys are ignored, and
 // re-fetches are skipped while the edit modal is open so a draft in progress
-// is never disturbed. Connects through the ONE shared SSE client
-// (subscribeToSSE), never a raw EventSource.
+// is never disturbed — but the missed broadcast is applied on close so a
+// reopened editor never re-seeds a stale row. Connects through the ONE shared
+// SSE client (subscribeToSSE), never a raw EventSource.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCs from './NPCs';
@@ -119,7 +120,7 @@ describe('NPCs live SSE sync', () => {
     expect(loadCallCount).toBe(1);
   });
 
-  it('skips re-fetches while the edit form is open, then applies the next event after closing', async () => {
+  it('skips re-fetches while the edit form is open, then applies the missed event on close', async () => {
     renderNPCs();
     await screen.findByText('Bardima');
 
@@ -133,11 +134,17 @@ describe('NPCs live SSE sync', () => {
     expect(nameInput.value).toBe('Draft Name Mid-Edit');
     expect(loadCallCount).toBe(1);
 
+    // Closing consumes the skipped broadcast immediately — the list must never
+    // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
     fireEvent.click(screen.getByText('Cancel'));
-    capturedHandler({ key: 'npcs-list-test-campaign', data: { action: 'created', name: 'QA Sync NPC A' } });
-
     await screen.findByLabelText('Edit NPC: QA Sync NPC A');
     expect(loadCallCount).toBe(2);
     expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
+
+    // Events arriving with the modal closed keep refreshing live.
+    npcsFixture = [...npcsFixture, { name: 'QA Sync NPC B', race: 'Human' }];
+    capturedHandler({ key: 'npcs-list-test-campaign', data: { action: 'created', name: 'QA Sync NPC B' } });
+    await screen.findByLabelText('Edit NPC: QA Sync NPC B');
+    expect(loadCallCount).toBe(3);
   });
 });

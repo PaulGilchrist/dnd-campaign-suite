@@ -3,8 +3,10 @@
 // event (per server/routes/quests.js broadcast hook: replaced/deleted) must
 // re-fetch and re-render the list, events for other keys are ignored, and
 // re-fetches are skipped while the edit modal is open so a draft in progress
-// is never disturbed. Mirrors NPCs.sse-sync.test.jsx. Connects through the
-// ONE shared SSE client (subscribeToSSE), never a raw EventSource.
+// is never disturbed — but the missed broadcast is applied on close so a
+// reopened editor never re-seeds a stale row. Mirrors NPCs.sse-sync.test.jsx.
+// Connects through the ONE shared SSE client (subscribeToSSE), never a raw
+// EventSource.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Quests from './Quests';
@@ -100,7 +102,7 @@ describe('Quests live SSE sync', () => {
     expect(loadCallCount).toBe(1);
   });
 
-  it('skips re-fetches while the edit form is open, then applies the next event after closing', async () => {
+  it('skips re-fetches while the edit form is open, then applies the missed event on close', async () => {
     const { findByText } = renderQuests();
     await findByText('The Lost Artifact');
 
@@ -114,10 +116,16 @@ describe('Quests live SSE sync', () => {
     expect(nameInput.value).toBe('Draft Quest');
     expect(loadCallCount).toBe(1);
 
+    // Closing consumes the skipped broadcast immediately — the list must never
+    // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    capturedHandler({ key: 'quests-list-test-campaign', data: { action: 'replaced' } });
-
     await findByText('The Sunken Shrine');
     expect(loadCallCount).toBe(2);
+
+    // Events arriving with the modal closed keep refreshing live.
+    questsFixture = [...questsFixture, { id: 'q3', name: 'The Hollow Crown', status: 'active', description: '' }];
+    capturedHandler({ key: 'quests-list-test-campaign', data: { action: 'replaced' } });
+    await findByText('The Hollow Crown');
+    expect(loadCallCount).toBe(3);
   });
 });

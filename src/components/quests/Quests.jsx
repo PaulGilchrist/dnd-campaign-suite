@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
@@ -178,13 +178,21 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   } = useCrudList(quests, ['name']);
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState(null);
+  // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
+  // the on-screen list is stale; consumed in handleCloseModal so a reopen
+  // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
+  const missedListBroadcast = useRef(false);
 
   // SSE handler — re-fetch quest list on quests-list events (another GM tab
   // created/updated/deleted a quest). Skipped while the edit modal is open so
-  // an in-progress draft is never squashed mid-edit. Mirrors NPCs.jsx.
+  // an in-progress draft is never squashed mid-edit; the miss is applied on
+  // close (see handleCloseModal). Mirrors NPCs.jsx.
   const handleSSEEvent = useCallback((event) => {
     if (!event || event.key !== `quests-list-${campaignName}`) return;
-    if (modalOpen) return;
+    if (modalOpen) {
+      missedListBroadcast.current = true;
+      return;
+    }
     loadQuestsList();
   }, [campaignName, modalOpen, loadQuestsList]);
 
@@ -204,6 +212,12 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     setError(null);
     closeModal();
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
+    // A broadcast skipped while editing, or a rejected save, means the rows
+    // are stale — refresh so the next reopen seeds fresh (mirrors NPCs.jsx).
+    if (missedListBroadcast.current) {
+      missedListBroadcast.current = false;
+      loadQuestsList();
+    }
   };
 
   // Name edits clear a sticky duplicate-name banner surfaced by a server 400
@@ -235,9 +249,11 @@ function Quests({ campaignName, isLocalhost, onBack }) {
         : [...quests, { id: crypto.randomUUID(), ...formData }];
       await saveQuestsList(questsArray);
       setError(null);
+      missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
       console.error('Failed to save quest:', err);
+      missedListBroadcast.current = true;
       setError(err.message || 'Failed to save quests');
     } finally {
       setSaving(false);
@@ -250,6 +266,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     try {
       await deleteQuestAction(quest.id);
       setError(null);
+      missedListBroadcast.current = false;
       // Close the modal on success — mirrors NPCs/Notes/Factions/Sessions deletes.
       handleCloseModal();
     } catch (error) {
