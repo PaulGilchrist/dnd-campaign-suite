@@ -1,6 +1,6 @@
 // @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import POIContextMenu from './POIContextMenu.jsx';
 
 const BASE_POI = { id: 'poi-1', type: 'city', q: 0, r: 0, label: 'City A', visible: true, linkedMap: null };
@@ -13,8 +13,12 @@ function menuOptionLabels(container) {
 
 describe('POIContextMenu', () => {
     let defaultProps;
-
+    // "Delete" rides a named native confirm (house pattern, mirrors the indoor
+    // token-removal lane in PlayerContextMenu.jsx). Accept by default; the
+    // cancel-leg test overrides to false.
+    let confirmSpy;
     beforeEach(() => {
+        confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         defaultProps = {
             selectedPoi: { id: 'poi-1', q: 0, r: 0 },
             pois: [BASE_POI],
@@ -30,6 +34,10 @@ describe('POIContextMenu', () => {
             viewPortBounds: null,
             roads: [],
         };
+    });
+
+    afterEach(() => {
+        confirmSpy.mockRestore();
     });
 
     function renderMenu(props = {}) {
@@ -133,6 +141,36 @@ describe('POIContextMenu', () => {
         } else {
             expect(defaultProps.onClose).not.toHaveBeenCalled();
         }
+    });
+
+    describe('delete confirm (named, native — mirrors indoor token-removal lane)', () => {
+        it('asks Delete POI "<label>"? and dispatches onDelete once when accepted', () => {
+            renderMenu();
+            fireEvent.click(screen.getByText('Delete'));
+            expect(confirmSpy).toHaveBeenCalledTimes(1);
+            expect(confirmSpy).toHaveBeenCalledWith('Delete POI "City A"?');
+            expect(defaultProps.onDelete).toHaveBeenCalledWith('poi-1');
+            expect(defaultProps.onDelete).toHaveBeenCalledTimes(1);
+        });
+
+        it('labels the confirm with the poi id when the poi has no label', () => {
+            renderMenu({ pois: [{ ...BASE_POI, label: undefined }] });
+            fireEvent.click(screen.getByText('Delete'));
+            expect(confirmSpy).toHaveBeenCalledWith('Delete POI "poi-1"?');
+            expect(defaultProps.onDelete).toHaveBeenCalledWith('poi-1');
+        });
+
+        it('is fully inert on cancel: no delete dispatch, roads untouched upstream, but the menu still closes', () => {
+            confirmSpy.mockReturnValue(false);
+            renderMenu({ roads: [{ fromPoiId: 'poi-1', toPoiId: 'poi-2' }] });
+            fireEvent.click(screen.getByText('Delete'));
+            expect(confirmSpy).toHaveBeenCalledTimes(1);
+            // No onDelete → usePoiManagement.handleDeletePoi never runs → no
+            // setPois/setRoads write → no autosave PUT attributable to the cancel.
+            expect(defaultProps.onDelete).not.toHaveBeenCalled();
+            expect(defaultProps.onRemoveRoads).not.toHaveBeenCalled();
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+        });
     });
 
     it('stops pointer and click events from bubbling to the map beneath, without swallowing the menu action', () => {

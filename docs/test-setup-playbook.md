@@ -1254,3 +1254,10 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 
 - WARN-COUNT FINGERPRINT SUPERSEDED: a 409 `conflict:true` save rejection now emits EXACTLY ONE app `console.warn` containing `Concurrent-edit conflict saving` — from the SERVICE layer only. `useEntityManagement.saveItems` and all six `.ct-*` component catches stay silent on `err.conflict` (non-conflict failures still console.error there). The old run-I census (array lanes = 3 warns, NPC PUT = 2) is DEAD; judge with the post-select console.error/warn wrapper rig as before, but expect 1/0. Sessions move-link + mark-played legs included.
 - `useEntityManagement.test.js` + per-component conflict-reload tests now spy-lock single/no-warn; `HexMapToolbar`-style mirror contracts mean new warn assertions must name the layer they pin.
+
+## 2026-10-27 improve run — poi-delete-confirm (named native confirm on hex POI Delete)
+
+- MCP DIALOG RACE: this Playwright MCP auto-surfaces native dialogs as a "Modal state" note and can beat an in-run `page.once('dialog')` handler — a follow-up `browser_handle_dialog` then errors "no related modal state" (= the in-run handler consumed it; NOT a failure). Judge cancel/accept legs by OUTCOME (disk `pois[]`/`roads[]` + `__mapPuts` fetch-spy), never by the tool return text.
+- `hex-map-poi-indicator` toolbar badge is the MARCHING-ORDER PC count (HexMapToolbar.jsx:118), NOT a POI count — run-I notes' "POI badge" claims mean this. POI truth = `svg rect[style*="grab"]` count + disk `pois[]`.
+- POI rename inline input PREFILLS the current label — `keyboard.type` appends (` Port B ` → `Settlement Port B` trims live per 6241954b9).
+- Full `npm run test:run` ≈3 min — background it; ~3 known "expected-fail" rows exist repo-wide (31674 pass / 3 expected fails as of run J).

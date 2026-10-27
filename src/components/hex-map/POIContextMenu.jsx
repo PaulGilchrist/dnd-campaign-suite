@@ -194,7 +194,19 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
                     fill="#ccc"
                     fontSize="11"
                     className="menu-option"
-                    onClick={() => { onDelete(selectedPoi.id); onClose(); }}
+                    onClick={() => {
+                        // Named-confirm before removal — mirrors the indoor token-removal
+                        // lane (PlayerContextMenu.jsx, `Remove "<name>" from the map?`).
+                        // This Delete is the ONLY placed-POI delete lane (HexMap.jsx wires
+                        // handleDeletePoi here and nowhere else), so the menu gates it once.
+                        // Cancel is fully inert: no onDelete call → no setPois/setRoads write
+                        // → the map's autosave PUT lane never fires; the menu still closes.
+                        const label = selectedItem.label || selectedPoi.id;
+                        if (window.confirm(`Delete POI "${label}"?`)) {
+                            onDelete(selectedPoi.id);
+                        }
+                        onClose();
+                    }}
                 >
                     Delete
                 </text>

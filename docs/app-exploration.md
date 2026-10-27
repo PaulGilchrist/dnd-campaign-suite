@@ -163,8 +163,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-G's three travel/CRUD backlog items closed run H. Run-H's noun-case + Reload-in-Factions/Quests + reroll-msg-clear items closed/proven run I.)*
-- *(2026-10-27 run I)* **POI delete has no confirm** while map-token removal does (`Remove "<name>" from the map?`) — inconsistent destructibility affordances on the same editor; POI ctxmenu Delete lands instantly (roads referencing it are cleaned, but a misclick loses the pin + its map-link).
+- *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-G's three travel/CRUD backlog items closed run H. Run-H's noun-case + Reload-in-Factions/Quests + reroll-msg-clear items closed/proven run I. Run-I's five backlog items all closed same-day by improve run J: array-conflict-display-name 4473153e4, poi-rename-whitespace-guard 6241954b9, erase-terrain-tooltip aa1deb881, single-conflict-warn-layer da075f989, poi-delete-confirm (this commit).)*
 ## Coverage
 
 | Feature/Flow | Depth | Notes |

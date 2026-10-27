@@ -83,12 +83,18 @@ describe('usePoiManagement', () => {
             { id: 'road-3', fromPoiId: 'poi-1', toPoiId: 'poi-3', hexes: ['1,0', '2,0', '3,0'] },
         ];
         const { result, setPois, setRoads } = setup({ roads });
+        // The named confirm lives in POIContextMenu.jsx (menu layer, mirroring the
+        // indoor token-removal lane) — the handler stays confirm-free so the menu
+        // gates exactly once (no double-confirm on the accept leg).
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         act(() => {
             result.current.handlePoiContextMenu('poi-1');
         });
         act(() => {
             result.current.handleDeletePoi('poi-2');
         });
+        expect(confirmSpy).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
         expect(applyUpdater(setPois, 0, basePois)).toEqual([basePois[0], basePois[2]]);
         expect(applyUpdater(setRoads, 0, roads).map(r => r.id)).toEqual(['road-3']);
         expect(result.current.selectedPoiMenu).toBeNull();
