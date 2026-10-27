@@ -17,7 +17,9 @@ function singularize(name) {
 // A save whose stamp differs from the disk stamp provably never read the
 // current row — refuse with 409 instead of silently clobbering edits that
 // another tab/session already persisted. A whole-array POST that omits a
-// disk row likewise dropped an entity created elsewhere — also 409. Legacy
+// disk row likewise dropped an entity created elsewhere — also 409 — and the
+// symmetric leg holds too: a re-sent row (with an echoed stamp) that disk no
+// longer has would resurrect an entity deleted elsewhere — also 409. Legacy
 // rows without any stamp stay writable (bootstrap), and get stamped on write.
 // ---------------------------------------------------------------------------
 
@@ -72,7 +74,8 @@ export function conflictErrorBody(singularDisplayName, id, reason = 'modified') 
 }
 
 // Detects a blind overwrite in a whole-array write: a row the sender re-sent
-// with a stale stamp, or a disk row the sender's snapshot never knew about.
+// with a stale stamp, a row the sender's snapshot resurrects after it was
+// deleted elsewhere, or a disk row the sender's snapshot never knew about.
 // Returns { id, reason } for the first offender, or null when the write is safe.
 function findConcurrentWrite(diskEntities, incomingEntities, idField) {
   const diskById = new Map(
@@ -85,6 +88,14 @@ function findConcurrentWrite(diskEntities, incomingEntities, idField) {
     const existing = id != null ? diskById.get(id) : undefined;
     if (existing && hasUpdateConflict(existing, incoming)) {
       return { id, reason: 'modified' };
+    }
+    // Resurrection leg: an incoming row absent from disk that echoes an
+    // updatedAt stamp proves the sender read it BEFORE another tab/session
+    // deleted it — saving would silently undo that delete. A brand-new row
+    // carries no echoed stamp (the client never sets updatedAt), so creating
+    // stays untouched.
+    if (!existing && id != null && typeof incoming.updatedAt === 'number') {
+      return { id, reason: 'created or deleted' };
     }
   }
   for (const id of diskById.keys()) {
