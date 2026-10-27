@@ -23,6 +23,27 @@ function TravelExhaustedBanner({ exhausted, partyHasMaxExhaustion, onForceCamp, 
   );
 }
 
+// Extreme-weather camp affordance (bug 2026-10-27-G): the impossible-travel
+// prompt says "Camp and wait it out", but the exhausted banner gates on
+// dayExhausted which is structurally UNREACHABLE under extreme weather (every
+// advance rejects in the cost-null branch BEFORE the budget check, and the
+// mount flag finds no affordable neighbor to compare). Render the camp row
+// directly from the blocking condition; it wires to the same forceCamp seam
+// (rolls the new day's weather, refreshes the budget from the NEW roll).
+// Hidden while the exhausted banner is up — it already carries Camp.
+function TravelExtremeWeatherBanner({ travelBlocked, onForceCamp }) {
+  if (!travelBlocked) return null;
+  return (
+    <div className="travel-panel-exhausted">
+      <i className="fa-solid fa-tent"></i>
+      <span>Extreme weather makes travel impossible — camp and wait it out</span>
+      <button onClick={onForceCamp} className="travel-btn-camp">
+        <i className="fa-solid fa-campground"></i> Camp
+      </button>
+    </div>
+  );
+}
+
 function TravelForcedMarchStatus({ forcedMarchHours, exhaustionMultiplier }) {
   if (!(forcedMarchHours > 0)) return null;
   return (
@@ -82,6 +103,12 @@ const advanceLabel = (path, pathIndex) => {
 const advanceTitle = (maxed, noDestination) =>
   (maxed ? MAX_EXHAUSTION_HINT : (noDestination ? NO_DESTINATION_TITLE : undefined));
 const forcedMarchTitle = (maxed) => (maxed ? FM_MAX_EXHAUSTION_TITLE : undefined);
+// Camp row visibility (bug 2026-10-27-G): a null moveCostMod is the blocking
+// condition itself (weatherService "extreme"). Hoisted to keep TravelPanel
+// under the complexity cap; hidden while the exhausted banner is up, which
+// already carries its own Camp button.
+const extremeWeatherBlocked = (weather, dayExhausted) =>
+  !dayExhausted && weather?.moveCostMod === null;
 
 function TravelMaxExhaustionHint({ visible }) {
   if (!visible) return null;
@@ -182,6 +209,7 @@ function TravelPanel({
   const budgetRemaining = Math.max(0, dailyBudget - accruedCost);
 
   const advanceDisabled = dayExhausted || pathIndex >= path.length || !!pendingEvent || partyHasMaxExhaustion;
+  const travelBlocked = extremeWeatherBlocked(weather, dayExhausted);
 
   const currentHex = path[pathIndex];
   const currentTerrain = currentHex ? terrain[`${currentHex.q},${currentHex.r}`] || 'plains' : null;
@@ -210,6 +238,11 @@ function TravelPanel({
         partyHasMaxExhaustion={partyHasMaxExhaustion}
         onForceCamp={onForceCamp}
         onForcedMarch={onForcedMarch}
+      />
+
+      <TravelExtremeWeatherBanner
+        travelBlocked={travelBlocked}
+        onForceCamp={onForceCamp}
       />
 
       <TravelForcedMarchStatus

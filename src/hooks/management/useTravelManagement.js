@@ -423,7 +423,11 @@ export default function useTravelManagement({
     const cost = effectiveHexCost(tileTerrain, nextHex.q, nextHex.r, weather, horseback);
     if (cost === null) {
       if (weather?.moveCostMod === null) {
-        setLastMessage(`Extreme ${weather.label?.toLowerCase() || 'weather'} makes travel impossible. Camp and wait it out.`);
+        // Label is "Extreme" (weatherService) — `${label} weather` reads
+        // "Extreme weather makes travel impossible…" without the old doubled
+        // word ("Extreme extreme", bug 2026-10-27-G). The panel's extreme-
+        // weather camp row is the affordance this prompt points at.
+        setLastMessage(`${weather.label || 'Extreme'} weather makes travel impossible. Camp and wait it out.`);
       }
       return { moved: false };
     }

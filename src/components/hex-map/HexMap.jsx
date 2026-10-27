@@ -216,11 +216,18 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }, [travelMgmt, handleGenerateWeather, partyPosition, weather, logTravel]);
 
     const handleReRollWeather = useCallback(() => {
+        const previousWeather = weather;
         const newWeather = handleGenerateWeather();
         if (travelMgmt.isTravelActive) {
             travelMgmt.changePace(travelMgmt.travelPace, newWeather);
+            // Lifting the extreme-weather block clears the stale impossible-
+            // travel prompt (bug 2026-10-27-G: it survived un-blocking until
+            // some other message write replaced it).
+            if (previousWeather?.moveCostMod === null && newWeather?.moveCostMod !== null) {
+                travelMgmt.setLastMessage(null);
+            }
         }
-    }, [handleGenerateWeather, travelMgmt]);
+    }, [handleGenerateWeather, travelMgmt, weather]);
 
     const handleAdvance = useCallback(() => {
         const nextIdx = travelMgmt.pathIndex + 1;
@@ -245,11 +252,17 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         } else if (travelMgmt.dayExhausted) {
             logTravel('day_exhausted', null, null, weather);
         } else if (weather?.moveCostMod === null) {
-            logTravel('extreme_weather', null, null, weather);
+            // The party stands still but the row must carry WHERE (bug
+            // 2026-10-27-G: hex/terrain were null): log the party's current
+            // hex + terrain like every other travel row (pos lanes mirror
+            // handleForceCamp's currentPosition || partyPosition).
+            const pos = travelMgmt.currentPosition || partyPosition;
+            const posKey = pos ? hexKey(pos.q, pos.r) : null;
+            logTravel('extreme_weather', pos, posKey ? terrain[posKey] || 'plains' : null, weather);
         }
 
         return result;
-    }, [travelMgmt, weather, terrain, logTravel]);
+    }, [travelMgmt, weather, terrain, partyPosition, logTravel]);
 
     // ── Indoor map linking ──
     const [indoorMaps, setIndoorMaps] = useState([]);
