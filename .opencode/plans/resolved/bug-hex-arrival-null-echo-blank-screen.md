@@ -30,3 +30,23 @@ Two complementary layers:
 
 ## Severity
 Broken feature — the core travel flow (arrival) reliably crashes any client left on the map, and an Admin clear-change-data while a hex editor is mounted hits the same lane. High-priority regression from the 947b9702c × a14e6db98 composition.
+
+## Resolution
+FIXED 2026-10-27 (this session). Reproduced live first (Vite :5173 dev:locked, `test-campaign`, fresh API-created outdoor map "QA Hex FixM"): 1-hex plan → `Advance One Hex` → arrived → ~1–2 s later the SPA blanked (empty `<body>`, `#root` empty) with the exact filed fingerprint `TypeError: Cannot read properties of null (reading 'length') at useTravelManagement (useTravelManagement.js:580:31) at HexMap (HexMap.jsx:125:21)`.
+
+Root cause confirmed as filed, with one refinement: `advanceOneHex` was already ref-null-guarded (`!currentPath || …`), so the crash was purely the three render-phase reads at file lines 538/542/546 (`path.length` / `path.slice` / `pathIndex` arithmetic) fed `travel-path → null` by the 947b9702c null-mirror (`applyStoreUpdate` stored the raw cleared-key echo; `useSyncedState` documents that a stored null is NOT replaced by the declared default).
+
+Both layers implemented as suggested:
+1. **Root fix — `src/App.jsx` `applyStoreUpdate`:** a `null` change-echo for a campaign key is now mirrored as `campaignStore.delete(storeKey)` (key REMOVE + notify) instead of `store.set(key, null)`. `useSyncedState`/`getRuntimeValue` consumers fall back to their declared defaults — `travel-pendingEvent`'s default is null, so the 947b9702c run-K EventDialog-close fix is byte-equivalent for that lane, while typed consumers (`path: []`, `pathIndex: 0`, `destination: null`) never receive raw null. Scalars/objects unchanged; character-scope null/scalar drops unchanged.
+2. **Defensive guard — `src/hooks/management/useTravelManagement.js`:** `safePath = Array.isArray(path) ? path : []` / `safePathIndex = typeof pathIndex === 'number' ? pathIndex : 0` used in `currentPosition`/`remainingSteps`/`hexesRemaining`, the same coercions seed `advanceOneHex`'s refs, and the hook now RETURNS the guarded `path`/`pathIndex` so HexMap.jsx's next-hex read (:238–239) and TravelPanel/TravelPathLayer stay off the crash path even if a raw null ever reaches the store through another lane. Same idiom as `useMapLoader.js` `buildTravelInit` (:58–59). No publisher-snapshot tightening was needed: the mount-captured defaults are the idle bytes (loader resolves the document async, per the file-adoption comment), so key-removal falls back to idle, never to a stale file trip.
+
+Files changed:
+- `src/App.jsx` (applyStoreUpdate null ⇒ key REMOVE + comments)
+- `src/hooks/management/useTravelManagement.js` (safePath/safePathIndex guard layer)
+- `src/hooks/management/useTravelManagement.null-echo.test.js` (NEW — 3 regression tests: raw-null echo renders null-proof; key-removal falls back to declared defaults; full 1-hex arrival survives the trailing null-echo beat with the DELETE trio pinned)
+- `src/App.runtime-events.test.jsx` (run-K null lane re-locked to remove semantics + new typed-travel-key removal test; header contract updated)
+
+Verification:
+- Vitest: new file 3/3; `src/hooks/management` 13 files / 140 tests; `src/App.*.test.jsx` 7 files / 67 tests (incl. run-K EventDialog lane); `src/components/hex-map` 35 files / 430 tests — all green. `npm run lint` exit 0 (zero warnings). `no-timers-guard` OK.
+- Live re-run of the original repro post-fix: plan 1-hex → Advance → arrived → waited 4 s → SPA fully alive (body text 457 chars, sidebar + `test-campaign` header present, panel unmounted, toggle auto-released aria-pressed=false), **0 console errors**; server bytes correct (trip keys removed, day keys survive, `travel/arrived` row logged, map-file `travelState` null). Second fresh plan→arrive cycle identical. Run-K lane re-verified live: object echo opened the EventDialog, the `travel-pendingEvent` DELETE null-echo auto-closed it (<2 s), SPA stayed alive.
+- Cleanup: Admin clear-change-data + clear-log via API, probe map deleted; final GETs `change-data {}`, `log []`, maps [Battle Arena, Test Map]; no tab left resurrecting.

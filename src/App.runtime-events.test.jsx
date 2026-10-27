@@ -18,8 +18,10 @@
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
  *       the campaign store and everything else to the character store,
  *       also skipSync=true; bardic-inspiration prompts gate other writes
- *       until cleared. Null (cleared-key) and scalar echoes mirror into the
- *       campaign store; for character keys they stay dropped (snapshot lane).
+ *       until cleared. Null (cleared-key) echoes REMOVE the key from the
+ *       campaign store (declared defaults win — never a raw null in the
+ *       mirror); scalar echoes mirror into the campaign store; for
+ *       character keys both stay dropped (snapshot lane).
  *     - Malformed events (null key, foreign campaigns, null/scalar data on
  *       character keys) are ignored.
  *  2. Character CRUD through the App shell: landing after campaign
@@ -534,8 +536,12 @@ describe('App - Runtime Events & State Management', () => {
 
     // Cross-tab staleness bug: cleared keys publish null and scalars are plain
     // value updates — dropping them kept resolved prompts (travel EventDialog)
-    // open and actionable on every other client.
-    it('mirrors a null cleared-key echo into the campaign store so stale prompts close', async () => {
+    // open and actionable on every other client. A cleared-key echo mirrors as
+    // a key REMOVE (not a stored null) so useSyncedState consumers fall back
+    // to their DECLARED default (pendingEvent's is null → the dialog closes)
+    // and typed consumers never receive a raw null (arrival-echo blank-screen
+    // bug: storing null crashed the whole SPA on travel arrival).
+    it('mirrors a null cleared-key echo as a key REMOVE so stale prompts close without feeding null', async () => {
       const campaignStore = new Map([[
         'travel-pendingEvent', { title: 'Wolves on the Hunt', type: 'combat' },
       ]]);
@@ -543,9 +549,30 @@ describe('App - Runtime Events & State Management', () => {
 
       await dispatch({ key: 'change-test-campaign-travel-pendingEvent', data: null });
 
-      expect(campaignStore.get('travel-pendingEvent')).toBeNull();
+      expect(campaignStore.has('travel-pendingEvent')).toBe(false);
       expect(notify).toHaveBeenCalledWith('campaign');
       expect(writesFor('travel-pendingEvent')).toHaveLength(0);
+    });
+
+    // bug-hex-arrival-null-echo-blank-screen: arrival's per-key DELETEs echo
+    // null for the typed COMPLETED_TRIP_KEYS; raw null in the store crashed
+    // useTravelManagement's render (path.length). Mirror them as removals so
+    // the hook's declared defaults ([] / 0 / null) win instead.
+    it('removes typed travel keys on null cleared-key echoes (arrival cleanup never stores null)', async () => {
+      const campaignStore = new Map([
+        ['travel-destination', { q: 20, r: 10 }],
+        ['travel-path', [{ q: 21, r: 10 }, { q: 20, r: 10 }]],
+        ['travel-pathIndex', 1],
+      ]);
+      getStore.mockImplementation(() => campaignStore);
+
+      for (const key of ['travel-destination', 'travel-path', 'travel-pathIndex']) {
+        await dispatch({ key: `change-test-campaign-${key}`, data: null });
+      }
+
+      expect(campaignStore.size).toBe(0);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      expect(writesFor('travel-path')).toHaveLength(0);
     });
 
     it('mirrors scalar change echoes (string values) into the campaign store', async () => {

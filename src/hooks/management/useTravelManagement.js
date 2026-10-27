@@ -143,6 +143,17 @@ export default function useTravelManagement({
   const pathRef = useRef(path);
   const pathIndexRef = useRef(pathIndex);
 
+  // Null-proof render paths (bug-hex-arrival-null-echo-blank-screen): a
+  // cleared-key SSE echo (arrival's per-key DELETEs, Admin clear-change-data)
+  // mirrors into the campaign store, and a stored null is NOT replaced by
+  // useSyncedState's default. App.jsx now removes cleared keys (declared
+  // defaults win), but a typed consumer must never blank the SPA even if a
+  // raw null slips through another lane — every render path below reads the
+  // guarded copies. Same idiom as useMapLoader.js buildTravelInit
+  // (Array.isArray / typeof number coercions).
+  const safePath = Array.isArray(path) ? path : [];
+  const safePathIndex = typeof pathIndex === 'number' ? pathIndex : 0;
+
   // Improve 2026-10-26 (run-E backlog): the mode an event interrupted. Events
   // only fire on advance, so mid-route the party was MODES.TRAVELING (set by
   // prior advances); an event on the FIRST advance interrupts MODES.PLANNING.
@@ -417,11 +428,13 @@ export default function useTravelManagement({
   }, [travelMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const advanceOneHex = useCallback(() => {
-    const currentPath = pathRef.current;
-    const currentIdx = pathIndexRef.current;
+    // Refs mirror the synced path/index; coerce through the same null-proof as
+    // the render paths so a null-echoed store can never feed arithmetic here.
+    const currentPath = Array.isArray(pathRef.current) ? pathRef.current : [];
+    const currentIdx = typeof pathIndexRef.current === 'number' ? pathIndexRef.current : 0;
     const nextIdx = currentIdx + 1;
 
-    if (!currentPath || currentPath.length < 2 || nextIdx >= currentPath.length) {
+    if (currentPath.length < 2 || nextIdx >= currentPath.length) {
       return { moved: false };
     }
 
@@ -535,15 +548,15 @@ export default function useTravelManagement({
     return true;
   }, [partyHasMaxExhaustion, addExhaustionToAll, effectiveBudgetForPace, travelPace, weather, forcedMarchHours]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const currentPosition = path.length > 0 && pathIndex < path.length
-    ? path[pathIndex]
+  const currentPosition = safePath.length > 0 && safePathIndex < safePath.length
+    ? safePath[safePathIndex]
     : null;
 
-  const remainingSteps = path.length > 0 ? path.slice(pathIndex + 1) : [];
+  const remainingSteps = safePath.length > 0 ? safePath.slice(safePathIndex + 1) : [];
 
   const paceInfo = TRAVEL_PACES.find(p => p.id === travelPace) || TRAVEL_PACES[1];
 
-  const hexesRemaining = Math.max(0, path.length - 1 - pathIndex);
+  const hexesRemaining = Math.max(0, safePath.length - 1 - safePathIndex);
 
   // resumePausedMode: the SKIP leg re-joins the in-progress route, so it
   // restores the mode the event interrupted (traveling mid-route, planning on
@@ -591,8 +604,8 @@ export default function useTravelManagement({
     travelMode,
     travelPace,
     destination,
-    path,
-    pathIndex,
+    path: safePath,
+    pathIndex: safePathIndex,
     accruedCost,
     dailyBudget,
     dayExhausted,

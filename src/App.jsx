@@ -89,7 +89,17 @@ function applyStoreUpdate(storeKey, data, campaignName) {
   // Character keys: SSE key is "change-{campaign}-{characterName}" -> apply full object to character store
   if (isCampaignKey(storeKey)) {
     const campaignStore = getStore('campaign');
-    campaignStore.set(storeKey, data);
+    if (data === null) {
+      // Cleared-key echo (POST null / key DELETE both publish null): mirror it as a
+      // key REMOVE, not a stored null. useSyncedState then re-exposes the consumer's
+      // DECLARED default (null scalars fall back to null too, so the run-K
+      // EventDialog-close-on-clear fix is unchanged) and typed consumers — e.g. the
+      // travel hook's Array `path` render reads — are never handed a raw null
+      // (bug-hex-arrival-null-echo-blank-screen: storing null crashed the whole SPA).
+      campaignStore.delete(storeKey);
+    } else {
+      campaignStore.set(storeKey, data);
+    }
     notify('campaign');
   } else {
     setRuntimeObject(storeKey, data, campaignName, true);
