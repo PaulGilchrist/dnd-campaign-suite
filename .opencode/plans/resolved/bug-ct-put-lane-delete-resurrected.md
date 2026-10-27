@@ -53,3 +53,27 @@ A brand-new NPC (editor "New NPC" → POST per-entity, or a create whose body ca
 ## Severity
 
 **Data integrity risk.** A concurrent delete in the GM's primary entity lane (NPCs) is silently reversed by a second editor's save — the player/monster never actually leaves the campaign, and neither session is told. Same class as the array-lane bug that was deemed worth fixing in `48c8ca2d2`; leaving the PUT lanes unguarded defeats the intent of that fix and the "reload the list and re-apply" recovery guidance.
+
+## Resolution
+
+**FIXED (2026-10-27).** The diagnosis in this file was confirmed exactly: `hasUpdateConflict(existing, incoming)` is null-safe (`existing && …`), so a PUT whose row was deleted elsewhere (`existing === null`) fell straight through to the upsert-create leg and silently re-inserted it with a fresh stamp.
+
+**What changed** (the array-POST and per-entity-PUT lanes now share ONE discriminator so they can never drift apart again):
+
+- `server/utils/jsonEntityCrud.js` — extracted the exported `isResurrectionAttempt(existing, incoming, id)` predicate (row absent from disk + echoed numeric `updatedAt` + resolvable id); `findConcurrentWrite`'s resurrection leg now calls it (behavior-preserving refactor — the existing array-lane tests pin it); guard docstring updated to cover both lanes.
+- `server/routes/npcs.js` — NPC PUT refuses with `409 conflictErrorBody('NPC', decodedNpcName, 'created or deleted')` when `isResurrectionAttempt(existingNpc, updatedNpc, …)`, placed after `hasUpdateConflict` and **before** `handleImageChange` so a rejected save is fully inert (no image side effects).
+- `server/routes/sessions.js` — same guard (lowercase `session` noun matching the lane's existing casing; the case-inconsistency is a separate run-H backlog item).
+- `server/routes/settlements.js` — same guard using the `resolveSettlementIndex`-resolved row (label prefers the body's display name); the stale comment claiming "only the 'modified' leg applies here" was removed. Genuine upsert-creates (client never sets `updatedAt`) keep flowing — proven live + unit-pinned.
+- No dual-ruleset twin needed: this is the server CRUD layer, not a rules module. Factions/Quests/Notes have no per-entity PUT lanes (whole-array POST only); encounters/maps PUTs carry no `updatedAt` stamp contract.
+
+**Regression tests** (all green):
+
+- `server/routes/npcs.concurrent-save.test.js` — new `deleted-row resurrection guard` describe: exact repro (create → DELETE → stale-echo PUT → 409 verbatim copy + `conflict:true` + disk stays deleted + image ops zero), genuine unstamped create still 200, legacy un-stamped saves stay bootstrap-writable.
+- `server/routes/sessions.concurrent-save.test.js` — NEW file mirroring the settlements harness: resurrection 409 (verbatim lowercase-`session` copy) + create unaffected + 'modified' leg intact.
+- `server/routes/settlements.concurrent-save.test.js` — new resurrection describe: by-name and by-id stale PUTs both 409, disk inert; unstamped upsert-create still 200.
+- `server/utils/jsonEntityCrud.resurrected-save.test.js` — `isResurrectionAttempt` truth-table describe locking the shared discriminator (and rejecting non-numeric stamps / null ids).
+- Touched-lane run: `npx vitest run server/routes/{npcs,sessions,settlements}* server/utils/jsonEntityCrud*` → **17 files / 258 tests passed**. `npm run lint` → zero warnings.
+
+**Live re-verification** (Playwright, test-campaign, real UI after API restart): created `QA Resurrect` via New-NPC form (PUT 200 — creates unaffected) → opened editor → `DELETE /npcs/QA Resurrect` as the other session (list `["Marta Copperkettle"]`) → editor Save → **409** `{ conflict: true, error: "NPC \"QA Resurrect\" was created or deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved." }` — verbatim Expected copy; modal + draft preserved; inline banner with the `Reload list` button; **disk stayed `["Marta Copperkettle"]`** (no resurrect, fully inert). Recovery leg: Reload list → modal closes, banner clears, list refetches to the true deleted state. Adjacent sanity: two legitimate back-to-back Marta saves (fresh stamp echoes) still 200; Marta notes baseline restored to `''`.
+
+Residuals (pre-existing, out of scope): sessions/settlements 409 banners still lack the close-refetch `Reload list` machinery the NPC lane has (9cee7bfa2) — noted in the playbook conflict-banner row as a natural follow-up pair; the cross-lane conflict-noun casing inconsistency is the run-H backlog item.

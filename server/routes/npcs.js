@@ -7,6 +7,7 @@ import {
   createJsonEntityRouter,
   conflictErrorBody,
   hasUpdateConflict,
+  isResurrectionAttempt,
   stampForSave,
 } from '../utils/jsonEntityCrud.js';
 import { publish } from '../utils/changeData.js';
@@ -122,6 +123,15 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
     // touching image files so a rejected save is fully inert.
     if (hasUpdateConflict(existingNpc, updatedNpc)) {
       return res.status(409).json(conflictErrorBody('NPC', decodedNpcName));
+    }
+
+    // Resurrection leg (mirrors the array lane's guard): the row is gone from
+    // disk (deleted in another tab/session) yet the sender echoes the stamp it
+    // read while the row still existed — refuse instead of silently reviving
+    // the deleted NPC. A genuine create carries no updatedAt (see
+    // isResurrectionAttempt).
+    if (isResurrectionAttempt(existingNpc, updatedNpc, decodedNpcName)) {
+      return res.status(409).json(conflictErrorBody('NPC', decodedNpcName, 'created or deleted'));
     }
 
     handleImageChange(campaign, updatedNpc, existingNpc, existingNpc?.imagePath);

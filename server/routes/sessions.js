@@ -5,6 +5,7 @@ import {
   createJsonEntityRouter,
   conflictErrorBody,
   hasUpdateConflict,
+  isResurrectionAttempt,
   stampForSave,
 } from '../utils/jsonEntityCrud.js';
 import { findDuplicateNameError } from '../utils/nameUniqueness.js';
@@ -50,6 +51,13 @@ baseRouter.put('/api/campaigns/:campaign/sessions/:sessionName', asyncHandler((r
     const existingSession = existingIndex !== -1 ? sessions[existingIndex] : null;
     if (hasUpdateConflict(existingSession, updatedSession)) {
       return res.status(409).json(conflictErrorBody('session', decodedName));
+    }
+
+    // Resurrection leg (mirrors the array lane's guard): row deleted elsewhere
+    // but the sender echoes the stamp it read before the delete — refuse
+    // instead of silently reviving it. Genuine creates carry no updatedAt.
+    if (isResurrectionAttempt(existingSession, updatedSession, decodedName)) {
+      return res.status(409).json(conflictErrorBody('session', decodedName, 'created or deleted'));
     }
 
     const stampedSession = stampForSave(updatedSession, existingSession);

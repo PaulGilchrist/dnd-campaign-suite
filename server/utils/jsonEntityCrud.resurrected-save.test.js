@@ -7,7 +7,7 @@
 // no echoed stamp, so creation stays untouched.
 import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
-import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import { createJsonEntityRouter, isResurrectionAttempt } from '../utils/jsonEntityCrud.js';
 
 // In-memory fs mirroring jsonEntityCrud.concurrent-save.test.js
 const mockFsState = new Map();
@@ -127,5 +127,27 @@ describe('jsonEntityCrud — deleted-row resurrection guard', () => {
         const res = await postArray(app, [{ id: 'e1', name: 'one' }, { id: 'legacy', name: 'old' }]);
         expect(res.status).toBe(200);
         expect(typeof readDisk()[1].updatedAt).toBe('number');
+    });
+});
+
+// Shared discriminator used by BOTH the whole-array POST (findConcurrentWrite)
+// and the per-entity PUT lanes (npcs/sessions/settlements — bug-ct-put-lane-
+// delete-resurrected) so the two write paths can never drift apart again.
+describe('isResurrectionAttempt — shared PUT/POST discriminator', () => {
+    it('flags a stamped incoming row whose disk row is gone', () => {
+        expect(isResurrectionAttempt(null, { id: 'e2', updatedAt: 5 }, 'e2')).toBe(true);
+    });
+
+    it('never fires when the disk row still exists (modified leg owns it)', () => {
+        expect(isResurrectionAttempt({ id: 'e1', updatedAt: 5 }, { id: 'e1', updatedAt: 5 }, 'e1')).toBe(false);
+    });
+
+    it('never fires on genuine creates (no echoed stamp) or un-stamped legacy bodies', () => {
+        expect(isResurrectionAttempt(null, { id: 'new' }, 'new')).toBe(false);
+        expect(isResurrectionAttempt(null, { id: 'legacy', updatedAt: '7' }, 'legacy')).toBe(false);
+    });
+
+    it('never fires without a resolvable id', () => {
+        expect(isResurrectionAttempt(null, { updatedAt: 5 }, null)).toBe(false);
     });
 });

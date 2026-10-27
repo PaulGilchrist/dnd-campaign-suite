@@ -5,6 +5,7 @@ import {
   createJsonEntityRouter,
   conflictErrorBody,
   hasUpdateConflict,
+  isResurrectionAttempt,
   stampForSave,
 } from '../utils/jsonEntityCrud.js';
 import { findDuplicateNameError } from '../utils/nameUniqueness.js';
@@ -66,12 +67,21 @@ baseRouter.put('/api/campaigns/:campaign/settlements/:settlementName', asyncHand
 
     // Concurrent-save guard (mirrors jsonEntityCrud POST): stale echoed stamp
     // = this tab never read the current row — refuse instead of clobbering.
-    // Only the 'modified' leg applies here: a PUT to an unknown id-or-name is
-    // the route's upsert-create contract, not a stale-row signal.
     const existingSettlement = existingIndex !== -1 ? settlements[existingIndex] : null;
     if (hasUpdateConflict(existingSettlement, updatedSettlement)) {
       const displayName = existingSettlement.name || decodedName;
       return res.status(409).json(conflictErrorBody(SINGULAR_DISPLAY_NAME, displayName));
+    }
+
+    // Resurrection leg (mirrors the array lane's guard, shared discriminator
+    // isResurrectionAttempt): a PUT whose id-or-name is absent from disk but
+    // echoes an updatedAt stamp is a stale editor reviving a settlement
+    // deleted elsewhere — refuse instead of undoing the delete. A genuine
+    // upsert-create carries no updatedAt, so creation stays unaffected.
+    if (isResurrectionAttempt(existingSettlement, updatedSettlement, decodedName)) {
+      return res.status(409).json(
+        conflictErrorBody(SINGULAR_DISPLAY_NAME, updatedSettlement.name || decodedName, 'created or deleted')
+      );
     }
 
     const stampedSettlement = stampForSave(updatedSettlement, existingSettlement);

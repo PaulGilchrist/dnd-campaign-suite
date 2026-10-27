@@ -21,6 +21,10 @@ function singularize(name) {
 // symmetric leg holds too: a re-sent row (with an echoed stamp) that disk no
 // longer has would resurrect an entity deleted elsewhere — also 409. Legacy
 // rows without any stamp stay writable (bootstrap), and get stamped on write.
+// The per-entity PUT-upsert lanes (npcs, sessions, settlements) share the
+// same 'modified' (hasUpdateConflict) and 'created or deleted'
+// (isResurrectionAttempt) discriminators so the two write paths can never
+// drift apart again.
 // ---------------------------------------------------------------------------
 
 const STALE_EDIT_ERROR = 'reload the list and re-apply your edit — it was NOT saved.';
@@ -42,6 +46,17 @@ function canonicalize(value, stripStamp = false) {
 /** True when two entity snapshots hold identical content (ignoring the stamp). */
 export function sameEntityContent(a, b) {
   return JSON.stringify(canonicalize(a, true)) === JSON.stringify(canonicalize(b, true));
+}
+
+/** True when a save echoes an `updatedAt` stamp for a row disk no longer has —
+ *  the sender could only have read it BEFORE another tab/session deleted the
+ *  row, so accepting the save would silently resurrect it. Shared by the
+ *  whole-array POST (findConcurrentWrite) and the per-entity PUT-upsert lanes
+ *  (npcs/sessions/settlements) so the two can never drift apart again. A
+ *  brand-new row carries no echoed stamp (the client never sets updatedAt), so
+ *  genuine creates never trip it; legacy un-stamped rows stay bootstrap-writable. */
+export function isResurrectionAttempt(existing, incoming, id) {
+  return id != null && !existing && Boolean(incoming) && typeof incoming.updatedAt === 'number';
 }
 
 /** True when the sender's echoed stamp proves it never read the current row. */
@@ -89,12 +104,11 @@ function findConcurrentWrite(diskEntities, incomingEntities, idField) {
     if (existing && hasUpdateConflict(existing, incoming)) {
       return { id, reason: 'modified' };
     }
-    // Resurrection leg: an incoming row absent from disk that echoes an
-    // updatedAt stamp proves the sender read it BEFORE another tab/session
-    // deleted it — saving would silently undo that delete. A brand-new row
-    // carries no echoed stamp (the client never sets updatedAt), so creating
-    // stays untouched.
-    if (!existing && id != null && typeof incoming.updatedAt === 'number') {
+    // Resurrection leg (shared discriminator — see isResurrectionAttempt):
+    // an incoming row absent from disk that echoes an updatedAt stamp proves
+    // the sender read it BEFORE another tab/session deleted it — saving would
+    // silently undo that delete.
+    if (isResurrectionAttempt(existing, incoming, id)) {
       return { id, reason: 'created or deleted' };
     }
   }

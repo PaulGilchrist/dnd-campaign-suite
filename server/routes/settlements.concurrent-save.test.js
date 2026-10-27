@@ -217,3 +217,59 @@ describe('settlements PUT — by-name backward compatibility', () => {
         expect(typeof readDisk()[0].updatedAt).toBe('number');
     });
 });
+
+// Regression lock for bug-ct-put-lane-delete-resurrected: the PUT lane used to
+// treat a stale echoed stamp on a row absent from disk as an upsert-CREATE
+// (200), silently undoing another tab/session's delete. It now mirrors the
+// array lane's 'created or deleted' leg via the shared isResurrectionAttempt
+// discriminator; the upsert-create contract survives for unstamped bodies.
+describe('settlements PUT — deleted-row resurrection guard', () => {
+    it('409s a stale-stamp PUT to a settlement deleted elsewhere (by-name URL)', async () => {
+        const app = createApp();
+        const boot = await putSettlement(app, ironhaven());
+        expect(boot.status).toBe(200);
+        const stamp = readDisk()[0].updatedAt;
+
+        // Another session deletes it.
+        const del = await request(app).delete(
+            `/api/campaigns/${campaign}/settlements/Ironhaven`
+        );
+        expect(del.status).toBe(200);
+        expect(readDisk()).toEqual([]);
+
+        // Tab A's stale editor replays the snapshot it read before the delete.
+        const stale = await putSettlement(app, ironhaven({ notes: 'TAB-A', updatedAt: stamp }));
+        expect(stale.status).toBe(409);
+        expect(stale.body.conflict).toBe(true);
+        expect(stale.body.error).toBe(
+            'Settlement "Ironhaven" was created or deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.'
+        );
+        // The peer's delete survives — nothing was written.
+        expect(readDisk()).toEqual([]);
+    });
+
+    it('409s a stale-stamp PUT-by-id to an id-row deleted elsewhere', async () => {
+        const app = createApp();
+        const row = { id: 'qa-set-id-1', name: 'QA Set Id', size: 'village', updatedAt: 123 };
+        FILE_SYSTEM.set(filePath, JSON.stringify([row]));
+
+        // Delete via the URL the client would use (by name — factory DELETE).
+        const del = await request(app).delete(
+            `/api/campaigns/${campaign}/settlements/QA%20Set%20Id`
+        );
+        expect(del.status).toBe(200);
+
+        const stale = await putSettlement(app, { ...row, size: 'town' }, 'qa-set-id-1');
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toMatch(/created or deleted/);
+        expect(readDisk()).toEqual([]);
+    });
+
+    it('still upsert-creates a settlement no stamp echo can fake (unknown name, no updatedAt)', async () => {
+        const app = createApp();
+        FILE_SYSTEM.set(filePath, JSON.stringify([{ name: 'Rival' }]));
+        const res = await putSettlement(app, ironhaven());
+        expect(res.status).toBe(200);
+        expect(readDisk().map(s => s.name)).toEqual(['Rival', 'Ironhaven']);
+    });
+});

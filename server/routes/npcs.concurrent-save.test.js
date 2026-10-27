@@ -171,3 +171,66 @@ describe('npcs PUT — concurrent-save conflict detection', () => {
         expect(typeof readDisk()[0].updatedAt).toBe('number');
     });
 });
+
+// Regression lock for bug-ct-put-lane-delete-resurrected: 48c8ca2d2 closed the
+// resurrection hole on the whole-array POST lane only — the per-entity PUT
+// still silently re-created a row another tab/session had deleted, because
+// hasUpdateConflict is null-safe against existing === null. The PUT lane now
+// mirrors the array lane's 'created or deleted' leg via the shared
+// isResurrectionAttempt discriminator.
+describe('npcs PUT — deleted-row resurrection guard', () => {
+    const resurrect = (overrides = {}) => ({
+        name: 'QA Resurrect',
+        race: 'human',
+        classRole: 'cultist',
+        notes: 'doomed',
+        ...overrides,
+    });
+
+    it('409s a stale-form save of an NPC deleted elsewhere and keeps it deleted', async () => {
+        const app = createApp();
+        // Tab A creates the NPC (genuine create carries no echoed stamp).
+        const created = await putNpc(app, resurrect());
+        expect(created.status).toBe(200);
+        const stamp = readDisk()[0].updatedAt;
+
+        // Another session deletes it (the open editor skips the SSE refresh).
+        const del = await request(app).delete(
+            `/api/campaigns/${campaign}/npcs/QA%20Resurrect`
+        );
+        expect(del.status).toBe(200);
+        expect(readDisk().map(n => n.name)).toEqual([]);
+
+        // Tab A's editor survives the delete and saves its stale snapshot —
+        // the exact repro from the bug file.
+        const stale = await putNpc(app, resurrect({ updatedAt: stamp }));
+        expect(stale.status).toBe(409);
+        expect(stale.body.conflict).toBe(true);
+        expect(stale.body.error).toBe(
+            'NPC "QA Resurrect" was created or deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.'
+        );
+
+        // The peer's delete survives: no resurrection, no write at all.
+        expect(readDisk().map(n => n.name)).toEqual([]);
+        expect(IMAGE_OPS.deleted).toEqual([]);
+        expect(IMAGE_OPS.uploaded).toEqual([]);
+    });
+
+    it('still accepts a genuine create to an unknown name (no echoed stamp)', async () => {
+        const app = createApp();
+        const res = await putNpc(app, resurrect()); // fresh form: updatedAt absent
+        expect(res.status).toBe(200);
+        expect(readDisk().map(n => n.name)).toEqual(['QA Resurrect']);
+        expect(typeof readDisk()[0].updatedAt).toBe('number');
+    });
+
+    it('keeps legacy un-stamped saves into deleted rows writable (bootstrap)', async () => {
+        const app = createApp();
+        // Pre-fix clients never echo stamps — indistinguishable from creates,
+        // so the bootstrap contract stays (mirrors jsonEntityCrud.resurrected-save).
+        FILE_SYSTEM.set(npcPath, JSON.stringify([marta({ updatedAt: 500 })]));
+        const res = await putNpc(app, { name: 'Ghost Row', notes: 'legacy re-add' });
+        expect(res.status).toBe(200);
+        expect(readDisk()).toHaveLength(2);
+    });
+});
