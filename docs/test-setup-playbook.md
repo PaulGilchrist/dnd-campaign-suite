@@ -1244,3 +1244,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - STALE /tmp/dnd-api.log TRAP: session-end campaign-lock-denial greps must target the CURRENT session's log (or check mtime) — old `> /tmp/dnd-api.log` debris from prior runs' restart recipe falsely implicates the current run (found `Testing G1` BLOCKED lines 64 min older than my server start).
 - Notes 409 probe-copy recipe: reconstruct the note row VERBATIM from disk (uuid `cb7fa303-dfcc-…`) before stale-echo rigs — a guessed id exercises the created-or-deleted leg, not the modified leg (still inert, but wrong proof).
 - Array-lane displayField now wired on ALL four entity routes (notes/factions/quests + NPC/Session/Settlement PUT lanes label by name); raw-id labeling is dead except blank-name fallback.
+
+## 2026-10-27 improve run — erase-terrain-tooltip (owner-confirmed tooltip-only scope)
+
+- Hex paint cells render as `path` elements under `g.terrain-layer` (~1671 on a grid-20 map); naive ordinal index (`cells[100]`) can land off-viewport (negative y, silent no-click) — filter candidates by BOTH `.hex-map` and viewport rect before `page.mouse.click`.
+- `HexMapToolbar.test.jsx` enforces a strict "every button aria-label mirrors its title" contract (BUTTON_TITLE_ORDER + TOOL_TITLES) — any future title-only clarification on an icon button needs an explicit exception there or the suite pins the mirror. Erase button now intentionally splits: aria-label "Erase terrain", title "Erase terrain paint (re-click Paint rivers tool to remove river hexes)".

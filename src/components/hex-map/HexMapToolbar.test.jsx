@@ -9,7 +9,7 @@ import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_ROAD, TOOL_TRAVEL }
 // but they must stay in sync with HexMapToolbar.jsx.
 const TOOL_TITLES = {
     [TOOL_PAINT]: 'Paint terrain',
-    [TOOL_ERASE]: 'Erase terrain',
+    [TOOL_ERASE]: 'Erase terrain paint (re-click Paint rivers tool to remove river hexes)',
     [TOOL_RIVER]: 'Paint rivers',
     [TOOL_ROAD]: 'Connect cities and settlements with roads',
     [TOOL_TRAVEL]: 'Travel mode — plan and execute overland travel',
@@ -81,13 +81,20 @@ describe('HexMapToolbar', () => {
     });
 
     // a0211afcb precedent: icon-only tool buttons mirror their title into an
-    // aria-label so harnesses can reach them by accessible name.
+    // aria-label so harnesses can reach them by accessible name. One
+    // intentional split: the erase button keeps its short accessible name
+    // ("Erase terrain") while the title carries the terrain-vs-rivers
+    // contract clarification (2026-10-27 QA run I — tooltip only, no rename).
     it('gives every toolbar button an aria-label mirroring its title', () => {
         renderToolbar();
         const buttons = [...container.querySelectorAll('.hex-map-toolbar button')];
         expect(buttons.length).toBe(BUTTON_TITLE_ORDER.length);
         for (const button of buttons) {
-            expect(button.getAttribute('aria-label')).toBe(button.getAttribute('title'));
+            if (button === screen.getByRole('button', { name: 'Erase terrain' })) {
+                expect(button.getAttribute('title')).toBe(TOOL_TITLES[TOOL_ERASE]);
+            } else {
+                expect(button.getAttribute('aria-label')).toBe(button.getAttribute('title'));
+            }
         }
         // Zero unlabelled buttons; a role+name click still dispatches.
         expect(container.querySelectorAll('.hex-map-toolbar button:not([aria-label])')).toHaveLength(0);
@@ -192,6 +199,33 @@ describe('HexMapToolbar', () => {
         expect(props.setTool).toHaveBeenLastCalledWith(TOOL_NONE);
         renderToolbar({ tool: TOOL_NONE });
         expect(screen.getByRole('button', { name: travelName })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    // Run I (2026-10-27) backlog: tooltip-only clarification of the erase
+    // contract — clears terrain paint overrides only; river hexes toggle off
+    // by re-clicking the Paint rivers tool. Behavior must be untouched:
+    // short aria-label, .active toggle, arm/disarm payloads unchanged.
+    it('erase button documents terrain-only scope in its tooltip without changing behavior', () => {
+        renderToolbar({ tool: TOOL_NONE });
+        const erase = screen.getByRole('button', { name: 'Erase terrain' });
+        expect(erase).toHaveAttribute(
+            'title',
+            'Erase terrain paint (re-click Paint rivers tool to remove river hexes)'
+        );
+        expect(erase).toHaveAttribute('aria-label', 'Erase terrain');
+        expect(erase).not.toHaveAttribute('aria-pressed');
+
+        fireEvent.click(erase);
+        expect(props.setTool).toHaveBeenCalledTimes(1);
+        expect(props.setTool).toHaveBeenCalledWith(TOOL_ERASE);
+
+        props.setTool.mockClear();
+        renderToolbar({ tool: TOOL_ERASE });
+        const armed = screen.getByRole('button', { name: 'Erase terrain' });
+        expect(armed).toHaveClass('active');
+        fireEvent.click(armed);
+        expect(props.setTool).toHaveBeenCalledTimes(1);
+        expect(props.setTool).toHaveBeenCalledWith(TOOL_NONE);
     });
 
     it('clicking a swatch selects that terrain and arms the paint tool', () => {

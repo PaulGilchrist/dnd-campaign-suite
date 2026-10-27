@@ -44,7 +44,7 @@ function HexMapToolbar({
             <button
                 className={tool === TOOL_ERASE ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_ERASE ? TOOL_NONE : TOOL_ERASE)}
-                title="Erase terrain"
+                title="Erase terrain paint (re-click Paint rivers tool to remove river hexes)"
                 aria-label="Erase terrain"
             >
                 <i className="fa-solid fa-eraser"></i>
