@@ -110,6 +110,16 @@
   font-size: 0.85rem;
 }
 
+/* "Reload list" one-click recovery inside a 409 conflict banner — rides the
+   global .ct-btn styling, sized like .ct-btn-sm, own line under the copy.
+   Mirrors .npcs-error-reload-btn. */
+.sessions-error-reload-btn {
+  display: block;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 4px 10px;
+}
+
 /* --- AI prompt buttons --- */
 .sessions-ai-row {
   display: flex;

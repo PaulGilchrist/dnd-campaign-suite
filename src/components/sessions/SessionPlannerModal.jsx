@@ -250,7 +250,9 @@ function SessionPlannerModal({
   saving,
   deleting,
   error,
+  errorConflict,
   onClose,
+  onReloadList,
   onSave,
   onDelete,
   onFormChange,
@@ -287,7 +289,22 @@ function SessionPlannerModal({
         </div>
 
         <div className="ct-modal-body">
-          {error && <div className="sessions-form-error">{error}</div>}
+          {error && (
+            <div className="sessions-form-error">
+              {error}
+              {/* 409 conflicts only: one-click sanctioned recovery (close +
+                  refetch) so the guided "reload the list" step needs no
+                  trial-and-error. Mirrors NPCs.jsx's stale-close path. */}
+              {errorConflict && onReloadList && (
+                <button
+                  className="ct-btn sessions-error-reload-btn"
+                  onClick={onReloadList}
+                >
+                  <i className="fa-solid fa-rotate" /> Reload list
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="sessions-form-row">
             <div className="sessions-form-col">

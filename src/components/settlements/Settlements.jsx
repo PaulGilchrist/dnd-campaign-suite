@@ -113,8 +113,8 @@ function SettlementListItem({ settlement, onEdit }) {
 }
 
 function SettlementModal({
-  formData, editingSettlement, saving, deleting, error,
-  onClose, onSave, onDelete, onFormChange,
+  formData, editingSettlement, saving, deleting, error, errorConflict,
+  onClose, onReloadList, onSave, onDelete, onFormChange,
   onAddService, onServiceChange, onRemoveService,
   onAddNPC, onNPCChange, onRemoveNPC,
   onAddRumor, onRumorChange, onRemoveRumor,
@@ -134,7 +134,22 @@ function SettlementModal({
         </div>
 
         <div className="ct-modal-body">
-          {error && <div className="settlements-form-error">{error}</div>}
+          {error && (
+            <div className="settlements-form-error">
+              {error}
+              {/* 409 conflicts only: one-click sanctioned recovery (close +
+                  refetch) so the guided "reload the list" step needs no
+                  trial-and-error. Mirrors NPCs.jsx's stale-close path. */}
+              {errorConflict && onReloadList && (
+                <button
+                  className="ct-btn settlements-error-reload-btn"
+                  onClick={onReloadList}
+                >
+                  <i className="fa-solid fa-rotate" /> Reload list
+                </button>
+              )}
+            </div>
+          )}
           <label htmlFor="settlement-name" className="ct-label">
             Name <span className="ct-required">*</span>
           </label>
@@ -396,7 +411,24 @@ function Settlements({ campaignName, onBack }) {
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  // True when the visible banner error is a 409 concurrent-edit conflict
+  // (server body { conflict: true }) — gates the "Reload list" action button.
+  const [errorIsConflict, setErrorIsConflict] = useState(false);
+  // Rejected (409) saves prove the on-screen list is stale; consumed in
+  // handleCloseModal so a reopen re-seeds a fresh row instead of repeating the
+  // same 409. Mirrors NPCs.jsx (9cee7bfa2). NOTE: unlike the NPC/Faction/
+  // Quest/Note lanes, the settlements route publishes no `settlements-list-*`
+  // SSE broadcast, so there is no skipped-while-editing leg here — the
+  // rejected save is the only staleness signal.
+  const missedListBroadcast = useRef(false);
   const descDataRef = useRef(null);
+
+  // Single choke point for the banner: every message carries whether it was a
+  // conflict, so the "Reload list" action can never outlive its error copy.
+  const showError = (message, conflict = false) => {
+    setError(message);
+    setErrorIsConflict(conflict);
+  };
 
   useEffect(() => {
     if (campaignName) {
@@ -435,7 +467,7 @@ function Settlements({ campaignName, onBack }) {
   });
 
   const handleNewSettlement = () => {
-    setError(null);
+    showError(null);
     openNew(getDefaultFormData());
   };
 
@@ -456,6 +488,7 @@ function Settlements({ campaignName, onBack }) {
     setGenerating(true);
     try {
       const generated = await generateSettlement(settlements);
+      showError(null);
       openNew(getDefaultFormData(generated));
     } catch (error) {
       console.error('Failed to generate settlement:', error);
@@ -465,14 +498,29 @@ function Settlements({ campaignName, onBack }) {
   };
 
   const handleEditSettlement = (settlement) => {
-    setError(null);
+    showError(null);
     openEdit(settlement);
     setFormData(getDefaultFormData(settlement));
   };
 
+  // Close modal and reset
   const handleCloseModal = () => {
-    setError(null);
+    showError(null);
     closeModal();
+    // A save the server rejected means the rows are stale — refresh so the
+    // next reopen seeds fresh (mirrors NPCs.jsx handleCloseModal).
+    if (missedListBroadcast.current) {
+      missedListBroadcast.current = false;
+      loadItems();
+    }
+  };
+
+  // One-click guided recovery for the 409 banner: force the sanctioned stale
+  // close path (close the editor + consume the list refresh) so the reopen
+  // immediately seeds the fresh row — no trial-and-error.
+  const handleReloadList = () => {
+    missedListBroadcast.current = true;
+    handleCloseModal();
   };
 
   const handleFormChange = (field, value) => {
@@ -572,14 +620,15 @@ function Settlements({ campaignName, onBack }) {
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
     if (hasDuplicateName()) {
-      setError('A settlement with that name already exists');
+      showError('A settlement with that name already exists');
       return;
     }
     setSaving(true);
     try {
       await saveSettlement(campaignName, formData, editingSettlement?.name);
       await loadItems();
-      setError(null);
+      showError(null);
+      missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
       if (err.conflict) {
@@ -587,7 +636,10 @@ function Settlements({ campaignName, onBack }) {
       } else {
         console.error('Failed to save settlement:', err);
       }
-      setError(err.message || 'Failed to save settlement');
+      // A rejected save means the server row moved on without us — the list
+      // is stale; closing refreshes it (see handleCloseModal).
+      missedListBroadcast.current = true;
+      showError(err.message || 'Failed to save settlement', err.conflict === true);
     } finally {
       setSaving(false);
     }
@@ -599,6 +651,7 @@ function Settlements({ campaignName, onBack }) {
     setDeleting(true);
     try {
       await deleteSettlementAction(editingSettlement.name);
+      missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {
       console.error('Failed to delete settlement:', error);
@@ -698,7 +751,9 @@ function Settlements({ campaignName, onBack }) {
           saving={saving}
           deleting={deleting}
           error={error}
+          errorConflict={errorIsConflict}
           onClose={handleCloseModal}
+          onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}
           onFormChange={handleFormChange}

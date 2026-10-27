@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadSessions, saveSession, saveSessions, deleteSession } from '../../services/campaign/sessionsService.js';
@@ -63,8 +63,25 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
 
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  // True when the visible banner error is a 409 concurrent-edit conflict
+  // (server body { conflict: true }) — gates the "Reload list" action button.
+  const [errorIsConflict, setErrorIsConflict] = useState(false);
+  // Rejected (409) saves prove the on-screen list is stale; consumed in
+  // handleCloseModal so a reopen re-seeds a fresh row instead of repeating the
+  // same 409. Mirrors NPCs.jsx (9cee7bfa2). NOTE: unlike the NPC/Faction/
+  // Quest/Note lanes, the sessions route publishes no `sessions-list-*` SSE
+  // broadcast, so there is no skipped-while-editing leg here — the rejected
+  // save is the only staleness signal.
+  const missedListBroadcast = useRef(false);
   const [picker, setPicker] = useState({ maps: [], encounters: [], npcs: [], quests: [], settlements: [], notes: [] });
   const [toast, setToast] = useState('');
+
+  // Single choke point for the banner: every message carries whether it was a
+  // conflict, so the "Reload list" action can never outlive its error copy.
+  const showError = (message, conflict = false) => {
+    setError(message);
+    setErrorIsConflict(conflict);
+  };
 
   useEffect(() => {
     if (campaignName) loadItems();
@@ -96,13 +113,33 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   }, [modalOpen, formData, setFormData]);
 
   const handleNewSession = () => {
-    setError(null);
+    showError(null);
     openNew(getDefaultSessionData());
   };
 
   const handleEditSession = (session) => {
-    setError(null);
+    showError(null);
     openEdit(getDefaultSessionData(session));
+  };
+
+  // Close modal and reset
+  const handleCloseModal = () => {
+    showError(null);
+    closeModal();
+    // A save the server rejected means the rows are stale — refresh so the
+    // next reopen seeds fresh (mirrors NPCs.jsx handleCloseModal).
+    if (missedListBroadcast.current) {
+      missedListBroadcast.current = false;
+      loadItems();
+    }
+  };
+
+  // One-click guided recovery for the 409 banner: force the sanctioned stale
+  // close path (close the editor + consume the list refresh) so the reopen
+  // immediately seeds the fresh row — no trial-and-error.
+  const handleReloadList = () => {
+    missedListBroadcast.current = true;
+    handleCloseModal();
   };
 
   const hasDuplicateName = () => sessions.some(s =>
@@ -112,7 +149,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
     if (hasDuplicateName()) {
-      setError('A session with that name already exists');
+      showError('A session with that name already exists');
       return;
     }
     setSaving(true);
@@ -120,16 +157,20 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       const cleaned = { ...formData, name: formData.name.trim() };
       cleaned.checklist = mergeChecklist(cleaned.checklist, cleaned.links);
       await saveSession(campaignName, cleaned, editingSession?.name);
-      setError(null);
+      showError(null);
       await loadItems();
-      closeModal();
+      missedListBroadcast.current = false;
+      handleCloseModal();
     } catch (err) {
       if (err.conflict) {
         console.warn('Concurrent-edit conflict saving session:', err.message);
       } else {
         console.error('Failed to save session:', err);
       }
-      setError(err.message || 'Failed to save session');
+      // A rejected save means the server row moved on without us — the list
+      // is stale; closing refreshes it (see handleCloseModal).
+      missedListBroadcast.current = true;
+      showError(err.message || 'Failed to save session', err.conflict === true);
     } finally {
       setSaving(false);
     }
@@ -141,10 +182,11 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     setDeleting(true);
     try {
       await deleteSessionAction(editingSession.name);
-      closeModal();
+      missedListBroadcast.current = false;
+      handleCloseModal();
     } catch (err) {
       console.error('Failed to delete session:', err);
-      setError(err.message || 'Failed to delete session');
+      showError(err.message || 'Failed to delete session');
     } finally {
       setDeleting(false);
     }
@@ -196,7 +238,8 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       } else {
         console.error('Failed to move link:', err);
       }
-      setError(err.message || 'Failed to move link');
+      missedListBroadcast.current = true;
+      showError(err.message || 'Failed to move link', err.conflict === true);
     }
   };
 
@@ -222,7 +265,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       }
     } catch (err) {
       console.error('Failed to run session quick action:', err);
-      setError(err.message || 'Quick action failed');
+      showError(err.message || 'Quick action failed');
     }
   };
 
@@ -291,14 +334,16 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       });
       showToast(`“${playedName}” archived to the campaign log`);
       await loadItems();
-      closeModal();
+      missedListBroadcast.current = false;
+      handleCloseModal();
     } catch (err) {
       if (err.conflict) {
         console.warn('Concurrent-edit conflict saving session (mark played):', err.message);
       } else {
         console.error('Failed to mark session as played:', err);
       }
-      setError(err.message || 'Failed to mark session as played');
+      missedListBroadcast.current = true;
+      showError(err.message || 'Failed to mark session as played', err.conflict === true);
     }
   };
 
@@ -380,7 +425,9 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
           saving={saving}
           deleting={deleting}
           error={error}
-          onClose={closeModal}
+          errorConflict={errorIsConflict}
+          onClose={handleCloseModal}
+          onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}
           onFormChange={handleFormChange}
