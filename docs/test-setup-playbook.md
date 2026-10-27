@@ -1218,3 +1218,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - PITFALL: `vi.spyOn(console, …)` without `afterEach(vi.restoreAllMocks)` accumulates call counts across tests in the same file (bit the Factions/Quests/NPCs conflict-reload tests).
 - PITFALL: an identical-content whole-array POST PRESERVES the disk stamp (no-op by design) — the curl-as-other-tab 409 rig must change content to force the re-stamp.
 - Note: Chrome itself logs `Failed to load resource: … 409` at error level for the non-2xx status; page JS cannot suppress it without breaking the 409 contract — judge app-level console.error only.
+
+## 2026-10-27 improve run — extreme-banner-copy-derive-label (TravelPanel label derivation)
+
+- STALE-DIST TRAP: `http://localhost` (:80) can serve an OLD `dist/` bundle predating recent commits while Vite :5173 serves live source — symptom is DOCUMENTED-DEAD behavior resurrected (e.g. weather auto-rolling on every travel-tool press despite the a2ff18611 fix, with the stale bundle's 1s autosave CLOBBERING a disk-seeded `weather` within seconds — panel label mutates Cloudy→Rain→Clear across identical attempts). For any client-behavior verification use :5173; rebuild `dist/` (`npm run build`) before trusting :80. Fingerprint: seeded disk value randomizing per interaction = stale bundle, not a loader race.
+- Fetch-spy rig: patch `window.fetch` to log `/maps/<slug>` GET-response weather labels + PUT-request weather bodies — instantly separates "loader lost the seed" from "something re-rolled it".
