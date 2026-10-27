@@ -86,7 +86,7 @@ function NoteListItem({ note, onEdit }) {
 }
 
 function NoteModal({
-  formData, editingNote, partyLevel, isLocalhost, saving, deleting,
+  formData, editingNote, partyLevel, isLocalhost, saving, deleting, error,
   onClose, onFieldChange, onSave, onDelete,
 }) {
   if (!formData) return null;
@@ -106,6 +106,10 @@ function NoteModal({
         </div>
 
         <div className="ct-modal-body">
+          {/* Inline error message (e.g. server 409 "changed elsewhere") —
+              mirrors .npcs-form-error / .factions-form-error usage */}
+          {error && <div className="notes-form-error">{error}</div>}
+
           {/* Description (largest input) */}
           <PreviewToggle
             id="note-description"
@@ -211,6 +215,9 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
     openNew, openEdit, closeModal, updateFormField,
   } = useCrudList(notes, ['description']);
   const [deleting, setDeleting] = useState(false);
+  // Server-surfaced save/delete errors (e.g. 409 concurrent-edit conflict) —
+  // mirrors the error state in NPCs.jsx / Factions.jsx.
+  const [error, setError] = useState(null);
 
   // Load notes on mount
   useEffect(() => {
@@ -237,6 +244,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
   // Open modal for new note
   const handleNewNote = () => {
+    setError(null);
     openNew({
       id: crypto.randomUUID(),
       description: '',
@@ -250,11 +258,15 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
   // Open modal for editing a note
   const handleEditNote = (note) => {
+    setError(null);
     openEdit(note);
   };
 
   // Close modal and reset
-  const handleCloseModal = closeModal;
+  const handleCloseModal = () => {
+    setError(null);
+    closeModal();
+  };
 
   // Handle form field changes
   const handleFormChange = updateFormField;
@@ -274,9 +286,13 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
         : [...notes, updated];
 
       await saveNotesList(updatedNotes);
+      setError(null);
       handleCloseModal();
     } catch (error) {
       console.error('Failed to save note:', error);
+      // Server-side conflicts (409 "changed elsewhere") and failures surface
+      // verbatim in the modal so a stale tab never silently loses its edit.
+      setError(error.message || 'Failed to save note');
     } finally {
       setSaving(false);
     }
@@ -291,9 +307,11 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
     setDeleting(true);
     try {
       await deleteNoteAction(editingNote.id);
+      setError(null);
       handleCloseModal();
     } catch (error) {
       console.error('Failed to delete note:', error);
+      setError(error.message || 'Failed to delete note');
     } finally {
       setDeleting(false);
     }
@@ -378,6 +396,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
           isLocalhost={isLocalhost}
           saving={saving}
           deleting={deleting}
+          error={error}
           onClose={handleCloseModal}
           onFieldChange={handleFormChange}
           onSave={handleSave}

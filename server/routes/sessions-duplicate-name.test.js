@@ -117,16 +117,19 @@ describe('sessions - POST duplicate-name guard (validateList)', () => {
             [sessionsPath('test-campaign')]: [{ name: 'QA Sess A' }],
         });
         const app = createTestApp();
+        // Whole-array saves must still carry every existing row (the
+        // concurrent-save guard 409s drops); unique names pass validateList.
         const res = await request(app)
             .post('/api/campaigns/test-campaign/sessions')
             .send({ sessions: [
+                { name: 'QA Sess A' },
                 { name: 'Renamed Unique Session' },
                 { name: 'Another Unique Session' },
             ] });
 
         expect(res.status).toBe(200);
         const content = JSON.parse(FILE_SYSTEM.get(sessionsPath('test-campaign')));
-        expect(content).toHaveLength(2);
+        expect(content).toHaveLength(3);
     });
 });
 

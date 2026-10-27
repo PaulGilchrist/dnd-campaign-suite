@@ -101,14 +101,14 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-        expect(res.body.settlement).toEqual(settlementData);
+        expect(res.body.settlement).toEqual({ ...settlementData, updatedAt: expect.any(Number) });
 
         // Verify file was written
         const filePath = getFilePath(campaign);
         expect(mockFsData.has(filePath)).toBe(true);
         const fileData = mockFsData.get(filePath);
         expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(settlementData);
+        expect(fileData[0]).toEqual({ ...settlementData, updatedAt: expect.any(Number) });
     });
 
     it('should update an existing settlement when it exists', async () => {
@@ -133,11 +133,11 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-        expect(res.body.settlement).toEqual(updatedData);
+        expect(res.body.settlement).toEqual({ ...updatedData, updatedAt: expect.any(Number) });
 
         const fileData = mockFsData.get(filePath);
         expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(updatedData);
+        expect(fileData[0]).toEqual({ ...updatedData, updatedAt: expect.any(Number) });
     });
 
     it('should append a new settlement to an existing file', async () => {
@@ -193,7 +193,7 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
 
         const fileData = mockFsData.get(filePath);
         expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(updatedData);
+        expect(fileData[0]).toEqual({ ...updatedData, updatedAt: expect.any(Number) });
         expect(fileData[0]).not.toHaveProperty('extraField');
     });
 
@@ -212,7 +212,7 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
             .send(settlementData);
 
         expect(res.status).toBe(200);
-        expect(res.body.settlement).toEqual(settlementData);
+        expect(res.body.settlement).toEqual({ ...settlementData, updatedAt: expect.any(Number) });
     });
 
     it('should handle settlement names with URL-encoded ampersand', async () => {
@@ -280,7 +280,7 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
             .send(settlementData);
 
         expect(res.status).toBe(200);
-        expect(res.body.settlement).toEqual(settlementData);
+        expect(res.body.settlement).toEqual({ ...settlementData, updatedAt: expect.any(Number) });
 
         const filePath = getFilePath(campaign);
         const fileData = mockFsData.get(filePath);
@@ -301,7 +301,7 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
             .send(settlementData);
 
         expect(res.status).toBe(200);
-        expect(res.body.settlement).toEqual(settlementData);
+        expect(res.body.settlement).toEqual({ ...settlementData, updatedAt: expect.any(Number) });
     });
 
     it('should handle multiple upserts to the same settlement', async () => {
@@ -342,7 +342,7 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
         const filePath = getFilePath(campaign);
         const fileData = mockFsData.get(filePath);
         expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(updatedData);
+        expect(fileData[0]).toEqual({ ...updatedData, updatedAt: expect.any(Number) });
     });
 
     it('should handle settlements with boolean and null fields', async () => {
@@ -506,7 +506,7 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
 
         const fileData = mockFsData.get(filePath);
         expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(settlementData);
+        expect(fileData[0]).toEqual({ ...settlementData, updatedAt: expect.any(Number) });
     });
 
     it('should handle non-array data in file by treating it as empty array', async () => {
@@ -532,6 +532,6 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
 
         const fileData = mockFsData.get(filePath);
         expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(settlementData);
+        expect(fileData[0]).toEqual({ ...settlementData, updatedAt: expect.any(Number) });
     });
 });

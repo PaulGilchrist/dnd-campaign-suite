@@ -1,7 +1,12 @@
 import fs from 'fs';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import {
+  createJsonEntityRouter,
+  conflictErrorBody,
+  hasUpdateConflict,
+  stampForSave,
+} from '../utils/jsonEntityCrud.js';
 import { findDuplicateNameError } from '../utils/nameUniqueness.js';
 
 const baseRouter = createJsonEntityRouter('sessions', {
@@ -40,14 +45,22 @@ baseRouter.put('/api/campaigns/:campaign/sessions/:sessionName', asyncHandler((r
 
     const existingIndex = sessions.findIndex(s => s.name === decodedName);
 
+    // Concurrent-save guard (mirrors jsonEntityCrud POST): stale echoed stamp
+    // = this tab never read the current row — refuse instead of clobbering.
+    const existingSession = existingIndex !== -1 ? sessions[existingIndex] : null;
+    if (hasUpdateConflict(existingSession, updatedSession)) {
+      return res.status(409).json(conflictErrorBody('session', decodedName));
+    }
+
+    const stampedSession = stampForSave(updatedSession, existingSession);
     if (existingIndex !== -1) {
-      sessions[existingIndex] = updatedSession;
+      sessions[existingIndex] = stampedSession;
     } else {
-      sessions.push(updatedSession);
+      sessions.push(stampedSession);
     }
 
     fs.writeFileSync(filePath, JSON.stringify(sessions, null, 2));
-    res.json({ success: true, session: updatedSession });
+    res.json({ success: true, session: stampedSession });
   } catch (error) {
     console.error('Error updating session:', error);
     throw new Error('Failed to update session');

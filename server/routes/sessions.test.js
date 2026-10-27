@@ -74,7 +74,10 @@ describe('sessions CRUD', () => {
       .post('/api/campaigns/c1/sessions')
       .send({ sessions: payload });
     expect(res.status).toBe(200);
-    expect(mockFsData.get(getFilePath('c1'))).toEqual(payload);
+    // Concurrent-save guard stamps every written row (bug-ct-editor-concurrent-save)
+    expect(mockFsData.get(getFilePath('c1'))).toEqual(
+      payload.map(s => ({ ...s, updatedAt: expect.any(Number) }))
+    );
   });
 
   it('POST rejects a non-array body', async () => {
@@ -112,7 +115,8 @@ describe('sessions PUT upsert', () => {
       .put('/api/campaigns/c1/sessions/Session 7: Smugglers Cave')
       .send(data);
     expect(res.status).toBe(200);
-    expect(res.body.session).toEqual(data);
+    // Written rows carry a concurrency stamp (bug-ct-editor-concurrent-save)
+    expect(res.body.session).toEqual({ ...data, updatedAt: expect.any(Number) });
     expect(mockFsData.get(getFilePath('c1'))).toHaveLength(1);
   });
 
@@ -123,7 +127,9 @@ describe('sessions PUT upsert', () => {
       .put('/api/campaigns/c1/sessions/Session 1')
       .send(updated);
     expect(res.status).toBe(200);
-    expect(mockFsData.get(getFilePath('c1'))).toEqual([updated]);
+    expect(mockFsData.get(getFilePath('c1'))).toEqual(
+      [{ ...updated, updatedAt: expect.any(Number) }]
+    );
   });
 
   it('rejects an empty name', async () => {

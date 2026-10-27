@@ -248,7 +248,7 @@ describe('npcs - POST /api/campaigns/:campaign/npcs', () => {
         expect(res.body).toHaveProperty('error', 'Expected an array for npcs');
     });
 
-    it('should overwrite existing npcs with the new array', async () => {
+    it('should refuse a whole-array POST that drops an existing NPC (concurrent-save guard)', async () => {
         const existingData = [
             { name: 'Old NPC', alignment: 'Lawful' },
         ];
@@ -263,7 +263,20 @@ describe('npcs - POST /api/campaigns/:campaign/npcs', () => {
             .post('/api/campaigns/test-campaign/npcs')
             .send({ npcs: newData });
 
-        expect(res.status).toBe(200);
+        // A save whose snapshot never knew about "Old NPC" is refused instead
+        // of silently dropping it (bug-ct-editor-concurrent-save).
+        expect(res.status).toBe(409);
+        expect(res.body.conflict).toBe(true);
+        const untouched = JSON.parse(FILE_SYSTEM.get(npcsPath('test-campaign')));
+        expect(untouched.map(n => n.name)).toEqual(['Old NPC']);
+
+        // The app's real delete lane is DELETE; replace after it still works.
+        const del = await request(app).delete('/api/campaigns/test-campaign/npcs/Old%20NPC');
+        expect(del.status).toBe(200);
+        const ok = await request(app)
+            .post('/api/campaigns/test-campaign/npcs')
+            .send({ npcs: newData });
+        expect(ok.status).toBe(200);
         const content = JSON.parse(FILE_SYSTEM.get(npcsPath('test-campaign')));
         expect(content).toHaveLength(1);
         expect(content[0].name).toBe('New NPC');
@@ -480,7 +493,8 @@ describe('npcs - PUT /api/campaigns/:campaign/npcs/:npcName (upsert)', () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
         expect(res.body).toHaveProperty('npc');
-        expect(res.body.npc).toEqual(npcData);
+        // Concurrent-save guard stamps every written row (bug-ct-editor-concurrent-save)
+        expect(res.body.npc).toEqual({ ...npcData, updatedAt: expect.any(Number) });
 
         const content = JSON.parse(FILE_SYSTEM.get(npcsPath('test-campaign')));
         expect(content).toHaveLength(1);
@@ -499,7 +513,7 @@ describe('npcs - PUT /api/campaigns/:campaign/npcs/:npcName (upsert)', () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
         expect(res.body).toHaveProperty('npc');
-        expect(res.body.npc).toEqual(npcData);
+        expect(res.body.npc).toEqual({ ...npcData, updatedAt: expect.any(Number) });
 
         const content = JSON.parse(FILE_SYSTEM.get(npcsPath('test-campaign')));
         expect(content).toHaveLength(1);
@@ -520,7 +534,7 @@ describe('npcs - PUT /api/campaigns/:campaign/npcs/:npcName (upsert)', () => {
             .send(updatedData);
 
         expect(res.status).toBe(200);
-        expect(res.body.npc).toEqual(updatedData);
+        expect(res.body.npc).toEqual({ ...updatedData, updatedAt: expect.any(Number) });
 
         const content = JSON.parse(FILE_SYSTEM.get(npcsPath('test-campaign')));
         expect(content).toHaveLength(1);

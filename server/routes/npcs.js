@@ -3,7 +3,12 @@ import fs from 'fs';
 import { processImageUpload, deleteCharacterImage } from '../utils/imageUtils.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDataFile, campaignImagesDir, ensureDataDir } from '../utils/campaignPaths.js';
-import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import {
+  createJsonEntityRouter,
+  conflictErrorBody,
+  hasUpdateConflict,
+  stampForSave,
+} from '../utils/jsonEntityCrud.js';
 import { publish } from '../utils/changeData.js';
 
 const broadcastNPCsList = (action, campaign, payload = {}) => {
@@ -112,18 +117,26 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
       return res.status(400).json({ error: bestiaryNameError(newName) });
     }
 
+    // Concurrent-save guard (mirrors jsonEntityCrud POST): an echoed stale
+    // updatedAt proves this tab never read the current row — refuse BEFORE
+    // touching image files so a rejected save is fully inert.
+    if (hasUpdateConflict(existingNpc, updatedNpc)) {
+      return res.status(409).json(conflictErrorBody('NPC', decodedNpcName));
+    }
+
     handleImageChange(campaign, updatedNpc, existingNpc, existingNpc?.imagePath);
 
     const action = existingIndex !== -1 ? 'updated' : 'created';
+    const stampedNpc = stampForSave(updatedNpc, existingNpc);
     if (existingIndex !== -1) {
-      npcs[existingIndex] = updatedNpc;
+      npcs[existingIndex] = stampedNpc;
     } else {
-      npcs.push(updatedNpc);
+      npcs.push(stampedNpc);
     }
 
     fs.writeFileSync(npcPath, JSON.stringify(npcs, null, 2));
-    broadcastNPCsList(action, campaign, { name: updatedNpc.name });
-    res.json({ success: true, npc: updatedNpc });
+    broadcastNPCsList(action, campaign, { name: stampedNpc.name });
+    res.json({ success: true, npc: stampedNpc });
   } catch (error) {
     console.error('Error updating NPC:', error);
     throw new Error('Failed to update NPC');

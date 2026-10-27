@@ -210,7 +210,7 @@ describe('jsonEntityCrud - basic CRUD with defaults', () => {
             expect(stored[0].name).toBe('Entity One');
         });
 
-        it('should overwrite existing entities', async () => {
+        it('should refuse a whole-array POST that drops existing rows (concurrent-save guard)', async () => {
             const existing = [{ id: 'old', name: 'Old Entity' }];
             writeEntities(campaign, entityName, existing);
 
@@ -221,7 +221,18 @@ describe('jsonEntityCrud - basic CRUD with defaults', () => {
                 .post(`/api/campaigns/${campaign}/${entityName}`)
                 .send({ testentities: newEntities });
 
-            expect(res.status).toBe(200);
+            // Silent drop of a row the sender never read is refused with 409.
+            expect(res.status).toBe(409);
+            expect(res.body.conflict).toBe(true);
+
+            // After the DELETE endpoint removes the row, replacement works.
+            const del = await request(app)
+                .delete(`/api/campaigns/${campaign}/${entityName}/old`);
+            expect(del.status).toBe(200);
+            const ok = await request(app)
+                .post(`/api/campaigns/${campaign}/${entityName}`)
+                .send({ testentities: newEntities });
+            expect(ok.status).toBe(200);
 
             const stored = JSON.parse(mockFsState.get(dataFileFor(campaign, entityName)));
             expect(stored).toHaveLength(1);

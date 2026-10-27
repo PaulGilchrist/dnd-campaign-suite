@@ -212,7 +212,7 @@ describe('factions - POST (real router)', () => {
         expect(stored).toEqual([]);
     });
 
-    it('should overwrite existing factions with the new array', async () => {
+    it('should refuse a whole-array POST that drops an existing faction (concurrent-save guard)', async () => {
         const existingData = [{ id: 'old-1', name: 'Old Faction', description: 'Old', goals: 'Old', influence: 1, notes: '' }];
         writeFactions(campaign, existingData);
 
@@ -223,8 +223,19 @@ describe('factions - POST (real router)', () => {
             .post(`/api/campaigns/${campaign}/factions`)
             .send({ factions: newFactionsData });
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        // Blind replace that forgets "old-1" is refused, not silently applied.
+        expect(res.status).toBe(409);
+        expect(res.body.conflict).toBe(true);
+        const untouched = JSON.parse(mockFsState.get(dataFileFor(campaign)));
+        expect(untouched.map(f => f.id)).toEqual(['old-1']);
+
+        // The app's delete lane is DELETE; replace afterwards still works.
+        const del = await request(app).delete(`/api/campaigns/${campaign}/factions/old-1`);
+        expect(del.status).toBe(200);
+        const ok = await request(app)
+            .post(`/api/campaigns/${campaign}/factions`)
+            .send({ factions: newFactionsData });
+        expect(ok.status).toBe(200);
 
         const stored = JSON.parse(mockFsState.get(dataFileFor(campaign)));
         expect(stored).toHaveLength(1);

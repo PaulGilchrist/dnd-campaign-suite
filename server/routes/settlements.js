@@ -1,7 +1,12 @@
 import fs from 'fs';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import {
+  createJsonEntityRouter,
+  conflictErrorBody,
+  hasUpdateConflict,
+  stampForSave,
+} from '../utils/jsonEntityCrud.js';
 import { findDuplicateNameError } from '../utils/nameUniqueness.js';
 
 const baseRouter = createJsonEntityRouter('settlements', {
@@ -42,14 +47,22 @@ baseRouter.put('/api/campaigns/:campaign/settlements/:settlementName', asyncHand
       return res.status(400).json({ error: 'A settlement with that name already exists' });
     }
 
+    // Concurrent-save guard (mirrors jsonEntityCrud POST): stale echoed stamp
+    // = this tab never read the current row — refuse instead of clobbering.
+    const existingSettlement = existingIndex !== -1 ? settlements[existingIndex] : null;
+    if (hasUpdateConflict(existingSettlement, updatedSettlement)) {
+      return res.status(409).json(conflictErrorBody('settlement', decodedName));
+    }
+
+    const stampedSettlement = stampForSave(updatedSettlement, existingSettlement);
     if (existingIndex !== -1) {
-      settlements[existingIndex] = updatedSettlement;
+      settlements[existingIndex] = stampedSettlement;
     } else {
-      settlements.push(updatedSettlement);
+      settlements.push(stampedSettlement);
     }
 
     fs.writeFileSync(filePath, JSON.stringify(settlements, null, 2));
-    res.json({ success: true, settlement: updatedSettlement });
+    res.json({ success: true, settlement: stampedSettlement });
   } catch (error) {
     console.error('Error updating settlement:', error);
     throw new Error('Failed to update settlement');
