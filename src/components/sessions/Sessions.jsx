@@ -124,7 +124,11 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       await loadItems();
       closeModal();
     } catch (err) {
-      console.error('Failed to save session:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving session:', err.message);
+      } else {
+        console.error('Failed to save session:', err);
+      }
       setError(err.message || 'Failed to save session');
     } finally {
       setSaving(false);
@@ -187,7 +191,11 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       await loadItems();
       showToast(`Moved to “${target.name}”`);
     } catch (err) {
-      console.error('Failed to move link:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving session (move link):', err.message);
+      } else {
+        console.error('Failed to move link:', err);
+      }
       setError(err.message || 'Failed to move link');
     }
   };
@@ -285,7 +293,11 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       await loadItems();
       closeModal();
     } catch (err) {
-      console.error('Failed to mark session as played:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving session (mark played):', err.message);
+      } else {
+        console.error('Failed to mark session as played:', err);
+      }
       setError(err.message || 'Failed to mark session as played');
     }
   };

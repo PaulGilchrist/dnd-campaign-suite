@@ -33,7 +33,19 @@ export function useEntityManagement(campaignName, { load: loadFn, save: saveFn, 
       await saveFn(campaignName, array);
       await loadItems();
     } catch (error) {
-      if (logError) console.error(`Failed to save ${responseKey || 'items'}:`, error);
+      if (logError) {
+        // Handled 409 concurrent-edit conflicts (error.conflict — server
+        // discriminator) are benign rejected edits: the editor banner +
+        // "Reload list" affordance own user feedback (improve 2026-10-27-H).
+        if (error.conflict) {
+          console.warn(
+            `Concurrent-edit conflict saving ${responseKey || 'items'}:`,
+            error.message
+          );
+        } else {
+          console.error(`Failed to save ${responseKey || 'items'}:`, error);
+        }
+      }
       throw error;
     }
   }, [campaignName, saveFn, loadItems, responseKey, logError]);

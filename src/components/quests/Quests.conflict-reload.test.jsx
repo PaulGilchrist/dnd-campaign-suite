@@ -7,7 +7,7 @@
 // (fix 9cee7bfa2). Non-conflict failures keep the old copy-only banner.
 // Mirrors the mocked service/SSE rig of Quests.sse-sync.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Quests from './Quests';
 
 vi.mock('../../services/ui/sseClient.js', () => ({
@@ -66,8 +66,15 @@ describe('Quests 409 banner — Reload list recovery action', () => {
     saveError = null;
     questsFixture = [{ id: 'q1', name: 'The Lost Artifact', status: 'active', description: 'old' }];
   });
+  afterEach(() => {
+    // Console warn/error spies are per-test: restore so flagged-409 (warn)
+    // and non-conflict (error) lanes never bleed across boundaries.
+    vi.restoreAllMocks();
+  });
 
   it('a flagged 409 offers Reload list — one click closes the editor and refetches the fresh row', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     saveError = conflictError();
     const { findByText } = renderQuests();
     await openEditorAndSave(findByText);
@@ -77,6 +84,12 @@ describe('Quests 409 banner — Reload list recovery action', () => {
     const reloadButton = screen.getByRole('button', { name: 'Reload list' });
     // Nothing re-fetched while the refusal banner is still up.
     expect(loadCallCount).toBe(1);
+    // improve 2026-10-27-H: rejected edit stays amber — no red console ERROR.
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Concurrent-edit conflict saving quest:',
+      CONFLICT_MESSAGE
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     // What the other tab already persisted server-side.
     questsFixture = [{ id: 'q1', name: 'The Sunken Shrine', status: 'active', description: 'new' }];
@@ -92,12 +105,17 @@ describe('Quests 409 banner — Reload list recovery action', () => {
   });
 
   it('non-conflict save failures keep the old copy-only banner (no Reload list)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     saveError = new Error('Failed to save quests');
     const { findByText } = renderQuests();
     await openEditorAndSave(findByText);
 
     await screen.findByText(/Failed to save quests/);
     expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
+    // Genuine failures still log red; warn channel untouched.
+    expect(errorSpy).toHaveBeenCalledWith('Failed to save quest:', saveError);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('the button vanishes once a live duplicate-name banner takes over the copy', async () => {

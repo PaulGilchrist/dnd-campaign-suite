@@ -24,12 +24,24 @@ export const saveSession = async (campaignName, session, oldName) => {
       body: JSON.stringify(session),
     });
     if (!response.ok) {
-      const { error } = await response.json();
-      throw new Error(error || 'Failed to save session');
+      const body = await response.json();
+      const err = new Error(body.error || 'Failed to save session');
+      // Server 409 concurrent-edit conflicts carry { conflict: true } — the
+      // editor banner keys its one-click "Reload list" recovery off this flag.
+      err.conflict = body.conflict === true;
+      throw err;
     }
     return await response.json();
   } catch (error) {
-    console.error('Error saving session:', error);
+    // A handled 409 concurrent-edit conflict (error.conflict — the server's
+    // sanctioned discriminator) is a benign rejected edit: the editor banner +
+    // "Reload list" affordance already tell the user, so keep it off the red
+    // ERROR channel. Genuine failures (network, 4xx/5xx) still log at error.
+    if (error.conflict) {
+      console.warn('Concurrent-edit conflict saving session:', error.message);
+    } else {
+      console.error('Error saving session:', error);
+    }
     throw error;
   }
 };
@@ -42,12 +54,22 @@ export const saveSessions = async (campaignName, sessions) => {
       body: JSON.stringify({ sessions }),
     });
     if (!response.ok) {
-      const { error } = await response.json();
-      throw new Error(error || 'Failed to save sessions');
+      const body = await response.json();
+      const err = new Error(body.error || 'Failed to save sessions');
+      // Server 409 concurrent-edit conflicts carry { conflict: true } — the
+      // editor banner keys its one-click "Reload list" recovery off this flag.
+      err.conflict = body.conflict === true;
+      throw err;
     }
     return await response.json();
   } catch (error) {
-    console.error('Error saving sessions:', error);
+    // Flagged 409 conflicts are benign rejected edits (banner handles them) —
+    // warn, never red ERROR; genuine failures still log at error.
+    if (error.conflict) {
+      console.warn('Concurrent-edit conflict saving sessions:', error.message);
+    } else {
+      console.error('Error saving sessions:', error);
+    }
     throw error;
   }
 };

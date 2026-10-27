@@ -188,3 +188,73 @@ describe('error lane: server bytes verbatim, then || fallback, per export', () =
     ]);
   });
 });
+
+// ─── Console lane split (improve 2026-10-27-H) ──────────────────────────────
+// A handled 409 concurrent-edit conflict is a benign rejected edit — the
+// editor banner + "Reload list" affordance owns user feedback, so it must
+// land on console.warn, NEVER the red console.error channel. Genuine save
+// failures (5xx, network rejection) keep logging at error.
+describe('409 console lane split: conflict -> warn, genuine failure -> error', () => {
+  // conflictErrorBody bytes (jsonEntityCrud.js:88, noun 'NPC' from npcs.js:46).
+  const CONFLICT_MESSAGE =
+    'NPC "Bram Ironhand" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+  const conflictBody = { error: CONFLICT_MESSAGE, conflict: true };
+
+  it.each([
+    { label: 'saveNPC (PUT lane)', invoke: (c) => saveNPC(c, CUSTOM_NPC) },
+    { label: 'saveNPCs (POST lane)', invoke: (c) => saveNPCs(c, [CUSTOM_NPC]) },
+  ])('$label: flagged 409 conflict -> warn only, err.conflict=true', async ({ invoke }) => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', fetchQueue(err(conflictBody)));
+
+    const thrown = await invoke('test-campaign').catch((e) => e);
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown.message).toBe(CONFLICT_MESSAGE);
+    expect(thrown.conflict).toBe(true); // banner's Reload-list discriminator
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Concurrent-edit conflict saving NPC'),
+      CONFLICT_MESSAGE
+    );
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'saveNPC', invoke: (c) => saveNPC(c, CUSTOM_NPC) },
+    { label: 'saveNPCs', invoke: (c) => saveNPCs(c, [CUSTOM_NPC]) },
+  ])('$label: non-conflict 500 -> error only, no warn, err.conflict=false', async ({ invoke }) => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', fetchQueue(err({ error: 'Failed to update NPC' })));
+
+    const thrown = await invoke('test-campaign').catch((e) => e);
+
+    expect(thrown.message).toBe('Failed to update NPC');
+    expect(thrown.conflict).toBe(false);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Error saving NPC'), thrown);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('saveNPC: an ok:false body without conflict:true is not treated as a conflict', async () => {
+    // 409-shaped probes aside, only the sanctioned { conflict: true } byte
+    // routes to warn — a plain error body stays red.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', fetchQueue(err({ error: 'Conflict-ish but unflagged', conflict: false })));
+
+    const thrown = await saveNPC('test-campaign', CUSTOM_NPC).catch((e) => e);
+
+    expect(thrown.conflict).toBe(false);
+    expect(console.error).toHaveBeenCalledWith('Error saving NPC:', thrown);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('saveNPC/saveNPCs: network rejection stays console.error (no conflict flag)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('ENOTFOUND'))));
+
+    await expect(saveNPC('test-campaign', CUSTOM_NPC)).rejects.toThrow('ENOTFOUND');
+    await expect(saveNPCs('test-campaign', [])).rejects.toThrow('ENOTFOUND');
+
+    expect(console.error).toHaveBeenCalledTimes(2);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});

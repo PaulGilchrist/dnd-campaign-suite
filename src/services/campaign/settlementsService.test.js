@@ -67,6 +67,7 @@ import {
 describe('settlementsService', () => {
   let fetchSpy;
   let consoleErrorSpy;
+  let consoleWarnSpy;
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -76,6 +77,9 @@ describe('settlementsService', () => {
       throw new Error(`unmocked fetch in settlementsService test: ${url}`);
     });
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Warn channel is assertable: a handled 409 conflict must land HERE
+    // (improve 2026-10-27-H) while genuine failures stay on console.error.
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -148,6 +152,31 @@ describe('settlementsService', () => {
         saveSettlement('test-campaign', { name: 'waterdeep' }, 'Neverwinter')
       ).rejects.toThrow('A settlement with that name already exists');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving settlement:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+
+    it('routes a handled 409 PUT-lane conflict to console.warn — never a red ERROR (improve 2026-10-27-H)', async () => {
+      // server truth: settlements.js PUT guard -> conflictErrorBody (noun
+      // 'Settlement') — the banner owns user feedback; console stays amber.
+      const conflictMessage =
+        'Settlement "Waterdeep" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+      fetchSpy.mockResolvedValue({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: () => Promise.resolve({ error: conflictMessage, conflict: true }),
+      });
+
+      const thrown = await saveSettlement('test-campaign', { name: 'Waterdeep' }).catch((e) => e);
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect(thrown.message).toBe(conflictMessage);
+      expect(thrown.conflict).toBe(true); // banner's Reload-list discriminator
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Concurrent-edit conflict saving settlement:',
+        conflictMessage
+      );
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
     it('falls back to its own generic message when the error body has no error field', async () => {
@@ -160,6 +189,7 @@ describe('settlementsService', () => {
 
       await expect(saveSettlement('test-campaign', { name: 'Test' })).rejects.toThrow('Failed to save settlement');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving settlement:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it('rejects and logs on network failure', async () => {
@@ -167,6 +197,7 @@ describe('settlementsService', () => {
 
       await expect(saveSettlement('test-campaign', { name: 'Test' })).rejects.toThrow('ENOTFOUND');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving settlement:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -284,6 +315,30 @@ describe('settlementsService', () => {
         saveSettlements('test-campaign', [{ name: 'Waterdeep' }, { name: 'waterdeep' }])
       ).rejects.toThrow('A settlement with that name already exists');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving settlements:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+
+    it('routes a handled 409 POST-lane conflict to console.warn — never a red ERROR (improve 2026-10-27-H)', async () => {
+      // server truth: jsonEntityCrud POST findConcurrentWrite → conflictErrorBody
+      const conflictMessage =
+        'Settlement "Waterdeep" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+      fetchSpy.mockResolvedValue({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: () => Promise.resolve({ error: conflictMessage, conflict: true }),
+      });
+
+      const thrown = await saveSettlements('test-campaign', []).catch((e) => e);
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect(thrown.message).toBe(conflictMessage);
+      expect(thrown.conflict).toBe(true); // banner's Reload-list discriminator
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Concurrent-edit conflict saving settlements:',
+        conflictMessage
+      );
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
     it('falls back to its own generic message when the error body has no error field', async () => {
@@ -296,6 +351,7 @@ describe('settlementsService', () => {
 
       await expect(saveSettlements('test-campaign', [])).rejects.toThrow('Failed to save settlements');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving settlements:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it('rejects and logs on network failure', async () => {
@@ -303,6 +359,7 @@ describe('settlementsService', () => {
 
       await expect(saveSettlements('test-campaign', [])).rejects.toThrow('ENOTFOUND');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving settlements:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 

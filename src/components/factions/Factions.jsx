@@ -195,7 +195,11 @@ function Factions({ campaignName, onBack }) {
       missedListBroadcast.current = false;
       flushSync(handleCloseModal);
     } catch (err) {
-      console.error('Failed to save faction:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving faction:', err.message);
+      } else {
+        console.error('Failed to save faction:', err);
+      }
       missedListBroadcast.current = true;
       showError(err.message || 'Failed to save factions', err.conflict === true);
     } finally {

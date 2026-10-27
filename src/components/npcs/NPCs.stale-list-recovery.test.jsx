@@ -8,7 +8,7 @@
 // list re-fetches and the next reopen seeds a fresh row. Mirrors the mocked
 // service/SSE harness of NPCs.sse-sync.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import NPCs from './NPCs';
 
 let capturedHandler = null;
@@ -97,6 +97,11 @@ describe('NPCs 409-recovery: close refreshes the stale list', () => {
     saveNPCImpl = async () => ({ success: true });
     npcsFixture = [{ name: 'Marta Copperkettle', notes: 'old notes', updatedAt: 1 }];
   });
+  afterEach(() => {
+    // Console warn/error spies are per-test: restore so flagged-409 (warn)
+    // and non-conflict (error) lanes never bleed across boundaries.
+    vi.restoreAllMocks();
+  });
 
   it('re-fetches on close after a broadcast was skipped while editing, so a reopen re-seeds the FRESH row', async () => {
     const { findByText } = renderNPCs();
@@ -166,6 +171,8 @@ describe('NPCs 409-recovery: close refreshes the stale list', () => {
   });
 
   it('conflict banner carries a Reload list action — one click closes + refetches so the reopen seeds the fresh row', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     // Service errors from a 409 carry { conflict: true } (server conflict body).
     saveNPCImpl = async () => {
       throw Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
@@ -183,6 +190,12 @@ describe('NPCs 409-recovery: close refreshes the stale list', () => {
     const reloadButton = screen.getByRole('button', { name: 'Reload list' });
     // Nothing re-fetched while the editor stays open on the refusal.
     expect(loadCallCount).toBe(1);
+    // improve 2026-10-27-H: rejected edit stays amber — no red console ERROR.
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Concurrent-edit conflict saving NPC:',
+      CONFLICT_MESSAGE
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     // What the other tab persisted — the refetch below will surface it.
     npcsFixture = [{ name: 'Marta Copperkettle', notes: 'other-tab notes', updatedAt: 2 }];
@@ -204,6 +217,8 @@ describe('NPCs 409-recovery: close refreshes the stale list', () => {
     saveNPCImpl = async () => {
       throw new Error('An NPC with that name already exists');
     };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     renderNPCs();
     await screen.findByText(/old notes/);
 
@@ -212,5 +227,11 @@ describe('NPCs 409-recovery: close refreshes the stale list', () => {
 
     expect(await screen.findByText(/already exists/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
+    // Genuine failures still log red; warn channel untouched.
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Failed to save NPC:',
+      expect.objectContaining({ message: 'An NPC with that name already exists' })
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });

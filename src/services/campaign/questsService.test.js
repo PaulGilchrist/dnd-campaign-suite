@@ -69,6 +69,7 @@ import { loadQuests, saveQuests, loadQuest, deleteQuest } from './questsService.
 describe('questsService', () => {
   let fetchSpy;
   let consoleErrorSpy;
+  let consoleWarnSpy;
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -78,6 +79,9 @@ describe('questsService', () => {
       throw new Error(`unmocked fetch in questsService test: ${url}`);
     });
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Warn channel is assertable: a handled 409 conflict must land HERE
+    // (improve 2026-10-27-H) while genuine failures stay on console.error.
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -220,6 +224,31 @@ describe('questsService', () => {
         { id: 'id-2', name: 'qa dup' },
       ])).rejects.toThrow('A quest with that name already exists');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving quests:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+
+    it('routes a handled 409 conflict to console.warn — never a red ERROR (improve 2026-10-27-H)', async () => {
+      // server truth: conflictErrorBody (jsonEntityCrud.js:88) — the banner +
+      // "Reload list" affordance owns user feedback; console stays amber.
+      const conflictMessage =
+        'Quest "The Lost Artifact" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+      fetchSpy.mockResolvedValue({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: () => Promise.resolve({ error: conflictMessage, conflict: true }),
+      });
+
+      const thrown = await saveQuests('test-campaign', []).catch((e) => e);
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect(thrown.message).toBe(conflictMessage);
+      expect(thrown.conflict).toBe(true); // banner's Reload-list discriminator
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Concurrent-edit conflict saving quests:',
+        conflictMessage
+      );
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
     it('falls back to its own generic message when the error body has no error field', async () => {
@@ -232,6 +261,7 @@ describe('questsService', () => {
 
       await expect(saveQuests('test-campaign', [])).rejects.toThrow('Failed to save quests');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving quests:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it('rejects and logs on network failure', async () => {
@@ -239,6 +269,7 @@ describe('questsService', () => {
 
       await expect(saveQuests('test-campaign', [])).rejects.toThrow('ENOTFOUND');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error saving quests:', expect.any(Error));
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -285,7 +285,11 @@ function Quests({ campaignName, isLocalhost, onBack }) {
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
-      console.error('Failed to save quest:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving quest:', err.message);
+      } else {
+        console.error('Failed to save quest:', err);
+      }
       missedListBroadcast.current = true;
       showError(err.message || 'Failed to save quests', err.conflict === true);
     } finally {

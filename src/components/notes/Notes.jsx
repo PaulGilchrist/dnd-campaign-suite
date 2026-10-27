@@ -335,7 +335,11 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {
-      console.error('Failed to save note:', error);
+      if (error.conflict) {
+        console.warn('Concurrent-edit conflict saving note:', error.message);
+      } else {
+        console.error('Failed to save note:', error);
+      }
       // Server-side conflicts (409 "changed elsewhere") and failures surface
       // verbatim in the modal so a stale tab never silently loses its edit.
       missedListBroadcast.current = true;

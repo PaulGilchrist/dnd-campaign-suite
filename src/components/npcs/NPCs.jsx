@@ -121,7 +121,11 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
-      console.error('Failed to save NPC:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving NPC:', err.message);
+      } else {
+        console.error('Failed to save NPC:', err);
+      }
       // A rejected save means the server row moved on without us — the list
       // is stale; closing refreshes it (see handleCloseModal).
       missedListBroadcast.current = true;
@@ -189,7 +193,11 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       }
       handleCloseModal();
     } catch (err) {
-      console.error('Failed to save NPC:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving NPC:', err.message);
+      } else {
+        console.error('Failed to save NPC:', err);
+      }
       missedListBroadcast.current = true;
       showError(err.message || 'Failed to save NPC', err.conflict === true);
     } finally {

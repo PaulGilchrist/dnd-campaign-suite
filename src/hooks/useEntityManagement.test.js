@@ -231,6 +231,32 @@ describe('useEntityManagement', () => {
         expect.any(Error)
       );
     });
+
+    it('logs a handled 409 conflict at warn, not error (improve 2026-10-27-H)', async () => {
+      // The editor banner + "Reload list" affordance own conflict feedback —
+      // the rejected edit must not add a red console ERROR here either.
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const conflictMessage =
+        'Faction "Harpers" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+      const hooks = createHooks();
+      hooks.save.mockRejectedValue(
+        Object.assign(new Error(conflictMessage), { conflict: true })
+      );
+
+      const { result } = render(hooks, { responseKey: 'factions' });
+      await expect(
+        act(async () => {
+          await result.current.saveItems([]);
+        })
+      ).rejects.toThrow(conflictMessage);
+
+      expect(consoleWarn).toHaveBeenCalledWith(
+        'Concurrent-edit conflict saving factions:',
+        conflictMessage
+      );
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleWarn.mockRestore();
+    });
   });
 
   describe('deleteItem', () => {

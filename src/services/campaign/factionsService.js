@@ -32,7 +32,15 @@ export const saveFactions = async (campaignName, factions) => {
     }
     return await response.json();
   } catch (error) {
-    console.error('Error saving Factions:', error);
+    // A handled 409 concurrent-edit conflict (error.conflict — the server's
+    // sanctioned discriminator) is a benign rejected edit: the editor banner +
+    // "Reload list" affordance already tell the user, so keep it off the red
+    // ERROR channel. Genuine failures (network, 4xx/5xx) still log at error.
+    if (error.conflict) {
+      console.warn('Concurrent-edit conflict saving Factions:', error.message);
+    } else {
+      console.error('Error saving Factions:', error);
+    }
     throw error;
   }
 };

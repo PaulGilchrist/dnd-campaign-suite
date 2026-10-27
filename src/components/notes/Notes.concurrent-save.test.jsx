@@ -122,6 +122,8 @@ describe('Notes — concurrent-save conflict surfacing', () => {
   });
 
   it('flags a 409 conflict with a Reload list action — one click closes the editor and refetches the list', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const hook = mockHook(vi.fn().mockRejectedValue(conflictError()));
     render(
       <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
@@ -132,6 +134,12 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     expect(document.querySelector('.notes-form-error')).not.toBeNull();
     // Only the mount load so far — nothing re-fetched while the banner is up.
     expect(hook.loadItems).toHaveBeenCalledTimes(1);
+    // improve 2026-10-27-H: rejected edit stays amber — no red console ERROR.
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Concurrent-edit conflict saving note:',
+      CONFLICT_MESSAGE
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     fireEvent.click(button);
     // One click = the sanctioned stale close: editor gone + one more refresh,
@@ -142,6 +150,8 @@ describe('Notes — concurrent-save conflict surfacing', () => {
   });
 
   it('non-conflict save failures keep the old copy-only banner (no Reload list)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockHook(vi.fn().mockRejectedValue(new Error('Failed to save notes')));
     render(
       <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
@@ -150,5 +160,8 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     openEditorWithStaleEdit(screen);
     await waitFor(() => expect(document.querySelector('.notes-form-error')).not.toBeNull());
     expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
+    // Genuine failures still log red; warn channel untouched.
+    expect(errorSpy).toHaveBeenCalledWith('Failed to save note:', expect.any(Error));
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });

@@ -582,7 +582,11 @@ function Settlements({ campaignName, onBack }) {
       setError(null);
       handleCloseModal();
     } catch (err) {
-      console.error('Failed to save settlement:', err);
+      if (err.conflict) {
+        console.warn('Concurrent-edit conflict saving settlement:', err.message);
+      } else {
+        console.error('Failed to save settlement:', err);
+      }
       setError(err.message || 'Failed to save settlement');
     } finally {
       setSaving(false);

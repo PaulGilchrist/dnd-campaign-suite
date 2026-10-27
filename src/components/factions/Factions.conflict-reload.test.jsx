@@ -7,7 +7,7 @@
 // (fix 9cee7bfa2). Non-conflict failures keep the old copy-only banner.
 // Mirrors the mocked service/SSE rig of Factions.sse-sync.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Factions from './Factions';
 
 vi.mock('../../services/ui/sseClient.js', () => ({
@@ -61,8 +61,15 @@ describe('Factions 409 banner — Reload list recovery action', () => {
     saveError = null;
     factionsFixture = [{ id: 'f1', name: 'The Iron Consortium', influence: 3 }];
   });
+  afterEach(() => {
+    // Console warn/error spies are per-test: restore so flagged-409 (warn)
+    // and non-conflict (error) lanes never bleed across boundaries.
+    vi.restoreAllMocks();
+  });
 
   it('a flagged 409 offers Reload list — one click closes the editor and refetches the fresh row', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     saveError = conflictError();
     const { findByText } = renderFactions();
     await openEditorAndSave(findByText);
@@ -72,6 +79,12 @@ describe('Factions 409 banner — Reload list recovery action', () => {
     const reloadButton = screen.getByRole('button', { name: 'Reload list' });
     // Nothing re-fetched while the refusal banner is still up.
     expect(loadCallCount).toBe(1);
+    // improve 2026-10-27-H: rejected edit stays amber — no red console ERROR.
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Concurrent-edit conflict saving faction:',
+      CONFLICT_MESSAGE
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     // What the other tab already persisted server-side.
     factionsFixture = [{ id: 'f1', name: 'The Iron Consortium', influence: 7 }];
@@ -87,12 +100,17 @@ describe('Factions 409 banner — Reload list recovery action', () => {
   });
 
   it('non-conflict save failures keep the old copy-only banner (no Reload list)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     saveError = new Error('Failed to save Factions');
     const { findByText } = renderFactions();
     await openEditorAndSave(findByText);
 
     await screen.findByText(/Failed to save Factions/);
     expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
+    // Genuine failures still log red; warn channel untouched.
+    expect(errorSpy).toHaveBeenCalledWith('Failed to save faction:', saveError);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('the button vanishes once a live duplicate-name banner takes over the copy', async () => {

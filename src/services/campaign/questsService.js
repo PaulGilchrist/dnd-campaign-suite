@@ -47,7 +47,15 @@ export async function saveQuests(campaignName, quests) {
       throw err;
     }
   } catch (error) {
-    console.error('Error saving quests:', error);
+    // A handled 409 concurrent-edit conflict (error.conflict — the server's
+    // sanctioned discriminator) is a benign rejected edit: the editor banner +
+    // "Reload list" affordance already tell the user, so keep it off the red
+    // ERROR channel. Genuine failures (network, 4xx/5xx) still log at error.
+    if (error.conflict) {
+      console.warn('Concurrent-edit conflict saving quests:', error.message);
+    } else {
+      console.error('Error saving quests:', error);
+    }
     throw error;
   }
 }
