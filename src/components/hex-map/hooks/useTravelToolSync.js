@@ -30,6 +30,10 @@ function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, { h
         const prevTool = prevToolRef.current;
         const toolJustActivated = tool === TOOL_TRAVEL && prevTool !== TOOL_TRAVEL;
         prevToolRef.current = tool;
+        // Session gate (improve 2026-10-26-D): this session mounted with a
+        // live trip OR loaded a file trip — the branches below split resume
+        // behavior from the legacy external-start contract on this ONE flag.
+        const resumeSession = openedLiveRef.current || hasLoadedTrip;
 
         if (toolJustActivated && travelMgmt.travelMode === 'inactive') {
             travelMgmt.startPlanning();
@@ -46,13 +50,25 @@ function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, { h
             // Domain rule: the travel tool may stay selected only while travel is
             // live — if travel goes inactive mid-selection, force the tool off.
             setTool(TOOL_NONE);
-        } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive
-                   && (prevTool === TOOL_TRAVEL || !(openedLiveRef.current || hasLoadedTrip))) {
-            // Cancel only on deliberate exit (GM deselected the travel tool
-            // mid-trip) or on an external (other-tab/SSE) start seen by a
-            // session that mounted with no trip AND loaded no file trip
-            // (pinned legacy contract). Resume sessions are immune.
-            travelMgmt.cancelTravel();
+        } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive) {
+            if (prevTool === TOOL_TRAVEL || !resumeSession) {
+                // Cancel only on deliberate exit (GM deselected the travel tool
+                // mid-trip) or on an external (other-tab/SSE) start seen by a
+                // session that mounted with no trip AND loaded no file trip
+                // (pinned legacy contract). Resume sessions are immune.
+                travelMgmt.cancelTravel();
+            } else {
+                // Toggle-mirror on adoption/resume (backlog 2026-10-27-G): the
+                // file-trip adoption and reopen-resume lanes activate travel
+                // while the tool stays NONE — the panel mounted but the toolbar
+                // Travel toggle rendered inactive/aria-pressed=false. Mirror
+                // the panel: auto-press the tool so `tool === TOOL_TRAVEL`
+                // stays the SINGLE source of truth for .active/aria-pressed
+                // (toolbar unchanged). A later Cancel lands mode=inactive with
+                // the tool selected → the force-off branch above clears
+                // .active/aria-pressed in the same effect pass.
+                setTool(TOOL_TRAVEL);
+            }
         }
     }, [tool, handleGenerateWeather, travelMgmt, setTool, hasPersistedWeather, hasLoadedTrip]);
 }

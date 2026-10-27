@@ -4,11 +4,12 @@ import { renderHook } from '@testing-library/react';
 import useTravelToolSync from './useTravelToolSync.js';
 import { TOOL_TRAVEL, TOOL_NONE, TOOL_PAINT, TOOL_ROAD } from '../../../config/outdoorConfig.js';
 
-// Source contract (useTravelToolSync.js): one effect with three branches after
+// Source contract (useTravelToolSync.js): one effect with four branches after
 // a mount guard, keyed ONLY on tool === TOOL_TRAVEL, travelMgmt.travelMode
-// === 'inactive', and travelMgmt.isTravelActive. Other tool identities and
-// other travelMode values are indistinguishable to the source, so each branch
-// is pinned once instead of per-permutation.
+// === 'inactive', travelMgmt.isTravelActive, and the resume/adoption session
+// gate (openedLive || hasLoadedTrip). Other tool identities and other
+// travelMode values are indistinguishable to the source, so each branch is
+// pinned once instead of per-permutation.
 describe('useTravelToolSync', () => {
     // Mirrors useTravelManagement: isTravelActive is derived from travelMode.
     const createTravelMgmt = (travelMode = 'inactive', isTravelActive = travelMode !== 'inactive') => ({
@@ -206,6 +207,12 @@ describe('useTravelToolSync', () => {
         expect(adopted.cancelTravel).not.toHaveBeenCalled();
         expect(echoed.cancelTravel).not.toHaveBeenCalled();
         expect(adopted.startPlanning).not.toHaveBeenCalled();
+        // Toggle-mirror (backlog 2026-10-27-G): the post-mount adoption pass
+        // auto-presses TOOL_TRAVEL (while the tool prop stays NONE in this
+        // harness) so the toolbar .active/aria-pressed state mirrors the
+        // panel the adoption mounted — one press per live pass.
+        expect(setTool).toHaveBeenCalledTimes(2);
+        expect(setTool).toHaveBeenCalledWith(TOOL_TRAVEL);
 
         // Intent still cancels: select then leave the travel tool.
         rerender({ tool: TOOL_TRAVEL, travelMgmt: adopted });
@@ -252,7 +259,12 @@ describe('useTravelToolSync', () => {
         expect(echoed.cancelTravel).not.toHaveBeenCalled();
         expect(mountMgmt.startPlanning).not.toHaveBeenCalled();
         expect(handleGenerateWeather).not.toHaveBeenCalled();
-        expect(setTool).not.toHaveBeenCalled();
+        // Toggle-mirror (backlog 2026-10-27-G): every post-mount pass that sees
+        // a live trip with the tool unselected auto-presses TOOL_TRAVEL so the
+        // toolbar .active/aria-pressed state mirrors the mounted panel. The
+        // mount pass itself stays inert (guard above).
+        expect(setTool).toHaveBeenCalledTimes(2);
+        expect(setTool).toHaveBeenCalledWith(TOOL_TRAVEL);
 
         // Intent still cancels: selecting then leaving the travel tool.
         rerender({ tool: TOOL_TRAVEL, travelMgmt: afterLoad });
