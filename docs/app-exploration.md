@@ -122,7 +122,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-D's stale-weather-budget bug + three travel backlog items are closed + live-proven run E. Run-E's stale-mount-budget + strand-until-repress + skip-mislabel travel items closed + live-proven run F.)*
-- *(2026-10-27 run F)* **Maps sidebar can render an empty list on first view entry** (transient): immediately after a campaign re-select / view swap, the first `.maps-manager-item` query occasionally returns 0 with the view heading already on "Maps", needing a moment or a second sidebar click to populate (observed once this run, not reliably reproducible — likely async folder-list hydration racing the DOM probe). Worth a loading-affordance or a guaranteed post-hydration paint so automated (and human) entry never sees a blank maps pane. Likely `src/components/maps-manager/` + view-mount hydration. Low priority / needs a stabler repro.
 ## Coverage
 
 | Feature/Flow | Depth | Notes |

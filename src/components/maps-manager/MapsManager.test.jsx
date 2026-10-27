@@ -122,6 +122,38 @@ describe('MapsManager', () => {
             expect(screen.getByText('Loading maps...')).toBeInTheDocument();
         });
 
+        // Regression (2026-10-28 improve run): the QA probe saw a Maps pane
+        // painting NEITHER rows NOR loading NOR empty-state on first view
+        // entry. Mount-time frames are locked here: the fetch-pending frame
+        // always shows the loading affordance, and resolution paints the
+        // rows with no second interaction. (The App-level blank sub-state
+        // that could strand the pane with `mapsView.type === 'none'` is
+        // pinned in App.map-navigation.test.jsx.)
+        it('never paints a blank list area between mount and fetch resolution', async () => {
+            let resolveMaps;
+            mapsService.loadMaps.mockImplementation(() => new Promise((resolve) => { resolveMaps = resolve; }));
+            const { container } = render(<MapsManager {...props} />);
+
+            // Fetch still pending: loading affordance up, zero rows, and no
+            // premature empty-state flash.
+            expect(container.querySelector('.maps-manager-loading')).toBeInTheDocument();
+            expect(container.querySelectorAll('.maps-manager-item')).toHaveLength(0);
+            expect(container.querySelector('.maps-manager-empty')).not.toBeInTheDocument();
+
+            await act(async () => {
+                resolveMaps({
+                    maps: [
+                        makeMap({ fileName: 'battle-arena.json', name: 'Battle Arena' }),
+                        makeMap({ fileName: 'test-map.json', name: 'Test Map', isActive: true }),
+                    ],
+                });
+            });
+
+            expect(container.querySelectorAll('.maps-manager-item')).toHaveLength(2);
+            expect(container.querySelector('.maps-manager-loading')).not.toBeInTheDocument();
+            expect(container.querySelector('.maps-manager-empty')).not.toBeInTheDocument();
+        });
+
         it('shows the empty state when no maps exist', async () => {
             render(<MapsManager {...props} />);
             await waitFor(() => {

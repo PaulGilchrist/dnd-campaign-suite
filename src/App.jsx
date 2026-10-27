@@ -189,13 +189,13 @@ function seedCampaignRuntimeData(serverData) {
   }
 }
 
-function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
+function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onBackFromManager, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
   if (mapsView.type === 'manager') {
     return (
       <MapsManager
         campaignName={campaignName}
         onOpenMap={(mapName) => { setMapsView({ type: 'map', mapName }); setActiveMapName(mapName); }}
-        onBack={() => setMapsView({ type: 'none' })}
+        onBack={onBackFromManager}
       />
     );
   }
@@ -397,6 +397,14 @@ function App() {
     }
   }, [isLocalhost]);
 
+  // Manager Back closes the maps area — but 'mapsManager' must not stay the
+  // active view over a null MapsAreaView (a blank pane with the sidebar still
+  // on "Maps"). Match every other view's Back → setActiveView(null) convention.
+  const handleBackFromManager = useCallback(() => {
+    setMapsView({ type: 'none' });
+    setActiveView(null);
+  }, []);
+
   const [combatSummaryLoaded, setCombatSummaryLoaded] = useState(false);
 
   // Reset the loaded flag when switching campaigns so stale characters from the
@@ -466,7 +474,14 @@ function App() {
       // Players: already on their only view, do nothing
     } else if (activeView === 'mapsManager') {
       if (isLocalhost) {
-        // GM is already viewing the manager listing — do nothing
+        // Self-heal the blank sub-state: a Back click or a campaign switch
+        // can reset mapsView to 'none' while the sidebar still reads
+        // 'mapsManager' — MapsAreaView renders nothing there, so the click
+        // must reopen the manager listing instead of being swallowed as an
+        // "already viewing the manager" no-op.
+        if (mapsView.type === 'none') {
+          setMapsView({ type: 'manager' });
+        }
         return;
       }
       // Player on a blank maps view (earlier load found no active map) —
@@ -673,6 +688,7 @@ function App() {
             isLocalhost={isLocalhost}
             mapsView={mapsView}
             onBackFromMap={handleBackFromMap}
+            onBackFromManager={handleBackFromManager}
             onEncounterCreated={handleEnterMap}
             setMapsView={setMapsView}
             setActiveMapName={setActiveMapName}

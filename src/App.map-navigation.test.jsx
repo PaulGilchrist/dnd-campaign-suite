@@ -6,7 +6,9 @@
  * GM (localhost):
  *  - "Maps" from the character sheet opens the maps manager listing; the
  *    manager opens a map; the map's back button returns to the listing; the
- *    manager's back button closes the maps area entirely (blank canvas).
+ *    manager's back button closes the maps area entirely (blank canvas) and
+ *    deselects the Maps view — a single re-entry click re-opens the listing,
+ *    and a campaign switch can never strand the blank 'none' sub-state.
  *  - Entering a POI pushes the current map onto a navigation stack: back
  *    walks the stack (inner map → original map → manager).
  *  - Clicking "Maps" while viewing a map exits the stack to the manager and
@@ -294,6 +296,71 @@ describe('App - Map Navigation & View Management', () => {
       expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
       expect(screen.getByTestId('sidebar')).toBeInTheDocument();
       expect(window.alert).not.toHaveBeenCalled();
+    });
+
+    // Regression (2026-10-28 improve run, QA 2026-10-27 run F): the Maps pane
+    // could strand in the blank `activeView === 'mapsManager'` +
+    // `mapsView.type === 'none'` sub-state — MapsAreaView renders null there
+    // while the sidebar still read "Maps", and the first re-entry click was
+    // swallowed by handleMapsClick's "already on mapsManager" early return
+    // (hence the observed "second sidebar click to populate").
+    it('manager-back deselects the Maps view and one Maps click re-opens the listing', async () => {
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
+
+      fireEvent.click(screen.getByTestId('mm-back-btn'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
+      });
+      // The blank canvas must not keep claiming Maps as the active view.
+      expect(screen.queryByTestId('sidebar-active-indicator')).not.toBeInTheDocument();
+
+      // Single re-entry click repopulates the manager.
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+        expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
+      });
+    });
+
+    it('a campaign switch to a characterless campaign cannot strand a blank Maps pane', async () => {
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+
+      // Leave and switch to a different, characterless campaign: the select
+      // callback opens the creation wizard and never resets activeView, while
+      // the campaignName effect clears mapsView to 'none' — the blank sub-state.
+      fireEvent.click(screen.getByTestId('back-to-campaigns-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
+      });
+      mockState.campaignName = 'test-campaign-two';
+      mockState.characters = [];
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('select-campaign-btn'));
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
+      await flushEffects();
+
+      // Stranded state: sidebar still on "Maps", but nothing renders there.
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
+      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+
+      // One Maps click self-heals into the new campaign's manager listing.
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('mm-campaign')).toHaveTextContent('test-campaign-two');
     });
 
     it('backs through the POI map history stack: inner map, original map, manager', async () => {
