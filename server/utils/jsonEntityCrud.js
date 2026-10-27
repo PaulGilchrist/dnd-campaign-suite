@@ -80,10 +80,15 @@ export function stampForSave(incoming, existing, now = Date.now()) {
   return { ...incoming, updatedAt: next };
 }
 
-export function conflictErrorBody(singularDisplayName, id, reason = 'modified') {
-  const label = id ? `${singularDisplayName} "${id}"` : singularDisplayName;
+/** Build the 409 conflict body. `label` is whatever identifies the row to a
+ *  human: per-entity PUT lanes pass the decoded display name (NPC/Session/
+ *  Settlement); the whole-array POST lane passes the row's displayField title
+ *  with an id fallback (Notes → partyLocation). Falls back to the bare noun
+ *  when there is nothing to label with — the copy must NEVER render `""`. */
+export function conflictErrorBody(singularDisplayName, label, reason = 'modified') {
+  const labelled = label ? `${singularDisplayName} "${label}"` : singularDisplayName;
   return {
-    error: `${label} was ${reason} in another tab or session since you loaded it — ${STALE_EDIT_ERROR}`,
+    error: `${labelled} was ${reason} in another tab or session since you loaded it — ${STALE_EDIT_ERROR}`,
     conflict: true,
   };
 }
@@ -91,8 +96,20 @@ export function conflictErrorBody(singularDisplayName, id, reason = 'modified') 
 // Detects a blind overwrite in a whole-array write: a row the sender re-sent
 // with a stale stamp, a row the sender's snapshot resurrects after it was
 // deleted elsewhere, or a disk row the sender's snapshot never knew about.
-// Returns { id, reason } for the first offender, or null when the write is safe.
-function findConcurrentWrite(diskEntities, incomingEntities, idField) {
+// Returns { id, label, reason } for the first offender, or null when the write
+// is safe. `label` mirrors what the PUT lanes pass to conflictErrorBody: the
+// row's displayField title when configured and non-blank (e.g. Notes'
+// partyLocation — the same field the list renders as the row title), falling
+// back to the raw id so lanes without a displayField (and untitled rows) keep
+// the id-labelled copy unchanged.
+function findConcurrentWrite(diskEntities, incomingEntities, idField, displayField) {
+  const titleOf = (row) => {
+    if (!displayField || !row) return '';
+    const raw = row[displayField];
+    return typeof raw === 'string' ? raw.trim() : '';
+  };
+  const labelFor = (existing, incoming, id) =>
+    titleOf(existing) || titleOf(incoming) || id;
   const diskById = new Map(
     diskEntities.filter(d => d && d[idField] != null).map(d => [d[idField], d])
   );
@@ -102,19 +119,19 @@ function findConcurrentWrite(diskEntities, incomingEntities, idField) {
     if (id != null) incomingIds.add(id);
     const existing = id != null ? diskById.get(id) : undefined;
     if (existing && hasUpdateConflict(existing, incoming)) {
-      return { id, reason: 'modified' };
+      return { id, label: labelFor(existing, incoming, id), reason: 'modified' };
     }
     // Resurrection leg (shared discriminator — see isResurrectionAttempt):
     // an incoming row absent from disk that echoes an updatedAt stamp proves
     // the sender read it BEFORE another tab/session deleted it — saving would
     // silently undo that delete.
     if (isResurrectionAttempt(existing, incoming, id)) {
-      return { id, reason: 'created or deleted' };
+      return { id, label: labelFor(existing, incoming, id), reason: 'created or deleted' };
     }
   }
   for (const id of diskById.keys()) {
     if (!incomingIds.has(id)) {
-      return { id, reason: 'created or deleted' };
+      return { id, label: labelFor(diskById.get(id), undefined, id), reason: 'created or deleted' };
     }
   }
   return null;
@@ -123,6 +140,10 @@ function findConcurrentWrite(diskEntities, incomingEntities, idField) {
 export function createJsonEntityRouter(entityName, options = {}) {
   const {
     idField = 'id',
+    // Optional row field naming a human-readable title used to label 409
+    // conflict copy (Notes → 'partyLocation'); rows with a blank title, and
+    // lanes without this option, keep labelling by idField value.
+    displayField = null,
     responseWrapper = entityName,
     itemWrapper = singularize(entityName),
     pluralDisplayName = entityName,
@@ -180,9 +201,9 @@ export function createJsonEntityRouter(entityName, options = {}) {
         }
       }
       const diskEntities = loadOrInit(campaign);
-      const clash = findConcurrentWrite(diskEntities, entities, idField);
+      const clash = findConcurrentWrite(diskEntities, entities, idField, displayField);
       if (clash) {
-        return res.status(409).json(conflictErrorBody(singularDisplayName, clash.id, clash.reason));
+        return res.status(409).json(conflictErrorBody(singularDisplayName, clash.label, clash.reason));
       }
       const now = Date.now();
       const stamped = entities.map(incoming => stampForSave(

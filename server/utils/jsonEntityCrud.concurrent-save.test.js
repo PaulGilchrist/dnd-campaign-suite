@@ -165,6 +165,102 @@ describe('jsonEntityCrud — concurrent-save conflict detection', () => {
     });
 });
 
+// 2026-10-27-H: the whole-array POST 409 must label rows by their display
+// title (Notes: partyLocation — the same field the list renders as the row
+// title), not the raw UUID. Blank/missing titles fall back to the id; lanes
+// without displayField keep the id-labelled copy byte-identical.
+describe('jsonEntityCrud — conflict copy display-title label (displayField)', () => {
+    const titledEntity = 'titleditems';
+    const titledUrl = () => `/api/campaigns/${campaign}/${titledEntity}`;
+    const titledDataFile = () => `/mock/campaigns/${campaign}/data/${titledEntity}.json`;
+
+    const createTitledApp = () => {
+        const app = express();
+        app.use(express.json());
+        app.use(createJsonEntityRouter(titledEntity, {
+            singularDisplayName: 'Note',
+            displayField: 'partyLocation',
+        }));
+        return app;
+    };
+
+    const postTitled = (app, entities) =>
+        request(app).post(titledUrl()).send({ [titledEntity]: entities });
+
+    const readTitledDisk = () => JSON.parse(mockFsState.get(titledDataFile()));
+
+    it('labels the "modified" 409 by the row display title, not the id', async () => {
+        const app = createTitledApp();
+        await postTitled(app, [{ id: 'cb7fa303-uuid', partyLocation: 'Skull Creek Cave', v: 1 }]);
+        const stamp = readTitledDisk()[0].updatedAt;
+
+        const stale = await postTitled(app, [
+            { id: 'cb7fa303-uuid', partyLocation: 'Skull Creek Cave', v: 2, updatedAt: stamp - 1000 },
+        ]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.conflict).toBe(true);
+        expect(stale.body.error).toBe(
+            'Note "Skull Creek Cave" was modified in another tab or session since you loaded it — ' +
+            'reload the list and re-apply your edit — it was NOT saved.'
+        );
+        expect(stale.body.error).not.toContain('cb7fa303-uuid');
+    });
+
+    it('labels the resurrection "created or deleted" 409 by the incoming row title', async () => {
+        const app = createTitledApp();
+        // Row deleted from disk elsewhere; the stale tab re-sends it with an
+        // echoed stamp — refuse, and name it by the title the sender holds.
+        mockFsState.set(titledDataFile(), JSON.stringify([]));
+        const res = await postTitled(app, [
+            { id: 'gone-uuid', partyLocation: 'Sunken Temple', updatedAt: 123 },
+        ]);
+        expect(res.status).toBe(409);
+        expect(res.body.error).toContain('Note "Sunken Temple" was created or deleted');
+        expect(res.body.error).not.toContain('gone-uuid');
+    });
+
+    it('labels a dropped-row "created or deleted" 409 by the disk row title', async () => {
+        const app = createTitledApp();
+        await postTitled(app, [
+            { id: 'e1', partyLocation: 'Keep', v: 1 },
+            { id: 'e2', partyLocation: 'Crossing Roads', v: 1 },
+        ]);
+        // Sender's snapshot never knew about e2 — drop it and get refused.
+        const stale = await postTitled(app, [{ id: 'e1', partyLocation: 'Keep', v: 2 }]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toContain('Note "Crossing Roads" was created or deleted');
+        expect(stale.body.error).not.toContain('e2');
+    });
+
+    it('falls back to the id for a blank or missing title — never renders ""', async () => {
+        const app = createTitledApp();
+        await postTitled(app, [{ id: 'untitled-uuid', partyLocation: '   ', v: 1 }]);
+        const stamp = readTitledDisk()[0].updatedAt;
+        const stale = await postTitled(app, [
+            { id: 'untitled-uuid', partyLocation: '', v: 2, updatedAt: stamp - 1000 },
+        ]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toContain('Note "untitled-uuid" was modified');
+
+        // Missing-field row on disk, dropped by a later save → id label too.
+        const res = await postTitled(app, []);
+        expect(res.status).toBe(409);
+        expect(res.body.error).toContain('Note "untitled-uuid" was created or deleted');
+        expect(res.body.error).not.toContain('Note ""');
+    });
+
+    it('keeps id-labelled copy for lanes without displayField (unchanged behavior)', async () => {
+        const app = createApp();
+        await postArray(app, [{ id: 'raw-uuid', name: 'one' }]);
+        const stamp = readDisk()[0].updatedAt;
+        const stale = await postArray(app, [
+            { id: 'raw-uuid', name: 'two', updatedAt: stamp - 1000 },
+        ]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toContain('item "raw-uuid" was modified');
+    });
+});
+
 describe('jsonEntityCrud — conflict helpers (per-entity PUT lanes reuse these)', () => {
     it('hasUpdateConflict: only an echoed stale stamp against a stamped row conflicts', () => {
         expect(hasUpdateConflict({ updatedAt: 2 }, { updatedAt: 1 })).toBe(true);

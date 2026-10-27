@@ -12,6 +12,9 @@ const broadcastNotesList = (action, campaign, payload = {}) => {
 export default createJsonEntityRouter('notes', {
   pluralDisplayName: 'notes',
   singularDisplayName: 'Note',
+  // 409 conflict copy labels rows by the same field the list renders as the
+  // row title (Notes.jsx noteDisplayName); blank titles fall back to the id.
+  displayField: 'partyLocation',
   broadcast: broadcastNotesList,
   transformList: (entities, req) => {
     if (!isLocalhost(req)) {
