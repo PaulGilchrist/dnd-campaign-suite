@@ -108,6 +108,32 @@ describe('usePoiManagement', () => {
         expect(result.current.selectedPoiMenu).toBeNull();
     });
 
+    it('trims surrounding whitespace before committing a rename', () => {
+        const { result, setPois } = setup();
+        act(() => {
+            result.current.handleRenamePoi('poi-1', '  Old Bridge  ');
+        });
+        expect(applyUpdater(setPois, 0, basePois)[0].label).toBe('Old Bridge');
+    });
+
+    it.each([
+        { name: 'spaces only', newLabel: '   ' },
+        { name: 'empty string', newLabel: '' },
+        { name: 'tabs and newlines', newLabel: '\t\n ' },
+        { name: 'non-string value', newLabel: undefined },
+    ])('keeps the previous label for a whitespace-only rename ($name) but still closes the editor and menu', ({ newLabel }) => {
+        const { result, setPois } = setup();
+        act(() => {
+            result.current.handlePoiContextMenu('poi-1');
+        });
+        act(() => {
+            result.current.handleRenamePoi('poi-1', newLabel);
+        });
+        expect(setPois).not.toHaveBeenCalled();
+        expect(result.current.showRename).toBeNull();
+        expect(result.current.selectedPoiMenu).toBeNull();
+    });
+
     it('links then unlinks a map on the target poi without disturbing other pois', () => {
         const { result, setPois } = setup();
         act(() => {

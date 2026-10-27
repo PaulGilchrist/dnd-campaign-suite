@@ -117,9 +117,14 @@ function usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, he
     }, [setPois, setRoads]);
 
     const handleRenamePoi = useCallback((poiId, newLabel) => {
-        setPois(prev => prev.map(p =>
-            p.id === poiId ? { ...p, label: newLabel } : p
-        ));
+        // Trim before committing; a whitespace-only (or empty) label keeps the
+        // previous one — never persist a nameless POI. Still closes the editor.
+        const trimmed = typeof newLabel === 'string' ? newLabel.trim() : '';
+        if (trimmed) {
+            setPois(prev => prev.map(p =>
+                p.id === poiId ? { ...p, label: trimmed } : p
+            ));
+        }
         setShowRename(null);
         setSelectedPoiMenu(null);
     }, [setPois]);
