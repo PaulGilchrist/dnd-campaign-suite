@@ -186,7 +186,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // ── Logging ──
     const { addEntry } = useLog(campaignName);
 
-    const logTravel = useCallback((action, hex, tileTerrain, w, evt) => {
+    // `opts` carries the optional event context and, for accepted combat
+    // events, the battleMap label RESOLVED from the spawn result (never a
+    // hard-coded string, backlog 2026-10-27 run F); the field stays absent on
+    // every other travel row so existing shapes remain byte-identical.
+    const logTravel = useCallback((action, hex, tileTerrain, w, opts = {}) => {
+        const { evt, battleMap } = opts;
         addEntry({
             type: 'travel', action,
             hex: hex || null,
@@ -195,6 +200,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             weatherIcon: w?.icon || null,
             eventType: evt?.type || null,
             eventTitle: evt?.title || null,
+            ...(battleMap ? { battleMap } : {}),
         });
     }, [addEntry]);
 
@@ -225,7 +231,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             const terrainKey = nextHex ? hexKey(nextHex.q, nextHex.r) : null;
             const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
             const action = result.event ? 'advance_with_event' : (result.arrived ? 'arrived' : 'advance');
-            logTravel(action, nextHex, tileTerrain, weather, result.event);
+            logTravel(action, nextHex, tileTerrain, weather, { evt: result.event });
             if (result.arrived) {
                 // The panel just auto-closed (mode → inactive) — surface the
                 // completion where it stays visible (display only, no game state).
@@ -325,6 +331,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const handleEventAccept = useCallback(() => {
         const evt = travelMgmt.acceptEvent();
         const pos = travelMgmt.currentPosition || partyPosition;
+        const terrainKey = pos ? hexKey(pos.q, pos.r) : null;
+        const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
         if (evt?.type === 'combat') {
             // The spawn seam resolves with the authored battle-map display name
             // (null when nothing spawned) so the auto-encounter audit can name
@@ -341,12 +349,29 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             // and moves the session phase to `encounter`. Off ⇒ zero writes;
             // the map-only behavior above is unchanged. Chained after the map
             // spawn (fire-and-forget overall) purely so the audit line can
-            // carry the map's readable label.
+            // carry the map's readable label. The event_accept row rides the
+            // SAME chain (backlog 2026-10-27 run F) so it names the arena the
+            // fight actually landed on — label derived from the spawn result,
+            // absent when staging failed or nothing spawned. Exactly ONE
+            // event_accept row per accept: the synchronous log below runs only
+            // for non-combat events.
+            let acceptLogged = false;
             Promise.resolve(mapSpawn)
-                .then((battleMapName) => autoStartEncounterFromEvent({
-                    campaignName, event: evt, characters, battleMapName: battleMapName || null,
-                }))
-                .catch((e) => { console.error('[handleEventAccept] auto-encounter failed:', e); });
+                .then((battleMapName) => {
+                    acceptLogged = true;
+                    logTravel('event_accept', pos, tileTerrain, weather, { evt, battleMap: battleMapName || null });
+                    return autoStartEncounterFromEvent({
+                        campaignName, event: evt, characters, battleMapName: battleMapName || null,
+                    });
+                })
+                .catch((e) => {
+                    // Spawn REJECTED (vs the normal resolve-with-null staging
+                    // failure): the row must still record the accept — the
+                    // automation-must-log rule — just without a map label.
+                    if (!acceptLogged) logTravel('event_accept', pos, tileTerrain, weather, { evt });
+                    console.error('[handleEventAccept] auto-encounter failed:', e);
+                });
+            return;
         }
         if (evt?.type === 'weatherChange') {
             // Same stale-closure lane as camp/manual re-roll: budget must be
@@ -356,23 +381,21 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 travelMgmt.changePace(travelMgmt.travelPace, newWeather);
             }
         }
-        const terrainKey = pos ? hexKey(pos.q, pos.r) : null;
-        const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
-        logTravel('event_accept', pos, tileTerrain, weather, evt);
+        logTravel('event_accept', pos, tileTerrain, weather, { evt });
     }, [travelMgmt, partyPosition, handleStartEncounter, generateMonsterPlacements, handleGenerateWeather, terrain, weather, logTravel, campaignName, characters]);
 
     const handleEventSkip = useCallback(() => {
         const evt = travelMgmt.pendingEvent;
         travelMgmt.skipEvent();
         const pos = travelMgmt.currentPosition || partyPosition;
-        logTravel('event_skip', pos, null, weather, evt);
+        logTravel('event_skip', pos, null, weather, { evt });
     }, [travelMgmt, partyPosition, weather, logTravel]);
 
     const handleEventReroll = useCallback(() => {
         const evt = travelMgmt.pendingEvent;
         travelMgmt.rerollEvent();
         const pos = travelMgmt.currentPosition || partyPosition;
-        logTravel('event_reroll', pos, null, weather, evt);
+        logTravel('event_reroll', pos, null, weather, { evt });
     }, [travelMgmt, partyPosition, weather, logTravel]);
 
     const handleForcedMarch = useCallback(() => {

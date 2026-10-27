@@ -357,7 +357,7 @@ describe('HexMap event & command wiring', () => {
                 generateMonsterPlacements: vi.fn(() => placements),
                 handleStartEncounter: vi.fn(async () => 'Test Map - Goblin Raid at (15,8)'),
             };
-            const { tm } = renderEventAccept({
+            const { tm, addEntry } = renderEventAccept({
                 pendingEvent: { type: 'combat', title: 'Goblin Raid', encounter: { monsters: [{ name: 'goblin', qty: 2 }] } },
                 travelOverrides: { currentPosition: { q: 15, r: 8 } },
                 mapOverrides: { partyPosition: { q: 15, r: 8 }, terrain: { '15,8': 'plains' } },
@@ -375,6 +375,37 @@ describe('HexMap event & command wiring', () => {
                 battleMapName: 'Test Map - Goblin Raid at (15,8)',
             }));
             expect(autoEncounterCalls[0].event).toEqual(expect.objectContaining({ title: 'Goblin Raid' }));
+            // travel/event_accept row (backlog 2026-10-27 run F): exactly one
+            // row, existing fields byte-identical, PLUS battleMap carrying the
+            // RESOLVED spawn label (not a hard-coded string).
+            const acceptRows = addEntry.mock.calls.map(([e]) => e).filter((e) => e.action === 'event_accept');
+            expect(acceptRows).toHaveLength(1);
+            expect(acceptRows[0]).toEqual({
+                type: 'travel', action: 'event_accept', hex: { q: 15, r: 8 }, terrain: 'plains',
+                weather: null, weatherIcon: null, eventType: 'combat', eventTitle: 'Goblin Raid',
+                battleMap: 'Test Map - Goblin Raid at (15,8)',
+            });
+        });
+
+        it('logs exactly one label-free event_accept row when the spawn promise rejects', async () => {
+            const encounter = {
+                generateMonsterPlacements: vi.fn(),
+                handleStartEncounter: vi.fn(async () => { throw new Error('staging exploded'); }),
+            };
+            const { addEntry } = renderEventAccept({
+                pendingEvent: { type: 'combat', title: 'Goblin Raid', encounter: { monsters: [{ name: 'goblin', qty: 1 }] } },
+                travelOverrides: { currentPosition: { q: 15, r: 8 } },
+                mapOverrides: { partyPosition: { q: 15, r: 8 }, terrain: { '15,8': 'plains' } },
+                encounter,
+            });
+            fireEvent.click(screen.getByTestId('event-accept'));
+            // automation-must-log: even a rejecting spawn lane records the accept —
+            // once, with no battleMap field (never a stale/wrong name).
+            await vi.waitFor(() => expect(addEntry).toHaveBeenCalledTimes(1));
+            expect(addEntry).toHaveBeenCalledWith({
+                type: 'travel', action: 'event_accept', hex: { q: 15, r: 8 }, terrain: 'plains',
+                weather: null, weatherIcon: null, eventType: 'combat', eventTitle: 'Goblin Raid',
+            });
         });
 
         it.each([
@@ -382,7 +413,7 @@ describe('HexMap event & command wiring', () => {
             { scenario: 'starts no encounter when there is no position', pos: null, expectStart: false },
         ])('$scenario', async ({ pos, expectStart }) => {
             const encounter = { generateMonsterPlacements: vi.fn(), handleStartEncounter: vi.fn() };
-            const { tm } = renderEventAccept({
+            const { tm, addEntry } = renderEventAccept({
                 pendingEvent: { type: 'combat' },
                 travelOverrides: { currentPosition: pos },
                 mapOverrides: { partyPosition: pos },
@@ -401,6 +432,11 @@ describe('HexMap event & command wiring', () => {
                 await vi.waitFor(() => expect(autoEncounterCalls).toHaveLength(1));
                 expect(autoEncounterCalls[0].battleMapName).toBeNull();
             }
+            // No spawn label resolved ⇒ event_accept row keeps its exact
+            // pre-run-F shape: battleMap absent, not null, never a stale name.
+            const acceptRows = addEntry.mock.calls.map(([e]) => e).filter((e) => e.action === 'event_accept');
+            expect(acceptRows).toHaveLength(1);
+            expect(acceptRows[0]).not.toHaveProperty('battleMap');
         });
 
         it.each([
@@ -429,6 +465,10 @@ describe('HexMap event & command wiring', () => {
                 expect(tm.changePace).not.toHaveBeenCalled();
             }
             expect(encounter.handleStartEncounter).not.toHaveBeenCalled();
+            // Non-combat advisory accept spawns no battle map: exactly one row,
+            // shape byte-identical to pre-run-F (strict toEqual has no room for
+            // a battleMap key — criterion: field absent when nothing spawns).
+            expect(addEntry).toHaveBeenCalledTimes(1);
             expect(addEntry).toHaveBeenCalledWith({
                 type: 'travel', action: 'event_accept', hex: { q: 10, r: 5 }, terrain: 'desert',
                 weather: null, weatherIcon: null, eventType, eventTitle: 'Storm Front',
