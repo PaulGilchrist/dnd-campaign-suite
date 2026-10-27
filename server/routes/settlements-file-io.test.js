@@ -115,14 +115,14 @@ function createJsonEntityCrudRoutes(entityName) {
         const key = `${campaign}:${entityName}`;
 
         if (!MOCK_STORE.has(key)) {
-            return res.status(404).json({ error: 'settlement not found' });
+            return res.status(404).json({ error: 'Settlement not found' });
         }
 
         const entities = Array.isArray(MOCK_STORE.get(key)) ? MOCK_STORE.get(key) : [];
         const entity = entities.find(e => e[idField] === id);
 
         if (!entity) {
-            return res.status(404).json({ error: 'settlement not found' });
+            return res.status(404).json({ error: 'Settlement not found' });
         }
 
         res.json({ settlement: entity });
@@ -135,7 +135,7 @@ function createJsonEntityCrudRoutes(entityName) {
         const key = `${campaign}:${entityName}`;
 
         if (!MOCK_STORE.has(key)) {
-            return res.status(404).json({ error: 'settlement not found' });
+            return res.status(404).json({ error: 'Settlement not found' });
         }
 
         const data = MOCK_STORE.get(key);

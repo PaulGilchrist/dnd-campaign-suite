@@ -21,8 +21,8 @@
  *    routes loadOrInit() the file, so a missing campaign/notes.json returns
  *    { notes: [] } — this leg never 404s 'Campaign not found'. Server-side
  *    localhost filtering of isPrivate lives in routes/notes.test.js.
- *  - GET item  → { note: entity } (itemWrapper), 404 { error: 'note not
- *    found' } (lowercase, jsonEntityCrud singularDisplayName:'note') when
+ *  - GET item  → { note: entity } (itemWrapper), 404 { error: 'Note not
+ *    found' } (Title-case, jsonEntityCrud singularDisplayName:'Note') when
  *    the file or id is missing; 403 { error: 'Access denied: private note' }
  *    via authorizeRead/forbiddenMessage — the notes family's own flavor.
  *  - POST      → { success: true } only (no savedCount or other keys); 400
@@ -246,16 +246,16 @@ describe('notesService', () => {
     });
 
     it('extracts the server 404 error and logs', async () => {
-      // server truth: { error: 'note not found' } (lowercase singularDisplayName)
+      // server truth: { error: 'Note not found' } (Title-case singularDisplayName)
       // for both file-missing and id-missing (jsonEntityCrud GET :id)
       fetchSpy.mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'note not found' }),
+        json: () => Promise.resolve({ error: 'Note not found' }),
       });
 
-      await expect(loadNote('test-campaign', 'missing-id')).rejects.toThrow('note not found');
+      await expect(loadNote('test-campaign', 'missing-id')).rejects.toThrow('Note not found');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading note:', expect.any(Error));
     });
 
@@ -318,10 +318,10 @@ describe('notesService', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'note not found' }),
+        json: () => Promise.resolve({ error: 'Note not found' }),
       });
 
-      await expect(deleteNote('test-campaign', 'missing-id')).rejects.toThrow('note not found');
+      await expect(deleteNote('test-campaign', 'missing-id')).rejects.toThrow('Note not found');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting note:', expect.any(Error));
     });
 

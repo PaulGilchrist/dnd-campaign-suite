@@ -26,6 +26,7 @@ vi.mock('../utils/jsonEntityCrud.js', async () => {
             idField,
             responseWrapper,
             itemWrapper,
+            singularDisplayName,
             transformList,
             authorizeRead,
             forbiddenMessage,
@@ -42,6 +43,9 @@ vi.mock('../utils/jsonEntityCrud.js', async () => {
         const effectiveIdField = idField || 'id';
         const effectiveResponseWrapper = responseWrapper || entityName;
         const effectiveItemWrapper = itemWrapper || singularize(entityName);
+        // Real factory builds 404 copy from singularDisplayName (defaulting to
+        // the lowercase singular), not the itemWrapper key.
+        const effectiveSingularDisplayName = singularDisplayName || singularize(entityName);
 
         // GET list
         router.get(`/api/campaigns/:campaign/${entityName}`, (req, res) => {
@@ -70,14 +74,14 @@ vi.mock('../utils/jsonEntityCrud.js', async () => {
             const data = MOCK_STORE.get(campaign);
 
             if (data === undefined) {
-                return res.status(404).json({ error: `${effectiveItemWrapper} not found` });
+                return res.status(404).json({ error: `${effectiveSingularDisplayName} not found` });
             }
 
             const entities = Array.isArray(data) ? data : [];
             const entity = entities.find(e => e[effectiveIdField] === id);
 
             if (!entity) {
-                return res.status(404).json({ error: `${effectiveItemWrapper} not found` });
+                return res.status(404).json({ error: `${effectiveSingularDisplayName} not found` });
             }
 
             if (authorizeRead && !authorizeRead(entity, req)) {
@@ -94,14 +98,14 @@ vi.mock('../utils/jsonEntityCrud.js', async () => {
             const data = MOCK_STORE.get(campaign);
 
             if (data === undefined) {
-                return res.status(404).json({ error: `${effectiveItemWrapper} not found` });
+                return res.status(404).json({ error: `${effectiveSingularDisplayName} not found` });
             }
 
             const entities = Array.isArray(data) ? data : [];
             const entity = entities.find(e => e[effectiveIdField] === id);
 
             if (!entity) {
-                return res.status(404).json({ error: `${effectiveItemWrapper} not found` });
+                return res.status(404).json({ error: `${effectiveSingularDisplayName} not found` });
             }
 
             if (onDelete) {
@@ -511,7 +515,7 @@ describe('notes - GET /api/campaigns/:campaign/notes/:noteId', () => {
             .get('/api/campaigns/test-campaign/notes/nonexistent-id');
 
         expect(res.status).toBe(404);
-        expect(res.body).toHaveProperty('error', 'note not found');
+        expect(res.body).toHaveProperty('error', 'Note not found');
     });
 
     it('should return 404 when campaign data does not exist', async () => {
@@ -520,7 +524,7 @@ describe('notes - GET /api/campaigns/:campaign/notes/:noteId', () => {
             .get('/api/campaigns/nonexistent-campaign/notes/any-id');
 
         expect(res.status).toBe(404);
-        expect(res.body).toHaveProperty('error', 'note not found');
+        expect(res.body).toHaveProperty('error', 'Note not found');
     });
 
     it('should return full note data when found by localhost user', async () => {
@@ -770,7 +774,7 @@ describe('notes - DELETE /api/campaigns/:campaign/notes/:noteId', () => {
             .delete('/api/campaigns/test-campaign/notes/nonexistent-id');
 
         expect(res.status).toBe(404);
-        expect(res.body).toHaveProperty('error', 'note not found');
+        expect(res.body).toHaveProperty('error', 'Note not found');
 
         const stored = MOCK_STORE.get('test-campaign');
         expect(stored).toHaveLength(1);
@@ -783,7 +787,7 @@ describe('notes - DELETE /api/campaigns/:campaign/notes/:noteId', () => {
             .delete('/api/campaigns/nonexistent-campaign/notes/any-id');
 
         expect(res.status).toBe(404);
-        expect(res.body).toHaveProperty('error', 'note not found');
+        expect(res.body).toHaveProperty('error', 'Note not found');
     });
 
     it('should delete a note and return success', async () => {
@@ -899,7 +903,7 @@ describe('notes - DELETE /api/campaigns/:campaign/notes/:noteId', () => {
             .delete('/api/campaigns/test-campaign/notes/nonexistent');
 
         expect(res.status).toBe(404);
-        expect(res.body).toHaveProperty('error', 'note not found');
+        expect(res.body).toHaveProperty('error', 'Note not found');
     });
 
     it('should handle note ids with spaces via URL encoding', async () => {

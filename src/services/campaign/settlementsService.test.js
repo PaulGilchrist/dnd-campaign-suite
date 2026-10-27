@@ -16,7 +16,7 @@
  * Response shapes pinned against the server, NOT canned JSON:
  * server/routes/settlements.js delegates to server/utils/jsonEntityCrud.js
  * (createJsonEntityRouter('settlements', { idField:'name',
- * pluralDisplayName:'settlements', singularDisplayName:'settlement',
+ * pluralDisplayName:'settlements', singularDisplayName:'Settlement',
  * validateList: findDuplicateNameError })) — no broadcast option, so no SSE
  * on POST/DELETE; the custom PUT writes directly, also no SSE:
  *  - GET list  → { settlements: [...] } (responseWrapper envelope — the client
@@ -26,8 +26,8 @@
  *    campaign/settlements.json returns { settlements: [] } — this endpoint
  *    family never 404s 'Campaign not found' on the collection leg.
  *  - GET item  → { settlement: entity } (itemWrapper), 404 { error:
- *    'settlement not found' } — lowercase: settlements.js passes an explicit
- *    singularDisplayName:'settlement' to the factory.
+ *    'Settlement not found' } — Title-case: settlements.js passes an explicit
+ *    singularDisplayName:'Settlement' to the factory.
  *  - POST      → { success: true } only (no savedCount), 400 { error:
  *    'Expected an array for settlements' } or the findDuplicateNameError
  *    message 'A settlement with that name already exists'.
@@ -37,7 +37,7 @@
  *    500 { error: 'Failed to update settlement' } via asyncHandler.
  *  - DELETE    → { success: true } only (no deleted-name key), sent with no
  *    headers; idempotent when the file exists but the name is absent —
- *    404 'settlement not found' only on the file-missing leg.
+ *    404 'Settlement not found' on both the file-missing and name-missing legs.
  *  - 500 body  → { error: <message> } via server/utils/asyncHandler.js;
  *    the client's `error || 'Failed to …'` generic fallback is defensive
  *    (server always sends { error }) — pinned as the client's own string.
@@ -335,17 +335,17 @@ describe('settlementsService', () => {
     });
 
     it('extracts the server 404 error and logs', async () => {
-      // server truth: lowercase 'settlement not found' — settlements.js
-      // passes singularDisplayName:'settlement' to jsonEntityCrud (both the
+      // server truth: Title-case 'Settlement not found' — settlements.js
+      // passes singularDisplayName:'Settlement' to jsonEntityCrud (both the
       // file-missing and id-missing legs)
       fetchSpy.mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'settlement not found' }),
+        json: () => Promise.resolve({ error: 'Settlement not found' }),
       });
 
-      await expect(loadSettlement('test-campaign', 'nonexistent')).rejects.toThrow('settlement not found');
+      await expect(loadSettlement('test-campaign', 'nonexistent')).rejects.toThrow('Settlement not found');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading settlement:', expect.any(Error));
     });
 
@@ -402,10 +402,10 @@ describe('settlementsService', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'settlement not found' }),
+        json: () => Promise.resolve({ error: 'Settlement not found' }),
       });
 
-      await expect(deleteSettlement('test-campaign', 'nonexistent')).rejects.toThrow('settlement not found');
+      await expect(deleteSettlement('test-campaign', 'nonexistent')).rejects.toThrow('Settlement not found');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting settlement:', expect.any(Error));
     });
 

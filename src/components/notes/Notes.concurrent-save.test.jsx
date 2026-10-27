@@ -30,7 +30,7 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 }));
 
 const CONFLICT_MESSAGE =
-  'note "abc" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+  'Note "abc" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
 
 const mockHook = (saveImpl) => {
   const hook = {

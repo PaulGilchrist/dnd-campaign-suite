@@ -29,8 +29,10 @@ function createMockRouter(entityName, options = {}) {
         forbiddenMessage,
     } = options;
 
-    const singular = singularDisplayName || (entityName.endsWith('ies') ? entityName.slice(0, -3) + 'y' : entityName.endsWith('s') ? entityName.slice(0, -1) : entityName);
-    const capitalizedSingular = singular.charAt(0).toUpperCase() + singular.slice(1);
+    const singular = entityName.endsWith('ies') ? entityName.slice(0, -3) + 'y' : entityName.endsWith('s') ? entityName.slice(0, -1) : entityName;
+    // Real factory emits 404 copy with the display noun verbatim — quests.js
+    // now passes Title-case 'Quest' (run-H noun-case convention).
+    const displaySingular = singularDisplayName || singular;
 
     // GET list
     router.get(`/api/campaigns/:campaign/${entityName}`, (req, res) => {
@@ -62,7 +64,7 @@ function createMockRouter(entityName, options = {}) {
         const key = `${campaign}:${entityName}`;
 
         if (!MOCK_STORE.has(key)) {
-            return res.status(404).json({ error: `${capitalizedSingular} not found` });
+            return res.status(404).json({ error: `${displaySingular} not found` });
         }
 
         const data = MOCK_STORE.get(key);
@@ -70,7 +72,7 @@ function createMockRouter(entityName, options = {}) {
         const entity = entities.find(e => e.id === id);
 
         if (!entity) {
-            return res.status(404).json({ error: `${capitalizedSingular} not found` });
+            return res.status(404).json({ error: `${displaySingular} not found` });
         }
 
         if (authorizeRead && !authorizeRead(entity, req)) {
@@ -87,7 +89,7 @@ function createMockRouter(entityName, options = {}) {
         const key = `${campaign}:${entityName}`;
 
         if (!MOCK_STORE.has(key)) {
-            return res.status(404).json({ error: `${capitalizedSingular} not found` });
+            return res.status(404).json({ error: `${displaySingular} not found` });
         }
 
         const data = MOCK_STORE.get(key);
@@ -95,7 +97,7 @@ function createMockRouter(entityName, options = {}) {
         const entity = entities.find(e => e.id === id);
 
         if (!entity) {
-            return res.status(404).json({ error: `${capitalizedSingular} not found` });
+            return res.status(404).json({ error: `${displaySingular} not found` });
         }
 
         const filtered = entities.filter(e => e.id !== id);

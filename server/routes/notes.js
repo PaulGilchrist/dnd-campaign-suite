@@ -11,7 +11,7 @@ const broadcastNotesList = (action, campaign, payload = {}) => {
 
 export default createJsonEntityRouter('notes', {
   pluralDisplayName: 'notes',
-  singularDisplayName: 'note',
+  singularDisplayName: 'Note',
   broadcast: broadcastNotesList,
   transformList: (entities, req) => {
     if (!isLocalhost(req)) {

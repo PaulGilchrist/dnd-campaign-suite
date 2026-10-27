@@ -13,7 +13,9 @@ import { findDuplicateNameError } from '../utils/nameUniqueness.js';
 const baseRouter = createJsonEntityRouter('sessions', {
   idField: 'name',
   pluralDisplayName: 'sessions',
-  singularDisplayName: 'session',
+  // Display noun for 404/409 copy (matches the NPC/Faction/Settlement lanes);
+  // duplicate-name 400 copy stays lowercase 'A session with that name already exists'.
+  singularDisplayName: 'Session',
   validateList: (sessions) => findDuplicateNameError(sessions, 'session'),
 });
 
@@ -50,14 +52,14 @@ baseRouter.put('/api/campaigns/:campaign/sessions/:sessionName', asyncHandler((r
     // = this tab never read the current row — refuse instead of clobbering.
     const existingSession = existingIndex !== -1 ? sessions[existingIndex] : null;
     if (hasUpdateConflict(existingSession, updatedSession)) {
-      return res.status(409).json(conflictErrorBody('session', decodedName));
+      return res.status(409).json(conflictErrorBody('Session', decodedName));
     }
 
     // Resurrection leg (mirrors the array lane's guard): row deleted elsewhere
     // but the sender echoes the stamp it read before the delete — refuse
     // instead of silently reviving it. Genuine creates carry no updatedAt.
     if (isResurrectionAttempt(existingSession, updatedSession, decodedName)) {
-      return res.status(409).json(conflictErrorBody('session', decodedName, 'created or deleted'));
+      return res.status(409).json(conflictErrorBody('Session', decodedName, 'created or deleted'));
     }
 
     const stampedSession = stampForSave(updatedSession, existingSession);

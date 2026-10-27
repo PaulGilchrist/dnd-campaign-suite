@@ -25,8 +25,8 @@
  *    campaign/quests.json returns { quests: [] } — this leg never 404s
  *    'Campaign not found'. Server-side localhost transformList/authorizeRead
  *    lives in server/routes/quests.test.js + quests-duplicate-name.test.js.
- *  - GET item  → { quest: entity } (itemWrapper), 404 { error: 'quest not
- *    found' } (lowercase, jsonEntityCrud singularDisplayName:'quest') when
+ *  - GET item  → { quest: entity } (itemWrapper), 404 { error: 'Quest not
+ *    found' } (Title-case, jsonEntityCrud singularDisplayName:'Quest') when
  *    the file or id is missing; 403 { error: 'Access denied: GM-only
  *    feature' } via authorizeRead/forbiddenMessage — quests' own flavor.
  *    authorizeRead is NOT wired on the DELETE leg (server-truth).
@@ -280,16 +280,16 @@ describe('questsService', () => {
     });
 
     it('extracts the server 404 error and logs', async () => {
-      // server truth: { error: 'quest not found' } (lowercase singularDisplayName)
+      // server truth: { error: 'Quest not found' } (Title-case singularDisplayName)
       // for both file-missing and id-missing (jsonEntityCrud GET :id)
       fetchSpy.mockResolvedValue({
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'quest not found' }),
+        json: () => Promise.resolve({ error: 'Quest not found' }),
       });
 
-      await expect(loadQuest('test-campaign', 'missing-id')).rejects.toThrow('quest not found');
+      await expect(loadQuest('test-campaign', 'missing-id')).rejects.toThrow('Quest not found');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error loading quest:', expect.any(Error));
     });
 
@@ -353,10 +353,10 @@ describe('questsService', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'quest not found' }),
+        json: () => Promise.resolve({ error: 'Quest not found' }),
       });
 
-      await expect(deleteQuest('test-campaign', 'missing-id')).rejects.toThrow('quest not found');
+      await expect(deleteQuest('test-campaign', 'missing-id')).rejects.toThrow('Quest not found');
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error deleting quest:', expect.any(Error));
     });
 

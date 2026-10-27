@@ -83,7 +83,7 @@ describe('sessions PUT — deleted-row resurrection guard', () => {
         expect(stale.status).toBe(409);
         expect(stale.body.conflict).toBe(true);
         expect(stale.body.error).toBe(
-            'session "Session 9: QA Probe" was created or deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.'
+            'Session "Session 9: QA Probe" was created or deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.'
         );
 
         // The peer's delete survives — nothing was written.

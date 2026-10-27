@@ -46,7 +46,7 @@ vi.mock('../common/MarkdownPreview.jsx', () => ({
 }));
 
 const CONFLICT_MESSAGE =
-  'quest "The Lost Artifact" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+  'Quest "The Lost Artifact" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
 
 const conflictError = () => Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
 

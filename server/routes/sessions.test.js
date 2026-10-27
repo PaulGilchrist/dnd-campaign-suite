@@ -98,6 +98,16 @@ describe('sessions CRUD', () => {
     mockFsData.set(getFilePath('c1'), []);
     const res = await request(createTestApp()).get('/api/campaigns/c1/sessions/Missing');
     expect(res.status).toBe(404);
+    // Title-case display noun (run-H noun-case convention, singularDisplayName)
+    expect(res.body).toEqual({ error: 'Session not found' });
+  });
+
+  it('DELETE 404s a missing session with the Title-case noun and writes nothing', async () => {
+    mockFsData.set(getFilePath('c1'), [{ name: 'Session 1' }]);
+    const res = await request(createTestApp()).delete('/api/campaigns/c1/sessions/Missing');
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Session not found' });
+    expect(mockFsData.get(getFilePath('c1'))).toEqual([{ name: 'Session 1' }]);
   });
 
   it('DELETE removes a session by name', async () => {
