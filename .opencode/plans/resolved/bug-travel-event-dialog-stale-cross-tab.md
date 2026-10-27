@@ -35,3 +35,21 @@ In `handleChangeKeyEvent`, don't reject non-object payloads wholesale. Route sca
 
 ## Severity
 Data integrity risk — a resolved adjudication prompt remains actionable on other clients and writes duplicate, mis-hexed log rows; the stale overlay also soft-locks the other client's map editor until the resolved prompt is clicked away.
+
+## Resolution
+FIXED 2026-10-27.
+
+**What was actually wrong** — the guess was right about `handleChangeKeyEvent`'s object-only guard, but there was a **second, outer guard that dropped nulls even earlier**: `handleRuntimeEvent` began with `if (event.key == null || event.data == null) return;`, so cleared-key echoes (null) never reached `handleChangeKeyEvent` at all. Both layers had to be relaxed:
+
+1. `handleRuntimeEvent` (src/App.jsx): now only drops `data == null` for keys that are **not** `change-<campaign>-` echoes (character/pipeline/map-activate lanes need object payloads and keep dropping nulls unchanged).
+2. `handleChangeKeyEvent` (src/App.jsx): moved the prefix/key parsing above the payload check; a `null`/scalar payload now routes to `applyStoreUpdate(storeKey, event.data, campaignName)` **only when `isCampaignKey(storeKey)`**. Character-scoped keys stay dropped for non-object payloads — the char store is a full-snapshot replace, so a scalar there is corrupt noise (and this keeps the pre-existing malformed-events test contract green). All object-payload branches (`saveResult-` redispatch, `biPrompt`/`biPromptCleared` ref gating) are untouched and unreachable by null/scalar echoes, so no double-apply; SavePromptModal and BardicInspirationReactionModal have their own Subscriber lanes with independent object guards, unaffected.
+
+**Files changed**
+- `src/App.jsx` — both guard relaxations (non-object echoes mirror for campaign keys only).
+- `src/App.runtime-events.test.jsx` — 3 new regression tests: `change-test-campaign-travel-pendingEvent` with `data: null` clears the seeded campaign-store event to null + wakes `notify('campaign')`; scalar-string echo (`travel-lastMessage`) mirrors into the campaign store; null/scalar on a character-scoped key stays dropped (zero campaign-store writes).
+
+**Verified**
+- Repro re-run live BEFORE the fix (test-campaign, :5173, two tabs, QA outdoor map, `Math.random=()=>0.0` forced "Wolves on the Hunt"): after A's Skip, server `travel-pendingEvent: null` while B's `.event-dialog-overlay` stayed open, intercepted `Back to maps`, and B's Skip logged a duplicate `event_skip` at B's stale hex (20,10 vs 19,10). Confirmed exactly.
+- Re-verified live AFTER the fix, same steps: A's Skip → B's dialog auto-closed (B never clicked), Back button clickable, log holds **exactly one** `event_skip` row. Adjacent sanity: object mirror (path → B shows REMAINING 2) and scalar mirror (accrued/budget/mode → B shows "2.5 left / 1.5 / 4", Advance enabled, mode planning) both correct.
+- `npx vitest run src/App.runtime-events.test.jsx` → 20/20 pass; all sibling `src/App.*.test.jsx` → 46/46 pass; `npm run lint` → zero warnings; `node .opencode/plans/no-timers-guard.mjs` → OK.
+- Cleanup: change-data `{}` + log `[]` verified from quiet state (tabs at about:blank/closed), QA BugDialog map deleted, maps back to [Battle Arena, Test Map]; zero campaign-lock denials in server log.

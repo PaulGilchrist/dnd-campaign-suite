@@ -97,10 +97,23 @@ function applyStoreUpdate(storeKey, data, campaignName) {
 }
 
 function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
-  if (!event.data || typeof event.data !== 'object') return;
   const prefix = `change-${campaignName}-`;
   if (!event.key.startsWith(prefix)) return;
   const storeKey = event.key.slice(prefix.length);
+  if (event.data === null || typeof event.data !== 'object') {
+    // Null payloads are cleared-key echoes (POST null / key DELETE both publish
+    // null from campaigns-changedata.js) and scalars are plain value updates
+    // (travel-mode, travel-lastMessage, …). Both must mirror into the campaign
+    // store or other clients keep stale state — e.g. a resolved travel
+    // EventDialog stays open on the second client (cross-tab staleness bug).
+    // Character stores are full-snapshot replaces, so a non-object payload
+    // there is corrupt noise and stays dropped; prompt lanes below need object
+    // data, so they are never reached by null/scalar echoes.
+    if (isCampaignKey(storeKey)) {
+      applyStoreUpdate(storeKey, event.data, campaignName);
+    }
+    return;
+  }
   if (storeKey.startsWith('saveResult-') || storeKey.startsWith('savePrompt-') || storeKey.startsWith('savePromptCleared-')) {
     console.debug(`[saveDebug] App.handleRuntimeEvent SSE change received`, { key: event.key, storeKey, data: event.data });
   }
@@ -600,7 +613,11 @@ function App() {
   // eslint-disable-next-line server-first/no-local-game-state
   const pendingPromptIdRef = useRef(null);
   const handleRuntimeEvent = useCallback((event) => {
-    if (event.key == null || event.data == null) return;
+    if (event.key == null) return;
+    // Null data on a change-<campaign>-<key> echo is a cleared-key broadcast —
+    // let it through so handleChangeKeyEvent can mirror the clear to the
+    // campaign store. All other lanes need object payloads and keep dropping nulls.
+    if (event.data == null && !event.key.startsWith(`change-${campaignName}-`)) return;
     if (event.key.startsWith('character-')) {
       handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter });
       return;

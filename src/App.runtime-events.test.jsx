@@ -18,8 +18,10 @@
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
  *       the campaign store and everything else to the character store,
  *       also skipSync=true; bardic-inspiration prompts gate other writes
- *       until cleared.
- *     - Malformed events (null key/data, foreign campaigns) are ignored.
+ *       until cleared. Null (cleared-key) and scalar echoes mirror into the
+ *       campaign store; for character keys they stay dropped (snapshot lane).
+ *     - Malformed events (null key, foreign campaigns, null/scalar data on
+ *       character keys) are ignored.
  *  2. Character CRUD through the App shell: landing after campaign
  *     selection, wizard cancel-then-create lifecycle, edit-wizard seeding,
  *     and confirmed delete — asserted as observable UI outcomes (roster +
@@ -528,6 +530,45 @@ describe('App - Runtime Events & State Management', () => {
       expect(campaignStore.get('targetEffects')).toEqual(data);
       expect(notify).toHaveBeenCalledWith('campaign');
       expect(writesFor('targetEffects')).toHaveLength(0);
+    });
+
+    // Cross-tab staleness bug: cleared keys publish null and scalars are plain
+    // value updates — dropping them kept resolved prompts (travel EventDialog)
+    // open and actionable on every other client.
+    it('mirrors a null cleared-key echo into the campaign store so stale prompts close', async () => {
+      const campaignStore = new Map([[
+        'travel-pendingEvent', { title: 'Wolves on the Hunt', type: 'combat' },
+      ]]);
+      getStore.mockImplementation(() => campaignStore);
+
+      await dispatch({ key: 'change-test-campaign-travel-pendingEvent', data: null });
+
+      expect(campaignStore.get('travel-pendingEvent')).toBeNull();
+      expect(notify).toHaveBeenCalledWith('campaign');
+      expect(writesFor('travel-pendingEvent')).toHaveLength(0);
+    });
+
+    it('mirrors scalar change echoes (string values) into the campaign store', async () => {
+      const campaignStore = new Map();
+      getStore.mockImplementation(() => campaignStore);
+
+      await dispatch({ key: 'change-test-campaign-travel-lastMessage', data: 'Party has arrived.' });
+
+      expect(campaignStore.get('travel-lastMessage')).toBe('Party has arrived.');
+      expect(notify).toHaveBeenCalledWith('campaign');
+      expect(writesFor('travel-lastMessage')).toHaveLength(0);
+    });
+
+    it('keeps dropping null/scalar echoes for character-scoped keys (full-snapshot lane)', async () => {
+      const campaignStore = new Map();
+      getStore.mockImplementation(() => campaignStore);
+
+      await dispatch({ key: 'change-test-campaign-Aragorn', data: null });
+      await dispatch({ key: 'change-test-campaign-Aragorn', data: 'corrupt' });
+
+      expect(writesFor('Aragorn')).toHaveLength(0);
+      expect(campaignStore.size).toBe(0);
+      expect(notify).not.toHaveBeenCalledWith('campaign');
     });
 
     it('suppresses character-store writes while a bardic-inspiration prompt is pending, resuming once cleared', async () => {
