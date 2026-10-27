@@ -149,7 +149,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-D's stale-weather-budget bug + three travel backlog items are closed + live-proven run E. Run-E's stale-mount-budget + strand-until-repress + skip-mislabel travel items closed + live-proven run F. Run-G's three travel/CRUD backlog items (lowercase settlement noun, file-trip adoption aria-desync, apple-mobile console warning) all CLOSED + live-proven run H.)*
-- *(2026-10-27-H) Extreme-weather banner copy is hardcoded (`"Extreme weather makes travel impossible — camp and wait it out"`, TravelPanel `TravelExtremeWeatherBanner`) while the runtime `lastMessage` uses `weather.label` — the two can drift if a future non-"Extreme" weather gains `moveCostMod:null`. Low risk; note only. File: `src/components/hex-map/TravelPanel.jsx`.)*
 ## Coverage
 
 | Feature/Flow | Depth | Notes |

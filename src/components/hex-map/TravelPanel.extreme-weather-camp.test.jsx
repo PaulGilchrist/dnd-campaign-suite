@@ -126,3 +126,34 @@ describe('TravelPanel — extreme-weather camp affordance', () => {
     expect(screen.queryByRole('button', { name: 'Camp' })).not.toBeInTheDocument();
   });
 });
+
+/* Backlog 2026-10-27-H: the banner noun derives from weather.label — the same
+ * field useTravelManagement's travel-lastMessage reads — so a future non-
+ * "Extreme" moveCostMod:null weather cannot make the two surfaces drift. */
+describe('TravelPanel — extreme-weather banner label derivation', () => {
+  it('standard extreme label renders the byte-identical classic copy', () => {
+    renderPanel({ weather: EXTREME });
+    const span = document.querySelector('.travel-panel-exhausted span');
+    expect(span.textContent).toBe('Extreme weather makes travel impossible — camp and wait it out');
+  });
+
+  it('custom label surfaces verbatim in the copy (drift-proofing)', () => {
+    renderPanel({ weather: { ...EXTREME, condition: 'blizzard', label: 'Blizzard' } });
+    const span = document.querySelector('.travel-panel-exhausted span');
+    expect(span.textContent).toBe('Blizzard weather makes travel impossible — camp and wait it out');
+    expect(span.textContent.startsWith('Blizzard weather')).toBe(true);
+  });
+
+  it('blank label degrades to the capitalized condition (no leading gap)', () => {
+    renderPanel({ weather: { ...EXTREME, condition: 'extreme', label: '   ' } });
+    const span = document.querySelector('.travel-panel-exhausted span');
+    expect(span.textContent).toBe('Extreme weather makes travel impossible — camp and wait it out');
+  });
+
+  it('missing label and condition fall back to the neutral word', () => {
+    renderPanel({ weather: { icon: 'triangle-exclamation', moveCostMod: null } });
+    const span = document.querySelector('.travel-panel-exhausted span');
+    expect(span.textContent).toBe('Extreme weather makes travel impossible — camp and wait it out');
+    expect(span.textContent.startsWith(' ')).toBe(false);
+  });
+});

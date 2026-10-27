@@ -31,12 +31,26 @@ function TravelExhaustedBanner({ exhausted, partyHasMaxExhaustion, onForceCamp, 
 // directly from the blocking condition; it wires to the same forceCamp seam
 // (rolls the new day's weather, refreshes the budget from the NEW roll).
 // Hidden while the exhausted banner is up — it already carries Camp.
-function TravelExtremeWeatherBanner({ travelBlocked, onForceCamp }) {
+// Banner noun derived from weather.label — the same field the runtime
+// travel-lastMessage uses in useTravelManagement (advanceOneHex cost-null
+// branch) — so the two surfaces cannot drift if a future non-"Extreme"
+// weather gains moveCostMod:null (backlog 2026-10-27-H). Missing/blank label
+// degrades to the capitalized condition, else the neutral "Extreme" — never
+// a leading gap or empty word in the copy.
+const weatherBlockNoun = (weather) => {
+  const label = (weather?.label || '').trim();
+  if (label) return label;
+  const condition = (weather?.condition || '').trim();
+  if (condition) return condition[0].toUpperCase() + condition.slice(1);
+  return 'Extreme';
+};
+
+function TravelExtremeWeatherBanner({ weather, travelBlocked, onForceCamp }) {
   if (!travelBlocked) return null;
   return (
     <div className="travel-panel-exhausted">
       <i className="fa-solid fa-tent"></i>
-      <span>Extreme weather makes travel impossible — camp and wait it out</span>
+      <span>{weatherBlockNoun(weather)} weather makes travel impossible — camp and wait it out</span>
       <button onClick={onForceCamp} className="travel-btn-camp">
         <i className="fa-solid fa-campground"></i> Camp
       </button>
@@ -241,6 +255,7 @@ function TravelPanel({
       />
 
       <TravelExtremeWeatherBanner
+        weather={weather}
         travelBlocked={travelBlocked}
         onForceCamp={onForceCamp}
       />
