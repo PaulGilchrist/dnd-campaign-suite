@@ -28,14 +28,17 @@ const hasDuplicateName = (quests, editingId, name) => quests.some(q =>
   q.id !== editingId && (q.name || '').trim().toLowerCase() === name.trim().toLowerCase()
 );
 
-function getDuplicateState({ modalOpen, formData, quests, editingQuest, saving, error }) {
-  if (!formData) return { visibleError: error, saveDisabled: true };
+function getDuplicateState({ modalOpen, formData, quests, editingQuest, saving, error, errorIsConflict }) {
+  if (!formData) return { visibleError: error, saveDisabled: true, showErrorReload: false };
   const duplicateNameError = modalOpen && hasDuplicateName(quests, editingQuest?.id, formData.name)
     ? DUPLICATE_NAME_ERROR
     : null;
   return {
     visibleError: duplicateNameError || error,
     saveDisabled: saving || !formData.name.trim() || !!duplicateNameError,
+    // Only a genuine conflict (never a live duplicate-name banner layered over
+    // a stale error) earns the one-click "Reload list" recovery action.
+    showErrorReload: !duplicateNameError && errorIsConflict,
   };
 }
 
@@ -63,7 +66,7 @@ function QuestEmptyState({ searchQuery }) {
   );
 }
 
-function QuestFormModal({ editingQuest, formData, saving, deleting, error, saveDisabled, onChange, onClose, onSave, onDelete }) {
+function QuestFormModal({ editingQuest, formData, saving, deleting, error, errorConflict, saveDisabled, onChange, onClose, onReloadList, onSave, onDelete }) {
   return (
     <div className="ct-modal-overlay">
       <div className="ct-modal quests-modal">
@@ -79,7 +82,19 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, saveD
         </div>
 
         <div className="ct-modal-body">
-          {error && <div className="quests-form-error">{error}</div>}
+          {error && (
+            <div className="quests-form-error">
+              {error}
+              {errorConflict && onReloadList && (
+                <button
+                  className="ct-btn quests-error-reload-btn"
+                  onClick={onReloadList}
+                >
+                  <i className="fa-solid fa-rotate" /> Reload list
+                </button>
+              )}
+            </div>
+          )}
           <label htmlFor="quest-name" className="ct-label">
             Name <span className="ct-required">*</span>
           </label>
@@ -178,10 +193,20 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   } = useCrudList(quests, ['name']);
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState(null);
+  // True when the visible banner error is a 409 concurrent-edit conflict
+  // (server body { conflict: true }) — gates the "Reload list" action button.
+  const [errorIsConflict, setErrorIsConflict] = useState(false);
   // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
   // the on-screen list is stale; consumed in handleCloseModal so a reopen
   // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
   const missedListBroadcast = useRef(false);
+
+  // Single choke point for the banner: every message carries whether it was a
+  // conflict, so the "Reload list" action can never outlive its error copy.
+  const showError = (message, conflict = false) => {
+    setError(message);
+    setErrorIsConflict(conflict);
+  };
 
   // SSE handler — re-fetch quest list on quests-list events (another GM tab
   // created/updated/deleted a quest). Skipped while the edit modal is open so
@@ -199,17 +224,17 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   if (!isLocalhost) return null;
 
   const handleNewQuest = () => {
-    setError(null);
+    showError(null);
     openNew({ name: '', status: 'active', description: '', rewards: '', notes: '' });
   };
 
   const handleEditQuest = (quest) => {
-    setError(null);
+    showError(null);
     openEdit(quest);
   };
 
   const handleCloseModal = () => {
-    setError(null);
+    showError(null);
     closeModal();
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
     // A broadcast skipped while editing, or a rejected save, means the rows
@@ -220,18 +245,26 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     }
   };
 
+  // One-click guided recovery for the 409 banner: force the sanctioned stale
+  // close path (close the editor + consume the list refresh) so the reopen
+  // immediately seeds the fresh row — no trial-and-error.
+  const handleReloadList = () => {
+    missedListBroadcast.current = true;
+    handleCloseModal();
+  };
+
   // Name edits clear a sticky duplicate-name banner surfaced by a server 400
   // (the derived guard below re-evaluates live while typing); unrelated
   // save/delete errors stay until Save/Close. Mirrors Factions.jsx.
   const handleFormChange = (field, value) => {
     updateFormField(field, value);
-    if (field === 'name' && error === DUPLICATE_NAME_ERROR) setError(null);
+    if (field === 'name' && error === DUPLICATE_NAME_ERROR) showError(null);
   };
 
   // Derived duplicate-name error: shown live while typing, cleared as soon as
   // the name is unique again; Save stays disabled while it persists.
-  const { visibleError, saveDisabled } = getDuplicateState({
-    modalOpen, formData, quests, editingQuest, saving, error,
+  const { visibleError, saveDisabled, showErrorReload } = getDuplicateState({
+    modalOpen, formData, quests, editingQuest, saving, error, errorIsConflict,
   });
 
   // Save quest (create or update); duplicate-name guard remains as backstop
@@ -239,7 +272,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   const handleSave = async () => {
     if (!formData.name?.trim()) return;
     if (hasDuplicateName(quests, editingQuest?.id, formData.name)) {
-      setError(DUPLICATE_NAME_ERROR);
+      showError(DUPLICATE_NAME_ERROR);
       return;
     }
     setSaving(true);
@@ -248,13 +281,13 @@ function Quests({ campaignName, isLocalhost, onBack }) {
         ? quests.map(q => q.id === editingQuest.id ? { ...formData } : q)
         : [...quests, { id: crypto.randomUUID(), ...formData }];
       await saveQuestsList(questsArray);
-      setError(null);
+      showError(null);
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
       console.error('Failed to save quest:', err);
       missedListBroadcast.current = true;
-      setError(err.message || 'Failed to save quests');
+      showError(err.message || 'Failed to save quests', err.conflict === true);
     } finally {
       setSaving(false);
     }
@@ -265,13 +298,13 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     setDeleting(quest.id);
     try {
       await deleteQuestAction(quest.id);
-      setError(null);
+      showError(null);
       missedListBroadcast.current = false;
       // Close the modal on success — mirrors NPCs/Notes/Factions/Sessions deletes.
       handleCloseModal();
     } catch (error) {
       console.error('Failed to delete quest:', error);
-      setError(error.message || 'Failed to delete quest');
+      showError(error.message || 'Failed to delete quest');
     } finally {
       setDeleting(null);
     }
@@ -375,9 +408,11 @@ function Quests({ campaignName, isLocalhost, onBack }) {
           saving={saving}
           deleting={deleting}
           error={visibleError}
+          errorConflict={showErrorReload}
           saveDisabled={saveDisabled}
           onChange={handleFormChange}
           onClose={handleCloseModal}
+          onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}
         />

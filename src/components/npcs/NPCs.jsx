@@ -22,6 +22,9 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   } = useCrudList(npcs, ['name', 'race', 'classRole', 'tags']);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  // True when the visible banner error is a 409 concurrent-edit conflict
+  // (server body { conflict: true }) — gates the "Reload list" action button.
+  const [errorIsConflict, setErrorIsConflict] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState('roleplay');
   const [modalKey, setModalKey] = useState(0);
   // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
@@ -30,6 +33,13 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   // Consumed in handleCloseModal — the first safe moment to re-sync — so the
   // conflict guidance ("reload the list and re-apply") actually works in-view.
   const missedListBroadcast = useRef(false);
+
+  // Single choke point for the banner: every message carries whether it was a
+  // conflict, so the "Reload list" action can never outlive its error copy.
+  const showError = (message, conflict = false) => {
+    setError(message);
+    setErrorIsConflict(conflict);
+  };
 
   useEffect(() => {
     if (campaignName) {
@@ -52,27 +62,27 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   }, [campaignName, modalOpen, loadNPCsList]);
 
   const handleNewNPC = () => {
-    setError(null);
+    showError(null);
     setModalInitialTab('roleplay');
     openNew(getDefaultFormData());
   };
 
   const handleGenerateNPC = async () => {
     const generated = await generateNPC(npcs);
-    setError(null);
+    showError(null);
     setModalInitialTab('roleplay');
     openNew(getDefaultFormData(generated));
   };
 
   const handleEditNPC = (npc, tab = 'roleplay') => {
-    setError(null);
+    showError(null);
     setModalInitialTab(tab);
     openEdit(npc);
     setFormData(getDefaultFormData(npc));
   };
 
   const handleCloseModal = () => {
-    setError(null);
+    showError(null);
     closeModal();
     // A broadcast skipped while editing, or a save the server rejected, means
     // the list rows are stale — refresh now so the next reopen seeds a fresh
@@ -83,6 +93,14 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     }
   };
 
+  // One-click guided recovery for the 409 banner: force the sanctioned stale
+  // close path (close the editor + consume the list refresh) so the reopen
+  // immediately seeds the fresh row — no trial-and-error.
+  const handleReloadList = () => {
+    missedListBroadcast.current = true;
+    handleCloseModal();
+  };
+
   // Duplicate-name guard (mirrors MapsManager.handleCreate)
   const hasDuplicateName = () => npcs.some(n =>
     n.name !== editingNPC?.name && n.name.toLowerCase() === formData.name.trim().toLowerCase()
@@ -91,14 +109,14 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
     if (hasDuplicateName()) {
-      setError('An NPC with that name already exists');
+      showError('An NPC with that name already exists');
       return;
     }
     setSaving(true);
     try {
       const cleaned = cleanNPCData(formData);
       await saveNPC(campaignName, cleaned, editingNPC?.name);
-      setError(null);
+      showError(null);
       await loadNPCsList();
       missedListBroadcast.current = false;
       handleCloseModal();
@@ -107,7 +125,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       // A rejected save means the server row moved on without us — the list
       // is stale; closing refreshes it (see handleCloseModal).
       missedListBroadcast.current = true;
-      setError(err.message || 'Failed to save NPC');
+      showError(err.message || 'Failed to save NPC', err.conflict === true);
     } finally {
       setSaving(false);
     }
@@ -132,19 +150,19 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     try {
       const status = await addNPCToInitiative(campaignName, npc, onViewInitiative);
       if (status === 'needs-weapon') {
-        setError(`${npc.name} was not added — give them at least one weapon in the Stats tab.`);
+        showError(`${npc.name} was not added — give them at least one weapon in the Stats tab.`);
         handleEditNPC(npc, 'stats');
       }
     } catch (err) {
       console.error('Failed to add NPC to initiative:', err);
-      setError(err.message || 'Failed to add NPC to initiative');
+      showError(err.message || 'Failed to add NPC to initiative');
     }
   };
 
   const handleSaveAndAddToInitiative = async () => {
     if (!formData || !formData.name.trim()) return;
     if (hasDuplicateName()) {
-      setError('An NPC with that name already exists');
+      showError('An NPC with that name already exists');
       return;
     }
     setSaving(true);
@@ -158,12 +176,12 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         image: savedNpc.image || snapshot.image,
         imagePath: savedNpc.imagePath || snapshot.image || '',
       };
-      setError(null);
+      showError(null);
       await loadNPCsList();
       missedListBroadcast.current = false;
       const status = await addNPCToInitiative(campaignName, npcForInitiative, onViewInitiative);
       if (status === 'needs-weapon') {
-        setError(`${npcForInitiative.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
+        showError(`${npcForInitiative.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
         // Modal stays open; bump the key so it remounts showing the Stats tab.
         setModalInitialTab('stats');
         setModalKey(k => k + 1);
@@ -173,7 +191,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     } catch (err) {
       console.error('Failed to save NPC:', err);
       missedListBroadcast.current = true;
-      setError(err.message || 'Failed to save NPC');
+      showError(err.message || 'Failed to save NPC', err.conflict === true);
     } finally {
       setSaving(false);
     }
@@ -270,8 +288,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
           saving={saving}
           deleting={deleting}
           error={error}
+          errorConflict={errorIsConflict}
           disabled={saving || !formData.name.trim()}
           onClose={handleCloseModal}
+          onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}
           onSaveAndAddToInitiative={handleSaveAndAddToInitiative}

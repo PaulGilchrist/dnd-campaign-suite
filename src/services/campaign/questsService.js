@@ -39,8 +39,12 @@ export async function saveQuests(campaignName, quests) {
       body: JSON.stringify({ quests })
     });
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to save quests');
+      const body = await response.json();
+      const err = new Error(body.error || 'Failed to save quests');
+      // Server 409 concurrent-edit conflicts carry { conflict: true } — the
+      // editor banner keys its one-click "Reload list" recovery off this flag.
+      err.conflict = body.conflict === true;
+      throw err;
     }
   } catch (error) {
     console.error('Error saving quests:', error);

@@ -52,12 +52,20 @@ vi.mock('./NPCListItem.jsx', () => ({
   ),
 }));
 
-// Modal mock exposes the seeded draft (notes), the inline error banner, and
-// Save/Cancel wired to the real handlers.
+// Modal mock exposes the seeded draft (notes), the inline error banner, the
+// conflict "Reload list" action contract, and Save/Cancel wired to the real
+// handlers. (The real modal's own rendering is pinned in NPCFormModal.test.jsx.)
 vi.mock('./NPCFormModal.jsx', () => ({
-  default: ({ formData, setFormData, error, onClose, onSave }) => (
+  default: ({ formData, setFormData, error, errorConflict, onReloadList, onClose, onSave }) => (
     <div data-testid="npc-form-modal">
-      {error ? <div className="npcs-form-error">{error}</div> : null}
+      {error ? (
+        <div className="npcs-form-error">
+          {error}
+          {errorConflict && onReloadList ? (
+            <button onClick={onReloadList}>Reload list</button>
+          ) : null}
+        </div>
+      ) : null}
       <input
         data-testid="npc-notes-input"
         value={formData?.notes ?? ''}
@@ -155,5 +163,54 @@ describe('NPCs 409-recovery: close refreshes the stale list', () => {
     await waitFor(() => expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument());
     expect(saveCallCount).toBe(1);
     expect(loadCallCount).toBe(2);
+  });
+
+  it('conflict banner carries a Reload list action — one click closes + refetches so the reopen seeds the fresh row', async () => {
+    // Service errors from a 409 carry { conflict: true } (server conflict body).
+    saveNPCImpl = async () => {
+      throw Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
+    };
+    renderNPCs();
+    await screen.findByText(/old notes/);
+    expect(loadCallCount).toBe(1);
+
+    fireEvent.click(screen.getByText('Edit'));
+    fireEvent.click(screen.getByText('Save'));
+
+    // Banner copy is unchanged and now offers the one-click recovery.
+    const banner = await screen.findByText(/NOT saved/);
+    expect(banner).toHaveTextContent(CONFLICT_MESSAGE);
+    const reloadButton = screen.getByRole('button', { name: 'Reload list' });
+    // Nothing re-fetched while the editor stays open on the refusal.
+    expect(loadCallCount).toBe(1);
+
+    // What the other tab persisted — the refetch below will surface it.
+    npcsFixture = [{ name: 'Marta Copperkettle', notes: 'other-tab notes', updatedAt: 2 }];
+    fireEvent.click(reloadButton);
+
+    // ONE click = the full sanctioned recovery: editor closed AND the stale
+    // list refresh consumed (the 9cee7bfa2 close path, no extra steps).
+    await waitFor(() => expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument());
+    await screen.findByText(/other-tab notes/);
+    expect(loadCallCount).toBe(2);
+
+    // Reopen seeds the FRESH row/stamp — re-applying the edit now saves 200.
+    fireEvent.click(screen.getByText('Edit'));
+    expect(screen.getByTestId('npc-notes-input').value).toBe('other-tab notes');
+    expect(loadCallCount).toBe(2);
+  });
+
+  it('non-conflict save errors render the old copy-only banner (no Reload list)', async () => {
+    saveNPCImpl = async () => {
+      throw new Error('An NPC with that name already exists');
+    };
+    renderNPCs();
+    await screen.findByText(/old notes/);
+
+    fireEvent.click(screen.getByText('Edit'));
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(await screen.findByText(/already exists/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
   });
 });

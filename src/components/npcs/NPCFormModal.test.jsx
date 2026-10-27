@@ -8,6 +8,7 @@ describe('NPCFormModal', () => {
   const callbacks = {
     setFormData: vi.fn(),
     onClose: vi.fn(),
+    onReloadList: vi.fn(),
     onSave: vi.fn(),
     onDelete: vi.fn(),
     onSaveAndAddToInitiative: vi.fn(),
@@ -63,6 +64,34 @@ describe('NPCFormModal', () => {
     it('shows the error message when provided', () => {
       renderModal({}, { error: 'A character with this name already exists.' });
       expect(screen.getByText('A character with this name already exists.')).toBeInTheDocument();
+    });
+  });
+
+  // ── Conflict recovery banner (409 "Reload list") ───────────────────
+
+  describe('Conflict recovery banner', () => {
+    const conflictCopy =
+      'NPC "Marta Copperkettle" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
+
+    it('renders the unchanged conflict copy with a Reload list button and reports the click', () => {
+      renderModal({}, { error: conflictCopy, errorConflict: true, onReloadList: callbacks.onReloadList });
+      // Existing copy untouched (criterion 1).
+      expect(screen.getByText(conflictCopy)).toBeInTheDocument();
+      const button = screen.getByRole('button', { name: 'Reload list' });
+      fireEvent.click(button);
+      expect(callbacks.onReloadList).toHaveBeenCalledTimes(1);
+    });
+
+    it('omits the Reload list button for a non-conflict error', () => {
+      renderModal({}, { error: 'An NPC with that name already exists', onReloadList: callbacks.onReloadList });
+      expect(screen.getByText('An NPC with that name already exists')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
+    });
+
+    it('omits the Reload list button when no onReloadList handler is wired', () => {
+      renderModal({}, { error: conflictCopy, errorConflict: true, onReloadList: undefined });
+      expect(screen.getByText(conflictCopy)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
     });
   });
 

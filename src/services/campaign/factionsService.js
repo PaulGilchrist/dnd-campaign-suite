@@ -23,8 +23,12 @@ export const saveFactions = async (campaignName, factions) => {
       body: JSON.stringify({ factions }),
     });
     if (!response.ok) {
-      const { error } = await response.json();
-      throw new Error(error || 'Failed to save Factions');
+      const body = await response.json();
+      const err = new Error(body.error || 'Failed to save Factions');
+      // Server 409 concurrent-edit conflicts carry { conflict: true } — the
+      // editor banner keys its one-click "Reload list" recovery off this flag.
+      err.conflict = body.conflict === true;
+      throw err;
     }
     return await response.json();
   } catch (error) {

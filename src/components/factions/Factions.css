@@ -84,3 +84,12 @@
   color: var(--color-error-light);
   font-size: 13px;
 }
+
+/* "Reload list" one-click recovery inside a 409 conflict banner — rides the
+   global .ct-btn styling, sized small, own line under the copy. */
+.factions-error-reload-btn {
+  display: block;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 4px 10px;
+}

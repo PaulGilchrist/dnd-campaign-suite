@@ -87,7 +87,7 @@ function NoteListItem({ note, onEdit }) {
 
 function NoteModal({
   formData, editingNote, partyLevel, isLocalhost, saving, deleting, error,
-  onClose, onFieldChange, onSave, onDelete,
+  errorConflict, onClose, onFieldChange, onReloadList, onSave, onDelete,
 }) {
   if (!formData) return null;
 
@@ -107,8 +107,21 @@ function NoteModal({
 
         <div className="ct-modal-body">
           {/* Inline error message (e.g. server 409 "changed elsewhere") —
-              mirrors .npcs-form-error / .factions-form-error usage */}
-          {error && <div className="notes-form-error">{error}</div>}
+              mirrors .npcs-form-error / .factions-form-error usage. Conflicts
+              get the one-click "Reload list" recovery (see Notes.jsx). */}
+          {error && (
+            <div className="notes-form-error">
+              {error}
+              {errorConflict && onReloadList && (
+                <button
+                  className="ct-btn notes-error-reload-btn"
+                  onClick={onReloadList}
+                >
+                  <i className="fa-solid fa-rotate" /> Reload list
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Description (largest input) */}
           <PreviewToggle
@@ -218,10 +231,20 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   // Server-surfaced save/delete errors (e.g. 409 concurrent-edit conflict) —
   // mirrors the error state in NPCs.jsx / Factions.jsx.
   const [error, setError] = useState(null);
+  // True when the visible banner error is a 409 concurrent-edit conflict
+  // (server body { conflict: true }) — gates the "Reload list" action button.
+  const [errorIsConflict, setErrorIsConflict] = useState(false);
   // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
   // the on-screen list is stale; consumed in handleCloseModal so a reopen
   // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
   const missedListBroadcast = useRef(false);
+
+  // Single choke point for the banner: every message carries whether it was a
+  // conflict, so the "Reload list" action can never outlive its error copy.
+  const showError = (message, conflict = false) => {
+    setError(message);
+    setErrorIsConflict(conflict);
+  };
 
   // Load notes on mount
   useEffect(() => {
@@ -252,7 +275,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
   // Open modal for new note
   const handleNewNote = () => {
-    setError(null);
+    showError(null);
     openNew({
       id: crypto.randomUUID(),
       description: '',
@@ -266,13 +289,13 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
   // Open modal for editing a note
   const handleEditNote = (note) => {
-    setError(null);
+    showError(null);
     openEdit(note);
   };
 
   // Close modal and reset
   const handleCloseModal = () => {
-    setError(null);
+    showError(null);
     closeModal();
     // A broadcast skipped while editing, or a rejected save, means the rows
     // are stale — refresh so the next reopen seeds fresh (mirrors NPCs.jsx).
@@ -280,6 +303,14 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
       missedListBroadcast.current = false;
       loadNotesList();
     }
+  };
+
+  // One-click guided recovery for the 409 banner: force the sanctioned stale
+  // close path (close the editor + consume the list refresh) so the reopen
+  // immediately seeds the fresh row — no trial-and-error.
+  const handleReloadList = () => {
+    missedListBroadcast.current = true;
+    handleCloseModal();
   };
 
   // Handle form field changes
@@ -300,7 +331,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
         : [...notes, updated];
 
       await saveNotesList(updatedNotes);
-      setError(null);
+      showError(null);
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {
@@ -308,7 +339,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
       // Server-side conflicts (409 "changed elsewhere") and failures surface
       // verbatim in the modal so a stale tab never silently loses its edit.
       missedListBroadcast.current = true;
-      setError(error.message || 'Failed to save note');
+      showError(error.message || 'Failed to save note', error.conflict === true);
     } finally {
       setSaving(false);
     }
@@ -324,11 +355,11 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
     try {
       await deleteNoteAction(editingNote.id);
       missedListBroadcast.current = false;
-      setError(null);
+      showError(null);
       handleCloseModal();
     } catch (error) {
       console.error('Failed to delete note:', error);
-      setError(error.message || 'Failed to delete note');
+      showError(error.message || 'Failed to delete note');
     } finally {
       setDeleting(false);
     }
@@ -414,8 +445,10 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
           saving={saving}
           deleting={deleting}
           error={error}
+          errorConflict={errorIsConflict}
           onClose={handleCloseModal}
           onFieldChange={handleFormChange}
+          onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}
         />

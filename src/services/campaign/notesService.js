@@ -23,8 +23,12 @@ export const saveNotes = async (campaignName, notes) => {
       body: JSON.stringify({ notes }),
     });
     if (!response.ok) {
-      const { error } = await response.json();
-      throw new Error(error || 'Failed to save notes');
+      const body = await response.json();
+      const err = new Error(body.error || 'Failed to save notes');
+      // Server 409 concurrent-edit conflicts carry { conflict: true } — the
+      // editor banner keys its one-click "Reload list" recovery off this flag.
+      err.conflict = body.conflict === true;
+      throw err;
     }
     return await response.json();
   } catch (error) {

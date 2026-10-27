@@ -32,14 +32,29 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 const CONFLICT_MESSAGE =
   'note "abc" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
 
-const mockHook = (saveImpl) =>
-  useEntityManagement.mockReturnValue({
+const mockHook = (saveImpl) => {
+  const hook = {
     items: [],
     loading: false,
     loadItems: vi.fn(),
     saveItems: saveImpl,
     deleteItem: vi.fn().mockResolvedValue(undefined),
+  };
+  useEntityManagement.mockReturnValue(hook);
+  return hook;
+};
+
+// Errors from notesService carry { conflict: true } only for a server 409
+// conflict body — the banner's Reload list action gates on that flag.
+const conflictError = () => Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
+
+const openEditorWithStaleEdit = (ui) => {
+  fireEvent.click(ui.getByRole('button', { name: /new note/i }));
+  fireEvent.change(ui.getByTestId('preview-toggle-textarea'), {
+    target: { value: 'A stale edit' },
   });
+  fireEvent.click(ui.getByRole('button', { name: /^save/i }));
+};
 
 describe('Notes — concurrent-save conflict surfacing', () => {
   beforeEach(() => {
@@ -104,5 +119,36 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     await waitFor(() => expect(useEntityManagement().saveItems).toHaveBeenCalled());
     expect(document.querySelector('.notes-form-error')).toBeNull();
     expect(screen.queryByTestId('preview-toggle-textarea')).toBeNull();
+  });
+
+  it('flags a 409 conflict with a Reload list action — one click closes the editor and refetches the list', async () => {
+    const hook = mockHook(vi.fn().mockRejectedValue(conflictError()));
+    render(
+      <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
+    );
+
+    openEditorWithStaleEdit(screen);
+    const button = await screen.findByRole('button', { name: 'Reload list' });
+    expect(document.querySelector('.notes-form-error')).not.toBeNull();
+    // Only the mount load so far — nothing re-fetched while the banner is up.
+    expect(hook.loadItems).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(button);
+    // One click = the sanctioned stale close: editor gone + one more refresh,
+    // so the next reopen seeds a fresh row (mirrors NPCs recovery machinery).
+    await waitFor(() => expect(hook.loadItems).toHaveBeenCalledTimes(2));
+    expect(screen.queryByTestId('preview-toggle-textarea')).toBeNull();
+    expect(document.querySelector('.notes-form-error')).toBeNull();
+  });
+
+  it('non-conflict save failures keep the old copy-only banner (no Reload list)', async () => {
+    mockHook(vi.fn().mockRejectedValue(new Error('Failed to save notes')));
+    render(
+      <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
+    );
+
+    openEditorWithStaleEdit(screen);
+    await waitFor(() => expect(document.querySelector('.notes-form-error')).not.toBeNull());
+    expect(screen.queryByRole('button', { name: 'Reload list' })).not.toBeInTheDocument();
   });
 });

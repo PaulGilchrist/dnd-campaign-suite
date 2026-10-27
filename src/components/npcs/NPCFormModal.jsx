@@ -70,8 +70,10 @@ function NPCFormModal({
   saving,
   deleting,
   error,
+  errorConflict,
   disabled,
   onClose,
+  onReloadList,
   onSave,
   onDelete,
   onSaveAndAddToInitiative,
@@ -165,7 +167,22 @@ function NPCFormModal({
           </div>
 
           <div className="ct-modal-body">
-            {error && <div className="npcs-form-error">{error}</div>}
+            {error && (
+              <div className="npcs-form-error">
+                {error}
+                {/* 409 conflicts only: one-click sanctioned recovery (close +
+                    refetch) so the guided "reload the list" step needs no
+                    trial-and-error. Mirrors handleCloseModal's stale path. */}
+                {errorConflict && onReloadList && (
+                  <button
+                    className="ct-btn npcs-error-reload-btn"
+                    onClick={onReloadList}
+                  >
+                    <i className="fa-solid fa-rotate" /> Reload list
+                  </button>
+                )}
+              </div>
+            )}
 
             <label htmlFor="npc-name" className="ct-label">
               Name <span className="ct-required">*</span>

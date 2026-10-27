@@ -39,14 +39,17 @@ const hasDuplicateName = (factions, editingId, name) => factions.some(f =>
 
 const DUPLICATE_NAME_ERROR = 'A faction with that name already exists';
 
-function getDuplicateState({ modalOpen, formData, factions, editingFaction, saving, error }) {
-  if (!formData) return { visibleError: error, saveDisabled: true };
+function getDuplicateState({ modalOpen, formData, factions, editingFaction, saving, error, errorIsConflict }) {
+  if (!formData) return { visibleError: error, saveDisabled: true, showErrorReload: false };
   const duplicateNameError = modalOpen && hasDuplicateName(factions, editingFaction?.id, formData.name)
     ? DUPLICATE_NAME_ERROR
     : null;
   return {
     visibleError: duplicateNameError || error,
     saveDisabled: saving || !formData.name.trim() || !!duplicateNameError,
+    // Only a genuine conflict (never a live duplicate-name banner layered over
+    // a stale error) earns the one-click "Reload list" recovery action.
+    showErrorReload: !duplicateNameError && errorIsConflict,
   };
 }
 
@@ -85,10 +88,20 @@ function Factions({ campaignName, onBack }) {
   } = useCrudList(factions, ['name']);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  // True when the visible banner error is a 409 concurrent-edit conflict
+  // (server body { conflict: true }) — gates the "Reload list" action button.
+  const [errorIsConflict, setErrorIsConflict] = useState(false);
   // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
   // the on-screen list is stale; consumed in handleCloseModal so a reopen
   // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
   const missedListBroadcast = useRef(false);
+
+  // Single choke point for the banner: every message carries whether it was a
+  // conflict, so the "Reload list" action can never outlive its error copy.
+  const showError = (message, conflict = false) => {
+    setError(message);
+    setErrorIsConflict(conflict);
+  };
 
   // Load factions on mount
   useEffect(() => {
@@ -112,7 +125,7 @@ function Factions({ campaignName, onBack }) {
 
   // Open modal for new faction
   const handleNewFaction = () => {
-    setError(null);
+    showError(null);
     openNew({
       id: crypto.randomUUID(),
       name: '',
@@ -125,13 +138,13 @@ function Factions({ campaignName, onBack }) {
 
   // Open modal for editing a faction
   const handleEditFaction = (faction) => {
-    setError(null);
+    showError(null);
     openEdit(faction);
   };
 
   // Close modal and reset
   const handleCloseModal = () => {
-    setError(null);
+    showError(null);
     closeModal();
     // A broadcast skipped while editing, or a rejected save, means the rows
     // are stale — refresh so the next reopen seeds fresh (mirrors NPCs.jsx).
@@ -141,24 +154,32 @@ function Factions({ campaignName, onBack }) {
     }
   };
 
+  // One-click guided recovery for the 409 banner: force the sanctioned stale
+  // close path (close the editor + consume the list refresh) so the reopen
+  // immediately seeds the fresh row — no trial-and-error.
+  const handleReloadList = () => {
+    missedListBroadcast.current = true;
+    handleCloseModal();
+  };
+
   // Handle form field changes. Name edits also clear a sticky duplicate-name
   // error surfaced by a server 400 (the derived guard above only re-evaluates
   // against the locally-loaded list); unrelated errors stay until Save/Close.
   const handleFormChange = (field, value) => {
     updateFormField(field, value);
-    if (field === 'name' && error === DUPLICATE_NAME_ERROR) setError(null);
+    if (field === 'name' && error === DUPLICATE_NAME_ERROR) showError(null);
   };
 
   // Derived duplicate-name error: shown while typing, cleared as soon as the name changes
-  const { visibleError, saveDisabled } = getDuplicateState({
-    modalOpen, formData, factions, editingFaction, saving, error,
+  const { visibleError, saveDisabled, showErrorReload } = getDuplicateState({
+    modalOpen, formData, factions, editingFaction, saving, error, errorIsConflict,
   });
 
   // Save faction (create or update); duplicate-name guard mirrors NPCs.jsx
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
     if (hasDuplicateName(factions, editingFaction?.id, formData.name)) {
-      setError(DUPLICATE_NAME_ERROR);
+      showError(DUPLICATE_NAME_ERROR);
       return;
     }
 
@@ -170,13 +191,13 @@ function Factions({ campaignName, onBack }) {
         : [...factions, updated];
 
       await saveFactionsList(updatedFactions);
-      setError(null);
+      showError(null);
       missedListBroadcast.current = false;
       flushSync(handleCloseModal);
     } catch (err) {
       console.error('Failed to save faction:', err);
       missedListBroadcast.current = true;
-      setError(err.message || 'Failed to save factions');
+      showError(err.message || 'Failed to save factions', err.conflict === true);
     } finally {
       setSaving(false);
     }
@@ -309,7 +330,19 @@ function Factions({ campaignName, onBack }) {
             </div>
 
             <div className="ct-modal-body">
-              {visibleError && <div className="factions-form-error">{visibleError}</div>}
+              {visibleError && (
+                <div className="factions-form-error">
+                  {visibleError}
+                  {showErrorReload && (
+                    <button
+                      className="ct-btn factions-error-reload-btn"
+                      onClick={handleReloadList}
+                    >
+                      <i className="fa-solid fa-rotate" /> Reload list
+                    </button>
+                  )}
+                </div>
+              )}
               {/* Name (required) */}
               <label htmlFor="faction-name" className="ct-label">
                 Faction Name <span className="ct-required">*</span>
