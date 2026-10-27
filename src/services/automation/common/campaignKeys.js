@@ -35,6 +35,11 @@ export const CAMPAIGN_KEYS = new Set([
     'travel-eventFrequency',
     'travel-rerollsRemaining',
     'travel-horseback',
+    // bug-hex-trip-clobbered-by-second-client: per-tab provenance stamp for
+    // the live trip — the client that pressed Travel claims it, and a second
+    // viewer's toggle interactions may never reset/cancel a trip it does not
+    // own. UI-ownership byte (session token), lives beside the travel keys.
+    'travel-started-by',
     'music',
     // Level 5 (L5-001): enforcement foundation — off-by-default flags and the
     // per-creature turn economy (see src/services/combat/turnState.js +

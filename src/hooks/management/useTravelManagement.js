@@ -20,6 +20,7 @@ import { getRuntimeValue, setRuntimeValue, hasRuntimeValue, setRuntimeObject } f
 import { hexNeighbors } from '../../services/maps/hexMapUtils.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
 import { setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js';
+import { claimTripOwner, releaseTripOwner } from '../../services/maps/travelSession.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -335,6 +336,10 @@ export default function useTravelManagement({
     setPath([]);
     setPathIndex(0);
     setLastMessage(null);
+    // Provenance claim (bug-hex-trip-clobbered-by-second-client): the tab
+    // that STARTS a trip stamps itself as owner in the shared store, so a
+    // second client's toggle interactions can adopt-but-never-destroy it.
+    claimTripOwner(campaignName);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cancelTravel = useCallback(() => {
@@ -343,6 +348,9 @@ export default function useTravelManagement({
     setPath([]);
     setPathIndex(0);
     setLastMessage(null);
+    // The trip is gone — ownership releases with it (arrival lands through
+    // the same inactive seam; cancel/arrival are the only exits).
+    releaseTripOwner(campaignName);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Arrival clears the finished trip (improve 2026-10-26-D): destination/

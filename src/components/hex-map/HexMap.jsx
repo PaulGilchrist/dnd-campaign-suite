@@ -142,6 +142,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, {
         hasPersistedWeather: weather != null,
         hasLoadedTrip: mapLoader.resumedTripRef?.current === true,
+        // Shared-trip authority (bug-hex-trip-clobbered-by-second-client):
+        // outdoor travel is campaign-shared — the hook consults the shared
+        // travel-mode store so a second client's press adopts a live trip
+        // instead of resetting or cancelling the session that owns it.
+        campaignName,
     });
 
     // ── POI management ──
