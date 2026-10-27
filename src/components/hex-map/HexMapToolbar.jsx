@@ -84,9 +84,11 @@ function HexMapToolbar({
                 <i className="fa-solid fa-road"></i>
             </button>
 
-            {/* Travel tool */}
+            {/* Travel tool — binary toggle: aria-pressed mirrors the .active
+                class (SessionSection.jsx pattern) so SRs announce on/off. */}
             <button
                 className={tool === TOOL_TRAVEL ? 'active no-print' : 'no-print'}
+                aria-pressed={tool === TOOL_TRAVEL}
                 onClick={() => setTool(tool === TOOL_TRAVEL ? TOOL_NONE : TOOL_TRAVEL)}
                 title="Travel mode — plan and execute overland travel"
                 aria-label="Travel mode — plan and execute overland travel"

@@ -166,6 +166,34 @@ describe('HexMapToolbar', () => {
         }
     );
 
+    // Run F (2026-10-27): binary view toggle must announce on/off to screen
+    // readers. aria-pressed mirrors the .active class — both driven by the
+    // same `tool` prop (SessionSection.jsx aria-pressed={boolean} pattern) —
+    // and renders for the false state too (never null/absent).
+    it('travel button exposes pressed state via aria-pressed across arm/disarm', () => {
+        const travelName = TOOL_TITLES[TOOL_TRAVEL];
+
+        // Inactive: attribute present and false.
+        renderToolbar({ tool: TOOL_NONE });
+        const idle = screen.getByRole('button', { name: travelName });
+        expect(idle).toHaveAttribute('aria-pressed', 'false');
+        expect(idle).not.toHaveClass('active');
+
+        // Arm: click requests TOOL_TRAVEL; parent re-render makes it pressed.
+        fireEvent.click(idle);
+        expect(props.setTool).toHaveBeenCalledWith(TOOL_TRAVEL);
+        renderToolbar({ tool: TOOL_TRAVEL });
+        const armed = screen.getByRole('button', { name: travelName });
+        expect(armed).toHaveAttribute('aria-pressed', 'true');
+        expect(armed).toHaveClass('active');
+
+        // Disarm (panel Cancel flips the tool via useTravelToolSync): false again.
+        fireEvent.click(armed);
+        expect(props.setTool).toHaveBeenLastCalledWith(TOOL_NONE);
+        renderToolbar({ tool: TOOL_NONE });
+        expect(screen.getByRole('button', { name: travelName })).toHaveAttribute('aria-pressed', 'false');
+    });
+
     it('clicking a swatch selects that terrain and arms the paint tool', () => {
         renderToolbar({ tool: TOOL_PAINT });
         fireEvent.click(screen.getByTitle('Forest'));
