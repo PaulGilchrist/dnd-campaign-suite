@@ -76,6 +76,12 @@ function createMockRouter() {
         }
 
         const entities = Array.isArray(MOCK_STORE.get(key)) ? MOCK_STORE.get(key) : [];
+        const entity = entities.find(e => e[idField] === id);
+
+        if (!entity) {
+            return res.status(404).json({ error: `${singularDisplayName} not found` });
+        }
+
         const filtered = entities.filter(e => e[idField] !== id);
 
         setupMock(campaign, filtered);
@@ -418,17 +424,19 @@ describe('factions - DELETE /api/campaigns/:campaign/factions/:factionId', () =>
         expect(res.body).toHaveProperty('error', 'Faction not found');
     });
 
-    it('should return 200 and succeed when faction does not exist (no-op delete)', async () => {
+    it('should return 404 when faction does not exist', async () => {
         const factionsData = [
             { id: 'f1', name: 'Keep Me', description: 'Keep', goals: 'Keep', influence: 1, notes: '' },
         ];
         setupMock('test-campaign', factionsData);
+        const before = MOCK_STORE.get('test-campaign:factions');
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/factions/nonexistent');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Faction not found');
+        expect(MOCK_STORE.get('test-campaign:factions')).toBe(before);
     });
 
     it('should delete a faction and return success', async () => {
@@ -482,24 +490,24 @@ describe('factions - DELETE /api/campaigns/:campaign/factions/:factionId', () =>
         expect(stored).toHaveLength(0);
     });
 
-    it('should handle deleting from an empty factions list (no-op delete)', async () => {
+    it('should return 404 when deleting from an empty factions list', async () => {
         setupMock('test-campaign', []);
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/factions/f1');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Faction not found');
     });
 
-    it('should handle factions.json containing non-array data', async () => {
+    it('should return 404 for factions.json containing non-array data', async () => {
         setupMock('test-campaign', []);
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/factions/any-id');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Faction not found');
     });
 
     it('should delete faction with complex nested data', async () => {

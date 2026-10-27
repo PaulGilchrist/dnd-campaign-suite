@@ -378,7 +378,7 @@ describe('npcs - DELETE /api/campaigns/:campaign/npcs/:npcName', () => {
         expect(res.body).toHaveProperty('error', 'NPC not found');
     });
 
-    it('should return 200 and succeed when npc does not exist (no-op delete)', async () => {
+    it('should return 404 when npc does not exist', async () => {
         const npcsData = [
             { name: 'Town Guard', alignment: 'Lawful Good', level: 1 },
         ];
@@ -386,8 +386,8 @@ describe('npcs - DELETE /api/campaigns/:campaign/npcs/:npcName', () => {
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/npcs/Nonexistent');
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'NPC not found');
 
         const content = JSON.parse(FILE_SYSTEM.get(npcsPath('test-campaign')));
         expect(content).toHaveLength(1);
@@ -434,13 +434,13 @@ describe('npcs - DELETE /api/campaigns/:campaign/npcs/:npcName', () => {
         expect(vi.mocked(deleteCharacterImage)).not.toHaveBeenCalled();
     });
 
-    it('should handle deleting from an empty npcs list (no-op delete)', async () => {
+    it('should return 404 when deleting from an empty npcs list', async () => {
         setupFs({ [npcsPath('test-campaign')]: '[]' });
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/npcs/Town%20Guard');
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'NPC not found');
     });
 
     it('should delete only the matching npc when multiple exist', async () => {

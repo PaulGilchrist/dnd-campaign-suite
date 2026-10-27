@@ -135,7 +135,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 - *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-D's stale-weather-budget bug + three travel backlog items are closed + live-proven run E. Run-E's stale-mount-budget + strand-until-repress + skip-mislabel travel items closed + live-proven run F.)*
-- *(2026-10-27 run G)* **Factory DELETE of a missing id returns 200 `{"success":true}`** (`DELETE /notes/<nonexistent>` observed) — a silent no-op that lies about deleting; prefer 404 so UI/SSE audits can trust the status code (one-line in `jsonEntityCrud.js` delete route + twins).
 - *(2026-10-27 run G)* **Deprecated mobile meta:** standing console warning `<meta name="apple-mobile-web-app-capable">` — add the `mobile-web-app-capable` twin in `index.html`.
 - *(2026-10-27 run G)* **409 banner could carry a one-click "Reload list" action** — the guided recovery currently needs a manual view remount (see `bug-ct-409-reopen-reseeds-stale-list-recovery-loop.md` for the root gap; even after that fix, an explicit retry affordance in the banner removes trial-and-error).
 ## Coverage

@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import { request } from '../test-utils/localhostSupertest.js';
 import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
 
@@ -54,6 +55,7 @@ vi.mock('../utils/campaignPaths.js', () => ({
 // Clear mock filesystem state before every test to prevent cross-test contamination
 beforeEach(() => {
     mockFsState.clear();
+    vi.mocked(fs.writeFileSync).mockClear();
 });
 
 // ---------------------------------------------------------------------------
@@ -388,19 +390,21 @@ describe('jsonEntityCrud - basic CRUD with defaults', () => {
             expect(stored[0].name).toBe('Keep Me');
         });
 
-        it('should return success when deleting non-existent entity (no-op)', async () => {
+        it('should return 404 when deleting non-existent entity from an existing file', async () => {
             const entities = [{ id: 'e1', name: 'Entity One' }];
             writeEntities(campaign, entityName, entities);
+            const before = mockFsState.get(dataFileFor(campaign, entityName));
 
             const router = createJsonEntityRouter(entityName);
             const app = createTestApp(router);
             const res = await request(app).delete(`/api/campaigns/${campaign}/${entityName}/nonexistent`);
 
-            expect(res.status).toBe(200);
-            expect(res.body).toHaveProperty('success', true);
+            expect(res.status).toBe(404);
+            expect(res.body).toHaveProperty('error', 'testentity not found');
 
-            const stored = JSON.parse(mockFsState.get(dataFileFor(campaign, entityName)));
-            expect(stored).toHaveLength(1);
+            // Fully inert: no file write (same bytes on disk).
+            expect(vi.mocked(fs.writeFileSync)).not.toHaveBeenCalled();
+            expect(mockFsState.get(dataFileFor(campaign, entityName))).toBe(before);
         });
 
         it('should remove only the matching entity', async () => {
@@ -436,15 +440,15 @@ describe('jsonEntityCrud - basic CRUD with defaults', () => {
             expect(stored).toHaveLength(0);
         });
 
-        it('should handle deleting from empty array', async () => {
+        it('should return 404 when deleting from an empty array', async () => {
             writeEntities(campaign, entityName, []);
 
             const router = createJsonEntityRouter(entityName);
             const app = createTestApp(router);
             const res = await request(app).delete(`/api/campaigns/${campaign}/${entityName}/e1`);
 
-            expect(res.status).toBe(200);
-            expect(res.body).toHaveProperty('success', true);
+            expect(res.status).toBe(404);
+            expect(res.body).toHaveProperty('error', 'testentity not found');
         });
     });
 });
@@ -783,20 +787,30 @@ describe('jsonEntityCrud - onDelete option', () => {
         expect(onDeleteCalls[0].campaignName).toBe(campaign);
     });
 
-    it('should NOT call onDelete when entity is not found (no-op delete)', async () => {
+    it('should return 404 without calling onDelete when entity is not found', async () => {
         onDeleteCalls = [];
+        const broadcastCalls = [];
         const router = createJsonEntityRouter('deletable', {
             onDelete: (entity) => {
                 onDeleteCalls.push(entity);
+            },
+            broadcast: (action, campaign, payload) => {
+                broadcastCalls.push({ action, campaign, payload });
             },
         });
         const app = createTestApp(router);
 
         writeEntities(campaign, 'deletable', [{ id: 'e1', name: 'Entity' }]);
+        const before = mockFsState.get(dataFileFor(campaign, 'deletable'));
 
         const res = await request(app).delete(`/api/campaigns/${campaign}/deletable/nonexistent`);
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'deletable not found');
         expect(onDeleteCalls).toHaveLength(0);
+        // A 404 missing-id delete is fully inert: no broadcast, no file write.
+        expect(broadcastCalls).toHaveLength(0);
+        expect(vi.mocked(fs.writeFileSync)).not.toHaveBeenCalled();
+        expect(mockFsState.get(dataFileFor(campaign, 'deletable'))).toBe(before);
     });
 
     it('should still delete the entity from file when onDelete is provided', async () => {

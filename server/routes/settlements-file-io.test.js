@@ -140,6 +140,12 @@ function createJsonEntityCrudRoutes(entityName) {
 
         const data = MOCK_STORE.get(key);
         const entities = Array.isArray(data) ? data : [];
+        const entity = entities.find(e => e[idField] === id);
+
+        if (!entity) {
+            return res.status(404).json({ error: 'Settlement not found' });
+        }
+
         const filtered = entities.filter(e => e[idField] !== id);
 
         setupMock(campaign, filtered);

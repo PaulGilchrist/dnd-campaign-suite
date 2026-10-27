@@ -233,7 +233,15 @@ export function createJsonEntityRouter(entityName, options = {}) {
       const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
       const entities = Array.isArray(data) ? data : [];
       const entity = entities.find(e => e[idField] === decodedId);
-      if (onDelete && entity) {
+
+      // Missing-id deletes 404 like missing files (run-G backlog): a silent
+      // 200 lied about deleting. Returning here keeps the request fully inert
+      // — no file write, no onDelete side effect, no 'deleted' SSE broadcast.
+      if (!entity) {
+        return res.status(404).json({ error: `${singularDisplayName} not found` });
+      }
+
+      if (onDelete) {
         onDelete(entity, campaign);
       }
       const filtered = entities.filter(e => e[idField] !== decodedId);

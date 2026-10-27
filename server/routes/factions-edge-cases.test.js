@@ -75,6 +75,12 @@ function createMockRouter() {
         }
 
         const entities = Array.isArray(MOCK_STORE.get(key)) ? MOCK_STORE.get(key) : [];
+        const entity = entities.find(e => e[idField] === id);
+
+        if (!entity) {
+            return res.status(404).json({ error: `${singularDisplayName} not found` });
+        }
+
         const filtered = entities.filter(e => e[idField] !== id);
 
         setupMock(campaign, filtered);
@@ -616,10 +622,10 @@ describe('factions - multiple operations in sequence', () => {
         const res1 = await request(app).delete('/api/campaigns/test-campaign/factions/f1');
         expect(res1.status).toBe(200);
 
-        // Second delete of same faction (already deleted) is no-op
+        // Second delete of same faction (already deleted) 404s and stays inert
         const res2 = await request(app).delete('/api/campaigns/test-campaign/factions/f1');
-        expect(res2.status).toBe(200);
-        expect(res2.body).toHaveProperty('success', true);
+        expect(res2.status).toBe(404);
+        expect(res2.body).toHaveProperty('error', 'Faction not found');
     });
 });
 

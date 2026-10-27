@@ -92,6 +92,12 @@ function createMockRouter(entityName, options = {}) {
 
         const data = MOCK_STORE.get(key);
         const entities = Array.isArray(data) ? data : [];
+        const entity = entities.find(e => e.id === id);
+
+        if (!entity) {
+            return res.status(404).json({ error: `${capitalizedSingular} not found` });
+        }
+
         const filtered = entities.filter(e => e.id !== id);
 
         setupMock(entityName, campaign, filtered);
@@ -669,22 +675,23 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
         expect(res.body).toHaveProperty('error', 'Quest not found');
     });
 
-    it('should return 200 and succeed when quest does not exist (no-op delete)', async () => {
+    it('should return 404 when quest does not exist', async () => {
         const questsData = [
             { id: 'quest-1', title: 'Keep Me', description: 'Content', stage: 'active', objectives: [] },
         ];
         setupMock('quests', 'test-campaign', questsData);
+        const before = MOCK_STORE.get('test-campaign:quests');
 
         const app = createTestApp();
         const res = await request(app)
             .delete('/api/campaigns/test-campaign/quests/nonexistent');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Quest not found');
 
         const stored = MOCK_STORE.get('test-campaign:quests');
         expect(stored).toHaveLength(1);
-        expect(stored[0].title).toBe('Keep Me');
+        expect(stored).toBe(before);
     });
 
     it('should delete a quest and return success', async () => {
@@ -741,15 +748,15 @@ describe('quests - DELETE /api/campaigns/:campaign/quests/:questId', () => {
         expect(stored).toHaveLength(0);
     });
 
-    it('should handle deleting from an empty quests list (no-op delete)', async () => {
+    it('should return 404 when deleting from an empty quests list', async () => {
         setupMock('quests', 'test-campaign', []);
 
         const app = createTestApp();
         const res = await request(app)
             .delete('/api/campaigns/test-campaign/quests/quest-1');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Quest not found');
     });
 
     it('should delete quest with complex nested data', async () => {

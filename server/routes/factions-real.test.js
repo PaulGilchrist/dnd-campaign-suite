@@ -367,18 +367,19 @@ describe('factions - DELETE (real router)', () => {
         expect(stored[0].name).toBe('Keep Me');
     });
 
-    it('should return success when deleting non-existent faction (no-op)', async () => {
+    it('should return 404 when deleting non-existent faction', async () => {
         const factionsData = [{ id: 'f1', name: 'Keep Me', description: 'Keep', goals: 'Keep', influence: 1, notes: '' }];
         writeFactions(campaign, factionsData);
+        const before = mockFsState.get(dataFileFor(campaign));
 
         const app = createTestApp();
         const res = await request(app).delete(`/api/campaigns/${campaign}/factions/nonexistent`);
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Faction not found');
 
-        const stored = JSON.parse(mockFsState.get(dataFileFor(campaign)));
-        expect(stored).toHaveLength(1);
+        // Inert: the file is left byte-identical.
+        expect(mockFsState.get(dataFileFor(campaign))).toBe(before);
     });
 
     it('should remove only the matching faction', async () => {
@@ -412,13 +413,13 @@ describe('factions - DELETE (real router)', () => {
         expect(stored).toHaveLength(0);
     });
 
-    it('should handle deleting from empty array', async () => {
+    it('should return 404 when deleting from empty array', async () => {
         writeFactions(campaign, []);
 
         const app = createTestApp();
         const res = await request(app).delete(`/api/campaigns/${campaign}/factions/f1`);
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Faction not found');
     });
 });

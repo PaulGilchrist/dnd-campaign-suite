@@ -99,7 +99,12 @@ vi.mock('../utils/jsonEntityCrud.js', async () => {
 
             const entities = Array.isArray(data) ? data : [];
             const entity = entities.find(e => e[effectiveIdField] === id);
-            if (onDelete && entity) {
+
+            if (!entity) {
+                return res.status(404).json({ error: `${effectiveItemWrapper} not found` });
+            }
+
+            if (onDelete) {
                 onDelete(entity, campaign);
             }
             const filtered = entities.filter(e => e[effectiveIdField] !== id);
@@ -758,16 +763,18 @@ describe('notes - DELETE /api/campaigns/:campaign/notes/:noteId', () => {
         setupNotes('test-campaign', [
             { id: 'note-1', description: 'Keep Me', isPrivate: false },
         ]);
+        const before = MOCK_STORE.get('test-campaign');
 
         const app = createTestApp();
         const res = await request(app)
             .delete('/api/campaigns/test-campaign/notes/nonexistent-id');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'note not found');
 
         const stored = MOCK_STORE.get('test-campaign');
         expect(stored).toHaveLength(1);
+        expect(stored).toBe(before);
     });
 
     it('should return 404 when campaign data does not exist', async () => {
@@ -884,15 +891,15 @@ describe('notes - DELETE /api/campaigns/:campaign/notes/:noteId', () => {
         expect(stored[0].description).toBe('Public');
     });
 
-    it('should handle deleting from empty notes list (returns 200 success since file exists)', async () => {
+    it('should return 404 when deleting from an empty notes list', async () => {
         setupNotes('test-campaign', []);
 
         const app = createTestApp();
         const res = await request(app)
             .delete('/api/campaigns/test-campaign/notes/nonexistent');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'note not found');
     });
 
     it('should handle note ids with spaces via URL encoding', async () => {

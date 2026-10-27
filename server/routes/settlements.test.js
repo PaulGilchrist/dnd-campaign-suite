@@ -47,14 +47,14 @@ function createMockRouter() {
         const data = MOCK_STORE.get(key);
 
         if (!MOCK_STORE.has(key)) {
-            return res.status(404).json({ error: 'settlement not found' });
+            return res.status(404).json({ error: 'Settlement not found' });
         }
 
         const entities = Array.isArray(data) ? data : [];
         const entity = entities.find(e => e.name === id);
 
         if (!entity) {
-            return res.status(404).json({ error: 'settlement not found' });
+            return res.status(404).json({ error: 'Settlement not found' });
         }
 
         res.json({ settlement: entity });
@@ -67,11 +67,17 @@ function createMockRouter() {
         const key = `${campaign}:settlements`;
 
         if (!MOCK_STORE.has(key)) {
-            return res.status(404).json({ error: 'settlement not found' });
+            return res.status(404).json({ error: 'Settlement not found' });
         }
 
         const data = MOCK_STORE.get(key);
         const entities = Array.isArray(data) ? data : [];
+        const entity = entities.find(e => e.name === id);
+
+        if (!entity) {
+            return res.status(404).json({ error: 'Settlement not found' });
+        }
+
         const filtered = entities.filter(e => e.name !== id);
 
         setupMock(campaign, filtered);
@@ -272,7 +278,7 @@ describe('settlements - GET /api/campaigns/:campaign/settlements/:settlementName
 
         expect(res.status).toBe(404);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('settlement not found');
+        expect(res.body.error).toBe('Settlement not found');
     });
 
     it('should return 404 when settlement with given name does not exist', async () => {
@@ -286,7 +292,7 @@ describe('settlements - GET /api/campaigns/:campaign/settlements/:settlementName
             .get('/api/campaigns/test-campaign/settlements/nonexistent');
 
         expect(res.status).toBe(404);
-        expect(res.body.error).toBe('settlement not found');
+        expect(res.body.error).toBe('Settlement not found');
     });
 
     it('should return the settlement when found', async () => {
@@ -335,7 +341,7 @@ describe('settlements - GET /api/campaigns/:campaign/settlements/:settlementName
             .get('/api/campaigns/test-campaign/settlements/%20nonexistent%20');
 
         expect(res.status).toBe(404);
-        expect(res.body.error).toBe('settlement not found');
+        expect(res.body.error).toBe('Settlement not found');
     });
 
     it('should use strict equality for name matching (case-sensitive)', async () => {
@@ -349,7 +355,7 @@ describe('settlements - GET /api/campaigns/:campaign/settlements/:settlementName
             .get('/api/campaigns/test-campaign/settlements/whiterun');
 
         expect(res.status).toBe(404);
-        expect(res.body.error).toBe('settlement not found');
+        expect(res.body.error).toBe('Settlement not found');
     });
 });
 
@@ -363,21 +369,23 @@ describe('settlements - DELETE /api/campaigns/:campaign/settlements/:settlementN
 
         expect(res.status).toBe(404);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('settlement not found');
+        expect(res.body.error).toBe('Settlement not found');
     });
 
-    it('should return 200 and succeed when settlement does not exist (no-op delete)', async () => {
+    it('should return 404 when settlement does not exist', async () => {
         const settlementsData = [
             { name: 'Riverwood', type: 'village', population: 100, description: 'Keep Me' },
         ];
         setupMock('test-campaign', settlementsData);
+        const before = MOCK_STORE.get('test-campaign:settlements');
 
         const app = createTestApp();
         const res = await request(app)
             .delete('/api/campaigns/test-campaign/settlements/nonexistent');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Settlement not found');
+        expect(MOCK_STORE.get('test-campaign:settlements')).toBe(before);
     });
 
     it('should delete a settlement and return success', async () => {
@@ -423,15 +431,15 @@ describe('settlements - DELETE /api/campaigns/:campaign/settlements/:settlementN
         expect(res.status).toBe(200);
     });
 
-    it('should handle deleting from an empty settlements list (no-op delete)', async () => {
+    it('should return 404 when deleting from an empty settlements list', async () => {
         setupMock('test-campaign', []);
 
         const app = createTestApp();
         const res = await request(app)
             .delete('/api/campaigns/test-campaign/settlements/riverwood');
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Settlement not found');
     });
 
     it('should delete settlement with complex nested data and leave other settlements intact', async () => {
@@ -474,7 +482,9 @@ describe('settlements - DELETE /api/campaigns/:campaign/settlements/:settlementN
         const res = await request(app)
             .delete('/api/campaigns/test-campaign/settlements/whiterun');
 
-        expect(res.status).toBe(200);
+        // Lowercase URL never matched the row — 404, and the row survives.
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Settlement not found');
 
         const stored = MOCK_STORE.get('test-campaign:settlements');
         expect(stored).toHaveLength(1);
