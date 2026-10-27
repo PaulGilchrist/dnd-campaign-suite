@@ -370,8 +370,28 @@ describe('maps - GET /api/campaigns/:campaign/maps', () => {
         const map = res.body.maps[0];
         expect(map).toHaveProperty('name');
         expect(map).toHaveProperty('fileName');
+        expect(map).toHaveProperty('slug', 'full-map');
         expect(map).toHaveProperty('type');
         expect(map).toHaveProperty('isActive');
+    });
+
+    it('every list row carries slug = fileName minus .json (backlog: maps-list-slug)', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, [
+            dirEntry('battle-arena.json', false),
+            dirEntry('town-square.json', false),
+        ]);
+        setupFs(`${mapsDir}/battle-arena.json`, { displayName: 'Battle Arena', type: 'indoor' });
+        setupFs(`${mapsDir}/town-square.json`, { displayName: 'Town Square', type: 'indoor' });
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/maps');
+
+        expect(res.status).toBe(200);
+        for (const m of res.body.maps) {
+            expect(m.slug).toBe(m.fileName.replace(/\.json$/, ''));
+        }
+        expect(res.body.maps.map(m => m.slug)).toEqual(['battle-arena', 'town-square']);
     });
 });
 
@@ -584,7 +604,7 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
 
         expect(changeData.publish).toHaveBeenCalledWith(
             'maps-list-test-campaign',
-            { action: 'created', map: { name: 'Broadcast Test', fileName: 'broadcast-test.json' } },
+            { action: 'created', map: { name: 'Broadcast Test', fileName: 'broadcast-test.json', slug: 'broadcast-test' } },
             'test-campaign'
         );
     });
@@ -784,6 +804,51 @@ describe('maps - GET /api/campaigns/:campaign/maps/:mapname', () => {
 
         expect(res.status).toBe(200);
         expect(res.body.displayName).toBe('Test Map');
+    });
+
+    // Backlog maps-list-slug: display names (spaces + case) resolve to their
+    // kebab file via the sanitizeMapName fallback in resolveMapFileName.
+    it('resolves a display name with spaces/case to the kebab file', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        setupFs(`${mapsDir}/battle-arena.json`, { displayName: 'Battle Arena', type: 'indoor' });
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/maps/Battle%20Arena');
+
+        expect(res.status).toBe(200);
+        expect(res.body.displayName).toBe('Battle Arena');
+    });
+
+    it('exact fileName/slug wins over the display-name fallback', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        // Two legit files: 'My Map' created 'my-map.json'; a literal 'My Map.json'
+        // (legacy upload) must still be reachable by its exact name.
+        setupFs(`${mapsDir}/my-map.json`, { displayName: 'Kebab Map' });
+        setupFs(`${mapsDir}/My Map.json`, { displayName: 'Literal Spaced Map' });
+
+        const app = createTestApp();
+        const exact = await request(app).get('/api/campaigns/test-campaign/maps/My%20Map.json');
+        const slug = await request(app).get('/api/campaigns/test-campaign/maps/my-map');
+
+        expect(exact.status).toBe(200);
+        expect(exact.body.displayName).toBe('Literal Spaced Map');
+        expect(slug.status).toBe(200);
+        expect(slug.body.displayName).toBe('Kebab Map');
+    });
+
+    it('still 404s a name that matches neither a file nor a kebab file', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/test-campaign/maps/Nope%20Here');
+
+        expect(res.status).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Map not found');
     });
 
     it('should return full map data including all fields', async () => {
@@ -1169,7 +1234,7 @@ describe('maps - PUT authored-name preservation guard', () => {
             .send({ newName: 'Grand Colosseum' });
 
         expect(res.status).toBe(200);
-        expect(res.body.map).toEqual({ name: 'Grand Colosseum', fileName: 'grand-colosseum.json' });
+        expect(res.body.map).toEqual({ name: 'Grand Colosseum', fileName: 'grand-colosseum.json', slug: 'grand-colosseum' });
         expect(MOCK_FS.has(`${mapsDir}/battle-arena.json`)).toBe(false);
         const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/grand-colosseum.json`));
         expect(saved.displayName).toBe('Grand Colosseum');

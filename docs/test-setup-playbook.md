@@ -1294,3 +1294,10 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 
 - Notes editor ALREADY closes the modal on save-success both lanes (new + edit; Notes.jsx handleSave → handleCloseModal, mirrors all six .ct-* sibling lanes; none toast on save — close+refreshed row IS the pattern). Run-K's "stays open" observation no longer reproduces (9cee7bfa2/ee4f9f177 lineage). 409 failure leg keeps modal open + banner + `.notes-error-reload-btn`; Reload recovers. Backlog bullet removed.
 - OTHER-TAB BUMP RIG (stamp-guarded array lanes): echo the disk `updatedAt` UNCHANGED in your synthetic other-tab POST — the server re-stamps on accept. Setting `updatedAt: Date.now()` makes the probe self-conflict (409), disk never bumps, and the later stale-UI save silently 200s = false negative. Notes POST body must be `{ notes: [...] }` wrapper (raw array → 400); there is NO per-entity `PUT /notes/<uuid>` (404) — array POST lane only.
+
+## 2026-10-27 improve run — maps-slug-exposure (list slug + display-name GET read lane)
+
+- Maps list rows + create 201 + maps-list `created` broadcast + rename 200 now carry `slug` = fileName minus `.json`, ALWAYS derived via `slugFromFileName(fileName)` (server maps.js + client mapsService mirror) — never re-slugified from the display name, so no drift. `loadMaps` back-fills legacy rows.
+- Display-name GET: `GET /maps/<Display Name>` (spaces/case) resolves via `resolveMapFileName` (exact normalizeMapFile first, sanitizeMapName fallback on miss) — READ lane only; write lanes (PUT/DELETE/rename/activate) keep exact resolution for unambiguous mutation targeting.
+- SSE mirror proof WITHOUT dual-tab rig: keep the manager open, curl-POST a map, `waitForFunction` for the new `.maps-manager-item` (<5s, zero reload); works for the delete mirror too.
+- PITFALL: in-map Back button is `button[title="Back"]` with EMPTY innerText (icon-only `<i>`) — `button:has-text("Back")` times out at the 30s default; target by title + explicit `{timeout}`. Back from an open map lands `mapsView:'none'`; a second sidebar Maps click self-heals to the listing (ac72d01a1, re-confirmed).

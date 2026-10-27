@@ -36,7 +36,7 @@ const API = '/api/campaigns/testCampaign/maps';
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 // Fixtures mirror server/routes/maps.js response shapes BY NAME (#977/#993).
-const MAPS_LIST = { maps: [{ name: 'Dungeon', fileName: 'dungeon.json', type: 'indoor', isActive: true }] };
+const MAPS_LIST = { maps: [{ name: 'Dungeon', fileName: 'dungeon.json', slug: 'dungeon', type: 'indoor', isActive: true }] };
 const MAP_DATA = { displayName: 'Dungeon', name: 'dungeon', type: 'indoor', gridSize: 20, walls: [], items: [], players: [], fog: [], zoom: 1, panX: 0, panY: 0 };
 const http = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 
@@ -121,6 +121,20 @@ describe('mapsService', () => {
       global.fetch.mockResolvedValueOnce(http(200, { message: 'Map deleted successfully' }));
       await deleteMap('Ice Cave', 'Ice Cave');
       expect(fetch).toHaveBeenLastCalledWith('/api/campaigns/Ice%20Cave/maps/ice-cave', { method: 'DELETE' });
+    });
+
+    // Backlog maps-list-slug: loadMaps surfaces `slug` on every row — server
+    // value passes through verbatim; legacy rows without it gain fileName minus .json.
+    it('loadMaps surfaces slug on every row (passthrough + fileName back-fill)', async () => {
+      global.fetch.mockResolvedValueOnce(http(200, MAPS_LIST));
+      const fresh = await loadMaps('testCampaign');
+      expect(fresh.maps[0].slug).toBe('dungeon');
+      expect(fresh.maps[0]).toBe(MAPS_LIST.maps[0]); // server rows untouched (identity)
+
+      const legacy = { maps: [{ name: 'Old', fileName: 'old-map.json' }] };
+      global.fetch.mockResolvedValueOnce(http(200, legacy));
+      const back = await loadMaps('testCampaign');
+      expect(back.maps[0].slug).toBe('old-map');
     });
   });
 

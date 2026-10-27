@@ -178,6 +178,7 @@ describe('maps - PUT /api/campaigns/:campaign/maps/:mapname/rename', () => {
         expect(res.body).toHaveProperty('map');
         expect(res.body.map.name).toBe('Renamed Map');
         expect(res.body.map.fileName).toBe('renamed-map.json');
+        expect(res.body.map.slug).toBe('renamed-map');
 
         // Old file should be deleted
         expect(MOCK_FS.has(`${mapsDir}/old-map.json`)).toBe(false);

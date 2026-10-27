@@ -2,6 +2,13 @@
 export const toKebabCase = (name) => name.toLowerCase().replace(/\.json$/i, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 const sanitizeMapName = (name) => toKebabCase(name) + '.json';
 
+// fileName minus its .json extension (mirrors server slugFromFileName). The
+// server list route already carries `slug` (= slugFromFileName(fileName));
+// this only back-fills the field on legacy envelopes so every row that
+// carries a fileName exposes a clean slug, derived from fileName so the two
+// can never drift.
+const slugFromFileName = (fileName) => fileName.replace(/\.json$/i, '');
+
 export const loadMaps = async (campaignName) => {
   try {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/maps`, {
@@ -12,7 +19,13 @@ export const loadMaps = async (campaignName) => {
       const { error } = await response.json();
       throw new Error(error || 'Failed to load maps');
     }
-    return await response.json();
+    const data = await response.json();
+    return {
+      ...data,
+      maps: (data.maps || []).map(m =>
+        typeof m.slug === 'string' || !m.fileName ? m : { ...m, slug: slugFromFileName(m.fileName) }
+      ),
+    };
   } catch (error) {
     console.error('Error loading maps:', error);
     throw error;

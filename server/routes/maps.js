@@ -13,6 +13,27 @@ const router = express.Router();
 export const toKebabCase = (name) => name.toLowerCase().replace(/\.json$/i, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 const sanitizeMapName = (name) => toKebabCase(name) + '.json';
 
+// Clean automation/UX handle for a map file: fileName minus its .json extension
+// (e.g. 'battle-arena.json' → 'battle-arena'). ALWAYS derived from fileName —
+// never re-slugified from the display name — so slug and fileName can never
+// drift, and every GET/PUT/DELETE/rename/activate lane resolves it via
+// normalizeMapFile. Backs the `slug` field on list rows, create/rename
+// responses and maps-list broadcasts.
+const slugFromFileName = (fileName) => fileName.replace(/\.json$/i, '');
+
+// Resolve a :mapname path segment to a fileName. Exact fileName/slug wins (the
+// normalizeMapFile seam every lane already uses); a miss falls back to the
+// sanitizeMapName of the segment so display names ('Battle Arena', with spaces
+// or case) reach their kebab file. Collision-safe by construction: creation
+// dedups on sanitizeMapName(name), so a display name can only kebab onto the
+// very file it created.
+function resolveMapFileName(mapsDir, mapname) {
+  const exact = normalizeMapFile(mapname);
+  if (fs.existsSync(path.join(mapsDir, exact))) return exact;
+  const kebab = normalizeMapFile(sanitizeMapName(mapname));
+  return fs.existsSync(path.join(mapsDir, kebab)) ? kebab : exact;
+}
+
 // Authority (mirrors quests.js / campaigns-admin.js and the npcs bestiary guard):
 // map documents are GM-authored — network clients get a read-only view
 // (AGENTS.md). Live-clobber, 2026-10-24: a LAN player tab auto-PUT its stale
@@ -86,9 +107,10 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     return {
       name: displayName,
       fileName: f,
+      slug: slugFromFileName(f),
       type: mapType,
       description,
-      isActive: f.replace(/\.json$/, '') === activeMap
+      isActive: slugFromFileName(f) === activeMap
     };
   });
 
@@ -233,17 +255,20 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
 
   fs.writeFileSync(filePath, JSON.stringify(defaultMapData, null, 2));
 
-  // Broadcast maps list change
-  publish(`maps-list-${campaign}`, { action: 'created', map: { name: name.trim(), fileName } }, campaign);
+  // Broadcast maps list change (slug rides along so consumers of the raw
+  // payload see the same handle the list route exposes)
+  const createdMap = { name: name.trim(), fileName, slug: slugFromFileName(fileName) };
+  publish(`maps-list-${campaign}`, { action: 'created', map: createdMap }, campaign);
 
-  res.status(201).json({ message: 'Map created successfully', map: { name: name.trim(), fileName } });
+  res.status(201).json({ message: 'Map created successfully', map: createdMap });
 }));
 
 // GET /api/campaigns/:campaign/maps/:mapname - Get map data
+// Resolves exact fileName/slug first, display names second (resolveMapFileName).
 router.get('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => {
   const { campaign, mapname } = req.params;
   const mapsDir = campaignMapsDir(campaign);
-  const fileName = normalizeMapFile(mapname);
+  const fileName = resolveMapFileName(mapsDir, mapname);
   const filePath = path.join(mapsDir, fileName);
 
   if (!fs.existsSync(filePath)) {
@@ -361,7 +386,7 @@ router.put('/api/campaigns/:campaign/maps/:mapname/rename', asyncHandler((req, r
 
   res.json({
     message: 'Map renamed successfully',
-    map: { name: newName.trim(), fileName: newFileName }
+    map: { name: newName.trim(), fileName: newFileName, slug: slugFromFileName(newFileName) }
   });
 }));
 
