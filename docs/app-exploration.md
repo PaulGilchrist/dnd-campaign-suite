@@ -181,10 +181,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ## Improvement Backlog
 
 *(2026-10-27-K open items)*
-- **Sessions planner field mismatch** — modal's "Notes"-labelled textarea (`#session-notes`, SessionPlannerModal.jsx:393) edits `formData.summary`; the persisted `notes` field (accepted by the API, seeded rows carry it) is invisible/uneditable everywhere in the planner. Either bind the visible field to `notes` (or show a second field), or drop `notes` from the row shape / server whitelist. *(2026-10-27-K, `src/components/sessions/SessionPlannerModal.jsx`, `server/routes/sessions.js`)*
-- **New-Note Save keeps the modal open** with no visible "saved" signal (list rows refresh underneath; NPCs/Factions modals close on save) — ambiguous feedback invites double-saves; add a toast or close like the modal lanes. *(2026-10-27-K, `src/components/notes/Notes.jsx`)*
 - **Maps list exposes no slug** — list rows carry `fileName` ('qa-hex-runk.json') only; `GET /maps/<display name>` 404s while `GET /maps/<fileName>` works. Surface a clean `slug` field (and/or accept the name) for automation/UX ergonomics. *(2026-10-27-K, `server/routes/maps.js`, `src/services/maps/mapsService.js`)*
-- **Travel ownership stamp** (companion to the clobber bug) — even with the bug fixed, a shared campaign trip has no notion of "whose turn is it at the wheel"; a `travel-` session stamp + confirm-on-hijack would make multi-GM-tab behavior deliberate. *(2026-10-27-K, `useTravelToolSync.js`)*
 
 *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-G's three travel/CRUD backlog items closed run H. Run-H's items closed/proven run I. Run-I's five backlog items all closed same-day by improve run J: array-conflict-display-name 4473153e4, poi-rename-whitespace-guard 6241954b9, erase-terrain-tooltip aa1deb881, single-conflict-warn-layer da075f989, poi-delete-confirm a430439d4 — all five live-proven again run K.)*
 ## Coverage

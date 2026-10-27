@@ -189,4 +189,40 @@ describe('SessionPlannerModal', () => {
     expect(screen.getByRole('heading', { name: /new session/i })).toBeInTheDocument();
     expect(screen.getByText(/already exists/i)).toBeInTheDocument();
   });
+
+  it('renders two distinct labelled textareas: "Session Summary" binds summary, "Notes" binds notes', () => {
+    const { props } = renderModal();
+    const summaryField = screen.getByLabelText('Session Summary');
+    const notesField = screen.getByLabelText('Notes');
+    expect(summaryField).toBeInTheDocument();
+    expect(notesField).toBeInTheDocument();
+    expect(summaryField).not.toBe(notesField);
+    expect(summaryField).toHaveAttribute('id', 'session-summary');
+    expect(notesField).toHaveAttribute('id', 'session-notes');
+
+    // Editing one field routes ONLY to its own key — labels never contradict bindings.
+    fireEvent.change(notesField, { target: { value: 'Private GM note' } });
+    expect(props.onFormChange).toHaveBeenCalledWith('notes', 'Private GM note');
+    expect(props.onFormChange).not.toHaveBeenCalledWith('summary', 'Private GM note');
+
+    props.onFormChange.mockClear();
+    fireEvent.change(summaryField, { target: { value: 'Recap text' } });
+    expect(props.onFormChange).toHaveBeenCalledWith('summary', 'Recap text');
+    expect(props.onFormChange).not.toHaveBeenCalledWith('notes', 'Recap text');
+  });
+
+  it('seeds both fields from persisted values and renders missing notes as empty', () => {
+    const { unmount } = renderModal({
+      formData: { ...baseFormData, summary: 'Stored summary', notes: 'Stored notes' },
+    });
+    expect(screen.getByLabelText('Session Summary')).toHaveValue('Stored summary');
+    expect(screen.getByLabelText('Notes')).toHaveValue('Stored notes');
+    unmount();
+
+    // Legacy rows without a notes key must show an empty field, never "undefined".
+    const legacyRow = { ...baseFormData };
+    delete legacyRow.notes;
+    renderModal({ formData: legacyRow });
+    expect(screen.getByLabelText('Notes')).toHaveValue('');
+  });
 });

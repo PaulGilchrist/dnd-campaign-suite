@@ -383,14 +383,24 @@ function SessionPlannerModal({
             onRemoveItem={onRemoveChecklistItem}
           />
 
+          <label htmlFor="session-summary" className="ct-label">Session Summary</label>
+          <textarea
+            id="session-summary"
+            className="ct-textarea"
+            rows={3}
+            value={formData.summary || ''}
+            onChange={(e) => onFormChange('summary', e.target.value)}
+            placeholder="Storyline summary, recap, key beats…"
+          />
+
           <label htmlFor="session-notes" className="ct-label">Notes</label>
           <textarea
             id="session-notes"
             className="ct-textarea"
             rows={3}
-            value={formData.summary || ''}
-            onChange={(e) => onFormChange('summary', e.target.value)}
-            placeholder="Storyline notes, reminders, loose threads…"
+            value={formData.notes || ''}
+            onChange={(e) => onFormChange('notes', e.target.value)}
+            placeholder="GM-only reminders, loose threads…"
           />
         </div>
 

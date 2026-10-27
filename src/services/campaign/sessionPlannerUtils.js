@@ -29,6 +29,7 @@ export function getDefaultSessionData(overrides = {}) {
     status: 'planned',
     playedAt: null,
     summary: '',
+    notes: '',
     contingencies: [],
     checklist: [],
     ...overrides,

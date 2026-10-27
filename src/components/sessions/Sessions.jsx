@@ -59,7 +59,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     modalOpen, editingItem: editingSession, formData, setFormData,
     saving, setSaving,
     openNew, openEdit, closeModal,
-  } = useCrudList(sessions, ['name', 'summary']);
+  } = useCrudList(sessions, ['name', 'summary', 'notes']);
 
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);

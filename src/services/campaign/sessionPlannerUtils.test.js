@@ -33,6 +33,7 @@ describe('sessionPlannerUtils — defaults', () => {
       status: 'planned',
       playedAt: null,
       summary: '',
+      notes: '',
       contingencies: [],
       checklist: [],
       links: { maps: [], encounters: [], npcs: [], quests: [], settlements: [], notes: [] },
