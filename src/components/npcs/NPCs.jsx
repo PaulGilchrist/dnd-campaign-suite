@@ -121,9 +121,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
-      if (err.conflict) {
-        console.warn('Concurrent-edit conflict saving NPC:', err.message);
-      } else {
+      // The 409 concurrent-edit conflict is already logged once at warn by
+      // the service layer (improve 2026-10-27-J); only genuine failures get
+      // a red console line here. The banner below owns user feedback.
+      if (!err.conflict) {
         console.error('Failed to save NPC:', err);
       }
       // A rejected save means the server row moved on without us — the list
@@ -193,9 +194,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       }
       handleCloseModal();
     } catch (err) {
-      if (err.conflict) {
-        console.warn('Concurrent-edit conflict saving NPC:', err.message);
-      } else {
+      // The 409 concurrent-edit conflict is already logged once at warn by
+      // the service layer (improve 2026-10-27-J); only genuine failures get
+      // a red console line here. The banner below owns user feedback.
+      if (!err.conflict) {
         console.error('Failed to save NPC:', err);
       }
       missedListBroadcast.current = true;

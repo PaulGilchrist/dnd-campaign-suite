@@ -162,9 +162,10 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
-      if (err.conflict) {
-        console.warn('Concurrent-edit conflict saving session:', err.message);
-      } else {
+      // The 409 concurrent-edit conflict is already logged once at warn by
+      // the service layer (improve 2026-10-27-J); only genuine failures get
+      // a red console line here. The banner below owns user feedback.
+      if (!err.conflict) {
         console.error('Failed to save session:', err);
       }
       // A rejected save means the server row moved on without us — the list
@@ -233,9 +234,10 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       await loadItems();
       showToast(`Moved to “${target.name}”`);
     } catch (err) {
-      if (err.conflict) {
-        console.warn('Concurrent-edit conflict saving session (move link):', err.message);
-      } else {
+      // The 409 concurrent-edit conflict is already logged once at warn by
+      // the service layer (improve 2026-10-27-J); only genuine failures get
+      // a red console line here. The banner below owns user feedback.
+      if (!err.conflict) {
         console.error('Failed to move link:', err);
       }
       missedListBroadcast.current = true;
@@ -337,9 +339,10 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (err) {
-      if (err.conflict) {
-        console.warn('Concurrent-edit conflict saving session (mark played):', err.message);
-      } else {
+      // The 409 concurrent-edit conflict is already logged once at warn by
+      // the service layer (improve 2026-10-27-J); only genuine failures get
+      // a red console line here. The banner below owns user feedback.
+      if (!err.conflict) {
         console.error('Failed to mark session as played:', err);
       }
       missedListBroadcast.current = true;

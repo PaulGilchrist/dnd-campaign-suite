@@ -134,11 +134,11 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     expect(document.querySelector('.notes-form-error')).not.toBeNull();
     // Only the mount load so far — nothing re-fetched while the banner is up.
     expect(hook.loadItems).toHaveBeenCalledTimes(1);
-    // improve 2026-10-27-H: rejected edit stays amber — no red console ERROR.
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Concurrent-edit conflict saving note:',
-      CONFLICT_MESSAGE
-    );
+    // improve 2026-10-27-J: rejected edit stays amber AND silent here — the
+    // service layer owns the single "Concurrent-edit conflict saving …" warn
+    // (asserted in NotesService.test.js); hook/component layers no longer
+    // duplicate it.
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
 
     fireEvent.click(button);

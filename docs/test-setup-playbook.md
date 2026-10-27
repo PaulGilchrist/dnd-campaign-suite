@@ -1249,3 +1249,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 
 - Hex paint cells render as `path` elements under `g.terrain-layer` (~1671 on a grid-20 map); naive ordinal index (`cells[100]`) can land off-viewport (negative y, silent no-click) — filter candidates by BOTH `.hex-map` and viewport rect before `page.mouse.click`.
 - `HexMapToolbar.test.jsx` enforces a strict "every button aria-label mirrors its title" contract (BUTTON_TITLE_ORDER + TOOL_TITLES) — any future title-only clarification on an icon button needs an explicit exception there or the suite pins the mirror. Erase button now intentionally splits: aria-label "Erase terrain", title "Erase terrain paint (re-click Paint rivers tool to remove river hexes)".
+
+## 2026-10-27 improve run — single-conflict-warn-layer (service is the ONE conflict warn)
+
+- WARN-COUNT FINGERPRINT SUPERSEDED: a 409 `conflict:true` save rejection now emits EXACTLY ONE app `console.warn` containing `Concurrent-edit conflict saving` — from the SERVICE layer only. `useEntityManagement.saveItems` and all six `.ct-*` component catches stay silent on `err.conflict` (non-conflict failures still console.error there). The old run-I census (array lanes = 3 warns, NPC PUT = 2) is DEAD; judge with the post-select console.error/warn wrapper rig as before, but expect 1/0. Sessions move-link + mark-played legs included.
+- `useEntityManagement.test.js` + per-component conflict-reload tests now spy-lock single/no-warn; `HexMapToolbar`-style mirror contracts mean new warn assertions must name the layer they pin.

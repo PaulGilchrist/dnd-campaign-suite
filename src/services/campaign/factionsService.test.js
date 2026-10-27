@@ -211,6 +211,7 @@ describe('factionsService', () => {
         'Concurrent-edit conflict saving Factions:',
         conflictMessage
       );
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(1); // single warn per rejected save
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 

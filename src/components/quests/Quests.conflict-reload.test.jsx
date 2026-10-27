@@ -84,11 +84,11 @@ describe('Quests 409 banner — Reload list recovery action', () => {
     const reloadButton = screen.getByRole('button', { name: 'Reload list' });
     // Nothing re-fetched while the refusal banner is still up.
     expect(loadCallCount).toBe(1);
-    // improve 2026-10-27-H: rejected edit stays amber — no red console ERROR.
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Concurrent-edit conflict saving quest:',
-      CONFLICT_MESSAGE
-    );
+    // improve 2026-10-27-J: rejected edit stays amber AND silent here — the
+    // service layer owns the single "Concurrent-edit conflict saving …" warn
+    // (asserted in QuestsService.test.js); hook/component layers no longer
+    // duplicate it.
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
 
     // What the other tab already persisted server-side.

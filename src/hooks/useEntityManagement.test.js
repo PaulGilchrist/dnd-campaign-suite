@@ -232,9 +232,10 @@ describe('useEntityManagement', () => {
       );
     });
 
-    it('logs a handled 409 conflict at warn, not error (improve 2026-10-27-H)', async () => {
-      // The editor banner + "Reload list" affordance own conflict feedback —
-      // the rejected edit must not add a red console ERROR here either.
+    it('stays silent on a handled 409 conflict — the service layer owns the single warn (improve 2026-10-27-J)', async () => {
+      // The editor banner + "Reload list" affordance own user feedback and
+      // the service layer logs the one redacted warn, so the hook must add
+      // neither a warn nor a red console ERROR for the conflict case.
       const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const conflictMessage =
         'Faction "Harpers" was modified in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.';
@@ -250,10 +251,7 @@ describe('useEntityManagement', () => {
         })
       ).rejects.toThrow(conflictMessage);
 
-      expect(consoleWarn).toHaveBeenCalledWith(
-        'Concurrent-edit conflict saving factions:',
-        conflictMessage
-      );
+      expect(consoleWarn).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
       consoleWarn.mockRestore();
     });

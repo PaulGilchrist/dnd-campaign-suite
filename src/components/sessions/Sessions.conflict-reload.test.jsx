@@ -173,11 +173,11 @@ describe('Sessions 409-recovery: close refreshes the stale list + Reload list ba
     const reloadButton = screen.getByRole('button', { name: 'Reload list' });
     // Nothing re-fetched while the editor stays open on the refusal.
     expect(loadCallCount).toBe(1);
-    // improve 2026-10-27-H: rejected edit stays amber — no red console ERROR.
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Concurrent-edit conflict saving session:',
-      CONFLICT_MESSAGE
-    );
+    // improve 2026-10-27-J: rejected edit stays amber AND silent here — the
+    // service layer owns the single "Concurrent-edit conflict saving …" warn
+    // (asserted in sessionsService.test.js); hook/component layers no longer
+    // duplicate it.
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
 
     // What the other tab persisted — the refetch below will surface it.

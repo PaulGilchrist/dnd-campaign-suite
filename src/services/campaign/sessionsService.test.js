@@ -117,6 +117,7 @@ describe('sessionsService', () => {
         'Concurrent-edit conflict saving session:',
         CONFLICT_MESSAGE
       );
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(1); // single warn per rejected save
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
@@ -194,6 +195,7 @@ describe('sessionsService', () => {
         'Concurrent-edit conflict saving sessions:',
         CONFLICT_MESSAGE
       );
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(1); // single warn per rejected save
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 

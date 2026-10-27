@@ -216,6 +216,7 @@ describe('409 console lane split: conflict -> warn, genuine failure -> error', (
       expect.stringContaining('Concurrent-edit conflict saving NPC'),
       CONFLICT_MESSAGE
     );
+    expect(warnSpy).toHaveBeenCalledTimes(1); // single warn per rejected save
     expect(console.error).not.toHaveBeenCalled();
   });
 

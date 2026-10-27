@@ -33,18 +33,13 @@ export function useEntityManagement(campaignName, { load: loadFn, save: saveFn, 
       await saveFn(campaignName, array);
       await loadItems();
     } catch (error) {
-      if (logError) {
-        // Handled 409 concurrent-edit conflicts (error.conflict — server
-        // discriminator) are benign rejected edits: the editor banner +
-        // "Reload list" affordance own user feedback (improve 2026-10-27-H).
-        if (error.conflict) {
-          console.warn(
-            `Concurrent-edit conflict saving ${responseKey || 'items'}:`,
-            error.message
-          );
-        } else {
-          console.error(`Failed to save ${responseKey || 'items'}:`, error);
-        }
+      // A handled 409 concurrent-edit conflict (error.conflict — the server's
+      // sanctioned discriminator) is already logged once at warn by the
+      // service layer, so the hook stays silent on it (improve 2026-10-27-J):
+      // one redacted line per choke point, not one per layer. Genuine
+      // failures (network, 4xx/5xx) still log red.
+      if (logError && !error.conflict) {
+        console.error(`Failed to save ${responseKey || 'items'}:`, error);
       }
       throw error;
     }

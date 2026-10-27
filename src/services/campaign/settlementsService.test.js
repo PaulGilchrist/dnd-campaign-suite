@@ -176,6 +176,7 @@ describe('settlementsService', () => {
         'Concurrent-edit conflict saving settlement:',
         conflictMessage
       );
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(1); // single warn per rejected save
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
@@ -338,6 +339,7 @@ describe('settlementsService', () => {
         'Concurrent-edit conflict saving settlements:',
         conflictMessage
       );
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(1); // single warn per rejected save
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 

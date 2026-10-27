@@ -335,9 +335,10 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {
-      if (error.conflict) {
-        console.warn('Concurrent-edit conflict saving note:', error.message);
-      } else {
+      // The 409 concurrent-edit conflict is already logged once at warn by
+      // the service layer (improve 2026-10-27-J); only genuine failures get
+      // a red console line here. The banner below owns user feedback.
+      if (!error.conflict) {
         console.error('Failed to save note:', error);
       }
       // Server-side conflicts (409 "changed elsewhere") and failures surface
