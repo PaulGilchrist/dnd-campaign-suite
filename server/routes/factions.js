@@ -11,6 +11,9 @@ const broadcastFactionsList = (action, campaign, payload = {}) => {
 export default createJsonEntityRouter('factions', {
   pluralDisplayName: 'Factions',
   singularDisplayName: 'Faction',
+  // 409 conflict copy labels rows by the same field the list renders as the
+  // row title (Factions.jsx row name); blank names fall back to the id.
+  displayField: 'name',
   broadcast: broadcastFactionsList,
   validateList: (factions) => findDuplicateNameError(factions, 'faction'),
 });

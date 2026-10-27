@@ -15,6 +15,9 @@ export default createJsonEntityRouter('quests', {
   // Display noun for 404/409 copy (matches the NPC/Faction/Settlement lanes);
   // duplicate-name 400 copy stays lowercase 'A quest with that name already exists'.
   singularDisplayName: 'Quest',
+  // 409 conflict copy labels rows by the same field the list renders as the
+  // row title (Quests.jsx row name); blank names fall back to the id.
+  displayField: 'name',
   broadcast: broadcastQuestsList,
   validateList: (quests) => findDuplicateNameError(quests, 'quest'),
   transformList: (entities, req) => {
