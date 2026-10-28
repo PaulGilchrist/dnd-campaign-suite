@@ -165,11 +165,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-### Open items — 2026-10-28 run R
-
-- **Generic change-data wildcard silently persists ANY unknown nested key** — `POST /api/campaigns/<campaign>/<anything>` (e.g. a typo'd/deleted route path like `migrate-image-paths`, or `zzz-arbitrary-probe`) returns `Data saved successfully` and creates a permanent top-level bucket; no allowlist/warning for non-character keys. Low harm, but it makes dead-route typos invisible and slowly litters change-data. Files: `server/routes/campaigns-changedata.js`, `server/utils/changeData.js`.
-
-
+*(2026-10-28 run-R backlog fully consumed by the 2026-10-28 improve run — 2 implemented (`char-shape-guard-abilities` 4b07c9cbf, `eb-generator-apply-toast` bad3f6e86), 1 blocked-premise-disproved live (EB toolbar aria-labels already pinned since b0cab1579), 1 skipped by owner (change-data wildcard allowlist — L, deferred; re-addable via e2e-explore). See `docs/test-setup-playbook.md` improve-run appends for dispositions.)*
 
 ### Open items — 2026-10-28 run P
 
