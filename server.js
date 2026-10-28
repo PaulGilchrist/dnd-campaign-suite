@@ -26,6 +26,7 @@ import spellOverlayRoutes from './server/routes/spell-overlay.js';
 import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 import createServerConfigRouter from './server/routes/server-config.js';
 import { createCampaignLockMiddleware, createCampaignRenameGuard } from './server/utils/campaignLock.js';
+import { noStoreCampaignGets } from './server/utils/noStoreApi.js';
 
 const PORT = process.env.PORT || 80;
 
@@ -57,6 +58,13 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', 'Cache-Control, Connection, Content-Type, Authorization');
     next();
 });
+
+// Route-served campaign JSON must never be heuristically cached — mirrors
+// the static lane's no-store below (see server/utils/noStoreApi.js). Mounted
+// before every /api/campaigns router so the whole family (character .json
+// GETs, campaign/file lists, change-data, log, etc.) inherits it. GET-only;
+// SSE (/subscribe) is outside this prefix and keeps its own no-cache.
+app.use('/api/campaigns', noStoreCampaignGets);
 
 // Serve static files from the public directory FIRST so live rule data
 // (/data/*) and campaign files (/campaigns/*) are never shadowed by the
