@@ -4,6 +4,11 @@ import EnforcementSection from './EnforcementSection.jsx';
 import AiRefereeSection from './AiRefereeSection.jsx';
 import SessionSection from './SessionSection.jsx';
 
+// Keep in sync with UPLOAD_SIZE_LIMIT in server/routes/campaigns-admin.js —
+// the server remains authoritative; this only fronts the rejection.
+const UPLOAD_SIZE_LIMIT_MB = 100;
+const UPLOAD_SIZE_LIMIT_BYTES = UPLOAD_SIZE_LIMIT_MB * 1024 * 1024;
+
 const BUSY_STATUS_TEXT = {
     'snapshotting': 'Creating snapshot...',
     'rolling-back': 'Rolling back...',
@@ -394,6 +399,14 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
             e.target.value = '';
             return;
         }
+        // Pre-flight size gate mirroring the server's multer limit, so an
+        // oversized archive is rejected instantly instead of after a long
+        // failed POST round-trip.
+        if (file.size > UPLOAD_SIZE_LIMIT_BYTES) {
+            setStatus({ error: `File too large (limit ${UPLOAD_SIZE_LIMIT_MB} MB)` });
+            e.target.value = '';
+            return;
+        }
         setConfirmModal({
             title: 'Upload Campaign',
             message: `This will replace ALL current campaign data for "${campaignName}" with the contents of "${file.name}". A snapshot of the current state will be saved first as a safety net. If the upload or reload fails, the campaign will be automatically rolled back.`,
@@ -406,17 +419,33 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                         method: 'POST',
                         body: formData
                     });
-                    const data = await res.json();
-                    if (!res.ok) {
-                        setStatus({ error: `${data.error}${data.details ? ': ' + data.details : ''}` });
-                        alert(`Upload failed. Campaign has been rolled back to the previous state.\n\nError: ${data.error}${data.details ? '\nDetails: ' + data.details : ''}`);
-                    } else {
+                    // Parse defensively: anything that fails before the route
+                    // body (or a generic server error page) may not be JSON,
+                    // and res.json() on such a body throws in here.
+                    const isJson = (res.headers.get('content-type') || '').includes('json');
+                    const data = isJson
+                        ? await res.json().catch(() => ({ error: `Server returned an invalid JSON response (HTTP ${res.status})` }))
+                        : { error: `Server returned a non-JSON error response (HTTP ${res.status})` };
+                    if (res.ok) {
                         setStatus({ success: data.message });
                         window.location.reload();
+                    } else {
+                        const details = data.details ? `: ${data.details}` : '';
+                        setStatus({ error: `${data.error}${details}` });
+                        // Only the route body reports failures as HTTP 500 JSON,
+                        // and only it runs after the safety snapshot (so those
+                        // failures genuinely self-restore). Pre-route rejections
+                        // (413 oversize, 400/403/404, non-JSON error pages) never
+                        // touched campaign data — claiming a rollback there is false.
+                        if (res.status === 500 && isJson) {
+                            alert(`Upload failed. Campaign has been rolled back to the previous state.\n\nError: ${data.error}${data.details ? '\nDetails: ' + data.details : ''}`);
+                        } else {
+                            alert(`Upload failed before any campaign data was replaced.\n\nError: ${data.error}${data.details ? '\nDetails: ' + data.details : ''}`);
+                        }
                     }
                 } catch (err) {
                     setStatus({ error: err.message });
-                    alert(`Upload failed. Campaign has been rolled back to the previous state.\n\nError: ${err.message}`);
+                    alert(`Upload failed. The request did not complete, so no changes were confirmed.\n\nError: ${err.message}`);
                 }
                 e.target.value = '';
             }

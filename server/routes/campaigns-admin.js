@@ -15,6 +15,30 @@ const router = express.Router();
 const UPLOAD_SIZE_LIMIT = 100 * 1024 * 1024; // 100 MB — adjust as needed
 const upload = multerLib({ storage: multerLib.memoryStorage(), limits: { fileSize: UPLOAD_SIZE_LIMIT } });
 
+// Multer rejects oversized (and malformed) uploads BEFORE the route body
+// runs, so its errors bypass the route's try/catch and would land on the
+// default Express HTML error handler — leaking a full stack trace with
+// absolute server paths. Convert them to the JSON error shape every other
+// admin route uses. MulterError codes/messages are static library strings,
+// safe to surface.
+const uploadSingle = upload.single('file');
+function uploadWithJsonErrors(req, res, next) {
+    uploadSingle(req, res, (err) => {
+        if (!err) return next();
+        console.error(`Upload rejected for ${req.params.campaign}: ${err.message}`);
+        if (!isLocalhost(req)) {
+            return res.status(403).json({ error: 'Only available on localhost' });
+        }
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ error: `File too large (limit ${UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)` });
+        }
+        if (err.name === 'MulterError') {
+            return res.status(400).json({ error: err.message });
+        }
+        return res.status(400).json({ error: 'Upload failed: could not read the uploaded file' });
+    });
+}
+
 function isLocalhost(req) {
     return req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 }
@@ -500,7 +524,7 @@ router.get('/api/campaigns/:campaign/admin/download', asyncHandler(async (req, r
 }));
 
 // POST /api/campaigns/:campaign/admin/upload
-router.post('/api/campaigns/:campaign/admin/upload', upload.single('file'), asyncHandler(async (req, res) => {
+router.post('/api/campaigns/:campaign/admin/upload', uploadWithJsonErrors, asyncHandler(async (req, res) => {
     if (!isLocalhost(req)) {
         return res.status(403).json({ error: 'Only available on localhost' });
     }

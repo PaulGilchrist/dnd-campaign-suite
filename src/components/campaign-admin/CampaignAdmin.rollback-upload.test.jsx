@@ -33,7 +33,12 @@ const RESTORED_ZIP = 'test-campaign-2026-10-10T12-34-56-789.zip';
 const adminPath = (campaignName, action) =>
     `/api/campaigns/${encodeURIComponent(campaignName)}/admin/${action}`;
 
-const jsonResponse = (body, ok = true) => ({ ok, json: () => Promise.resolve(body) });
+const jsonResponse = (body, ok = true, { status = 200, contentType = 'application/json' } = {}) => ({
+    ok,
+    status,
+    headers: { get: (name) => (name.toLowerCase() === 'content-type' ? contentType : null) },
+    json: () => Promise.resolve(body),
+});
 const neverSettles = () => new Promise(() => {});
 
 const createDefaultProps = (overrides = {}) => ({
@@ -243,6 +248,22 @@ describe('CampaignAdmin - Upload', () => {
                 await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(0));
             }
         );
+
+        it('rejects a file over the 100 MB server limit up front — no modal, no network round-trip', async () => {
+            const fetchMock = stubFetch();
+            renderAdmin();
+
+            const file = new File(['tiny'], 'huge.zip', { type: 'application/zip' });
+            // A real 101 MB buffer would bloat the test runner; the size
+            // getter is all the pre-check reads.
+            Object.defineProperty(file, 'size', { value: 101 * 1024 * 1024 });
+            fireEvent.change(fileInput(), { target: { files: [file] } });
+
+            expect(screen.getByText('File too large (limit 100 MB)')).toBeInTheDocument();
+            expect(fileInput().value).toBe('');
+            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
+            await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(0));
+        });
     });
 
     describe('confirmation gate', () => {
@@ -283,9 +304,11 @@ describe('CampaignAdmin - Upload', () => {
     });
 
     describe('confirmed upload', () => {
-        // One entry per terminal outcome: success reloads, both failure
-        // paths alert (the campaign is auto-rolled-back server-side) and
-        // leave the page in place so the GM can read the status.
+        // One entry per terminal outcome: success reloads; only failures the
+        // route itself reports (HTTP 500 JSON, raised after the safety
+        // snapshot) may claim a rollback. Pre-route rejections (413 oversize
+        // JSON, non-JSON server error pages) and transport errors never
+        // touched campaign data, so their alert copy must not claim a restore.
         const OUTCOMES = [
             {
                 name: 'succeeds',
@@ -297,12 +320,35 @@ describe('CampaignAdmin - Upload', () => {
             },
             {
                 name: 'is rejected by the server',
-                handler: jsonResponse({ error: 'Upload failed', details: 'corrupt archive' }, false),
+                handler: jsonResponse({ error: 'Upload failed', details: 'corrupt archive' }, false, { status: 500 }),
                 statusText: 'Upload failed: corrupt archive',
                 kind: 'error',
                 reloads: false,
                 alertText:
                     'Upload failed. Campaign has been rolled back to the previous state.\n\nError: Upload failed\nDetails: corrupt archive',
+            },
+            {
+                name: 'is rejected as oversized (server JSON 413)',
+                handler: jsonResponse({ error: 'File too large (limit 100 MB)' }, false, { status: 413 }),
+                statusText: 'File too large (limit 100 MB)',
+                kind: 'error',
+                reloads: false,
+                alertText:
+                    'Upload failed before any campaign data was replaced.\n\nError: File too large (limit 100 MB)',
+            },
+            {
+                name: 'draws a non-JSON server error page',
+                handler: {
+                    ok: false,
+                    status: 500,
+                    headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : null) },
+                    json: () => Promise.reject(new SyntaxError('Unexpected token \'<\', "<!DOCTYPE "... is not valid JSON')),
+                },
+                statusText: 'Server returned a non-JSON error response (HTTP 500)',
+                kind: 'error',
+                reloads: false,
+                alertText:
+                    'Upload failed before any campaign data was replaced.\n\nError: Server returned a non-JSON error response (HTTP 500)',
             },
             {
                 name: 'never reaches the server',
@@ -311,7 +357,7 @@ describe('CampaignAdmin - Upload', () => {
                 kind: 'error',
                 reloads: false,
                 alertText:
-                    'Upload failed. Campaign has been rolled back to the previous state.\n\nError: Network failed',
+                    'Upload failed. The request did not complete, so no changes were confirmed.\n\nError: Network failed',
             },
         ];
 
