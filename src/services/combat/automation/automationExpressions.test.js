@@ -1,5 +1,5 @@
 // @maintained-by-ai
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   evaluateAutoExpression,
   resolveUses,
@@ -10,6 +10,7 @@ import {
   getSuperiorityDieSize,
   getPsionicEnergyDieSize,
   reresolveAutomationUsesMax,
+  STRING_SENTINEL_EXPRESSIONS,
 } from './automationExpressions.js'
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -355,6 +356,61 @@ describe('evaluateAutoExpression', () => {
 
   it('fully evaluates token arithmetic with no dice present', () => {
     expect(evaluateAutoExpression('ally_hit_die + proficiency_bonus', makePlayerStats({ level: 5 }), 1)).toBe(8)
+  })
+})
+
+// ── STRING_SENTINEL_EXPRESSIONS — data-driven string markers ─────
+// "class_level_scaling" (2024 classes.json maxKinds/maxRages/uses_expression)
+// is resolved by component-level logic, not the expression engine. It must
+// pass through verbatim WITHOUT the string-fallback console.warn (app-load
+// noise), while genuinely malformed expressions still warn.
+
+describe('evaluateAutoExpression string sentinels', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each(STRING_SENTINEL_EXPRESSIONS)('returns sentinel %s verbatim without warning', (sentinel) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(evaluateAutoExpression(sentinel, makePlayerStats())).toBe(sentinel)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('does not token-substitute or coerce the sentinel (no numeric conversion, no throw)', () => {
+    // Level 5 stats would otherwise let \blevel\b-style tokens corrupt a match;
+    // the exact-string guard short-circuits before resolveDiceExpression.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = evaluateAutoExpression('class_level_scaling', makePlayerStats({ level: 5 }))
+    expect(result).toBe('class_level_scaling')
+    expect(typeof result).toBe('string')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('still warns exactly once for a genuinely unparseable non-sentinel expression', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(evaluateAutoExpression('@@invalid@@', makePlayerStats())).toBe('@@invalid@@')
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]).toContain('@@invalid@@')
+  })
+
+  it('reresolveAutomationUsesMax leaves sentinel uses_expression entries untouched and silent', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const stats = {
+      level: 5,
+      proficiency: 3,
+      abilities: [{ name: 'Wisdom', bonus: 3 }],
+      automation: {
+        specialActions: [{
+          type: 'resource_pool',
+          name: 'Channel Divinity',
+          uses: 2,
+          usesMax: 2,
+          uses_expression: 'class_level_scaling',
+        }],
+      },
+    }
+    reresolveAutomationUsesMax(stats)
+    expect(stats.automation.specialActions[0].usesMax).toBe(2)
+    expect(stats.automation.specialActions[0].uses).toBe(2)
+    expect(warn).not.toHaveBeenCalled()
   })
 })
 

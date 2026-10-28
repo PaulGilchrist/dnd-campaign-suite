@@ -232,8 +232,21 @@ function isRollableDiceFormula(expr) {
     return collapsed.includes('#') && /^[#0-9+-]+$/.test(collapsed)
 }
 
+// Data-driven string markers stored in the 2024 classes.json automation blocks
+// ("class_level_scaling" for maxKinds/maxRages/uses_expression). They are NOT
+// arithmetic or dice expressions — component-level logic resolves them from the
+// player's class-level entry (WeaponKindMasteryModal.jsx, attack.js
+// weapon_kind_mastery, resource_pool Channel Divinity handlers). Returned
+// verbatim without the string-fallback console.warn to silence the recurring
+// app-load noise; genuinely malformed expressions still warn.
+export const STRING_SENTINEL_EXPRESSIONS = ['class_level_scaling']
+
 export function evaluateAutoExpression(expression, playerStats, prof, level, slotLevel) {
     if (!expression) return expression
+    if (STRING_SENTINEL_EXPRESSIONS.includes(expression)) {
+        console.debug('[automationExpressions] Known string sentinel, returning as-is:', expression)
+        return expression
+    }
     let expr = resolveDiceExpression(expression, playerStats, slotLevel)
 
     const minMatch = expr.match(/^(.+?)_min_(\d+)$/)
