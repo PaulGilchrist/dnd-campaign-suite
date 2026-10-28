@@ -10,10 +10,11 @@ import { normalizeCharacterName, characterFileName } from '../utils/characterNam
 const router = express.Router();
 
 // Authority (mirrors maps.js refuseUnlessGm / quests.js / campaigns-admin.js):
-// character creation is a GM-only write — network clients get a read-only
-// view (AGENTS.md). The client hides the sidebar "Add Character" affordance
-// (Sidebar.jsx CharacterList isLocalhost gate); this route guard is the
-// server seam that makes it structural (bug-player-view-can-create-characters).
+// character creation AND deletion are GM-only writes — network clients get a
+// read-only view (AGENTS.md). The client hides the sidebar "Add Character"
+// affordance (Sidebar.jsx CharacterList isLocalhost gate); this route guard is
+// the server seam that makes it structural (bug-player-view-can-create-characters,
+// delete gate: bug-character-delete-no-gm-gate).
 const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 
 function refuseUnlessGm(req, res) {
@@ -125,6 +126,12 @@ function syncCharacterImage(campaign, character, originalImagePath, requireNameM
 }
 
 // API endpoint to update an existing character in a campaign
+// INTENTIONAL non-GM write (Paul's adjudication, bug-character-delete-no-gm-gate):
+// unlike create/delete, the .json PUT lane (save/rename + image move) stays
+// open to network clients — players legitimately write their OWN character
+// file through it (runtime-sync lane, AGENTS.md server-first pattern). The
+// write is full-object-replace guarded by the shape check below; GM-model
+// host-gating is deliberately NOT applied here.
 router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     const { campaign, file } = req.params;
     if (file === 'log' || !file.endsWith('.json')) return next();
@@ -235,6 +242,8 @@ router.patch('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => 
 
 // API endpoint to delete a character file and its associated image
 router.delete('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
+    if (!refuseUnlessGm(req, res)) return;
+
     const { campaign, file } = req.params;
     if (file === 'log' || !file.endsWith('.json')) return next();
     const dir = campaignDir(campaign);

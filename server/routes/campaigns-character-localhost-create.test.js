@@ -129,9 +129,12 @@ describe('campaignsCharacter — POST create localhost authority gate', () => {
         expect(FILE_SYSTEM.has('/mock/campaigns/test-campaign/LoopbackProbe.json')).toBe(true);
     });
 
-    it('existing-character routes (GET/PUT/DELETE on the .json file) stay reachable from the network view', async () => {
-        // Scope pin: this ticket guards CREATE only — the players' read lane and
-        // the pre-existing edit/delete lanes are unchanged (deny-nothing-sibling).
+    it('existing-character read lane (GET on the .json file) stays reachable from the network view', async () => {
+        // Scope pin: this ticket guards CREATE only — the players' read lane
+        // and the pre-existing PUT edit lane (intentional player-writes-own-
+        // file, see the PUT handler comment) are unchanged (deny-nothing-
+        // sibling). DELETE gained its refuseUnlessGm gate later, in
+        // bug-character-delete-no-gm-gate.
         setupFs({
             '/mock/campaigns/test-campaign/AasimarTest.json': { name: 'AasimarTest', level: 20 },
         });
