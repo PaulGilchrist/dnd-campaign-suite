@@ -199,10 +199,10 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-*(2026-10-27-L open items)*
-- **Sessions list rows preview `summary` only** — the newly-real `notes` field (c1198a4f3) is invisible on rows (GM-only content, arguably intentional) — owner call: maybe show a `fa-note-sticky` dot when `notes` non-empty so GMs can tell the field carries data without listing it.
+*(2026-10-27-L backlog fully consumed — 2 implemented, 3 blocked/subsumed; see improve-run commits + `docs/test-setup-playbook.md` § 2026-10-27 improve run for dispositions.)*
 
 *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-G's three travel/CRUD backlog items closed run H. Run-H's items closed/proven run I. Run-I's five backlog items all closed same-day by improve run J (live-proven run K). Run-K's sessions-notes-field pitfall CLOSED by c1198a4f3 (live-proven run L); run-K maps fileName-only backlog CLOSED by 75766bb0f (live-proven run L).)*
+
 ## Coverage
 
 | Feature/Flow | Depth | Notes |

@@ -1,4 +1,4 @@
-import { checklistProgress, countLinks } from '../../services/campaign/sessionPlannerUtils.js';
+import { checklistProgress, countLinks, hasNotes } from '../../services/campaign/sessionPlannerUtils.js';
 
 function SessionListItem({ session, onEdit }) {
   const handleKeyDown = (e) => {
@@ -46,6 +46,11 @@ function SessionListItem({ session, onEdit }) {
         {(session.contingencies || []).length > 0 && (
           <span className="sessions-list-contingencies">
             <i className="fa-solid fa-code-branch" /> {(session.contingencies || []).length} contingenc{(session.contingencies || []).length === 1 ? 'y' : 'ies'}
+          </span>
+        )}
+        {hasNotes(session.notes) && (
+          <span className="sessions-list-notes" title="Has notes" aria-label="Has notes">
+            <i className="fa-solid fa-note-sticky" />
           </span>
         )}
       </div>

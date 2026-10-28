@@ -53,6 +53,11 @@ export function countLinks(links) {
   return Object.values(merged).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
 }
 
+/** True when a session's notes field carries data (non-empty after trim). */
+export function hasNotes(notes) {
+  return typeof notes === 'string' && notes.trim() !== '';
+}
+
 export function newContingency() {
   return { id: `ctg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ifText: '', thenText: '', branch: 'negotiate' };
 }

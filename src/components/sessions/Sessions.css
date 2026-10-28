@@ -51,7 +51,8 @@
 }
 
 .sessions-list-links,
-.sessions-list-contingencies {
+.sessions-list-contingencies,
+.sessions-list-notes {
   font-size: 0.8rem;
   color: var(--color-text-secondary);
 }
