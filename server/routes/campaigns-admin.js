@@ -47,56 +47,10 @@ function isLocalhost(req) {
     return req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 }
 
-// API endpoint to migrate all existing campaign imagePath fields to relative format
-router.post('/api/campaigns/migrate-image-paths', asyncHandler((req, res) => {
-    const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
-    if (!fs.existsSync(campaignsDir)) {
-        return res.json({ message: 'No campaigns directory found' });
-    }
-
-    const campaignNames = fs.readdirSync(campaignsDir).filter(f => fs.statSync(path.join(campaignsDir, f)).isDirectory());
-    let migrated = 0;
-
-    for (const campaignName of campaignNames) {
-        const campaignDirPath = path.join(campaignsDir, campaignName);
-        const files = fs.readdirSync(campaignDirPath);
-
-        // Migrate character JSON files
-        for (const file of files) {
-            if (!file.endsWith('.json')) continue;
-            const filePath = path.join(campaignDirPath, file);
-            const content = fs.readFileSync(filePath, 'utf8');
-            const data = JSON.parse(content);
-
-            if (data.imagePath && typeof data.imagePath === 'string' && data.imagePath.includes('campaigns/')) {
-                data.imagePath = data.imagePath.replace(`campaigns/${campaignName}/images`, 'images');
-                fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-                migrated++;
-            }
-        }
-
-        // Migrate NPC data
-        const npcsPath = path.join(campaignDirPath, 'data', 'npcs.json');
-        if (fs.existsSync(npcsPath)) {
-            const npcsContent = fs.readFileSync(npcsPath, 'utf8');
-            const npcs = JSON.parse(npcsContent);
-            let changed = false;
-            for (const npc of npcs) {
-                if (npc.imagePath && typeof npc.imagePath === 'string' && npc.imagePath.includes('campaigns/')) {
-                    npc.imagePath = npc.imagePath.replace(`campaigns/${campaignName}/images`, 'images');
-                    changed = true;
-                    migrated++;
-                }
-            }
-            if (changed) {
-                fs.writeFileSync(npcsPath, JSON.stringify(npcs, null, 2));
-            }
-        }
-    }
-
-    res.json({ message: `Migration complete. Migrated ${migrated} imagePath fields.` });
-}));
-
+// POST /api/campaigns/migrate-image-paths (legacy bulk imagePath migration) was
+// removed 2026-10-28: one-time migration already complete, zero callers, and it
+// lacked the isLocalhost gate every sibling here carries (owner decision: delete;
+// pin in campaigns-admin-migrate.test.js).
 
 // API endpoint to create a new campaign folder
 router.post('/api/campaigns', asyncHandler((req, res) => {

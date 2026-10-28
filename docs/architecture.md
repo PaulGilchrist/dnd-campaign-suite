@@ -275,12 +275,12 @@ Runtime campaign content lives separately in `public/campaigns/` (5 campaigns pr
 2. *`React.StrictMode`:* absent from `main.jsx`; AGENTS.md claims it present.
 3. *Playwright orphan:* `testDir: './tests'` — the folder doesn't exist; E2E config stale.
 4. *Legacy `.eslintrc.cjs`* still on disk alongside flat `eslint.config.js` (ignored but confusing).
-5. *Security gaps:* campaign create/rename/delete, character CRUD, map/encounter writes, change-data POST, `/migrate-image-paths`, and factions CRUD are **not** localhost-gated; `imageUtils.deleteCharacterImage` joins caller-supplied paths under `public/` unchecked (traversal risk).
+5. *Security gaps:* campaign create/rename/delete, character CRUD, map/encounter writes, change-data POST, and factions CRUD are **not** localhost-gated (`/migrate-image-paths` since DELETED outright, 2026-10-28 — dead one-time migration, owner decision); `imageUtils.deleteCharacterImage` joins caller-supplied paths under `public/` unchecked (traversal risk).
 6. *Dual automation stacks:* `automation/handlers/spells/` (73) vs `rules/features/` (82) with ~50 same-name pairs and a circular `executeHandler` adapter (e.g. `blessService.js` importing back from `automation/index.js`).
 7. *Pipeline ambiguity:* two steps subscribe `cleave:check`; runner takes first match — Topple mastery reachable only via registration order.
 8. *Probable bugs:* dead ternaries in `rules.js:377-385` (identical branches, incl. `getCarryingCapacity` calling `getHitPoints` on both branches).
 9. *Hardcoded rules in code* that belong in data files: Hunter's Mark dice + Foe Slayer level check (`steps/features/huntersMarkDamage.js`), level-19 ability bumps in `abilityCalc*`, crit cap, default truesight/blindsight ranges in `rulesFactory.js`.
-10. *Path-building duplication:* `campaignPaths.js` exists but `changeData.js`, `imageUtils.js`, `encounterUtils.js`, admin migrate still compose `process.cwd()` paths; name-formatting helpers triplicated (`formatMapName`/`formatEncounterName`/`ui/formatUtils`).
+10. *Path-building duplication:* `campaignPaths.js` exists but `changeData.js`, `imageUtils.js`, `encounterUtils.js`, admin clear/reset lanes still compose `process.cwd()` paths; name-formatting helpers triplicated (`formatMapName`/`formatEncounterName`/`ui/formatUtils`).
 11. *Upsert-PUT logic* duplicated verbatim between `npcs.js` and `settlements.js` routes (missing factory option).
 12. *SSE URL* hardcoded `http://${hostname}` (`sseClient.js:21`) — breaks HTTPS/reverse-proxy TLS deployments.
 13. *Two `valuesEqual` implementations* (store vs SSE guard, latter adds `Set`); `useSyncedState` subscribes with `===` while `useRuntimeValue` deep-compares.

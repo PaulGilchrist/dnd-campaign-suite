@@ -1,106 +1,34 @@
 import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
+import fs from 'fs';
 import campaignsAdmin from './campaigns-admin.js';
 
-// Mock filesystem state
-const mockFsState = {
-    exists: new Set(),
-    files: new Map(),
-    readdir: new Map(),
-};
+// Regression for bug-migrate-image-paths-ungated-dead-route (owner decision
+// 2026-10-28: delete). POST /api/campaigns/migrate-image-paths was a completed
+// one-time migration with zero client callers and no isLocalhost gate — in an
+// isolated mount of this router a foreign Host got a 200 and the bulk-rewrite
+// body executed across EVERY campaign. The endpoint is now deleted; these
+// cases pin that it stays gone (404 for any Host, zero filesystem activity)
+// while the sibling admin lanes keep enforcing the host gate.
 
-vi.mock('fs', () => ({
-    default: {
+const mockFsState = { exists: new Set(), files: new Map(), readdir: new Map() };
+
+// Mirrors campaigns-admin-crud-localhost-guard.test.js: vi.mock factories are
+// hoisted so the fs mock must be spelled out inline (default + named).
+vi.mock('fs', () => {
+    const impl = {
         existsSync: vi.fn((path) => mockFsState.exists.has(path)),
-        mkdirSync: vi.fn((path) => {
-            mockFsState.exists.add(path);
-        }),
-        renameSync: vi.fn((oldPath, newPath) => {
-            if (mockFsState.exists.has(oldPath)) {
-                mockFsState.exists.delete(oldPath);
-            }
-            mockFsState.exists.add(newPath);
-        }),
-        rmSync: vi.fn((path) => {
-            mockFsState.exists.delete(path);
-        }),
-        writeFileSync: vi.fn((path, data) => {
-            mockFsState.files.set(path, data);
-        }),
-        readdirSync: vi.fn((path) => {
-            const entries = mockFsState.readdir.get(path);
-            if (entries === undefined) {
-                throw new Error('ENOENT: no such file or directory');
-            }
-            return entries;
-        }),
-        readFileSync: vi.fn((path) => {
-            if (mockFsState.files.has(path)) {
-                return mockFsState.files.get(path);
-            }
-            throw new Error('ENOENT: no such file or directory');
-        }),
-        unlinkSync: vi.fn((path) => {
-            mockFsState.files.delete(path);
-            mockFsState.exists.delete(path);
-        }),
-        createWriteStream: vi.fn(() => ({
-            on: vi.fn((event, cb) => {
-                if (event === 'error') return { on: () => {} };
-                if (event === 'close') setTimeout(cb, 0);
-                return {};
-            }),
-            write: () => {},
-            end: () => {},
-            bytesWritten: 1024,
-        })),
+        mkdirSync: vi.fn((p) => { mockFsState.exists.add(p); }),
+        renameSync: vi.fn((oldPath, newPath) => { if (mockFsState.exists.has(oldPath)) mockFsState.exists.delete(oldPath); mockFsState.exists.add(newPath); }),
+        rmSync: vi.fn((p) => { mockFsState.exists.delete(p); }),
+        writeFileSync: vi.fn((p, data) => { mockFsState.files.set(p, data); }),
+        readdirSync: vi.fn((p) => { const entries = mockFsState.readdir.get(p); if (entries === undefined) throw new Error('ENOENT'); return entries; }),
+        readFileSync: vi.fn((p) => { if (mockFsState.files.has(p)) return mockFsState.files.get(p); throw new Error('ENOENT'); }),
+        unlinkSync: vi.fn((p) => { mockFsState.files.delete(p); mockFsState.exists.delete(p); }),
         statSync: vi.fn(() => ({ isDirectory: () => true })),
-    },
-    existsSync: vi.fn((path) => mockFsState.exists.has(path)),
-    mkdirSync: vi.fn((path) => {
-        mockFsState.exists.add(path);
-    }),
-    renameSync: vi.fn((oldPath, newPath) => {
-        if (mockFsState.exists.has(oldPath)) {
-            mockFsState.exists.delete(oldPath);
-        }
-        mockFsState.exists.add(newPath);
-    }),
-    rmSync: vi.fn((path) => {
-        mockFsState.exists.delete(path);
-    }),
-    writeFileSync: vi.fn((path, data) => {
-        mockFsState.files.set(path, data);
-    }),
-    readdirSync: vi.fn((path) => {
-        const entries = mockFsState.readdir.get(path);
-        if (entries === undefined) {
-            throw new Error('ENOENT: no such file or directory');
-        }
-        return entries;
-    }),
-    readFileSync: vi.fn((path) => {
-        if (mockFsState.files.has(path)) {
-            return mockFsState.files.get(path);
-        }
-        throw new Error('ENOENT: no such file or directory');
-    }),
-    unlinkSync: vi.fn((path) => {
-        mockFsState.files.delete(path);
-        mockFsState.exists.delete(path);
-    }),
-    createWriteStream: vi.fn(() => ({
-        on: vi.fn((event, cb) => {
-            if (event === 'error') return { on: () => {} };
-            if (event === 'close') setTimeout(cb, 0);
-            return {};
-        }),
-        write: () => {},
-        end: () => {},
-        bytesWritten: 1024,
-    })),
-    statSync: vi.fn(() => ({ isDirectory: () => true })),
-}));
+    };
+    return { default: impl, ...impl };
+});
 
 vi.mock('../utils/campaignPaths.js', () => ({
     campaignDir: (name) => `/mock/campaigns/${name}`,
@@ -110,6 +38,7 @@ vi.mock('../utils/campaignPaths.js', () => ({
     campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
     campaignSnapshotDir: () => '/mock/campaigns/.snapshots',
     campaignSnapshotFile: (campaign) => `/mock/campaigns/.snapshots/${campaign}.zip`,
+    snapshotTimestamp: () => '0000-00-00T00-00-00-000',
 }));
 
 vi.mock('../utils/changeData.js', () => ({
@@ -122,276 +51,54 @@ vi.mock('../utils/changeData.js', () => ({
     readFile: vi.fn(),
 }));
 
-vi.mock('./log.js', () => ({
-    logCache: new Map(),
-}));
-
-vi.mock('archiver', () => ({
-    default: {
-        ZipArchive: vi.fn().mockImplementation(() => ({
-            on: vi.fn().mockReturnThis(),
-            pipe: vi.fn().mockReturnThis(),
-            directory: vi.fn().mockReturnThis(),
-            finalize: vi.fn(),
-            abort: vi.fn(),
-        })),
-    },
-}));
-
-vi.mock('extract-zip', () => ({
-    default: vi.fn().mockResolvedValue(undefined),
-}));
-
+vi.mock('./log.js', () => ({ logCache: new Map() }));
+vi.mock('archiver', () => ({ default: { ZipArchive: vi.fn().mockImplementation(() => ({ on: vi.fn().mockReturnThis(), pipe: vi.fn().mockReturnThis(), directory: vi.fn().mockReturnThis(), finalize: vi.fn(), abort: vi.fn() })) } }));
+vi.mock('extract-zip', () => ({ default: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('multer', () => {
-    const multerInstance = {
-        single: vi.fn(() => (req, res, next) => next()),
-        array: vi.fn(() => (req, res, next) => next()),
-        fields: vi.fn(() => (req, res, next) => next()),
-    };
-    const multerFn = Object.assign(function multer() {
-        return multerInstance;
-    }, {
-        memoryStorage: () => ({}),
-        diskStorage: () => ({}),
-    });
+    const multerInstance = { single: vi.fn(() => (req, res, next) => next()), array: vi.fn(() => (req, res, next) => next()), fields: vi.fn(() => (req, res, next) => next()) };
+    const multerFn = Object.assign(function multer() { return multerInstance; }, { memoryStorage: () => ({}), diskStorage: () => ({}) });
     return { default: multerFn };
 });
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+const FOREIGN_HOST = '100.92.171.80';
 
-function createTestApp() {
-    const app = express();
-    app.use(express.json());
-    app.use(campaignsAdmin);
-    return app;
-}
+function createTestApp() { const app = express(); app.use(express.json()); app.use(campaignsAdmin); return app; }
+function ensureCampaign(name) { mockFsState.exists.add(`/mock/campaigns/${name}`); }
+function removeCampaign(name) { mockFsState.exists.delete(`/mock/campaigns/${name}`); }
 
-function ensureRealCampaignsDir(campaignNames) {
-    const realPath = `${process.cwd()}/public/campaigns`;
-    mockFsState.exists.add(realPath);
-    mockFsState.readdir.set(realPath, campaignNames || []);
-}
+afterEach(() => {
+    removeCampaign('test-campaign');
+    vi.clearAllMocks();
+});
 
-// ─── Tests: POST /api/campaigns/migrate-image-paths ────────────────────────────
-
-describe('campaignsAdmin - POST /api/campaigns/migrate-image-paths', () => {
-
-    beforeEach(() => {
-        mockFsState.exists.clear();
-        mockFsState.files.clear();
-        mockFsState.readdir.clear();
+describe('campaignsAdmin - POST /api/campaigns/migrate-image-paths (deleted endpoint)', () => {
+    it('should 404 for localhost — the legacy route no longer exists', async () => {
+        const res = await request(createTestApp()).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
+        expect(res.status).toBe(404);
+        expect(fs.readdirSync).not.toHaveBeenCalled();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
     });
 
-    it('should return early when campaigns directory does not exist', async () => {
-        const app = createTestApp();
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('No campaigns directory found');
+    it('should 404 for a non-localhost host — the ungated bulk-rewrite lane is gone', async () => {
+        // Pre-fix this was the authority gap: foreign Host got 200 and the
+        // migration body ran. It must never come back.
+        const res = await request(createTestApp()).post('/api/campaigns/migrate-image-paths').set('Host', FOREIGN_HOST);
+        expect(res.status).toBe(404);
+        expect(fs.readdirSync).not.toHaveBeenCalled();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
     });
 
-    it('should migrate imagePath in character JSON files', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        const charPath = `${realCampaignPath}/character1.json`;
-        mockFsState.exists.add(charPath);
-        const imageData = JSON.stringify({
-            name: 'Hero',
-            imagePath: 'campaigns/test-campaign/images/hero.png',
-        });
-        mockFsState.files.set(charPath, imageData);
-        mockFsState.readdir.set(realCampaignPath, ['character1.json']);
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 1 imagePath fields.');
-
-        // Verify the file was rewritten with relative path
-        const written = mockFsState.files.get(charPath);
-        const parsed = JSON.parse(written);
-        expect(parsed.imagePath).toBe('images/hero.png');
+    it('should still reject non-localhost requests on the sibling admin lane', async () => {
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/clear-change-data').set('Host', FOREIGN_HOST);
+        expect(res.status).toBe(403);
+        expect(res.body.error).toBe('Only available on localhost');
+        expect(fs.unlinkSync).not.toHaveBeenCalled();
     });
 
-    it('should skip character JSON files without imagePath', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        const charPath = `${realCampaignPath}/character1.json`;
-        const imageData = JSON.stringify({
-            name: 'Hero',
-            level: 5,
-        });
-        mockFsState.files.set(charPath, imageData);
-        mockFsState.readdir.set(realCampaignPath, ['character1.json']);
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
+    it('should still serve localhost on the sibling admin lane', async () => {
+        ensureCampaign('test-campaign');
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/admin/snapshots').set('Host', 'localhost');
         expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 0 imagePath fields.');
-    });
-
-    it('should skip character JSON files with imagePath that does not include campaigns/', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        const charPath = `${realCampaignPath}/character1.json`;
-        const imageData = JSON.stringify({
-            name: 'Hero',
-            imagePath: 'images/hero.png',
-        });
-        mockFsState.files.set(charPath, imageData);
-        mockFsState.readdir.set(realCampaignPath, ['character1.json']);
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 0 imagePath fields.');
-    });
-
-    it('should migrate imagePath in NPC data files', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        mockFsState.exists.add(`${realCampaignPath}/data`);
-        const npcsPath = `${realCampaignPath}/data/npcs.json`;
-        mockFsState.exists.add(npcsPath);
-        const npcData = JSON.stringify([
-            { name: 'Goblin', imagePath: 'campaigns/test-campaign/images/goblin.png' },
-            { name: 'Dragon', imagePath: 'campaigns/test-campaign/images/dragon.png' },
-            { name: 'NPC without image' },
-        ]);
-        mockFsState.files.set(npcsPath, npcData);
-        mockFsState.readdir.set(realCampaignPath, ['data']);
-        mockFsState.readdir.set(`${realCampaignPath}/data`, ['npcs.json']);
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 2 imagePath fields.');
-
-        // Verify NPCs were rewritten
-        const written = mockFsState.files.get(npcsPath);
-        const parsed = JSON.parse(written);
-        expect(parsed[0].imagePath).toBe('images/goblin.png');
-        expect(parsed[1].imagePath).toBe('images/dragon.png');
-        expect(parsed[2].imagePath).toBeUndefined();
-    });
-
-    it('should not write npc file if no changes needed', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        const npcPath = `${realCampaignPath}/data/npcs.json`;
-        mockFsState.exists.add(`${realCampaignPath}/data`);
-        mockFsState.exists.add(npcPath);
-        const npcData = JSON.stringify([
-            { name: 'Goblin' },
-        ]);
-        mockFsState.files.set(npcPath, npcData);
-        mockFsState.readdir.set(realCampaignPath, ['data']);
-        mockFsState.readdir.set(`${realCampaignPath}/data`, ['npcs.json']);
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 0 imagePath fields.');
-
-        // File should not have been rewritten
-        const written = mockFsState.files.get(npcPath);
-        expect(written).toBe(npcData);
-    });
-
-    it('should handle campaign with no npcs.json', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        mockFsState.readdir.set(realCampaignPath, ['character1.json']);
-        mockFsState.files.set(`${realCampaignPath}/character1.json`, JSON.stringify({
-            name: 'Hero',
-            level: 5,
-        }));
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 0 imagePath fields.');
-    });
-
-    it('should handle multiple campaigns', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath1 = `${realCampaignsDir}/campaign-a`;
-        const realCampaignPath2 = `${realCampaignsDir}/campaign-b`;
-        ensureRealCampaignsDir(['campaign-a', 'campaign-b']);
-        mockFsState.exists.add(realCampaignPath1);
-        mockFsState.exists.add(realCampaignPath2);
-
-        const charPath1 = `${realCampaignPath1}/char1.json`;
-        const charData1 = JSON.stringify({ name: 'Hero1', imagePath: 'campaigns/campaign-a/images/hero1.png' });
-        mockFsState.files.set(charPath1, charData1);
-        mockFsState.readdir.set(realCampaignPath1, ['char1.json']);
-
-        const charPath2 = `${realCampaignPath2}/char2.json`;
-        const charData2 = JSON.stringify({ name: 'Hero2', imagePath: 'campaigns/campaign-b/images/hero2.png' });
-        mockFsState.files.set(charPath2, charData2);
-        mockFsState.readdir.set(realCampaignPath2, ['char2.json']);
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 2 imagePath fields.');
-
-        const written1 = mockFsState.files.get(charPath1);
-        const parsed1 = JSON.parse(written1);
-        expect(parsed1.imagePath).toBe('images/hero1.png');
-
-        const written2 = mockFsState.files.get(charPath2);
-        const parsed2 = JSON.parse(written2);
-        expect(parsed2.imagePath).toBe('images/hero2.png');
-    });
-
-    it('should skip non-json files in campaign directory', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        mockFsState.readdir.set(realCampaignPath, ['character1.json', 'readme.txt', 'map.png']);
-        mockFsState.files.set(`${realCampaignPath}/character1.json`, JSON.stringify({
-            name: 'Hero',
-            level: 5,
-        }));
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 0 imagePath fields.');
-    });
-
-    it('should handle character with non-string imagePath', async () => {
-        const app = createTestApp();
-        const realCampaignsDir = `${process.cwd()}/public/campaigns`;
-        const realCampaignPath = `${realCampaignsDir}/test-campaign`;
-        ensureRealCampaignsDir(['test-campaign']);
-        mockFsState.exists.add(realCampaignPath);
-        const charPath = `${realCampaignPath}/character1.json`;
-        const imageData = JSON.stringify({
-            name: 'Hero',
-            imagePath: 123,
-        });
-        mockFsState.files.set(charPath, imageData);
-        mockFsState.readdir.set(realCampaignPath, ['character1.json']);
-
-        const res = await request(app).post('/api/campaigns/migrate-image-paths').set('Host', 'localhost');
-        expect(res.status).toBe(200);
-        expect(res.body.message).toBe('Migration complete. Migrated 0 imagePath fields.');
-
-        // File must not have been rewritten
-        expect(mockFsState.files.get(charPath)).toBe(imageData);
+        expect(res.body.snapshots).toEqual([]);
     });
 });
