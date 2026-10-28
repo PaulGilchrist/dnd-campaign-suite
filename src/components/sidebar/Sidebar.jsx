@@ -78,7 +78,7 @@ function NavButton({ item, activeView, handlers, isLocalhost }) {
     );
 }
 
-function CharacterList({ characters, activeView, activeCharacter, onAddCharacter, onCharacterClick, isLocalhost }) {
+function CharacterList({ characters, activeView, activeCharacter, onAddCharacter, onCharacterClick, isLocalhost, deleteErrorName, onDismissDeleteError }) {
     return (
         <div className="sidebar-section">
             <div className="sidebar-section-header sidebar-section-header-static">
@@ -101,12 +101,31 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
                         {char.name}
                     </button>
                 ))}
+                {/* Persistent counterpart to the transient delete-failure alert:
+                    a failed DELETE never broadcasts SSE, so nothing else heals
+                    the view — surface it here until dismissed or a later delete
+                    succeeds. The roster link itself stays live (char NOT deleted). */}
+                {deleteErrorName && (
+                    <div className="sidebar-delete-error" role="alert">
+                        <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span className="sidebar-delete-error-text">
+                            Delete failed: {deleteErrorName} — server error; the character is still in the roster.
+                        </span>
+                        <button
+                            className="sidebar-delete-error-dismiss"
+                            aria-label={`Dismiss delete error for "${deleteErrorName}"`}
+                            onClick={onDismissDeleteError}
+                        >
+                            <i className="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError }) {
     const [diceResult, setDiceResult] = useState(null);
 
     // Auto-hide timer (display only, no game state). A re-roll replaces
@@ -158,6 +177,8 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     onAddCharacter={onAddCharacter}
                     onCharacterClick={onCharacterClick}
                     isLocalhost={isLocalhost}
+                    deleteErrorName={deleteErrorName}
+                    onDismissDeleteError={onDismissDeleteError}
                 />
 
                 {NAV_ITEMS.map((item) => (

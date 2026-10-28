@@ -10,6 +10,12 @@ import utils from '../../services/ui/utils.js';
 function useCharacterManagement(campaignName) {
   const [characters, setCharacters] = useState([]);
   const [activeCharacter, setActiveCharacter] = useState(null);
+  // Ephemeral UI error state (display-flag category, NOT game state — see the
+  // server-first doctrine): name of the character whose last DELETE failed, so
+  // the roster can surface the failure inline (the alert alone is transient and
+  // the name-filtered delete-SSE mirror cannot see a failed delete). Cleared on
+  // the next successful delete or explicit dismiss.
+  const [deleteErrorName, setDeleteErrorName] = useState(null);
   const inputRef = useRef(null);
 
   const handleCharacterClick = (character) => {
@@ -83,22 +89,36 @@ function useCharacterManagement(campaignName) {
   // Quests, Settlements, NPCs, PartyInventory, CharSummary). Sole production
   // caller is that wrapper, always reached through the confirming leaf.
   const handleDeleteCharacter = async (characterName) => {
-    if (!campaignName) throw new Error('No campaign selected');
+    // Any DELETE failure (404-mocked or otherwise) records the character name
+    // for the sidebar's inline roster error, then RE-THROWS so the App.jsx
+    // wrapper keeps owning the user-visible alert (service still owns the
+    // single console.error + "Failed to delete character: " prefix).
+    try {
+      if (!campaignName) throw new Error('No campaign selected');
 
-    await campaignService.deleteCharacter(campaignName, characterFileName(characterName));
+      await campaignService.deleteCharacter(campaignName, characterFileName(characterName));
 
-    setCharacters(prev => {
-      const remaining = prev.filter(char => char.name !== characterName);
-      if (activeCharacter && activeCharacter.name === characterName) {
-        setActiveCharacter(remaining.length > 0 ? cloneDeep(remaining[0]) : null);
-      }
-      return remaining;
-    });
+      setCharacters(prev => {
+        const remaining = prev.filter(char => char.name !== characterName);
+        if (activeCharacter && activeCharacter.name === characterName) {
+          setActiveCharacter(remaining.length > 0 ? cloneDeep(remaining[0]) : null);
+        }
+        return remaining;
+      });
+      setDeleteErrorName(null);
+    } catch (error) {
+      setDeleteErrorName(characterName);
+      throw error;
+    }
   };
+
+  const dismissDeleteError = () => setDeleteErrorName(null);
 
   return {
     characters,
     activeCharacter,
+    deleteErrorName,
+    dismissDeleteError,
     handleCharacterClick,
     handleInitiativeClick,
     handleUploadChange,

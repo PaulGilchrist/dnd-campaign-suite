@@ -360,7 +360,7 @@ function App() {
   }, [consumeRestore]);
 
   const { showCampaignSelection, campaignName, isLocalhost, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
-  const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
+  const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, deleteErrorName, dismissDeleteError, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
    // Compute full stats for all characters through the rules engine
@@ -683,7 +683,9 @@ function App() {
       // "Failed to delete character: " prefix, so alerting the raw message
       // here printed it twice ("Failed to delete character: Failed to delete
       // character: Not Found", c8acd5cba residual). The service owns the
-      // prefix; we surface the message verbatim.
+      // prefix; we surface the message verbatim. The persistent inline roster
+      // error is owned by useCharacterManagement (deleteErrorName) and shown
+      // under the sidebar roster; this wrapper keeps the transient alert only.
       alert(error.message);
     }
   };
@@ -700,6 +702,8 @@ function App() {
           campaignName={campaignName}
           characters={characters}
           activeCharacter={activeCharacter}
+          deleteErrorName={deleteErrorName}
+          onDismissDeleteError={dismissDeleteError}
           onBackToCampaigns={handleBackToCampaigns}
           onAddCharacter={handleAddCharacter}
           onCharacterClick={handleCharacterClick}
