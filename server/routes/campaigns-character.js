@@ -5,6 +5,7 @@ import { processImageUpload, deleteCharacterImage } from '../utils/imageUtils.js
 import { publish, removeChangeDataKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDir, campaignImagesDir } from '../utils/campaignPaths.js';
+import { normalizeCharacterName, characterFileName } from '../utils/characterName.js';
 
 const router = express.Router();
 
@@ -90,39 +91,41 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     }
 
     const dir = campaignDir(campaign);
-    const filePath = path.join(dir, file);
 
-    const isRename = character.originalFileName && character.originalFileName !== file;
-    let originalCharacter = null;
+    // Same server-boundary normalization as the create route: the stored
+    // display name is normalized and the TARGET filename derives from it, so
+    // a rename to " X " lands on X.json exactly like create would (and clean
+    // names keep writing to the exact URL-supplied path — byte-identical).
+    const name = normalizeCharacterName(character.name);
+    if (!name) {
+        return res.status(400).json({ error: 'Character name is required' });
+    }
+    character.name = name;
+    const targetFile = characterFileName(name);
+
+    const sourceFile = character.originalFileName || file;
+    const isRename = sourceFile !== targetFile;
+    const sourcePath = path.join(dir, sourceFile);
+
+    if (!fs.existsSync(sourcePath)) {
+        return res.status(404).json({ error: 'Character file not found' });
+    }
+
+    // Read the original character to get the imagePath for image cleanup
+    const originalCharacter = JSON.parse(fs.readFileSync(sourcePath, 'utf-8'));
 
     if (isRename) {
-        // Renaming: read from the original file path
-        const originalFilePath = path.join(dir, character.originalFileName);
-        if (!fs.existsSync(originalFilePath)) {
-            return res.status(404).json({ error: 'Character file not found' });
-        }
-
-        // Read the original character to get the imagePath for image cleanup
-        originalCharacter = JSON.parse(fs.readFileSync(originalFilePath, 'utf-8'));
-        const originalImagePath = originalCharacter.imagePath;
-
         // Delete the original character file
-        fs.unlinkSync(originalFilePath);
+        fs.unlinkSync(sourcePath);
 
         // Image unchanged but character renamed — rename the image file
-        syncCharacterImage(campaign, character, originalImagePath, false);
+        syncCharacterImage(campaign, character, originalCharacter.imagePath, false);
     } else {
-        // Standard update: verify the file exists at the current path
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ error: 'Character file not found' });
-        }
-
-        // Read the original character to get the imagePath for image cleanup
-        originalCharacter = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
         syncCharacterImage(campaign, character, originalCharacter.imagePath, true);
     }
 
     // Write the updated character data
+    const filePath = path.join(dir, targetFile);
     delete character.originalFileName;
     delete character._fileName;
     fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
@@ -133,7 +136,7 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     }
 
     // Broadcast character update
-    publish(`character-${campaign}-${file}`, character, campaign);
+    publish(`character-${campaign}-${targetFile}`, character, campaign);
 
     res.json({ message: 'Character updated successfully' });
 }));
@@ -228,8 +231,18 @@ router.post('/api/campaigns/:campaign', asyncHandler((req, res) => {
         return res.status(404).json({ error: 'Campaign not found' });
     }
 
+    // Server-boundary name normalization (server/utils/characterName.js):
+    // trim + collapse whitespace so stray spaces never leak into the stored
+    // display name or filename ("X " → "X.json", never "X_.json"), and the
+    // duplicate guard below compares normalized spellings ("X " vs "X" → 400).
+    const name = normalizeCharacterName(character.name);
+    if (!name) {
+        return res.status(400).json({ error: 'Character name is required' });
+    }
+    character.name = name;
+
     // Generate filename from character name
-    const fileName = `${character.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+    const fileName = characterFileName(name);
     const filePath = path.join(dir, fileName);
 
     // Duplicate-name guard (mirrors the NPCs/Quests/Settlements 400 guards):

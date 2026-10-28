@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import * as campaignService from '../../services/campaign/campaignService.js';
-import { characterFileName } from '../../services/campaign/characterFileName.js';
+import { characterFileName, normalizeCharacterName } from '../../services/campaign/characterFileName.js';
 import { stampElfishLineageRuntime } from '../../services/automation/handlers/class-other/elfishLineageHandler.js';
 import { stampFiendishLegacyRuntime } from '../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
 import { endMageArmorOnDonning } from '../../services/rules/features/mageArmorService.js';
@@ -41,7 +41,11 @@ export function useCharacterWizard(campaignName) {
   const handleWizardComplete = useCallback(async (characterData) => {
     try {
       if (!campaignName) throw new Error('No campaign selected');
-      const result = await campaignService.createCharacter(campaignName, characterData);
+      // Normalize the display name client-side too (server mirror) so the
+      // local roster/sidebar shows exactly what the server stores — no
+      // leading/trailing spaces, collapsed internal runs.
+      const payload = { ...characterData, name: normalizeCharacterName(characterData.name) };
+      const result = await campaignService.createCharacter(campaignName, payload);
       callbacksRef.current.setActiveCharacter(cloneDeep(result.character));
       setShowCharacterWizard(false);
       const encodedCampaign = encodeURIComponent(campaignName);
@@ -73,27 +77,30 @@ export function useCharacterWizard(campaignName) {
       // object): a level change re-derives proficiency, HP and every dependent
       // modifier across the live campaign — name the change and confirm before
       // the save PUT fires. Cancel aborts the save and keeps the wizard open.
+      // Mirror the server's display-name normalization so the PUT URL, the
+      // stored name, and local roster state all agree on the clean spelling.
+      const savedData = { ...characterData, name: normalizeCharacterName(characterData.name) };
       const originalLevel = Number(originalCharacter?.level);
-      const newLevel = Number(characterData?.level);
+      const newLevel = Number(savedData?.level);
       if (
         Number.isFinite(originalLevel) &&
         Number.isFinite(newLevel) &&
         originalLevel !== newLevel &&
-        !window.confirm(`Change ${characterData.name}'s level from ${originalLevel} to ${newLevel}? This updates the character in the live campaign.`)
+        !window.confirm(`Change ${savedData.name}'s level from ${originalLevel} to ${newLevel}? This updates the character in the live campaign.`)
       ) {
         return;
       }
       const originalFileName = characterFileName(originalCharacter.name);
-      const fileName = characterFileName(characterData.name);
-      await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);
+      const fileName = characterFileName(savedData.name);
+      await campaignService.updateCharacter(campaignName, fileName, savedData, originalFileName);
       // SP-074: inventory step (16) saves are the donning seam — armor newly added
       // to equipped[] ends Mage Armor before any consumer re-reads the sheet (§39).
-      await endMageArmorOnDonning(originalCharacter, characterData, campaignName);
-      stampLineageRuntime(originalCharacter, characterData, campaignName);
-      callbacksRef.current.setActiveCharacter(cloneDeep(characterData));
+      await endMageArmorOnDonning(originalCharacter, savedData, campaignName);
+      stampLineageRuntime(originalCharacter, savedData, campaignName);
+      callbacksRef.current.setActiveCharacter(cloneDeep(savedData));
       setShowEditCharacterWizard(false);
       const { setCharacters } = callbacksRef.current;
-      setCharacters(prev => prev.map(char => char.name === originalCharacter.name ? characterData : char));
+      setCharacters(prev => prev.map(char => char.name === originalCharacter.name ? savedData : char));
     } catch (error) {
       console.error('Error updating character:', error);
       alert(`Failed to update character: ${error.message}`);

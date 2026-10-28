@@ -131,7 +131,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run P
 
-- **Campaign create/rename/delete server-side filename/name sanitation** — character names flow to filenames via two DIFFERENT recipes (create `_`-sanitize vs delete lowercase-dash, bug filed) but nothing normalizes the display name itself (trailing spaces `"X "` → `"X_.json"`); one shared util (e.g. `campaigns-character.js` sanitize exported + consumed by client) would prevent the whole bug class. *(2026-10-28-P)*
 
 *(2026-10-27-L backlog fully consumed — 2 implemented, 3 blocked/subsumed; see improve-run commits + `docs/test-setup-playbook.md` § 2026-10-27 improve run for dispositions.)*
 
