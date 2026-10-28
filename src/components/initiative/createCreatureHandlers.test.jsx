@@ -465,6 +465,18 @@ describe('handleAddNpc', () => {
 });
 
 describe('handleClear', () => {
+    // QA backlog: house NAMED canon (Factions/Notes/character-delete name their
+    // target + irreversibility) — the Clear confirm must state what it does.
+    it('confirm copy names the action, its scope, and irreversibility', () => {
+        const { handlers } = makeHandlers([{ name: 'Alice', type: 'player', currentHp: 20 }]);
+
+        handlers.handleClear();
+
+        expect(window.confirm).toHaveBeenCalledWith(
+            'Clear combat status for all creatures? This resets initiative and removes all monsters from the board. This action is irreversible.'
+        );
+    });
+
     it('confirmed: fresh summary, active creature, exploration phase, CLA-100 player latches, closing roster rewards', () => {
         const cleared = {
             round: 1,

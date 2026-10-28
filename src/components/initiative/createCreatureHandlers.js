@@ -150,7 +150,7 @@ export function createCreatureHandlers({
     }
 
     const handleClear = function handleClear() {
-        if (window.confirm('Are you sure you want to clear all combat status?')) {
+        if (window.confirm('Clear combat status for all creatures? This resets initiative and removes all monsters from the board. This action is irreversible.')) {
             // L5 §10.3: capture the closing roster BEFORE clear wipes it —
             // auto-rewards (flag-gated, off ⇒ zero writes) need the NPCs
             // that were on the tracker to compute loot + XP.
