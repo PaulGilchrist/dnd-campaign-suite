@@ -1312,3 +1312,14 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - SESSIONS PLANNER (c1198a4f3 live): `#session-summary` + `#session-notes` are now distinct persisted fields; search `Search sessions…` matches name/summary/notes (row preview shows summary only); legacy row without `notes` key seeds '' fine, re-save re-adds the key; upsert lane = `PUT /sessions/<urlencoded name>` (echo current `updatedAt` unchanged).
 - MAPS SLUGS (75766bb0f live): list rows `{name,fileName,slug,type,description,isActive}`; create 201 + rename 200 carry `map.slug`; GET read lanes resolve slug OR display name (kebab fallback; bad name still 404 `Map not found`); rename round-trip moves the slug (old segment 404s after).
 - Run-end baseline unchanged: maps [battle-arena, test-map]; npcs [Marta '']; sessions []; notes/factions/quests/settlements baseline stamps as recorded run-K (qa-dup 1793127696761, Lost Artifact 1793133681292, Ironhaven 1793133961018); change-data {} log [] GET-verified from closed-tab quiet; zero lock denials.
+
+## Run additions 2026-10-27 (hex-arrival-null-echo fix, 171a9dcbe)
+- NULL ECHO = KEY REMOVE (post-171a9dcbe): campaign-key `change-*` null SSE echoes now `delete` from the App.jsx mirror; consumers see declared defaults, never raw null. Any future test asserting `store.get(key) === null` after a cleared-key echo must assert `!store.has(key)` instead. Run-K EventDialog auto-close still works (its default is null).
+- TRAVEL-TOOL SELECTOR: the toolbar Travel button is icon-only — locate by `button[title="Travel mode — plan and execute overland travel"]`; a text `/Travel/` locator hangs 30s.
+- NULL-ECHO RIG (no gameplay): in-page `POST /api/campaigns/test-campaign/travel-pendingEvent {value:{…}}` opens the EventDialog on the same client; `DELETE` the same key closes it — cheap delivery-lane probe for the App.jsx mirror.
+
+## Run additions 2026-10-27 (hex-mount-window-silent-trip-cancel fix)
+- MAPS `PUT` IS A FULL-OBJECT REPLACE, not a patch — `PUT /maps/<slug> {travelState:null}` wipes `players`/`type`/`gridSize`, which then blanks the SPA via `Map.jsx:469`→`Players.jsx:14` (`mapData.players` undefined, no default). Always GET-modify-PUT the whole map object. Backlog: guard the Players render lane.
+- UNKNOWN-MOUNT-WINDOW AMPLIFIER (deterministic, no race luck): `page.route` a 3s delay on the boot `change-data` GET, reload, open the map — the campaign store stays empty through the whole mount churn while the file/loader keeps the local mirror live; exactly the divergence `useTravelToolSync` must hold inert against.
+- Campaign-select-then-immediate-Maps click can transiently blank the SPA if a `clear-change-data`/key-wipe landed mid-navigation; recover with a clean `goto` + re-select.
+- Confirmed-cancel contract (post-fix): cancel requires explicit `travel-mode: 'inactive'` byte (or deliberate own-trip exit); null/missing authority read = UNKNOWN ⇒ adopt/hold, never cancel.

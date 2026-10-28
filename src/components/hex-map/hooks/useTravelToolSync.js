@@ -10,28 +10,67 @@ import { getSessionId, getTripOwner } from '../../../services/maps/travelSession
 // trip's owner. Reads the live trip mode + its claiming tab and answers
 // whether this session may destroy it. Empty campaignName ⇒ no server lane
 // wired ⇒ mode null ⇒ every pre-fix pinned contract stands byte-identical.
+//
+// The read carries THREE states, not two (bug-hex-mount-window-silent-trip-
+// cancel): a live mode string (tripLive), the CONFIRMED 'inactive' byte
+// (modeConfirmedInactive), or UNKNOWN — a missing/null key. The store returns
+// null both before the boot change-data seed lands AND after a null change-
+// echo REMOVES the key (post 171a9dcbe); in that window useSyncedState still
+// renders its declared default `init.travelMode` (a file-carried live mode),
+// so the LOCAL channel reads the trip live while this authority read does
+// NOT. UNKNOWN must never be mistaken for a confirmed trip-over: it is not
+// authority to destroy a trip, only the explicit 'inactive' byte is. So the
+// empty-lane legacy path reports modeConfirmedInactive true (no lane ⇒ the
+// pre-fix external-start cancel contract stands), while a wired lane reports
+// UNKNOWN as modeConfirmedInactive false.
 function readSharedTripAuthority(campaignName, startedHere) {
-    if (!campaignName) return { tripLive: false, foreignTrip: false };
+    if (!campaignName) return { tripLive: false, foreignTrip: false, modeConfirmedInactive: true };
     // 'campaign' is the runtime store's campaign-bucket scope (same one
     // useTravelManagement writes travel-* bytes through).
     const sharedMode = getRuntimeValue('campaign', 'travel-mode');
     const tripLive = typeof sharedMode === 'string' && sharedMode !== 'inactive';
+    const modeConfirmedInactive = sharedMode === 'inactive';
     const owner = tripLive ? getTripOwner(campaignName) : '';
     const mine = owner === '' || owner === getSessionId() || startedHere;
-    return { tripLive, foreignTrip: tripLive && !mine };
+    return { tripLive, foreignTrip: tripLive && !mine, modeConfirmedInactive };
 }
 
 // Branch 3 (tool unpressed/pressed-away WHILE a trip is live): decide the one
 // action for this pass. Order carries the contracts: foreign trip + deliberate
 // exit → HOLD the press (leg 2 guard — a raw toggle-off may never cancel
-// another tab's journey); trip arrived without ever pressing → ADOPT (late-join
-// lane); exit of a session-owned trip or the no-lane external-start echo →
-// CANCEL (pinned contracts); mounted-live churn → mirror the toggle.
-function activeTripToolAction({ prevTool, foreignTrip, tripLive, startedHere, resumeSession }) {
+// another tab's journey); confirmed-live trip arrived without ever pressing →
+// ADOPT (late-join lane); an UNKNOWN authority read (travel-mode missing —
+// boot seed lag or the post-171a9dcbe null-echo key REMOVAL) → ADOPT, NEVER
+// cancel (bug-hex-mount-window-silent-trip-cancel: the local useSyncedState
+// channel may still render a live init.travelMode while this shared read lags,
+// and a stale first-echo pass has no authority to destroy a trip — a confirmed
+// cancel needs the explicit 'inactive' byte, a confirmed exit needs a live one);
+// only then the pinned legacy CANCEL (deliberate own-trip exit, or the no-lane
+// external-start echo); mounted-live churn → mirror the toggle.
+function activeTripToolAction({ prevTool, foreignTrip, tripLive, startedHere, resumeSession, modeConfirmedInactive }) {
     if (prevTool === TOOL_TRAVEL && foreignTrip) return 'hold';
     if (prevTool !== TOOL_TRAVEL && tripLive && !startedHere) return 'adopt';
+    // UNKNOWN authority (neither a live mode nor the confirmed 'inactive'
+    // byte — only reachable on a WIRED lane: the empty-lane path reports
+    // modeConfirmedInactive true so the no-lane legacy cancel below stands
+    // byte-identical). Neither sighting reached cancel: the fresh-boot reopen
+    // (never pressed, own/foreign trip lost to a writeback race) and the
+    // first-press-after-boot whose just-claimed trip churned while travel-mode
+    // was transiently absent. Both settle by ADOPTING (recover/hold the press)
+    // instead of silently destroying the journey.
+    if (!tripLive && !modeConfirmedInactive) return 'adopt';
     if (prevTool === TOOL_TRAVEL || !resumeSession) return 'cancel';
     return 'mirror';
+}
+
+// Human-readable adopt provenance for the branch-3 adopt lane (kept out of the
+// effect so its decision complexity stays in the pure helpers, matching this
+// file's readSharedTripAuthority / activeTripToolAction structure). Returns ''
+// for the own-trip late-join pass that has always been silent.
+function adoptLogMessage(foreignTrip, tripLive) {
+    if (foreignTrip) return '[useTravelToolSync] Live shared trip started elsewhere reached this client — adopting it (no cancel)';
+    if (!tripLive) return '[useTravelToolSync] Shared travel-mode authority unreadable (boot/SSE hydration) — holding the live trip, not cancelling it';
+    return '';
 }
 
 // Options object (max-params): hasPersistedWeather (a map file that already
@@ -99,7 +138,7 @@ function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, { h
         // live trip OR loaded a file trip — the branches below split resume
         // behavior from the legacy external-start contract on this ONE flag.
         const resumeSession = openedLiveRef.current || hasLoadedTrip;
-        const { tripLive, foreignTrip } = readSharedTripAuthority(campaignName, startedHereRef.current);
+        const { tripLive, foreignTrip, modeConfirmedInactive } = readSharedTripAuthority(campaignName, startedHereRef.current);
 
         if (toolJustActivated && travelMgmt.travelMode === 'inactive') {
             handleToolActivation(foreignTrip);
@@ -116,6 +155,7 @@ function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, { h
                 tripLive,
                 startedHere: startedHereRef.current,
                 resumeSession,
+                modeConfirmedInactive,
             });
             if (action === 'hold') {
                 // Leg 2 guard: a raw toggle-off may NOT cancel another tab's
@@ -124,22 +164,31 @@ function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, { h
                 console.info('[useTravelToolSync] Leaving the tool over a shared trip started elsewhere — keeping travel live (use the panel Cancel to stop it)');
                 setTool(TOOL_TRAVEL);
             } else if (action === 'adopt') {
-                // Late-join lane (bug-hex-trip-clobbered-by-second-client): the
-                // trip reached this client via SSE while the tool sat unpressed.
-                // Pre-fix, a session that mounted without the trip treated this
-                // echo as stale bytes and cancelTravel()'d another tab's journey
-                // on arrival; with the owner stamp it is ADOPTED instead — own or
-                // foreign alike, matching what the reopen lane already does.
-                if (foreignTrip) {
-                    console.info('[useTravelToolSync] Live shared trip started elsewhere reached this client — adopting it (no cancel)');
-                }
+                // Trip reached this client's branch-3 with the tool unpressed
+                // (or its press desynced during mount churn) and NO confirmed
+                // authority to destroy it. Two lanes land here:
+                //  • Late-join (bug-hex-trip-clobbered-by-second-client): a live
+                //    shared trip arrived via SSE while the tool sat unpressed —
+                //    ADOPT it (own or foreign alike) rather than the pre-fix
+                //    cancelTravel() on arrival that destroyed another tab's run.
+                //  • Mount-window UNKNOWN authority (bug-hex-mount-window-
+                //    silent-trip-cancel, both sightings): the boot change-data
+                //    seed has not landed, or a null change-echo REMOVED the
+                //    travel-mode key (post 171a9dcbe), so the shared read can't
+                //    CONFIRM a trip-over while useSyncedState still renders a
+                //    live init.travelMode (or this tab's just-claimed press).
+                //    Adopt and let the authority settle — a confirmed cancel
+                //    needs the explicit 'inactive' byte, an UNKNOWN one never
+                //    authorises destruction.
+                const adoptMessage = adoptLogMessage(foreignTrip, tripLive);
+                if (adoptMessage) console.info(adoptMessage);
                 openedLiveRef.current = true;
                 setTool(TOOL_TRAVEL);
             } else if (action === 'cancel') {
-                // Cancel only on deliberate exit (GM deselected the travel tool
-                // mid-trip) or on an external (other-tab/SSE) start seen by a
-                // session that mounted with no trip AND loaded no file trip
-                // (pinned legacy contract). Resume sessions are immune.
+                // Cancel only on a CONFIRMED authority state: deliberate exit of
+                // this session's own trip (tool was selected, now deselected) or
+                // the pinned no-lane external-start echo. An UNKNOWN hydration
+                // read always routed to adopt above; resume sessions are immune.
                 travelMgmt.cancelTravel();
             } else {
                 // Toggle-mirror on adoption/resume (backlog 2026-10-27-G): the
