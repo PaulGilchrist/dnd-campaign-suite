@@ -49,7 +49,14 @@ function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setAct
   if (event.key.startsWith('character-delete-')) {
     const file = event.key.replace(/^character-delete-.+-/, '');
     setCharacters(prev => prev.filter(c => characterFileName(c.name) !== file));
-  } else if (!event.key.startsWith('character-create-')) {
+  } else if (event.key.startsWith('character-create-')) {
+    // Create echo (bug-character-create-no-live-mirror): event.data carries the
+    // full new character — append it if absent so passive tabs see new party
+    // members live. The name check dedups the echo on the CREATING tab, whose
+    // wizard refetch already listed the character.
+    const created = event.data;
+    setCharacters(prev => (prev.some(c => c.name === created.name) ? prev : [...prev, created]));
+  } else {
     const updated = event.data;
     setCharacters(prev => {
       const idx = prev.findIndex(c => c.name === updated.name);

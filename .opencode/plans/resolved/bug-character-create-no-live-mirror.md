@@ -28,3 +28,21 @@ Give the create key a real branch in `handleCharacterKeyEvent`: parse the file/n
 
 ## Severity
 **Minor UX issue** (data-safe: stale roster self-heals on refresh and nothing is corrupted) — but it's a live-sync asymmetry in the app's flagship SSE party-sync feature: create is silently inert while delete/update on the same channel are live.
+
+## Resolution
+**FIXED (2026-10-28, run P-fix).** Root cause confirmed exactly as diagnosed: the server POST route publishes `character-create-<campaign>-<file>` with the full character object as payload (`server/routes/campaigns-character.js:250`), the shared SSE delivers it to every client, but `handleCharacterKeyEvent` (`src/App.jsx`) routed every `character-create-` key into a no-op via the `!event.key.startsWith('character-create-')` guard — the create branch was a deliberate dead-end, so passive tabs silently kept the stale roster.
+
+**Live repro before fixing:** two tabs on test-campaign; created `QA FixP Wizard` in Tab A via the Add Character wizard (16-step walk, Human Fighter/Champion). Tab A listed it; Tab B (window marker proves zero reloads) polled ~10s: link never appeared, count stayed 12.
+
+**Fix (minimal, mirrors the working delete/update siblings):** `src/App.jsx` `handleCharacterKeyEvent` — replaced the exclusion guard with a real three-way branch. The new `character-create-` branch appends `event.data` if absent: `prev.some(c => c.name === created.name) ? prev : [...prev, created]`. The name dedup makes the creating tab's own SSE echo idempotent against its wizard refetch. No server, wizard, or event-schema changes (the "consider replacing the wizard refetch-all" note left as-is — the dedup makes it redundant but harmless, and keeping the change surface minimal was the priority).
+
+**Files changed:**
+- `src/App.jsx` — create branch in `handleCharacterKeyEvent` (+8 lines).
+- `src/App.runtime-events.test.jsx` — replaced the "character-create is ignored" regression (which pinned the buggy behavior): a `character-create-` frame now must add exactly one `char-btn-Stranger` roster entry, must not hijack the open sheet, and a re-echo must keep it at one entry (`getAllByTestId` length 1). File-header dispatch-table doc updated to match.
+
+**Verification:**
+- Tests: `npx vitest run src/App.runtime-events.test.jsx` → 21/21 pass; folder run `npx vitest run src/App` → 7 files / 67 tests pass. `npm run lint` → zero warnings/errors.
+- Live re-verification (`npm run dev:locked`, :5173, test-campaign, two tabs): created `QA FixP Two` via the wizard in Tab A → Tab B (marker `alive`, zero reloads) rendered the new sidebar link **within the poll window, no manual refresh** — expected behavior now exact. New entry appends at list end (order self-heals to server order on next refetch/reload).
+- Delete-lane sanity (same handler touched): UI Delete of `QA FixP Two` in Tab A removed the link from Tab B live (marker still `alive`).
+- Dedup live: Tab A showed exactly one `QA FixP Two` entry after wizard-refetch + SSE echo.
+- Cleanup: both QA characters deleted via UI (disk `files` back to 12, zero QA matches), all tabs closed, `/admin/clear-change-data` + `/admin/clear-log` → `{}` / `[]` API-verified. Campaign lockdown honored: every mutation test-campaign-only.

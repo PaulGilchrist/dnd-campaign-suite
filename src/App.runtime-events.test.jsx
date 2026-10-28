@@ -8,8 +8,10 @@
  *     the mocked Subscriber): which event keys mutate what state.
  *     - `character-*` one test covers the whole row: update replaces a
  *       roster entry by name and swaps the active sheet only when the
- *       updated character is active; create is ignored (the create flow
- *       refreshes the roster itself); delete (own describe, own roster)
+ *       updated character is active; create appends the new character to
+ *       every client's roster (deduped by name so the creating tab's own
+ *       refetch + SSE echo never doubles it — bug-character-create-no-live-
+ *       mirror); delete (own describe, own roster)
  *       removes a roster entry by its underscore-sanitized file name
  *       (roster only — the open sheet stays until the server publishes a
  *       new active character, and the API is never re-called).
@@ -478,7 +480,7 @@ describe('App - Runtime Events & State Management', () => {
       await renderInCampaign();
     });
 
-    it('character-update replaces a roster entry (swapping the active sheet only for the active character); character-create is ignored', async () => {
+    it('character-update replaces a roster entry (swapping the active sheet only for the active character); character-create appends exactly one entry, deduped on re-echo', async () => {
       await dispatch({
         key: 'character-update-test-campaign-Aragorn.json',
         data: { name: 'Aragorn', level: 5 },
@@ -497,15 +499,28 @@ describe('App - Runtime Events & State Management', () => {
       expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
       expect(screen.getByTestId('character-level')).toHaveTextContent('5');
 
-      // Creates are ignored — the create flow refreshes the roster itself.
+      // bug-character-create-no-live-mirror: a create frame appends the new
+      // character to every client's roster — passive tabs see new party
+      // members live, no reload.
       await dispatch({
         key: 'character-create-test-campaign-stranger.json',
         data: { name: 'Stranger', level: 1 },
       });
 
-      expect(screen.queryByTestId('char-btn-Stranger')).not.toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Stranger')).toBeInTheDocument();
       expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
       expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
+      // The create echo must NOT hijack the open sheet on a passive tab.
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
+
+      // Re-echo (e.g. the creating tab's refetch already listed the character)
+      // must dedup by name — exactly one entry.
+      await dispatch({
+        key: 'character-create-test-campaign-stranger.json',
+        data: { name: 'Stranger', level: 1 },
+      });
+
+      expect(screen.getAllByTestId('char-btn-Stranger')).toHaveLength(1);
     });
 
     it('mirrors pipeline events into the runtime store with skipSync (never re-posting the SSE echo)', async () => {
