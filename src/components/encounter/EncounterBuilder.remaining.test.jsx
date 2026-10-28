@@ -146,6 +146,27 @@ describe('EncounterBuilder - residual interactions', () => {
     expect(selectedTitle()).toBe('Selected Monsters (1)');
   });
 
+  it('Apply over a non-empty draft toasts "Draft replaced by generator"; an empty-draft Apply stays silent', () => {
+    // Empty draft: applying a suggestion is not a replacement — no toast.
+    mountBuilder();
+    fireEvent.click(screen.getByRole('button', { name: 'Generate encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Suggestion' }));
+    expect(document.querySelector('.encounter-toast')).toBeNull();
+
+    // Non-empty draft (the Apply above left Suggested Goblin selected):
+    // re-open and apply again — the prior selection is replaced, so toast.
+    fireEvent.click(screen.getByRole('button', { name: 'Close generator' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Suggestion' }));
+
+    const toast = document.querySelector('.encounter-toast');
+    expect(toast).toBeTruthy();
+    expect(toast).toHaveTextContent('Draft replaced by generator');
+    expect(toast).not.toHaveClass('encounter-toast-error');
+    // Applied draft lands unchanged — still exactly the 1-monster suggestion.
+    expect(selectedTitle()).toBe('Selected Monsters (1)');
+  });
+
   it('keeps a selected monster in the table when the type filter excludes it, dropping only unmatched unselected rows', () => {
     const { container } = mountBuilder();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));

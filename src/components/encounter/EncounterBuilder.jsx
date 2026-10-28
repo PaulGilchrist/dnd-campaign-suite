@@ -447,6 +447,11 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
    };
 
   const handleApplySuggestion = (monsters) => {
+    // Replacement feedback only when a draft actually existed — an empty draft
+    // is not "replaced" (matches Save-lane honesty; toast is display-only).
+    if (selectedMonsters.length > 0) {
+      showToast('Draft replaced by generator');
+    }
     setSelectedMonsters(monsters);
     };
 
