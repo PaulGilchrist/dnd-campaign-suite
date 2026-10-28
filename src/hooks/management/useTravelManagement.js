@@ -175,17 +175,53 @@ export default function useTravelManagement({
   // re-renders (new array identities, same bytes) from bumping, and seeding
   // from the mount snapshot keeps a quiet open — resume included — silent.
   const publishedTravelRef = useRef(buildPublishSnapshot(init));
+  // Quiet-adopt reconciliation (bug-hex-quiet-adopt-stale-file-travelstate):
+  // the async document load lands AFTER this hook mounts, and
+  // useMapLoader.applyExistingMap re-adopts the FILE's travelState into the
+  // save ref + dirty-gate baseline when it lands, silently dropping any
+  // publish that fired earlier in the load window. So a resume mount (store
+  // carries a live trip) holds its premature publish until the file bytes
+  // arrive, then seeds publishedTravelRef from the FILE snapshot — exactly
+  // what the loader wrote into its baseline. A file that DIVERGED from the
+  // adopted store trip (write-back lost to a mid-plan reload) therefore
+  // publishes exactly one reconciliation PUT; a quiet resume (file bytes ==
+  // store bytes) compares equal and stays silent, preserving the a2da687d7
+  // zero-PUT contract. Adoption mounts (store silent at mount) are untouched
+  // — their publish rides the materialized store values and re-confirms the
+  // file bytes the loader already holds.
+  const mountStoreSnapshotRef = useRef(buildPublishSnapshot({
+    travelMode, travelPace, destination, path, pathIndex,
+    accruedCost, dailyBudget, dayExhausted, forcedMarchHours,
+  }));
+  const fileSettledRef = useRef(false);
   useEffect(() => {
     if (!onTravelStateChange) return;
     const snapshot = buildPublishSnapshot({
       travelMode, travelPace, destination, path, pathIndex,
       accruedCost, dailyBudget, dayExhausted, forcedMarchHours,
     });
+    if (!fileSettledRef.current) {
+      if (initialTravelState) {
+        fileSettledRef.current = true;
+        if (mountStoreSnapshotRef.current) {
+          publishedTravelRef.current = buildPublishSnapshot(init);
+        }
+      } else if (snapshot && isEqual(snapshot, mountStoreSnapshotRef.current)) {
+        // The premature resume publish — clobbered by the loader anyway.
+        // Bytes that already moved off the mount snapshot (a real mutation
+        // inside the load window) publish normally and re-reconcile below.
+        return;
+      }
+    }
     if (isEqual(snapshot, publishedTravelRef.current)) return;
     publishedTravelRef.current = snapshot;
     onTravelStateChange(snapshot);
+    // init is deliberately NOT a dep: it re-derives from initialTravelState
+    // (below) on every render; the effect must only react to the SETTLE pass.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travelMode, travelPace, destination, path, pathIndex, accruedCost,
-      dailyBudget, dayExhausted, forcedMarchHours, onTravelStateChange]);
+      dailyBudget, dayExhausted, forcedMarchHours, initialTravelState,
+      onTravelStateChange]);
 
   // File→store adoption (improve 2026-10-26-D, second half of the lane).
   // The loader resolves the map document ASYNC, so on a cold mount the
