@@ -1,4 +1,6 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import cloneDeep from 'lodash/cloneDeep';
+import isEqual from 'lodash/isEqual';
 import './CharacterCreationWizard.css';
 import { validateStep, validateFinalFormData, validateAbilityTotals, hasDuplicateCharacterName, DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
@@ -170,6 +172,31 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     updateInventory,
     resetErrors,
    } = useWizardForm(characterData, isEditing);
+
+  // Unsaved-changes guard: deep-compare formData against the initial draft
+  // snapshot on any close request (footer Cancel / header ×). A modified
+  // draft asks for confirmation that names the character (house NAMED-confirm
+  // pattern, mirrors the delete confirms); an unmodified draft closes
+  // silently. Post-save the parent unmounts the wizard, so no double-prompt.
+  const initialSnapshotRef = useRef(null);
+  if (initialSnapshotRef.current === null) {
+    initialSnapshotRef.current = cloneDeep(formData);
+  }
+
+  const handleRequestClose = useCallback(() => {
+    if (!isEqual(formData, initialSnapshotRef.current)) {
+      const trimmedName = (formData.name || '').trim();
+      const message = isEditing
+        ? `Discard changes to "${trimmedName || characterData?.name || 'this character'}"?`
+        : trimmedName
+          ? `Discard changes to "${trimmedName}"?`
+          : 'Discard this new character draft?';
+      if (!window.confirm(message)) {
+        return;
+      }
+    }
+    onCancel();
+  }, [formData, isEditing, characterData, onCancel]);
 
   // Ruleset state (needed by data hook)
   const [ruleset, setRuleset] = useState(characterData?.rules ?? null);
@@ -567,7 +594,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         <div className="character-creation-wizard">
           <WizardHeader
           title={isEditing ? "Edit Character" : "Create New Character"}
-          onClose={onCancel}
+          onClose={handleRequestClose}
           />
           <WizardProgressBar
           currentStep={currentStep}
@@ -592,7 +619,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
           currentStep={currentStep}
           isFirstStep={isEditing ? currentStep === 2 : currentStep === 1}
           isLastStep={currentStep === lastCanonicalStep}
-          onCancel={onCancel}
+          onCancel={handleRequestClose}
           onPrevious={navigatePrevious}
           onNext={handleNext}
           onSubmit={handleSubmit}

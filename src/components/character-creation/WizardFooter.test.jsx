@@ -9,9 +9,9 @@ import WizardFooter from './WizardFooter.jsx';
 // CharacterCreationWizard.submission.test.jsx; do not restate it here.
 const POSITION_CASES = [
   { name: 'first step', props: { isFirstStep: true, isLastStep: false },
-    buttons: [['Cancel', true, 'btn btn-secondary'], ['Next', false, 'btn btn-primary']] },
+    buttons: [['Cancel', false, 'btn btn-secondary'], ['Next', false, 'btn btn-primary']] },
   { name: 'first step, Next disabled', props: { isFirstStep: true, isLastStep: false, isNextDisabled: true },
-    buttons: [['Cancel', true, 'btn btn-secondary'], ['Next', true, 'btn btn-primary']] },
+    buttons: [['Cancel', false, 'btn btn-secondary'], ['Next', true, 'btn btn-primary']] },
   { name: 'middle step', props: { isFirstStep: false, isLastStep: false },
     buttons: [['Previous', false, 'btn btn-secondary'], ['Next', false, 'btn btn-primary']] },
   { name: 'last step (create)', props: { isFirstStep: false, isLastStep: true },
@@ -19,12 +19,13 @@ const POSITION_CASES = [
   { name: 'last step (edit)', props: { isFirstStep: false, isLastStep: true, isEditing: true },
     buttons: [['Previous', false, 'btn btn-secondary'], ['Save Changes', false, 'btn btn-success']] },
   { name: 'single step (create)', props: { isFirstStep: true, isLastStep: true },
-    buttons: [['Cancel', true, 'btn btn-secondary'], ['Create Character', false, 'btn btn-success']] },
+    buttons: [['Cancel', false, 'btn btn-secondary'], ['Create Character', false, 'btn btn-success']] },
   { name: 'single step (edit)', props: { isFirstStep: true, isLastStep: true, isEditing: true },
-    buttons: [['Cancel', true, 'btn btn-secondary'], ['Save Changes', false, 'btn btn-success']] },
+    buttons: [['Cancel', false, 'btn btn-secondary'], ['Save Changes', false, 'btn btn-success']] },
 ];
 
 const CLICK_CASES = [
+  ['Cancel', { isFirstStep: true, isLastStep: false }, 'onCancel'],
   ['Previous', { isFirstStep: false, isLastStep: false }, 'onPrevious'],
   ['Next', { isFirstStep: false, isLastStep: false }, 'onNext'],
   ['Create Character', { isFirstStep: false, isLastStep: true }, 'onSubmit'],
@@ -55,8 +56,9 @@ describe('WizardFooter', () => {
     }
   });
 
-  // Cancel is permanently disabled on the first step — its disabled state
-  // is pinned in the table above; never click a disabled button.
+  // Cancel is clickable on the first step (its guard-prompting behavior is
+  // owned by CharacterCreationWizard.close-guard.test.jsx — here we only pin
+  // that the footer routes the click to onCancel and nothing else).
   it.each(CLICK_CASES)('clicking %s fires only that callback', (label, props, handler) => {
     const all = createProps();
     render(<WizardFooter {...all} {...props} />);

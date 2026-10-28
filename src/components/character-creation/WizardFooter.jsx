@@ -11,10 +11,12 @@ function WizardFooter({
 }) {
   return (
      <div className="wizard-footer">
+       {/* Cancel must be clickable on the first step — the wizard's
+           unsaved-changes guard (CharacterCreationWizard handleRequestClose)
+           decides whether closing prompts or happens silently. */}
        <button 
         className="btn btn-secondary" 
         onClick={isFirstStep ? onCancel : onPrevious}
-        disabled={isFirstStep}
        >
          {isFirstStep ? 'Cancel' : 'Previous'}
        </button>
