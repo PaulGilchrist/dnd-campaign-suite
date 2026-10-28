@@ -36,3 +36,21 @@ Pick one intentionally:
 
 ## Severity
 **Data integrity risk** — a whole-campaign replace (restore from snapshot, upload backup, full reset) leaves every other connected client silently operating on, and writing back, pre-replace state indefinitely.
+
+## Resolution
+**FIXED 2026-10-28.** Root cause confirmed exactly as diagnosed: `reloadCampaign()` (server `campaigns-admin.js:396-400`) publishes `reload-<campaign>` with `data: null` on every rollback/upload/full-reset, and the client dropped it — `App.jsx handleRuntimeEvent` null-data guard (`event.data == null && !key.startsWith('change-<campaign>-')`) rejected the frame before any handler, and a repo-wide grep found zero consumers of a `reload-` key.
+
+**Fix (option (a) — wire the consumer):** a new self-subscribing banner component consumes the frame; no server or dispatch-table changes.
+
+- `src/components/common/CampaignReloadNotice/CampaignReloadNotice.jsx` (new) — subscribes via the shared `subscribeToSSE(campaignName, …)` lane (same pattern as `useLog`), listens ONLY for `key === 'reload-<campaign>'`, and shows a fixed-top `role="alert"` banner ("This campaign was replaced on the server… Reload / Dismiss"). Reload = `window.location.reload()`; Dismiss hides until the next frame; the banner resets on campaign switch. The initiating tab is excluded by the existing sessionStorage `postRestoreNotice` marker (it writes it immediately before its own `reload()`; the guard covers the window where the SSE fan-out echoes back before navigation). UI-only ephemeral state — no game state touched, server remains truth.
+- `src/components/common/CampaignReloadNotice/CampaignReloadNotice.css` (new) — scoped styles; colors mirror the `.admin-status--error` warning lane; buttons ride the global `.ct-container .ct-*` classes. No inline styles, no `!important`.
+- `src/App.jsx` — 2-line mount only (`<CampaignReloadNotice campaignName={campaignName} />` beside `<Subscriber>`). Deliberately NOT wired into `handleRuntimeEvent`: App sits at its `max-statements` 60 ceiling, and a self-subscribing component (precedent: `useLog`, `PartyInventory`) keeps the shared single-SSE-client invariant with zero added statements.
+- `src/components/common/CampaignReloadNotice/CampaignReloadNotice.reload-broadcast.test.jsx` (new) — 6 tests: null-data reload frame surfaces banner; Reload calls `location.reload()`; Dismiss hides and a later frame re-shows; foreign-campaign `reload-*` and ordinary `change-`/`log-` frames stay inert; initiating tab (postRestoreNotice present) never banners; unmount unsubscribes.
+
+Both 5e and 2024 lanes unaffected — the broadcast lane is ruleset-neutral.
+
+**Verification:**
+- Live repro re-run pre-fix (this session): Tab B NPC view kept deleted `QA Bugfix Reload` after curl rollback, `window.__noReload` survived, no banner — bug confirmed.
+- Live re-verification post-fix, two tabs on :5173 dev:locked, header `test-campaign` verified every hop: curl rollback → passive tab shows the banner within ~2s (marker intact = no forced reload); clicking Reload recovers (list = `[Marta Copperkettle]`, matches disk); Dismiss hides; a UI-initiated rollback from Tab A's Admin shows the banner on Tab B while Tab A self-reloads with its `postRestoreNotice` "Campaign restored from …" banner (initiating lane intact); normal `npcs`-list SSE cross-tab mirroring still works live.
+- Tests: new file 6/6; all 7 sibling `src/App.*.test.jsx` + `subscriber.test.jsx` = 81/81 pass. `npm run lint` clean (zero warnings).
+- Cleanup: probe NPC removed by the recovery rollback; change-data `{}` + log `[]` GET-verified from closed-tab quiet state.

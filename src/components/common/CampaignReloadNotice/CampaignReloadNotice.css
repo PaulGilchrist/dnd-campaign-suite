@@ -1,0 +1,34 @@
+/* Campaign-replace banner (bug-admin-reload-broadcast-no-consumer): fixed
+   overlay so it is visible from any view without disturbing layout.
+   Colors mirror the .admin-status--error warning lane (CampaignAdmin.css);
+   button styling comes from the global .ct-container .ct-* classes. */
+
+.campaign-reload-notice {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  background: #7c2d12;
+  color: #fecaca;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.campaign-reload-notice-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.campaign-reload-notice-text {
+  font-weight: 600;
+}
+
+.campaign-reload-notice .campaign-reload-notice-btn {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+}
