@@ -63,7 +63,12 @@ export const updateEncounter = async (campaignName, encounterName, data) => {
     });
     if (!response.ok) {
       const { error } = await response.json();
-      throw new Error(error || 'Failed to update encounter');
+      const wrapped = new Error(error || 'Failed to update encounter');
+      // Status attached so the update-save lane can tell a vanished row (404)
+      // apart from generic save failures and fall back to the create-name
+      // modal instead of dead-ending on a stale attached name.
+      wrapped.status = response.status;
+      throw wrapped;
     }
     return await response.json();
   } catch (error) {

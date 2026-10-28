@@ -24,7 +24,9 @@ vi.mock('../../services/encounters/encountersService.js', () => ({
 
 // Mutating operations that follow the same contract: delegate to the service
 // with (campaignName, ...args), then reload the encounter list. On failure they
-// console.error with their own prefix and re-throw.
+// console.error with their own prefix and re-throw — EXCEPT updateEncounter,
+// whose wrapper stays 0-console (c5d784d1f single-layer fingerprint: the
+// service logs once, EncounterBuilder owns the user-facing copy).
 const mutatingOps = [
   {
     label: 'saveEncounter',
@@ -38,8 +40,8 @@ const mutatingOps = [
     service: mockUpdateEncounter,
     hookFn: 'updateEncounter',
     args: ['goblin-ambush', { monsters: ['hobgoblin'], difficulty: 'medium' }],
-    logPrefix: 'Failed to update encounter:',
     reloads: false,
+    logs: false,
   },
   {
     label: 'deleteEncounterAction',
@@ -302,6 +304,8 @@ describe('useEncounterManagement', () => {
 
   describe('mutating operations', () => {
     for (const op of mutatingOps) {
+      const logsOnError = op.logs !== false;
+
       it(`${op.label} delegates to the service${op.reloads === false ? ' without reloading the list' : ' and reloads the list'}`, async () => {
         const updatedEncounters = [{ name: `${op.label}-list` }];
         op.service.mockResolvedValue({ success: true });
@@ -322,7 +326,7 @@ describe('useEncounterManagement', () => {
         }
       });
 
-      it(`${op.label} throws error and logs when the service fails`, async () => {
+      it(`${op.label} throws error${logsOnError ? ' and logs' : ' without a wrapper log'} when the service fails`, async () => {
         const failure = new Error(`${op.label} failed`);
         op.service.mockRejectedValue(failure);
 
@@ -338,7 +342,13 @@ describe('useEncounterManagement', () => {
         });
 
         expect(caughtError).toBe(failure);
-        expect(consoleSpy).toHaveBeenCalledWith(op.logPrefix, failure);
+        if (logsOnError) {
+          expect(consoleSpy).toHaveBeenCalledWith(op.logPrefix, failure);
+        } else {
+          // Single-layer logging (c5d784d1f fingerprint): the service owns the
+          // one console.error; this wrapper must stay silent.
+          expect(consoleSpy).not.toHaveBeenCalled();
+        }
         expect(mockLoadEncounters).not.toHaveBeenCalled();
       });
     }

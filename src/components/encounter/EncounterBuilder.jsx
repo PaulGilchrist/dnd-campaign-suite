@@ -375,8 +375,23 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
         await updateEncounter(currentEncounterName, data);
         showToast('Encounter updated');
       } catch (error) {
-        console.error('Failed to update encounter:', error);
-        showToast('Failed to save encounter', true);
+        // No console.error here — the service owns the single log line
+        // (c5d784d1f delete-lane fingerprint: 1 service, 0 wrappers).
+        if (error.status === 404) {
+          // Row deleted elsewhere since Load: name the encounter in the copy,
+          // detach the stale name (toolbar Save flips back to create mode;
+          // `Reset` is no longer the only recovery), and route the surviving
+          // draft straight into the create-name modal so one save lands a
+          // fresh row.
+          const missingName = formatEncounterName(currentEncounterName);
+          setCurrentEncounterName(null);
+          setEncounterTitle('Encounter Builder');
+          setPendingEncounterData(data);
+          openSaveModal();
+          showToast(`Could not update "${missingName}" — it no longer exists. Save it as a new encounter.`, true);
+        } else {
+          showToast('Failed to save encounter', true);
+        }
       }
     } else {
       setPendingEncounterData(data);

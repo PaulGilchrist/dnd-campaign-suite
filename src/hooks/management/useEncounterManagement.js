@@ -97,14 +97,14 @@ function useEncounterManagement(campaignName) {
     }
   }, [campaignName, loadEncounterList]);
 
-  const updateExistingEncounter = useCallback(async (name, data) => {
-    try {
-      await updateEncounter(campaignName, name, data);
-    } catch (error) {
-      console.error('Failed to update encounter:', error);
-      throw error;
-    }
-  }, [campaignName]);
+  // No try/catch here (lint no-useless-catch + c5d784d1f single-layer
+  // fingerprint): the service logs the one console.error, the error passes
+  // through to EncounterBuilder which owns the user-facing copy. Run-S
+  // double-logging (hook + component) is what pinned this lane silent.
+  const updateExistingEncounter = useCallback(
+    (name, data) => updateEncounter(campaignName, name, data),
+    [campaignName]
+  );
 
   return {
     encounters,

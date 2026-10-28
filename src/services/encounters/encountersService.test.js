@@ -145,6 +145,17 @@ describe('encountersService', () => {
     }
   });
 
+  it('updateEncounter attaches the HTTP status to the rejection (404 = vanished row → EB create-modal fallback)', async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 404, json: () => Promise.resolve({ error: 'Encounter not found' }) });
+
+    await expect(updateEncounter(CAMPAIGN, ENCOUNTER, UPDATE_DATA)).rejects.toMatchObject({
+      message: 'Encounter not found',
+      status: 404,
+    });
+    // Still the single-layer fingerprint: one service log, no extra lines.
+    expect(consoleError).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ['goblin-ambush', 'Goblin Ambush'],
     ['dragon-lair.json', 'Dragon Lair'],
