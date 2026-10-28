@@ -137,7 +137,7 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, targetXP,
       <div className="encounter-modal gen-modal">
         <div className="encounter-modal-header">
           <h3><i className="fa-solid fa-wand-magic-sparkles"></i> Generate Encounter</h3>
-          <button className="encounter-modal-close" onClick={onClose}>&times;</button>
+          <button className="encounter-modal-close" onClick={onClose} aria-label="Close">&times;</button>
         </div>
 
         <div className="encounter-modal-body">

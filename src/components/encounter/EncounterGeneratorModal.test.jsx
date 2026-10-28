@@ -200,9 +200,13 @@ describe('EncounterGeneratorModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('the header close button closes without applying', () => {
+  it('the header close button is labelled "Close" (family convention) and closes without applying', () => {
     const { onApply, onClose } = renderModal();
-    fireEvent.click(screen.getByRole('button', { name: '×' }));
+    // Pinned like EncounterModal.test.jsx: role-by-accessible-name. Without
+    // aria-label the × glyph is the whole name and this query resolves zero.
+    const close = screen.getByRole('button', { name: 'Close' });
+    expect(close).toHaveAttribute('aria-label', 'Close');
+    fireEvent.click(close);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onApply).not.toHaveBeenCalled();
   });
