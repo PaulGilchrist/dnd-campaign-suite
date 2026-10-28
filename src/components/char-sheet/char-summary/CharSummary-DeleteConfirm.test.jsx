@@ -178,7 +178,9 @@ describe('CharSummary delete confirm — real component + real hook (fix#36 queu
         await waitFor(() => {
             expect(campaignService.deleteCharacter).toHaveBeenCalledTimes(1);
         });
-        expect(campaignService.deleteCharacter).toHaveBeenCalledWith(mockCampaignName, 'thorin.json');
+        // 'Thorin' → case-preserved 'Thorin.json' (canonical create recipe). The
+        // old lowercased 'thorin.json' guess caused bug-character-delete-sanitizer-mismatch.
+        expect(campaignService.deleteCharacter).toHaveBeenCalledWith(mockCampaignName, 'Thorin.json');
         expect(window.alert).not.toHaveBeenCalled();
 
         await waitFor(() => {

@@ -448,7 +448,9 @@ describe('App - Runtime Events & State Management', () => {
       expect(window.confirm).toHaveBeenCalledTimes(1);
       expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete this character? This action is irreversible.');
       await waitFor(() => {
-        expect(campaignService.deleteCharacter).toHaveBeenCalledWith('test-campaign', 'aragorn.json');
+        // Case-preserved canonical recipe ('Aragorn' → 'Aragorn.json'), NOT the
+        // old lowercase guess (bug-character-delete-sanitizer-mismatch).
+        expect(campaignService.deleteCharacter).toHaveBeenCalledWith('test-campaign', 'Aragorn.json');
       });
       await waitFor(() => {
         expect(screen.queryByTestId('char-btn-Aragorn')).not.toBeInTheDocument();

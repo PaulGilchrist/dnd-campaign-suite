@@ -235,7 +235,9 @@ describe('useCharacterManagement', () => {
       // is gone — confirming here stacked two dialogs per click. This hook
       // is now a straight dispatcher.
       expect(window.confirm).not.toHaveBeenCalled();
-      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'frodo.json');
+      // 'Frodo' → case-preserved 'Frodo.json' (canonical create recipe; the
+      // old lowercased 'frodo.json' was the bug-character-delete-sanitizer-mismatch guess).
+      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'Frodo.json');
       expect(result.current.characters).toEqual([{ name: 'Sam' }]);
     });
 
@@ -260,7 +262,7 @@ describe('useCharacterManagement', () => {
       });
 
       expect(window.confirm).not.toHaveBeenCalled();
-      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'frodo.json');
+      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'Frodo.json');
       expect(result.current.characters).toEqual([{ name: 'Sam' }]);
     });
 

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import * as campaignService from '../../services/campaign/campaignService.js';
+import { characterFileName } from '../../services/campaign/characterFileName.js';
 import { stampElfishLineageRuntime } from '../../services/automation/handlers/class-other/elfishLineageHandler.js';
 import { stampFiendishLegacyRuntime } from '../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
 import { endMageArmorOnDonning } from '../../services/rules/features/mageArmorService.js';
@@ -82,8 +83,8 @@ export function useCharacterWizard(campaignName) {
       ) {
         return;
       }
-      const originalFileName = `${originalCharacter.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
-      const fileName = `${characterData.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+      const originalFileName = characterFileName(originalCharacter.name);
+      const fileName = characterFileName(characterData.name);
       await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);
       // SP-074: inventory step (16) saves are the donning seam — armor newly added
       // to equipped[] ends Mage Armor before any consumer re-reads the sheet (§39).

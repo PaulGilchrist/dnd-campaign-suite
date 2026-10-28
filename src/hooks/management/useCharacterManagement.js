@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import { saveAs } from 'file-saver';
 import * as campaignService from '../../services/campaign/campaignService.js';
+import { characterFileName } from '../../services/campaign/characterFileName.js';
 import utils from '../../services/ui/utils.js';
 
 function useCharacterManagement(campaignName) {
@@ -84,8 +85,7 @@ function useCharacterManagement(campaignName) {
   const handleDeleteCharacter = async (characterName) => {
     if (!campaignName) throw new Error('No campaign selected');
 
-    const fileName = `${characterName.toLowerCase().replace(/\s+/g, '-')}.json`;
-    await campaignService.deleteCharacter(campaignName, fileName);
+    await campaignService.deleteCharacter(campaignName, characterFileName(characterName));
 
     setCharacters(prev => {
       const remaining = prev.filter(char => char.name !== characterName);

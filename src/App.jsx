@@ -16,6 +16,7 @@ import { loadCombatSummary, setCombatSummaryCache } from './services/encounters/
 import storage from './services/ui/storage.js';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/maps/mapsService.js';
+import { characterFileName } from './services/campaign/characterFileName.js';
 import useAppData from './hooks/runtime/useAppData.js';
 import useCharacterManagement from './hooks/management/useCharacterManagement.js';
 import useCampaignManagement from './hooks/management/useCampaignManagement.js';
@@ -47,7 +48,7 @@ import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
   if (event.key.startsWith('character-delete-')) {
     const file = event.key.replace(/^character-delete-.+-/, '');
-    setCharacters(prev => prev.filter(c => `${c.name.replace(/[^a-zA-Z0-9]/g, '_')}.json` !== file));
+    setCharacters(prev => prev.filter(c => characterFileName(c.name) !== file));
   } else if (!event.key.startsWith('character-create-')) {
     const updated = event.data;
     setCharacters(prev => {

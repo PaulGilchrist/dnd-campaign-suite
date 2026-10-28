@@ -11,12 +11,15 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
 import { resolveDiceExpression, evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
+import { characterFileName } from '../../../campaign/characterFileName.js';
 
 async function fetchTargetCharacterData(targetName, campaignName) {
     try {
         const encodedCampaign = encodeURIComponent(campaignName);
-        const fileName = `${targetName.toLowerCase().replace(/\s+/g, '-')}.json`;
-        const response = await fetch(`/api/campaigns/${encodedCampaign}/${encodeURIComponent(fileName)}`);
+        // Canonical create recipe ('_'-sanitized, case-preserved) — the old
+        // lowercase-dash guess 404'd for every multi-word PC name (same bug
+        // class as bug-character-delete-sanitizer-mismatch).
+        const response = await fetch(`/api/campaigns/${encodedCampaign}/${encodeURIComponent(characterFileName(targetName))}`);
         if (response.ok) {
             return await response.json();
         }
