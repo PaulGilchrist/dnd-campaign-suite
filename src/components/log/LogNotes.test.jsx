@@ -16,6 +16,8 @@
 //   "whitespace not submitted" + "preserves textarea when whitespace" → one short-circuit test
 //   "ctrl+enter submits" + "plain enter does not" → one keyboard test (plain leg first,
 //     then ctrl leg; call-count pin covers both without mock surgery)
+// Added later: disable-until-valid post-button pins (empty/whitespace/text/clear states +
+//   disabled-click zero-dispatch) mirroring the .ct-* Save-button canon.
 
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { beforeEach } from 'vitest';
@@ -69,6 +71,25 @@ describe('Log notes', () => {
     fireEvent.click(q('.log-add-btn'));
     expect(mockAddEntry).not.toHaveBeenCalled();
     expect(textarea()).toHaveValue('   ');
+  });
+
+  // ── DISABLE-UNTIL-VALID POST BUTTON (`.ct-*` Save canon) ──
+  it('post button is disabled when empty and whitespace-only, enabled with text, disabled again on clear', () => {
+    setup(Log, []);
+    const btn = q('.log-add-btn');
+    expect(btn).toBeDisabled();
+    fireEvent.change(textarea(), { target: { value: '   ' } });
+    expect(btn).toBeDisabled();
+    fireEvent.change(textarea(), { target: { value: 'note' } });
+    expect(btn).not.toBeDisabled();
+    fireEvent.change(textarea(), { target: { value: '' } });
+    expect(btn).toBeDisabled();
+  });
+
+  it('clicking the disabled (empty-composer) button fires zero dispatches', () => {
+    setup(Log, []);
+    fireEvent.click(q('.log-add-btn'));
+    expect(mockAddEntry).not.toHaveBeenCalled();
   });
 
   it('plain Enter never submits; Ctrl+Enter submits exact payload', async () => {

@@ -94,9 +94,15 @@
     height: 32px;
 }
 
-.log-add-btn:hover {
+.log-add-btn:hover:not(:disabled) {
     background: var(--color-primary-hover);
     border-color: var(--color-primary-hover);
+}
+
+/* Disable-until-valid affordance — mirrors the .ct-btn:disabled canon (App.css) */
+.log-add-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Filter toolbar — the single filter affordance row (client-side only) */

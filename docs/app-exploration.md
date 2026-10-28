@@ -185,7 +185,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run S
 
-- **Log composer posts with an EMPTY note while the button stays ENABLED** — honest double no-op (zero render, zero persist) but silent: app canon elsewhere is disable-until-valid `.ct-*` Save buttons. Suggest disabling the icon-post button when `note.trim()===''` (`src/components/log/Log.jsx` composer).
 - **`Reload list` conflict recovery silently DISCARDS the tab's unsaved edits** — banner copy says "re-apply your edit" and the button closes the editor with the draft lost (`NPCs.jsx` handleReloadList :89-96). Suggest naming the discard (`Reload list — your unsaved edits will be lost`) or re-opening the editor with fresh stamp + retained draft.
 - **EB modal asymmetry:** generator Apply auto-closes the modal but the Load row leaves it open (then intercepts the toolbar Save the user just armed). Consistent close-on-action (or at least an aria-live hint) would remove a click and a class of "nothing happens" confusion.
 - **EB Load/Delete row aria-labels are UNQUOTED (`Delete QA RunS Encounter`) while the confirm copy is NAMED-quoted (`Delete "X"?`)** — cosmetic inconsistency in the accessible-name canon; quoting the aria would match the sheet-family pattern (`Delete "X"` on character sheets).
