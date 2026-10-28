@@ -28,10 +28,14 @@ const jsonResponse = (body, ok = true, { status = 200, contentType = 'applicatio
     json: () => Promise.resolve(body),
 });
 
-function stubFetch({ upload } = {}) {
+function stubFetch({ upload, inspect } = {}) {
     const fetchMock = vi.fn((url) => {
         let result;
-        if (url.endsWith('/admin/upload')) {
+        if (url.endsWith('/admin/upload-inspect')) {
+            // Default: the archive sniff recognises the file (rejection lanes
+            // live in CampaignAdmin.upload-inspect.test.jsx).
+            result = inspect ?? jsonResponse({ entryCount: 2, recognizableCount: 2, recognizable: ['data/', 'Hero.json'] });
+        } else if (url.endsWith('/admin/upload')) {
             result = upload ?? jsonResponse({ message: 'Upload complete' });
         } else if (url.endsWith('/admin/snapshots')) {
             result = jsonResponse({ snapshots: [] });
@@ -69,6 +73,17 @@ const clickModalButton = (name) =>
 
 const statusLine = () => document.querySelector('.campaign-admin > .admin-status');
 
+/**
+ * Pick a zip the default inspect stub recognises and wait for the pre-flight
+ * sniff to resolve — the confirm modal only opens after inspection passes.
+ */
+async function selectRecognisedZip(name = 'garbage.zip') {
+    const file = new File(['zip-bytes'], name, { type: 'application/zip' });
+    fireEvent.change(fileInput(), { target: { files: [file] } });
+    await screen.findByRole('heading', { name: 'Upload Campaign' });
+    return file;
+}
+
 const postCount = (fetchMock, url) =>
     fetchMock.mock.calls.filter(([u, opts]) => u === url && opts?.method === 'POST').length;
 
@@ -89,8 +104,7 @@ describe('CampaignAdmin - Upload cancel resets the file selection', () => {
         const fetchMock = stubFetch();
         renderAdmin();
 
-        selectFile('garbage.zip');
-        expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
+        await selectRecognisedZip('garbage.zip');
         // jsdom's fireEvent.change populates files but not the fakepath value.
         expect(fileInput().files).toHaveLength(1);
 
@@ -103,11 +117,11 @@ describe('CampaignAdmin - Upload cancel resets the file selection', () => {
         await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(0));
     });
 
-    it('the × close button resets the input the same way Cancel does', () => {
+    it('the × close button resets the input the same way Cancel does', async () => {
         stubFetch();
         const { container } = renderAdmin();
 
-        selectFile('garbage.zip');
+        await selectRecognisedZip('garbage.zip');
         fireEvent.click(container.querySelector('.ct-modal-header .ct-modal-close'));
 
         expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
@@ -115,7 +129,7 @@ describe('CampaignAdmin - Upload cancel resets the file selection', () => {
         expect(fileInput().files).toHaveLength(0);
     });
 
-    it('cancel clears a lingering error status so the line reflects the latest action', () => {
+    it('cancel clears a lingering error status so the line reflects the latest action', async () => {
         stubFetch();
         renderAdmin();
 
@@ -123,35 +137,33 @@ describe('CampaignAdmin - Upload cancel resets the file selection', () => {
         selectFile('notes.txt', 'text/plain');
         expect(screen.getByText('Please select a .zip file')).toBeInTheDocument();
 
-        // A valid pick opens the modal (the stale error line still lingers at
-        // this point — that separate backlog nit is out of scope here);
-        // cancelling dismisses both the modal and the stale status.
-        selectFile('garbage.zip');
-        expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
+        // A valid pick runs the pre-flight sniff and opens the modal (the
+        // check clears the line itself as it succeeds); cancelling dismisses
+        // the modal and keeps the line clear either way.
+        await selectRecognisedZip('garbage.zip');
         clickModalButton('Cancel');
 
         expect(statusLine()).toBeNull();
         expect(screen.queryByText('Please select a .zip file')).not.toBeInTheDocument();
     });
 
-    it('re-selecting the SAME file after a cancel re-opens the confirmation modal', () => {
+    it('re-selecting the SAME file after a cancel re-opens the confirmation modal', async () => {
         stubFetch();
         renderAdmin();
 
-        selectFile('garbage.zip');
+        await selectRecognisedZip('garbage.zip');
         clickModalButton('Cancel');
         expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
 
         // Native picker semantics: change only fires because the value was reset.
-        selectFile('garbage.zip');
-        expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
+        await selectRecognisedZip('garbage.zip');
     });
 
     it('the confirm path still uploads the chosen file despite the reset helper', async () => {
         const fetchMock = stubFetch({ upload: jsonResponse({ message: 'Upload complete' }) });
         renderAdmin();
 
-        const file = selectFile('backup.zip');
+        const file = await selectRecognisedZip('backup.zip');
         fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
         const status = await screen.findByText('Upload complete');

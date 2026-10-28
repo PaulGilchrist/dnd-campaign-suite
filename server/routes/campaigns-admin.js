@@ -5,6 +5,7 @@ import os from 'os';
 import * as archiverLib from 'archiver';
 import extractZip from 'extract-zip';
 import multerLib from 'multer';
+import yauzlLib from 'yauzl';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile, campaignSnapshotDir, campaignSnapshotFile, snapshotTimestamp } from '../utils/campaignPaths.js';
 import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish, readFile } from '../utils/changeData.js';
@@ -24,11 +25,14 @@ const upload = multerLib({ storage: multerLib.memoryStorage(), limits: { fileSiz
 const uploadSingle = upload.single('file');
 function uploadWithJsonErrors(req, res, next) {
     uploadSingle(req, res, (err) => {
-        if (!err) return next();
-        console.error(`Upload rejected for ${req.params.campaign}: ${err.message}`);
+        // Gate the Host before reading the error: a foreign client must get
+        // the same 403 here that the route bodies enforce, never a
+        // multer-detail leak.
         if (!isLocalhost(req)) {
             return res.status(403).json({ error: 'Only available on localhost' });
         }
+        if (!err) return next();
+        console.error(`Upload rejected for ${req.params.campaign}: ${err.message}`);
         if (err.code === 'LIMIT_FILE_SIZE') {
             return res.status(413).json({ error: `File too large (limit ${UPLOAD_SIZE_LIMIT / (1024 * 1024)} MB)` });
         }
@@ -345,7 +349,10 @@ router.post('/api/campaigns/:campaign/admin/full-reset', asyncHandler(async (req
 
 // --- Snapshot helpers ---
 
-const SNAPSHOT_RETENTION = 10;
+// Keep at most 4 restore points per campaign (owner cap 2026-10-28; pruned
+// per-campaign in pruneSnapshots — the shared .snapshots/ dir holds every
+// campaign's files but each prune pass only counts its own campaign's).
+const SNAPSHOT_RETENTION = 4;
 
 function listSnapshotFiles(campaign) {
     const snapshotDir = campaignSnapshotDir();
@@ -521,6 +528,79 @@ router.get('/api/campaigns/:campaign/admin/download', asyncHandler(async (req, r
         return entry;
     });
     archive.finalize();
+}));
+
+// --- Upload pre-flight inspection ---
+
+// Top-level entries that are campaign data but never characters (the same
+// exclusion set isCharacterJsonFile uses, plus the known entity data files
+// that live at the archive root or under data/).
+const KNOWN_CAMPAIGN_FILES = new Set(['npcs.json', 'quests.json', 'factions.json', 'settlements.json', 'sessions.json', 'notes.json', 'maps.json']);
+
+// Judge a decoded zip entry path (slash-separated) as a recognizable piece of
+// a campaign backup: the data/ folder, one of the known campaign data files,
+// or a top-level character JSON (shared heuristic with isCharacterJsonFile).
+function isRecognizableCampaignEntry(entryPath) {
+    const segments = entryPath.split('/');
+    if (segments[0] === 'data') return true;
+    if (segments.length > 1) return false;
+    const name = segments[0];
+    if (KNOWN_CAMPAIGN_FILES.has(name)) return true;
+    return isCharacterJsonFile(name);
+}
+
+// Read-only listing of a zip buffer's entry paths via yauzl (extract-zip's
+// own dependency — no new npm dependency). Rejects when the buffer cannot be
+// parsed as a zip archive.
+function readZipEntryPaths(buffer) {
+    return new Promise((resolve, reject) => {
+        yauzlLib.fromBuffer(buffer, { lazyEntries: true }, (err, zipFile) => {
+            if (err || !zipFile) return reject(err || new Error('Could not open the archive'));
+            const names = [];
+            zipFile.on('entry', (entry) => {
+                names.push(entry.fileName);
+                zipFile.readEntry();
+            });
+            zipFile.on('end', () => resolve(names));
+            zipFile.on('error', reject);
+            zipFile.readEntry();
+        });
+    });
+}
+
+// POST /api/campaigns/:campaign/admin/upload-inspect
+// Dry-run companion of /admin/upload: reads the archive's entry names only,
+// never touches campaign data, so the client can reject empty/foreign zips
+// BEFORE the destructive confirm-and-replace flow.
+router.post('/api/campaigns/:campaign/admin/upload-inspect', uploadWithJsonErrors, asyncHandler(async (req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+
+    if (!fs.existsSync(campaignDir(campaign))) {
+        return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    let entryPaths;
+    try {
+        entryPaths = await readZipEntryPaths(req.file.buffer);
+    } catch (err) {
+        console.error(`Upload inspect could not read archive for ${campaign}: ${err.message}`);
+        return res.status(400).json({ error: 'Could not read the archive — it is not a valid zip file' });
+    }
+
+    const recognizable = entryPaths.filter(isRecognizableCampaignEntry);
+    res.json({
+        entryCount: entryPaths.length,
+        recognizableCount: recognizable.length,
+        recognizable: recognizable.slice(0, 10),
+    });
 }));
 
 // POST /api/campaigns/:campaign/admin/upload

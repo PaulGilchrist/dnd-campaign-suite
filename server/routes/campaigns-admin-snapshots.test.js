@@ -161,10 +161,11 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/snapshot', () => 
         expect(second.body.filename).not.toBe(first.body.filename);
     });
 
-    it('should prune snapshots beyond the 10 newest after creating one', async () => {
+    it('should prune snapshots beyond the 4 newest after creating one', async () => {
         ensureCampaign('test-campaign');
         // Mock fs defaults statSync mtime to 2026-01-01 (the newly created snapshot);
-        // existing snapshots are all older (Dec 2025), oldest two must be pruned.
+        // existing snapshots are all older (Dec 2025). With retention 4, the
+        // new snapshot + Dec 09–11 survive and the 8 oldest are pruned.
         const existing = [];
         for (let i = 1; i <= 11; i += 1) {
             const name = `test-campaign-2025-12-${String(i).padStart(2, '0')}T00-00-00-000.zip`;
@@ -179,9 +180,10 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/snapshot', () => 
 
         const pruned = fsMock.rmSync.mock.calls.map(([p]) => p).filter((p) => p.includes('.snapshots'));
         expect(pruned).toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-01T00-00-00-000.zip');
-        expect(pruned).toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-02T00-00-00-000.zip');
+        expect(pruned).toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-08T00-00-00-000.zip');
+        expect(pruned).not.toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-09T00-00-00-000.zip');
         expect(pruned).not.toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-11T00-00-00-000.zip');
-        expect(pruned).toHaveLength(2);
+        expect(pruned).toHaveLength(8);
     });
 });
 

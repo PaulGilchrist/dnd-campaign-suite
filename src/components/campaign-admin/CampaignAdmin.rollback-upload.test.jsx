@@ -5,7 +5,9 @@
  * styling, overlay/content clicks are inert, Cancel/close dismiss without
  * contacting the server), client-side zip validation (the check is by file
  * name, case-sensitive ".zip" is the documented contract, plus the accept
- * filter), POST wiring for /admin/rollback and /admin/upload — including
+ * filter), the archive pre-flight: a valid zip opens the confirm modal only
+ * once /admin/upload-inspect (stubbed recognising by default) resolves —
+ * POST wiring for /admin/rollback and /admin/upload — including
  * URL-encoding of the campaign name, which the data-management sibling
  * encode-checks only for its own routes — one assertion set per terminal
  * outcome (busy/success/error, alert copy, reload semantics), the
@@ -57,11 +59,15 @@ const createDefaultProps = (overrides = {}) => ({
  * OK JSON. A handler may be a response object, an Error (rejects), or a
  * never-settling Promise (busy state).
  */
-function stubFetch({ rollback, upload } = {}) {
+function stubFetch({ rollback, upload, inspect } = {}) {
     const fetchMock = vi.fn((url) => {
         let result;
         if (url.endsWith('/admin/rollback')) {
             result = rollback ?? jsonResponse({ message: 'Rolled back', restored: RESTORED_ZIP });
+        } else if (url.endsWith('/admin/upload-inspect')) {
+            // Default: the archive sniff passes (the upload-inspect sibling
+            // file covers the rejection lanes in detail).
+            result = inspect ?? jsonResponse({ entryCount: 2, recognizableCount: 2, recognizable: ['data/', 'Hero.json'] });
         } else if (url.endsWith('/admin/upload')) {
             result = upload ?? jsonResponse({ message: 'Upload complete' });
         } else if (url.endsWith('/admin/snapshots')) {
@@ -87,6 +93,17 @@ function selectFile(name, type = 'application/zip') {
 }
 
 const clickModalConfirm = () => fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+/**
+ * Pick a zip the default inspect stub recognises and wait for the pre-flight
+ * sniff to resolve — the confirm modal only opens once inspection passes.
+ */
+async function selectRecognisedZip(name = 'backup.zip') {
+    const file = new File(['zip-bytes'], name, { type: 'application/zip' });
+    fireEvent.change(fileInput(), { target: { files: [file] } });
+    await screen.findByRole('heading', { name: 'Upload Campaign' });
+    return file;
+}
 
 /** Number of POSTs the mock received for a given URL. */
 const postCount = (fetchMock, url) =>
@@ -271,7 +288,7 @@ describe('CampaignAdmin - Upload', () => {
             const fetchMock = stubFetch();
             const { container } = renderAdmin({ campaignName: TRICKY });
 
-            selectFile('backup.zip');
+            await selectRecognisedZip('backup.zip');
 
             const heading = screen.getByRole('heading', { name: 'Upload Campaign' });
             const warning = screen.getByText(/replace ALL current campaign data/);
@@ -295,7 +312,7 @@ describe('CampaignAdmin - Upload', () => {
             expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
 
             // Re-open, then dismiss via Cancel too.
-            selectFile('backup.zip');
+            await selectRecognisedZip('backup.zip');
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
             expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
 
@@ -367,7 +384,7 @@ describe('CampaignAdmin - Upload', () => {
                 const fetchMock = stubFetch({ upload: handler });
                 renderAdmin({ campaignName: TRICKY });
 
-                const file = selectFile('backup.zip');
+                const file = await selectRecognisedZip('backup.zip');
                 clickModalConfirm();
 
                 const status = await screen.findByText(statusText);
@@ -397,7 +414,7 @@ describe('CampaignAdmin - Upload', () => {
             const fetchMock = stubFetch({ upload: neverSettles() });
             renderAdmin();
 
-            selectFile('backup.zip');
+            await selectRecognisedZip('backup.zip');
             clickModalConfirm();
 
             const busy = await screen.findByText('Uploading and extracting...');

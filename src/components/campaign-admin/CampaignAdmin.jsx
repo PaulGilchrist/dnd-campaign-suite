@@ -13,6 +13,7 @@ const BUSY_STATUS_TEXT = {
     'snapshotting': 'Creating snapshot...',
     'rolling-back': 'Rolling back...',
     'downloading': 'Preparing download...',
+    'checking-archive': 'Checking archive...',
     'uploading': 'Uploading and extracting...',
     'clearing-change-data': 'Clearing change data...',
     'clearing-log': 'Clearing log...',
@@ -45,6 +46,52 @@ function clearFileInput(input) {
     } catch (_err) {
         input.files = [];
     }
+}
+
+// Read-only pre-flight of a chosen archive: POSTs it to the dry-run
+// /admin/upload-inspect endpoint (which lists zip entries without touching
+// campaign data) and decides whether the destructive confirm gate may open.
+// Fail-closed on every path — an unrecognizable archive, a corrupt one, and
+// any transport/protocol failure in the check itself all abort the flow with
+// a visible status before any POST to /admin/upload can happen. Returns true
+// only when the server reports recognizable campaign content.
+async function inspectUploadArchive(campaignName, file, setStatus, input) {
+    const abort = (message) => {
+        console.error('Upload pre-flight check:', message);
+        setStatus({ error: `Upload aborted — ${message}` });
+        clearFileInput(input);
+        return false;
+    };
+    setStatus('checking-archive');
+    let res;
+    let data;
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/upload-inspect`, {
+            method: 'POST',
+            body: formData
+        });
+        data = await res.json();
+    } catch (err) {
+        return abort(`could not check the archive (${err.message})`);
+    }
+    if (!res.ok) {
+        return abort(data && data.error ? data.error : `archive check failed (HTTP ${res.status})`);
+    }
+    if (!data || typeof data.recognizableCount !== 'number') {
+        return abort('the archive check returned an unreadable response');
+    }
+    if (data.recognizableCount === 0) {
+        setStatus({ error: `No campaign data found in ${file.name} — contains 0 recognizable campaign files` });
+        clearFileInput(input);
+        return false;
+    }
+    // Recognised — release the busy line; the confirm modal carries the UX
+    // from here (Confirm re-posts the file with its own "uploading" status,
+    // Cancel resets the status again).
+    setStatus(null);
+    return true;
 }
 
 function AdminHeader({ campaignName, onBack }) {
@@ -412,10 +459,11 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
 
     const handleUpload = async (e) => {
         const file = e.target.files[0];
+        const input = e.target;
         if (!file) return;
         if (!file.name.endsWith('.zip')) {
             setStatus({ error: 'Please select a .zip file' });
-            clearFileInput(e.target);
+            clearFileInput(input);
             return;
         }
         // Pre-flight size gate mirroring the server's multer limit, so an
@@ -423,9 +471,14 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
         // failed POST round-trip.
         if (file.size > UPLOAD_SIZE_LIMIT_BYTES) {
             setStatus({ error: `File too large (limit ${UPLOAD_SIZE_LIMIT_MB} MB)` });
-            clearFileInput(e.target);
+            clearFileInput(input);
             return;
         }
+        // Read-only server sniff of the archive BEFORE the destructive
+        // confirm gate: an empty/foreign/corrupt zip never reaches a state
+        // where Confirm could wipe the campaign.
+        const recognisable = await inspectUploadArchive(campaignName, file, setStatus, input);
+        if (!recognisable) return;
         setConfirmModal({
             title: 'Upload Campaign',
             message: `This will replace ALL current campaign data for "${campaignName}" with the contents of "${file.name}". A snapshot of the current state will be saved first as a safety net. If the upload or reload fails, the campaign will be automatically rolled back.`,
@@ -466,7 +519,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                     setStatus({ error: err.message });
                     alert(`Upload failed. The request did not complete, so no changes were confirmed.\n\nError: ${err.message}`);
                 }
-                clearFileInput(e.target);
+                clearFileInput(input);
             }
         });
     };
