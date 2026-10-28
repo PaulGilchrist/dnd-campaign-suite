@@ -141,11 +141,10 @@ vi.mock('./components/char-sheet/CharSheet.jsx', async () => {
         ),
         React.createElement(
           'button',
-          // Mirrors the real CharSummary leaf (:626): confirm at the click
-          // point, dispatch only on accept (fix#36 queue — the hook no
-          // longer confirms, so the double must carry the leaf's prompt to
-          // keep this lane's delete flow honest end-to-end).
-          { onClick: () => { if (window.confirm('Are you sure you want to delete this character? This action is irreversible.')) onDeleteCharacter?.(playerSummary?.name); } },
+          // Mirrors the real CharSummary leaf (:626): named confirm at the
+          // click point, dispatch only on accept (fix#36 queue — the hook no
+          // longer confirms; 2026-10-28-P — the prompt names the character).
+          { onClick: () => { if (window.confirm(`Delete character "${playerSummary?.name}"? This action is irreversible.`)) onDeleteCharacter?.(playerSummary?.name); } },
           'Delete Char'
         ),
         React.createElement('button', { onClick: () => onEditCharacter?.() }, 'Edit')
@@ -448,9 +447,11 @@ describe('App - Runtime Events & State Management', () => {
 
       // Single dialog, exact leaf bytes (fix#36 queue: hook guard removed —
       // the name used to appear only in the retired second stacked hook
-      // prompt; the dispatched name is pinned on the deleteCharacter call).
+      // prompt; 2026-10-28-P: the leaf prompt itself now names the character
+      // — the dispatched name is also pinned on the deleteCharacter call).
       expect(window.confirm).toHaveBeenCalledTimes(1);
-      expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete this character? This action is irreversible.');
+      expect(window.confirm).toHaveBeenCalledWith('Delete character "Aragorn"? This action is irreversible.');
+      expect(window.confirm).not.toHaveBeenCalledWith(expect.stringContaining('Legolas'));
       await waitFor(() => {
         // Case-preserved canonical recipe ('Aragorn' → 'Aragorn.json'), NOT the
         // old lowercase guess (bug-character-delete-sanitizer-mismatch).

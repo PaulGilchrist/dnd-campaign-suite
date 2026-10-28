@@ -623,7 +623,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     }
 
     const handleDeleteCharacter = () => {
-        if (window.confirm('Are you sure you want to delete this character? This action is irreversible.')) {
+        // House NAMED-confirm canon (Notes/NPCs/Factions/Sessions/...): the
+        // target is named in the prompt (2026-10-28-P).
+        if (window.confirm(`Delete character "${playerStats.name}"? This action is irreversible.`)) {
             onDeleteCharacter(playerStats.name);
         }
     };
@@ -668,8 +670,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <div className='name-row'>
                         <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
                         <div className='char-btn-group no-print'>
-                            <button className="char-btn" onClick={onEditCharacter} title="Edit Character"><i className="fas fa-pen"></i> Edit</button>
-                            <button className="char-btn" onClick={handleDeleteCharacter} title="Delete Character">Delete</button>
+                            <button className="char-btn" onClick={onEditCharacter} title="Edit Character" aria-label={`Edit "${playerStats.name}"`}><i className="fas fa-pen"></i> Edit</button>
+                            <button className="char-btn" onClick={handleDeleteCharacter} title="Delete Character" aria-label={`Delete "${playerStats.name}"`}>Delete</button>
                             <button className="char-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
                             <button className="char-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
                             <ShortRestButton onClick={() => setShowShortRest(true)} />

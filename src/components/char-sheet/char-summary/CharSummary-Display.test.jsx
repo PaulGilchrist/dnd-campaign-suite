@@ -148,9 +148,13 @@ describe('CharSummary - Display', () => {
         it('renders the character name and the full set of action buttons', () => {
             renderSummary();
             expect(screen.getByText(mockPlayerStats.name)).toBeInTheDocument();
-            for (const label of ['Edit', 'Delete', 'Upload', 'Download']) {
+            for (const label of ['Upload', 'Download']) {
                 expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
             }
+            // Edit/Delete carry named aria-labels (2026-10-28-P) — accessible
+            // name wins over the visible text, pin both spellings.
+            expect(screen.getByRole('button', { name: `Edit "${mockPlayerStats.name}"` })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: `Delete "${mockPlayerStats.name}"` })).toBeInTheDocument();
         });
 
         it.each`
@@ -162,7 +166,7 @@ describe('CharSummary - Display', () => {
             vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
             renderSummary(mockPlayerStats, { onDeleteCharacter });
 
-            fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+            fireEvent.click(screen.getByRole('button', { name: `Delete "${mockPlayerStats.name}"` }));
 
             expect(window.confirm).toHaveBeenCalled();
             expect(onDeleteCharacter).toHaveBeenCalledTimes(confirmed ? 1 : 0);

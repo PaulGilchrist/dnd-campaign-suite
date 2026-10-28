@@ -140,7 +140,10 @@ function DeleteWiringHarness({ campaignName }) {
     );
 }
 
-const LEAF_MESSAGE = 'Are you sure you want to delete this character? This action is irreversible.';
+// Named-confirm copy (2026-10-28-P): house NAMED pattern per Notes/NPCs/
+// Factions/Sessions canon — the target is named; irreversibility clause
+// retained from the campaign-delete sibling.
+const LEAF_MESSAGE = `Delete character "${mockPlayerStats.name}"? This action is irreversible.`;
 const HOOK_MESSAGE = `Are you sure you want to delete '${mockPlayerStats.name}'? This cannot be undone.`;
 
 async function renderHarness() {
@@ -168,12 +171,17 @@ describe('CharSummary delete confirm — real component + real hook (fix#36 queu
     it('single click raises exactly ONE dialog — the leaf message — and dispatches once', async () => {
         await renderHarness();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(screen.getByRole('button', { name: `Delete "${mockPlayerStats.name}"` }));
 
         // One dialog, exact owner bytes, no second stacked hook dialog.
         expect(window.confirm).toHaveBeenCalledTimes(1);
         expect(window.confirm).toHaveBeenCalledWith(LEAF_MESSAGE);
         expect(window.confirm).not.toHaveBeenCalledWith(HOOK_MESSAGE);
+        // Named confirm (2026-10-28-P): the prompt names the VIEWED character
+        // and never a roster sibling — the roster contains 'Sam', whose
+        // delete must not be what this click confirms.
+        expect(LEAF_MESSAGE).toContain(mockPlayerStats.name);
+        expect(window.confirm.mock.calls[0][0]).not.toContain('Sam');
 
         await waitFor(() => {
             expect(campaignService.deleteCharacter).toHaveBeenCalledTimes(1);
@@ -192,10 +200,12 @@ describe('CharSummary delete confirm — real component + real hook (fix#36 queu
         window.confirm = vi.fn(() => false);
         await renderHarness();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(screen.getByRole('button', { name: `Delete "${mockPlayerStats.name}"` }));
 
         expect(window.confirm).toHaveBeenCalledTimes(1);
         expect(window.confirm).toHaveBeenCalledWith(LEAF_MESSAGE);
+        expect(window.confirm.mock.calls[0][0]).toContain(mockPlayerStats.name);
+        expect(window.confirm.mock.calls[0][0]).not.toContain('Sam');
         expect(campaignService.deleteCharacter).not.toHaveBeenCalled();
         expect(_mgmt.current.characters.map(c => c.name)).toEqual([mockPlayerStats.name, 'Sam']);
     });
