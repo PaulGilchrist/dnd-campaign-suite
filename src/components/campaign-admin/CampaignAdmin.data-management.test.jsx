@@ -4,7 +4,10 @@
  * Log, and Full Reset. Covers the confirmation prompt (including declined
  * paths), correct endpoint + URL-encoding of the campaign name, busy state,
  * and success/error status rendering (non-OK response vs rejected fetch —
- * two distinct handler branches).
+ * two distinct handler branches), and the acting-tab reload semantics: Full
+ * Reset reloads on success like the rollback/upload lanes (mirroring the
+ * reload assertions in CampaignAdmin.rollback-upload.test.jsx), while the
+ * sibling clears and every failure path stay put.
  *
  * Other CampaignAdmin flows are covered by sibling files: backup-restore,
  * rollback-upload, rename, delete, rendering, and theme-toggle tests —
@@ -23,18 +26,23 @@ const DATA_ACTIONS = [
         button: 'Clear Change Data',
         path: 'clear-change-data',
         busyText: 'Clearing change data...',
+        reloads: false,
         confirmPattern: /clear all runtime state for ".*" including HP, conditions, spell slots, death saves, and target effects/,
     },
     {
         button: 'Clear Campaign Log',
         path: 'clear-log',
         busyText: 'Clearing log...',
+        reloads: false,
         confirmPattern: /permanently delete the campaign log for ".*"\. Roll history will be lost/,
     },
     {
         button: 'Full Reset',
         path: 'full-reset',
         busyText: 'Performing full reset...',
+        // Success wipes change-data + log server-side; the acting tab must
+        // reload so its React state reflects the wipe (rollback-lane parity).
+        reloads: true,
         confirmPattern: /FULL RESET: This will delete both the campaign log AND all change data/,
     },
 ];
@@ -80,6 +88,9 @@ const countPosts = (fetchMock, url) =>
 
 beforeEach(() => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // Reload is stubbed (same shape as the rollback-upload sibling) so a
+    // successful Full Reset can still be inspected post-"reload".
+    vi.stubGlobal('location', { href: 'http://localhost/', reload: vi.fn() });
 });
 
 afterEach(() => {
@@ -87,7 +98,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern }) => {
+describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern, reloads }) => {
     const url = postUrl(CAMPAIGN, path);
 
     it('asks for confirmation with a data-loss warning and sends nothing when declined', async () => {
@@ -106,7 +117,7 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern
         expect(screen.getByRole('button', { name: button })).toBeEnabled();
     });
 
-    it('posts to /admin/$path exactly once and shows the server success message', async () => {
+    it('posts to /admin/$path exactly once, shows the server success message, and reloads=$reloads', async () => {
         const fetchMock = stubFetch(jsonResponse({ message: `${button} complete` }));
         render(<CampaignAdmin {...createDefaultProps()} />);
 
@@ -118,6 +129,13 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern
         // The action settles: busy text gone, buttons usable again.
         expect(screen.queryByText(busyText)).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: button })).toBeEnabled();
+        // reload is in the same success branch as setStatus, so by the time
+        // the status rendered the decision is final.
+        if (reloads) {
+            await waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
+        } else {
+            expect(window.location.reload).not.toHaveBeenCalled();
+        }
     });
 
     it('shows a busy state and blocks repeat requests while $path is in flight', async () => {
@@ -138,7 +156,7 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern
         expect(window.confirm).toHaveBeenCalledTimes(1);
     });
 
-    it('surfaces the server error message and re-enables the buttons when $path fails', async () => {
+    it('surfaces the server error message and re-enables the buttons without reloading when $path fails', async () => {
         stubFetch(jsonResponse({ error: `${button} declined by server` }, false));
         render(<CampaignAdmin {...createDefaultProps()} />);
 
@@ -147,6 +165,7 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern
         const status = await screen.findByText(`${button} declined by server`);
         expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
         expect(screen.getByRole('button', { name: button })).toBeEnabled();
+        expect(window.location.reload).not.toHaveBeenCalled();
     });
 });
 
@@ -162,6 +181,8 @@ describe('CampaignAdmin - Data Management network failures', () => {
         expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
         expect(countPosts(fetchMock, postUrl(CAMPAIGN, 'full-reset'))).toBe(1);
         expect(screen.getByRole('button', { name: 'Full Reset' })).toBeEnabled();
+        // Transport error: the wipe never happened, the tab stays put.
+        expect(window.location.reload).not.toHaveBeenCalled();
     });
 });
 

@@ -113,7 +113,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run O
 
-- **[2026-10-28-O] Full Reset gives no live feedback to non-acting tabs until reload** — same root as the filed reload-broadcast bug, but even after a manual refresh the acting tab doesn't reload (unlike rollback); consider aligning the two UXes (either both reload, neither + banner).
+*(none — run-O backlog fully consumed: 3 bugs fixed by the e2e-fix-bugs run (8921cdc56, 2aa8fcc51, 72851aa99), 5 polish items resolved by the 2026-10-28 improve run (5098d1e5b, c94103c01 + this run's final commit); dispositions in the run summary and `docs/test-setup-playbook.md` § Improve run 2026-10-28.)*
 
 *(2026-10-27-L backlog fully consumed — 2 implemented, 3 blocked/subsumed; see improve-run commits + `docs/test-setup-playbook.md` § 2026-10-27 improve run for dispositions.)*
 

@@ -346,6 +346,12 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                 setStatus({ error: data.error });
             } else {
                 setStatus({ success: data.message });
+                // Align with the rollback/upload-success lanes: the acting tab
+                // reloads so its React state (sidebar, sheet, runtime store)
+                // reflects the wipe immediately instead of serving stale
+                // in-memory data until the next manual refresh. Other tabs get
+                // the reload notice via the SSE broadcast (CampaignReloadNotice).
+                window.location.reload();
             }
         } catch (err) {
             setStatus({ error: err.message });
