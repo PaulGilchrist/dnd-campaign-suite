@@ -25,7 +25,8 @@
 //   spell_effect→SpellEffectEntry     buff→BuffEntry   music→MusicEntry
 //
 // old->new map: "reverse chronological order" folded into batch order pins (#864:
-// authored order, test never re-sorts); "skips unknown" → exact empty-wrapper bytes;
+// authored order, test never re-sorts); "skips unknown" → generic fallback row pin
+// (bug-log-api-ghost-entries fix — unregistered types render an honest generic row);
 // "empty log"/"loading" → exact authored placeholder strings (#829); two NoteEntry
 // content tests consolidated into one with custom values (same legs, distinct strings).
 
@@ -110,20 +111,19 @@ describe('Log container dispatch', () => {
     });
   });
 
-  it('renders unknown entry types as an honest blank wrapper (no entry markup, no text)', () => {
+  it('routes unknown entry types to the generic fallback row (never a silent ghost)', () => {
     setup(Log, [
       note({ id: 'a', noteText: 'Valid' }),
-      { id: '?', type: 'unknown' },
+      { id: '?', type: 'unknown', message: 'Ghost no more' },
       note({ id: 'b', noteText: 'Also valid' }),
     ]);
-    // Authored fallback: LogEntryRenderer emits a wrapper <div> per entry, but an
-    // unknown type gets no children at all — pin the exact blank, not just absence.
+    // Regression pin (bug-log-api-ghost-entries): an unregistered type renders a
+    // readable generic row (type label + message excerpt), not an empty wrapper.
     const wrappers = Array.from(q('.log-entries').children);
-    expect(wrappers.map(w => w.children.length)).toEqual([1, 0, 1]);
-    expect(wrappers[1].textContent).toBe('');
-    // Scoped to the entries list: the filter bar's type facet legitimately
-    // surfaces 'Unknown' as an option once such entries exist — no entry text.
-    expect(within(q('.log-entries')).queryByText(/unknown/i)).toBeNull();
+    expect(wrappers.map(w => w.children.length)).toEqual([1, 1, 1]);
+    expect(q('.log-entry.log-generic')).toBeInTheDocument();
+    expect(within(q('.log-entries')).getByText('Ghost no more')).toBeInTheDocument();
+    expect(within(q('.log-entries')).getByText('Unknown')).toBeInTheDocument();
   });
 
   it('shows the exact loading placeholder when not initialized', () => {

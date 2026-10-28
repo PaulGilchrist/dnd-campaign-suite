@@ -54,10 +54,13 @@ function saveLogFile() {
 // Exported for L5 server-dice (campaigns-roll.js) — one log pipeline.
 export function addEntry(campaign, entry) {
   const log = loadLog(campaign);
+  // id/timestamp are server-controlled audit fields: spread the incoming entry
+  // FIRST so a client-supplied id or timestamp can never forge identity or
+  // ordering of the shared campaign log.
   const newEntry = {
+    ...entry,
     id: guid.create().toString(),
-    timestamp: Date.now(),
-    ...entry
+    timestamp: Date.now()
   };
   log.push(newEntry);
   logCache.set(campaign, log);

@@ -361,6 +361,21 @@
     word-break: break-word;
 }
 
+/* Generic fallback entries (type not in ENTRY_COMPONENTS — mirrors the note layout) */
+.log-generic .log-generic-type {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+
+.log-generic .log-generic-text {
+    flex: 1;
+    padding-left: 28px;
+    color: var(--color-text);
+    font-size: 0.88rem;
+    word-break: break-word;
+}
+
 /* Travel entries */
 .log-travel {
     border-left: 3px solid #4a90d9;

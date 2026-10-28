@@ -21,6 +21,7 @@ import { SummonsEntry } from './LogSummonsEntry.jsx';
 import { SpellEffectEntry } from './LogSpellEffectEntry.jsx';
 import { BuffEntry } from './LogBuffEntry.jsx';
 import { MusicEntry } from './LogMusicEntry.jsx';
+import { GenericEntry } from './LogGenericEntry.jsx';
 
 const ENTRY_COMPONENTS = {
   roll: RollEntry,
@@ -49,8 +50,10 @@ const ENTRY_COMPONENTS = {
 };
 
 function LogEntryRenderer({ entry }) {
-  const EntryComponent = ENTRY_COMPONENTS[entry.type];
-  return <div>{EntryComponent && <EntryComponent entry={entry}/>}</div>;
+  // Unregistered types fall back to a generic row so stored entries are never
+  // silently invisible in the shared log (bug-log-api-ghost-entries).
+  const EntryComponent = ENTRY_COMPONENTS[entry.type] || GenericEntry;
+  return <div>{<EntryComponent entry={entry}/>}</div>;
 }
 
 // Presentational filter toolbar (display-only; state lives in Log via useState).
@@ -155,7 +158,7 @@ export default function Log({ campaignName, characters }) {
 
   const filteredEntries = useMemo(() => filterLogEntries(logEntries, filters), [logEntries, filters]);
   const typeOptions = useMemo(
-    () => [...new Set(logEntries.map(entry => entry.type))].sort(),
+    () => [...new Set(logEntries.map(entry => entry.type).filter(Boolean))].sort(),
     [logEntries]
   );
   const rollTypeOptions = useMemo(() => getRollTypeOptions(logEntries), [logEntries]);

@@ -745,20 +745,22 @@ describe('Edge cases and error handling', () => {
         expect(res.body.message).toBe('');
     });
 
-    it('should allow entry to provide its own timestamp (spread merges after generated fields)', async () => {
+    it('rejects a client-supplied timestamp: the server Date.now() always wins (bug-log-api-ghost-entries)', async () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
-        const customTimestamp = 9999999;
+        const before = Date.now();
         const res = await request(app)
             .post('/api/campaigns/test-campaign/log')
-            .send({ type: 'test', message: 'Custom time', timestamp: customTimestamp });
+            .send({ type: 'test', message: 'Custom time', timestamp: 9999999 });
 
         expect(res.status).toBe(200);
-        // The spread operator ...entry comes after id/timestamp, so entry's timestamp wins
-        expect(res.body.timestamp).toBe(customTimestamp);
+        // Regression pin: the entry spread comes FIRST and id/timestamp are forced
+        // after it, so a forged client timestamp can never affect audit ordering.
+        expect(res.body.timestamp).not.toBe(9999999);
+        expect(res.body.timestamp).toBeGreaterThanOrEqual(before);
     });
 
-    it('should allow entry to provide its own id (spread merges after generated fields)', async () => {
+    it('rejects a client-supplied id: the server always mints the uuid (bug-log-api-ghost-entries)', async () => {
         ensureCampaign('test-campaign');
         const app = createTestApp();
         const res = await request(app)
@@ -766,8 +768,36 @@ describe('Edge cases and error handling', () => {
             .send({ id: 'my-custom-id', type: 'test', message: 'Custom id' });
 
         expect(res.status).toBe(200);
-        // The spread operator ...entry comes after id/timestamp, so entry's id wins
-        expect(res.body.id).toBe('my-custom-id');
+        // Regression pin: client-forged ids are overridden by the server uuid.
+        expect(res.body.id).not.toBe('my-custom-id');
+        expect(typeof res.body.id).toBe('string');
+        expect(res.body.id.length).toBeGreaterThan(10);
+    });
+
+    it('keeps the forged fields out of the stored cache and the SSE broadcast', async () => {
+        ensureCampaign('test-campaign');
+        const app = createTestApp();
+        const { publish } = await import('../utils/changeData.js');
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/log')
+            .send({ id: 'FORGED-ID', timestamp: 1, type: 'note', message: 'TS FORGE PROBE' });
+
+        expect(res.body.type).toBe('note');
+        expect(res.body.message).toBe('TS FORGE PROBE');
+
+        const stored = logModule.logCache.get('test-campaign');
+        expect(stored.at(-1)).toMatchObject({
+            id: res.body.id,
+            timestamp: res.body.timestamp,
+            message: 'TS FORGE PROBE',
+        });
+        expect(stored.at(-1).id).not.toBe('FORGED-ID');
+        expect(stored.at(-1).timestamp).not.toBe(1);
+
+        expect(publish).toHaveBeenCalledWith('log-test-campaign', expect.objectContaining({
+            id: res.body.id,
+            timestamp: res.body.timestamp,
+        }), 'test-campaign');
     });
 });
 
