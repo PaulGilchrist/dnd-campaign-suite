@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import cloneDeep from 'lodash/cloneDeep';
+import isEqual from 'lodash/isEqual';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
@@ -33,6 +35,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   // Consumed in handleCloseModal — the first safe moment to re-sync — so the
   // conflict guidance ("reload the list and re-apply") actually works in-view.
   const missedListBroadcast = useRef(false);
+  // Deep snapshot of the draft the editor was seeded with (edit/new/generate).
+  // Powers the unsaved-edits check in handleReloadList — mirrors the wizard's
+  // close-guard (CharacterCreationWizard.jsx initialSnapshotRef).
+  const draftSnapshot = useRef(null);
 
   // Single choke point for the banner: every message carries whether it was a
   // conflict, so the "Reload list" action can never outlive its error copy.
@@ -64,26 +70,33 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   const handleNewNPC = () => {
     showError(null);
     setModalInitialTab('roleplay');
-    openNew(getDefaultFormData());
+    const seed = getDefaultFormData();
+    draftSnapshot.current = cloneDeep(seed);
+    openNew(seed);
   };
 
   const handleGenerateNPC = async () => {
     const generated = await generateNPC(npcs);
     showError(null);
     setModalInitialTab('roleplay');
-    openNew(getDefaultFormData(generated));
+    const seed = getDefaultFormData(generated);
+    draftSnapshot.current = cloneDeep(seed);
+    openNew(seed);
   };
 
   const handleEditNPC = (npc, tab = 'roleplay') => {
     showError(null);
     setModalInitialTab(tab);
     openEdit(npc);
-    setFormData(getDefaultFormData(npc));
+    const seed = getDefaultFormData(npc);
+    draftSnapshot.current = cloneDeep(seed);
+    setFormData(seed);
   };
 
   const handleCloseModal = () => {
     showError(null);
     closeModal();
+    draftSnapshot.current = null;
     // A broadcast skipped while editing, or a save the server rejected, means
     // the list rows are stale — refresh now so the next reopen seeds a fresh
     // row (and a re-applied edit saves clean) instead of looping on 409.
@@ -95,8 +108,20 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
   // One-click guided recovery for the 409 banner: force the sanctioned stale
   // close path (close the editor + consume the list refresh) so the reopen
-  // immediately seeds the fresh row — no trial-and-error.
+  // immediately seeds the fresh row — no trial-and-error. That recovery
+  // throws away the open draft, so with unsaved edits (deep-compare against
+  // the seed snapshot, house NAMED-confirm pattern) the loss is stated up
+  // front and Cancel keeps the banner, editor, and draft fully inert.
   const handleReloadList = () => {
+    if (
+      modalOpen &&
+      formData &&
+      draftSnapshot.current &&
+      !isEqual(formData, draftSnapshot.current) &&
+      !window.confirm('Reload the NPC list and discard your unsaved edits?')
+    ) {
+      return;
+    }
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -187,7 +212,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       const status = await addNPCToInitiative(campaignName, npcForInitiative, onViewInitiative);
       if (status === 'needs-weapon') {
         showError(`${npcForInitiative.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
-        // Modal stays open; bump the key so it remounts showing the Stats tab.
+        // Modal stays open — the saved draft is the new baseline for the
+        // unsaved-edits check (see handleReloadList).
+        draftSnapshot.current = cloneDeep(snapshot);
+        // bump the key so it remounts showing the Stats tab.
         setModalInitialTab('stats');
         setModalKey(k => k + 1);
         return;
