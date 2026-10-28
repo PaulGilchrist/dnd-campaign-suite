@@ -25,3 +25,18 @@ Make the first-travel auto-roll publish the budget through the same helper: in `
 
 ## Severity
 Data integrity risk — wrong move budget (≈33% too generous under storm) for an entire in-game day on every fresh map whose first roll is budget-modding (temperate 1/8 storm; cold/arid also roll wind/extreme), mirrored to all clients and the map file; silent, no error.
+
+## Resolution
+FIXED 2026-10-27 (fix run). The black-box diagnosis was confirmed exactly: the press lane calls `startPlanning()` (writes `travel-mode` into change-data synchronously — `useSyncedState` parks the store value before the POST) and THEN the non-persisted-weather auto-roll lands one render later; by then the mount seed effect's `hasRuntimeValue('campaign', 'travel-mode')` gate was already true, so the weather-modded budget was never published. (The file-weather lane works because the map GET lands weather *before* any press.)
+
+**Fix** (`src/hooks/management/useTravelManagement.js`): dropped the `travel-mode` guard from the `weatherBudgetSeedRef` mount-seed effect — the bug file's suggested alternative — and rewrote the docstring. Safe because the guard only ever double-covered what the remaining gates already pin: the `travel-dailyBudget` key probe (store-first — a live/resume/carry day's stamped budget always wins) and the `initialTravelState` guard (file-trip adoption lane materializes its stamped budget in the same commit the file lands, one effect ABOVE the seed). The first-travel press clears the trip keys but NEVER writes a budget key, so on that lane the seed now writes `floor(base × budgetMod)` from the new roll through the synced lane (server + SSE + the map-file snapshot publisher all follow). No new API surface; same `effectiveBudgetForPace` helper as the camp/reroll/weatherChange seams (ff52b0907 pattern). Travel is ruleset-agnostic — no 2024 twin needed.
+
+**Regression test**: NEW `src/hooks/management/useTravelManagement.first-roll-budget.test.js` (6 tests, rig mirrors `weather-budget-init.test.js`) — pins press→storm seeds 3, wind seeds 3, clear writes base 4, carried budget survives the first roll untouched (store-first), file trip stays the adoption lane, one-shot stands after the press-lane seed.
+
+**Verification**:
+- `npx vitest run` new file: 6/6; touched folders (`src/hooks/management/` + `src/components/hex-map/`): 52 files / 589 tests pass; `npm run lint`: zero warnings.
+- Live repro re-run in test-campaign on a fresh API-created `qa-hex-verify` (outdoor, gridSize 20, no file weather), `Math.random=()=>0.9` forced storm, travel-tool press: panel reads **`0.0 / 3`** (was `0.0 / 4`), `travel-dailyBudget:3` lands in change-data (was absent), map-file `travelState.dailyBudget:3` (was 4).
+- Numeric leg: 6-hex plains route, events suppressed (`Math.random=()=>0.999`) — advances accrue 1.125/hex, **3rd advance REJECTED** (banner "budget exhausted" after 2 moves, accrued pinned 2.25, `travel-dayExhausted:true` persisted). Pre-fix the day grinds to 3.375 = 3 storm hexes.
+- Adjacent sanity: pace chips still re-derive (Slow→`2.3 / 1`, Normal→`2.3 / 3`); advance rows log with Storm weather.
+- Cleanup: qa-hex-fixbug (repro map) + qa-hex-verify (verify map) deleted; change-data `{}` + log `[]` API-verified from a closed-tab quiet state; maps back to [Battle Arena, Test Map].
+

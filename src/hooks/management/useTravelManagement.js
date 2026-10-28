@@ -280,27 +280,28 @@ export default function useTravelManagement({
   }, []);
 
   // Budget-at-mount weather seed (improve 2026-10-26-E): a FRESH mount (no
-  // travel-* keys in change-data — same authority guard as the adoption lane
-  // above, one step stricter: it probes the budget key itself) baked the
-  // un-modded lazy base (4) into travel-dailyBudget before the async map
-  // load could surface the file's persisted weather, so a storm-seeded map
-  // showed base 4 until the first pace/camp/reroll seam re-derived it. Seed
-  // the weather-modded effective budget ONCE via the SAME helper the seams
-  // use. Gates, in order: one-shot ref; weather arrived (loaded file carries
-  // one, or a later first-travel auto-roll — riding those re-derives is the
-  // whole point, the seams below re-publish the budget on their own rolls
-  // and the hasRuntimeValue guard then keeps this silent); change-data
-  // already holds a budget = live/resume day (store-first authority,
-  // navigation-restore + AC2); an in-flight or file trip belongs to the
-  // adoption lane, which already carries its stamped budget. Clear weather
-  // (budgetMod 1) writes the same 4 the default baked (valuesEqual short-
-  // circuits the POST). Rides the mount/load effect — no game timers.
+  // travel-dailyBudget key in change-data — the authority probe is the budget
+  // key itself) baked the un-modded lazy base (4) into travel-dailyBudget
+  // before the async map load could surface the file's persisted weather, so
+  // a storm-seeded map showed base 4 until the first pace/camp/reroll seam
+  // re-derived it. Seed the weather-modded effective budget ONCE via the SAME
+  // helper the seams use. Gates, in order: one-shot ref; weather arrived (the
+  // loaded file carries one, or the FIRST TRAVEL auto-roll lands one — the
+  // press that starts a trip clears the day keys but never a budget key, so
+  // by the time that roll lands travel-mode is already in change-data: the
+  // former hasRuntimeValue('travel-mode') gate silently killed the seed on
+  // this lane all day, bug-hex-first-roll-unseeded-budget — dropped; the
+  // budget-key guard covers the resume authority it used to double-cover);
+  // change-data already holds a budget = live/resume day (store-first
+  // authority, navigation-restore + AC2); an in-flight file trip belongs to
+  // the adoption lane, which already carries its stamped budget. Clear
+  // weather (budgetMod 1) writes the same 4 the default baked (valuesEqual
+  // short-circuits the POST). Rides the mount/load effect — no game timers.
   const weatherBudgetSeedRef = useRef(false);
   useEffect(() => {
     if (weatherBudgetSeedRef.current || !weather || !campaignName) return;
     weatherBudgetSeedRef.current = true;
     if (hasRuntimeValue('campaign', 'travel-dailyBudget')) return;
-    if (hasRuntimeValue('campaign', 'travel-mode')) return;
     if (initialTravelState) return;
     setDailyBudget(effectiveBudgetForPace(travelPace, weather, 0));
   }, [weather, initialTravelState, campaignName, travelPace, effectiveBudgetForPace]); // eslint-disable-line react-hooks/exhaustive-deps
