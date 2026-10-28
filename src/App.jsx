@@ -48,7 +48,19 @@ import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
   if (event.key.startsWith('character-delete-')) {
     const file = event.key.replace(/^character-delete-.+-/, '');
-    setCharacters(prev => prev.filter(c => characterFileName(c.name) !== file));
+    // Ghost-sheet fix (backlog 2026-10-28-P): mirror the local-delete lane's
+    // fallback (useCharacterManagement.js) — if the deleted character is the
+    // one open in the sheet view, reassign activeCharacter to the next
+    // remaining character (cloneDeep, like the local lane) or null when the
+    // roster empties; activeView is left alone (the sheet renders only while
+    // activeCharacter is set). Non-active deletes leave it untouched.
+    setCharacters(prev => {
+      const remaining = prev.filter(c => characterFileName(c.name) !== file);
+      if (activeCharacter && characterFileName(activeCharacter.name) === file) {
+        setActiveCharacter(remaining.length > 0 ? cloneDeep(remaining[0]) : null);
+      }
+      return remaining;
+    });
   } else if (event.key.startsWith('character-create-')) {
     // Create echo (bug-character-create-no-live-mirror): event.data carries the
     // full new character — append it if absent so passive tabs see new party

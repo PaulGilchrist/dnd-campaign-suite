@@ -12,9 +12,11 @@
  *       every client's roster (deduped by name so the creating tab's own
  *       refetch + SSE echo never doubles it — bug-character-create-no-live-
  *       mirror); delete (own describe, own roster)
- *       removes a roster entry by its underscore-sanitized file name
- *       (roster only — the open sheet stays until the server publishes a
- *       new active character, and the API is never re-called).
+ *       removes a roster entry by its underscore-sanitized file name AND,
+ *       when the deleted character is the one open in the sheet, reassigns
+ *       the active character to the next remaining one (or null when the
+ *       roster empties) — mirroring the local-delete lane's fallback —
+ *       while the API is never re-called.
  *     - `pipeline-<campaign>-<key>` mirrors into the runtime store with
  *       skipSync=true (the SSE echo must never re-POST to the server).
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
@@ -653,14 +655,19 @@ describe('App - Runtime Events & State Management', () => {
     });
   });
 
-  // Remote deletes (SSE echoes from another client) touch the roster only —
-  // a sheet another client still holds open stays rendered until the server
-  // publishes a new active character, and the API is never re-called here.
-  // Matches delete file names by underscore sanitization of the display name
-  // ("Sir Basil" → Sir_Basil.json). Own describe: renders its own roster.
+  // Remote deletes (SSE echoes from another client) mirror the local-delete
+  // lane: the roster entry goes, and when the deleted character is the one
+  // open in the sheet the active character falls back to the next remaining
+  // one (cloneDeep(remaining[0])) or null when the roster empties — no ghost
+  // sheet of a deleted character (ghost-sheet backlog, 2026-10-28-P). The
+  // API is never re-called here. Matches delete file names by the canonical
+  // characterFileName() recipe ("Sir Basil" → Sir_Basil.json). Own describe:
+  // renders its own rosters.
   describe('SSE character-delete events', () => {
-    it('removes the roster entry by sanitized file name without re-calling the API', async () => {
+    it('deleting the ACTIVE character reassigns the sheet to the next remaining one, removing the sidebar link without re-calling the API', async () => {
+      // Landing auto-selects the first character, so Sir Basil is open.
       await renderInCampaign([{ name: 'Sir Basil', level: 4 }, { name: 'Legolas', level: 2 }]);
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Sir Basil');
 
       await dispatch({
         key: 'character-delete-other-folder-Sir_Basil.json',
@@ -669,8 +676,35 @@ describe('App - Runtime Events & State Management', () => {
 
       expect(screen.queryByTestId('char-btn-Sir Basil')).not.toBeInTheDocument();
       expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
-      expect(screen.getByTestId('character-name')).toHaveTextContent('Sir Basil');
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Legolas');
       expect(campaignService.deleteCharacter).not.toHaveBeenCalled();
+    });
+
+    it('deleting a NON-active character leaves the open sheet untouched', async () => {
+      await renderInCampaign([{ name: 'Sir Basil', level: 4 }, { name: 'Legolas', level: 2 }]);
+
+      await dispatch({
+        key: 'character-delete-test-campaign-Legolas.json',
+        data: { file: 'Legolas.json' },
+      });
+
+      expect(screen.queryByTestId('char-btn-Legolas')).not.toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Sir Basil')).toBeInTheDocument();
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Sir Basil');
+      expect(screen.getByTestId('character-level')).toHaveTextContent('4');
+    });
+
+    it('deleting the LAST character nulls the active one (sheet unmounts, no ghost)', async () => {
+      await renderInCampaign([{ name: 'Sir Basil', level: 4 }]);
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+
+      await dispatch({
+        key: 'character-delete-test-campaign-Sir_Basil.json',
+        data: { file: 'Sir_Basil.json' },
+      });
+
+      expect(screen.queryByTestId('char-btn-Sir Basil')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
     });
   });
 });
