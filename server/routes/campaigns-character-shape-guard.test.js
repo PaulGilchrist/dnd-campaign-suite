@@ -8,6 +8,13 @@
 // hazard). Both write lanes must 400 with a clear English error and stay
 // fully disk-inert, while legitimate wizard-shaped characters (both rulesets)
 // keep creating/saving normally.
+//
+// Entry-shape leg (2026-10-28 backlog): `abilities` was only checked
+// non-empty, so `[{name:'STR',score:10}]` passed and later threw in
+// computeInitiative (rules-initiative.js:17-18 dereferences the Dexterity
+// entry unconditionally). The guard now requires all six standard entries,
+// each carrying numeric score data (baseScore — the persisted wizard shape —
+// or an already-numeric bonus).
 import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
 import campaignsCharacter from './campaigns-character.js';
@@ -66,14 +73,22 @@ function createTestApp() {
 }
 
 // Wizard-produced minimum: rules.js reads race.name/class.name and assigns
-// inventory.magicItems for BOTH rulesets (rules-magicItems.js:8-11).
+// inventory.magicItems for BOTH rulesets (rules-magicItems.js:8-11). The six
+// standard abilities each carry numeric baseScore — the persisted shape the
+// wizard writes (constants.js DEFAULT_FORM_DATA) and every real campaign file
+// uses; `bonus` itself is computed at load (abilityCalc), never stored.
+const standardAbilities = () => (
+    ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+        .map((name) => ({ name, baseScore: 10, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 }))
+);
+
 const valid5e = {
     name: 'Shape Guard Five',
     rules: '5e',
     level: 1,
     race: { name: 'Human' },
     class: { name: 'Fighter', subclass: { name: 'Champion' } },
-    abilities: [{ name: 'Strength', score: 10 }],
+    abilities: standardAbilities(),
     inventory: { magicItems: [], equipped: [] },
 };
 
@@ -162,6 +177,72 @@ describe('campaignsCharacter — character shape guard (stale-body impostor bug)
             expect(getMockFs().writeFileSync).not.toHaveBeenCalled();
         });
 
+        it('rejects the backlog hazard body abilities:[{name:"STR",score:10}] naming abilities, disk-inert', async () => {
+            mockFreshCampaignDir();
+
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign')
+                .send({ character: { ...valid5e, name: 'Bonusless Hazard', abilities: [{ name: 'STR', score: 10 }] } });
+
+            expect(res.status).toBe(400);
+            expect(res.body.error).toContain('Character is missing required data');
+            expect(res.body.error).toContain('abilities');
+            // the five absent standards are enumerated; `score` alone is not
+            // engine-read score data, so even a present entry without
+            // baseScore/bonus would be flagged
+            expect(res.body.error).toContain('Dexterity');
+            expect(getMockFs().writeFileSync).not.toHaveBeenCalled();
+            expect(publish).not.toHaveBeenCalled();
+        });
+
+        it('rejects six well-named entries whose only score is a non-numeric score field', async () => {
+            mockFreshCampaignDir();
+
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign')
+                .send({ character: {
+                    ...valid5e,
+                    name: 'Score Only',
+                    abilities: standardAbilities().map((a) => ({ name: a.name, score: 10 })),
+                } });
+
+            expect(res.status).toBe(400);
+            expect(res.body.error).toContain('abilities');
+            expect(getMockFs().writeFileSync).not.toHaveBeenCalled();
+        });
+
+        it('rejects an abilities entry with a non-numeric bonus', async () => {
+            mockFreshCampaignDir();
+
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign')
+                .send({ character: {
+                    ...valid5e,
+                    name: 'String Bonus',
+                    abilities: standardAbilities().map(a => (a.name === 'Dexterity' ? { name: a.name, bonus: '3' } : a)),
+                } });
+
+            expect(res.status).toBe(400);
+            expect(res.body.error).toContain('Dexterity');
+            expect(getMockFs().writeFileSync).not.toHaveBeenCalled();
+        });
+
+        it('still creates a well-formed character whose six entries each carry a numeric bonus (derived-form contract)', async () => {
+            mockFreshCampaignDir();
+
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign')
+                .send({ character: {
+                    ...valid5e,
+                    name: 'Bonus Form',
+                    abilities: ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+                        .map((name) => ({ name, bonus: 1 })),
+                } });
+
+            expect(res.status).toBe(201);
+            expect(getMockFs().writeFileSync).toHaveBeenCalled();
+        });
+
         it('rejects a race object with a blank name', async () => {
             mockFreshCampaignDir();
 
@@ -240,6 +321,23 @@ describe('campaignsCharacter — character shape guard (stale-body impostor bug)
             expect(res.status).toBe(400);
             expect(mfs.unlinkSync).not.toHaveBeenCalled();
             expect(mfs.writeFileSync).not.toHaveBeenCalled();
+        });
+
+        it('rejects a PUT body with the backlog hazard abilities:[{name:"STR",score:10}] — disk-inert', async () => {
+            const mfs = getMockFs();
+            mfs.existsSync.mockReturnValue(true);
+            mfs.readFileSync.mockReturnValue(JSON.stringify(valid5e));
+
+            const res = await request(createTestApp())
+                .put('/api/campaigns/test-campaign/Shape_Guard_Five.json')
+                .send({ ...valid5e, abilities: [{ name: 'STR', score: 10 }] });
+
+            expect(res.status).toBe(400);
+            expect(res.body.error).toContain('Character is missing required data');
+            expect(res.body.error).toContain('abilities');
+            expect(mfs.writeFileSync).not.toHaveBeenCalled();
+            expect(mfs.unlinkSync).not.toHaveBeenCalled();
+            expect(publish).not.toHaveBeenCalled();
         });
 
         it('still saves a valid full character (200)', async () => {

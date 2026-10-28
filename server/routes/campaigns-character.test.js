@@ -74,11 +74,17 @@ function createTestApp() {
 }
 
 // Minimal sheet-loadable sections (campaigns-character.js shape guard, run-Q
-// stale-body bug): race/class objects with names + inventory.magicItems array.
+// stale-body bug): race/class objects with names + inventory.magicItems array
+// + all six standard abilities with numeric baseScore (entry-shape guard).
+const standardAbilities = () => (
+    ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+        .map((name) => ({ name, baseScore: 10 }))
+);
+
 const VALID_SECTIONS = {
     race: { name: 'Human' },
     class: { name: 'Fighter', subclass: { name: 'Champion' } },
-    abilities: [{ name: 'Strength', score: 10 }],
+    abilities: standardAbilities(),
     inventory: { magicItems: [], equipped: [] },
 };
 

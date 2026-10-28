@@ -81,11 +81,17 @@ function createTestApp() {
 
 // Minimal sheet-loadable sections (campaigns-character.js shape guard): the
 // 201/200 lanes must send full bodies; the 400-name/400-dupe lanes short-
-// circuit BEFORE the guard and keep their historical payloads.
+// circuit BEFORE the guard and keep their historical payloads. Abilities must
+// carry all six standards with numeric baseScore (entry-shape guard).
+const standardAbilities = () => (
+    ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+        .map((name) => ({ name, baseScore: 10 }))
+);
+
 const VALID_SECTIONS = {
     race: { name: 'Human' },
     class: { name: 'Fighter', subclass: { name: 'Champion' } },
-    abilities: [{ name: 'Strength', score: 10 }],
+    abilities: standardAbilities(),
     inventory: { magicItems: [], equipped: [] },
 };
 

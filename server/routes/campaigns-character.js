@@ -40,10 +40,26 @@ function refuseUnlessGm(req, res) {
 //     without a name, and the wizard hard-gates subclass selection — every
 //     loadable character carries one (run-Q live proof: subclass-less Fighter
 //     throws class.major).
-//   - abilities non-empty → rules-initiative.js:17-18 dereferences the
+//   - abilities entry-shape → rules-initiative.js:17-18 dereferences the
 //     Dexterity entry unconditionally (`dexAbility.bonus` crash for an empty
-//     array — live-proven run R; wizard characters always carry all six).
+//     array OR one lacking the six standard entries — live-proven run R with
+//     `[{name:'STR',score:10}]`; wizard characters always carry all six).
+//     Stored entries carry no `bonus` (it is computed at load from
+//     baseScore/featIncrease/backgroundIncrease/miscIncrease —
+//     abilityCalc.js:11-18 / abilityCalc2024.js:10-23), so a numeric
+//     `baseScore` (the persisted shape every wizard/campaign file uses,
+//     verified against all 12 test-campaign JSONs) or a numeric `bonus`
+//     (already-derived shape) each count as score data. Rejects the
+//     `score`-only impostor the backlog named.
 // Reject such payloads at the write boundary instead of poisoning the sheet.
+const STANDARD_ABILITIES = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+
+// An ability entry is loadable when it carries score data the rules engine
+// can turn into a modifier: a numeric baseScore (persisted form) or a numeric
+// bonus (already-derived form). `score` alone is NOT engine-read data.
+const hasNumericScore = (entry) => !!entry && typeof entry === 'object'
+    && (Number.isFinite(entry.baseScore) || Number.isFinite(entry.bonus));
+
 function missingCharacterSections(character) {
     const namedObject = (v) => v && typeof v === 'object' && !Array.isArray(v) && typeof v.name === 'string' && v.name.trim() !== '';
     const missing = [];
@@ -52,8 +68,16 @@ function missingCharacterSections(character) {
     else if (!namedObject(character.class.major) && !namedObject(character.class.subclass)) {
         missing.push('class.major or class.subclass (an object with a name)');
     }
-    if (!Array.isArray(character.abilities) || character.abilities.length === 0) {
-        missing.push('abilities (a non-empty array)');
+    if (!Array.isArray(character.abilities)) {
+        missing.push('abilities (an array of the six abilities, each with numeric score data)');
+    } else {
+        const byName = new Map(
+            character.abilities.filter((a) => a && typeof a === 'object').map((a) => [a.name, a])
+        );
+        const bad = STANDARD_ABILITIES.filter((name) => !hasNumericScore(byName.get(name)));
+        if (bad.length > 0) {
+            missing.push(`abilities (missing or lacking numeric score data: ${bad.join(', ')})`);
+        }
     }
     if (!character.inventory || typeof character.inventory !== 'object' || Array.isArray(character.inventory) || !Array.isArray(character.inventory.magicItems)) {
         missing.push('inventory.magicItems (an array)');

@@ -8,6 +8,13 @@
 import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
 
+// Shape-guard-compatible: all six standard abilities with numeric baseScore
+// (entry-shape guard in campaigns-character.js).
+const standardAbilities = () => (
+    ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+        .map((name) => ({ name, baseScore: 10 }))
+);
+
 const FILE_SYSTEM = new Map();
 
 function setupFs(entries) {
@@ -109,7 +116,7 @@ describe('campaignsCharacter — POST create localhost authority gate', () => {
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign')
             .set('Host', 'localhost')
-            .send({ campaignName: 'test-campaign', character: { name: 'GMProbe', level: 1, race: { name: 'Human' }, class: { name: 'Fighter', subclass: { name: 'Champion' } }, abilities: [{ name: 'Strength', score: 10 }], inventory: { magicItems: [], equipped: [] } } });
+            .send({ campaignName: 'test-campaign', character: { name: 'GMProbe', level: 1, race: { name: 'Human' }, class: { name: 'Fighter', subclass: { name: 'Champion' } }, abilities: standardAbilities(), inventory: { magicItems: [], equipped: [] } } });
 
         expect(res.status).toBe(201);
         expect(res.body).toHaveProperty('fileName', 'GMProbe.json');
@@ -123,7 +130,7 @@ describe('campaignsCharacter — POST create localhost authority gate', () => {
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign')
             .set('Host', '127.0.0.1')
-            .send({ character: { name: 'LoopbackProbe', level: 1, race: { name: 'Human' }, class: { name: 'Fighter', subclass: { name: 'Champion' } }, abilities: [{ name: 'Strength', score: 10 }], inventory: { magicItems: [], equipped: [] } } });
+            .send({ character: { name: 'LoopbackProbe', level: 1, race: { name: 'Human' }, class: { name: 'Fighter', subclass: { name: 'Champion' } }, abilities: standardAbilities(), inventory: { magicItems: [], equipped: [] } } });
 
         expect(res.status).toBe(201);
         expect(FILE_SYSTEM.has('/mock/campaigns/test-campaign/LoopbackProbe.json')).toBe(true);
