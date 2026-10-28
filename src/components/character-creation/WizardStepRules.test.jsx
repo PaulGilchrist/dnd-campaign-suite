@@ -95,4 +95,30 @@ describe('WizardStepRules', () => {
       expect(document.querySelector('.error-message')).not.toBeInTheDocument();
     }
   });
+
+  // Step-1 blocker hint (parity with the step-2 name gate): derived straight
+  // from the ruleset prop, so a pick clears it on the very same re-render.
+  it('shows the inline blocker hint while no ruleset is selected', () => {
+    renderStep({ ruleset: null });
+
+    const hint = screen.getByText('Select a ruleset to continue');
+    expect(hint).toBeInTheDocument();
+    expect(hint).toHaveClass('error-message');
+  });
+
+  it.each(['5e', '2024'])(
+    'shows no hint once ruleset %s is selected', (ruleset) => {
+      renderStep({ ruleset });
+
+      expect(screen.queryByText('Select a ruleset to continue')).not.toBeInTheDocument();
+      expect(document.querySelector('.error-message')).not.toBeInTheDocument();
+    }
+  );
+
+  it('prefers an explicit errors.ruleset message over the default hint', () => {
+    renderStep({ ruleset: null, errors: { ruleset: 'Please select a ruleset' } });
+
+    expect(screen.getByText('Please select a ruleset')).toBeInTheDocument();
+    expect(screen.queryByText('Select a ruleset to continue')).not.toBeInTheDocument();
+  });
 });

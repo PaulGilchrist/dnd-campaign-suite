@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
 import { DEFAULT_FORM_DATA } from '../../config/constants.js';
-import { DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR } from '../../config/utils.js';
+import { DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR, RULESET_REQUIRED_ERROR } from '../../config/utils.js';
 
 // Data-load boundary only: fixed arrays with the same shape the wizard
 // consumes, so the component tree below it stays fully real. The fixture
@@ -98,6 +98,35 @@ describe('CharacterCreationWizard - Integration', () => {
     // Step order glue: step 2 walks to step 3 (Race), not any other step.
     expect(await screen.findByText('Step 3: Race')).toBeInTheDocument();
     expect(screen.queryByText('Step 2: Basic Information')).not.toBeInTheDocument();
+  });
+
+  // Step-1 ruleset gate (parity with the step-2 name gate, backlog 2026-10-28-P):
+  // a fresh create has NO ruleset (useState seeds from characterData?.rules =
+  // null even though formData.rules defaults to '5e'), so the step itself shows
+  // the inline hint and Next is disabled; sidebar tabs + Save stay locked.
+  it('create flow: ruleset step hard-gates Next with an inline hint until a card is picked', async () => {
+    renderWizard();
+    const next = () => screen.getByRole('button', { name: 'Next' });
+
+    expect(await screen.findByText(RULESET_REQUIRED_ERROR)).toBeInTheDocument();
+    await waitFor(() => expect(next()).toBeDisabled());
+    // Sidebar lane (already gated via step1Valid — pinned so it cannot regress):
+    // later tabs and Save stay locked with no ruleset.
+    expect(screen.getByRole('button', { name: /Basic Information/ })).toBeDisabled();
+    expect(document.querySelector('.sidebar-save')).toBeDisabled();
+
+    // Picking a card clears the hint and auto-advances to Step 2.
+    fireEvent.click(screen.getByTestId('rules-option-5e'));
+    expect(await screen.findByText('Step 2: Basic Information')).toBeInTheDocument();
+    expect(screen.queryByText(RULESET_REQUIRED_ERROR)).not.toBeInTheDocument();
+
+    // Back on step 1 with the ruleset chosen: hint gone, Next re-enabled,
+    // sidebar unlocked.
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(screen.getByText('Select Rules System')).toBeInTheDocument();
+    expect(screen.queryByText(RULESET_REQUIRED_ERROR)).not.toBeInTheDocument();
+    await waitFor(() => expect(next()).toBeEnabled());
+    expect(screen.getByRole('button', { name: /Basic Information/ })).toBeEnabled();
   });
 
   it('live duplicate-name guard blocks advancement with the collision error while the name still collides', async () => {

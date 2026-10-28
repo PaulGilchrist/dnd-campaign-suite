@@ -139,8 +139,8 @@ describe('CharacterCreationWizard - unsaved-changes guard', () => {
       expect(onCancel).not.toHaveBeenCalled();
       expect(container.querySelector('.character-creation-wizard-overlay')).toBeInTheDocument();
       // Draft survived the dismissed confirm — sidebar tab walks back to the
-      // Basic step (re-clicking footer Next from step 1 is the known
-      // lenient-Next backlog quirk, not this guard's lane).
+      // Basic step (the ruleset was already picked here, so footer Next would
+      // advance too; the tab click is this test's direct route).
       fireEvent.click(screen.getByRole('button', { name: /Basic Information/ }));
       await screen.findByText('Step 2: Basic Information');
       expect(screen.getByRole('textbox')).toHaveValue('Aragorn');

@@ -131,7 +131,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run P
 
-- **Wizard step-1 lenient-Next vs strict-Save asymmetry** — Step 2 blocks Next on invalid name, but Step 1 lets you walk Race→…→Special Actions with no ruleset chosen (Save disabled but no inline hint on Step 1 itself); first-time users may click 15 times before noticing the real blocker. Consider making ruleset selection gate Next like the name does. *(2026-10-28-P)*
 - **Character sheet Edit/Delete affordances are unlabeled icon-text buttons** (`Edit`, `Delete` plain) while every other CRUD pane uses aria-labelled controls; delete also uses an unnamed generic confirm string (`Are you sure you want to delete this character?`) vs the app's NAMED-confirm house pattern (NPC/Note/Faction/etc.). Name the character in the confirm + add aria-labels. *(2026-10-28-P)*
 - **Character-delete failure logs two identical console layers** — one failed UI delete prints TWO `Error deleting character:` stacks (`campaignService.deleteCharacter`'s catch + the `handleDeleteCharacter` wrapper in `App.jsx` ~:655) for one user-visible alert; single-warn doctrine says one layer. *(2026-10-28-P)*
 - **NPC bulk-POST clone rows 409 silently on stale `updatedAt`** — copying an existing row verbatim (stamp included) → `created or deleted in another tab` 400/409 with no hint that the STAMP (not the list) collided; test rigs & any future clone feature need a friendlier message or fresh-stamp normalization server-side. *(2026-10-28-P)*

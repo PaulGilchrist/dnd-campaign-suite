@@ -242,6 +242,19 @@ describe('character-creation/utils', () => {
   describe('validateStep', () => {
     const validBasics = { name: 'Test', level: 1, alignment: 'Good' };
 
+    it('step 1 requires a ruleset selection (hard Next gate, parity with the name gate)', async () => {
+      // Missing ruleset blocks regardless of form data (formData.rules defaults
+      // to '5e', so the gate MUST read the context ruleset, not the draft).
+      await expect(utils.validateStep(1, {})).resolves.toEqual({
+        ruleset: 'Select a ruleset to continue',
+      });
+      await expect(utils.validateStep(1, { rules: '5e' }, stepContext({ ruleset: null })))
+        .resolves.toEqual({ ruleset: 'Select a ruleset to continue' });
+      for (const ruleset of ['5e', '2024']) {
+        await expect(utils.validateStep(1, {}, stepContext({ ruleset }))).resolves.toEqual({});
+      }
+    });
+
     it('step 2 accepts valid basics and bubbles up the shared level validator on invalid levels', async () => {
       await expect(utils.validateStep(2, validBasics, stepContext())).resolves.toEqual({});
       for (const level of [0, 21]) {
@@ -340,7 +353,7 @@ describe('character-creation/utils', () => {
     });
 
     it('accepts unrecognized step numbers (nothing to validate)', async () => {
-      for (const step of [undefined, 0, 1, 8, 99]) {
+      for (const step of [undefined, 0, 8, 99]) {
         await expect(utils.validateStep(step, {}, stepContext())).resolves.toEqual({});
       }
     });

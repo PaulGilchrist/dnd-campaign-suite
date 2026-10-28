@@ -152,6 +152,7 @@ export async function validateLevel(level, ruleset = '5e') {
 
 export const DUPLICATE_CHARACTER_NAME_ERROR = 'A character with that name already exists';
 export const CHARACTER_NAME_REQUIRED_ERROR = 'Character name is required';
+export const RULESET_REQUIRED_ERROR = 'Select a ruleset to continue';
 
 /**
  * Case-insensitive duplicate-name lookup over existing character names
@@ -166,6 +167,16 @@ export function hasDuplicateCharacterName(name, existingNames = []) {
   const lower = trimmed.toLowerCase();
   return existingNames.some(n => (n || '').trim().toLowerCase() === lower);
 }
+
+// Step 1 (ruleset) hard-gates Next like the step-2 name gate. Keyed off the
+// ruleset HOOK state (context.ruleset), NOT formData.rules — the draft default
+// is already '5e' before any card is clicked, so formData would never block.
+const validateRulesetStep = (_formData, context) => {
+  if (!context.ruleset) {
+    return { ruleset: RULESET_REQUIRED_ERROR };
+  }
+  return {};
+};
 
 const validateBasicsStep = async (formData, context) => {
   const newErrors = {};
@@ -243,6 +254,7 @@ const validateSkillsStep = async (formData, context) => {
 };
 
 const stepValidators = {
+  1: validateRulesetStep,
   2: validateBasicsStep,
   3: validateRaceStep,
   4: validateSubraceStep,

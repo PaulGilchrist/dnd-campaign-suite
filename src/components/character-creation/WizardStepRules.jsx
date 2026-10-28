@@ -1,6 +1,13 @@
 
 
+import { RULESET_REQUIRED_ERROR } from '../../config/utils.js';
+
 function WizardStepRules({ ruleset, errors, onRulesetChange }) {
+  // Inline blocker hint (parity with the step-2 name gate): visible while no
+  // ruleset is chosen, clears the moment a card is picked. An explicit
+  // validator message (errors.ruleset) takes precedence over the default copy.
+  const rulesetError = errors?.ruleset || (ruleset ? null : RULESET_REQUIRED_ERROR);
+
   return (
     <div className="wizard-step">
       <h2>Select Rules System</h2>
@@ -40,7 +47,7 @@ function WizardStepRules({ ruleset, errors, onRulesetChange }) {
         </div>
       </div>
       
-      {errors?.ruleset && <span className="error-message">{errors.ruleset}</span>}
+      {rulesetError && <span className="error-message">{rulesetError}</span>}
     </div>
   );
 }
