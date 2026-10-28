@@ -208,10 +208,13 @@ describe('EncounterBuilder - additional interactions', () => {
     expect(screen.queryByLabelText('Encounter Name')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save encounter' })).toHaveTextContent('Update');
 
-    // Edit-in-place: second save updates directly — no modal, no new saveEncounter.
+    // Edit-in-place: second save updates directly — no modal, no new saveEncounter —
+    // but the update lane gates the PUT behind a named native overwrite confirm.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Ambush at dawn (revised)' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save encounter' }));
 
+    expect(confirmSpy).toHaveBeenCalledWith('Overwrite encounter "Crag Mole Lair"? This replaces the saved encounter.');
     await waitFor(() => {
       expect(manageSpies.updateEncounter).toHaveBeenCalledTimes(1);
     });

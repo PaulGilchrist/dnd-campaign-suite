@@ -197,19 +197,27 @@ describe('EncounterBuilder - save/load toasts', () => {
     expect(toastNode()).toHaveClass('encounter-toast-error');
   });
 
-  it('toasts "Encounter saved" when updating an already-loaded encounter', async () => {
+  it('toasts "Encounter updated" when updating an already-loaded encounter (confirm accepted)', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const management = renderBuilder();
     await clickLoadRow();
     await waitFor(() => expect(screen.getByText('Encounter: test-encounter')).toBeInTheDocument());
 
     fireEvent.click(screen.getByTitle('Update encounter'));
     await waitFor(() => {
-      expect(toastNode()).toHaveTextContent('Encounter saved');
+      expect(toastNode()).toHaveTextContent('Encounter updated');
     });
+    // Toast honesty: the update lane never claims the create copy.
+    expect(toastNode()).not.toHaveTextContent('Encounter saved');
+    // Exact formatted copy pinned byte-identically in update-save-confirm lane;
+    // here formatEncounterName is mocked to `Encounter: <name>`.
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/^Overwrite encounter ".*test-encounter"\? This replaces the saved encounter\.$/);
     expect(management.updateEncounter).toHaveBeenCalledWith('test-encounter', expect.anything());
   });
 
   it('toasts an error when the update PUT fails', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const failingUpdate = vi.fn().mockResolvedValue(undefined);
     renderBuilder({ updateEncounter: failingUpdate });
     await clickLoadRow();

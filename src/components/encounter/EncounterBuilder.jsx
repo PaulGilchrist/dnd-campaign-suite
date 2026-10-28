@@ -363,9 +363,17 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
       effectiveXP,
       };
     if (currentEncounterName) {
+      // Named native confirm before overwriting durable campaign data — house
+      // canon for destructive/durable mutations (row delete: EncounterModal.jsx:68
+      // `Delete "X"?`; level-change, character/map deletes all confirm). The
+      // toolbar button IS the click point for this lane (no leaf modal), so the
+      // confirm lives here. Cancel = zero network, draft + disk untouched.
+      if (!window.confirm(`Overwrite encounter "${formatEncounterName(currentEncounterName)}"? This replaces the saved encounter.`)) {
+        return;
+      }
       try {
         await updateEncounter(currentEncounterName, data);
-        showToast('Encounter saved');
+        showToast('Encounter updated');
       } catch (error) {
         console.error('Failed to update encounter:', error);
         showToast('Failed to save encounter', true);
