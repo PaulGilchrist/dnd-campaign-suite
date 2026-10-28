@@ -233,8 +233,19 @@ const buildIndoorMapData = (name, body) => ({
 });
 
 // POST /api/campaigns/:campaign/maps - Create a new map
+// GM-only (Paul adjudicated 2026-10-28): travel/hex-event resolution is
+// GM-driven — players may ENTER/LEAVE the active outdoor map (read lanes stay
+// open) but never resolve its events. Live two-tab proof: on a combat-event
+// Accept the spawn POST fires ONLY from the GM tab (the passive client
+// auto-closes its dialog via the SSE clear, zero POSTs); and the spawn lane's
+// authoritative content write is the indoor full-document PUT below, which
+// already 403s non-localhost (:301) — an un-gated POST was therefore never a
+// functional player lane, only an orphan-empty-file hole (a LAN client could
+// litter any campaign with un-writable map files and win the auto-activate
+// race). Mirror the DELETE/rename/activate/desc gate at the handler head.
 router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   const { campaign } = req.params;
+  if (!refuseUnlessGm(req, res)) return;
   const body = req.body;
   const name = body.name;
 
