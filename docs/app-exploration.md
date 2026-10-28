@@ -150,7 +150,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run Q
 
-- **EB "Add Campaign"-class first-input trap for automation**: two `input[type=text]` live above the monster table whose React state ignores programmatic fills, making naive filters look broken — an `aria-label`/`data-testid` on the real monster search would stabilize selectors. (`src/components/encounter/EncounterMonsterTable.jsx`.)
 
 ### Open items — 2026-10-28 run P
 
