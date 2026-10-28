@@ -42,6 +42,17 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
     onClose();
   };
 
+  const handleLoad = async (encounterName) => {
+    // QA backlog 2026-10-28-S: close-on-action parity with this modal's save leg
+    // above and the generator Apply auto-close (bad3f6e86) — arm the draft, then
+    // drop the overlay so the toolbar Save is immediately clickable (no extra ×
+    // click, no pointer-events interception). The parent handleLoadEncounter
+    // catches its own failures (toast copy), so a resolved await always means
+    // the dispatch completed — same success/failure ownership as the save leg.
+    await onLoad(encounterName);
+    onClose();
+  };
+
   const handleRename = async () => {
     if (!newName.trim()) {
       setError('New name is required');
@@ -167,7 +178,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                       <div className="encounter-list-actions">
                         <button
                           className="encounter-btn encounter-btn-sm encounter-btn-primary"
-                          onClick={() => onLoad(enc.name)}
+                          onClick={() => handleLoad(enc.name)}
                           aria-label={`Load ${enc.name}`}
                           disabled={loading}
                         >

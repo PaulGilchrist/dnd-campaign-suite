@@ -185,7 +185,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run S
 
-- **EB modal asymmetry:** generator Apply auto-closes the modal but the Load row leaves it open (then intercepts the toolbar Save the user just armed). Consistent close-on-action (or at least an aria-live hint) would remove a click and a class of "nothing happens" confusion.
 - **EB Load/Delete row aria-labels are UNQUOTED (`Delete QA RunS Encounter`) while the confirm copy is NAMED-quoted (`Delete "X"?`)** — cosmetic inconsistency in the accessible-name canon; quoting the aria would match the sheet-family pattern (`Delete "X"` on character sheets).
 *(2026-10-27-L backlog fully consumed — 2 implemented, 3 blocked/subsumed; see improve-run commits + `docs/test-setup-playbook.md` § 2026-10-27 improve run for dispositions.)*
 
