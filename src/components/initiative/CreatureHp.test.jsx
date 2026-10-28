@@ -3,7 +3,9 @@
 // Owned here (input lane):
 //   status badge thresholds DEAD/BLOODIED/OK vs effective max (jsx:66-67, 89)
 //   lane census: NPC remote badge / summoned numeric / localhost editable / player static (jsx:69-129)
-//   current HP commit: onChange(name, parseInt(v)||0), negatives pass through (jsx:24)
+//   current HP commit (NPC lane): onChange(name, clamped 0..effectiveMax) — bug-initiative-hp-input-no-range-clamp
+//     (high clamps to effective max, negative clamps to 0, input echoes the stored number) (jsx:24-38)
+//   current HP commit (player lane): pass-through — temp-HP overshoot above max is legitimate (jsx:29-36)
 //   Enter key blurs → commits once (jsx:25-27)
 //   max HP commit: onChange(name, clamped current, base max = value - aid - feast); prop is
 //     never mutated — #854 removed direct creature.maxHp/currentHp writes (frozen-pin below) (jsx:40-49)
@@ -93,16 +95,39 @@ describe('CreatureHp', () => {
     });
 
     it.each`
-        inputValue | expectedHp
-        ${'5'}     | ${5}
-        ${'abc'}   | ${0}
-        ${'-5'}    | ${-5}
-    `('current HP blur of "$inputValue" commits onChange(name, $expectedHp)', ({ inputValue, expectedHp }) => {
+        inputValue | expectedHp | echoValue | label
+        ${'5'}     | ${5}       | ${'5'}    | ${'in-range value passes through'}
+        ${'abc'}   | ${0}       | ${'0'}    | ${'non-numeric commits 0'}
+        ${'-5'}    | ${0}       | ${'0'}    | ${'negative clamps to 0'}
+        ${'99'}    | ${7}       | ${'7'}    | ${'overshoot clamps to max'}
+    `('NPC current HP blur of "$inputValue" — $label — commits onChange(name, $expectedHp) and echoes $echoValue', ({ inputValue, expectedHp, echoValue }) => {
         render(<CreatureHp {...props} />);
         const input = currentInput('Goblin');
         input.value = inputValue;
         fireEvent.blur(input);
         expect(props.onChange).toHaveBeenCalledWith('Goblin', expectedHp);
+        expect(input.value).toBe(echoValue);
+    });
+
+    it('player current HP blur passes overshoot/negative through unclamped (temp-HP lane)', () => {
+        render(<CreatureHp {...props} creature={player} />);
+        const input = currentInput('Alice');
+        input.value = '99';
+        fireEvent.blur(input);
+        expect(props.onChange).toHaveBeenCalledWith('Alice', 99);
+        expect(input.value).toBe('99');
+        input.value = '-5';
+        fireEvent.blur(input);
+        expect(props.onChange).toHaveBeenCalledWith('Alice', -5);
+    });
+
+    it('NPC clamp ceiling is the effective max (base + aid increase)', () => {
+        useRuntimeValue.mockImplementation((_, prop) => (prop === 'aidHpMaxIncrease' ? 5 : null));
+        render(<CreatureHp {...props} creature={{ ...npc, currentHp: 1, maxHp: 7 }} />);
+        const input = currentInput('Goblin');
+        input.value = '99';
+        fireEvent.blur(input);
+        expect(props.onChange).toHaveBeenCalledWith('Goblin', 12);
     });
 
     it('Enter in current HP input commits once; other keys do not', () => {

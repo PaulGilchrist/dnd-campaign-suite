@@ -14,14 +14,26 @@ function HpStatusBadges({ isDead, isBloodied }) {
     )
 }
 
-function CurrentHpInput({ creature, currentHp, onChange }) {
+function CurrentHpInput({ creature, currentHp, effectiveMaxHp, onChange }) {
+    const isPlayer = creature.type === 'player'
     return (
         <input
             className="hp-inline-input"
             type="number"
             min={0}
             defaultValue={currentHp}
-            onBlur={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
+            onBlur={(e) => {
+                let value = parseInt(e.target.value) || 0
+                if (!isPlayer) {
+                    // bug-initiative-hp-input-no-range-clamp: monster commits clamp
+                    // into [0, effective max] and the input echoes the stored number
+                    // so the card never shows an impossible value. Players keep
+                    // pass-through (temp-HP overshoot above max is legitimate).
+                    value = Math.max(0, Math.min(value, effectiveMaxHp))
+                    e.target.value = value
+                }
+                onChange(creature.name, value)
+            }}
             onKeyDown={(e) => {
                 if (e.key === 'Enter') e.target.blur()
             }}
@@ -99,7 +111,7 @@ function CreatureHp({ creature, isLocalhost, onChange, isPlayerSummoned }) {
                 </div>
                 <div className="hp-inline-row">
                     <span className="hp-label">HP</span>
-                    <CurrentHpInput creature={creature} currentHp={currentHp} onChange={onChange} />
+                    <CurrentHpInput creature={creature} currentHp={currentHp} effectiveMaxHp={effectiveMaxHp} onChange={onChange} />
                     <span className="hp-sep">/</span>
                     <MaxHpInput creature={creature} effectiveMaxHp={effectiveMaxHp} aidIncrease={aidIncrease} heroesFeastIncrease={heroesFeastIncrease} onChange={onChange} />
                 </div>
@@ -116,7 +128,7 @@ function CreatureHp({ creature, isLocalhost, onChange, isPlayerSummoned }) {
                 <span className="hp-label">HP</span>
                 {isLocalhost ? (
                     <>
-                        <CurrentHpInput creature={creature} currentHp={currentHp} onChange={onChange} />
+                        <CurrentHpInput creature={creature} currentHp={currentHp} effectiveMaxHp={effectiveMaxHp} onChange={onChange} />
                         <span className="hp-sep">/</span>
                         <span className="hp-max-val">{effectiveMaxHp}</span>
                     </>

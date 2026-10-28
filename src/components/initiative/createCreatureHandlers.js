@@ -1,6 +1,7 @@
 import { cloneDeep } from 'lodash'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
+import { addEntry } from '../../services/ui/logService.js'
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
 import { setSessionPhase } from '../../services/combat/sessionService.js'
@@ -24,6 +25,70 @@ function writePlayerHp(creatureName, newValue, oldHp, campaignName) {
     }
 }
 
+// Monster card HP ceiling: base maxHp + runtime Aid/Heroes-Feast increases
+// (mirrors CreatureHp's effectiveMaxHp display). Null when the card carries no
+// numeric max — bare placeholder rows (no maxHp) stay unclamped.
+function monsterHpCap(creature) {
+    const base = Number(creature.maxHp)
+    if (!Number.isFinite(base)) return null
+    const aid = Number(getRuntimeValue(creature.name, 'aidHpMaxIncrease')) || 0
+    const feast = Number(getRuntimeValue(creature.name, 'heroesFeastHpMaxIncrease')) || 0
+    return base + aid + feast
+}
+
+// bug-initiative-hp-input-no-range-clamp: monster commits clamp into
+// [0, effective max]. Math.max(0, …) mirrors applyDamage's death floor, and
+// currentHp <= 0 IS the app's monster death model (no separate dead flag).
+// Max-edit payloads arrive pre-clamped by MaxHpInput against the NEW max, so
+// the third-arg lane must not be re-clamped against the old cap. Players are
+// never routed here (temp-HP overshoot is legitimate sheet state), and the
+// clamp is UI-lane only: the server /combatSummary POST stays free-write
+// for test rigs (playbook §124/§125 maxHp-stamp lanes).
+function clampMonsterCommit(creature, committedHp, isMaxEdit) {
+    if (isMaxEdit) return committedHp
+    const cap = monsterHpCap(creature)
+    if (cap == null) return committedHp
+    return Math.max(0, Math.min(committedHp, cap))
+}
+
+// Threshold stamps mirror applyDamage's resolveHpThreshold/logDamageApplication
+// (HpChangeEntry renders 'Defeated'/'Bloodied' from this byte).
+function resolveOverrideThreshold(oldHp, newHp, maxHp) {
+    if (oldHp > 0 && newHp <= 0) return 'dead'
+    const half = Math.floor(maxHp / 2)
+    if (oldHp > 0 && newHp > 0 && oldHp > half && newHp <= half) return 'bloodied'
+    return null
+}
+
+/**
+ * Audit channel for manual GM HP overrides (bug-initiative-hp-input-no-range-
+ * clamp): every committed card edit writes an hp_change entry in the exact
+ * damage/healing-lane shape (type/targetName/sourceName/delta/currentHp/
+ * maxHp/isHealing/isUnconscious [+threshold]).
+ */
+function logManualHpOverride({ campaignName, creature, oldHp, newHp }) {
+    const isPlayer = creature.type === 'player'
+    const maxHp = isPlayer
+        ? (getRuntimeValue(creature.name, 'hitPoints') ?? newHp)
+        : creature.maxHp
+    const delta = newHp - oldHp
+    const entry = {
+        type: 'hp_change',
+        targetName: creature.name,
+        sourceName: 'GM HP override',
+        delta,
+        currentHp: newHp,
+        maxHp,
+        isHealing: delta > 0,
+        isUnconscious: !isPlayer && newHp <= 0,
+        note: 'Manual GM edit from the initiative card.',
+    }
+    const threshold = resolveOverrideThreshold(oldHp, newHp, maxHp)
+    if (threshold) entry.threshold = threshold
+    addEntry(campaignName, entry)
+        .catch((e) => { console.error('[handleCreatureHpChange] hp_change log failed:', e) })
+}
+
 /**
  * Creates creature operation handlers for the initiative component.
  */
@@ -39,7 +104,16 @@ export function createCreatureHandlers({
     numOfNpc,
     isLocalhost,
 }) {
-    const handleCreatureHpChange = function handleCreatureHpChange(creatureName, newValue, newMaxHp) {
+    // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
+    const writeNpcHp = function writeNpcHp(creature, newValue, oldHp, isMaxEdit, newMaxHp) {
+        creature.currentHp = newValue
+        if (isMaxEdit) creature.maxHp = newMaxHp
+        if (oldHp > 0 && newValue <= 0 && creature.summonedBy && creature.summonSource === 'spell') {
+            vanishSummonAtZeroHp(creature, combatSummary, campaignName)
+        }
+    }
+
+    const handleCreatureHpChange = function handleCreatureHpChange(creatureName, committedHp, newMaxHp) {
         if (!combatSummary) return
         const creature = combatSummary.creatures.find(c => c.name === creatureName)
         if (!creature) return
@@ -49,6 +123,9 @@ export function createCreatureHandlers({
         // MaxHpInput — third arg present ⇒ base max is being re-stamped on the card.
         const isMaxEdit = typeof newMaxHp === 'number'
         const oldHp = isPlayer ? (getRuntimeValue(creature.name, 'currentHitPoints') ?? 0) : creature.currentHp
+        // bug-initiative-hp-input-no-range-clamp: monsters clamp via clampMonsterCommit
+        // (see helper); players stay UNCLAMPED (temp-HP overshoot is legitimate).
+        const newValue = isPlayer ? committedHp : clampMonsterCommit(creature, committedHp, isMaxEdit)
         const delta = newValue - oldHp
         if (delta === 0 && !isMaxEdit) return
 
@@ -63,15 +140,13 @@ export function createCreatureHandlers({
             writePlayerHp(creatureName, newValue, oldHp, campaignName)
         }
         else {
-            creature.currentHp = newValue
-            if (isMaxEdit) creature.maxHp = newMaxHp
-            // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
-            if (oldHp > 0 && newValue <= 0 && creature.summonedBy && creature.summonSource === 'spell') {
-                vanishSummonAtZeroHp(creature, combatSummary, campaignName)
-            }
+            writeNpcHp(creature, newValue, oldHp, isMaxEdit, newMaxHp)
         }
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
+        // Every automation must log: the manual override rides the hp_change
+        // audit channel (repo rule; playbook §19 "judge by hp_change log delta").
+        logManualHpOverride({ campaignName, creature, oldHp, newHp: newValue })
     }
 
     const handleClear = function handleClear() {

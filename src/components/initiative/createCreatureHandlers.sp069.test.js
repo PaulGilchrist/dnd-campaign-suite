@@ -18,6 +18,10 @@ vi.mock('../../services/rules/features/hypnoticPatternService.js', () => ({
 }));
 
 vi.mock('../../services/ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
+vi.mock('../../services/ui/logService.js', () => ({
+    getLog: vi.fn(async () => []),
+    addEntry: vi.fn(async () => ({})),
+}));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
