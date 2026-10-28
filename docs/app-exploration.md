@@ -132,7 +132,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### Open items — 2026-10-28 run P
 
 - **Character-delete failure logs two identical console layers** — one failed UI delete prints TWO `Error deleting character:` stacks (`campaignService.deleteCharacter`'s catch + the `handleDeleteCharacter` wrapper in `App.jsx` ~:655) for one user-visible alert; single-warn doctrine says one layer. *(2026-10-28-P)*
-- **NPC bulk-POST clone rows 409 silently on stale `updatedAt`** — copying an existing row verbatim (stamp included) → `created or deleted in another tab` 400/409 with no hint that the STAMP (not the list) collided; test rigs & any future clone feature need a friendlier message or fresh-stamp normalization server-side. *(2026-10-28-P)*
 - **Campaign create/rename/delete server-side filename/name sanitation** — character names flow to filenames via two DIFFERENT recipes (create `_`-sanitize vs delete lowercase-dash, bug filed) but nothing normalizes the display name itself (trailing spaces `"X "` → `"X_.json"`); one shared util (e.g. `campaigns-character.js` sanitize exported + consumed by client) would prevent the whole bug class. *(2026-10-28-P)*
 
 *(2026-10-27-L backlog fully consumed — 2 implemented, 3 blocked/subsumed; see improve-run commits + `docs/test-setup-playbook.md` § 2026-10-27 improve run for dispositions.)*

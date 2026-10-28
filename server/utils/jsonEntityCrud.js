@@ -24,16 +24,19 @@ function singularize(name) {
 // The per-entity PUT-upsert lanes (npcs, sessions, settlements) share the
 // same 'modified' (hasUpdateConflict) and 'created or deleted'
 // (isResurrectionAttempt) discriminators so the two write paths can never
-// drift apart again.
+// drift apart again. Exception on the array lane only: a stamped row whose
+// echo matches a live row's CURRENT stamp and whose content equals it apart
+// from the id is a verbatim CLONE (copy/rename), accepted and re-stamped —
+// see isVerbatimClone.
 // ---------------------------------------------------------------------------
 
 const STALE_EDIT_ERROR = 'reload the list and re-apply your edit — it was NOT saved.';
 
-function canonicalize(value, stripStamp = false) {
+function canonicalize(value, stripKeys = []) {
   if (Array.isArray(value)) return value.map(item => canonicalize(item));
   if (value && typeof value === 'object') {
     const keys = Object.keys(value)
-      .filter(key => !(stripStamp && key === 'updatedAt'))
+      .filter(key => !stripKeys.includes(key))
       .sort();
     return keys.reduce((acc, key) => {
       acc[key] = canonicalize(value[key]);
@@ -45,7 +48,7 @@ function canonicalize(value, stripStamp = false) {
 
 /** True when two entity snapshots hold identical content (ignoring the stamp). */
 export function sameEntityContent(a, b) {
-  return JSON.stringify(canonicalize(a, true)) === JSON.stringify(canonicalize(b, true));
+  return JSON.stringify(canonicalize(a, ['updatedAt'])) === JSON.stringify(canonicalize(b, ['updatedAt']));
 }
 
 /** True when a save echoes an `updatedAt` stamp for a row disk no longer has —
@@ -54,9 +57,36 @@ export function sameEntityContent(a, b) {
  *  whole-array POST (findConcurrentWrite) and the per-entity PUT-upsert lanes
  *  (npcs/sessions/settlements) so the two can never drift apart again. A
  *  brand-new row carries no echoed stamp (the client never sets updatedAt), so
- *  genuine creates never trip it; legacy un-stamped rows stay bootstrap-writable. */
+ *  genuine creates never trip it; legacy un-stamped rows stay bootstrap-writable.
+ *  The array lane layers ONE exception on top: a stamped row disk doesn't know
+ *  may still be a verbatim clone of a LIVE row (see isVerbatimClone) — the PUT
+ *  lanes keep this discriminator strict (their pinned create contract). */
 export function isResurrectionAttempt(existing, incoming, id) {
   return id != null && !existing && Boolean(incoming) && typeof incoming.updatedAt === 'number';
+}
+
+/** True when a stamped row the sender POSTs under an id disk does not know is
+ *  a verbatim COPY of a live disk row — the clone/copy scenario (a test rig or
+ *  future clone feature copies an existing row, renames it, and carries the
+ *  source's CURRENT stamp along). Two facts make it provably safe: the echoed
+ *  stamp equals a live row's current stamp (the sender read that source fresh —
+ *  it cannot clobber a row it never missed), and the content is byte-identical
+ *  to the source ignoring the stamp and the id (no hidden edit rides along).
+ *  A genuine ghost keeps its resurrection verdict: an echoed stamp no live row
+ *  carries (the source row was deleted elsewhere) or a copy whose content
+ *  differs beyond the id is a same-stamp overwrite attempt and must 409.
+ *  Accepted clones fall through to stampForSave, which gives them a fresh
+ *  stamp on write (no-op normalization — the copy never ships the source's). */
+export function isVerbatimClone(diskEntities, incoming, idField) {
+  if (!incoming || typeof incoming.updatedAt !== 'number') return false;
+  const stripKeys = ['updatedAt', idField];
+  const target = JSON.stringify(canonicalize(incoming, stripKeys));
+  const incomingId = incoming[idField];
+  return (diskEntities || []).some(disk => disk
+    && disk[idField] !== incomingId
+    && disk.updatedAt === incoming.updatedAt
+    && JSON.stringify(canonicalize(disk, stripKeys)) === target
+  );
 }
 
 /** True when the sender's echoed stamp proves it never read the current row. */
@@ -124,8 +154,12 @@ function findConcurrentWrite(diskEntities, incomingEntities, idField, displayFie
     // Resurrection leg (shared discriminator — see isResurrectionAttempt):
     // an incoming row absent from disk that echoes an updatedAt stamp proves
     // the sender read it BEFORE another tab/session deleted it — saving would
-    // silently undo that delete.
-    if (isResurrectionAttempt(existing, incoming, id)) {
+    // silently undo that delete. ONE exception (bug-npc-bulk-post-clone-409):
+    // a stamped row whose echo matches a LIVE disk row's current stamp AND
+    // whose content equals that row's apart from the id is a verbatim clone
+    // (copy/rename), not a ghost — accept it and let stampForSave re-stamp.
+    if (isResurrectionAttempt(existing, incoming, id)
+      && !isVerbatimClone(diskEntities, incoming, idField)) {
       return { id, label: labelFor(existing, incoming, id), reason: 'created or deleted' };
     }
   }

@@ -234,3 +234,70 @@ describe('npcs PUT — deleted-row resurrection guard', () => {
         expect(readDisk()).toHaveLength(2);
     });
 });
+
+// 2026-10-28 improve (bug-npc-bulk-post-clone-409, 2026-10-28-P backlog): the
+// bulk {npcs:[…]} envelope must accept verbatim clone rows (copy of an
+// existing NPC, renamed, source's CURRENT stamp echoed) instead of the
+// misleading 'created or deleted' 409 — while edited copies and ghosts of
+// deleted rows keep their refusal. Rides the shared factory clone leg.
+describe('npcs array POST — verbatim clone rows', () => {
+    const postNpcs = (app, npcs) =>
+        request(app).post(`/api/campaigns/${campaign}/npcs`).send({ npcs });
+
+    const seedMarta = async (app) => {
+        const boot = await postNpcs(app, [marta()]);
+        expect(boot.status).toBe(200);
+        return readDisk()[0]; // stamped by the write
+    };
+
+    it('accepts a renamed clone echoing Marta\'s live stamp (verbatim Marta re-posted too)', async () => {
+        const app = createApp();
+        const stampedMarta = await seedMarta(app);
+
+        // Criterion-7 rig shape: {npcs:[<verbatim Marta row> + <clone>]} —
+        // the clone carries Marta's stamp verbatim from the same GET.
+        const res = await postNpcs(app, [
+            stampedMarta,
+            { ...stampedMarta, name: 'QA Clone' },
+        ]);
+        expect(res.status).toBe(200);
+
+        const [martaAfter, cloneAfter] = readDisk();
+        expect(martaAfter).toEqual(stampedMarta); // stamp NOT churned
+        expect(cloneAfter.name).toBe('QA Clone');
+        expect(cloneAfter.updatedAt).toBeGreaterThanOrEqual(stampedMarta.updatedAt); // fresh stamp (may share ms)
+    });
+
+    it('accepts the verbatim no-op re-post of Marta alone (byte-stable)', async () => {
+        const app = createApp();
+        const stampedMarta = await seedMarta(app);
+        const res = await postNpcs(app, [stampedMarta]);
+        expect(res.status).toBe(200);
+        expect(readDisk()).toEqual([stampedMarta]);
+    });
+
+    it('still 409s an edited copy at the same live stamp (genuine same-stamp overwrite)', async () => {
+        const app = createApp();
+        const stampedMarta = await seedMarta(app);
+        const res = await postNpcs(app, [
+            stampedMarta,
+            { ...stampedMarta, name: 'QA Copy', notes: 'CUSTOMISED' },
+        ]);
+        expect(res.status).toBe(409);
+        expect(res.body.conflict).toBe(true);
+        expect(res.body.error).toContain('NPC "QA Copy" was created or deleted');
+        expect(readDisk().map(n => n.name)).toEqual(['Marta Copperkettle']);
+    });
+
+    it('still 409s a clone whose echoed stamp matches no live row (ghost/unverifiable)', async () => {
+        const app = createApp();
+        const stampedMarta = await seedMarta(app);
+        const res = await postNpcs(app, [
+            stampedMarta,
+            { ...stampedMarta, name: 'QA Ghost', updatedAt: stampedMarta.updatedAt - 1000 },
+        ]);
+        expect(res.status).toBe(409);
+        expect(res.body.error).toContain('NPC "QA Ghost" was created or deleted');
+        expect(readDisk().map(n => n.name)).toEqual(['Marta Copperkettle']);
+    });
+});

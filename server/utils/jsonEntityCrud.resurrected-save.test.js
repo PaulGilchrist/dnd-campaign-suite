@@ -7,7 +7,7 @@
 // no echoed stamp, so creation stays untouched.
 import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
-import { createJsonEntityRouter, isResurrectionAttempt } from '../utils/jsonEntityCrud.js';
+import { createJsonEntityRouter, isResurrectionAttempt, isVerbatimClone } from '../utils/jsonEntityCrud.js';
 
 // In-memory fs mirroring jsonEntityCrud.concurrent-save.test.js
 const mockFsState = new Map();
@@ -149,5 +149,118 @@ describe('isResurrectionAttempt — shared PUT/POST discriminator', () => {
 
     it('never fires without a resolvable id', () => {
         expect(isResurrectionAttempt(null, { updatedAt: 5 }, null)).toBe(false);
+    });
+});
+
+// 2026-10-28 improve (bug-npc-bulk-post-clone-409, 2026-10-28-P backlog): a
+// clone/copy row — an existing row copied VERBATIM (only the idField value
+// changed, source's CURRENT stamp echoed) — must NOT take the misleading
+// 'created or deleted' verdict. The array lane normalizes it (accept + fresh
+// stamp via stampForSave) while the ghost lanes above stay byte-identical 409s.
+describe('jsonEntityCrud — verbatim clone rows (fresh-stamp normalization)', () => {
+    it('accepts a renamed clone echoing the live source row\'s current stamp, re-stamping only the clone', async () => {
+        const app = createApp();
+        await postArray(app, [{ id: 'e1', name: 'one', notes: 'src' }]);
+        const [source] = readDisk();
+
+        // Rig copies e1 verbatim under a new id (idField is 'id' here, so
+        // every other field stays byte-identical), keeping the stamp it read.
+        const res = await postArray(app, [
+            source,
+            { ...source, id: 'e2' },
+        ]);
+        expect(res.status).toBe(200);
+
+        const [oneAfter, copyAfter] = readDisk();
+        // The source row: untouched, stamp NOT churned by the re-post.
+        expect(oneAfter).toEqual(source);
+        // The clone landed with a FRESH stamp (normalization) — it never
+        // ships the source's stamp as a borrowed legacy value; both writes
+        // may share a millisecond, so compare with ≥.
+        expect(copyAfter).toEqual({ ...source, id: 'e2', updatedAt: copyAfter.updatedAt });
+        expect(copyAfter.updatedAt).toBeGreaterThanOrEqual(source.updatedAt);
+    });
+
+    it('accepts the verbatim no-op re-post itself (same id + same stamp + same content), stamp untouched', async () => {
+        const app = createApp();
+        await postArray(app, [{ id: 'e1', name: 'one', notes: 'src' }]);
+        const [source] = readDisk();
+
+        const res = await postArray(app, [source]);
+        expect(res.status).toBe(200);
+        expect(readDisk()).toEqual([source]);
+    });
+
+    it('still 409s an edited copy — same stamp as a live row but content differs beyond the id', async () => {
+        const app = createApp();
+        await postArray(app, [{ id: 'e1', name: 'one', notes: 'src' }]);
+        const [source] = readDisk();
+
+        // Copy-then-customize at the source's live stamp: the acceptance rule
+        // (stamp matches AND content differs) keeps this a genuine conflict —
+        // exactly the ghost shape pinned by the up-to-date-stamp test above.
+        const res = await postArray(app, [
+            source,
+            { ...source, id: 'e2', name: 'edited copy', notes: 'CUSTOM' },
+        ]);
+        expect(res.status).toBe(409);
+        expect(res.body.error).toMatch(/"e2" was created or deleted/);
+        expect(readDisk().map(e => e.id)).toEqual(['e1']);
+    });
+
+    it('still 409s a clone whose echoed stamp matches no live row (deleted twin / unverifiable stamp)', async () => {
+        const app = createApp();
+        await postArray(app, [{ id: 'e1', name: 'one' }]);
+        const [one] = readDisk();
+
+        // Fresh Date.now()-style stamp (or a deleted twin's gone-from-disk
+        // stamp) proves nothing about provenance — the strict guard stands.
+        const res = await postArray(app, [
+            one,
+            { id: 'e2', name: 'one', updatedAt: one.updatedAt + 123456 },
+        ]);
+        expect(res.status).toBe(409);
+        expect(res.body.error).toMatch(/"e2" was created or deleted/);
+        expect(readDisk().map(e => e.id)).toEqual(['e1']);
+    });
+
+    it('keeps the dropped-row leg strict for clones (omitting the source still 409s)', async () => {
+        const app = createApp();
+        await postArray(app, [{ id: 'e1', name: 'one' }]);
+        const [one] = readDisk();
+
+        // A clone POST that also DROPS its source from the envelope would
+        // delete e1 — that list collision is still refused, clone or not.
+        const res = await postArray(app, [{ ...one, id: 'e2' }]);
+        expect(res.status).toBe(409);
+        expect(res.body.error).toMatch(/"e1" was created or deleted/);
+        expect(readDisk().map(e => e.id)).toEqual(['e1']);
+    });
+});
+
+describe('isVerbatimClone — clone-vs-ghost discriminator', () => {
+    const disk = [{ id: 'e1', name: 'one', notes: 'n', updatedAt: 10 }];
+
+    it('flags a copy of a live row sharing its current stamp (only the id differs)', () => {
+        expect(isVerbatimClone(disk, { id: 'e2', name: 'one', notes: 'n', updatedAt: 10 }, 'id')).toBe(true);
+        // NPC lane shape: idField is the name, so a renamed copy is verbatim.
+        const npcDisk = [{ name: 'Marta', notes: 'n', updatedAt: 10 }];
+        expect(isVerbatimClone(npcDisk, { name: 'QA Clone', notes: 'n', updatedAt: 10 }, 'name')).toBe(true);
+    });
+
+    it('ignores id + stamp only — any other content difference disqualifies', () => {
+        expect(isVerbatimClone(disk, { id: 'e2', name: 'one', notes: 'EDITED', updatedAt: 10 }, 'id')).toBe(false);
+        expect(isVerbatimClone(disk, { id: 'e2', name: 'renamed too', notes: 'n', updatedAt: 10 }, 'id')).toBe(false);
+    });
+
+    it('requires an exact current-stamp match on the source row', () => {
+        expect(isVerbatimClone(disk, { id: 'e2', name: 'one', notes: 'n', updatedAt: 9 }, 'id')).toBe(false);
+        expect(isVerbatimClone(disk, { id: 'e2', name: 'one', notes: 'n' }, 'id')).toBe(false);
+    });
+
+    it('is key-order safe and never fires on an empty disk', () => {
+        const reordered = { notes: 'n', updatedAt: 10, id: 'e2', name: 'one' };
+        expect(isVerbatimClone(disk, reordered, 'id')).toBe(true);
+        expect(isVerbatimClone([], reordered, 'id')).toBe(false);
     });
 });
