@@ -25,30 +25,32 @@ import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
 import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 import createServerConfigRouter from './server/routes/server-config.js';
+import { createCampaignLockMiddleware, createCampaignRenameGuard } from './server/utils/campaignLock.js';
 
 const PORT = process.env.PORT || 80;
 
 // Campaign lockdown: when CAMPAIGN_LOCK is set, all mutating requests to
-// /api/campaigns/* are rejected unless they target the locked campaign.
+// /api/campaigns/* are rejected unless they target the locked campaign, AND
+// a rename of the locked campaign to any other name is rejected too (the
+// two phases around express.json() — see server/utils/campaignLock.js).
 // Used during automated verification so subagents can never touch production
 // campaigns. Unset (normal use) = no behavior change.
 const CAMPAIGN_LOCK = process.env.CAMPAIGN_LOCK ? decodeURIComponent(process.env.CAMPAIGN_LOCK.trim()) : null;
 
 const app = express();
 
-app.use((req, res, next) => {
-    if (!CAMPAIGN_LOCK) return next();
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-    if (!req.path.startsWith('/api/campaigns')) return next();
-    const rest = req.path.slice('/api/campaigns'.length).replace(/^\//, '');
-    const target = rest ? decodeURIComponent(rest.split('/')[0]) : '';
-    if (target === CAMPAIGN_LOCK) return next();
-    console.error(`[campaign-lock] BLOCKED ${req.method} ${req.path} (locked to "${CAMPAIGN_LOCK}")`);
-    return res.status(403).json({ error: `Campaign locked to "${CAMPAIGN_LOCK}" — ${req.method} ${req.path} denied` });
-});
+// Lock phase 1 (path check) runs BEFORE body parsing so off-target
+// mutations are refused without ever buffering/parsing their body.
+app.use(createCampaignLockMiddleware(CAMPAIGN_LOCK));
 
 // Increase JSON body limit to accommodate base64 image uploads
 app.use(express.json({ limit: '5mb' }));
+
+// Lock phase 2: PUT /api/campaigns/:campaign renames the campaign folder to
+// req.body.newName — an identity the phase-1 path check cannot see. Mounted
+// right after the JSON parser so it can read req.body; only exact-shape
+// rename PUTs into the locked campaign pay the check.
+app.use(createCampaignRenameGuard(CAMPAIGN_LOCK));
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, PATCH');
