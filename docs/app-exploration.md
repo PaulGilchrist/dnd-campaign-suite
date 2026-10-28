@@ -100,8 +100,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 *(2026-10-27-L backlog fully consumed — 2 implemented, 3 blocked/subsumed; see improve-run commits + `docs/test-setup-playbook.md` § 2026-10-27 improve run for dispositions.)*
 
-- (2026-10-27-M) **Spent-day fresh trip gives no budget context** — with accrued≥budget carried over BY DESIGN, a newly planned trip's Advance rejects and the banner reads "Travel budget exhausted — camp or forced march?" without hinting the accrual belongs to an earlier trip that day (my advance loop looked dead until I read the keys). Panel hint naming `accrued/budget` or "carried from earlier trips today" copy would remove the confusion. `src/components/hex-map/TravelPanel.jsx`.
-
 *(Closed-history pointer — resolved items live in improve-run commits + `docs/app-exploration-archive-2026-10.md`. Owner doctrine: party inventory is DURABLE campaign treasury data — survives Admin "Clear Change Data"; restore baselines via chips/PUT. Run-G's three travel/CRUD backlog items closed run H. Run-H's items closed/proven run I. Run-I's five backlog items all closed same-day by improve run J (live-proven run K). Run-K's sessions-notes-field pitfall CLOSED by c1198a4f3 (live-proven run L); run-K maps fileName-only backlog CLOSED by 75766bb0f (live-proven run L).)*
 
 ## Coverage

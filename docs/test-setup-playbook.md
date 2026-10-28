@@ -1361,3 +1361,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Pitfall: attaching that PUT spy twice (pre-reload + post-navigation) double-logs each request with identical timestamps — dedupe by timestamp before counting.
 - Pitfall: `.travel-btn-cancel` deselects the travel tool + unmounts the panel — a plan-click straight after cancel lands silently as a pan unless the tool is re-pressed first (produces idle-store/file-live instead of the intended divergence).
 - `applyExistingMap` sits ~4 branches from lint complexity cap 15 — new load-time logic must land in a module helper (`adoptLoadedTrip`) from the start, not inline.
+- Orchestrator pitfall (improve run): a subagent BLOCKED verdict citing paths that don't exist in this repo (e.g. `src/sse/sseClient.ts`, `ChatView.jsx`) is a hallucination/injection artifact — re-verify the premise against your own `git show HEAD:<file>` before accepting or retrying; the I2 Players.jsx premise was re-confirmed unguarded on disk after such a false-BLOCKED.
+
+## Improve run 2026-10-27 (hex-spent-day-budget-context FIXED)
+- API-created outdoor maps play EMPTY terrain dict as plains: 0.75/hex @ Normal, budget 4 — a 4-hex trip ARRIVES unspent; plan 6-hex routes when a fresh-day grind to the exhausted banner is needed.
+- Mount-flag effect (a6cf65f52) lives in the persistently-mounted HexMap hook and fires live AT ARRIVAL when accrued+minNeighbor>budget — `travel-dayExhausted` can already be true in the store before the tool is re-pressed (banner then shows instantly on press).
+- Spent-day hint discriminator: pre-plan (spent day, no trip) renders numbers only; the "carried from earlier trips today" clause appears exactly at the plan flip — cheap DOM proof: `document.querySelector('.travel-budget-hint span').textContent.includes('carried')`.

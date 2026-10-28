@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/campaign/travelService.js';
 import { EVENT_FREQUENCIES } from '../../services/campaign/randomEventService.js';
 
@@ -151,6 +151,49 @@ function TravelOwnHexHint({ visible }) {
   );
 }
 
+// Spent-day budget context (backlog 2026-10-27-M): accruedCost deliberately
+// survives arrival/cancel (same-day trips share the day's pool), so a freshly
+// planned trip on an already-spent day reject-flags the exhausted banner with
+// no hint that the accrual belongs to an EARLIER trip. Latch the day's accrued
+// cost at the moment the CURRENT trip starts — path empty→non-empty (plan
+// click) or a mount that adopts a just-planned trip (pathIndex 0: no advance
+// has been taken yet, so any accrued cost predates this trip) — and keep it
+// for the trip's lifetime. A trip that spends the day itself latches 0 and
+// the copy never claims a carry; the render-side `carriedCost <= accruedCost`
+// guard below drops the claim once a camp/regen resets the day's accrual.
+// Pure display state — never written to the runtime store, no timers.
+const useCarriedTripCost = (path, pathIndex, accruedCost) => {
+  const tripActive = (path?.length ?? 0) > 0;
+  const [carriedCost, setCarriedCost] = useState(
+    () => (tripActive && pathIndex === 0 ? accruedCost : 0)
+  );
+  const wasActiveRef = useRef(tripActive);
+  useEffect(() => {
+    if (tripActive === wasActiveRef.current) return;
+    wasActiveRef.current = tripActive;
+    setCarriedCost(tripActive ? accruedCost : 0);
+  }, [tripActive, accruedCost]);
+  return carriedCost;
+};
+
+function TravelBudgetContextHint({ dayExhausted, accruedCost, dailyBudget, carriedCost }) {
+  if (!dayExhausted) return null;
+  // Sibling of the max-exhaustion hint lane; rides the SAME banner condition
+  // so the day's numbers are legible without devtools. Carried wording ONLY
+  // while a non-zero carry from earlier trips is still inside today's accrual
+  // (a fresh day ground down by this trip's own advances shows numbers only).
+  const carried = carriedCost > 0 && carriedCost <= accruedCost;
+  return (
+    <div className="travel-panel-hint travel-budget-hint">
+      <i className="fa-solid fa-circle-info"></i>
+      <span>
+        {accruedCost.toFixed(1)} / {dailyBudget} used today
+        {carried ? ' — carried from earlier trips today' : ''}
+      </span>
+    </div>
+  );
+}
+
 function TravelPanel({
   travelPace,
   path,
@@ -182,6 +225,7 @@ function TravelPanel({
   const panelRef = useRef(null);
   // eslint-disable-next-line server-first/no-local-game-state
   const dragState = useRef(null);
+  const carriedCost = useCarriedTripCost(path, pathIndex, accruedCost);
 
   const handleHeaderPointerDown = (e) => {
     if (e.target.closest('button')) return;
@@ -252,6 +296,13 @@ function TravelPanel({
         partyHasMaxExhaustion={partyHasMaxExhaustion}
         onForceCamp={onForceCamp}
         onForcedMarch={onForcedMarch}
+      />
+
+      <TravelBudgetContextHint
+        dayExhausted={dayExhausted}
+        accruedCost={accruedCost}
+        dailyBudget={dailyBudget}
+        carriedCost={carriedCost}
       />
 
       <TravelExtremeWeatherBanner
