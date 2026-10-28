@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
+import { normalizeCharacterName } from './characterName.js';
 
 // Tracks the active map key per campaign
 export const activeMaps = new Map();
@@ -180,17 +181,26 @@ export const publish = (key, data, campaignName) => {
 /**
  * Removes change-data entries for a character that was deleted or renamed.
  * Keeps reserved keys intact (combatSummary, activeCreatureId, log, positioning).
+ *
+ * Bucket keys are the character's FULL display name (e.g. "QA Space Cadet"),
+ * so the full name must match case-insensitively — matching only the first
+ * token orphaned every multi-word character's bucket on delete/rename.
+ * The first-token leg is kept for legacy rename cleanup (e.g. "Bob-Jr" → "Bob").
  */
 export const removeChangeDataKey = (campaign, characterName) => {
-    const firstName = characterName.split(/[^a-zA-Z0-9]/)[0] || characterName;
     if (!characterChangeData.has(campaign)) return;
+
+    const normalized = normalizeCharacterName(characterName);
+    const fullName = normalized.toLowerCase();
+    const firstName = (normalized.split(/[^a-zA-Z0-9]/)[0] || normalized).toLowerCase();
 
     const data = characterChangeData.get(campaign);
     const reservedKeys = ['combatSummary', 'activeCreatureId', 'log', 'positioning'];
      /* Clean up any entry that matches the old name (case-insensitive) */
     Object.keys(data).forEach(key => {
         if (reservedKeys.includes(key)) return;
-        if (key.toLowerCase() === firstName.toLowerCase()) {
+        const lower = key.toLowerCase();
+        if (lower === fullName || lower === firstName) {
             delete data[key];
           }
       });

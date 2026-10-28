@@ -869,6 +869,91 @@ describe('changeData - removeChangeDataKey', () => {
         expect(data).not.toHaveProperty('123');
         expect(data).toHaveProperty('character2');
     });
+
+    // --- Regression: multi-word names orphaned their buckets (delete lane
+    // matched only the FIRST token, so "QA Space Cadet" survived forever) ---
+
+    it('should remove a full multi-word name bucket on delete', () => {
+        characterChangeData.set('test-campaign', {
+            'QA Space Cadet': { fanaticalFocusUsed: false, hitPoints: 9 },
+            AasimarTest: { hitPoints: 20 },
+        });
+
+        removeChangeDataKey('test-campaign', 'QA Space Cadet');
+
+        const data = characterChangeData.get('test-campaign');
+        expect(data).not.toHaveProperty('QA Space Cadet');
+        expect(data).toHaveProperty('AasimarTest');
+    });
+
+    it('should remove a multi-word name bucket case-insensitively', () => {
+        characterChangeData.set('test-campaign', {
+            'zap repro cadet': { hitPoints: 9 },
+            character2: { hp: 10 },
+        });
+
+        removeChangeDataKey('test-campaign', 'Zap Repro Cadet');
+
+        const data = characterChangeData.get('test-campaign');
+        expect(data).not.toHaveProperty('zap repro cadet');
+        expect(data).toHaveProperty('character2');
+    });
+
+    it('should remove full-name and legacy first-token buckets for a renamed character', () => {
+        characterChangeData.set('test-campaign', {
+            'Cadet One': { hitPoints: 7 },
+            Bob: { hp: 25 },
+            character2: { hp: 10 },
+        });
+
+        // rename cleanup passes the FULL old name; the first-token leg stays
+        // for the legacy "Bob-Jr" → "Bob" cleanup semantics
+        removeChangeDataKey('test-campaign', 'Cadet One');
+        removeChangeDataKey('test-campaign', 'Bob-Jr');
+
+        const data = characterChangeData.get('test-campaign');
+        expect(data).not.toHaveProperty('Cadet One');
+        expect(data).not.toHaveProperty('Bob');
+        expect(data).toHaveProperty('character2');
+    });
+
+    it('should not wipe a live character bucket whose name merely shares the first token', () => {
+        characterChangeData.set('test-campaign', {
+            'Cadet One': { hitPoints: 7 },
+            'Cadet Two': { hitPoints: 14 },
+        });
+
+        removeChangeDataKey('test-campaign', 'Cadet One');
+
+        const data = characterChangeData.get('test-campaign');
+        expect(data).not.toHaveProperty('Cadet One');
+        expect(data).toHaveProperty('Cadet Two');
+    });
+
+    it('should match multi-word buckets despite uneven whitespace in the name', () => {
+        characterChangeData.set('test-campaign', {
+            'Cadet One': { hitPoints: 7 },
+            character2: { hp: 10 },
+        });
+
+        removeChangeDataKey('test-campaign', '  Cadet   One  ');
+
+        const data = characterChangeData.get('test-campaign');
+        expect(data).not.toHaveProperty('Cadet One');
+        expect(data).toHaveProperty('character2');
+    });
+
+    it('should do nothing for an empty or missing character name', () => {
+        characterChangeData.set('test-campaign', {
+            'Cadet One': { hitPoints: 7 },
+        });
+
+        removeChangeDataKey('test-campaign', undefined);
+        removeChangeDataKey('test-campaign', '');
+
+        const data = characterChangeData.get('test-campaign');
+        expect(data).toHaveProperty('Cadet One');
+    });
 });
 
 // ---------------------------------------------------------------------------

@@ -31,3 +31,23 @@ Match the FULL name in addition to (or instead of) the first token, e.g. delete 
 
 ## Severity
 Data integrity risk — silent stale-state resurrection for same-named future characters; no crash, but HP/latch truth from deleted characters can flow back into live gameplay.
+
+## Resolution
+FIXED 2026-10-28 (fix subagent run).
+
+**What was actually wrong:** exactly as diagnosed — `removeChangeDataKey()` in `server/utils/changeData.js` derived `firstName = characterName.split(/[^a-zA-Z0-9]/)[0]` and only deleted bucket keys equal to that first token, while change-data buckets are keyed by the FULL display name. Both caller lanes (`campaigns-character.js` DELETE :209 and PUT-rename :135) already pass the full name, so the defect was purely the util's match predicate — no route changes needed. Reproduced live BEFORE fixing: UI-wizard-created `Zap Repro Cadet` (16-step wizard, seeded bucket `{fanaticalFocusUsed:false, hitPoints:9}`), UI sheet Delete → file + link gone but the `Zap Repro Cadet` bucket survived in memory AND on disk after the debounce; API rename leg `Cadet One`→`Cadet Two`→DELETE left `{"Cadet One":{"hitPoints":7}}` orphaned. Confirmed no prior fix existed (clean working tree, `git log` on the util).
+
+**Fix (minimal, suggested-fix shape):** `removeChangeDataKey` now normalizes the name via the existing `normalizeCharacterName()` from `server/utils/characterName.js` (re-use, not re-invention) and deletes keys matching the FULL name case-insensitively **or** the legacy first token (first-token leg kept deliberately for rename-cleanup semantics like `Bob-Jr` → `Bob`, pinned by the pre-existing `Bob-Jr` test). Whitespace-tolerant matching comes free via the normalization helper. Non-string/empty names are now a safe no-op instead of a throw.
+
+**Files changed:**
+- `server/utils/changeData.js` — full-name + first-token match in `removeChangeDataKey`, `normalizeCharacterName` import.
+- `server/utils/changeData.test.js` — 6 regression tests added to the existing `removeChangeDataKey` describe: multi-word full-name bucket removed; case-insensitive multi-word; rename-lane full-old-name removed while `Bob-Jr`→`Bob` legacy leg retained; sibling bucket sharing only the first token (`Cadet Two` when deleting `Cadet One`) NOT wiped; uneven-whitespace name matches collapsed bucket; empty/missing name no-op.
+
+**Verification:**
+1. `npx vitest run server/utils/changeData.test.js` → 69/69 pass.
+2. `npx vitest run server/utils server/routes/campaigns-character` → 17 files, 529/529 pass (route tests pin callers still pass full names).
+3. `npm run lint` → clean (zero warnings).
+4. Live re-run after API restart (`CAMPAIGN_LOCK=test-campaign`, `campaignLocked:true` verified): UI wizard create `Zap Repro Cadet` → bucket seeded → UI Delete → >12 s → `GET /change-data` keys `['combatSummary','__campaign__','AasimarTest']` — bucket GONE from API and disk; live `AasimarTest` bucket untouched. Rename leg: `Cadet One` seeded → PUT→`Cadet Two` → DELETE → no `Cadet One`/`Cadet Two` buckets remain. Single-token control: `ZapSolo` create→seed→delete → bucket removed (first-token lane un-regressed).
+5. Cleanup: all probe chars deleted (disk-verified), tabs closed, admin clear → change-data `{}` + log `[]` GET-verified; zero campaign-lock denials in the server log.
+
+**Related observation NOT fixed here (out of scope per brief):** the create-boundary validation / CharSheet crash-silent hazard described above is a distinct bug (server payload shape validation + client `fetchData().catch`) and deserves its own bug file; only the change-data cleanup matching was in this ticket's scope.
