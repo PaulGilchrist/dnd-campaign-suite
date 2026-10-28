@@ -395,8 +395,12 @@ export default function useTravelManagement({
     setPath([]);
     setPathIndex(0);
     setLastMessage(null);
-    // The trip is gone — ownership releases with it (arrival lands through
-    // the same inactive seam; cancel/arrival are the only exits).
+    // The trip is gone — ownership releases with it. BOTH trip exits release
+    // the stamp with the same releaseTripOwner call: cancel here, arrival
+    // from clearCompletedTripKeys on the final-hex advance (backlog
+    // 2026-10-27: the pre-fix comment claimed arrival "lands through the
+    // same inactive seam" but never released, leaving a stale owner stamp in
+    // the store until the next trip claimed it).
     releaseTripOwner(campaignName);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -412,7 +416,12 @@ export default function useTravelManagement({
   // a bare store.delete would expose) keeps the publisher's snapshot null
   // even after a reload-resumed trip arrives. Day-state keys (pace,
   // accruedCost, dailyBudget, dayExhausted, forcedMarchHours) survive
-  // arrival exactly as they survive cancelTravel.
+  // arrival exactly as they survive cancelTravel. The trip-owner stamp
+  // releases here too (backlog 2026-10-27): arrival is a trip exit just
+  // like cancel, so it mirrors cancel's lane exactly — the shared
+  // releaseTripOwner null-write (POST {value:null}), never a per-key
+  // DELETE, keeping it clear of the hex-editor null-echo crash lane the
+  // trip-key removals ride.
   const clearCompletedTripKeys = useCallback(() => {
     setRuntimeObject('campaign', {
       'travel-destination': null,
@@ -421,6 +430,10 @@ export default function useTravelManagement({
     }, campaignName, true);
     pathRef.current = [];
     pathIndexRef.current = 0;
+    // Trip over — release the ownership stamp through the EXACT cancel lane
+    // (shared releaseTripOwner: setRuntimeValue null-POST; the store parks
+    // on null, and a fresh trip's startPlanning re-stamps a live owner).
+    releaseTripOwner(campaignName);
     if (!campaignName) return;
     COMPLETED_TRIP_KEYS.forEach((key) => {
       fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`, { method: 'DELETE' })

@@ -1329,3 +1329,7 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - REPRO TIMING: cancel-then-replan within ~2s keeps re-arming the 1s map-PUT debounce (each planning publish re-arms it), so the PREVIOUS trip's bytes deterministically survive a reload on disk — reliable divergence precondition.
 - PUT SPY: use a Node-side `page.on('request')` PUT spy — it survives reload; context `addInitScript` does NOT retro-apply to an already-open page and window state dies on reload anyway.
 - HMR HOOK-COUNT TRAP: editing a mounted hook's ref/effect count on :5173 triggers `Cannot read properties of null (reading 'inst')` + full reload back to campaign-select — harmless dev artifact; re-select campaign and continue with fresh code.
+
+## Improve run 2026-10-27 (trip-owner-release-on-arrival, item 1/5)
+- Owner-release server-truth signature: `releaseTripOwner` is a null-POST (`setRuntimeValue 'travel-started-by' → {value:null}`), so after cancel OR arrival GET change-data shows `"travel-started-by": null` (key RETAINED, not absent). Trip-key removals (destination/path/pathIndex) are the DELETE lane (key absent). Judge each lane by its own signature — expecting "absent" for started-by gives a false negative.
+- Arrival now releases the owner stamp via `clearCompletedTripKeys` (useTravelManagement.js); next trip's `startPlanning` re-claims a live uuid.
