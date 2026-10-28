@@ -100,6 +100,10 @@ router.post('/api/campaigns/migrate-image-paths', asyncHandler((req, res) => {
 
 // API endpoint to create a new campaign folder
 router.post('/api/campaigns', asyncHandler((req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
     const { campaignName } = req.body;
 
     if (!campaignName || campaignName.trim() === '') {
@@ -192,6 +196,10 @@ function renameImagePathsInNpcData(npcsPath, campaign) {
 
 // API endpoint to rename a campaign directory
 router.put('/api/campaigns/:campaign', asyncHandler((req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
     const { campaign } = req.params;
     const { newName } = req.body;
 
@@ -226,6 +234,10 @@ router.put('/api/campaigns/:campaign', asyncHandler((req, res) => {
 
 // API endpoint to delete a campaign and all its files/images
 router.delete('/api/campaigns/:campaign', asyncHandler((req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
     const { campaign } = req.params;
     const dir = campaignDir(campaign);
 
