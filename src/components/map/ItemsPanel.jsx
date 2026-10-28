@@ -84,7 +84,9 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
 
     if (!itemsPanelOpen) return null;
 
-    const playerNames = new Set(players.map(p => p.name));
+    // players=null from a legacy map document slips past the [] prop default —
+    // degrade to no tokens (backlog 2026-10-27-M crash lane).
+    const playerNames = new Set((players || []).map(p => p.name));
     const missingChars = characters.filter(c => !playerNames.has(c.name));
     const isOutdoor = mapVariant === 'outdoor';
 

@@ -14,7 +14,10 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
 
     return (
         <>
-            {players.map((player) => {
+            {/*players guard (backlog 2026-10-27-M): a whole-document PUT that
+              stripped `players` used to land here as undefined/null and throw —
+              the render path degrades to an empty token list instead. */}
+            {(players || []).map((player) => {
                 const cx = gridCenterX(player.gridX);
                 const cy = gridCenterY(player.gridY);
                 const img = getPlayerImage(player, characters);

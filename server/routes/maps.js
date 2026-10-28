@@ -53,15 +53,6 @@ function refuseUnlessGm(req, res) {
   return false;
 }
 
-function isOutdoorMapDocument(filePath, body) {
-  try {
-    if (fs.existsSync(filePath)) {
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8')).type === 'outdoor';
-    }
-  } catch (_e) { /* unreadable disk bytes — fall back to the claimed type */ }
-  return body?.type === 'outdoor';
-}
-
 // Mirror the authoritative active map into the '__map__' runtime key so range
 // gates (rangeCheck.js) and every client see the same map the /maps list reports.
 function stampActiveMapContext(campaign, mapKey) {
@@ -190,6 +181,21 @@ function readStoredMapDocument(filePath) {
   }
 }
 
+// players-clobber guard (backlog 2026-10-27-M): the general map PUT is a
+// full-object replace, so a body that omits `players` (or carries a non-array)
+// silently erased every PC token from an INDOOR map document — the exact
+// self-destruct lane the run-M ErrorBoundary rig used (live-hit: GET full
+// object → strip players → PUT → reopen crashes the editor). A stored outdoor
+// document never carries a players array, so the Array.isArray(stored) test
+// keeps the hex travelState lane byte-identical without a type check. Create-
+// via-PUT (no stored doc) and legacy stored docs that never had players stay
+// untouched — this rejects only an ERASE, never over-validates.
+export function erasesStoredPlayers(storedData, incomingData) {
+  return !!storedData
+    && Array.isArray(storedData.players)
+    && !Array.isArray(incomingData?.players);
+}
+
 const buildOutdoorMapData = (name, body) => ({
   displayName: name.trim(),
   name: toKebabCase(name.trim()),
@@ -286,10 +292,21 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   const fileName = normalizeMapFile(mapname);
   const filePath = path.join(mapsDir, fileName);
 
-  if (!isOutdoorMapDocument(filePath, req.body) && !refuseUnlessGm(req, res)) return;
+  // ONE read of the stored document feeds the outdoor/authority decision, the
+  // players-clobber guard and the authored-name guard below. Outdoor decision
+  // keeps isOutdoorMapDocument semantics: readable stored type wins; missing/
+  // unreadable file falls back to the claimed body type (deny-safe on unknown).
+  const storedData = readStoredMapDocument(filePath);
+  const isOutdoor = storedData ? storedData.type === 'outdoor' : req.body?.type === 'outdoor';
+  if (!isOutdoor && !refuseUnlessGm(req, res)) return;
+
+  if (!isOutdoor && erasesStoredPlayers(storedData, req.body)) {
+    console.log(`[maps] BLOCKED PUT ${campaign}/${fileName} — body without a players array would erase stored player tokens`);
+    return res.status(400).json({ error: 'Map save rejected: a whole-map save must include the players array — without it every player token would be erased from the map.' });
+  }
 
   const mapData = preserveAuthoredNames(
-    readStoredMapDocument(filePath),
+    storedData,
     pruneRevealedToGrid(req.body)
   );
 

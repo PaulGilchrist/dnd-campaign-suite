@@ -46,6 +46,16 @@ describe('Players', () => {
         expect(container.querySelectorAll('g.creature-group').length).toBe(0);
     });
 
+    // Backlog 2026-10-27-M: a whole-document PUT that stripped `players` used
+    // to land here as undefined/null and throw "players.map is not a
+    // function" — the render path must degrade to an empty token list.
+    it('does not throw when the players prop is undefined or null (players-less doc)', () => {
+        for (const players of [undefined, null]) {
+            const { container } = renderComponent({ players });
+            expect(container.querySelectorAll('g.creature-group').length).toBe(0);
+        }
+    });
+
     it('renders one token group with grab cursor and clipPath per player', () => {
         const players = [
             makePlayer({ id: 'p1', name: 'Thorin', gridX: 1, gridY: 1 }),

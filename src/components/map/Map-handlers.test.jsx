@@ -315,4 +315,14 @@ describe('Map container - player context menu', () => {
         expect(playerCircles(container)).toHaveLength(2);
         confirmSpy.mockRestore();
     });
+
+    it('renders the editor without throwing when the map document has no players (backlog 2026-10-27-M)', async () => {
+        // Legacy/externally-stripped doc: the mapData.players key is absent —
+        // the old `const { players } = mapData` handed Players.jsx undefined
+        // and the whole editor threw on mount.
+        mockState.mapData = { walls: new Set() };
+        const { container } = await act(async () => renderMap());
+        expect(container.querySelector('[data-testid="map-editor"]')).toBeInTheDocument();
+        expect(playerCircles(container)).toHaveLength(0);
+    });
 });
