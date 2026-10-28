@@ -673,7 +673,12 @@ function App() {
     try {
       await handleDeleteCharacterRaw(characterName);
     } catch (error) {
-      console.error('Error deleting character:', error);
+      // Single-warn doctrine: campaignService.deleteCharacter's catch owns
+      // the console.error for every character HTTP failure (uniform with its
+      // sibling service functions); this wrapper's job is the user-visible
+      // alert only — logging at both layers printed two identical stacks per
+      // failed delete (2026-10-28-P). Same reasoning as the delete-dispatcher
+      // comment in useCharacterManagement.js:78-84.
       alert(`Failed to delete character: ${error.message}`);
     }
   };

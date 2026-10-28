@@ -465,14 +465,20 @@ describe('App - Runtime Events & State Management', () => {
     });
 
     it('alerts and keeps the roster intact when the delete request fails', async () => {
+      // Single-warn doctrine pin: campaignService is mocked here, so the
+      // service layer's own console.error never runs — assert directly that
+      // the App wrapper logs NOTHING (its job is the alert only) while the
+      // user-visible alert still fires (2026-10-28-P backlog).
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       campaignService.deleteCharacter.mockRejectedValueOnce(new Error('server offline'));
       await renderInCampaign();
 
       fireEvent.click(screen.getByText('Delete Char'));
 
       await waitFor(() => {
-        expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('server offline'));
+        expect(window.alert).toHaveBeenCalledWith('Failed to delete character: server offline');
       });
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
       expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
       expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
     });

@@ -279,6 +279,14 @@ describe('campaignService', () => {
       await expect(
         deleteCharacter('campaign1', 'char1.json')
       ).rejects.toThrow('Failed to delete character: Not Found');
+
+      // This layer owns the single console warning for character-delete
+      // failures (App.jsx wrapper alerts only — single-warn doctrine).
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error deleting character:',
+        expect.any(Error)
+      );
     });
 
     it('should throw and rethrow network errors', async () => {
@@ -287,6 +295,12 @@ describe('campaignService', () => {
       await expect(
         deleteCharacter('campaign1', 'char1.json')
       ).rejects.toThrow('Network error');
+
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error deleting character:',
+        expect.any(Error)
+      );
     });
   });
 
