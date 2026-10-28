@@ -122,7 +122,9 @@ describe('campaignsCharacter - POST duplicate-name guard', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign')
-            .send({ character: { name: 'BrandNewHero', level: 1 } });
+            // Full sheet-loadable shape (shape guard, run-Q bug): race/class
+            // objects with names + inventory.magicItems array.
+            .send({ character: { name: 'BrandNewHero', level: 1, race: { name: 'Human' }, class: { name: 'Fighter', subclass: { name: 'Champion' } }, abilities: [{ name: 'Strength', score: 10 }], inventory: { magicItems: [], equipped: [] } } });
 
         expect(res.status).toBe(201);
         expect(res.body).toHaveProperty('fileName', 'BrandNewHero.json');

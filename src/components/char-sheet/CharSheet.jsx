@@ -215,6 +215,11 @@ async function applyMovementPassives(stats, playerName, campaignName) {
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
+    // bug-charsheet-stale-body-minimal-payload: when the rules engine rejects
+    // this character's file (e.g. an API-created file missing class/inventory
+    // sections) the sheet must show an honest error card for the SELECTED
+    // character — never keep rendering the PREVIOUS character's live body.
+    const [statsLoadError, setStatsLoadError] = React.useState(null);
     const [charActionsModalState, setCharActionsModalState] = React.useState({});
     const setModalState = React.useCallback((state) => {
         setCharActionsModalState(state);
@@ -306,26 +311,41 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const weaponKindMasteryWeapons = useRuntimeValue(playerSummary?.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);
     React.useEffect(() => {
         const fetchData = async () => {
-            const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
-            const effectiveClasses = playerSummary.rules === '2024' ? allClasses2024 : allClasses;
-            const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
-            const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
-            const processingSummary = cloneDeep(playerSummary);
-            // WM-003: attackCalc reads playerStats.campaignName to honor the Nick
-            // latch in resolveOffHandActionType — without it the off-hand row can
-            // never promote from Bonus Action to Action.
-            processingSummary.campaignName = campaignName;
-            applyCotlLandType(processingSummary, cotlLandTypeRuntime);
-            const stats = await rulesFactory.getPlayerStats({ allClasses: effectiveClasses, allEquipment, allMagicItems: effectiveMagicItems, allRaces: effectiveRaces, allSpells: spellData, playerSummary: processingSummary });
+            try {
+                const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
+                const effectiveClasses = playerSummary.rules === '2024' ? allClasses2024 : allClasses;
+                const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
+                const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
+                const processingSummary = cloneDeep(playerSummary);
+                // WM-003: attackCalc reads playerStats.campaignName to honor the Nick
+                // latch in resolveOffHandActionType — without it the off-hand row can
+                // never promote from Bonus Action to Action.
+                processingSummary.campaignName = campaignName;
+                applyCotlLandType(processingSummary, cotlLandTypeRuntime);
+                const stats = await rulesFactory.getPlayerStats({ allClasses: effectiveClasses, allEquipment, allMagicItems: effectiveMagicItems, allRaces: effectiveRaces, allSpells: spellData, playerSummary: processingSummary });
 
-            applyPreparedSpells(stats, playerSummary);
-            applyAspectOfTheWilds(stats, getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption'));
+                applyPreparedSpells(stats, playerSummary);
+                applyAspectOfTheWilds(stats, getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption'));
 
-            await applyMovementPassives(stats, playerSummary.name, campaignName);
+                await applyMovementPassives(stats, playerSummary.name, campaignName);
 
-            injectBardicInspirationFeatures(stats, playerSummary, campaignName);
+                injectBardicInspirationFeatures(stats, playerSummary, campaignName);
 
-            setPlayerStats(stats);
+                setPlayerStats(stats);
+                setStatsLoadError(null);
+            } catch (error) {
+                // A character file missing sections the rules engine requires
+                // throws here (rules-magicItems / rules-proficiencies / class
+                // & race lookups). Without this catch the rejection is silently
+                // swallowed, setPlayerStats never runs, and the sheet keeps
+                // showing the PREVIOUS character's full body — with its LIVE
+                // Edit/Delete buttons — under the newly-selected header
+                // (wrong-entity mutation hazard). Show an honest error card
+                // for the selected character instead.
+                console.error(`CharSheet: could not load stats for "${playerSummary?.name}":`, error);
+                setPlayerStats(null);
+                setStatsLoadError(error?.message || 'Unknown error while computing character stats');
+            }
         };
         fetchData();
     }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, spellThiefStolenRuntime, spellThiefCasterBlockRuntime, cotlLandTypeRuntime, fiendishResilienceType, boonEnergyResistanceTypes, nickUsedRoundRuntime, weaponKindMasteryWeapons, campaignName]);
@@ -359,6 +379,23 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             setRuntimeValue(mutableStats.name, 'preparedSpells', preparedSpells, campaignName);
             setPlayerStats(mutableStats);
         }
+    }
+
+    // Honest degraded card when this character's file cannot be computed —
+    // placed BEFORE the !playerStats guard so a load failure replaces any
+    // previously-rendered body (and its live Edit/Delete affordances) rather
+    // than silently leaving the previous character on screen. Reuses the
+    // global .ct-container/.ct-empty-state card pattern (ErrorBoundary twin).
+    if (statsLoadError) {
+        return (
+            <div className="ct-container char-sheet-load-error" role="alert">
+                <div className="ct-empty-state">
+                    <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    <span>Could not load "{playerSummary?.name}" — this character file is missing data the sheet needs.</span>
+                    <span>Ask the GM to repair it in the character wizard or delete it.</span>
+                </div>
+            </div>
+        );
     }
 
     // Don't render hooks or content until playerStats is ready

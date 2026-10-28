@@ -73,6 +73,15 @@ function createTestApp() {
     return app;
 }
 
+// Minimal sheet-loadable sections (campaigns-character.js shape guard, run-Q
+// stale-body bug): race/class objects with names + inventory.magicItems array.
+const VALID_SECTIONS = {
+    race: { name: 'Human' },
+    class: { name: 'Fighter', subclass: { name: 'Champion' } },
+    abilities: [{ name: 'Strength', score: 10 }],
+    inventory: { magicItems: [], equipped: [] },
+};
+
 // ─── GET /api/campaigns/:campaign/:file ───────────────────────────────────────
 
 describe('campaignsCharacter - GET /api/campaigns/:campaign/:file', () => {
@@ -182,7 +191,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
         mfs.existsSync.mockReturnValue(true);
         mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter', level: 5 }));
 
-        const updatedData = { name: 'Thorin', class: 'Fighter', level: 10 };
+        const updatedData = { name: 'Thorin', ...VALID_SECTIONS, level: 10 };
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/Thorin.json')
@@ -199,7 +208,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             originalFileName: 'NonExistent.json'
         };
 
@@ -219,7 +228,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             level: 5,
             originalFileName: 'OldName.json'
         };
@@ -241,7 +250,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Mage',
+            ...VALID_SECTIONS,
             level: 7,
             originalFileName: 'OldName.json'
         };
@@ -265,7 +274,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/Thorin.json')
-            .send({ name: 'Thorin', class: 'Fighter' });
+            .send({ name: 'Thorin', ...VALID_SECTIONS });
 
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
@@ -283,7 +292,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const updatedData = {
             name: 'Thorin',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             imagePath: ''
         };
 
@@ -302,7 +311,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const updatedData = {
             name: 'Thorin',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             image: 'data:image/png;base64,iVBORw==',
             imageName: 'thorin.png'
         };
@@ -327,7 +336,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             originalFileName: 'OldName.json'
         };
 
@@ -351,7 +360,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             originalFileName: 'OldName.json',
             imagePath: 'campaigns/test-campaign/images/oldname.png',
             image: 'data:image/png;base64,newimage',
@@ -380,7 +389,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             originalFileName: 'OldName.json',
             imagePath: 'campaigns/test-campaign/images/oldname.png'
         };
@@ -409,7 +418,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const sameNameData = {
             name: 'SameName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             imagePath: 'campaigns/test-campaign/images/SameName.png'
         };
 
@@ -435,7 +444,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             originalFileName: 'OldName.json',
             imagePath: 'campaigns/test-campaign/images/oldname.png'
         };
@@ -460,7 +469,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const renamedData = {
             name: 'NewName',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             originalFileName: 'OldName.json'
         };
 
@@ -480,7 +489,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
         const app = createTestApp();
         await request(app)
             .put('/api/campaigns/test-campaign/Thorin.json')
-            .send({ name: 'Thorin', class: 'Fighter', level: 10 });
+            .send({ name: 'Thorin', ...VALID_SECTIONS, level: 10 });
 
         expect(publish).toHaveBeenCalledWith('character-test-campaign-Thorin.json', expect.any(Object), 'test-campaign');
     });
@@ -498,7 +507,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const updatedData = {
             name: 'Thorin',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             level: 10,
             imagePath: 'campaigns/test-campaign/images/oldname.png'
         };
@@ -526,7 +535,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const updatedData = {
             name: 'Thorin',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             level: 10,
             imagePath: 'campaigns/test-campaign/images/Thorin.png'
         };
@@ -553,7 +562,7 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         const updatedData = {
             name: 'Thorin',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             level: 10,
             imagePath: 'campaigns/test-campaign/images/oldname.png'
         };
@@ -732,7 +741,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
         const mfs = getMockFs();
         mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
-        const characterData = { name: 'Thorin', class: 'Fighter', level: 5 };
+        const characterData = { name: 'Thorin', ...VALID_SECTIONS, level: 5 };
 
         const app = createTestApp();
         const res = await request(app)
@@ -750,7 +759,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
         const mfs = getMockFs();
         mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
-        const characterData = { name: 'Thorin Oakenshield!', class: 'Fighter' };
+        const characterData = { name: 'Thorin Oakenshield!', ...VALID_SECTIONS };
 
         const app = createTestApp();
         const res = await request(app)
@@ -767,7 +776,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
         const characterData = {
             name: 'Thorin',
-            class: 'Fighter',
+            ...VALID_SECTIONS,
             image: 'data:image/png;base64,iVBORw==',
             imageName: 'thorin.png'
         };
@@ -787,7 +796,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
             throw new Error('EACCES');
         });
 
-        const characterData = { name: 'Thorin', class: 'Fighter' };
+        const characterData = { name: 'Thorin', ...VALID_SECTIONS };
 
         const app = createTestApp();
         const res = await request(app)
@@ -803,7 +812,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
         const mfs = getMockFs();
         mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
-        const characterData = { name: 'Thorin', class: 'Fighter', level: 5 };
+        const characterData = { name: 'Thorin', ...VALID_SECTIONS, level: 5 };
 
         const app = createTestApp();
         const res = await request(app)
@@ -811,7 +820,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
             .send({ character: characterData });
 
         expect(res.status).toBe(201);
-        expect(res.body.character).toEqual({ name: 'Thorin', class: 'Fighter', level: 5 });
+        expect(res.body.character).toEqual({ name: 'Thorin', ...VALID_SECTIONS, level: 5 });
         expect(res.body.fileName).toBe('Thorin.json');
     });
 
@@ -819,7 +828,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
         const mfs = getMockFs();
         mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
-        const characterData = { name: 'Lady Moonshadow von Lightbringer', class: 'Wizard' };
+        const characterData = { name: 'Lady Moonshadow von Lightbringer', ...VALID_SECTIONS };
 
         const app = createTestApp();
         const res = await request(app)
@@ -834,7 +843,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
         const mfs = getMockFs();
         mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
-        const characterData = { name: '123', class: 'Fighter' };
+        const characterData = { name: '123', ...VALID_SECTIONS };
 
         const app = createTestApp();
         const res = await request(app)

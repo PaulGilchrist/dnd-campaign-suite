@@ -78,6 +78,17 @@ function createTestApp() {
     return app;
 }
 
+
+// Minimal sheet-loadable sections (campaigns-character.js shape guard): the
+// 201/200 lanes must send full bodies; the 400-name/400-dupe lanes short-
+// circuit BEFORE the guard and keep their historical payloads.
+const VALID_SECTIONS = {
+    race: { name: 'Human' },
+    class: { name: 'Fighter', subclass: { name: 'Champion' } },
+    abilities: [{ name: 'Strength', score: 10 }],
+    inventory: { magicItems: [], equipped: [] },
+};
+
 beforeEach(() => {
     vi.mocked(publish).mockClear();
     vi.mocked(removeChangeDataKey).mockClear();
@@ -94,7 +105,7 @@ describe('campaignsCharacter - POST name normalization', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign')
-            .send({ character: { name: ' QA Trim Probe ', class: 'Fighter', level: 1 } });
+            .send({ character: { name: ' QA Trim Probe ', ...VALID_SECTIONS, level: 1 } });
 
         expect(res.status).toBe(201);
         expect(res.body.fileName).toBe('QA_Trim_Probe.json');
@@ -159,7 +170,7 @@ describe('campaignsCharacter - POST name normalization', () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/test-campaign')
-            .send({ character: { name: 'Thorin Oakenshield!', class: 'Fighter', level: 5 } });
+            .send({ character: { name: 'Thorin Oakenshield!', ...VALID_SECTIONS, level: 5 } });
 
         expect(res.status).toBe(201);
         expect(res.body.fileName).toBe('Thorin_Oakenshield_.json');
@@ -179,7 +190,7 @@ describe('campaignsCharacter - PUT name normalization (rename/save lane)', () =>
         // the server normalizes and lands on the canonical path regardless.
         const res = await request(app)
             .put('/api/campaigns/test-campaign/_QA_Trim_Probe2_.json')
-            .send({ name: ' QA Trim Probe2 ', class: 'Fighter', level: 1, imagePath: '', originalFileName: 'QA_Trim_Probe.json' });
+            .send({ name: ' QA Trim Probe2 ', ...VALID_SECTIONS, level: 1, imagePath: '', originalFileName: 'QA_Trim_Probe.json' });
 
         expect(res.status).toBe(200);
         expect(FILE_SYSTEM.has('/mock/campaigns/test-campaign/QA_Trim_Probe.json')).toBe(false);
@@ -197,7 +208,7 @@ describe('campaignsCharacter - PUT name normalization (rename/save lane)', () =>
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/QA_Trim_Probe.json')
-            .send({ name: '  QA Trim Probe  ', class: 'Fighter', level: 2, imagePath: '', originalFileName: 'QA_Trim_Probe.json' });
+            .send({ name: '  QA Trim Probe  ', ...VALID_SECTIONS, level: 2, imagePath: '', originalFileName: 'QA_Trim_Probe.json' });
 
         expect(res.status).toBe(200);
         const persisted = JSON.parse(FILE_SYSTEM.get('/mock/campaigns/test-campaign/QA_Trim_Probe.json'));
@@ -228,7 +239,7 @@ describe('campaignsCharacter - PUT name normalization (rename/save lane)', () =>
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/NewName.json')
-            .send({ name: 'NewName', class: 'Mage', level: 7, imagePath: '', originalFileName: 'OldName.json' });
+            .send({ name: 'NewName', ...VALID_SECTIONS, level: 7, imagePath: '', originalFileName: 'OldName.json' });
 
         expect(res.status).toBe(200);
         expect(FILE_SYSTEM.has('/mock/campaigns/test-campaign/OldName.json')).toBe(false);

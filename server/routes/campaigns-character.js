@@ -23,6 +23,50 @@ function refuseUnlessGm(req, res) {
     return false;
 }
 
+// Sheet-load shape guard (bug-charsheet-stale-body-minimal-payload): the rules
+// engine THROWS when these sections are absent, and a character file missing
+// them crash-silents CharSheet.fetchData (no .catch), leaving the PREVIOUS
+// character's full live body (with its Edit/Delete affordances) on screen
+// under the new header — a wrong-entity mutation hazard. Enumerated from the
+// engine's unconditional throw sites, nothing more:
+//   - class.name   → classRules.js:30 / classRules2024.js:91 (`playerSummary.class.name`)
+//   - race.name    → race-rules/5e.js:30 / 2024.js:66 (`playerSummary.race.name`)
+//   - inventory.magicItems array → rules.js assigns it and rules-magicItems.js:8-11
+//     throws `Missing array: inventory.magicItems`
+//   - class.major/class.subclass (named object) → rules-proficiencies.js:121-123
+//     (2024 `Missing object: class.major`) / :165-167 (5e `Missing object:
+//     class.subclass`); resolveMajor (classRules2024.js:24-29) yields undefined
+//     without a name, and the wizard hard-gates subclass selection — every
+//     loadable character carries one (run-Q live proof: subclass-less Fighter
+//     throws class.major).
+//   - abilities non-empty → rules-initiative.js:17-18 dereferences the
+//     Dexterity entry unconditionally (`dexAbility.bonus` crash for an empty
+//     array — live-proven run R; wizard characters always carry all six).
+// Reject such payloads at the write boundary instead of poisoning the sheet.
+function missingCharacterSections(character) {
+    const namedObject = (v) => v && typeof v === 'object' && !Array.isArray(v) && typeof v.name === 'string' && v.name.trim() !== '';
+    const missing = [];
+    if (!namedObject(character.race)) missing.push('race (an object with a name)');
+    if (!namedObject(character.class)) missing.push('class (an object with a name)');
+    else if (!namedObject(character.class.major) && !namedObject(character.class.subclass)) {
+        missing.push('class.major or class.subclass (an object with a name)');
+    }
+    if (!Array.isArray(character.abilities) || character.abilities.length === 0) {
+        missing.push('abilities (a non-empty array)');
+    }
+    if (!character.inventory || typeof character.inventory !== 'object' || Array.isArray(character.inventory) || !Array.isArray(character.inventory.magicItems)) {
+        missing.push('inventory.magicItems (an array)');
+    }
+    return missing;
+}
+
+function refuseIncompleteCharacter(res, character) {
+    const missing = missingCharacterSections(character);
+    if (missing.length === 0) return true;
+    res.status(400).json({ error: `Character is missing required data: ${missing.join(', ')}` });
+    return false;
+}
+
 // API endpoint to get a specific character file in a campaign
 // NOTE: This wildcard route must be mounted AFTER all specific resource routes
 // (maps, encounters, notes, npcs, quests, factions) to avoid intercepting them
@@ -110,6 +154,13 @@ router.put('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
     if (!fs.existsSync(sourcePath)) {
         return res.status(404).json({ error: 'Character file not found' });
     }
+
+    // Same section-shape guard as create (the PUT body is the bare FULL
+    // character object — wizard save/rename/level all send it): a partial or
+    // sections-less body would replace a loadable file with one that breaks
+    // the sheet. Validate BEFORE the rename unlink so a rejected PUT is
+    // fully disk-inert.
+    if (!refuseIncompleteCharacter(res, character)) return;
 
     // Read the original character to get the imagePath for image cleanup
     const originalCharacter = JSON.parse(fs.readFileSync(sourcePath, 'utf-8'));
@@ -250,6 +301,11 @@ router.post('/api/campaigns/:campaign', asyncHandler((req, res) => {
     if (fs.existsSync(filePath)) {
         return res.status(400).json({ error: 'A character with that name already exists' });
     }
+
+    // Section-shape guard (see missingCharacterSections): a stored file the
+    // rules engine cannot load crash-silents the sheet into a stale-body
+    // impostor — never write one.
+    if (!refuseIncompleteCharacter(res, character)) return;
 
     // Handle image upload
     if (character.image && character.imageName) {

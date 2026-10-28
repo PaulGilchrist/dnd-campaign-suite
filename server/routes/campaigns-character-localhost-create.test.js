@@ -109,7 +109,7 @@ describe('campaignsCharacter — POST create localhost authority gate', () => {
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign')
             .set('Host', 'localhost')
-            .send({ campaignName: 'test-campaign', character: { name: 'GMProbe', level: 1 } });
+            .send({ campaignName: 'test-campaign', character: { name: 'GMProbe', level: 1, race: { name: 'Human' }, class: { name: 'Fighter', subclass: { name: 'Champion' } }, abilities: [{ name: 'Strength', score: 10 }], inventory: { magicItems: [], equipped: [] } } });
 
         expect(res.status).toBe(201);
         expect(res.body).toHaveProperty('fileName', 'GMProbe.json');
@@ -123,7 +123,7 @@ describe('campaignsCharacter — POST create localhost authority gate', () => {
         const res = await request(createTestApp())
             .post('/api/campaigns/test-campaign')
             .set('Host', '127.0.0.1')
-            .send({ character: { name: 'LoopbackProbe', level: 1 } });
+            .send({ character: { name: 'LoopbackProbe', level: 1, race: { name: 'Human' }, class: { name: 'Fighter', subclass: { name: 'Champion' } }, abilities: [{ name: 'Strength', score: 10 }], inventory: { magicItems: [], equipped: [] } } });
 
         expect(res.status).toBe(201);
         expect(FILE_SYSTEM.has('/mock/campaigns/test-campaign/LoopbackProbe.json')).toBe(true);

@@ -3,6 +3,18 @@
     padding: 10px;
 }
 
+/* Could-not-load card (bug-charsheet-stale-body-minimal-payload) — layout and
+   typography come from the global .ct-container + .ct-empty-state classes;
+   only the error tint and upright text are scoped here (ErrorBoundary twin). */
+.char-sheet-load-error .ct-empty-state {
+    font-style: normal;
+}
+
+.char-sheet-load-error .ct-empty-state i {
+    color: var(--color-error-light);
+    opacity: 1;
+}
+
 /* Short Rest Modal */
 .short-rest-overlay {
     position: fixed;
