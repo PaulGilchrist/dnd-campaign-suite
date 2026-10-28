@@ -1,0 +1,17 @@
+/* ErrorBoundary fallback card — layout/typography come from the global
+   .ct-container + .ct-empty-state + .ct-btn classes; only the error-tinted
+   icon and non-italic message are scoped here (no !important, no inline styles). */
+
+.error-boundary .ct-empty-state {
+  font-style: normal;
+}
+
+.error-boundary .ct-empty-state i {
+  color: var(--color-error-light);
+  opacity: 1;
+}
+
+.error-boundary-reload-btn {
+  font-style: normal;
+  margin-top: 8px;
+}

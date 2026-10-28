@@ -41,6 +41,7 @@ import DeathSavePromptModal from './components/common/DeathSavePromptModal.jsx';
 import ConcentrationPromptModal from './components/common/ConcentrationPromptModal.jsx';
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import BardicInspirationReactionModal from './components/common/BardicInspirationReactionModal.jsx';
+import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 
 function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
   if (event.key.startsWith('character-delete-')) {
@@ -224,16 +225,20 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
   }
   if (mapsView.type === 'map') {
     return (
-      <Map
-        campaignName={campaignName}
-        characters={characters}
-        npcs={npcs}
-        isLocalhost={isLocalhost}
-        mapName={mapsView.mapName}
-        onBack={onBackFromMap}
-        onEncounterCreated={onEncounterCreated}
-        onPoiEntered={onEncounterCreated}
-      />
+      // Per-editor seam: a map-editor render crash degrades to the reload
+      // card without taking the maps manager/sidebar down with it.
+      <ErrorBoundary resetKey={mapsView.mapName}>
+        <Map
+          campaignName={campaignName}
+          characters={characters}
+          npcs={npcs}
+          isLocalhost={isLocalhost}
+          mapName={mapsView.mapName}
+          onBack={onBackFromMap}
+          onEncounterCreated={onEncounterCreated}
+          onPoiEntered={onEncounterCreated}
+        />
+      </ErrorBoundary>
     );
   }
   // Player with no active map — friendly waiting state until the GM
@@ -684,6 +689,7 @@ function App() {
           onRepairClick={() => setActiveView('campaignRepair')}
           activeView={activeView}
            />
+        <ErrorBoundary resetKey={`${campaignName}|${activeView}`}>
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
              allAbilityScores={abilityScores}
@@ -734,6 +740,7 @@ function App() {
           setActiveView={setActiveView}
           restoredSnapshot={restoredSnapshot}
         />
+        </ErrorBoundary>
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allClasses={classes} campaignName={campaignName} existingCharacters={characters} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allClasses={classes} characterData={activeCharacter} isEditing={true} campaignName={campaignName} existingCharacters={characters} />}
