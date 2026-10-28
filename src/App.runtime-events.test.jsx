@@ -469,14 +469,21 @@ describe('App - Runtime Events & State Management', () => {
       // service layer's own console.error never runs — assert directly that
       // the App wrapper logs NOTHING (its job is the alert only) while the
       // user-visible alert still fires (2026-10-28-P backlog).
+      // Single-owner copy pin (c8acd5cba residual): the mock mirrors the
+      // REAL service rejection shape — campaignService.js already throws
+      // with the "Failed to delete character: " prefix — so the wrapper
+      // must alert the message verbatim; re-prefixing here doubled it
+      // ("Failed to delete character: Failed to delete character: Not Found").
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      campaignService.deleteCharacter.mockRejectedValueOnce(new Error('server offline'));
+      campaignService.deleteCharacter.mockRejectedValueOnce(new Error('Failed to delete character: Not Found'));
       await renderInCampaign();
 
       fireEvent.click(screen.getByText('Delete Char'));
 
       await waitFor(() => {
-        expect(window.alert).toHaveBeenCalledWith('Failed to delete character: server offline');
+        const alertText = window.alert.mock.calls[0][0];
+        expect(alertText).toBe('Failed to delete character: Not Found');
+        expect(alertText.match(/Failed to delete character:/g)).toHaveLength(1);
       });
       expect(consoleErrorSpy).not.toHaveBeenCalled();
       expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();

@@ -679,7 +679,12 @@ function App() {
       // alert only — logging at both layers printed two identical stacks per
       // failed delete (2026-10-28-P). Same reasoning as the delete-dispatcher
       // comment in useCharacterManagement.js:78-84.
-      alert(`Failed to delete character: ${error.message}`);
+      // Single-owner copy: the service's thrown Error already carries the
+      // "Failed to delete character: " prefix, so alerting the raw message
+      // here printed it twice ("Failed to delete character: Failed to delete
+      // character: Not Found", c8acd5cba residual). The service owns the
+      // prefix; we surface the message verbatim.
+      alert(error.message);
     }
   };
 

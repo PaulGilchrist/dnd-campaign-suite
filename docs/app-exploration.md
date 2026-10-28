@@ -150,7 +150,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run Q
 
-- **Delete-failure alert double-prefixes** (c8acd5cba residual): wrapper alert prints `Failed to delete character: Failed to delete character: Not Found` — service Error message already carries the prefix; alert on `error.message` alone. (`src/hooks/management/useCharacterManagement.js` wrapper + `campaignService.js:56`.)
 - **Campaign JSON GETs need `Cache-Control: no-store`**: route-served `/api/campaigns/:c/<file>.json` responses carry weak ETag but NO cache directive (static lane already sets no-store) — deleted/renamed characters can resurrect as sidebar phantoms for one reload. Mirror the static-servers' no-store on all campaign/char JSON routes. (`server/routes/campaigns-character.js`, GET lane.)
 - **Disabled wizard tabs are click-navigable**: `button.sidebar-tab[disabled]` still receives real clicks and jumps ahead (renumber trap during automation + genuine UX leak of unvalidated steps) — either truly gate clicks or intentionally allow free browsing WITH the footer gates blocking commit (current copy implies gating). (`src/components/character-creation/` tab list.)
 - **Initiative Clear confirm is unnamed**: `Are you sure you want to clear all combat status?` is the last unmigrated native confirm in the entity family vs the house NAMED canon (Factions/Quests/NPC/Notes/character-delete all name their target) — e.g. `Clear combat status for all creatures? …`. (`src/components/initiative/`.)

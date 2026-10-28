@@ -109,9 +109,10 @@ vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
 // ---------------------------------------------------------------------------
 // Harness: mirrors the App.jsx wiring exactly —
-//   App :255  useCharacterManagement(campaignName)
-//   App :598  async wrapper: try { await raw(name) } catch { console.error; alert }
-//   App :655  onDeleteCharacter={wrapper} -> CharSheet -> CharSummary leaf
+//   App :363  useCharacterManagement(campaignName)
+//   App :672  async wrapper: try { await raw(name) } catch { alert(msg) }
+//             (service owns the console.error AND the message prefix)
+//   App :740  onDeleteCharacter={wrapper} -> CharSheet -> CharSummary leaf
 // ---------------------------------------------------------------------------
 const _mgmt = { current: null };
 
@@ -119,13 +120,13 @@ function DeleteWiringHarness({ campaignName }) {
     const mgmt = useCharacterManagement(campaignName);
     _mgmt.current = mgmt;
 
-    // App.jsx :598 wrapper — verbatim shape (no confirm here).
+    // App.jsx :672 wrapper — verbatim shape (no confirm here, no prefixing:
+    // the service Error already carries "Failed to delete character: ").
     const handleDeleteCharacter = async (characterName) => {
         try {
             await mgmt.handleDeleteCharacter(characterName);
         } catch (error) {
-            console.error('Error deleting character:', error);
-            alert(`Failed to delete character: ${error.message}`);
+            alert(error.message);
         }
     };
 
