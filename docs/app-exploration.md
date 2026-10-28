@@ -113,7 +113,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run O
 
-- **[2026-10-28-O] Snapshot list is display-only** — "Available Snapshots" rows (filename/date/size) have no per-snapshot Restore button; rollback is hard-wired to the newest. Users can see older restores exist but cannot pick one. Suggested: per-row restore button posting a `{filename}` body to a widened `/admin/rollback` (server already lists by timestamp in `listSnapshotFiles`).
 - **[2026-10-28-O] Full Reset gives no live feedback to non-acting tabs until reload** — same root as the filed reload-broadcast bug, but even after a manual refresh the acting tab doesn't reload (unlike rollback); consider aligning the two UXes (either both reload, neither + banner).
 
 *(2026-10-27-L backlog fully consumed — 2 implemented, 3 blocked/subsumed; see improve-run commits + `docs/test-setup-playbook.md` § 2026-10-27 improve run for dispositions.)*

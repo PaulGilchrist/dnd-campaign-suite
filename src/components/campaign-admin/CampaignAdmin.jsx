@@ -210,7 +210,7 @@ function ConfirmModal({ modal, onClose }) {
     );
 }
 
-function SnapshotList({ snapshots }) {
+function SnapshotList({ snapshots, onRestore, disabled }) {
     return (
         <div className="admin-snapshots">
             <h3>Available Snapshots</h3>
@@ -224,6 +224,14 @@ function SnapshotList({ snapshots }) {
                             <span className="admin-snapshot-meta">
                                 {formatSnapshotDate(snapshot.timestamp)} · {formatBytes(snapshot.size)}
                             </span>
+                            <button
+                                className="ct-btn ct-btn-danger admin-snapshot-restore"
+                                onClick={() => onRestore(snapshot)}
+                                disabled={disabled}
+                                aria-label={`Restore "${snapshot.filename}"`}
+                            >
+                                <i className="fas fa-undo"></i> Restore
+                            </button>
                         </li>
                     ))}
                 </ul>
@@ -408,14 +416,24 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
         }
     };
 
-    const handleRollback = () => {
+    // Shared destructive-confirm gate for both rollback lanes: the top button
+    // (no filename — server's legacy newest-first behavior) and per-snapshot
+    // row restores (exact filename body). Everything after Confirm — POST,
+    // postRestoreNotice handoff, acting-tab reload — is identical.
+    const openRollbackConfirm = (message, filename) => {
         setConfirmModal({
             title: 'Rollback Campaign',
-            message: `This will overwrite ALL current campaign data for "${campaignName}" with the last snapshot. All changes since the snapshot will be lost. This cannot be undone.`,
+            message,
             onConfirm: async () => {
                 setStatus('rolling-back');
                 try {
-                    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/rollback`, { method: 'POST' });
+                    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/rollback`, {
+                        method: 'POST',
+                        ...(filename ? {
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ filename })
+                        } : {})
+                    });
                     const data = await res.json();
                     if (!res.ok) {
                         setStatus({ error: data.error });
@@ -433,6 +451,14 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                 }
             }
         });
+    };
+
+    const handleRollback = () => {
+        openRollbackConfirm(`This will overwrite ALL current campaign data for "${campaignName}" with the latest snapshot. All changes since the snapshot will be lost. This cannot be undone.`);
+    };
+
+    const handleRestoreSnapshot = (snapshot) => {
+        openRollbackConfirm(`This will overwrite ALL current campaign data for "${campaignName}" with the snapshot "${snapshot.filename}". All changes since that snapshot will be lost. This cannot be undone.`, snapshot.filename);
     };
 
     const handleDownload = async () => {
@@ -647,7 +673,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                     </div>
                 </div>
 
-                <SnapshotList snapshots={snapshots} />
+                <SnapshotList snapshots={snapshots} onRestore={handleRestoreSnapshot} disabled={isBusy} />
             </div>
 
             <StatusDisplay status={status} />

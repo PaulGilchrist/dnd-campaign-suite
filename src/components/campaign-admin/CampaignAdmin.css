@@ -140,3 +140,11 @@
     color: var(--color-text-secondary);
     white-space: nowrap;
 }
+
+/* Per-snapshot Restore button in the "Available Snapshots" rows — compact so
+   the filename/meta/row layout stays readable. */
+.campaign-admin .admin-snapshot-restore {
+    padding: 2px 8px;
+    font-size: 0.85em;
+    white-space: nowrap;
+}

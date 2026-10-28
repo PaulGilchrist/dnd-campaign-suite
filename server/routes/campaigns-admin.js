@@ -424,6 +424,34 @@ function extractZipToDir(source, targetDir) {
     });
 }
 
+// Which snapshot a rollback restores. No `filename` in the body → the newest
+// entry (legacy lane, exact prior behavior). A requested name must be a plain
+// safe .zip name owned by THIS campaign (rejects path separators, '..', and
+// foreign-campaign prefixes → 400) AND appear verbatim in the campaign's own
+// freshly listed snapshots (rejects missing/pruned files → 404). Membership
+// in that list is the authority; the safety pattern only sharpens the error.
+function isSafeSnapshotName(campaign, filename) {
+    if (typeof filename !== 'string') return false;
+    if (filename.includes('/') || filename.includes('\\') || filename.includes('..')) return false;
+    if (!filename.endsWith('.zip')) return false;
+    return filename === `${campaign}.zip` || filename.startsWith(`${campaign}-`);
+}
+
+// Returns `{ filename }` to restore, or `{ error }` (disk-inert — callers
+// respond before touching anything). 404 for 'Snapshot not found'.
+function selectRollbackSnapshot(campaign, snapshots, requested) {
+    if (requested === undefined || requested === null) {
+        return { filename: snapshots[0].filename };
+    }
+    if (!isSafeSnapshotName(campaign, requested)) {
+        return { error: 'Invalid snapshot filename' };
+    }
+    if (!snapshots.some((s) => s.filename === requested)) {
+        return { error: 'Snapshot not found', missing: true };
+    }
+    return { filename: requested };
+}
+
 function reloadCampaign(campaign) {
     readFile();
     logCache.delete(campaign);
@@ -463,6 +491,8 @@ router.get('/api/campaigns/:campaign/admin/snapshots', asyncHandler((req, res) =
 }));
 
 // POST /api/campaigns/:campaign/admin/rollback
+// Body (optional): { filename } — restore exactly that snapshot. Omitting it
+// keeps the legacy newest-first behavior.
 router.post('/api/campaigns/:campaign/admin/rollback', asyncHandler(async (req, res) => {
     if (!isLocalhost(req)) {
         return res.status(403).json({ error: 'Only available on localhost' });
@@ -482,7 +512,13 @@ router.post('/api/campaigns/:campaign/admin/rollback', asyncHandler(async (req, 
         return res.status(404).json({ error: 'No snapshot found' });
     }
 
-    const snapshotPath = path.join(campaignSnapshotDir(), snapshots[0].filename);
+    const requested = req.body?.filename;
+    const target = selectRollbackSnapshot(campaign, snapshots, requested);
+    if (target.error) {
+        return res.status(target.missing ? 404 : 400).json({ error: target.error });
+    }
+
+    const snapshotPath = path.join(campaignSnapshotDir(), target.filename);
 
     // Flush in-memory data to disk before extracting snapshot
     saveFile();
@@ -492,7 +528,7 @@ router.post('/api/campaigns/:campaign/admin/rollback', asyncHandler(async (req, 
     await extractZipToDir(snapshotPath, dir);
     reloadCampaign(campaign);
 
-    res.json({ message: 'Rollback complete', restored: snapshots[0].filename });
+    res.json({ message: 'Rollback complete', restored: target.filename });
 }));
 
 // GET /api/campaigns/:campaign/admin/download
