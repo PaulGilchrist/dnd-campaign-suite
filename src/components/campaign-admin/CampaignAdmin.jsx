@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './CampaignAdmin.css';
 import EnforcementSection from './EnforcementSection.jsx';
 import AiRefereeSection from './AiRefereeSection.jsx';
@@ -30,6 +30,21 @@ function formatSnapshotDate(timestamp) {
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return '';
     return date.toLocaleString();
+}
+
+// Fully deselect the upload control so a later pick of the SAME file fires a
+// change event (real browsers drop `files` with the value; assign the empty
+// list explicitly where FileList semantics are not emulated, e.g. tests).
+function clearFileInput(input) {
+    if (!input) return;
+    input.value = '';
+    try {
+        // Via window so environments without DataTransfer (SSR lint/tests)
+        // take the fallback branch instead of a bare-reference throw.
+        input.files = new window.DataTransfer().files;
+    } catch (_err) {
+        input.files = [];
+    }
 }
 
 function AdminHeader({ campaignName, onBack }) {
@@ -185,6 +200,10 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
     // targets the renamed folder and 403s opaquely mid-flow, so we disable
     // the affordance up front instead.
     const [campaignLocked, setCampaignLocked] = useState(false);
+    // The upload file input, so a dismissed (cancelled) Upload confirm can
+    // reset it — otherwise the cancelled file stays selected and re-choosing
+    // the SAME file fires no change event (silent no-op).
+    const uploadInputRef = useRef(null);
 
     const isBusy = status && typeof status === 'string';
 
@@ -396,7 +415,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
         if (!file) return;
         if (!file.name.endsWith('.zip')) {
             setStatus({ error: 'Please select a .zip file' });
-            e.target.value = '';
+            clearFileInput(e.target);
             return;
         }
         // Pre-flight size gate mirroring the server's multer limit, so an
@@ -404,7 +423,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
         // failed POST round-trip.
         if (file.size > UPLOAD_SIZE_LIMIT_BYTES) {
             setStatus({ error: `File too large (limit ${UPLOAD_SIZE_LIMIT_MB} MB)` });
-            e.target.value = '';
+            clearFileInput(e.target);
             return;
         }
         setConfirmModal({
@@ -447,9 +466,23 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                     setStatus({ error: err.message });
                     alert(`Upload failed. The request did not complete, so no changes were confirmed.\n\nError: ${err.message}`);
                 }
-                e.target.value = '';
+                clearFileInput(e.target);
             }
         });
+    };
+
+    const handleConfirmModalClose = () => {
+        // Dismissing the Upload confirmation without confirming must reset the
+        // file input, otherwise it keeps the cancelled file and re-choosing the
+        // SAME file fires no change event (the button looks dead). Clearing the
+        // status too keeps the line honest about the latest action. (The
+        // confirm path holds its own File reference, so resetting the input
+        // here never affects an in-flight upload.)
+        if (confirmModal?.title === 'Upload Campaign') {
+            clearFileInput(uploadInputRef.current);
+            setStatus(null);
+        }
+        setConfirmModal(null);
     };
 
     return (
@@ -556,7 +589,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                         <p>Replaces the current campaign with an uploaded .zip file. A safety snapshot is saved first and used if upload fails.</p>
                         <label className="ct-btn ct-btn-primary admin-upload-label">
                             <i className="fas fa-upload"></i> Upload Campaign
-                            <input type="file" accept=".zip" onChange={handleUpload} disabled={isBusy} />
+                            <input type="file" accept=".zip" ref={uploadInputRef} onChange={handleUpload} disabled={isBusy} />
                         </label>
                     </div>
                 </div>
@@ -579,7 +612,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
             )}
 
             {confirmModal && (
-                <ConfirmModal modal={confirmModal} onClose={() => setConfirmModal(null)} />
+                <ConfirmModal modal={confirmModal} onClose={handleConfirmModalClose} />
             )}
         </div>
     );
