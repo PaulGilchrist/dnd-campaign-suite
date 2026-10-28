@@ -3,6 +3,7 @@ import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
 
 // Coalescing window for the autosave chokepoint (mirrors the indoor lane's
@@ -75,6 +76,79 @@ function resolveLoadedCollections(existing) {
     };
 }
 
+// Quiet-adopt stale-bytes window (backlog 2026-10-27-M): the campaign
+// store's live trip, read synchronously off the same getRuntimeValue
+// ('campaign', …) channel useTravelToolSync's shared-trip authority uses.
+// Field coercions mirror buildTravelInit so the snapshot deep-compares
+// against file-derived bytes (quiet resume ⇒ equal ⇒ zero-PUT contract).
+// null = the store declares NO live trip (silent key, confirmed inactive,
+// or pre-hydration UNKNOWN) — every lane keeps the file-adoption contract,
+// where the file is legitimately the resume source.
+function readStoreTripSnapshot(weather) {
+    const travelMode = getRuntimeValue('campaign', 'travel-mode');
+    if (typeof travelMode !== 'string' || travelMode === 'inactive') return null;
+    const travelPace = getRuntimeValue('campaign', 'travel-pace') || 'normal';
+    const destination = getRuntimeValue('campaign', 'travel-destination');
+    const path = getRuntimeValue('campaign', 'travel-path');
+    const pathIndex = getRuntimeValue('campaign', 'travel-pathIndex');
+    const accruedCost = getRuntimeValue('campaign', 'travel-accruedCost');
+    const dailyBudget = getRuntimeValue('campaign', 'travel-dailyBudget');
+    const dayExhausted = getRuntimeValue('campaign', 'travel-dayExhausted');
+    const forcedMarchHours = getRuntimeValue('campaign', 'travel-forcedMarchHours');
+    return {
+        travelMode,
+        travelPace,
+        destination: destination || null,
+        path: Array.isArray(path) ? path : [],
+        pathIndex: typeof pathIndex === 'number' ? pathIndex : 0,
+        accruedCost: typeof accruedCost === 'number' ? accruedCost : 0,
+        dailyBudget: typeof dailyBudget === 'number'
+            ? dailyBudget
+            : Math.floor(getDailyHexBudget(travelPace) * (weather?.budgetMod ?? 1)),
+        dayExhausted: !!dayExhausted,
+        forcedMarchHours: typeof forcedMarchHours === 'number' ? forcedMarchHours : 0,
+    };
+}
+
+// Load-time travel adoption (improve 2026-10-26-D + backlog 2026-10-27-M):
+// decide the save-ref bytes and the dirty-gate baseline travelState from the
+// loaded document. Returns { travelInitData, baselineTravel } where
+// travelInitData is null when the file carries no live trip.
+//
+// When the file carries a live trip: adopt it into the save ref BEFORE the
+// baseline seed (which reads the return value) so the bytes are exactly what
+// the publisher re-emits on resume (deep-equal ⇒ a quiet resume emits zero
+// PUTs) while a later unrelated edit (pan, terrain) re-writes the same
+// travelState instead of clobbering it back to null (improve 2026-10-26-D).
+//
+// Reconcile-at-adopt (backlog 2026-10-27-M): when the campaign store ALSO
+// declares a live trip and its bytes DIVERGE from the file's (a quiet-adopt
+// reopen after a write-back lost to a mid-plan reload), the store owns the
+// trip — seed the REF with the store bytes instead of the file's, while the
+// baseline stays the disk bytes. Every document flush from this instant on
+// (the loading-flip pass included) already carries the reconciled bytes: no
+// PUT window can re-publish the stale trip before the 53066f5c9
+// reconciliation publish lands. Equal bytes (quiet resume) deep-compare ⇒
+// identical ref/baseline ⇒ the zero-PUT contract holds; a store that speaks
+// no live trip keeps the pure file-adoption lane untouched. Empty
+// campaignName ⇒ no store lane wired ⇒ never consult it (mirrors
+// readSharedTripAuthority's empty-lane contract).
+function adoptLoadedTrip(existing, ctx) {
+    const travelInitData = buildTravelInit(existing.travelState || {}, existing.weather || null);
+    const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
+    ctx.resumedTripRef.current = hasActiveTravel;
+    if (!hasActiveTravel) {
+        return { travelInitData: null, baselineTravel: ctx.travelStateRef.current };
+    }
+    ctx.setTravelInit(travelInitData);
+    const storeTrip = ctx.campaignName ? readStoreTripSnapshot(existing.weather || null) : null;
+    ctx.travelStateRef.current = storeTrip && !isEqual(storeTrip, travelInitData)
+        ? storeTrip
+        : travelInitData;
+    ctx.resumedTripRef.current = true;
+    return { travelInitData, baselineTravel: travelInitData };
+}
+
 function applyExistingMap(existing, mapName, characters, ctx) {
     const { loadedTerrain, loadedRivers, loadedRoads, loadedPois, loadedGridSize } = resolveLoadedCollections(existing);
     const { loadedZoom, loadedPanX, loadedPanY, isOldDefault } = normalizeExistingView(existing);
@@ -93,20 +167,7 @@ function applyExistingMap(existing, mapName, characters, ctx) {
     ctx.hexMapDisplayNameRef.current = existing.displayName || mapName;
     if (existing.weather) ctx.setWeather(existing.weather);
 
-    const travelInitData = buildTravelInit(existing.travelState || {}, existing.weather || null);
-    const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
-    ctx.resumedTripRef.current = hasActiveTravel;
-    if (hasActiveTravel) {
-        ctx.setTravelInit(travelInitData);
-        // The file carries a live trip: adopt it into the save ref BEFORE the
-        // baseline seed below (which reads it) so the bytes are exactly what
-        // the publisher re-emits on resume (deep-equal ⇒ a quiet resume emits
-        // zero PUTs) while a later unrelated edit (pan, terrain) re-writes the
-        // same travelState instead of clobbering it back to null
-        // (improve 2026-10-26-D).
-        ctx.travelStateRef.current = travelInitData;
-        ctx.resumedTripRef.current = true;
-    }
+    const { baselineTravel } = adoptLoadedTrip(existing, ctx);
 
     if (isOldDefault) {
         ctx.needsResetViewRef.current = true;
@@ -138,7 +199,7 @@ function applyExistingMap(existing, mapName, characters, ctx) {
         marchingOrder: loadOrder,
         partyPosition: loadedPartyPos,
         weather: existing.weather || null,
-        travelState: ctx.travelStateRef.current,
+        travelState: baselineTravel,
     });
 
     // Claim the held-bytes name BEFORE setLoading(false): the persistence
@@ -324,6 +385,7 @@ function useMapLoader(campaignName, mapName, characters) {
         setLoading(true);
 
         const ctx = {
+            campaignName,
             setMapData, setGridSize, setTerrain, setRivers, setRoads, setPois,
             setZoom, setPanX, setPanY, setWeather, setTravelInit,
             setMarchingOrder, setPartyPosition, setLoading,
