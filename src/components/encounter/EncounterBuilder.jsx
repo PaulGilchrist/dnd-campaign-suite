@@ -508,7 +508,13 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
   };
 
   const handleRenameEncounter = async (oldName, newName) => {
+    // Backlog 2026-10-28-T: rename success was the only silent lane — save/load/
+    // update/404 all toast. renameEncounterAction reloads the list before
+    // resolving and throws on non-2xx/network failure, so a resolved await here
+    // is a true success (same ownership contract as the save lane); failures
+    // pass through untouched to the leaf modal's inline error (EncounterModal.jsx).
     await renameEncounterAction(oldName, newName);
+    showToast('Encounter renamed');
   };
 
   const handleDifficultyChange = (e) => {
