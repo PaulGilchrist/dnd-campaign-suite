@@ -6,12 +6,10 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
-import { stripSummonedFromCombatSummary } from '../../services/combat/summons/summonedCreatureService.js'
 import { getMonsterImageUrl } from '../../services/npcs/monsterUtils.js'
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
 import { loadCombatSummary, getCombatSummary, getActiveCreatureName, setCombatSummaryCache } from '../../services/encounters/combatData.js'
-import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js'
 import { clearExpirationEffects } from '../../services/rules/effects/expirations.js'
 import {
     setupCreatures,
@@ -467,25 +465,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         return () => window.removeEventListener('prismatic-spray-violet-result', handler)
     }, [combatSummary, campaignName])
 
-    // Concentration-result listener
-    React.useEffect(() => {
-        const handler = (e) => {
-            if (!combatSummary) return
-            const creature = combatSummary.creatures.find(c =>
-                c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')
-            )
-            if (creature && !e.detail.success) {
-                const concentrationSpell = creature.concentration?.spell
-                creature.concentration = null
-                stripSummonedFromCombatSummary(combatSummary, creature.name)
-                storage.set('combatSummary', combatSummary, campaignName)
-                setCombatSummary(cloneDeep(combatSummary))
-                cleanupConcentrationEffects(creature.name, concentrationSpell, campaignName)
-            }
-        }
-        window.addEventListener('concentration-result', handler)
-        return () => window.removeEventListener('concentration-result', handler)
-    }, [combatSummary, campaignName])
+    // NOTE: no `concentration-result` listener here — the page-singleton consumer in
+    // useLoggedDiceRollEventHandlers.setupEventListeners is the ONE adjudicator for
+    // failed concentration saves (it logs the roll row, nulls concentration in the
+    // shared cache, strips summons, clears mantle, persists and dispatches
+    // `combat-summary-updated`). A second view-mounted copy here used to double every
+    // SP-011 "Concentration broken; X ends." log row (bug-concentration-broken-double-log-rows);
+    // this view adopts the adjudicated summary via the combat-summary-updated listener below.
 
     // death-save-result listener
     React.useEffect(() => {

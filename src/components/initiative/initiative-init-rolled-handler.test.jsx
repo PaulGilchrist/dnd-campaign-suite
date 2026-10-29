@@ -11,7 +11,9 @@
 //      args; non-dominated entries survive in the filtered write; empty list → no-op;
 //      non-empty all-non-dominated list → zero rewrite (#864 only-if-changed guard)
 // Delegated (do NOT duplicate here):
-//   - concentration-result / death-save-result inline listeners → initiative-callbacks.test.jsx (#863)
+//   - concentration-result (pinned ABSENT on the view — single adjudicator is the
+//     useLoggedDiceRollEventHandlers page-singleton) / death-save-result inline
+//     listeners → initiative-callbacks.test.jsx (#863)
 //   - round-wrap Vex latch reset (navigation seam, different event path) → navigationHandlers.wm008-vex-latch.test.js
 //   - char-sheet per-character initiative resets → src/components/char-sheet/useInitiativeEffects.*.test.js
 //   - dispatch side of the event → initiativeProcessing.test.js, encounterToInitiative.test.js

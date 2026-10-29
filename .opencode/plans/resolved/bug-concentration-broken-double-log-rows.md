@@ -38,3 +38,21 @@ Whichever lane: add a test pinning exactly ONE `Concentration broken` row per fa
 
 ### Severity
 Minor UX issue / data-hygiene — no state corruption (cleanup is idempotent), but the GM-facing campaign log tells the story twice on a common lane (every failed con save during combat), and doubles the cs persist chatter.
+
+## Resolution
+
+**FIXED** (2026-10-29). Root cause confirmed as described: the local `concentration-result` CustomEvent (dispatched by `ConcentrationPromptModal.jsx:169` on the acting client) had TWO window consumers, each running `cleanupConcentrationEffects()` — whose SP-011 emitter logs `Concentration broken; <spell> ends.` unconditionally when a spellName was captured — so a failing save on the Initiative view wrote the row twice.
+
+**Chosen lane: Suggested-fix option 1** (consolidate into the one consumer). The `useLoggedDiceRollEventHandlers.js` page-singleton (`setupEventListeners`, guarded by `window.__pendingResultHandlersInstalled`) is a strict superset of the Initiative copy — it logs the `roll:concentration-save` row, nulls concentration in the imperative store, strips summons, clears `mantleOfMajestyActive`, persists via `storage.set`, and dispatches `combat-summary-updated`. The Initiative view already re-adopts the summary through its existing `combat-summary-updated` listener (`Initiative.jsx:540`), so deleting its duplicate `concentration-result` listener loses nothing and the card still clears its badge. The Initiative copy added nothing the hook lacked except reading React state instead of the store (the stale-copy read is exactly what produced the second row). No 2024 twin listener exists — the adjudication seam is shared across both rulesets, so the single fix covers 5e and 2024.
+
+**Files changed:**
+- `src/components/initiative/Initiative.jsx` — deleted the duplicate `concentration-result` `useEffect` listener (+ its now-unused `cleanupConcentrationEffects` / `stripSummonedFromCombatSummary` imports), replaced with a NOTE pointing at the single consumer.
+- `src/components/initiative/initiative-callbacks.test.jsx` — replaced the removed consumer's positive assertion with a **single-consumer regression pin**: with the Initiative view mounted, a dispatched `concentration-result` (fail/success/unknown-target) is fully inert on the view (zero `storage.set` / `setRuntimeValue` / `cleanupConcentrationEffects`). Updated the file's owned-contract header comment.
+- `src/components/initiative/initiative-init-rolled-handler.test.jsx` — updated the delegation pointer comment (listener is now pinned ABSENT).
+- `src/hooks/combat/useLoggedDiceRollEventHandlers.test.js` — strengthened the surviving single-consumer test to assert **exactly-once** adjudication (`storage.set`, `cleanupConcentrationEffects`, `logEntry` all `toHaveBeenCalledTimes(1)`).
+
+**Verification:**
+- **Live repro pre-fix** (test-campaign, dev:locked :5173, header verified `test-campaign`): 12-PC board + EB Goblin; AasimarTest concentration `{Hex,DC10}` via full-store cs POST; armed own-card target-select; Scimitar chip → Done → `.cnp-overlay` → Roll Con Save. A failing save (total 6 < DC10) produced **2** break rows at +1/+2ms (matching the filed fingerprint).
+- **Live re-verify post-fix** (Vite HMR reload, same rig): a fresh failing save (total 3 < DC10) produced **exactly 1** `ability_use` break row (+1ms), `creature.concentration` null in the store, BROKEN panel shown, card badge cleared. Machine-counted the whole session log: 13 roll rows, 0 roll-row dupes (<5ms), 11 successes each with 0 break rows, 2 failures → 2 attributed break rows (1 pre-fix, 1 post-fix), 0 orphan break rows.
+- `npx vitest run` on touched files (2 files/36), full `src/components/initiative` (65 files/509), `src/hooks/combat` (229 files/1941), and `src/services/combat/concentration`+`src/components/common` (54 files/594) — all green. `npm run lint` zero warnings. `no-timers-guard` OK (35 benign UI sites).
+- Cleanup: Admin `clear-change-data` + `clear-log` (API POST, 200 no-dialog) → `change-data {}` + `log []` GET-verified two-pass from closed-tab quiet.

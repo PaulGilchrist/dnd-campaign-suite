@@ -1,6 +1,8 @@
 // @maintained-by-ai
 // Owned contract: Initiative.jsx's INLINE window-event listeners —
-//   concentration-result (Initiative.jsx:457-474), death-save-result
+//   concentration-result (Initiative.jsx — regression-pinned as ABSENT per
+//   bug-concentration-broken-double-log-rows: the page-singleton consumer in
+//   useLoggedDiceRollEventHandlers is the ONE adjudicator), death-save-result
 //   (Initiative.jsx:476-494), and the keydown navigation block
 //   (Initiative.jsx:557-575, fix#362 — re-homed here per the
 //   navigationHandlers.test.jsx:16-20 ruling; factory lanes have no DOM).
@@ -219,31 +221,32 @@ describe('Initiative window-event listeners', () => {
         });
     });
 
-    describe('concentration-result', () => {
+    // bug-concentration-broken-double-log-rows: the mounted view must NOT consume
+    // 'concentration-result'. The page-singleton in useLoggedDiceRollEventHandlers.
+    // setupEventListeners is the ONE adjudicator for failed concentration saves (its
+    // failure branch is pinned in useLoggedDiceRollEventHandlers.test.js). A second
+    // view-mounted consumer here previously ran cleanupConcentrationEffects per
+    // failure — doubling every SP-011 "Concentration broken; X ends." log row plus
+    // the cs persist chatter. Mounting this view and dispatching a resolved save
+    // must stay fully inert from this component (adoption rides combat-summary-updated).
+    describe('concentration-result (single-consumer regression pin)', () => {
         const withConcentration = () => ({
             round: 1,
             creatures: [{ name: 'Alice', type: 'player', concentration: { spell: 'Shield', dc: 10 } }],
         });
 
-        it('breaks concentration on a failed save, persisting the cleared summary and cleaning up effects', async () => {
-            await renderWithSummary(withConcentration(), 'Alice');
-
-            await dispatchEvent('concentration-result', { targetName: 'Alice', success: false });
-
-            expect(latestStoredSummary().creatures.find(c => c.name === 'Alice').concentration).toBeNull();
-            expect(cleanupConcentrationEffects).toHaveBeenCalledWith('Alice', 'Shield', 'test-campaign');
-        });
-
         it.each([
+            ['the save fails', { targetName: 'Alice', success: false }],
             ['the save succeeds', { targetName: 'Alice', success: true }],
             ['no creature matches the target', { targetName: 'Nobody', success: false }],
-        ])('is a no-op when %s', async (_label, detail) => {
+        ])('is fully inert on the mounted view when %s', async (_label, detail) => {
             await renderWithSummary(withConcentration(), 'Alice');
 
             const before = writeCounts();
             await dispatchEvent('concentration-result', detail);
 
             expect(storage.set).toHaveBeenCalledTimes(before.storage);
+            expect(setRuntimeValue).toHaveBeenCalledTimes(before.runtime);
             expect(cleanupConcentrationEffects).toHaveBeenCalledTimes(before.cleanup);
         });
     });

@@ -358,6 +358,10 @@ describe('concentration-result event', () => {
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ mode: 'disadvantage' }));
     });
 
+    // bug-concentration-broken-double-log-rows: this hook listener is the ONE
+    // window consumer of 'concentration-result' (the Initiative view's duplicate
+    // copy was deleted) — each failed dispatch must adjudicate EXACTLY once:
+    // one roll row, one storage persist, one cleanup (→ one SP-011 break row).
     it('failed save clears concentration, strips mantle, persists summary, dispatches refresh, runs cleanup', () => {
         const creature = { name: 'TestWizard', concentration: { spell: 'Fireball' } };
         getCombatSummary.mockReturnValue({ creatures: [creature] });        let refreshed = false;
@@ -368,8 +372,11 @@ describe('concentration-result event', () => {
 
         expect(creature.concentration).toBeNull();
         expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'mantleOfMajestyActive', null, CAMPAIGN);
+        expect(storage.set).toHaveBeenCalledTimes(1);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), CAMPAIGN);
+        expect(cleanupConcentrationEffects).toHaveBeenCalledTimes(1);
         expect(cleanupConcentrationEffects).toHaveBeenCalledWith('TestWizard', 'Fireball', CAMPAIGN);
+        expect(deps.logEntry).toHaveBeenCalledTimes(1);
         expect(refreshed).toBe(true);
         window.removeEventListener('combat-summary-updated', onRefresh);
     });
