@@ -255,7 +255,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const displayCreatures = React.useMemo(() => {
         if (!combatSummary || !combatSummary.creatures) return []
         return combatSummary.creatures.map(c => buildDisplayCreature(c, characters))
-    }, [combatSummary, characters])
+        // runtimeStateTick is bumped by the SSE handler on every per-character
+        // change (sseHandlers.js catch-all). buildDisplayCreature merges
+        // activeConditions/activeConditionMeta/HP via the imperative, NON-reactive
+        // getRuntimeValue, so without this dep a passive tab's memo freezes at its
+        // mount-time snapshot and remote condition writes never re-render the badges.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [combatSummary, characters, runtimeStateTick])
 
     React.useEffect(() => {
         if (!campaignName) return
