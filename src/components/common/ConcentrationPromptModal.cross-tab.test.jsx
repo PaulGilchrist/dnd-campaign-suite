@@ -2,7 +2,8 @@
 // ConcentrationPromptModal — cross-tab resolution (bug-concentration-prompt-stale-cross-tab-double-roll)
 //
 // Locks the resolution contract for passive clients: once any client answers a
-// concentration check, the server DELETEs `concentrationPrompt-<Target>` and
+// concentration check, the server DELETEs `concentrationPrompt-<Target>-<promptId>`
+// (per-promptId key since the multi-hit collapse fix) and
 // broadcasts a null echo — every OTHER client must close its queued check for
 // that target (the pre-fix component dropped the null echo at the top of
 // handleEvent, leaving stale tabs a live "Roll Con Save" that spent a second
@@ -53,16 +54,17 @@ vi.mock('./Subscriber.jsx', () => {
       'div',
       { 'data-testid': 'subscriber', 'data-campaign': campaignName },
       button('prompt', {
-        key: `change-${campaignName}-concentrationPrompt-${ROLLER}`,
+        key: `change-${campaignName}-concentrationPrompt-${ROLLER}-test-prompt-1`,
         data: { promptId: 'test-prompt-1', targetName: ROLLER, spellName: 'Bless', dc: 10, attackerName: 'Goblin' },
       }),
-      // Passive-tab mirror of another client's clearConcentrationPrompt DELETE.
+      // Passive-tab mirror of another client's clearConcentrationPrompt DELETE
+      // (per-promptId key since the multi-hit collapse fix).
       button('prompt-cleared', {
-        key: `change-${campaignName}-concentrationPrompt-${ROLLER}`,
+        key: `change-${campaignName}-concentrationPrompt-${ROLLER}-test-prompt-1`,
         data: null,
       }),
       button('other-target-cleared', {
-        key: `change-${campaignName}-concentrationPrompt-${OTHER}`,
+        key: `change-${campaignName}-concentrationPrompt-${OTHER}-some-other-prompt`,
         data: null,
       }),
       // Another client's submitted result broadcast (sendConcentrationResult POST).
@@ -172,7 +174,7 @@ describe('ConcentrationPromptModal cross-tab resolution', () => {
     await openPrompt();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     await waitFor(() => { expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument(); });
-    expect(clearConcentrationPrompt).toHaveBeenCalledWith(CAMPAIGN, ROLLER);
+    expect(clearConcentrationPrompt).toHaveBeenCalledWith(CAMPAIGN, ROLLER, 'test-prompt-1');
     expect(sendConcentrationResult).not.toHaveBeenCalled();
     expect(rollD20).not.toHaveBeenCalled();
   });

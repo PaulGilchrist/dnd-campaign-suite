@@ -38,7 +38,9 @@ const ENCODED_CAMPAIGN = 'Campaign%20%231';
 const PROMPT_POSTS = [
   { fn: sendSavePrompt, key: 'savePrompt-Goblin', data: { targetName: 'Goblin', dc: 13 } },
   { fn: sendDeathSavePrompt, key: 'deathSavePrompt-Fighter', data: { targetName: 'Fighter' } },
-  { fn: sendConcentrationPrompt, key: 'concentrationPrompt-Wizard', data: { targetName: 'Wizard' } },
+  // Per-promptId key (multi-hit collapse fix): each damage event's prompt
+  // lives under its own key so answering one never DELETEs another's.
+  { fn: sendConcentrationPrompt, key: 'concentrationPrompt-Wizard-prompt-abc', data: { targetName: 'Wizard', promptId: 'prompt-abc' } },
   { fn: sendFleshToStonePrompt, key: 'fleshToStonePrompt-Goblin', data: { targetName: 'Goblin', dc: 15, casterName: 'Wizard' } },
 ];
 
@@ -127,6 +129,15 @@ describe('savePromptService', () => {
       expect(init.headers).toBeUndefined();
     }
   );
+
+  it('clears a concentration prompt by promptId so sibling multi-hit prompts survive', () => {
+    clearConcentrationPrompt(CAMPAIGN, 'Wizard', 'prompt-abc');
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = globalThis.fetch.mock.calls[0];
+    expect(url).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/concentrationPrompt-Wizard-prompt-abc`);
+    expect(init.method).toBe('DELETE');
+  });
 
   it.each(RESULT_EVENTS)(
     'dispatches exactly one $event with the full result envelope after the POST resolves',

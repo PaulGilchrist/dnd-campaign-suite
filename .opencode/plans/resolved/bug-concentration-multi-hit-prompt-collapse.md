@@ -1,7 +1,75 @@
 # Bug: Multi-hit concentration saves collapse — resolving one queued prompt silently voids every other pending save for that target (no roll, no log, key deleted)
 
+## Resolution (2026-10-29)
+
+**FIXED.** Root cause confirmed exactly as diagnosed: `sendConcentrationPrompt`
+POSTed every damage event to the SAME key `concentrationPrompt-<Target>`, and
+both the roll/dismiss clear (DELETE by target name) and the 6b1800fa2
+null-echo handler cleared/dropped **per target**, so resolving one queued save
+silently voided every sibling save for that target.
+
+**Fix — promptId-scoped lane end-to-end (option 1 of the suggested fix):**
+
+- `src/services/combat/conditions/savePromptService.js` — new
+  `concentrationPromptKey(targetName, promptId)` helper; `sendConcentrationPrompt`
+  now writes `concentrationPrompt-<Target>-<promptId>` (N hits stack as N keys
+  server-side instead of overwriting one), and `clearConcentrationPrompt` takes
+  an optional `promptId` and deletes only that prompt's key. A missing
+  promptId falls back to the legacy target-only key (staged/rig writes stay
+  supported — the echo lane treats both shapes).
+- `src/components/common/ConcentrationPromptModal.jsx` — `handleEvent` derives
+  `targetName` from the payload (falling back to the key suffix minus the
+  trailing promptId); the null-echo drop now removes **only the entry whose
+  `<Target>-<promptId>` key was cleared**, while a bare-target null echo still
+  performs the legacy target-wide drop (the 6b1800fa2 cross-tab contract).
+  `handleRoll`/`handleDismiss` pass `current.promptId` into the clear.
+- `src/services/rules/combat/applyDamage.js` — no change needed: it already
+  generated a per-hit `promptId` and included it in the payload; the key
+  construction lives in the service. Single `applyDamage.js` serves both
+  rulesets (no 2024 sibling to mirror).
+
+**Tests:**
+
+- NEW `src/components/common/ConcentrationPromptModal.multi-hit.test.jsx` (4
+  tests): same-target two-prompt queue `(1 of 2)` → Roll A → Next Check →
+  Roll B with one `sendConcentrationResult` + one `clearConcentrationPrompt`
+  per promptId; per-promptId null echo keeps the sibling save live; legacy
+  bare-target null echo still target-wide drops; dismiss advances to B
+  promptId-scoped.
+- `src/components/common/ConcentrationPromptModal.cross-tab.test.jsx` /
+  `.test.jsx` — mocks updated to the new per-promptId wire key shape and
+  clear-call pins now include the promptId (legacy fallback proven by the
+  multi-hit suite's bare-target test).
+- `src/services/combat/conditions/savePromptService.test.js` — POST row pins
+  the `<Target>-<promptId>` key; new DELETE row pins the promptId-scoped clear.
+
+Results: new test 4/4; touched folders — `src/services/combat/conditions` 21
+files/872 tests, `src/services/rules/combat/applyDamage*` 26/207,
+`src/components/common` 49/540, all green. `npm run lint` zero warnings.
+
+**Live re-verification (test-campaign, dev :5173, single tab + two-tab):**
+
+- Repro pre-fix confirmed first: 2 hits → server key held only promptId B
+  (A overwritten), answering A left `.cnp-overlay` = 0, 1 `roll:concentration-save`
+  row for 2 `hp_change`s, conc intact.
+- Post-fix: hit 1 stored `concentrationPrompt-AasimarTest-3b9b7908-…`; hit 2
+  stored a SECOND key `…-7bc293d6-…` (both present simultaneously) while the
+  modal showed `(1 of 2)`. Rolled A (MAINTAINED) → A's key gone, B's key
+  still on the server; Done → **B's prompt appeared with its own Roll Con
+  Save**, rolled it (Total 19 vs DC 10), Done → 0 overlays, both keys gone,
+  exactly **2 new `roll:concentration-save` rows** (totals 19/19 in the log,
+  the earlier 11 was the pre-fix leg) for the 2 damage instances.
+- Adjacent sanity: single-hit flow still one save/one row; Dismiss path
+  promptId-scoped; two-tab: prompt mirrored to passive tab (1 overlay each),
+  acting tab's Roll closed the passive overlay in ~150ms with zero reloads,
+  exactly one new save row, key cleared (6b1800fa2 contract intact —
+  verified on the new keys; the failing-roll leg correctly nulled
+  `creature.concentration`).
+- Cleanup: admin clear-change-data `{}` + clear-log `[]` GET-verified after
+  closing both tabs; dev server stopped.
+
 ## Summary
-When a concentrating player takes damage more than once before a prompt is answered, each hit queues its own prompt (client modal even shows “(1 of 2)”), but the prompts all share ONE server key `concentrationPrompt-<Target>`, and clearing/answering deletes by target name. So resolving the first save wipes the second save for a real, separate damage event — it never gets a save, produces no log row, and the concentration incorrectly persists. Follow-up to `6b1800fa2` (cross-tab double-roll fix); this is the over-clearing side of the same lane.
+When a concentrating player takes damage more than once before a prompt is answered, each hit queues its own prompt (client modal even shows “(1 of 2)”), but the prompts all shared ONE server key `concentrationPrompt-<Target>`, and clearing/answering deleted by target name. Resolving the first save wiped the second save for a real, separate damage event — no save, no log row, concentration incorrectly persisted. Fixed by keying prompts per promptId (`concentrationPrompt-<Target>-<promptId>`) end-to-end: prompts stack on the server, clears and null-echo drops are promptId-scoped (bare-target echoes keep the legacy target-wide clear), and each damage instance now gets its own save, roll, and `roll:concentration-save` log row.
 
 ## Steps to reproduce
 Live-proven 2026-10-29 in `test-campaign` (dev:locked, two tabs on :5173):

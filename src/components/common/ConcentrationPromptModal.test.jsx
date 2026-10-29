@@ -58,14 +58,14 @@ vi.mock('./Subscriber.jsx', () => {
       React.createElement('button', {
         'data-testid': 'subscriber-trigger',
         onClick: () => fire({
-          key: `change-${campaignName}-concentrationPrompt-${ROLLER}`,
+          key: `change-${campaignName}-concentrationPrompt-${ROLLER}-test-prompt-1`,
           data: { promptId: 'test-prompt-1', targetName: ROLLER, spellName: 'Bless', dc: 10, attackerName: 'Elarielle' },
         }),
       }),
       React.createElement('button', {
         'data-testid': 'subscriber-trigger-second',
         onClick: () => fire({
-          key: `change-${campaignName}-concentrationPrompt-${ROLLER2}`,
+          key: `change-${campaignName}-concentrationPrompt-${ROLLER2}-test-prompt-2`,
           data: { promptId: 'test-prompt-2', targetName: ROLLER2, spellName: 'Haste', dc: 13 },
         }),
       }),
@@ -284,7 +284,8 @@ describe('ConcentrationPromptModal', () => {
   it('clears the server-side prompt after the roll is sent', async () => {
     await openPrompt();
     await rollAndSeeResult();
-    expect(clearConcentrationPrompt).toHaveBeenCalledWith(CAMPAIGN, ROLLER);
+    // promptId-scoped clear: only the adjudicated prompt's key leaves the store.
+    expect(clearConcentrationPrompt).toHaveBeenCalledWith(CAMPAIGN, ROLLER, 'test-prompt-1');
   });
 
   // ── Advantage / disadvantage from real modifiers ──

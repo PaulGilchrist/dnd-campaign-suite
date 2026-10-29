@@ -50,8 +50,21 @@ export function sendDeathSaveResult(campaignName, targetName, resultData) {
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
+// Concentration prompts are keyed per promptId so back-to-back damage on one
+// concentrating target stacks in the store instead of every hit overwriting
+// the same `concentrationPrompt-<Target>` key (multi-hit collapse bug): the
+// client queue could show "(1 of 2)" while the server only ever held the
+// last prompt, and answering any prompt DELETEd the key and silently voided
+// every other pending save for that target. A missing promptId falls back to
+// the legacy target-only key (staged/admin writes without a promptId).
+function concentrationPromptKey(targetName, promptId) {
+  return promptId
+    ? `concentrationPrompt-${targetName}-${promptId}`
+    : `concentrationPrompt-${targetName}`;
+}
+
 export function sendConcentrationPrompt(campaignName, promptData) {
-  const key = `concentrationPrompt-${promptData.targetName}`;
+  const key = concentrationPromptKey(promptData.targetName, promptData.promptId);
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -68,8 +81,8 @@ export function sendConcentrationResult(campaignName, targetName, resultData) {
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
-export function clearConcentrationPrompt(campaignName, targetName) {
-  const key = `concentrationPrompt-${targetName}`;
+export function clearConcentrationPrompt(campaignName, targetName, promptId) {
+  const key = concentrationPromptKey(targetName, promptId);
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'DELETE',
   }).catch((e) => { console.error("[savePromptService] Error:", e); });

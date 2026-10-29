@@ -81,25 +81,34 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
     if (!event.key) return;
     const prefix = `change-${campaignName}-concentrationPrompt-`;
     if (!event.key.startsWith(prefix)) return;
-    const targetName = event.key.slice(prefix.length);
-    if (!targetName) return;
+    const keySuffix = event.key.slice(prefix.length);
+    if (!keySuffix) return;
 
     if (event.data == null) {
       // Cleared-key echo (the server broadcasts null on key DELETE, as every
       // client's Roll/Dismiss does via clearConcentrationPrompt): the prompt
-      // was answered on another client — drop this target's outstanding
-      // checks so a passive tab can never re-roll a resolved save. Keeps a
-      // check this client already adjudicated so its result panel survives
-      // until the user clicks Done.
-      setPrompts(prev => {
-        if (!prev.some(p => p.targetName === targetName && !p.result)) return prev;
-        return prev.filter(p => p.targetName !== targetName || p.result);
-      });
+      // was answered on another client — drop exactly the check whose per-
+      // promptId key (`<Target>-<promptId>`) was cleared, so a passive tab
+      // can never re-roll a resolved save while a sibling multi-hit prompt
+      // for the same target survives. A suffix naming only the target is the
+      // legacy/staged target-wide clear — it still drops that target's
+      // outstanding checks. Keeps a check this client already adjudicated
+      // so its result panel survives until the user clicks Done.
+      const isCleared = (p) => !p.result
+        && (keySuffix === `${p.targetName}-${p.promptId}` || keySuffix === p.targetName);
+      setPrompts(prev => (prev.some(isCleared) ? prev.filter(p => !isCleared(p)) : prev));
       return;
     }
 
+    // Per-prompt keys carry the promptId; trust the payload's targetName and
+    // fall back to the key suffix minus the trailing promptId.
+    const { promptId, targetName: dataTargetName } = event.data;
+    const targetName = dataTargetName
+      || (promptId && keySuffix.endsWith(`-${promptId}`)
+        ? keySuffix.slice(0, -(promptId.length + 1))
+        : keySuffix);
     setPrompts(prev => {
-      if (prev.some(p => p.promptId === event.data.promptId)) return prev;
+      if (prev.some(p => p.promptId === promptId)) return prev;
       return [...prev, { targetName, ...event.data }];
     });
   }, [campaignName]);
@@ -117,8 +126,10 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
     if (!current) return;
     // Mirror SavePromptModal.dismiss: a dismissed un-rolled prompt is a
     // client-wide answer — clear the server key (the null echo closes every
-    // other client) so no orphan outlives the tab that dismissed it.
-    clearConcentrationPrompt(campaignName, current.targetName);
+    // other client) so no orphan outlives the tab that dismissed it. The
+    // clear is promptId-scoped: a sibling multi-hit prompt for this target
+    // keeps its own key and stays live on every client.
+    clearConcentrationPrompt(campaignName, current.targetName, current.promptId);
     advance();
   }, [campaignName, current, advance]);
 
@@ -180,7 +191,9 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
 
     rollingPromptIdsRef.current.delete(promptId);
     resolvedPromptIdsRef.current.add(promptId);
-    clearConcentrationPrompt(campaignName, current.targetName);
+    // promptId-scoped: only this damage event's key leaves the store — a
+    // sibling multi-hit prompt keeps its own key and advances on every client.
+    clearConcentrationPrompt(campaignName, current.targetName, promptId);
   }, [campaignName, current, characters, activeMapName]);
 
   const handleNext = useCallback(() => {
