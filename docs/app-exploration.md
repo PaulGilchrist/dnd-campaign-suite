@@ -159,7 +159,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run V
 
-- **`settlements-sessions-no-list-sse`** (2026-10-29-V, live + code) — `server/routes/settlements.js` and `server/routes/sessions.js` publish NO `<entity>-list-<campaign>` event and neither component mounts a `<Subscriber>` (npcs/factions/quests/notes all do, per `broadcastFactionsList` pattern in `factions.js:5-9`); passive GM tabs see stale lists with no refresh affordance (proven: 0 rows after remote create; stale row after remote restore). Add publisher on every mutation route + `handleSSEEvent` w/ skip-while-editing + `missedListBroadcast` per the Notes/NPC canon.
+*(none — run-V backlog fully consumed by the 2026-10-29 improve run: `sessions-reload-guard-parity` 469e6a31b, `ct-lanes-close-x-unguarded` 4d4b1e69a, `notes-conflict-banner-identity-flip` a304ff27f, `settlements-sessions-no-list-sse` this commit (settlements+sessions list SSE publishers + Subscribers — the SSE-absence rows in Coverage/quirks are superseded). Dispositions in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-28 run U
 

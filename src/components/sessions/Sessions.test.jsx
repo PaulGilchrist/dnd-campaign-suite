@@ -4,6 +4,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Sessions from './Sessions.jsx';
 import { emptyLinks } from '../../services/campaign/sessionPlannerUtils.js';
 
+// Sessions mounts <Subscriber> (live sessions-style list sync, improve
+// settlements-sessions-no-list-sse). Mock the shared SSE client so this
+// file's beforeEach `vi.unstubAllGlobals()` — which also drops setup.js's
+// global EventSource stub — cannot break later mounts (Notes.test.jsx
+// precedent).
+vi.mock('../../services/ui/sseClient.js', () => ({
+  subscribeToSSE: () => () => {},
+}));
+
 const sessionMockStore = {
   items: [],
   loading: false,

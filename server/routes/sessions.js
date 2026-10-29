@@ -9,6 +9,14 @@ import {
   stampForSave,
 } from '../utils/jsonEntityCrud.js';
 import { findDuplicateNameError } from '../utils/nameUniqueness.js';
+import { publish } from '../utils/changeData.js';
+
+// Mirrors broadcastNPCsList (routes/npcs.js) / broadcastNotesList
+// (routes/notes.js): every list mutation publishes a `sessions-list-<campaign>`
+// SSE event so other GM tabs re-fetch live (improve settlements-sessions-no-list-sse).
+const broadcastSessionsList = (action, campaign, payload = {}) => {
+  publish(`sessions-list-${campaign}`, { action, ...payload }, campaign);
+};
 
 const baseRouter = createJsonEntityRouter('sessions', {
   idField: 'name',
@@ -16,6 +24,9 @@ const baseRouter = createJsonEntityRouter('sessions', {
   // Display noun for 404/409 copy (matches the NPC/Faction/Settlement lanes);
   // duplicate-name 400 copy stays lowercase 'A session with that name already exists'.
   singularDisplayName: 'Session',
+  // Factory lanes: whole-array POST publishes 'replaced', DELETE publishes
+  // 'deleted' — both AFTER the disk write lands (jsonEntityCrud sequencing).
+  broadcast: broadcastSessionsList,
   validateList: (sessions) => findDuplicateNameError(sessions, 'session'),
 });
 
@@ -62,6 +73,7 @@ baseRouter.put('/api/campaigns/:campaign/sessions/:sessionName', asyncHandler((r
       return res.status(409).json(conflictErrorBody('Session', decodedName, 'created or deleted'));
     }
 
+    const action = existingIndex !== -1 ? 'updated' : 'created';
     const stampedSession = stampForSave(updatedSession, existingSession);
     if (existingIndex !== -1) {
       sessions[existingIndex] = stampedSession;
@@ -70,6 +82,9 @@ baseRouter.put('/api/campaigns/:campaign/sessions/:sessionName', asyncHandler((r
     }
 
     fs.writeFileSync(filePath, JSON.stringify(sessions, null, 2));
+    // Publish AFTER the write lands (no echo-before-persist race — mirrors
+    // npcs.js PUT: writeFileSync → broadcast → res.json).
+    broadcastSessionsList(action, campaign, { name: stampedSession.name });
     res.json({ success: true, session: stampedSession });
   } catch (error) {
     console.error('Error updating session:', error);

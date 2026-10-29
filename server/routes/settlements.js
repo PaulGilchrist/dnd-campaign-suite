@@ -9,15 +9,26 @@ import {
   stampForSave,
 } from '../utils/jsonEntityCrud.js';
 import { findDuplicateNameError } from '../utils/nameUniqueness.js';
+import { publish } from '../utils/changeData.js';
 
 // Display noun for conflict/404 copy (matches the NPC lane's 'NPC'; duplicate-
 // name 400 copy stays lowercase 'A settlement with that name already exists').
 const SINGULAR_DISPLAY_NAME = 'Settlement';
 
+// Mirrors broadcastNPCsList (routes/npcs.js) / broadcastNotesList
+// (routes/notes.js): every list mutation publishes a `settlements-list-<campaign>`
+// SSE event so other GM tabs re-fetch live (improve settlements-sessions-no-list-sse).
+const broadcastSettlementsList = (action, campaign, payload = {}) => {
+  publish(`settlements-list-${campaign}`, { action, ...payload }, campaign);
+};
+
 const baseRouter = createJsonEntityRouter('settlements', {
   idField: 'name',
   pluralDisplayName: 'settlements',
   singularDisplayName: SINGULAR_DISPLAY_NAME,
+  // Factory lanes: whole-array POST publishes 'replaced', DELETE publishes
+  // 'deleted' — both AFTER the disk write lands (jsonEntityCrud sequencing).
+  broadcast: broadcastSettlementsList,
   validateList: (settlements) => findDuplicateNameError(settlements, 'settlement'),
 });
 
@@ -84,6 +95,7 @@ baseRouter.put('/api/campaigns/:campaign/settlements/:settlementName', asyncHand
       );
     }
 
+    const action = existingIndex !== -1 ? 'updated' : 'created';
     const stampedSettlement = stampForSave(updatedSettlement, existingSettlement);
     if (existingIndex !== -1) {
       settlements[existingIndex] = stampedSettlement;
@@ -92,6 +104,9 @@ baseRouter.put('/api/campaigns/:campaign/settlements/:settlementName', asyncHand
     }
 
     fs.writeFileSync(filePath, JSON.stringify(settlements, null, 2));
+    // Publish AFTER the write lands (no echo-before-persist race — mirrors
+    // npcs.js PUT: writeFileSync → broadcast → res.json).
+    broadcastSettlementsList(action, campaign, { name: stampedSettlement.name });
     res.json({ success: true, settlement: stampedSettlement });
   } catch (error) {
     console.error('Error updating settlement:', error);

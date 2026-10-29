@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadSettlements, saveSettlement, deleteSettlement } from '../../services/campaign/settlementsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
+import Subscriber from '../common/Subscriber.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 import './Settlements.css';
 
@@ -415,12 +416,11 @@ function Settlements({ campaignName, onBack }) {
   // True when the visible banner error is a 409 concurrent-edit conflict
   // (server body { conflict: true }) — gates the "Reload list" action button.
   const [errorIsConflict, setErrorIsConflict] = useState(false);
-  // Rejected (409) saves prove the on-screen list is stale; consumed in
-  // handleCloseModal so a reopen re-seeds a fresh row instead of repeating the
-  // same 409. Mirrors NPCs.jsx (9cee7bfa2). NOTE: unlike the NPC/Faction/
-  // Quest/Note lanes, the settlements route publishes no `settlements-list-*`
-  // SSE broadcast, so there is no skipped-while-editing leg here — the
-  // rejected save is the only staleness signal.
+  // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
+  // the on-screen list is stale; consumed in handleCloseModal so a reopen
+  // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx
+  // (9cee7bfa2) / Notes.jsx (broadcast wired server-side in routes/
+  // settlements.js, improve settlements-sessions-no-list-sse).
   const missedListBroadcast = useRef(false);
   const descDataRef = useRef(null);
   // Draft snapshot powering the reload-discard guard — shared with the NPC
@@ -449,6 +449,19 @@ function Settlements({ campaignName, onBack }) {
       .then(r => r.json())
       .then(d => { descDataRef.current = d; });
   }, []);
+
+  // SSE handler — re-fetch settlement list on settlements-list events (another
+  // GM tab created/updated/deleted a settlement). Skipped while the edit modal
+  // is open so an in-progress draft is never squashed mid-edit; the miss is
+  // applied on close (see handleCloseModal). Mirrors Notes.jsx/NPCs.jsx.
+  const handleSSEEvent = useCallback((event) => {
+    if (!event || event.key !== `settlements-list-${campaignName}`) return;
+    if (modalOpen) {
+      missedListBroadcast.current = true;
+      return;
+    }
+    loadItems();
+  }, [campaignName, modalOpen, loadItems]);
 
   const filteredSettlements = useMemo(() => {
     let result = filteredItems;
@@ -697,6 +710,8 @@ function Settlements({ campaignName, onBack }) {
 
   return (
     <div className="ct-container">
+      <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back

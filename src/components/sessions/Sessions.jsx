@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
+import Subscriber from '../common/Subscriber.jsx';
 import { loadSessions, saveSession, saveSessions, deleteSession } from '../../services/campaign/sessionsService.js';
 import {
   getDefaultSessionData,
@@ -67,12 +68,11 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   // True when the visible banner error is a 409 concurrent-edit conflict
   // (server body { conflict: true }) — gates the "Reload list" action button.
   const [errorIsConflict, setErrorIsConflict] = useState(false);
-  // Rejected (409) saves prove the on-screen list is stale; consumed in
-  // handleCloseModal so a reopen re-seeds a fresh row instead of repeating the
-  // same 409. Mirrors NPCs.jsx (9cee7bfa2). NOTE: unlike the NPC/Faction/
-  // Quest/Note lanes, the sessions route publishes no `sessions-list-*` SSE
-  // broadcast, so there is no skipped-while-editing leg here — the rejected
-  // save is the only staleness signal.
+  // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
+  // the on-screen list is stale; consumed in handleCloseModal so a reopen
+  // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx
+  // (9cee7bfa2) / Notes.jsx (broadcast wired server-side in routes/sessions.js,
+  // improve settlements-sessions-no-list-sse).
   const missedListBroadcast = useRef(false);
   // Deep snapshot of the draft the planner was seeded with (new/edit), powering
   // the unsaved-edits check in handleReloadList via the shared useReloadGuard
@@ -96,6 +96,19 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   useEffect(() => {
     if (campaignName) loadItems();
   }, [campaignName, loadItems]);
+
+  // SSE handler — re-fetch session list on sessions-list events (another GM
+  // tab created/updated/deleted a session). Skipped while the planner modal is
+  // open so an in-progress draft is never squashed mid-edit; the miss is
+  // applied on close (see handleCloseModal). Mirrors Notes.jsx/NPCs.jsx.
+  const handleSSEEvent = useCallback((event) => {
+    if (!event || event.key !== `sessions-list-${campaignName}`) return;
+    if (modalOpen) {
+      missedListBroadcast.current = true;
+      return;
+    }
+    loadItems();
+  }, [campaignName, modalOpen, loadItems]);
 
   useEffect(() => {
     if (!modalOpen || !campaignName) return;
@@ -395,6 +408,8 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
 
   return (
     <div className="ct-container">
+      <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back
