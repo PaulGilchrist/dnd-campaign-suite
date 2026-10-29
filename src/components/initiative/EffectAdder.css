@@ -289,6 +289,16 @@
     font-size: 0.9em;
 }
 
+/* DC-optional hint (condition-badge-saveless-dc-noise 2026-10-29-Y) — copy
+   mirrors .ea-config-desc muted small-text convention, centered under .ea-fields. */
+.ea-dc-hint {
+    font-size: 0.78em;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin: -8px 0 12px;
+    line-height: 1.4;
+}
+
 .ea-actions {
     display: flex;
     gap: 12px;

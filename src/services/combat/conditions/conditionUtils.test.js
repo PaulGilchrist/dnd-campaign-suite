@@ -11,6 +11,7 @@
 // CONDITION_SAVE_MAP| internal via getDefaultAbility                         | golden pin (test 1)
 // ABILITY_LABELS   | internal via getAbilityLabel                           | golden pin (test 1)
 // getDefaultAbility| EffectAdder                                             | it.each guard table
+// conditionDeclaresSave| EffectAdder (badge-DC prefill, 2026-10-29-Y)         | it.each branch table
 // getAbilityLabel  | CreatureCard, CharConditions, createRollConditionSaveHandler | it.each branch table
 // getAbilitySaveBonus| conditionSaveService, SavePromptModal, savePromptHandlers,
 //                    | concentrationPromptRoll, CharConditions               | it.each ladder table
@@ -26,6 +27,7 @@ import {
   CONDITION_SAVE_MAP,
   ABILITY_LABELS,
   getDefaultAbility,
+  conditionDeclaresSave,
   getAbilityLabel,
   getAbilitySaveBonus,
 } from './conditionUtils.js'
@@ -90,6 +92,35 @@ describe('getDefaultAbility', () => {
     [undefined, null],        // absent arg → null, never undefined
   ])('getDefaultAbility(%s) → %s', (key, expected) => {
     expect(getDefaultAbility(key)).toBe(expected)
+  })
+})
+
+// condition-badge-saveless-dc-noise (2026-10-29-Y): EffectAdder's DC-prefill
+// predicate. Map-declared saves pre-fill DC 10; saveless conditions (and the
+// poisoned special case — CON there names the SOURCE's save, not a save wired
+// to the condition) start empty → the badge renders without a "DC n" suffix.
+describe('conditionDeclaresSave', () => {
+  it.each([
+    ['paralyzed', true],   // map hit con — declared condition-level save
+    ['restrained', true],  // map hit str
+    ['charmed', true],     // map hit wis
+    ['frightened', true],  // map hit wis
+    ['grappled', true],    // map hit str (escape save)
+    ['cursed', true],      // map hit con
+    ['slow', true],        // map hit wis
+    ['stunned', true],     // map hit con
+    ['poisoned', false],   // EXCLUDED despite map con (source-save semantics)
+    ['blinded', false],    // null map value
+    ['prone', false],      // null map value
+    ['petrified', false],  // null map value
+    ['unconscious', false],
+    ['incapacitated', false],
+    ['deafened', false],
+    ['invisible', false],  // unknown key → no declaration
+    ['', false],           // empty string → false, never throws
+    [undefined, false],    // absent arg → false
+  ])('conditionDeclaresSave(%s) → %s', (key, expected) => {
+    expect(conditionDeclaresSave(key)).toBe(expected)
   })
 })
 

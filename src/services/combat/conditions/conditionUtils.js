@@ -51,6 +51,18 @@ function getDefaultAbility(conditionKey) {
   return CONDITION_SAVE_MAP[conditionKey] || null
 }
 
+// condition-badge-saveless-dc-noise (2026-10-29-Y): EffectAdder pre-fills the
+// default save DC only for conditions that declare a condition-level saving
+// throw. Poisoned is excluded: its CON entry in CONDITION_SAVE_MAP names the
+// save against BECOMING poisoned (the inflicting source's save), not a save
+// wired to the condition itself — stamping a default "Poisoned DC 10" badge
+// misled GMs into thinking an escape save existed.
+const CONDITIONS_WITHOUT_OWN_SAVE = new Set(['poisoned'])
+
+function conditionDeclaresSave(conditionKey) {
+  return CONDITION_SAVE_MAP[conditionKey] != null && !CONDITIONS_WITHOUT_OWN_SAVE.has(conditionKey)
+}
+
 function getAbilityLabel(abbr) {
   return ABILITY_LABELS[abbr] || abbr || 'None'
 }
@@ -66,6 +78,7 @@ export {
   CONDITION_SAVE_MAP,
   ABILITY_LABELS,
   getDefaultAbility,
+  conditionDeclaresSave,
   getAbilityLabel,
   getAbilitySaveBonus,
 }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { CONDITIONS, getDefaultAbility } from '../../services/combat/conditions/conditionUtils.js'
+import { CONDITIONS, CONDITION_SAVE_DC, getDefaultAbility, conditionDeclaresSave } from '../../services/combat/conditions/conditionUtils.js'
 import { TARGET_EFFECT_DEFINITIONS } from '../../services/combat/conditions/targetEffectDefinitions.js'
 import './EffectAdder.css'
 
@@ -19,7 +19,11 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
 
   // Conditions tab state
   const [selectedCondition, setSelectedCondition] = React.useState(null)
-  const [conditionDc, setConditionDc] = React.useState(10)
+  // condition-badge-saveless-dc-noise (2026-10-29-Y): '' = no DC wired — the badge
+  // then renders bare ("Poisoned", not "Poisoned DC 10"). Conditions that declare a
+  // saving throw pre-fill CONDITION_SAVE_DC on select; typing any number stamps a DC
+  // even for a saveless condition (GM intent wins).
+  const [conditionDc, setConditionDc] = React.useState('')
   const [conditionAbility, setConditionAbility] = React.useState('con')
 
   // Effects tab state
@@ -98,7 +102,7 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
 
   const handleApplyCondition = async () => {
     if (!selectedCondition) return
-    const outcome = await onApply('conditions', { target: targetName, conditionKey: selectedCondition, dc: conditionDc, ability: conditionAbility })
+    const outcome = await onApply('conditions', { target: targetName, conditionKey: selectedCondition, dc: conditionDc === '' ? undefined : conditionDc, ability: conditionAbility })
     // Suppressed add: the modal stays open (parent did not clear the target) and
     // the refusal is shown inline. Success closes the modal via the parent — no notice.
     if (outcome?.suppressed) {
@@ -163,6 +167,10 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
                     setImmunityNotice(null)
                     const defaultAb = getDefaultAbility(key)
                     if (defaultAb) setConditionAbility(defaultAb)
+                    // Pre-fill the default DC only for conditions that declare a
+                    // saving throw; saveless conditions start with an empty DC
+                    // (badge then renders without any "DC n" suffix).
+                    setConditionDc(conditionDeclaresSave(key) ? CONDITION_SAVE_DC : '')
                   }}
                   type='button'
                 >
@@ -176,8 +184,14 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
                 <input
                   type='number'
                   min='1'
+                  placeholder='none'
                   value={conditionDc}
-                  onChange={e => setConditionDc(parseInt(e.target.value) || 10)}
+                  onChange={e => {
+                    // Empty/invalid input = no DC wired (badge renders bare);
+                    // a typed number always stamps one (GM intent wins).
+                    const parsed = parseInt(e.target.value, 10)
+                    setConditionDc(Number.isFinite(parsed) && parsed > 0 ? parsed : '')
+                  }}
                 />
               </label>
               <label>
@@ -191,6 +205,11 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
                   ))}
                 </select>
               </label>
+            </div>
+            <div className='ea-dc-hint'>
+              {selectedCondition && !conditionDeclaresSave(selectedCondition)
+                ? 'No saving throw — the badge shows no DC unless you type one.'
+                : 'DC is optional — an empty DC renders the badge without one.'}
             </div>
             <div className='ea-actions'>
               <button onClick={onCancel} type='button'>Cancel</button>

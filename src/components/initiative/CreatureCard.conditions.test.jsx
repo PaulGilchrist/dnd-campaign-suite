@@ -135,6 +135,30 @@ describe('CreatureCard - conditions', () => {
             expect(screen.getByText('Blinded DC 12')).toBeInTheDocument();
             expect(screen.queryAllByText(/Blinded/).length).toBe(1);
         });
+
+        // condition-badge-saveless-dc-noise (2026-10-29-Y) label-build rule:
+        // the " DC n" suffix rides ONLY on a stored dc. EffectAdder dispatches
+        // dc: undefined for a saveless condition left at its (empty) default →
+        // buildRuntimeConditions lands dc 0 here → bare badge + bare tooltip.
+        it('omits the DC suffix from badge and tooltip when the stored dc is absent (saveless default)', () => {
+            const conditions = [{ id: 'c1', key: 'poisoned', label: 'Poisoned', dc: 0, ability: 'con' }];
+            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
+            const badge = screen.getByText('Poisoned', { selector: 'button.creature-badge' });
+            expect(badge).toBeInTheDocument();
+            expect(screen.queryByText(/Poisoned DC/)).not.toBeInTheDocument();
+            // Tooltip lane: bare CONDITION_DESCRIPTIONS copy — no fabricated save line.
+            expect(badge.getAttribute('title')).not.toMatch(/DC/);
+        });
+
+        it.each([
+            { label: 'declared save with default DC', cond: { id: 'c1', key: 'paralyzed', label: 'Paralyzed', dc: 10, ability: 'con' }, text: 'Paralyzed DC 10' },
+            { label: 'GM-typed DC on a saveless condition', cond: { id: 'c1', key: 'blinded', label: 'Blinded', dc: 15, ability: 'dex' }, text: 'Blinded DC 15' },
+        ])('keeps the DC suffix + tooltip save line — $label', ({ cond, text }) => {
+            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions: [cond] }} />);
+            const badge = screen.getByText(text);
+            expect(badge).toBeInTheDocument();
+            expect(badge.getAttribute('title')).toContain(`DC ${cond.dc}`);
+        });
     });
 
     describe('concentration badges', () => {
