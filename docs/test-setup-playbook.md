@@ -1755,3 +1755,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - GUARDED CONTROLLED `<select>`: when a change handler confirm-DISCARDS a mood/tab switch, the component must restore `event.target.value` by hand — the state never changed so React has no re-render and the DOM keeps the abandoned option (silent select-lie).
 - MUSIC MOODS keys are exactly `town/outdoors/combat/dungeon/tavern` — a `selectOption` to a non-existent key (e.g. `wilderness`) hangs ~4s then throws; read `#music-editor-mood` options before scripting switches.
 - Editor `Reset` saves but stays OPEN — any dirty-guard snapshot must re-baseline there (useReloadGuard doctrine: re-seed wherever a save keeps the modal open), else the fresh seed looks like an unsaved edit and Cancel false-confirms.
+
+## Improve run 2026-10-29 (map3d-camera-hint) — NEW durable entries
+
+- ORBITCONTROLS-MOVEMENT PROOF without camera internals: WebGL canvas lacks `preserveDrawingBuffer`, but Playwright locator-screenshot BYTE-COMPARE before/after a mouse gesture (left-drag/right-drag/wheel on the canvas) reliably proves the camera moved — reusable for any canvas-interaction pin.
+- `.map3d-hint` chip (`Left-drag to pan · Right-drag to orbit · Scroll to zoom`) renders between toolbar-row and viewport (copy pinned in Map3D.test.jsx); AE's "OrbitControls UNDOCUMENTED → backlog" rig note is CLOSED — judge 3D discoverability against the live hint, not that row.
