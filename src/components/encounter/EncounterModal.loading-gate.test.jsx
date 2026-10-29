@@ -48,9 +48,9 @@ const createProps = (overrides = {}) => ({
 // Every row action button across the list — Load + Rename + Delete per row.
 const rowActionButtons = () =>
     encounters.flatMap((enc) => [
-        screen.getByRole('button', { name: `Load ${enc.name}` }),
-        screen.getByRole('button', { name: `Rename ${enc.name}` }),
-        screen.getByRole('button', { name: `Delete ${enc.name}` }),
+        screen.getByRole('button', { name: `Load "${enc.name}"` }),
+        screen.getByRole('button', { name: `Rename "${enc.name}"` }),
+        screen.getByRole('button', { name: `Delete "${enc.name}"` }),
     ]);
 
 describe('EncounterModal — row actions are disabled while the load list is loading', () => {
@@ -77,9 +77,9 @@ describe('EncounterModal — row actions are disabled while the load list is loa
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = render(<EncounterModal {...createProps({ loading: true })} />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Load goblin-ambush' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Delete dragon-lair' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Load "goblin-ambush"' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "dragon-lair"' }));
 
         expect(mockOnLoad).not.toHaveBeenCalled();
         expect(mockOnDelete).not.toHaveBeenCalled();
@@ -108,18 +108,18 @@ describe('EncounterModal — row actions are disabled while the load list is loa
         rowActionButtons().forEach((btn) => expect(btn).not.toBeDisabled());
 
         // Load dispatches with the raw name.
-        fireEvent.click(screen.getByRole('button', { name: 'Load goblin-ambush' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Load "goblin-ambush"' }));
         expect(mockOnLoad).toHaveBeenCalledTimes(1);
         expect(mockOnLoad).toHaveBeenCalledWith('goblin-ambush');
 
         // Delete reaches the named confirm (refused — form/list must survive).
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-        fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
         expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).not.toHaveBeenCalled();
 
         // Pen opens the seeded rename form (last: the form replaces the list).
-        fireEvent.click(screen.getByRole('button', { name: 'Rename dragon-lair' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Rename "dragon-lair"' }));
         expect(screen.getByLabelText('New Name')).toHaveValue('dragon-lair');
     });
 
@@ -137,11 +137,11 @@ describe('EncounterModal — row actions are disabled while the load list is loa
         // Commit: parent's onDelete (DELETE + list reload) is pending. The
         // hook's reload sets loading=true — surviving rows re-render disabled.
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
         });
         rerender(<EncounterModal {...createProps({ loading: true })} />);
-        expect(screen.getByRole('button', { name: 'Rename dragon-lair' })).toBeDisabled();
-        expect(screen.getByRole('button', { name: 'Delete dragon-lair' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Rename "dragon-lair"' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Delete "dragon-lair"' })).toBeDisabled();
 
         // Reload resolves → onClose fires once, overlay gone.
         await act(async () => {

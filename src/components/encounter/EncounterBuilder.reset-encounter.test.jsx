@@ -109,7 +109,7 @@ function mountBuilder() {
 async function loadEncounter(data) {
   h.loadEncounterData.mockResolvedValue(data);
   fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Load test-encounter' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load "test-encounter"' }));
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'Reset encounter' })).toBeInTheDocument();
   });

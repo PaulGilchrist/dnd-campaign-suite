@@ -136,16 +136,24 @@ describe('EncounterModal', () => {
             encounter('forest-shrine', { effectiveXP: 100 }),
         ];
         render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
+        // Verbatim quoting pin (sheet-family canon, 35777ab7f): row aria labels
+        // name the encounter in QUOTES — `Load "X"` / `Rename "X"` / `Delete "X"`
+        // — matching the modal's named-quoted `Delete "X"?` confirm copy (:79).
         const loadOrder = screen
-            .getAllByRole('button', { name: /^Load / })
+            .getAllByRole('button', { name: /^Load "/ })
             .map((btn) => btn.getAttribute('aria-label'));
         expect(loadOrder).toEqual([
-            'Load road-encounter',
-            'Load old-map',
-            'Load goblin-ambush',
-            'Load forest-shrine',
-            'Load dragon-lair',
+            'Load "road-encounter"',
+            'Load "old-map"',
+            'Load "goblin-ambush"',
+            'Load "forest-shrine"',
+            'Load "dragon-lair"',
         ]);
+        const deleteLabels = screen
+            .getAllByRole('button', { name: /^Delete "/ })
+            .map((btn) => btn.getAttribute('aria-label'));
+        expect(deleteLabels).toEqual(expect.arrayContaining(['Delete "goblin-ambush"']));
+        expect(screen.getByRole('button', { name: 'Rename "goblin-ambush"' })).toHaveAttribute('aria-label', 'Rename "goblin-ambush"');
         // Real formatEncounterName: hyphenated raw name → title-cased display name.
         expect(screen.getByText('Dragon Lair')).toBeInTheDocument();
     });
@@ -170,7 +178,7 @@ describe('EncounterModal', () => {
     it('calls onLoad with the raw encounter name when Load is clicked', () => {
         const encounters = [encounter('goblin-ambush'), encounter('dragon-lair')];
         render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Load dragon-lair' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Load "dragon-lair"' }));
         expect(mockOnLoad).toHaveBeenCalledTimes(1);
         expect(mockOnLoad).toHaveBeenCalledWith('dragon-lair');
     });
@@ -182,14 +190,14 @@ describe('EncounterModal', () => {
         const encounters = [encounter('goblin-ambush'), encounter('dragon-lair')];
         render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
         });
         expect(confirmSpy).toHaveBeenCalledTimes(1);
         expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
 
         confirmSpy.mockReturnValue(false);
-        fireEvent.click(screen.getByRole('button', { name: 'Delete dragon-lair' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "dragon-lair"' }));
         expect(confirmSpy).toHaveBeenLastCalledWith('Delete "Dragon Lair"?');
         expect(mockOnDelete).toHaveBeenCalledTimes(1);
     });
@@ -206,21 +214,21 @@ describe('EncounterModal', () => {
 
         it('pen click in load mode opens the rename form pre-seeded with the raw name, titled Rename Encounter, list yielding', () => {
             render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
             expect(screen.getByRole('heading', { name: 'Rename Encounter' })).toBeInTheDocument();
             expect(screen.queryByRole('heading', { name: 'Load Encounter' })).not.toBeInTheDocument();
             const input = screen.getByLabelText('New Name');
             expect(input).toHaveValue('goblin-ambush');
             expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
             // Form replaces the list; handleRename's setRenameTarget(null) restores it.
-            expect(screen.queryByRole('button', { name: 'Load dragon-lair' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Load "dragon-lair"' })).not.toBeInTheDocument();
             expect(mockOnRename).not.toHaveBeenCalled();
         });
 
         it('submit dispatches onRename(old, new.trim()) exactly once, closes the modal, confirms nothing', async () => {
             const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
             render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Rename dragon-lair' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Rename "dragon-lair"' }));
             fireEvent.change(screen.getByLabelText('New Name'), { target: { value: '  Goblin Remix  ' } });
             await act(async () => {
                 fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
@@ -237,7 +245,7 @@ describe('EncounterModal', () => {
 
         it('Enter submits the rename exactly once and trims', async () => {
             render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
             const input = screen.getByLabelText('New Name');
             fireEvent.change(input, { target: { value: '  Goblin Remix  ' } });
             await act(async () => {
@@ -250,7 +258,7 @@ describe('EncounterModal', () => {
 
         it.each(['', '   '])('blank new name "%s" shows the inline error, never dispatches, form stays open', async (value) => {
             render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
             fireEvent.change(screen.getByLabelText('New Name'), { target: { value } });
             await act(async () => {
                 fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
@@ -262,14 +270,14 @@ describe('EncounterModal', () => {
 
         it('a second pen click after commit retargets the form to the freshly seeded name', async () => {
             render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
             fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'First Rename' } });
             await act(async () => {
                 fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
             });
             expect(mockOnRename).toHaveBeenCalledWith('goblin-ambush', 'First Rename');
             // List restored; take the OTHER row's pen this time.
-            fireEvent.click(screen.getByRole('button', { name: 'Rename dragon-lair' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Rename "dragon-lair"' }));
             expect(screen.getByLabelText('New Name')).toHaveValue('dragon-lair');
         });
     });

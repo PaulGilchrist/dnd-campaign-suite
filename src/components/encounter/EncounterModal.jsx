@@ -179,7 +179,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                         <button
                           className="encounter-btn encounter-btn-sm encounter-btn-primary"
                           onClick={() => handleLoad(enc.name)}
-                          aria-label={`Load ${enc.name}`}
+                          aria-label={`Load "${enc.name}"`}
                           disabled={loading}
                         >
                           <i className="fa-solid fa-download" /> Load
@@ -187,7 +187,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                         <button
                           className="encounter-btn encounter-btn-sm encounter-btn-secondary"
                           onClick={() => setRenameTarget(enc)}
-                          aria-label={`Rename ${enc.name}`}
+                          aria-label={`Rename "${enc.name}"`}
                           disabled={loading}
                         >
                           <i className="fa-solid fa-pen" />
@@ -195,7 +195,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                         <button
                           className="encounter-btn encounter-btn-sm encounter-btn-danger"
                           onClick={() => handleDelete(enc.name)}
-                          aria-label={`Delete ${enc.name}`}
+                          aria-label={`Delete "${enc.name}"`}
                           disabled={loading}
                         >
                           <i className="fa-solid fa-trash-can" />

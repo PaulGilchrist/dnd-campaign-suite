@@ -1,6 +1,6 @@
 // @maintained-by-ai
 /* Lane — Load-row close-on-action (QA backlog 2026-10-28-S: the Load modal
- * stayed OPEN after a `Load <name>` row click and intercepted the toolbar Save
+ * stayed OPEN after a `Load "<name>"` row click and intercepted the toolbar Save
  * via .encounter-modal-overlay pointer-events, while the generator Apply lane
  * (bad3f6e86) auto-closed — an asymmetry costing an extra × click).
  * EncounterModal.handleLoad now mirrors the modal's own save leg:
@@ -11,8 +11,8 @@
  *    immediately clickable);
  *  - × cancel leg: overlay closes with ZERO load dispatch, no draft change, no
  *    Save-title flip (zero network — no load/save/update/delete calls);
- *  - toolbar aria `Load encounter` vs modal row aria `Load <name>` stays a
- *    strict-mode-safe pairing (run-S locator note: row aria is UNQUOTED).
+ *  - toolbar aria `Load encounter` vs modal row aria `Load "<name>"` stays a
+ *    strict-mode-safe pairing (aria-quoting improve: row aria now QUOTED, toolbar still bare).
  * Owned elsewhere — do NOT duplicate: hydration/XP reconcile (#403
  * load-encounter), delete/rename close legs (EncounterModal.delete-close),
  * update-save 404 recovery (update-save-404). Management mock uses real
@@ -130,8 +130,8 @@ describe('EncounterBuilder — Load row closes the modal on action (generator-Ap
     mountBuilder();
     await openLoadModal();
 
-    // Row aria-label is UNQUOTED (run-S fingerprint).
-    fireEvent.click(screen.getByRole('button', { name: 'Load test-encounter' }));
+    // Row aria-label is QUOTED (2026-10-28 aria-quoting improve; was unquoted in run-S).
+    fireEvent.click(screen.getByRole('button', { name: 'Load "test-encounter"' }));
 
     await waitFor(() => {
       // (a) draft armed exactly as before: checkbox checked, Save title flips.

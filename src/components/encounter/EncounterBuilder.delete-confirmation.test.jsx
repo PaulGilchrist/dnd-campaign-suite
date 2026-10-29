@@ -104,7 +104,7 @@ function mountBuilder() {
 async function openLoadModal() {
   fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: 'Delete test-encounter' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete "test-encounter"' })).toBeInTheDocument();
   });
 }
 
@@ -124,7 +124,7 @@ describe('EncounterBuilder + REAL EncounterModal — delete confirms exactly onc
     await openLoadModal();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete test-encounter' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete "test-encounter"' }));
     });
 
     // Fix#410: one dialog per click (pre-fix this received 2: formatted then raw).
@@ -143,12 +143,12 @@ describe('EncounterBuilder + REAL EncounterModal — delete confirms exactly onc
     mountBuilder();
     await openLoadModal();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete test-encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "test-encounter"' }));
 
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(h.deleteEncounterAction).not.toHaveBeenCalled();
     // Cancel leaves the load list intact: the row is still offered for delete.
-    expect(screen.getByRole('button', { name: 'Delete test-encounter' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete "test-encounter"' })).toBeInTheDocument();
   });
 
   it('each successive delete click asks exactly once (2 clicks => 2 dialogs, never 4)', async () => {
@@ -157,9 +157,9 @@ describe('EncounterBuilder + REAL EncounterModal — delete confirms exactly onc
     await openLoadModal();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete test-encounter' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete "test-encounter"' }));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Delete test-encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "test-encounter"' }));
 
     expect(confirmSpy).toHaveBeenCalledTimes(2);
     expect(confirmSpy).toHaveBeenNthCalledWith(1, 'Delete "Test Encounter"?');

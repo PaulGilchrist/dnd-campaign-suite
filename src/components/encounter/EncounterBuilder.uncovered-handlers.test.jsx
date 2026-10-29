@@ -144,7 +144,7 @@ describe('EncounterBuilder - delete/rename server seam', () => {
     mountBuilder();
     await openLoadModal();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete test-encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "test-encounter"' }));
 
     await waitFor(() => {
       expect(h.deleteEncounterAction).toHaveBeenCalledWith('test-encounter');
@@ -163,7 +163,7 @@ describe('EncounterBuilder - delete/rename server seam', () => {
 
     // Fix#38 production path: pen sets modal-local renameTarget (:150), the seeded
     // form (New Name pre-filled with the raw name) submits the dispatch (:45-55).
-    fireEvent.click(screen.getByRole('button', { name: 'Rename test-encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rename "test-encounter"' }));
     fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'Renamed Encounter' } });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Rename' }));

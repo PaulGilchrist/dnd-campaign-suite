@@ -73,7 +73,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
         });
 
         expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
@@ -86,14 +86,14 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
         const { container } = render(<Host />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
 
         expect(confirmSpy).toHaveBeenCalledTimes(1);
         expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).not.toHaveBeenCalled();
         expect(mockOnClose).not.toHaveBeenCalled();
         expect(container.querySelector('.encounter-modal-overlay')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Delete goblin-ambush' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete "goblin-ambush"' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
     });
 
@@ -104,7 +104,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         const { container } = render(<Host />);
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Delete "goblin-ambush"' }));
         });
 
         expect(confirmSpy).toHaveBeenCalledTimes(1);
@@ -115,8 +115,8 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(err).toHaveTextContent('Server said no');
         expect(mockOnClose).not.toHaveBeenCalled();
         // Row still offered (server truth unchanged) with the OTHER row intact.
-        expect(screen.getByRole('button', { name: 'Delete goblin-ambush' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Delete dragon-lair' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete "goblin-ambush"' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Delete "dragon-lair"' })).toBeInTheDocument();
     });
 
     it('a network-shaped rejection with no message falls back to the generic delete error copy', async () => {
@@ -126,7 +126,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         const { container } = render(<Host />);
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Delete dragon-lair' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Delete "dragon-lair"' }));
         });
 
         expect(confirmSpy).toHaveBeenCalledTimes(1);
@@ -151,7 +151,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
     it('rename leg now mirrors delete: commit dispatches onRename and CLOSES the modal (unmounts the overlay)', async () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = render(<Host />);
-        fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
         fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'Goblin Remix' } });
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
@@ -168,7 +168,7 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         vi.spyOn(console, 'error').mockImplementation(() => {});
         mockOnRename.mockRejectedValueOnce(new Error('Server said no'));
         const { container } = render(<Host />);
-        fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
         fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'Goblin Remix' } });
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
