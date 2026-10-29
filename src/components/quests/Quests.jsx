@@ -126,7 +126,7 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, error
             id="quest-description"
             value={formData.description}
             onChange={(value) => onChange('description', value)}
-            placeholder="Describe the quest\u2026"
+            placeholder="Describe the quest…"
             label="Description"
           />
 
@@ -134,7 +134,7 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, error
             id="quest-rewards"
             value={formData.rewards}
             onChange={(value) => onChange('rewards', value)}
-            placeholder="Describe rewards\u2026"
+            placeholder="Describe rewards…"
             label="Rewards"
           />
 
@@ -142,7 +142,7 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, error
             id="quest-notes"
             value={formData.notes}
             onChange={(value) => onChange('notes', value)}
-            placeholder="Additional notes\u2026"
+            placeholder="Additional notes…"
             label="Notes"
           />
         </div>
@@ -336,7 +336,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
         <input
           type="text"
           className="ct-search-input"
-          placeholder="Search Quests\u2026"
+          placeholder="Search Quests…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           aria-label="Search Quests"
@@ -354,7 +354,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
 
       {loading && (
         <div className="ct-empty-state">
-          <i className="fa-solid fa-spinner fa-spin" /> Loading quests\u2026
+          <i className="fa-solid fa-spinner fa-spin" /> Loading quests…
         </div>
       )}
 

@@ -24,3 +24,21 @@ Replace the five literal-escape occurrences with the real `…` character (or `{
 
 ## Severity
 Minor UX issue — visible broken text in a GM view; no functional impact (typing/saving still work, and conflict/validation lanes were verified healthy around it).
+
+## Resolution
+**FIXED 2026-10-28.** Original diagnosis confirmed exactly: JSX attribute strings and raw JSX text children are not JavaScript string literals, so `\u2026` was taken verbatim.
+
+**Root cause (verified):** `src/components/quests/Quests.jsx` lines 129/137/145/339 (`placeholder="…\u2026"` attribute strings) and 357 (JSX text child `Loading quests\u2026`). Lines 159/177 (`'Deleting\u2026'` / `'Saving\u2026'`) sit inside JS string expressions and were already correct — left untouched.
+
+**Fix:** Replaced the five literal escapes with the real `…` character, matching sibling `.ct-*` convention (Sessions `Search sessions…`, Settlements placeholders). App-wide sweep (`grep -rnE 'placeholder="[^"]*\\u|>[^<]*\\u2026' src/`) confirmed Quests was the ONLY component with this defect class; remaining `\u2026` occurrences (Quests 159/177 + `Settlements.listRendering.test.jsx:137`) are valid JS-string escapes.
+
+**Files changed:**
+- `src/components/quests/Quests.jsx` — 5 one-line replacements (129, 137, 145, 339, 357)
+- `src/components/quests/Quests.test.jsx` — 3 new regression tests: search placeholder `toHaveAttribute('placeholder','Search Quests…')`; editor textarea placeholders contain real `…` + no literal `\u2026` anywhere in rendered body; loading text contains `Loading quests…` and not `\u2026`. Existing tests pinned nothing on the broken strings (loading test used `/Loading quests/` regex) — no test updates needed.
+
+**Verification:**
+- Live repro (before fix, Playwright in test-campaign): search placeholder DOM attribute = literal `Search Quests\u2026`; opening The Lost Artifact editor, all three textarea placeholders literal `Describe the quest\u2026` etc.
+- Live re-verification (after fix, fresh reload): `Search Quests…`, `Describe the quest…`, `Describe rewards…`, `Additional notes…` all real ellipses; `document.body.innerHTML` contains zero literal `\u2026`. Sanity: typed + saved a quest edit (modal closed, row updated), then restored baseline description byte-exact (API `quests` read confirms).
+- Tests: `npx vitest run src/components/quests/Quests.test.jsx` → 28/28 pass; folder `src/components/quests/` → 6 files / 44 tests pass. `npm run lint` → clean (zero warnings).
+- Cleanup: change-data `{}` + log `[]` API-verified from closed-tab quiet; quest data at baseline.
+

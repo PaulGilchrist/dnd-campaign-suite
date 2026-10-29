@@ -106,12 +106,24 @@ describe('Quests', () => {
       fireEvent.click(screen.getByRole('button', { name: /Back/ }));
       expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
     });
+
+    it('renders the search placeholder with a real ellipsis (not a literal \\u2026 escape)', () => {
+      renderWithQuests([]);
+      expect(screen.getByRole('textbox', { name: /Search Quests/ })).toHaveAttribute('placeholder', 'Search Quests…');
+    });
   });
 
   describe('loading and empty states', () => {
     it('shows a loading state while quests are loading', () => {
       renderWithQuests([], { loading: true });
       expect(screen.getByText(/Loading quests/)).toBeInTheDocument();
+    });
+
+    it('renders a real ellipsis (not a literal \\u2026 escape) in the loading text', () => {
+      renderWithQuests([], { loading: true });
+      const loading = screen.getByText(/Loading quests/);
+      expect(loading.textContent).toContain('Loading quests…');
+      expect(loading.textContent).not.toContain('\\u2026');
     });
 
     it('shows an empty state when there are no quests', () => {
@@ -338,6 +350,16 @@ describe('Quests', () => {
         rewards: '100 gold',
         notes: 'Almost done',
       });
+    });
+
+    it('renders editor textarea placeholders with real ellipses (not literal \\u2026 escapes)', () => {
+      renderWithQuests([quest({ name: 'The Lost Artifact' })]);
+
+      openEditModal('The Lost Artifact');
+      expect(field.description()).toHaveAttribute('placeholder', 'Describe the quest…');
+      expect(field.rewards()).toHaveAttribute('placeholder', 'Describe rewards…');
+      expect(field.notes()).toHaveAttribute('placeholder', 'Additional notes…');
+      expect(document.body.textContent).not.toContain('\\u2026');
     });
 
     it('resets the form to defaults when opening the new quest modal after cancelling an edit', () => {
