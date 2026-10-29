@@ -206,6 +206,33 @@ describe('jsonEntityCrud — conflict copy display-title label (displayField)', 
         expect(stale.body.error).not.toContain('cb7fa303-uuid');
     });
 
+    // notes-conflict-banner-identity-flip (2026-10-29-V): after a REMOTE edit
+    // to the title field, the banner must name the row by the title in the
+    // SENDER's loaded copy — never the other session's new stored value.
+    it('labels the "modified" 409 by the sender\'s loaded title, not the remote-renamed disk title', async () => {
+        const app = createTitledApp();
+        await postTitled(app, [{ id: 'cb7fa303-uuid', partyLocation: 'Skull Creek Cave', v: 1 }]);
+        const bootStamp = readTitledDisk()[0].updatedAt;
+        // Another session renames the row on disk (fresh stamp lands).
+        const remote = await postTitled(app, [
+            { id: 'cb7fa303-uuid', partyLocation: 'X-bump', v: 1, updatedAt: bootStamp },
+        ]);
+        expect(remote.status).toBe(200);
+
+        // The stale tab saves; its body still carries the title it loaded.
+        const stale = await postTitled(app, [
+            { id: 'cb7fa303-uuid', partyLocation: 'Skull Creek Cave', v: 2, updatedAt: bootStamp },
+        ]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toBe(
+            'Note "Skull Creek Cave" was modified in another tab or session since you loaded it — ' +
+            'reload the list and re-apply your edit — it was NOT saved.'
+        );
+        expect(stale.body.error).not.toContain('X-bump');
+        // The remote rename survives — the stale write never landed.
+        expect(readTitledDisk()[0].partyLocation).toBe('X-bump');
+    });
+
     it('labels the resurrection "created or deleted" 409 by the incoming row title', async () => {
         const app = createTitledApp();
         // Row deleted from disk elsewhere; the stale tab re-sends it with an
@@ -247,6 +274,76 @@ describe('jsonEntityCrud — conflict copy display-title label (displayField)', 
         expect(res.status).toBe(409);
         expect(res.body.error).toContain('Note "untitled-uuid" was created or deleted');
         expect(res.body.error).not.toContain('Note ""');
+    });
+
+    // Notes lane override (rowLabel): partyLocation, else a plain-text 40-char
+    // excerpt of the SENDER's description. Locks the recipe + identity source
+    // used by notes-conflict-banner-identity-flip (2026-10-29-V).
+    const noteRowLabel = (note) => {
+        const location = (note.partyLocation || '').trim();
+        if (location) return location;
+        const plain = (note.description || '')
+            .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/[*_`~#>]+/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        return plain.length > 40 ? plain.slice(0, 40) + '…' : plain;
+    };
+
+    const createCustomLabelApp = () => {
+        const app = express();
+        app.use(express.json());
+        app.use(createJsonEntityRouter(titledEntity, {
+            singularDisplayName: 'Note',
+            rowLabel: noteRowLabel,
+        }));
+        return app;
+    };
+
+    it('rowLabel override: unset-location rows label by the sender\'s 40-char description excerpt', async () => {
+        const app = createCustomLabelApp();
+        const loadedDesc = 'A clue by the fire **describing** the ritual site in vivid detail for the party';
+        await postTitled(app, [{ id: 'n1', partyLocation: '', description: loadedDesc }]);
+        const bootStamp = readTitledDisk()[0].updatedAt;
+        // Remote session rewrites BOTH mutable identity fields.
+        const remote = await postTitled(app, [{
+            id: 'n1', partyLocation: 'X-bump', description: 'totally new remote description', updatedAt: bootStamp,
+        }]);
+        expect(remote.status).toBe(200);
+
+        const stale = await postTitled(app, [{
+            id: 'n1', partyLocation: '', description: loadedDesc, v: 2, updatedAt: bootStamp,
+        }]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toContain(
+            `Note "${loadedDesc.replace(/\*\*/g, '').slice(0, 40)}…" was modified`
+        );
+        expect(stale.body.error).not.toContain('X-bump');
+        expect(stale.body.error).not.toContain('totally new remote description');
+        expect(stale.body.error).not.toContain('Note ""');
+    });
+
+    it('rowLabel override: location set on the sender copy wins over the excerpt (never empty)', async () => {
+        const app = createCustomLabelApp();
+        await postTitled(app, [{ id: 'n1', partyLocation: 'Skull Creek Cave', description: 'desc' }]);
+        const stamp = readTitledDisk()[0].updatedAt;
+        const stale = await postTitled(app, [
+            { id: 'n1', partyLocation: 'Skull Creek Cave', description: 'edited', updatedAt: stamp - 1 },
+        ]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toContain('Note "Skull Creek Cave" was modified');
+    });
+
+    it('rowLabel override: blank location AND blank description fall back to the id', async () => {
+        const app = createCustomLabelApp();
+        await postTitled(app, [{ id: 'blank-uuid', partyLocation: '', description: '  ', v: 1 }]);
+        const stamp = readTitledDisk()[0].updatedAt;
+        const stale = await postTitled(app, [
+            { id: 'blank-uuid', partyLocation: '', description: '', v: 2, updatedAt: stamp - 1000 },
+        ]);
+        expect(stale.status).toBe(409);
+        expect(stale.body.error).toContain('Note "blank-uuid" was modified');
+        expect(stale.body.error).not.toContain('Note ""');
     });
 
     it('keeps id-labelled copy for lanes without displayField (unchanged behavior)', async () => {

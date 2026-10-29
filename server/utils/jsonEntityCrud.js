@@ -112,9 +112,11 @@ export function stampForSave(incoming, existing, now = Date.now()) {
 
 /** Build the 409 conflict body. `label` is whatever identifies the row to a
  *  human: per-entity PUT lanes pass the decoded display name (NPC/Session/
- *  Settlement); the whole-array POST lane passes the row's displayField title
- *  with an id fallback (Notes → partyLocation). Falls back to the bare noun
- *  when there is nothing to label with — the copy must NEVER render `""`. */
+ *  Settlement); the whole-array POST lane passes the title derived from the
+ *  SENDER's copy of the row (displayField or rowLabel override — Notes →
+ *  partyLocation, else description excerpt; see findConcurrentWrite). Falls
+ *  back to the bare noun when there is nothing to label with — the copy must
+ *  NEVER render `""`. */
 export function conflictErrorBody(singularDisplayName, label, reason = 'modified') {
   const labelled = label ? `${singularDisplayName} "${label}"` : singularDisplayName;
   return {
@@ -131,15 +133,31 @@ export function conflictErrorBody(singularDisplayName, label, reason = 'modified
 // row's displayField title when configured and non-blank (e.g. Notes'
 // partyLocation — the same field the list renders as the row title), falling
 // back to the raw id so lanes without a displayField (and untitled rows) keep
-// the id-labelled copy unchanged.
-function findConcurrentWrite(diskEntities, incomingEntities, idField, displayField) {
+// the id-labelled copy unchanged. `rowLabel` (per-entity override, e.g. Notes'
+// partyLocation → 40-char description excerpt) fully replaces the displayField
+// recipe when supplied.
+//
+// Identity source (improve 2026-10-29-V notes-conflict-banner-identity-flip):
+// whenever the SENDER's copy of the row is in hand (modified + resurrection
+// legs), label from IT, not the current disk row — after a remote edit the
+// disk title is the OTHER session's value, which flips the banner's identity
+// under the user's eyes and makes "which note?" unanswerable. The sender's
+// body row is exactly what it loaded (plus its own rejected draft), so it is
+// the stable identity the user recognises. The dropped-row leg has no sender
+// copy (the snapshot never knew the row) and keeps naming by the disk title.
+function findConcurrentWrite(diskEntities, incomingEntities, idField, displayField, rowLabel = null) {
   const titleOf = (row) => {
-    if (!displayField || !row) return '';
+    if (!row) return '';
+    if (rowLabel) {
+      const custom = rowLabel(row);
+      return typeof custom === 'string' ? custom.trim() : '';
+    }
+    if (!displayField) return '';
     const raw = row[displayField];
     return typeof raw === 'string' ? raw.trim() : '';
   };
   const labelFor = (existing, incoming, id) =>
-    titleOf(existing) || titleOf(incoming) || id;
+    titleOf(incoming) || titleOf(existing) || id;
   const diskById = new Map(
     diskEntities.filter(d => d && d[idField] != null).map(d => [d[idField], d])
   );
@@ -178,6 +196,11 @@ export function createJsonEntityRouter(entityName, options = {}) {
     // conflict copy (Notes → 'partyLocation'); rows with a blank title, and
     // lanes without this option, keep labelling by idField value.
     displayField = null,
+    // Optional per-entity label override `(row) => string` for 409 conflict
+    // copy — used when a single displayField cannot express the row's title
+    // (Notes: partyLocation, else a plain-text excerpt of the description).
+    // Takes precedence over displayField; lanes without it are unchanged.
+    rowLabel,
     responseWrapper = entityName,
     itemWrapper = singularize(entityName),
     pluralDisplayName = entityName,
@@ -235,7 +258,7 @@ export function createJsonEntityRouter(entityName, options = {}) {
         }
       }
       const diskEntities = loadOrInit(campaign);
-      const clash = findConcurrentWrite(diskEntities, entities, idField, displayField);
+      const clash = findConcurrentWrite(diskEntities, entities, idField, displayField, rowLabel);
       if (clash) {
         return res.status(409).json(conflictErrorBody(singularDisplayName, clash.label, clash.reason));
       }

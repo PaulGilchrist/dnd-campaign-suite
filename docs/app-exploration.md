@@ -160,7 +160,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### Open items — 2026-10-29 run V
 
 - **`settlements-sessions-no-list-sse`** (2026-10-29-V, live + code) — `server/routes/settlements.js` and `server/routes/sessions.js` publish NO `<entity>-list-<campaign>` event and neither component mounts a `<Subscriber>` (npcs/factions/quests/notes all do, per `broadcastFactionsList` pattern in `factions.js:5-9`); passive GM tabs see stale lists with no refresh affordance (proven: 0 rows after remote create; stale row after remote restore). Add publisher on every mutation route + `handleSSEEvent` w/ skip-while-editing + `missedListBroadcast` per the Notes/NPC canon.
-- **`notes-conflict-banner-identity-flip`** (2026-10-29-V) — the Notes 409 banner labels the row by the CURRENT stored `partyLocation` — after a remote edit that's the OTHER session's value (`Note "__vtabB bump6" was modified…`) while the user loaded `Skull Creek Cave`; unset-location rows label by 40-char description prefix (also mutable). Consider labeling by the value the requester loaded, or the row id, so "which note?" stays answerable.
 
 ### Open items — 2026-10-28 run U
 
