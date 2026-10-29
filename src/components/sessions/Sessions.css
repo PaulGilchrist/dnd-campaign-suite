@@ -111,6 +111,24 @@
   font-size: 0.85rem;
 }
 
+/* Partial picker-batch failure notice (improve sessions-picker-failure-double-
+   console) — one visible line for the whole batch instead of silent empty
+   option lists. Mirrors .ea-immunity-notice / .notes-form-error global error
+   tokens; cleared on close/reopen, which is also the retry (failed batches
+   are never cached). */
+.sessions-picker-load-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-error-border);
+  border-radius: 4px;
+  background-color: var(--background-color-error);
+  color: var(--color-error-light);
+  font-size: 0.85rem;
+}
+
 /* "Reload list" one-click recovery inside a 409 conflict banner — rides the
    global .ct-btn styling, sized like .ct-btn-sm, own line under the copy.
    Mirrors .npcs-error-reload-btn. */

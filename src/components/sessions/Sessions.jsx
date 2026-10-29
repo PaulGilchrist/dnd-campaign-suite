@@ -40,7 +40,10 @@ async function loadResourceOptions(campaignName) {
   settled.forEach((r, i) => {
     const [key] = loaders[i];
     if (r.status !== 'fulfilled') {
-      console.error(`Failed to load session picker resources for ${key}:`, r.reason);
+      // 1-service/0-wrapper console canon (0a026c804): the service layer
+      // already logs the one line per failure (e.g. `Error loading notes:`),
+      // so this batch wrapper logs NOTHING — it owns only the single inline
+      // planner hint below (improve sessions-picker-failure-double-console).
       raw[key] = [];
       complete = false;
     } else {
@@ -102,6 +105,12 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   // tab editing a picker list) invalidates the cache so the NEXT open
   // re-fetches. Failed batches are never cached (see loadResourceOptions).
   const pickerCache = useRef(null); // { campaign, options }
+  // Single inline planner hint (improve sessions-picker-failure-double-console):
+  // a partial picker-batch failure is loud ONCE in the modal instead of being
+  // silent empty-option lists. Reset on close and on every (re)load, so the
+  // notice never outlives the open that produced it; a failed batch is never
+  // cached, so the reopen that clears it is also the retry.
+  const [pickerLoadFailed, setPickerLoadFailed] = useState(false);
   const [toast, setToast] = useState('');
 
   // Single choke point for the banner: every message carries whether it was a
@@ -141,12 +150,14 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     const cached = pickerCache.current;
     if (cached && cached.campaign === campaignName) {
       setPicker(cached.options);
+      setPickerLoadFailed(false);
       return;
     }
     let cancelled = false;
     loadResourceOptions(campaignName).then(({ options, complete }) => {
       if (cancelled) return;
       setPicker(options);
+      setPickerLoadFailed(!complete);
       if (complete) pickerCache.current = { campaign: campaignName, options };
     });
     return () => { cancelled = true; };
@@ -190,6 +201,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   // Close modal and reset
   const handleCloseModal = () => {
     showError(null);
+    setPickerLoadFailed(false);
     closeModal();
     clearDraft();
     // A save the server rejected means the rows are stale — refresh so the
@@ -514,6 +526,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
           editingSession={editingSession}
           otherSessions={otherSessions}
           resourceOptions={picker}
+          pickerLoadError={pickerLoadFailed}
           characters={characters}
           campaignName={campaignName}
           saving={saving}

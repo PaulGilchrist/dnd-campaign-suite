@@ -245,6 +245,7 @@ function SessionPlannerModal({
   editingSession,
   otherSessions,
   resourceOptions,
+  pickerLoadError,
   characters = [],
   campaignName,
   saving,
@@ -355,6 +356,15 @@ function SessionPlannerModal({
           <h4 className="sessions-section-title">
             <i className="fa-solid fa-link" /> Linked Resources
           </h4>
+          {/* One line for the WHOLE batch (never per-list): empty pickers are
+              otherwise silent to the user. Failed batches are never cached, so
+              closing and reopening IS the retry (Sessions.jsx loader). */}
+          {pickerLoadError && (
+            <div className="sessions-picker-load-notice">
+              <i className="fa-solid fa-circle-exclamation" />
+              Some picker lists failed to load — reopen the planner to retry.
+            </div>
+          )}
           {LINK_TYPES.map(linkType => (
             <LinkPicker
               key={linkType.key}

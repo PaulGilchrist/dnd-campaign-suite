@@ -8,8 +8,10 @@
 // invalidates the cache so the NEXT open re-fetches fresh options; events for
 // other lanes (sessions/factions), other campaigns, and the sessions list
 // itself never touch the picker cache. A failed batch is never cached
-// (dataLoader's "failure is a cache miss by law"), and campaign switches
-// re-fetch. Mocks mirror Sessions.sse-sync.test.jsx; the REAL planner modal is
+// (dataLoader's "failure is a cache miss by law") and surfaces ONE inline
+// hint in the modal — the batch wrapper itself logs NOTHING (1-service/
+// 0-wrapper canon, 0a026c804), and campaign switches re-fetch.
+// Mocks mirror Sessions.sse-sync.test.jsx; the REAL planner modal is
 // rendered so option population is pinned, not just the call counts.
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -131,6 +133,8 @@ describe('Sessions link-picker list cache', () => {
     for (const fn of Object.values(PICKER_LOADERS)) {
       expect(fn).toHaveBeenCalledTimes(1);
     }
+    // A clean batch never shows the picker-failure hint.
+    expect(screen.queryByText(/picker lists failed to load/)).not.toBeInTheDocument();
   });
 
   it('reopen with no intervening change fetches NOTHING and the pickers keep their options', async () => {
@@ -208,20 +212,31 @@ describe('Sessions link-picker list cache', () => {
     expect(totalPickerCalls()).toBe(6);
   });
 
-  it('a picker batch with a failed list is not cached — the next open re-fetches', async () => {
+  it('a picker batch with a failed list is not cached — the next open re-fetches, the batch wrapper logs NOTHING, and the modal shows ONE inline hint', async () => {
+    // 1-service/0-wrapper console canon (0a026c804, improve sessions-picker-
+    // failure-double-console): services log their own line at the fetch seam
+    // (pinned by the service tests); mocked here, so a failed batch must
+    // produce ZERO app console.error lines end-to-end through Sessions.
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     loadQuests.mockRejectedValueOnce(new Error('boom'));
     renderSessions();
     openPlanner();
-    await waitFor(() => expect(loadMaps).toHaveBeenCalledTimes(1));
+    // The whole batch gets exactly ONE hint line (not per-list) once the
+    // batch settles, and the other five pickers still populate.
+    const hints = await screen.findAllByText(/picker lists failed to load/);
+    expect(hints).toHaveLength(1);
+    expect(await screen.findByLabelText('Link Maps')).toBeInTheDocument();
     closePlanner();
+    expect(consoleSpy).not.toHaveBeenCalled();
 
+    // Close clears the hint; the failed batch never cached, so this reopen
+    // re-fetches everything, succeeds, and the hint stays away.
     openPlanner();
+    expect(screen.queryByText(/picker lists failed to load/)).not.toBeInTheDocument();
     await expectAllPickersPopulated();
     expect(totalPickerCalls()).toBe(12);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to load session picker resources for quests:', expect.any(Error)
-    );
+    expect(screen.queryByText(/picker lists failed to load/)).not.toBeInTheDocument();
+    expect(consoleSpy).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
