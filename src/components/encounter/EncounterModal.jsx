@@ -70,7 +70,8 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
       // Close the modal on success — mirrors the delete lane (d4da4ebc1).
       onClose();
     } catch (err) {
-      console.error('Failed to rename encounter:', err);
+      // Backlog 2026-10-28-U: no console.error here — the service already logs
+      // the one line (c5d784d1f canon); this leaf owns only the inline copy.
       setError(err.message || 'Failed to rename encounter');
     }
   };

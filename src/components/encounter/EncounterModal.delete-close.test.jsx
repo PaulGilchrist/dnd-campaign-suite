@@ -164,8 +164,10 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
     });
 
-    it('a FAILED rename (onRename rejects) keeps the modal open showing .encounter-modal-error with the form intact', async () => {
-        vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('a FAILED rename (onRename rejects) keeps the modal open showing .encounter-modal-error with the form intact, wrapper console SILENT', async () => {
+        // Backlog 2026-10-28-U: 1-service/0-wrapper canon (c5d784d1f) — the
+        // modal renders the leaf-inline error and logs NOTHING itself.
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         mockOnRename.mockRejectedValueOnce(new Error('Server said no'));
         const { container } = render(<Host />);
         fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
@@ -181,5 +183,6 @@ describe('EncounterModal — delete closes the Load modal on success only', () =
         expect(err).toHaveTextContent('Server said no');
         // Rename form still mounted for a retry (renameTarget untouched on failure).
         expect(screen.getByLabelText('New Name')).toBeInTheDocument();
+        expect(errSpy).not.toHaveBeenCalled();
     });
 });

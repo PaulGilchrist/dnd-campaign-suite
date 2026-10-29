@@ -24,9 +24,10 @@ vi.mock('../../services/encounters/encountersService.js', () => ({
 
 // Mutating operations that follow the same contract: delegate to the service
 // with (campaignName, ...args), then reload the encounter list. On failure they
-// console.error with their own prefix and re-throw — EXCEPT updateEncounter,
-// whose wrapper stays 0-console (c5d784d1f single-layer fingerprint: the
-// service logs once, EncounterBuilder owns the user-facing copy).
+// console.error with their own prefix and re-throw — EXCEPT updateEncounter and
+// renameEncounterAction, whose wrappers stay 0-console (c5d784d1f single-layer
+// fingerprint, extended to rename by backlog 2026-10-28-U: the service logs
+// once, the leaf modal/builder own the user-facing copy).
 const mutatingOps = [
   {
     label: 'saveEncounter',
@@ -55,7 +56,7 @@ const mutatingOps = [
     service: mockRenameEncounter,
     hookFn: 'renameEncounterAction',
     args: ['goblin-ambush', 'goblin-ambush-v2'],
-    logPrefix: 'Failed to rename encounter:',
+    logs: false,
   },
 ];
 

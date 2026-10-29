@@ -87,14 +87,15 @@ function useEncounterManagement(campaignName) {
     }
   }, [campaignName, loadEncounterList]);
 
+  // Backlog 2026-10-28-U: single-layer logging (c5d784d1f canon, mirroring
+  // updateExistingEncounter below): the service logs the one
+  // `Error renaming encounter:` console.error; failures pass through untouched
+  // to the leaf EncounterModal, which renders the inline error. Run U counted
+  // THREE app lines for one dup-name rename (service + hook + modal) — this
+  // wrapper must stay silent.
   const handleRename = useCallback(async (oldName, newName) => {
-    try {
-      await renameEncounter(campaignName, oldName, newName);
-      await loadEncounterList();
-    } catch (error) {
-      console.error('Failed to rename encounter:', error);
-      throw error;
-    }
+    await renameEncounter(campaignName, oldName, newName);
+    await loadEncounterList();
   }, [campaignName, loadEncounterList]);
 
   // No try/catch here (lint no-useless-catch + c5d784d1f single-layer

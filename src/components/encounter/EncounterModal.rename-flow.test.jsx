@@ -192,4 +192,33 @@ describe('EncounterBuilder + REAL EncounterModal — rename reachable end-to-end
     expect(h.renameEncounter).not.toHaveBeenCalled();
     expect(screen.getByLabelText('New Name')).toBeInTheDocument();
   });
+
+  // Backlog 2026-10-28-U: 1-service/0-wrapper rename canon (c5d784d1f/186a4e9f4
+  // save-404 pattern). Service is mocked at the export seam, so its own log
+  // (pinned by encountersService.test.js) never fires here — a dup-name reject
+  // must produce ZERO app console.error lines end-to-end through the REAL hook
+  // and REAL modal (was two: hook `Failed to rename encounter:` + modal).
+  it('failed rename (dup-name 400) renders the leaf-inline error, keeps the modal open, and BOTH wrappers log nothing', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    h.renameEncounter = vi.fn(async () => {
+      throw new Error('An encounter with this name already exists');
+    });
+    const { container } = mountBuilder();
+    await openLoadModal();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
+    fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'dragon-lair' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    });
+
+    // User surface unchanged: inline error, modal open for retry, rows untouched.
+    const err = container.querySelector('.encounter-modal-error');
+    expect(err).toBeInTheDocument();
+    expect(err).toHaveTextContent('An encounter with this name already exists');
+    expect(screen.getByLabelText('New Name')).toBeInTheDocument();
+    expect(h.loadEncounters).toHaveBeenCalledTimes(1); // no list reload on failure
+    // Single-layer logging: neither the hook nor the modal wrapper console.errored.
+    expect(errSpy).not.toHaveBeenCalled();
+  });
 });

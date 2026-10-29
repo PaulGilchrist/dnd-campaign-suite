@@ -159,7 +159,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run U
 
-- **EB rename-failure console is THREE app lines for one failure** (2026-10-28 run U): a dup-name/rename failure logs service `Error renaming encounter:` (`encountersService.js:113`) + hook `Failed to rename encounter:` (`useEncounterManagement.js:95`) + modal `Failed to rename encounter:` (`EncounterModal.jsx:73`) — vs the save-404 lane's 1-service/0-wrapper canon (c5d784d1f/186a4e9f4). The modal's leaf-inline error is the user surface already; drop the hook's wrapper log (keep re-throw) or the modal's, to land at one line.
+*(Consumed by the 2026-10-28 improve run — `eb-rename-fail-console-trio` implemented: hook + modal rename wrappers now 0-console, service `Error renaming encounter:` is the single line (c5d784d1f canon extended); inline error / modal-open / zero-toast failure surface + `Encounter renamed` success toast unchanged; pinned by `EncounterModal.rename-flow.test.jsx` + updated hook/delete-close pins.)*
 - **Factions conflict-reload refetches the list TWICE on the accept leg** (2026-10-28 run U; NPC/Quest lanes fetch once) — cosmetic network chatter in `Factions.jsx` reload handler after the shared `useReloadGuard` confirm; worth aligning to the single-GET pattern while the lanes are fresh.
 
 ### Open items — 2026-10-28 run T
