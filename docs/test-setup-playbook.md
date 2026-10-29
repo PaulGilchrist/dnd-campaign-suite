@@ -1613,3 +1613,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Popup `/hit/i` false-positive re-confirmed via "(+4 to hit)" on the miss popup — decisive test is the ✓/✗ glyph; clicking Done on a miss popup is harmless (no damage).
 - Goblin Scimitar grind vs AC19 ≈25%/roll (nat15+); `mode:normal` logs carry 2 dice with `total`=first die — a `[10,19]` row honestly reads 14 vs AC19 miss. Budget ~13 rolls per hit-heavy repro.
 - Miss-popup "click to dismiss" leaf-text mouse-click is the reliable dismiss when overlay-level `el.click()` silently no-ops; a chip re-click right after a dismiss can absorb (popups then replay the previous miss).
+
+## Improve run 2026-10-29 (effect-adder-effects-tab-no-cancel, 3ba44c5d0) — NEW durable entries
+
+- EffectAdder EXIT TRAP CLOSED: the Effects tab now has Cancel rows on BOTH views (browse pane `.ea-actions` + config Back/Cancel/Apply) AND a document-keydown Escape handler closes the modal from any tab (DiceTray convention). The run-Y/X playbook row "Effects tab has NO Cancel — exit lane = click a sibling tab then Cancel" is DEAD. Pinned by `EffectAdder.effects-cancel-escape.test.jsx` (8 tests).
+- PITFALL: live Escape verification needs real `page.keyboard.press('Escape')` — a synthetic `window.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true}))` from evaluate does NOT fire `document` listeners (window sits above document in the propagation path; it briefly looked like a fix failure). jsdom `fireEvent.keyDown(document,…)` does propagate.
+- Accounting: the EffectAdder modal open/close rides synced UI key `combat-ui-effectAdderTarget`, so EVERY close leg (Cancel included) posts once per open + once per close — when asserting "close causes no writes", scope the spy window and compare against the Conditions-tab Cancel baseline, never absolute zero.
