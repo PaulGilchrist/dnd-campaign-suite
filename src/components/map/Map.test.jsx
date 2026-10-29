@@ -381,7 +381,10 @@ describe('Map container — availability & composition', () => {
             radiusFt: 20, coneAngle: 0, widthFt: 0, distanceFt: 0, sizeFt: 0,
             color: 'rgba(255,80,60,0.35)',
         }];
-        await act(async () => renderMap());
+        const { container } = await act(async () => renderMap());
+
+        // Camera hint is 3D-only chrome (backlog 2026-10-29-AE): absent in 2D.
+        expect(container.querySelector('.map3d-hint')).toBeNull();
 
         fireEvent.click(screen.getByTitle('View map in 3D'));
         expect(screen.getByTestId('map3d')).toBeInTheDocument();
@@ -391,6 +394,7 @@ describe('Map container — availability & composition', () => {
         fireEvent.click(screen.getByTestId('map3d-exit'));
         expect(screen.queryByTestId('map3d')).not.toBeInTheDocument();
         expect(screen.getByTitle('View map in 3D')).toBeInTheDocument();
+        expect(container.querySelector('.map3d-hint')).toBeNull();
     });
 
     it('T6: wires fog role through the mounted SVG — GM sees translucent cells, network client opaque (cell bytes → FogOverlay #901)', async () => {

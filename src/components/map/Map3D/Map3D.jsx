@@ -110,6 +110,15 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
                     </label>
                 </div>
             </div>
+            {/* Camera affordance hint (backlog 2026-10-29-AE): OrbitControls are
+                invisible until discovered — mirror the .travel-panel-hint idiom
+                with a one-line muted chip in the toolbar chrome, ABOVE the
+                viewport so it never eats canvas pointer events. Mouse mapping
+                lives in map3dScene.js (LEFT pan / RIGHT orbit / wheel zoom). */}
+            <div className="map3d-hint no-print">
+                <i className="fa-solid fa-circle-info"></i>
+                <span>Left-drag to pan · Right-drag to orbit · Scroll to zoom</span>
+            </div>
             <div className="map3d-viewport" ref={containerRef}>
                 {initError && <div className="map3d-error">{initError}</div>}
                 {!initError && !ready && <div className="map3d-loading">Loading 3D map…</div>}

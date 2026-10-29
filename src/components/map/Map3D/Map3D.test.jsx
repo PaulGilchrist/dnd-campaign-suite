@@ -5,7 +5,8 @@ import Map3D from './Map3D.jsx';
 
 // Map3D container lane. Map.test.jsx (#924) owns the 2D↔3D mount decision and
 // props-down bytes; this file owns what Map3D does ONCE MOUNTED: toolbar title
-// + counts + exit dispatch, scene lifecycle (viewport identity, loading/error
+// + counts + exit dispatch, the camera-control hint (backlog 2026-10-29-AE),
+// scene lifecycle (viewport identity, loading/error
 // states, dispose), the exact mapData→buildMap payload transform, toggle and
 // top-down forwarding. Overlay SHAPE geometry is owned by ./map3dSpellOverlays
 // .test.js — only verbatim overlay forwarding is pinned here. Map3DScene is
@@ -91,6 +92,24 @@ describe('Map3D', () => {
 
         renderMap3D({ mapData: createMapData({ displayName: undefined }) });
         expect(screen.getByText('3D Map')).toBeInTheDocument();
+    });
+
+    it('renders the camera-control hint in the toolbar chrome with the exact copy, alongside the intact controls', () => {
+        const { container } = renderMap3D();
+        const hint = container.querySelector('.map3d-hint');
+        expect(hint).toBeTruthy();
+        expect(hint.textContent).toBe('Left-drag to pan · Right-drag to orbit · Scroll to zoom');
+        // Sibling of the viewport, never inside it — the hint must not sit over
+        // the canvas where it could eat OrbitControls pointer events.
+        expect(hint.closest('.map3d-viewport')).toBeNull();
+        // Criterion 3: existing controls unchanged in copy and presence.
+        expect(screen.getByTitle('Top-down view')).toBeInTheDocument();
+        expect(screen.getByTitle('Back to 2D map')).toBeInTheDocument();
+        const toggles = [...document.querySelectorAll('.map3d-toggle input')];
+        expect(toggles).toHaveLength(2);
+        expect(screen.getByRole('checkbox', { name: 'Labels' })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: 'Torch light' })).toBeChecked();
+        expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs')).toBeInTheDocument();
     });
 
     it('holds the viewport loading state until init resolves, then builds the exact scene payload', async () => {

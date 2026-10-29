@@ -205,7 +205,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run AE
 
-- **3D viewer camera affordances undiscoverable (2026-10-29-AE):** `map3dScene.js` ships OrbitControls (drag-pan, wheel-zoom) but the `.map3d` toolbar prints no hint and the canvas has no title/help — first-time users only discover 2D/Top-down/Labels/Torch. A one-line hint chip (`.travel-panel-hint` idiom) or `title` on the viewport would close it. Related audit gap (also in bug-music-player-no-remote-state-adoption): Pause writes no log row while set_ambience/stop do — `pause`/`resume` rows would make the music audit trail complete.
+*(none — both run-AE items consumed by the 2026-10-29 improve run: `music-editor-dirty-cancel-guard` implemented (9e829c328 — dirty Cancel + mood-switch now pay NAMED `Discard changes to the <Mood> track list?` via shared useReloadGuard, clean lanes silent, Reset re-baselines; live two-leg confirm-spy proof); `map3d-camera-hint` implemented (this commit — `.map3d-hint` chip `Left-drag to pan · Right-drag to orbit · Scroll to zoom` in the 3D toolbar, all three OrbitControls lanes live-proven, zero canvas pointer interception, no map PUT on open→exit). The bullet's Pause-log audit sub-clause was already delivered by 576be121d (pause/resume rows) — skipped as remainder. Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-29 run AC
 
