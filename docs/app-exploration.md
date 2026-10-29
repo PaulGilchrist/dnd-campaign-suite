@@ -159,8 +159,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-28 run U
 
-*(Consumed by the 2026-10-28 improve run — `eb-rename-fail-console-trio` implemented: hook + modal rename wrappers now 0-console, service `Error renaming encounter:` is the single line (c5d784d1f canon extended); inline error / modal-open / zero-toast failure surface + `Encounter renamed` success toast unchanged; pinned by `EncounterModal.rename-flow.test.jsx` + updated hook/delete-close pins.)*
-- **Factions conflict-reload refetches the list TWICE on the accept leg** (2026-10-28 run U; NPC/Quest lanes fetch once) — cosmetic network chatter in `Factions.jsx` reload handler after the shared `useReloadGuard` confirm; worth aligning to the single-GET pattern while the lanes are fresh.
+*(Consumed by the 2026-10-28 improve run — both run-U items closed: `eb-rename-fail-console-trio` implemented (hook + modal rename wrappers now 0-console, service `Error renaming encounter:` is the single line, c5d784d1f canon extended; inline error / modal-open / zero-toast failure surface + `Encounter renamed` success toast unchanged; pinned by `EncounterModal.rename-flow.test.jsx` + updated hook/delete-close pins). `factions-reload-double-fetch` blocked — premise disproved live: the accept leg is already exactly ONE factions GET (`handleReloadList` → one gated `loadFactionsList`, code-identical to NPCs/Quests; pins at `Factions.reload-discard-confirm.test.jsx:116` / `Factions.conflict-reload.test.jsx:99` already lock 1→2); run U's 2-GET read was the sibling tab's save-success list GET polluting an unscoped network count — see playbook accounting pitfall.)*
 
 ### Open items — 2026-10-28 run T
 
