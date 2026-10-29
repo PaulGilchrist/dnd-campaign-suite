@@ -92,6 +92,19 @@ describe('Log notes', () => {
     expect(mockAddEntry).not.toHaveBeenCalled();
   });
 
+  // ── ACCESSIBLE NAME (icon-only button, `.toolbar-*` title+aria canon) ──
+  it('post button carries verbatim accessible name in disabled and enabled states', () => {
+    setup(Log, []);
+    const btn = q('.log-add-btn');
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('aria-label', 'Post note');
+    expect(btn).toHaveAttribute('title', 'Post note');
+    fireEvent.change(textarea(), { target: { value: 'note' } });
+    expect(btn).not.toBeDisabled();
+    expect(btn).toHaveAttribute('aria-label', 'Post note');
+    expect(btn).toHaveAttribute('title', 'Post note');
+  });
+
   it('plain Enter never submits; Ctrl+Enter submits exact payload', async () => {
     setup(Log, []);
     const box = textarea();

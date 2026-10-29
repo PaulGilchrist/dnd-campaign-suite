@@ -215,7 +215,7 @@ export default function Log({ campaignName, characters }) {
               onChange={(e) => setNoteText(e.target.value)}
               onKeyDown={handleKeyDown}
             />
-            <button className="log-add-btn" onClick={handleAddNote} disabled={!noteText.trim()}><i className="fas fa-plus"></i></button>
+            <button className="log-add-btn" onClick={handleAddNote} disabled={!noteText.trim()} title="Post note" aria-label="Post note"><i className="fas fa-plus"></i></button>
           </div>
 
       {initialized && logEntries.length > 0 && (
