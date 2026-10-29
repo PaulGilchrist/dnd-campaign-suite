@@ -154,12 +154,15 @@ describe('EncounterBuilder - additional interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Increase quantity of Goblin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Join Encounter' }));
 
-    // Exact campaign log payload (qty propagated).
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', {
-      type: 'encounter',
-      action: 'joined',
-      encounterName: 'Encounter Builder',
-      monsters: ['2x Goblin'],
+    // Exact campaign log payload (qty propagated). The joined row is written
+    // only AFTER the board accepts the creatures (join success first).
+    await waitFor(() => {
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+        type: 'encounter',
+        action: 'joined',
+        encounterName: 'Encounter Builder',
+        monsters: ['2x Goblin'],
+      });
     });
 
     // Exact initiative dispatch: full selected monster objects, party, campaign.

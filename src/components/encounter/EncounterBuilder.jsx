@@ -335,14 +335,26 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
   const handleJoinEncounter = async () => {
     if (!selectedMonsters.length) return;
 
+    const monsterLabels = selectedMonsters.map(m => `${m.qty || 1}x ${m.name}`);
+
+    try {
+      await addMonstersToInitiative(selectedMonsters, characters, campaignName);
+    } catch (error) {
+      // The join never reached the board — say so loudly and log NOTHING:
+      // a pre-written `joined` row here left the durable campaign log
+      // claiming an encounter join that never happened (log/board divergence).
+      console.error('Failed to join encounter:', error);
+      showToast('Failed to join encounter', true);
+      return;
+    }
+
+    // Board accepted the creatures — only now is the join true.
     logEntry({
       type: 'encounter',
       action: 'joined',
       encounterName: encounterTitle || currentEncounterName || 'Unnamed Encounter',
-      monsters: selectedMonsters.map(m => `${m.qty || 1}x ${m.name}`),
+      monsters: monsterLabels,
     });
-
-    await addMonstersToInitiative(selectedMonsters, characters, campaignName);
 
     setSelectedMonsters([]);
     setDescription('');

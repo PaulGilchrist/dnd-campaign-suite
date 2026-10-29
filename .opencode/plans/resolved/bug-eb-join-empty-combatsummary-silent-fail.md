@@ -32,3 +32,27 @@ Confident (code read + live rejection message):
 
 ### Severity
 Data integrity risk — the durable campaign log records an encounter join that never happened (log/board divergence), and the failure is fully silent for the GM. Precondition (an empty-object combatSummary) is rare in pure-UI flows (Admin clear writes key-absence, Initiative mount self-heals), which caps blast radius, but the corruption lane is documented in the test playbook and any stale full-store POST can produce it.
+
+## Resolution
+
+**FIXED 2026-10-29.** The original diagnosis was correct on both counts (verified against live code + a live repro before touching anything):
+
+1. `addMonstersToInitiative` guarded only `if (!combatSummary)`, so a truthy creature-less `{}` fell through to `hasMonsterVariant(baseName, combatSummary.creatures)` → `creatures.some(...)` on `undefined` → unhandled `TypeError: Cannot read properties of undefined (reading 'some')` (server-side Vite log captured the exact frame chain `hasMonsterVariant:156 ← addMonstersToInitiative:193 ← handleJoinEncounter:345`).
+2. `handleJoinEncounter` pre-wrote the `encounter/joined` row fire-and-forget BEFORE the await and had no try/catch, so the phantom row survived the abort with zero GM feedback.
+
+### Changes
+
+- `src/services/encounters/encounterToInitiative.js` — `addMonstersToInitiative` now normalizes the store with `if (!combatSummary || !Array.isArray(combatSummary.creatures))` → re-seed `{round:1,creatures:[]}` + the existing new-combat clock sweep. Mirrors the Initiative-mount self-heal seam (`Initiative.jsx` `initialSummary && initialSummary.creatures`): a `{}` store IS a new combat.
+- `src/components/encounter/EncounterBuilder.jsx` — `handleJoinEncounter`: awaits `addMonstersToInitiative` in try/catch FIRST; on failure one `console.error('Failed to join encounter:', error)` + `showToast('Failed to join encounter', true)` (same single-layer copy family as the save lanes) + early return (draft survives for retry). The `encounter/joined` `logEntry` moved AFTER the successful join, so the campaign log can never claim a join the board didn't receive.
+- Guard audit (suggested item 3): `loadEncounterToInitiative` builds its own `{round:1,creatures}` and never reads an existing summary; its only caller (`autoEncounterService.js`) reads `.creatures.length` off that fresh object — no analogous hole. Module is ruleset-shared (no 2024 twin).
+- Tests: new `src/services/encounters/encounterToInitiative.empty-summary.test.js` (`{}` and `{round:3}` self-heal + byte-persist join), new `src/components/encounter/EncounterBuilder.join-failure.test.jsx` (rejection ⇒ toast + console line + NO log row + no navigation + draft kept; success ⇒ row lands, navigate), updated `EncounterBuilder.additional-interactions.test.jsx` join pin (row now lands post-await → `waitFor`).
+
+### Verification
+
+- **Live repro (pre-fix, test-campaign on :5173, campaign-lock dev):** poisoned `POST /combatSummary {value:{}}` → checked `Goblin 0.25` (`checked:true`, strip `Selected Monsters (1)`) → Join → log 0→1 `encounter/joined` while cs stayed `{}`, zero navigation/toast, window `unhandledrejection` captured — exact filed behavior.
+- **Live re-verification (post-fix, same poisoned `{}` board):** Join now self-heals: cs becomes `{round:1,creatures:[Goblin,…]}`, exactly one `roll/initiative` + one `encounter/joined` row pair, auto-navigates to Initiative with the Goblin card visible, zero unhandled rejections, zero console errors/warnings. Adjacent sanity: populated-board join unaffected (existing suite + live board re-seed flow).
+- **Tests:** new files 4/4 green; touched folders `src/services/encounters` + `src/components/encounter` full run 477 files / 3044 tests passed (vitest resolved the folder filter to the whole suite — all green, no pre-existing failures). `npm run lint` clean (zero warnings); `node .opencode/plans/no-timers-guard.mjs` OK (35 benign sites, no new timers).
+- Cleanup: change-data `{}` + log `[]` GET-verified after closing the browser context (API clears, no dialogs).
+
+## Summary
+Join Encounter on a `{}`-poisoned combatSummary silently failed (unhandled `creatures.some` TypeError in `addMonstersToInitiative`) while a pre-written phantom `encounter/joined` log row persisted. Fixed by normalizing creature-less summaries to a fresh `{round:1,creatures:[]}` board (matching the Initiative-mount self-heal seam) and moving the joined log row after a successful join behind a try/catch with an honest failure toast. Verified live (repro + re-verify in test-campaign) + 4 new regression tests; touched-folder suite and lint green.

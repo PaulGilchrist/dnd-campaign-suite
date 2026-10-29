@@ -180,7 +180,12 @@ export function getNextUniqueMonsterName(baseName, creatures) {
 
 export async function addMonstersToInitiative(selectedMonsters, characters, campaignName) {
     let combatSummary = await loadCombatSummary(campaignName);
-    if (!combatSummary) {
+    // A missing OR creature-less summary (e.g. a corrupted `{}` in the store)
+    // is exactly a new combat — same self-heal seam as the Initiative mount
+    // guard (Initiative.jsx `initialSummary && initialSummary.creatures`).
+    // Without the Array check a `{}` store crashed below at
+    // `combatSummary.creatures.some(...)` (TypeError reading 'some').
+    if (!combatSummary || !Array.isArray(combatSummary.creatures)) {
         combatSummary = { round: 1, creatures: [] };
         // no-timers T4: no prior initiative = new combat — sweep stale
         // combat-scoped clocks any earlier encounter left behind.
