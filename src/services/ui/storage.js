@@ -39,14 +39,26 @@ const storage = {
         if (key === 'combatSummary') {
             const queue = getCombatSummaryQueue(campaignName);
             const current = queue.pending;
-            queue.pending = current.then(() => {
+            // Board writes resolve TRUE only when the server acknowledged with an
+            // ok response, FALSE on network failure/HTTP error — the awaited-writer
+            // contract (EB Join awaits this and aborts its `joined` log row on false,
+            // bug-eb-join-swallowed-network-fail-phantom-row). The queue chain itself
+            // still swallows rejections: un-awaited writers keep the old fire-and-
+            // forget behaviour, and one failed write cannot poison later ones.
+            queue.pending = current.then(async () => {
                 const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`;
-                return fetch(fullUrl, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ value })
-                }).catch((e) => { console.error("[storage:error]", e); });
+                try {
+                    const response = await fetch(fullUrl, {
+                        method: 'POST',
+                        mode: 'cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ value })
+                    });
+                    return response.ok;
+                } catch (e) {
+                    console.error("[storage:error]", e);
+                    return false;
+                }
             });
             return queue.pending;
         }

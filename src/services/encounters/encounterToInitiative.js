@@ -4,7 +4,7 @@ import { cloneDeep } from 'lodash';
 import { rollD20 } from '../dice/diceRoller.js';
 import { addEntry } from '../ui/logService.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { loadCombatSummary } from './combatData.js';
+import { loadCombatSummary, setCombatSummaryCache } from './combatData.js';
 import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js';
 import { sweepNewCombatClocks } from '../rules/effects/zoneDurationClock.js';
 
@@ -179,7 +179,11 @@ export function getNextUniqueMonsterName(baseName, creatures) {
 }
 
 export async function addMonstersToInitiative(selectedMonsters, characters, campaignName) {
-    let combatSummary = await loadCombatSummary(campaignName);
+    // Strict read (bug-eb-join-swallowed-network-fail-phantom-row): a failed
+    // READ must surface as an error, never be conflated with "no combat" —
+    // otherwise a GET blip + successful POST would silently REPLACE a live
+    // initiative board with just the joining monsters for every player.
+    let combatSummary = await loadCombatSummary(campaignName, { strict: true });
     // A missing OR creature-less summary (e.g. a corrupted `{}` in the store)
     // is exactly a new combat — same self-heal seam as the Initiative mount
     // guard (Initiative.jsx `initialSummary && initialSummary.creatures`).
@@ -191,6 +195,12 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
         // combat-scoped clocks any earlier encounter left behind.
         await sweepNewCombatClocks(campaignName)
             .catch((e) => { console.error('[addMonstersToInitiative:new-combat-sweep]', e); });
+    } else {
+        // Join onto a COPY: loadCombatSummary cached the shared object for
+        // sync readers (getCombatSummary). Mutating it in place left a
+        // phantom joined row in every reader's view when the board write
+        // below later failed. The cache is refreshed only on ack (below).
+        combatSummary = cloneDeep(combatSummary);
     }
 
     const npcRollResults = [];
@@ -245,14 +255,29 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
 
     combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
 
+    // Authoritative board write (bug-eb-join-swallowed-network-fail-phantom-row):
+    // storage.set('combatSummary') resolves TRUE only when the server acked.
+    // A rejected write must THROW before the rolls/event below, so
+    // handleJoinEncounter's catch shows the failure toast, suppresses the
+    // `joined` log row, and keeps the draft — no log/board divergence.
+    // (`false` is the honest-failure signal; legacy mocks resolving
+    // undefined keep the historical success semantics.)
+    const saved = await storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
+    if (saved === false) {
+        throw new Error('combatSummary board write failed — the server never received the joined creatures');
+    }
+    // Board accepted — publish the joined truth to sync cache readers.
+    setCombatSummaryCache(combatSummary, campaignName);
+
+    // Initiative rolls join the durable log only AFTER the board accepted
+    // (same contract as the `joined` row above — a failed join must leave
+    // zero phantom rows behind).
     for (const { name, rollResult } of npcRollResults) {
         logRoll(campaignName, name, rollResult);
     }
 
-    storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
-
     const firstName = combatSummary.creatures[0]?.name;
-    storage.set('activeCreatureName', firstName, campaignName);
+    await storage.set('activeCreatureName', firstName, campaignName);
 
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 

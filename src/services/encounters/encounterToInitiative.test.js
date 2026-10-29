@@ -35,6 +35,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('./combatData.js', () => ({
   loadCombatSummary: vi.fn(() => null),
+  setCombatSummaryCache: vi.fn(),
 }));
 
 // ── Imports ─────────────────────────────────────────────────────

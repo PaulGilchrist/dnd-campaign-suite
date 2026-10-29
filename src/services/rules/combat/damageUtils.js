@@ -37,14 +37,27 @@ export function getResistanceNotice(damageTypes, targetResistances, targetImmuni
   return null;
 }
 
-export async function getCombatContext(campaignName) {
+export async function getCombatContext(campaignName, { strict = false } = {}) {
+  // strict: transport failure THROWS instead of reading as null ("no combat").
+  // The EB Join lane uses this — conflating a network blip with an absent
+  // board let a join normalize a live initiative board away (phantom-join
+  // class, bug-eb-join-swallowed-network-fail-phantom-row). Default (lenient)
+  // bytes unchanged for the dozens of consumers that treat null as "no combat".
   if (!campaignName) return null;
+  let response;
   try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
-    if (!response.ok) {
-      console.error('[getCombatContext] Failed to fetch change-data:', response.status, response.statusText, 'for', campaignName);
-      return null;
-    }
+    response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
+  } catch (err) {
+    console.error('[getCombatContext] Error fetching change-data:', err.message);
+    if (strict) throw err;
+    return null;
+  }
+  if (!response.ok) {
+    console.error('[getCombatContext] Failed to fetch change-data:', response.status, response.statusText, 'for', campaignName);
+    if (strict) throw new Error(`change-data fetch failed (${response.status}) for ${campaignName}`);
+    return null;
+  }
+  try {
     const data = await response.json();
     const combatSummary = data.combatSummary || null;
     // BUG (MA-1966 infra): the baked combatSummary.activeCreatureName only moves at
@@ -56,10 +69,11 @@ export async function getCombatContext(campaignName) {
       combatSummary.activeCreatureName = data.activeCreatureName;
     }
     return combatSummary;
-   } catch (err) {
+  } catch (err) {
     console.error('[getCombatContext] Error fetching change-data:', err.message);
+    if (strict) throw err;
     return null;
-   }
+  }
 }
 
 export function findCreatureByName(combatSummary, name) {

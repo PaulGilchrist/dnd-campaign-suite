@@ -32,15 +32,21 @@ function resolveActiveCreatureName(fromApi, campaignName) {
   }
 }
 
-export async function loadCombatSummary(campaignName) {
+export async function loadCombatSummary(campaignName, { strict = false } = {}) {
   if (!campaignName) return null
   try {
-    const fromApi = await getCombatContext(campaignName)
+    const fromApi = await getCombatContext(campaignName, { strict })
     if (!fromApi) return null
     resolveActiveCreatureName(fromApi, campaignName)
     setCombatSummaryCache(fromApi, campaignName)
     return fromApi
-  } catch (error) { console.warn('[combatData] Combat context unavailable from API:', error) }
+  } catch (error) {
+    // strict (EB Join lane): a transport failure must reach the caller —
+    // returning null here would normalize a possibly-live board away.
+    // Lenient loads keep the null-as-"no combat" degradation (default).
+    if (strict) throw error
+    console.warn('[combatData] Combat context unavailable from API:', error)
+  }
   return null
 }
 
