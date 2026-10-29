@@ -1745,3 +1745,7 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 ## 2026-10-29 fix run — music dead-track skip storm (ca0f26c6c)
 - SERVICE→UI NOTIFY WITHOUT NEW EXPORTS: `window.dispatchEvent(new CustomEvent('<kebab-event>', {detail}))` is app-wide canon — a new export into `youtubePlayer.js` would break its three whole-module `vi.mock`s in MusicPlayer tests; the CustomEvent lane sidesteps mock-surface growth entirely.
 - MUSIC RIG: mood-transport selectors stable (`button[title="Play <Mood> ambience"]`, `.music-btn[title=Pause|Play|Stop]`); `#music-editor-urls` needs native-setter+input event for scripted fills; dead-video proof cheap live — YT id `Me9VLOSaJkg` errors 150 in ~0.5s.
+
+## 2026-10-29 fix run — music remote-state adoption (576be121d)
+- PER-TAB-MEDIA × SHARED-KEY PATTERN: a campaign key mirroring UI state is not enough when the engine is per-tab (YT iframe) — component needs an adoption effect on remote transitions (mount/pause/resume/stop), mirroring `useTravelToolSync`; guard self-echoes with a `commitXxx` useRef flag so the adopter never re-commands the local engine for its own POST/SSE round-trip.
+- TWO-TAB ADOPTION PROOF: count `#yt-music-frame` per tab as the owning/stand-down discriminator (owner=1, adopter=0 after remote pause); pause/resume transitions must write campaign log rows (audit-gap check).
