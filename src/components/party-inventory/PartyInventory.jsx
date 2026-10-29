@@ -637,7 +637,8 @@ function PartyInventory({ campaignName, characters = [], isLocalhost, onBack }) 
   // divergence 4d81b8495 closed for the EB join. Now an atomic destructive
   // lane (handleConfirmMove idiom): drain the debounced currency snapshot,
   // POST the deletion, and write the row ONLY after the server acks it.
-  // Rejection = console.error + lane-convention alert, zero rows.
+  // Rejection = console.error + lane-convention alert + optimistic-delete
+  // rollback (2026-10-29 AC backlog), zero rows.
   const handleDeleteItem = (item) => {
     if (!window.confirm(`Delete "${item.name}" from party inventory?`)) return;
     flushCurrencyPersist();
@@ -659,6 +660,10 @@ function PartyInventory({ campaignName, characters = [], isLocalhost, onBack }) 
       })
       .catch(error => {
         console.error('[PartyInventory] delete failed:', error);
+        // Roll the optimistic delete back so the row re-appears in the open view
+        // (server kept the item). Stale guard mirrors the ack above: a newer
+        // local edit made while this write was in flight owns the display.
+        if (localRevRef.current === rev) applyInventory(inv);
         alert(`Delete failed: ${error.message}`);
       })
       .finally(() => setSaving(false));
