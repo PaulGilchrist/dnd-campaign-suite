@@ -72,13 +72,45 @@ export function sendConcentrationPrompt(campaignName, promptData) {
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
+// Result keys mirror the prompt lane's per-promptId shape (a3c10a0ea): each
+// adjudicated save owns `concentrationResult-<Target>-<promptId>` so a late
+// hygiene DELETE for one save can never shadow a sibling multi-hit save's
+// echo. A promptId-less result (legacy/staged lane) uses the bare-target key.
+function concentrationResultKey(targetName, promptId) {
+  return promptId
+    ? `concentrationResult-${targetName}-${promptId}`
+    : `concentrationResult-${targetName}`;
+}
+
+export function clearConcentrationResult(campaignName, targetName, promptId) {
+  const key = concentrationResultKey(targetName, promptId);
+  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
+    method: 'DELETE',
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
+}
+
+// The result key's only job is the SSE broadcast: every connected client
+// stamps resolvedPromptIds from the value echo (double-roll guard). The
+// server publishes that echo synchronously BEFORE responding
+// (campaigns-changedata.js publish → res.json) and the shared SSE fans
+// messages out in order per connection, so once the POST response resolves,
+// each live client's socket already holds the echo ahead of anything a
+// DELETE could publish — the echo has served every connected client and the
+// key is swept immediately (backlog 2026-10-29-Z: stale result surviving
+// until Admin Clear). Event-driven hygiene, no timers (No Game Timers rule);
+// the DELETE is chained AFTER the POST resolves on purpose — issuing it in
+// parallel could let the null echo reach a client before the value echo and
+// weaken the re-roll guard. A failed POST never DELETEs (nothing was written).
 export function sendConcentrationResult(campaignName, targetName, resultData) {
-  const key = `concentrationResult-${targetName}`;
+  const promptId = resultData?.promptId;
+  const key = concentrationResultKey(targetName, promptId);
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: resultData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); });
+  })
+    .then(() => { clearConcentrationResult(campaignName, targetName, promptId); })
+    .catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function clearConcentrationPrompt(campaignName, targetName, promptId) {

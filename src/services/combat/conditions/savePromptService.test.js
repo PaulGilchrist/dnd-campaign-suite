@@ -9,7 +9,10 @@
 // only (e.g. createRollConditionSaveHandler #1004 pins call-args through a
 // mock; buildConditionPopup envelope is @#1004). Endpoint bytes are here.
 // Turn-based canon: the source uses no timers — adjudication prompts wait
-// indefinitely and are removed only by explicit clear* calls. Verified.
+// indefinitely and are removed only by explicit clear* calls; the lone
+// exception-shaped lane is the concentration result's self-sweep, DELETEd
+// event-driven on its own POST response (no timer, backlog 2026-10-29-Z).
+// Verified.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import {
@@ -22,6 +25,7 @@ import {
   sendConcentrationPrompt,
   sendConcentrationResult,
   clearConcentrationPrompt,
+  clearConcentrationResult,
   sendFleshToStonePrompt,
   clearFleshToStonePrompt,
   sendFleshToStoneResult,
@@ -56,6 +60,7 @@ const CLEARS = [
   { fn: clearSavePrompt, key: 'savePrompt-Goblin' },
   { fn: clearDeathSavePrompt, key: 'deathSavePrompt-Fighter' },
   { fn: clearConcentrationPrompt, key: 'concentrationPrompt-Wizard' },
+  { fn: clearConcentrationResult, key: 'concentrationResult-Goblin' },
   { fn: clearFleshToStonePrompt, key: 'fleshToStonePrompt-Goblin' },
 ];
 
@@ -139,6 +144,56 @@ describe('savePromptService', () => {
     expect(init.method).toBe('DELETE');
   });
 
+  describe('concentration result hygiene lane (backlog 2026-10-29-Z)', () => {
+    // POSTs the result then lets the chained DELETE settle.
+    const sendAndSettle = async (result) => {
+      sendConcentrationResult(CAMPAIGN, 'Wizard', result);
+      await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+    };
+
+    it('posts the result to its own promptId-scoped key (sibling multi-hit results never collide)', async () => {
+      await sendAndSettle({ promptId: 'prompt-abc', success: true });
+
+      const [postUrl, postInit] = globalThis.fetch.mock.calls[0];
+      expect(postUrl).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/concentrationResult-Wizard-prompt-abc`);
+      expect(postInit.method).toBe('POST');
+    });
+
+    it('falls back to the bare-target key for promptId-less (legacy/staged) results', async () => {
+      await sendAndSettle({ success: true });
+
+      const [postUrl] = globalThis.fetch.mock.calls[0];
+      expect(postUrl).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/concentrationResult-Wizard`);
+    });
+
+    it('deletes the result key once the POST resolves (echo has reached every connected client)', async () => {
+      let resolvePost;
+      globalThis.fetch.mockImplementationOnce(() => new Promise((res) => { resolvePost = res; }));
+
+      sendConcentrationResult(CAMPAIGN, 'Wizard', { promptId: 'prompt-abc', success: false });
+      await Promise.resolve();
+      // No DELETE while the POST is still in flight — the server must publish
+      // the value echo before its null-echo can trail it on any SSE socket.
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+      resolvePost({ ok: true, json: () => Promise.resolve({}) });
+      await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+      const [url, init] = globalThis.fetch.mock.calls[1];
+      expect(url).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/concentrationResult-Wizard-prompt-abc`);
+      expect(init.method).toBe('DELETE');
+      expect(init.body).toBeUndefined();
+      expect(init.headers).toBeUndefined();
+    });
+
+    it('never deletes a result key when the POST fails (nothing was written)', async () => {
+      globalThis.fetch.mockRejectedValueOnce(new Error('network fail'));
+
+      sendConcentrationResult(CAMPAIGN, 'Wizard', { promptId: 'prompt-abc', success: true });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it.each(RESULT_EVENTS)(
     'dispatches exactly one $event with the full result envelope after the POST resolves',
     async ({ fn, key, event, result }) => {
@@ -156,7 +211,7 @@ describe('savePromptService', () => {
     }
   );
 
-  it('never throws to the caller when the network fails (all 14 entry points, fire-and-forget)', async () => {
+  it('never throws to the caller when the network fails (all 15 entry points, fire-and-forget)', async () => {
     globalThis.fetch.mockRejectedValue(new Error('network fail'));
 
     ALL_SENDERS.forEach((call) => expect(call()).toBeUndefined());

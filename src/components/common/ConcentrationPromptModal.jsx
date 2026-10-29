@@ -64,8 +64,9 @@ function ConcentrationActions({ hasResult, queueCount, onRoll, onDismiss, onNext
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
   // PromptIds already adjudicated — rolled on this client or resolved by
-  // another client's concentrationResult-<Target> echo. One save per damage
-  // event: a stale queue entry can never re-roll (double-save bug).
+  // another client's concentrationResult-<Target>-<promptId> echo. One save
+  // per damage event: a stale queue entry can never re-roll (double-save
+  // bug). The echo prefix below matches the bare-target legacy key too.
   const resolvedPromptIdsRef = useRef(new Set());
   // Rolls awaiting their async settlement on this client — a same-tick
   // second click must stay inert, never prune the check being resolved.

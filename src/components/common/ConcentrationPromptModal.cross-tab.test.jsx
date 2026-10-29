@@ -10,7 +10,9 @@
 // save and logged a duplicate concentration-save row for one damage event).
 // Also locks: the acting client's own result panel survives its own DELETE
 // echo until Done; a resolved promptId can never re-roll (result-echo seen
-// stamp); and Dismiss clears the server key instead of orphaning it.
+// stamp) on BOTH result key shapes (bare legacy + promptId-scoped hygiene
+// lane); the result key's own chained DELETE null echo is inert on panels;
+// and Dismiss clears the server key instead of orphaning it.
 //
 // Queue/roll/outcome math lives in ConcentrationPromptModal.test.jsx — not
 // repeated here.
@@ -71,6 +73,18 @@ vi.mock('./Subscriber.jsx', () => {
       button('result-echo', {
         key: `change-${campaignName}-concentrationResult-${ROLLER}`,
         data: { promptId: 'test-prompt-1', success: true, total: 27 },
+      }),
+      // Post-hygiene-fix key shape: per-promptId result key echo.
+      button('result-echo-scoped', {
+        key: `change-${campaignName}-concentrationResult-${ROLLER}-test-prompt-1`,
+        data: { promptId: 'test-prompt-1', success: true, total: 27 },
+      }),
+      // The acting client's own chained result-key DELETE (sendConcentrationResult
+      // sweeps the key once the POST has served its broadcast). A null echo on
+      // the RESULT prefix must be a no-op — it must never close a panel.
+      button('result-cleared', {
+        key: `change-${campaignName}-concentrationResult-${ROLLER}-test-prompt-1`,
+        data: null,
       }),
     );
   }
@@ -154,6 +168,28 @@ describe('ConcentrationPromptModal cross-tab resolution', () => {
     await waitFor(() => { expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument(); });
     expect(sendConcentrationResult).not.toHaveBeenCalled();
     expect(rollD20).not.toHaveBeenCalled();
+  });
+
+  it('refuses to re-roll after a promptId-scoped concentrationResult echo', async () => {
+    await openPrompt();
+    // Post-hygiene-fix key shape (concentrationResult-<Target>-<promptId>)
+    // still matches the modal's result-echo prefix and stamps the promptId.
+    fireEvent.click(screen.getByTestId('result-echo-scoped'));
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }));
+    await waitFor(() => { expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument(); });
+    expect(sendConcentrationResult).not.toHaveBeenCalled();
+    expect(rollD20).not.toHaveBeenCalled();
+  });
+
+  it('result-key DELETE null echo never closes the acting tab\'s panel', async () => {
+    await openPrompt();
+    await rollAndSeeResult();
+    // sendConcentrationResult sweeps its own result key after the POST serves
+    // its broadcast — that null echo must not touch the queued check.
+    fireEvent.click(screen.getByTestId('result-cleared'));
+    expect(screen.getByText(/CONCENTRATION MAINTAINED/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => { expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument(); });
   });
 
   it('submits exactly one result when the Roll button is double-clicked', async () => {
