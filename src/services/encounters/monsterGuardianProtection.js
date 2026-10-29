@@ -31,7 +31,8 @@
 // {type:'remove_active_buff', buffName:'Guardian Protection'} entry →
 // ability_use spend log + guardian_protection_granted log. At Will: MONSTER_
 // REACTION_USES is NEVER written (parry MA-0341 never-spends shape) — the
-// chip stays "(999 left)" honestly. Refusals are log-only, NO popupHtml
+// chip prints no counter (At Will sentinel hides it, monsterReactionUsesRemaining
+// → null). Refusals are log-only, NO popupHtml
 // (§235d/MA-0895 lineage) so the attacker's pending Done popup survives a
 // refused press. The RAW 5-ft proximity prerequisite has no gridless consumer
 // (§42/§70) — it rides the grant log as honest advisory copy.

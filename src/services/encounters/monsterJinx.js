@@ -31,6 +31,7 @@
 // + lastAttack.jinxResolved identity stamp are the only fire limits.
 import { addEntry } from '../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { isAtWillUsesLimit } from './monsterAbilityUses.js';
 
 // Same key MonsterCardHelpers.js pins (local literal avoids a circular import —
 // the dispatcher passes the stored map in, the resolver writes it back).
@@ -156,7 +157,7 @@ export function buildJinxSpendLog({ monsterName, attackerName, spec, success, li
     type: 'ability_use',
     characterName: monsterName,
     abilityName: 'Jinx',
-    description: `${monsterName} uses Jinx (Reaction) against ${attackerName}'s pending attack — ${attackerName} ${success ? 'SUCCEEDED' : 'FAILED'} their ${spec.saveType} save vs DC ${spec.saveDc}. ${success ? 'The attack proceeds normally — press Done to commit its damage.' : 'The attack misses instead — press Done to resolve it as a miss (zero damage).'} At Will — unlimited, 1 Reaction per round. ${limit === 999 ? 'At Will · ' : `${limit}/Day · `}${remaining} left.`,
+    description: `${monsterName} uses Jinx (Reaction) against ${attackerName}'s pending attack — ${attackerName} ${success ? 'SUCCEEDED' : 'FAILED'} their ${spec.saveType} save vs DC ${spec.saveDc}. ${success ? 'The attack proceeds normally — press Done to commit its damage.' : 'The attack misses instead — press Done to resolve it as a miss (zero damage).'} At Will — unlimited, 1 Reaction per round. ${isAtWillUsesLimit(limit) ? 'At Will · ' : `${limit}/Day · `}${remaining} left.`,
     timestamp: Date.now(),
   };
 }

@@ -96,7 +96,7 @@ describe('MA-0329 Hellish Rebuke authored data + spec', () => {
     expect(CULTIST_ACTION.automation).toEqual(HR_AUTOMATION);
     expect(CULTIST_ACTION).toMatchObject({ range: '60 ft.', usage: 'At Will', uses: 999, maxUses: 999 });
     expect(getGatedMonsterReaction(CULTIST_ACTION)?.effect).toBe('hellish_rebuke');
-    expect(monsterReactionUsesRemaining(CULTIST_ACTION, {})).toBe(999);
+    expect(monsterReactionUsesRemaining(CULTIST_ACTION, {})).toBeNull(); // At Will sentinel → no counter
     // fresh/spent uses arithmetic owned at gated-reaction.test.js:67-68 (#508).
   });
 

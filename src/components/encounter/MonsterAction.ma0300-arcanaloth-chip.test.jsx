@@ -1,7 +1,9 @@
 // @maintained-by-ai
 // MA-0300 component lane: the Counterspell reaction rows (REAL monsters.json
 // "At Will" + uses:999 sentinel shape) must expose exactly one gated-reaction chip whose
-// counter reads maxUses−spends honestly and NEVER marks spent pre-sentinel (RAW-unlimited,
+// label carries NO counter (At Will sentinel → monsterReactionUsesRemaining null,
+// improve `at-will-reaction-chip-999`) while the row keeps the honest "(At Will)"
+// usage echo, and NEVER marks spent pre-sentinel (RAW-unlimited,
 // unlinked to 1/Day). Press truth-table (open/consumed/closed attackerCannotAct #289) is
 // owned by MonsterAction.gated-reaction.test.jsx; data shape is data-locked by
 // MonsterCardHelpers.ma{0300,0305,1120}-counterspell.test.js — never restated here.
@@ -47,14 +49,15 @@ function renderRow(action, overrides = {}) {
 describe('MA-0300 MonsterAction Counterspell chip — At Will sentinel (3 disk rows)', () => {
   it.each(
     DISK_ROWS.flatMap(({ index, action, def }) => [
-      [index, 'fresh row shows the 999 sentinel and the honest "At Will" echo', action, def, {}, '(999 left)'],
-      [index, 'partial spends count the sentinel down, never spent-class the chip', action, def, { reactionUsesUsed: { counterspell: 3 } }, '(996 left)'],
+      [index, 'fresh row prints NO 999 counter — the honest "At Will" echo is the only usage text', action, def, {}],
+      [index, 'partial spends still print no counter (RAW-unlimited label stays clean)', action, def, { reactionUsesUsed: { counterspell: 3 } }],
     ])
-  )('%s %s — one chip, click dispatches the disk row once', (_index, _case, action, def, overrides, counter) => {
+  )('%s %s — one chip, click dispatches the disk row once', (_index, _case, action, def, overrides) => {
     const { onGatedReaction } = renderRow(action, overrides);
     // getByRole single-match pins exactly one press surface (MA-1488 sole-press).
     const chip = screen.getByRole('button', { name: new RegExp(`^${def.label}`) });
-    expect(chip.textContent).toContain(counter);
+    expect(chip.textContent.trim()).toBe(def.label);
+    expect(chip.textContent).not.toMatch(/left|\d/);
     expect(chip.querySelector(`.${def.icon}`)).toBeTruthy();
     expect(screen.getByText(`(${action.usage})`)).toBeTruthy();
     expect(chip.className.includes('mc-dice-link-spell-spent')).toBe(false);

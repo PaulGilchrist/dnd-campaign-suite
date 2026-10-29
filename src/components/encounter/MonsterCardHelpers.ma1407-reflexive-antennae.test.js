@@ -96,8 +96,8 @@ describe('MA-1407 Reflexive Antennae disk lock + registry (by name, once)', () =
 
     expect(getGatedMonsterReaction(RA_ACTION)?.effect).toBe('reflexive_antennae');
     expect(getGatedMonsterReaction({ name: 'Bite', description: 'Melee Attack Roll: +3.' })).toBeNull();
-    expect(monsterReactionUsesRemaining(RA_ACTION, {})).toBe(999);
-    expect(monsterReactionUsesRemaining(RA_ACTION, { reflexive_antennae: 1 })).toBe(998);
+    expect(monsterReactionUsesRemaining(RA_ACTION, {})).toBeNull(); // At Will sentinel → no counter
+    expect(monsterReactionUsesRemaining(RA_ACTION, { reflexive_antennae: 1 })).toBeNull();
   });
 });
 

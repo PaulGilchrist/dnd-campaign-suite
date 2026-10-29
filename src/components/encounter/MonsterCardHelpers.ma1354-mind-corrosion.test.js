@@ -89,10 +89,10 @@ describe('MA-1354 Mind Corrosion data + registry', () => {
     expect(MC_ACTION.trigger).toMatch(/fails a saving throw against a spell/);
   });
 
-  it('registry resolves mind_corrosion; At Will sentinel arithmetic (generic plain-row null at owner gated-reaction :66)', () => {
+  it('registry resolves mind_corrosion; At Will sentinel hides the counter (generic plain-row null at owner gated-reaction :66)', () => {
     expect(getGatedMonsterReaction(MC_ACTION)?.effect).toBe('mind_corrosion');
-    expect(monsterReactionUsesRemaining(MC_ACTION, {})).toBe(999);
-    expect(monsterReactionUsesRemaining(MC_ACTION, { mind_corrosion: 1 })).toBe(998);
+    expect(monsterReactionUsesRemaining(MC_ACTION, {})).toBeNull();
+    expect(monsterReactionUsesRemaining(MC_ACTION, { mind_corrosion: 1 })).toBeNull();
     expect(mindCorrosionSpec({ name: 'Mind Corrosion' }).reason).toBe('formula');
     expect(mindCorrosionSpec(MC_ACTION).spec).toEqual({ formula: '1d6', damageType: 'Psychic' });
   });

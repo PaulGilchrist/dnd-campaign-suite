@@ -84,7 +84,7 @@ describe('MA-0399/MA-1249 split registry + disk fingerprints (BY-name #387)', ()
       expect(row.usage).toBe('At Will');
       expect(row.uses).toBe(999);
       expect(row.maxUses).toBe(999);
-      expect(monsterReactionUsesRemaining(row, {})).toBe(999); // RAW-unlimited sentinel
+      expect(monsterReactionUsesRemaining(row, {})).toBeNull(); // At Will sentinel → no counter
     }
     expect(pudding.description).toMatch(/^Trigger: While the pudding is Large or Medium/);
     expect(ochre.description).toMatch(/^The jelly splits into two new <strong>Ochre Jellies<\/strong>/);

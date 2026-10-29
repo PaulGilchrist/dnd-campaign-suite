@@ -179,7 +179,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run AA
 
-- **at-will reaction chip prints `(999 left)`** (Goblin Boss → Redirect Attack row renders `Redirect Attack (999 left)` because data authors `uses/maxUses: 999` for "At Will"; the number is honest-but-noisy stat-block leakage into an affordance label — siblings with real limits print e.g. `(2 left)`, which is the point of the counter). Suggested: `monsterReactionUsesRemaining` (MonsterCardHelpers.js) returns null for at-will/999 sentinels or `formatActionUsage` renders `At Will` — GatedReactionLink already hides the em when remaining==null. Files: `src/components/encounter/MonsterAction.jsx` (GatedReactionLink), `MonsterCardHelpers.js`.
 - **pendingRedirect identity gate ignores `lastAttackNonce`** — the stamp CARRIES `lastAttackNonce` (`attackName:d20:total`) but `consumePendingRedirectOnResolve` matches only attackerName+originalTarget, so a redirect granted over an attack whose popup the GM then abandons (close modal × then dismiss popup — plausibly user-reachable; harness-proven that the abandoned attack lands zero damage) silently retargets the attacker's NEXT swing at the same original victim. RAW-wise one redirect should ride one attack. Non-blocking: verify the ×-abandon lane with real clicks, then either check the nonce at consume or clear `pendingRedirect` when its owning popup dies. Files: `src/services/encounters/monsterRedirectAttack.js:253-297`.
 
 ### Open items — 2026-10-29 run Z

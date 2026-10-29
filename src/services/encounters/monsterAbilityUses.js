@@ -12,6 +12,16 @@ import { addEntry } from '../../services/ui/logService.js';
 
 export const MONSTER_SPELL_USES_KEY = 'monsterSpellUses';
 
+// At Will authoring sentinel (MA-0006/0341/1140 family): unlimited rows are
+// authored usage:'At Will' + uses/maxUses:999. ONE helper decides at-will —
+// chip counters and prose consumers must never inline-test the raw number.
+export const AT_WILL_USES_SENTINEL = 999;
+
+export function isAtWillUsesLimit(maxUses) {
+  const n = Number(maxUses);
+  return Number.isFinite(n) && n >= AT_WILL_USES_SENTINEL;
+}
+
 export function abilitySaveUseKey(action) {
   return String(action?.name || '').replace(/\s*\(\d+\s*\/\s*Day(?:\s*Each)?\)\s*$/i, '').trim();
 }

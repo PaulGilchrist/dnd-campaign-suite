@@ -19,6 +19,7 @@ import { resolveMonsterGuardianProtectionRow } from '../../services/encounters/m
 import { resolveMonsterSpellReflectionRow } from '../../services/encounters/monsterSpellReflection.js';
 import { resolveMonsterBurstOfIngenuityRow } from '../../services/encounters/monsterBurstOfIngenuity.js';
 import { legendaryDelegateAction } from '../../services/encounters/monsterLegendaryUses.js';
+import { isAtWillUsesLimit } from '../../services/encounters/monsterAbilityUses.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -2208,6 +2209,11 @@ export function getGatedMonsterReaction(action) {
 export function monsterReactionUsesRemaining(action, storedUses) {
   const maxUses = action?.maxUses ?? action?.uses ?? null;
   if (maxUses == null) return null;
+  // At Will sentinel (uses:999, MA-0006/0341 family): RAW-unlimited rows print
+  // NO counter — GatedReactionLink hides the em at null and the row's honest
+  // "At Will" usage note stays the affordance text. Real limits keep the
+  // maxUses−spends counter byte-identical (spend economy unchanged).
+  if (isAtWillUsesLimit(maxUses)) return null;
   const used = Number(storedUses?.[action?.automation?.effect]) || 0;
   return Math.max(0, maxUses - used);
 }
@@ -3033,7 +3039,7 @@ async function resolveMonsterReflexiveAntennae({ action, monsterName, campaignNa
 export function buildCounterspellMessage({ monsterName, spellName, outcome, limit, remaining }) {
   // At-Will sentinel rows carry uses:999 — print "At Will", never "999/Day"
   // (cosmetic defect ledger pass #517; finite-limits keep the N/Day byte).
-  const limitLabel = limit === 999 ? 'At Will' : `${limit}/Day`;
+  const limitLabel = isAtWillUsesLimit(limit) ? 'At Will' : `${limit}/Day`;
   const tail = `${limitLabel} · ${remaining} left today.`;
   if (outcome.auto) return `${monsterName} Counterspells ${spellName} (spell level ${outcome.spellLevel} < 3) — auto-countered. ${tail}`;
   const verdict = outcome.countered ? 'countered' : 'failed — spell resolves';
