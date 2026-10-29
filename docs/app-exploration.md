@@ -184,7 +184,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run AB
 
-- **[2026-10-29-AB] Pre-await log-row writes across mutation lanes** — `EncounterBuilder.handleJoinEncounter` writes its `encounter/joined` row BEFORE awaiting `addMonstersToInitiative`, so a rejected join leaves the campaign log claiming a join the board never got (core fix rides `bug-eb-join-empty-combatsummary-silent-fail.md`); the GENERAL audit is the non-blocking improvement: sweep other lanes that `logEntry`/`addEntry` ahead of an awaitable mutation (EB Save/create-modal commit, Load row, map Open/Activate, `+NPC` join chip) and either move the write after success or log a compensating failure row on reject. Likely files: `src/components/encounter/EncounterBuilder.jsx`, `src/hooks/management/useEncounterManagement.js`, `src/services/maps/mapsService.js`. Display-only audit, no state risk.
+*(none — run-AB backlog fully consumed by the 2026-10-29 improve run: `pre-await-log-row-writes-audit` implemented — full audit sweep found exactly ONE remaining pre-await offender outside the already-fixed EB join (4d81b8495): PartyInventory `handleDeleteItem` wrote its `Removed "X"` row on the fire-and-forget persist queue; now an atomic drain→POST→post-ack-row lane with reject = alert + single console.error + zero rows. All other named lanes (EB Save/create/Load, map Open/Activate, +NPC chip, Sessions mark-played, loot, GM-HP audit) verified row-free or already post-await; pinned by `PartyInventory.delete-item-log.test.jsx`, live-proven poisoned-500 + success legs. Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-29 run AA
 

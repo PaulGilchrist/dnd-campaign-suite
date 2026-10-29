@@ -631,15 +631,37 @@ function PartyInventory({ campaignName, characters = [], isLocalhost, onBack }) 
     persist({ ...inv, items: inv.items.map(i => i.id === item.id ? { ...i, quantity } : i) });
   };
 
+  // Pre-await log audit (backlog 2026-10-29-AB): this row used to ride the
+  // fire-and-forget persist queue, so a rejected saveInventory left the durable
+  // campaign log claiming a removal the ledger never got — the same log/disk
+  // divergence 4d81b8495 closed for the EB join. Now an atomic destructive
+  // lane (handleConfirmMove idiom): drain the debounced currency snapshot,
+  // POST the deletion, and write the row ONLY after the server acks it.
+  // Rejection = console.error + lane-convention alert, zero rows.
   const handleDeleteItem = (item) => {
     if (!window.confirm(`Delete "${item.name}" from party inventory?`)) return;
+    flushCurrencyPersist();
     const inv = inventoryRef.current;
-    persist({ ...inv, items: inv.items.filter(i => i.id !== item.id) });
-    addEntry(campaignName, {
-      type: 'inventory_transfer',
-      message: `Removed "${item.name}" from party inventory`,
-      timestamp: Date.now(),
-    }).catch(err => console.error('[PartyInventory] log error:', err));
+    const next = { ...inv, items: inv.items.filter(i => i.id !== item.id) };
+    applyInventory(next);
+    const rev = localRevRef.current;
+    setSaving(true);
+    saveInventory(campaignName, next)
+      .then(saved => {
+        // Stale-response guard mirrors flushPersist: a newer local edit
+        // superseded this snapshot's ack.
+        if (localRevRef.current === rev) applyInventory(saved, { ack: true });
+        addEntry(campaignName, {
+          type: 'inventory_transfer',
+          message: `Removed "${item.name}" from party inventory`,
+          timestamp: Date.now(),
+        }).catch(err => console.error('[PartyInventory] log error:', err));
+      })
+      .catch(error => {
+        console.error('[PartyInventory] delete failed:', error);
+        alert(`Delete failed: ${error.message}`);
+      })
+      .finally(() => setSaving(false));
   };
 
   const handleConfirmMove = () => {
