@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 import useLog from '../../hooks/runtime/useLog.js';
@@ -39,6 +39,47 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   const [toast, setToast] = useState(null);
   const { addEntry } = useLog(campaignName);
 
+  // Remote-adoption guard (bug-music-player-no-remote-state-adoption): the
+  // last {mood,playing} THIS tab committed with its own click (or null until
+  // the first observation, which is the mount baseline — nothing changed
+  // remotely yet). The adoption effect skips bytes it committed itself, so
+  // the SSE echo of a local action never re-commands the local player.
+  const localMusicRef = useRef(null);
+
+  // All mood/playing transitions go through here so the adoption guard stays
+  // in step with what this tab committed.
+  const commitMusic = useCallback((next) => {
+    localMusicRef.current = { mood: next.mood ?? null, playing: !!next.playing };
+    setMusic(next);
+  }, [setMusic]);
+
+  // Remote-state adoption (mirrors the useTravelToolSync adopt lane): the
+  // shared 'music' key mirrors across tabs but the YouTube player is per-tab,
+  // so a transition committed by ANOTHER client must drive this tab's module
+  // to match. A play/mood change always originates from a click in a tab that
+  // mounts its own player, so every other tab stands down (stop + unmount) —
+  // only the acting tab produces audio, and no tab's UI ever claims a player
+  // state its module was never commanded to. Pause is gentler: the owner just
+  // pauses, keeping its frame so a later local resume reuses it.
+  useEffect(() => {
+    const seen = { mood: music.mood, playing: music.playing };
+    const last = localMusicRef.current;
+    localMusicRef.current = seen;
+    if (!last) return; // mount baseline — adopt nothing on first observation
+    if (seen.mood === last.mood && seen.playing === last.playing) return; // own echo / no transport change
+    if (!playerMounted) return; // no local player to command
+    if (seen.playing || !seen.mood) {
+      youtubePlayer.stop();
+      setPlayerMounted(false);
+      console.info(seen.playing
+        ? "[MusicPlayer] Ambience started in another tab — releasing this tab's player (no double playback)"
+        : "[MusicPlayer] Ambience stopped in another tab — releasing this tab's player");
+    } else {
+      youtubePlayer.pause();
+      console.info("[MusicPlayer] Ambience paused in another tab — pausing this tab's player");
+    }
+  }, [music.mood, music.playing, playerMounted]);
+
   const showToast = useCallback((message, isError = false) => {
     setToast({ message, isError });
     setTimeout(() => setToast(null), 2500); // toast auto-hide (display only, no game state)
@@ -62,7 +103,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     }
     setPlayerMounted(true);
     youtubePlayer.playTracks(tracks.map(t => t.videoId));
-    setMusic({ ...music, mood: moodKey, playing: true });
+    commitMusic({ ...music, mood: moodKey, playing: true });
     const mood = getMood(moodKey);
     addEntry({
       type: 'music',
@@ -70,13 +111,19 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       mood: moodKey,
       message: `GM set ambience: ${mood ? mood.label : moodKey} — ${tracks[0].title}`
     });
-  }, [music, setMusic, addEntry]);
+  }, [music, commitMusic, addEntry]);
 
   const togglePlay = useCallback(() => {
     if (!music.mood) return;
     if (music.playing) {
       youtubePlayer.pause();
-      setMusic({ ...music, playing: false });
+      commitMusic({ ...music, playing: false });
+      addEntry({
+        type: 'music',
+        action: 'pause',
+        mood: music.mood,
+        message: `GM paused ${moodLabel(music.mood)} ambience`
+      });
     } else {
       if (!playerMounted) {
         setPlayerMounted(true);
@@ -89,15 +136,21 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       } else {
         youtubePlayer.resume();
       }
-      setMusic({ ...music, playing: true });
+      commitMusic({ ...music, playing: true });
+      addEntry({
+        type: 'music',
+        action: 'resume',
+        mood: music.mood,
+        message: `GM resumed ${moodLabel(music.mood)} ambience`
+      });
     }
-  }, [music, setMusic, playerMounted]);
+  }, [music, commitMusic, playerMounted, addEntry]);
 
   const stopMusic = useCallback(() => {
     youtubePlayer.stop();
-    setMusic({ ...music, mood: null, playing: false });
+    commitMusic({ ...music, mood: null, playing: false });
     addEntry({ type: 'music', action: 'stop', message: 'GM stopped ambience' });
-  }, [music, setMusic, addEntry]);
+  }, [music, commitMusic, addEntry]);
 
   // Queue exhaustion (youtubePlayer.js handleError): every track failed
   // back-to-back — un-arm the mood and tell the GM honestly instead of the
@@ -107,7 +160,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     const handleQueueExhausted = (event) => {
       const label = music.mood ? moodLabel(music.mood) : 'this mood';
       const failedIds = (event.detail || {}).videoIds || [];
-      setMusic({ ...music, mood: null, playing: false });
+      commitMusic({ ...music, mood: null, playing: false });
       showToast(`No playable tracks for ${label} ambience`, true);
       addEntry({
         type: 'music',
@@ -118,7 +171,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     };
     window.addEventListener('music-queue-exhausted', handleQueueExhausted);
     return () => window.removeEventListener('music-queue-exhausted', handleQueueExhausted);
-  }, [music, setMusic, showToast, addEntry]);
+  }, [music, commitMusic, showToast, addEntry]);
 
   const handleVolume = useCallback((event) => {
     const next = Number(event.target.value) / 100;
