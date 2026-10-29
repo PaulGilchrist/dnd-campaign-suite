@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadSessions, saveSession, saveSessions, deleteSession } from '../../services/campaign/sessionsService.js';
 import {
   getDefaultSessionData,
@@ -73,6 +74,15 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   // broadcast, so there is no skipped-while-editing leg here — the rejected
   // save is the only staleness signal.
   const missedListBroadcast = useRef(false);
+  // Deep snapshot of the draft the planner was seeded with (new/edit), powering
+  // the unsaved-edits check in handleReloadList via the shared useReloadGuard
+  // so all six .ct-* CRUD lanes share the guard (improve 2026-10-29-V backlog;
+  // mirrors NPCs.jsx ba51c25ee).
+  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+    modalOpen,
+    formData,
+    confirmMessage: 'Reload the session list and discard your unsaved edits?',
+  });
   const [picker, setPicker] = useState({ maps: [], encounters: [], npcs: [], quests: [], settlements: [], notes: [] });
   const [toast, setToast] = useState('');
 
@@ -112,20 +122,30 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     }
   }, [modalOpen, formData, setFormData]);
 
+  // Seed the guard with the SAME shape the merge-checklist effect will settle
+  // on (auto items merged in), so opening a row never looks like an unsaved
+  // edit before the user has typed anything (clean-draft leg stays silent).
   const handleNewSession = () => {
     showError(null);
-    openNew(getDefaultSessionData());
+    const seed = getDefaultSessionData();
+    seed.checklist = mergeChecklist(seed.checklist, seed.links);
+    seedDraft(seed);
+    openNew(seed);
   };
 
   const handleEditSession = (session) => {
     showError(null);
-    openEdit(getDefaultSessionData(session));
+    const seed = getDefaultSessionData(session);
+    seed.checklist = mergeChecklist(seed.checklist, seed.links);
+    seedDraft(seed);
+    openEdit(seed);
   };
 
   // Close modal and reset
   const handleCloseModal = () => {
     showError(null);
     closeModal();
+    clearDraft();
     // A save the server rejected means the rows are stale — refresh so the
     // next reopen seeds fresh (mirrors NPCs.jsx handleCloseModal).
     if (missedListBroadcast.current) {
@@ -136,8 +156,12 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
 
   // One-click guided recovery for the 409 banner: force the sanctioned stale
   // close path (close the editor + consume the list refresh) so the reopen
-  // immediately seeds the fresh row — no trial-and-error.
+  // immediately seeds the fresh row — no trial-and-error. That recovery
+  // throws away the open draft, so with unsaved edits the shared
+  // useReloadGuard states the loss up front and Cancel keeps the banner,
+  // editor, and draft fully inert (mirrors NPCs.jsx handleReloadList).
   const handleReloadList = () => {
+    if (!confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -231,6 +255,10 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       await saveSession(campaignName, updatedSource, editingSession?.name);
       await saveSession(campaignName, updatedTarget, target.name);
       setFormData(updatedSource);
+      // Editor stays open — the moved-link draft just hit the server, so it is
+      // the new baseline for the unsaved-edits check (mirrors NPCs.jsx
+      // handleSaveAndAddToInitiative's re-baseline).
+      seedDraft(updatedSource);
       await loadItems();
       showToast(`Moved to “${target.name}”`);
     } catch (err) {
