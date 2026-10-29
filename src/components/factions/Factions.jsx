@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadFactions, saveFactions, deleteFaction } from '../../services/campaign/factionsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
@@ -95,6 +96,13 @@ function Factions({ campaignName, onBack }) {
   // the on-screen list is stale; consumed in handleCloseModal so a reopen
   // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
   const missedListBroadcast = useRef(false);
+  // Draft snapshot powering the reload-discard guard — shared with the NPC
+  // lane (useReloadGuard, improve 2026-10-28-T backlog).
+  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+    modalOpen,
+    formData,
+    confirmMessage: 'Reload the faction list and discard your unsaved edits?',
+  });
 
   // Single choke point for the banner: every message carries whether it was a
   // conflict, so the "Reload list" action can never outlive its error copy.
@@ -126,26 +134,30 @@ function Factions({ campaignName, onBack }) {
   // Open modal for new faction
   const handleNewFaction = () => {
     showError(null);
-    openNew({
+    const seed = {
       id: crypto.randomUUID(),
       name: '',
       description: '',
       goals: '',
       influence: 1,
       notes: '',
-    });
+    };
+    seedDraft(seed);
+    openNew(seed);
   };
 
   // Open modal for editing a faction
   const handleEditFaction = (faction) => {
     showError(null);
     openEdit(faction);
+    seedDraft(faction);
   };
 
   // Close modal and reset
   const handleCloseModal = () => {
     showError(null);
     closeModal();
+    clearDraft();
     // A broadcast skipped while editing, or a rejected save, means the rows
     // are stale — refresh so the next reopen seeds fresh (mirrors NPCs.jsx).
     if (missedListBroadcast.current) {
@@ -156,8 +168,12 @@ function Factions({ campaignName, onBack }) {
 
   // One-click guided recovery for the 409 banner: force the sanctioned stale
   // close path (close the editor + consume the list refresh) so the reopen
-  // immediately seeds the fresh row — no trial-and-error.
+  // immediately seeds the fresh row — no trial-and-error. That recovery
+  // throws away the open draft, so with unsaved edits the loss is NAMED up
+  // front and Cancel keeps the banner, editor, and draft fully inert
+  // (mirrors NPCs.jsx via shared useReloadGuard).
   const handleReloadList = () => {
+    if (!confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };

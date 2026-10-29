@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import cloneDeep from 'lodash/cloneDeep';
-import isEqual from 'lodash/isEqual';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
@@ -36,9 +35,14 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   // conflict guidance ("reload the list and re-apply") actually works in-view.
   const missedListBroadcast = useRef(false);
   // Deep snapshot of the draft the editor was seeded with (edit/new/generate).
-  // Powers the unsaved-edits check in handleReloadList — mirrors the wizard's
-  // close-guard (CharacterCreationWizard.jsx initialSnapshotRef).
-  const draftSnapshot = useRef(null);
+  // Powers the unsaved-edits check in handleReloadList — lifted into the
+  // shared useReloadGuard so all five .ct-* CRUD lanes share the guard
+  // (improve 2026-10-28-T backlog); behavior unchanged from ba51c25ee.
+  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+    modalOpen,
+    formData,
+    confirmMessage: 'Reload the NPC list and discard your unsaved edits?',
+  });
 
   // Single choke point for the banner: every message carries whether it was a
   // conflict, so the "Reload list" action can never outlive its error copy.
@@ -71,7 +75,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     showError(null);
     setModalInitialTab('roleplay');
     const seed = getDefaultFormData();
-    draftSnapshot.current = cloneDeep(seed);
+    seedDraft(seed);
     openNew(seed);
   };
 
@@ -80,7 +84,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     showError(null);
     setModalInitialTab('roleplay');
     const seed = getDefaultFormData(generated);
-    draftSnapshot.current = cloneDeep(seed);
+    seedDraft(seed);
     openNew(seed);
   };
 
@@ -89,14 +93,14 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     setModalInitialTab(tab);
     openEdit(npc);
     const seed = getDefaultFormData(npc);
-    draftSnapshot.current = cloneDeep(seed);
+    seedDraft(seed);
     setFormData(seed);
   };
 
   const handleCloseModal = () => {
     showError(null);
     closeModal();
-    draftSnapshot.current = null;
+    clearDraft();
     // A broadcast skipped while editing, or a save the server rejected, means
     // the list rows are stale — refresh now so the next reopen seeds a fresh
     // row (and a re-applied edit saves clean) instead of looping on 409.
@@ -111,17 +115,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   // immediately seeds the fresh row — no trial-and-error. That recovery
   // throws away the open draft, so with unsaved edits (deep-compare against
   // the seed snapshot, house NAMED-confirm pattern) the loss is stated up
-  // front and Cancel keeps the banner, editor, and draft fully inert.
+  // front and Cancel keeps the banner, editor, and draft fully inert. The
+  // dirty-check now lives in the shared useReloadGuard (all five lanes).
   const handleReloadList = () => {
-    if (
-      modalOpen &&
-      formData &&
-      draftSnapshot.current &&
-      !isEqual(formData, draftSnapshot.current) &&
-      !window.confirm('Reload the NPC list and discard your unsaved edits?')
-    ) {
-      return;
-    }
+    if (!confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
@@ -214,7 +211,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         showError(`${npcForInitiative.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
         // Modal stays open — the saved draft is the new baseline for the
         // unsaved-edits check (see handleReloadList).
-        draftSnapshot.current = cloneDeep(snapshot);
+        seedDraft(snapshot);
         // bump the key so it remounts showing the Stats tab.
         setModalInitialTab('stats');
         setModalKey(k => k + 1);

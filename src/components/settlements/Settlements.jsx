@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadSettlements, saveSettlement, deleteSettlement } from '../../services/campaign/settlementsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
@@ -422,6 +423,13 @@ function Settlements({ campaignName, onBack }) {
   // rejected save is the only staleness signal.
   const missedListBroadcast = useRef(false);
   const descDataRef = useRef(null);
+  // Draft snapshot powering the reload-discard guard — shared with the NPC
+  // lane (useReloadGuard, improve 2026-10-28-T backlog).
+  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+    modalOpen,
+    formData,
+    confirmMessage: 'Reload the settlement list and discard your unsaved edits?',
+  });
 
   // Single choke point for the banner: every message carries whether it was a
   // conflict, so the "Reload list" action can never outlive its error copy.
@@ -468,7 +476,9 @@ function Settlements({ campaignName, onBack }) {
 
   const handleNewSettlement = () => {
     showError(null);
-    openNew(getDefaultFormData());
+    const seed = getDefaultFormData();
+    seedDraft(seed);
+    openNew(seed);
   };
 
   // Dirty-form guard: the generator replaces every form field, so warn before
@@ -489,7 +499,9 @@ function Settlements({ campaignName, onBack }) {
     try {
       const generated = await generateSettlement(settlements);
       showError(null);
-      openNew(getDefaultFormData(generated));
+      const seed = getDefaultFormData(generated);
+      seedDraft(seed);
+      openNew(seed);
     } catch (error) {
       console.error('Failed to generate settlement:', error);
     } finally {
@@ -500,13 +512,16 @@ function Settlements({ campaignName, onBack }) {
   const handleEditSettlement = (settlement) => {
     showError(null);
     openEdit(settlement);
-    setFormData(getDefaultFormData(settlement));
+    const seed = getDefaultFormData(settlement);
+    seedDraft(seed);
+    setFormData(seed);
   };
 
   // Close modal and reset
   const handleCloseModal = () => {
     showError(null);
     closeModal();
+    clearDraft();
     // A save the server rejected means the rows are stale — refresh so the
     // next reopen seeds fresh (mirrors NPCs.jsx handleCloseModal).
     if (missedListBroadcast.current) {
@@ -517,8 +532,12 @@ function Settlements({ campaignName, onBack }) {
 
   // One-click guided recovery for the 409 banner: force the sanctioned stale
   // close path (close the editor + consume the list refresh) so the reopen
-  // immediately seeds the fresh row — no trial-and-error.
+  // immediately seeds the fresh row — no trial-and-error. That recovery
+  // throws away the open draft, so with unsaved edits the loss is NAMED up
+  // front and Cancel keeps the banner, editor, and draft fully inert
+  // (mirrors NPCs.jsx via shared useReloadGuard).
   const handleReloadList = () => {
+    if (!confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };

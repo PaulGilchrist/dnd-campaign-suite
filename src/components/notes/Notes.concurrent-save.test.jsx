@@ -121,7 +121,7 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     expect(screen.queryByTestId('preview-toggle-textarea')).toBeNull();
   });
 
-  it('flags a 409 conflict with a Reload list action — one click closes the editor and refetches the list', async () => {
+  it('flags a 409 conflict with a Reload list action — accept the discard confirm and one click closes the editor and refetches the list', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const hook = mockHook(vi.fn().mockRejectedValue(conflictError()));
@@ -141,7 +141,13 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     expect(warnSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
 
+    // improve 2026-10-28-T: the typed 'A stale edit' makes the draft dirty,
+    // so Reload now NAMES the discard — accept it to run the recovery.
+    globalThis.confirm.mockReturnValue(true);
     fireEvent.click(button);
+    expect(globalThis.confirm).toHaveBeenCalledWith(
+      'Reload the note list and discard your unsaved edits?'
+    );
     // One click = the sanctioned stale close: editor gone + one more refresh,
     // so the next reopen seeds a fresh row (mirrors NPCs recovery machinery).
     await waitFor(() => expect(hook.loadItems).toHaveBeenCalledTimes(2));

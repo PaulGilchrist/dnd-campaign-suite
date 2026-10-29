@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
@@ -200,6 +201,13 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   // the on-screen list is stale; consumed in handleCloseModal so a reopen
   // re-seeds a fresh row instead of repeating the same 409. Mirrors NPCs.jsx.
   const missedListBroadcast = useRef(false);
+  // Draft snapshot powering the reload-discard guard — shared with the NPC
+  // lane (useReloadGuard, improve 2026-10-28-T backlog).
+  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+    modalOpen,
+    formData,
+    confirmMessage: 'Reload the quest list and discard your unsaved edits?',
+  });
 
   // Single choke point for the banner: every message carries whether it was a
   // conflict, so the "Reload list" action can never outlive its error copy.
@@ -225,17 +233,21 @@ function Quests({ campaignName, isLocalhost, onBack }) {
 
   const handleNewQuest = () => {
     showError(null);
-    openNew({ name: '', status: 'active', description: '', rewards: '', notes: '' });
+    const seed = { name: '', status: 'active', description: '', rewards: '', notes: '' };
+    seedDraft(seed);
+    openNew(seed);
   };
 
   const handleEditQuest = (quest) => {
     showError(null);
     openEdit(quest);
+    seedDraft(quest);
   };
 
   const handleCloseModal = () => {
     showError(null);
     closeModal();
+    clearDraft();
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
     // A broadcast skipped while editing, or a rejected save, means the rows
     // are stale — refresh so the next reopen seeds fresh (mirrors NPCs.jsx).
@@ -247,8 +259,12 @@ function Quests({ campaignName, isLocalhost, onBack }) {
 
   // One-click guided recovery for the 409 banner: force the sanctioned stale
   // close path (close the editor + consume the list refresh) so the reopen
-  // immediately seeds the fresh row — no trial-and-error.
+  // immediately seeds the fresh row — no trial-and-error. That recovery
+  // throws away the open draft, so with unsaved edits the loss is NAMED up
+  // front and Cancel keeps the banner, editor, and draft fully inert
+  // (mirrors NPCs.jsx via shared useReloadGuard).
   const handleReloadList = () => {
+    if (!confirmDiscardDraft()) return;
     missedListBroadcast.current = true;
     handleCloseModal();
   };
