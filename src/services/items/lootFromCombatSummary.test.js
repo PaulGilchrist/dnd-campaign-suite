@@ -41,7 +41,10 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { clearDataCache } from '../ui/dataLoader.js';
 
 const CN = 'test-campaign';
-const npc = (name, monsterIndex) => ({ name, type: 'npc', ...(monsterIndex ? { monsterIndex } : {}) });
+// Loot candidates are DEFEATED monsters (currentHp <= 0) — generateLootFromCombatSummary
+// now mirrors the board's death model, so a creature with no HP reads as alive and is
+// skipped. These fixtures represent slain monsters, hence currentHp: 0.
+const npc = (name, monsterIndex) => ({ name, type: 'npc', currentHp: 0, ...(monsterIndex ? { monsterIndex } : {}) });
 const te = (target, source, effect = 'summoned') => ({ target, source, effect });
 
 beforeEach(() => {
@@ -99,8 +102,45 @@ describe('generateLootFromCombatSummary — combat roster → loot bridge', () =
     expect(fetch).toHaveBeenCalledWith('/data/monsters.json'); // #1010 transport exact-if-fetch
   });
 
+  it('DEFEATED-only filter (live-proven bug): living monster (HP > 0) contributes nothing; slain monster still pays', async () => {
+    // The "Generate loot from defeated monsters in combat" contract: an unharmed
+    // monster on the board must not arm the award lane. Live repro 2026-10-29:
+    // a Goblin at 7/7 HP generated `Encounter XP: 50 total · 4 per character`
+    // identical to its KO-ed state — alive vs dead was unobservable to the generator.
+    const aliveRoster = {
+      creatures: [
+        { name: 'Goblin', type: 'npc', monsterIndex: 'goblin', currentHp: 7, maxHp: 7 },
+        { name: 'Bandit', type: 'npc', monsterIndex: 'bandit', currentHp: 1 },
+      ],
+    };
+    expect(await generateLootFromCombatSummary(aliveRoster, [{ name: 'Druid' }], CN))
+      .toEqual({ lootEntries: [], totalEncounterXp: 0 });
+
+    // Boundary: currentHp exactly 0 is the board's death threshold ⇒ defeated, so it counts.
+    const slainRoster = {
+      creatures: [
+        { name: 'Goblin', type: 'npc', monsterIndex: 'goblin', currentHp: 0, maxHp: 7 },
+        { name: 'Bandit', type: 'npc', monsterIndex: 'bandit', currentHp: -3 },
+      ],
+    };
+    const slain = await generateLootFromCombatSummary(slainRoster, [{ name: 'Druid' }], CN);
+    expect(slain.totalEncounterXp).toBeGreaterThan(0);
+
+    // Mixed board: only the fallen contribute (goblin alive 7 HP, bandit slain 0 HP).
+    const mixedRoster = {
+      creatures: [
+        { name: 'Goblin', type: 'npc', monsterIndex: 'goblin', currentHp: 7, maxHp: 7 },
+        { name: 'Bandit', type: 'npc', monsterIndex: 'bandit', currentHp: 0, maxHp: 11 },
+      ],
+    };
+    const mixed = await generateLootFromCombatSummary(mixedRoster, [{ name: 'Druid' }], CN);
+    // Bandit XP only (goblin excluded); both CR ≤ 1.5 ⇒ tier 'none' ⇒ sentinel, no RNG.
+    const banditXp = realMonsters.find(m => m.index === 'bandit').xp;
+    expect(mixed).toEqual({ lootEntries: ['No loot for these monsters'], totalEncounterXp: banditXp });
+  });
+
   it.each([
-    ['non-npc summoned by a party member bypasses the filter — real fire elemental', [{ name: 'Fire Elemental', type: 'elemental', monsterIndex: 'fire-elemental' }], [te('Fire Elemental', 'Druid')], [{ name: 'Druid' }], 1800],
+    ['non-npc summoned by a party member bypasses the filter — real fire elemental', [{ name: 'Fire Elemental', type: 'elemental', monsterIndex: 'fire-elemental', currentHp: 0 }], [te('Fire Elemental', 'Druid')], [{ name: 'Druid' }], 1800],
     ['non-summoned targetEffects never exclude — goblin still pays', [npc('Goblin 1', 'goblin')], [te('Goblin 1', 'Druid', 'slowed'), te('Goblin 1', 'Cleric', 'blessed')], [{ name: 'Druid' }], 50],
     ['characters undefined: nobody counts as a summoner', [npc('Goblin 1', 'goblin')], [te('Goblin 1', 'Druid')], undefined, 50],
     ['empty characters roster: summons stay on the bill', [npc('Goblin 1', 'goblin')], [te('Goblin 1', 'Druid')], [], 50],

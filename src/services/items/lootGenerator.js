@@ -448,6 +448,12 @@ export async function generateLootFromCombatSummary(combatSummary, characters, _
   const monsterCounts = {};
   for (const creature of filteredCreatures) {
     if (!creature.monsterIndex) continue;
+    // Contract of the "Generate loot from defeated monsters in combat" button
+    // (InitiativeLoot.jsx:39): a monster still at HP > 0 was never slain, so it
+    // contributes no XP/loot. Mirrors the board's death model — `currentHp <= 0`
+    // (CreatureCard.jsx:619 / CreatureHp.jsx:77) and autoRewardService.isDefeatedNpc
+    // — where a creature with no HP reads as ALIVE, so it is skipped here too.
+    if (!(Number(creature.currentHp ?? creature.maxHp ?? 1) <= 0)) continue;
     if (!monsterCounts[creature.monsterIndex]) {
       monsterCounts[creature.monsterIndex] = { count: 0, creature };
     }

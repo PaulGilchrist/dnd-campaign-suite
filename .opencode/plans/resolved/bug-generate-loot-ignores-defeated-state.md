@@ -31,3 +31,19 @@ In `generateLootFromCombatSummary`, exclude creatures that are not defeated, e.g
 
 ## Severity
 Broken feature (labelled-contract violation with durable side effects) — awarding XP for unslain monsters writes lasting character progression (`xp` runtime keys) and `loot`/`loot_awarded` log rows; the UI's own affordance text invites the mis-grant.
+
+## Resolution
+FIXED 2026-10-29 (live-reproduced then live-re-verified in test-campaign at HEAD, builds on 26ffb4aa5).
+
+**Root cause (confirmed as diagnosed):** `generateLootFromCombatSummary` (`src/services/items/lootGenerator.js`) filtered only PC-owned `summoned` creatures; every `monsterIndex` creature on the board contributed full XP + loot regardless of HP. Live repro: Goblin 7/7 HP → Generate → `No loot for these monsters` + `Encounter XP: 50 total · 4 per character` + awardable Award-Loot button; KO-ing it to 0 produced byte-identical output.
+
+**Fix:** in the `monsterCounts` build loop, skip creatures that are not defeated: `if (!(Number(creature.currentHp ?? creature.maxHp ?? 1) <= 0)) continue;`. This mirrors the app's established monster death model rather than inventing one — the board marks death as `currentHp <= 0` (`CreatureCard.jsx:619`, `CreatureHp.jsx:77`, `createCreatureHandlers.js:41` comment "currentHp <= 0 IS the app's monster death model") and the sibling auto-rewards lane pre-filters with exactly this `currentHp ?? maxHp ?? 1` predicate (`autoRewardService.js:25-27` `isDefeatedNpc`). Missing HP therefore reads as ALIVE (contributes nothing), consistent with both siblings; real joined monsters always carry `currentHp`. The auto-rewards lane is unaffected (it already passes only defeated creatures). No 2024 twin exists — loot generation is ruleset-shared (single `generateLootFromCombatSummary`).
+
+**Files changed:**
+- `src/services/items/lootGenerator.js` — defeated-state filter in `generateLootFromCombatSummary` (+3-line contract comment).
+- `src/services/items/lootFromCombatSummary.test.js` — regression pin `DEFEATED-only filter (live-proven bug)` (live goblin 7 HP + bandit 1 HP → `{lootEntries: [], totalEncounterXp: 0}`; boundary currentHp 0 and negative count; mixed board pays only the slain); existing no-HP fixtures now explicitly defeated (`npc()` helper + fire-elemental row get `currentHp: 0`) to match the corrected contract.
+
+**Verification:**
+- Vitest: `lootFromCombatSummary.test.js` 9/9; full touched folders `src/services/items/` + `src/components/initiative/` = 69 files / 588 tests passed. `npm run lint` clean (zero warnings).
+- Playwright re-run (test-campaign, :5173): join Goblin (7/7) → Generate → **nothing renders** (zero `.initiative-loot-textarea`, `.initiative-xp-label`, Award buttons — same empty face as the zero-monsters control) ⇒ Expected met exactly. Sanity leg: KO goblin to 0 → Generate → `No loot for these monsters` + `Encounter XP: 50 total · 4 per character` → Award stage-1→stage-2 → panel wipes, `encounter/loot_awarded` row lands (xpPerChar 4, total 50; no `loot` row — sentinel-only CR-0.25 loot is filtered by design, unchanged behavior), all 12 PCs' runtime `xp` = 4. Defeated monsters still generate loot + XP correctly.
+- Cleanup: board cleared (Goblin + Clear-stub `NPC 1` removed), Admin cleared change-data + log (GET-verified `{}` / `[]`).
