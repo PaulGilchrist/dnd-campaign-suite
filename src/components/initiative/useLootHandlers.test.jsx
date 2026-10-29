@@ -191,7 +191,8 @@ describe('useLootHandlers', () => {
                 encounterName: 'Combat',
                 xpPerChar: 100,
                 totalEncounterXp: 201,
-                lootItems: ['Gold coins (100)', 'Silver sword'],
+                // 2026-10-29-AC: the 'loot' row above owns the per-line record;
+                // the paired award row suppresses the duplicate lootItems list.
             });
 
             expect(result.current.lootData).toEqual(EMPTY);
@@ -219,8 +220,11 @@ describe('useLootHandlers', () => {
                 encounterName: 'Combat',
                 xpPerChar: 25,
                 totalEncounterXp: 50,
-                lootItems: ['No loot for these monsters'],
+                // 2026-10-29-AC criteria 2+3: no loot row was written, so the
+                // award row still carries the xp fields, and the sentinel is
+                // never persisted on ANY row (previously lootItems held it).
             });
+            expect(JSON.stringify(addEntry.mock.calls)).not.toContain('No loot for these monsters');
             expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'xp', 25, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('Bob', 'xp', 25, campaignName);
 
@@ -246,6 +250,16 @@ describe('useLootHandlers', () => {
                 xpPerChar: 50,
                 totalEncounterXp: 100,
             });
+            // Criterion 1: paired award row carries only the xp fields.
+            expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, {
+                type: 'encounter',
+                action: 'loot_awarded',
+                encounterName: 'Combat',
+                xpPerChar: 50,
+                totalEncounterXp: 100,
+            });
+            // Criterion 3: sentinel never persisted on any row.
+            expect(JSON.stringify(addEntry.mock.calls)).not.toContain('No loot for these monsters');
         });
 
         it('with characters null writes no XP but still logs the encounter award', async () => {
@@ -271,7 +285,7 @@ describe('useLootHandlers', () => {
                 encounterName: 'Combat',
                 xpPerChar: 200, // full pool, no one to split with
                 totalEncounterXp: 200,
-                lootItems: ['Gold'],
+                // 2026-10-29-AC: lootItems suppressed (loot row owns the lines).
             });
             expect(result.current.showAwardLoot).toBe(false);
         });
@@ -329,8 +343,14 @@ describe('useLootHandlers', () => {
 
             // Existing award logs untouched (loot + loot_awarded), deposit appended
             expect(addEntry).toHaveBeenCalledTimes(3);
-            expect(addEntry).toHaveBeenNthCalledWith(1, campaignName, expect.objectContaining({ type: 'loot' }));
+            // 2026-10-29-AC: loot row owns the per-line record, sentinel-filtered.
+            expect(addEntry).toHaveBeenNthCalledWith(1, campaignName, expect.objectContaining({
+                type: 'loot',
+                lootItems: ['70 platinum pieces, 3 gold pieces, 2 silver coins', '"Shield +1" (Rare, Shield)'],
+            }));
             expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, expect.objectContaining({ type: 'encounter', action: 'loot_awarded' }));
+            expect(addEntry.mock.calls[1][1]).not.toHaveProperty('lootItems'); // suppression
+            expect(JSON.stringify(addEntry.mock.calls)).not.toContain('No loot for these monsters');
             const depositLog = addEntry.mock.calls[2][1];
             expect(depositLog.type).toBe('inventory_transfer');
             expect(depositLog.message).toContain('Loot currency deposited to party inventory');
@@ -381,14 +401,47 @@ describe('useLootHandlers', () => {
                 await result.current.handleAwardLoot();
             });
 
-            // Award (logs + XP) still completes; failure is loud, not swallowed
+            // Award (logs + XP) still completes; failure is loud, not swallowed.
+            // 2026-10-29-AC: '50 gp' is a currency-only award — the 'loot' row
+            // is skipped (criteria 2/6), so with the deposit down the single
+            // surviving row is the loot_awarded rewards record.
             expect(consoleSpy).toHaveBeenCalledWith('Failed to deposit loot currency to party inventory:', expect.any(Error));
-            expect(addEntry).toHaveBeenCalledTimes(2); // no phantom deposit log
+            expect(addEntry).toHaveBeenCalledTimes(1); // no phantom deposit log
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({ type: 'encounter', action: 'loot_awarded' }));
             expect(setRuntimeValue).toHaveBeenCalledTimes(2);
             expect(result.current.showAwardLoot).toBe(false);
             expect(result.current.lootTextValue).toBe('');
 
             consoleSpy.mockRestore();
+        });
+
+        // 2026-10-29-AC criteria 2/6: currency-only award — no 'loot' row (the
+        // deposit row owns the currency), loot_awarded keeps the xp fields.
+        it('currency-only award writes no loot row — loot_awarded carries the xp fields plus the deposit row', async () => {
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            await act(async () => {
+                result.current.setLootData({ lootEntries: ['70 platinum pieces'], totalEncounterXp: 100 });
+                result.current.setLootTextValue('70 platinum pieces');
+                result.current.setShowAwardLoot(true);
+            });
+
+            await act(async () => {
+                await result.current.handleAwardLoot();
+            });
+
+            expect(depositCurrency).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledTimes(2);
+            expect(addEntry).toHaveBeenNthCalledWith(1, campaignName, {
+                type: 'encounter',
+                action: 'loot_awarded',
+                encounterName: 'Combat',
+                xpPerChar: 50,
+                totalEncounterXp: 100,
+            });
+            expect(addEntry.mock.calls.some(([, e]) => e.type === 'loot')).toBe(false);
+            expect(addEntry.mock.calls[1][1].type).toBe('inventory_transfer');
         });
     });
 

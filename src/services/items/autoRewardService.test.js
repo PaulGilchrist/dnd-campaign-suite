@@ -44,7 +44,10 @@ const LOOT = (summary) => {
     };
 };
 const lootCalls = [];
-vi.mock('./lootGenerator.js', () => ({
+// importOriginal keeps the REAL filterNoLootSentinel helper (autoRewardService
+// now imports it); only the generator itself is stubbed.
+vi.mock('./lootGenerator.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     generateLootFromCombatSummary: vi.fn(async (summary) => {
         lootCalls.push(summary);
         return LOOT(summary);
@@ -115,10 +118,12 @@ describe('autoRewards ON — award lane', () => {
             ['HexWarlock', 'xp', 27, CN],
         ]);
         expect(addEntry.mock.calls.every(([c]) => c === CN)).toBe(true);
-        // exact toBe-log payloads (#app mandate): loot, encounter, audit
+        // exact toBe-log payloads (#app mandate): loot, encounter, audit.
+        // 2026-10-29-AC parity: the award row suppresses the duplicate
+        // lootItems list — the 'loot' row owns the per-line record.
         expect(logs).toEqual([
             { type: 'loot', encounterName: 'Combat', lootItems: ['a pouch of 25 gp'], xpPerChar: 27, totalEncounterXp: 55 },
-            { type: 'encounter', action: 'loot_awarded', encounterName: 'Combat', xpPerChar: 27, totalEncounterXp: 55, lootItems: ['a pouch of 25 gp'], auto: true },
+            { type: 'encounter', action: 'loot_awarded', encounterName: 'Combat', xpPerChar: 27, totalEncounterXp: 55, auto: true },
             { type: 'automation', automationType: 'auto_rewards_awarded', description: 'Auto-rewards at combat close: 27 XP each to 2 characters (encounter 55 XP, 1 loot item).' },
         ]);
     });
@@ -143,7 +148,11 @@ describe('autoRewards ON — award lane', () => {
         expect(r).toEqual({ awarded: true, xpPerChar: 27 });
         expect(logs.some((l) => l.type === 'loot')).toBe(false); // sentinel filtered pre-log
         expect(logs).toHaveLength(2);
-        expect(logs[0]).toEqual({ type: 'encounter', action: 'loot_awarded', encounterName: 'Combat', xpPerChar: 27, totalEncounterXp: 55, lootItems: [], auto: true });
+        // No loot row was written, so the award row alone is the rewards
+        // record (xp fields kept, 2026-10-29-AC criterion 2) and the sentinel
+        // is never persisted (criterion 3).
+        expect(logs[0]).toEqual({ type: 'encounter', action: 'loot_awarded', encounterName: 'Combat', xpPerChar: 27, totalEncounterXp: 55, auto: true });
+        expect(JSON.stringify(logs)).not.toContain('No loot for these monsters');
         expect(logs[1].description).toBe('Auto-rewards at combat close: 27 XP each to 2 characters (encounter 55 XP, 0 loot items).');
     });
 

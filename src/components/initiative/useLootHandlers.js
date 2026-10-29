@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-import { generateLootFromCombatSummary, parseCurrencyFromLootText } from '../../services/items/lootGenerator.js'
+import { generateLootFromCombatSummary, parseCurrencyFromLootText, parsePureCurrencyLine, filterNoLootSentinel } from '../../services/items/lootGenerator.js'
 import { depositCurrency } from '../../services/campaign/inventoryService.js'
 import * as logService from '../../services/ui/logService.js'
 
@@ -49,16 +49,26 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
             const numChars = characters && characters.length > 0 ? characters.length : 1
             const xpPerChar = Math.floor(lootData.totalEncounterXp / numChars)
 
-            const lootItems = lootTextValue
+            // Raw split lines minus the sentinel (never persisted anywhere —
+            // 2026-10-29-AC criterion 3).
+            const realLootItems = filterNoLootSentinel(lootTextValue
                 .split('\n')
                 .map(line => line.trim())
-                .filter(line => line.length > 0)
+                .filter(line => line.length > 0))
 
-            if (lootItems.length > 0 && lootItems.some(item => item !== 'No loot for these monsters')) {
+            // Producer-side suppression (2026-10-29-AC): the 'loot' row owns the
+            // per-line reward record; when it is written the paired loot_awarded
+            // row drops its duplicate lootItems list and keeps only the xp
+            // fields, so a currency award no longer triple-counts in the Log.
+            // Currency-only awards skip the 'loot' row entirely — the currency
+            // is owned by the inventory_transfer deposit below (criteria 2/6);
+            // only a real item line earns the row.
+            const lootRowWritten = realLootItems.some(line => !parsePureCurrencyLine(line))
+            if (lootRowWritten) {
                 await logService.addEntry(campaignName, {
                     type: 'loot',
                     encounterName: 'Combat',
-                    lootItems: lootItems.filter(item => item !== 'No loot for these monsters'),
+                    lootItems: realLootItems,
                     xpPerChar,
                     totalEncounterXp: lootData.totalEncounterXp,
                 })
@@ -67,13 +77,14 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
             const logEntry = async (entry) => {
                 try { await logService.addEntry(campaignName, entry) } catch { /* ignore */ }
             }
+            // Zero-item / no-loot-row awards still land here, so the Log keeps a
+            // rewards record via xpPerChar/totalEncounterXp (criterion 2).
             await logEntry({
                 type: 'encounter',
                 action: 'loot_awarded',
                 encounterName: 'Combat',
                 xpPerChar,
                 totalEncounterXp: lootData.totalEncounterXp,
-                lootItems,
             })
 
             for (const charData of (characters || [])) {

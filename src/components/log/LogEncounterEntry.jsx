@@ -5,9 +5,12 @@ import { formatTimestamp } from './log-utils.js';
 //   'joined'        EncounterBuilder.jsx:315 handleJoinEncounter — players join an
 //                   in-progress encounter; payload carries encounterName + monsters
 //                   roster (render the roster, NEVER the completion trophy/xp/loot).
-//   'loot_awarded'  useLootHandlers.js:60, autoRewardService.js:61 — rewards pushed
-//                   onto a running encounter; payload carries xpPerChar + lootItems
-//                   (autoRewardService adds totalEncounterXp + auto). Rewards leg.
+//   'loot_awarded'  useLootHandlers.js, autoRewardService.js — rewards pushed
+//                   onto a running encounter; payload carries xpPerChar (+
+//                   totalEncounterXp + auto on the auto lane). Since 2026-10-29-AC
+//                   producers suppress the duplicate lootItems list when the
+//                   sibling type:'loot' row already owns the per-line record;
+//                   legacy rows WITH lootItems still render below. Rewards leg.
 //   'started'     legacy/test vocabulary — no live src producer found in this census
 //                   (log-test-utils.jsx enc() default); leg bytes preserved byte-exact.
 //   'completed'   legacy/test vocabulary — no live src producer found; owns the

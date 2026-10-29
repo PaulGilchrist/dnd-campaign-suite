@@ -80,6 +80,18 @@ describe('Log > EncounterEntry', () => {
     expect(container.querySelector('.log-encounter-monsters')).toBeNull();
   });
 
+  // 2026-10-29-AC producer suppression: NEW loot_awarded rows omit lootItems
+  // (the sibling type:'loot' row owns the per-line record). Renderer must stay
+  // sane — label + xp leg, no loot list, no crash. The legacy WITH-lootItems
+  // pin above proves old rows still render byte-exact (criterion 5).
+  it('loot_awarded row without lootItems (post-fix producer shape) still renders the rewards record', () => {
+    const { container } = setup(Log, [enc({ timestamp: TS, action: 'loot_awarded', encounterName: 'Combat', xpPerChar: 27, totalEncounterXp: 55 })]);
+    expect(q('.log-name').textContent).toBe('Loot Awarded');
+    expect(q('.log-encounter .log-icon i')).toHaveClass('fa-coins');
+    expect(q('.log-encounter-xp').textContent).toBe('\u00a027 XP per character');
+    expect(container.querySelector('.log-encounter-loot')).toBeNull();
+  });
+
   // #878 enum-cover (#1348): every action the producers can emit (plus the defensive
   // UNKNOWN arm) renders a mutually distinguishable label/icon/class triple — no two
   // rows share all three bytes.

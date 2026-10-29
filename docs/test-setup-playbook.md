@@ -1711,3 +1711,12 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 
 - RECIPE — inventory delete poison leg: route `**/api/campaigns/:c/inventory` and fulfill 500 ONLY when `request().method()==='POST'` (the same URL serves the lane's GET load — a blanket route breaks seeding). Prove "no remount" with a `window.__noReload` marker and "row after ack" with a `page.on('request'/'response')` sequence showing `RES 200 /inventory` BEFORE `REQ /log`. Record confirm+alert copy via `window.confirm/alert` override spies (no native-dialog stalls).
 - PITFALL: never edit source while a background `vitest run` is in flight — late workers import the mutated tree (silently ambiguous full-suite results); kill and re-run instead. Admin clear endpoints write synchronously (GET-verify passes on first poll; no 10s debounce wait needed).
+
+## Improve run 2026-10-29 (loot-award-row-pair-double-book) — NEW durable entries
+
+- `POST /log` body is the BARE entry (server/routes/log.js:80 forwards req.body verbatim); a `{entry:{…}}` wrapper 200s and persists invisible `type:null` junk (no DELETE route — admin clear only). Nearly mis-read as "legacy row didn't land".
+- Enforcement config lands TOP-LEVEL in change-data (`getRuntimeValue('campaign','enforcement')` → `cd.enforcement`, NOT `cd.campaign.enforcement`).
+- Campaign-Admin enforcement toggles POST via the tab's own SSE registry; after a full reload without campaign re-subscribe the UI arms locally but never flushes — re-select campaign (or poke the toggle) before judging persistence.
+- Initiative Clear confirm is native `window.confirm`: in-run `page.on('dialog', accept)` consumes it and a later `browser_handle_dialog` errors "no related modal state" (double-handle pitfall re-proven) — judge by API rows.
+- Nested-snippet escaping: raw `\n`/`"` inside `browser_run_code_unsafe` code strings SyntaxError through the JSON layers — build strings with `String.fromCharCode(10/34)`.
+- After reload the SPA lands on campaign-select (`.campaign-name` waits time out until re-select). New award contract (this run): currency-only awards write NO `loot` row (deposit row owns the cash) — log audits must expect the pair only when a real item line exists.

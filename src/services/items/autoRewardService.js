@@ -16,7 +16,7 @@
  */
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { resolveEnforcement } from '../combat/canTakeAction.js';
-import { generateLootFromCombatSummary } from './lootGenerator.js';
+import { generateLootFromCombatSummary, filterNoLootSentinel } from './lootGenerator.js';
 import * as logService from '../ui/logService.js';
 
 // Kills-only honesty: a Clear after a RETREAT must not pay out. Only
@@ -45,9 +45,10 @@ export async function autoAwardCombatRewards({ campaignName, combatSummary, char
     const loot = await generateLootFromCombatSummary(closingRoster, characters, campaignName);
     const numChars = characters.length > 0 ? characters.length : 1;
     const xpPerChar = Math.floor((loot?.totalEncounterXp || 0) / numChars);
-    const lootItems = (loot?.lootEntries || []).filter((l) => l && l !== 'No loot for these monsters');
+    const lootItems = filterNoLootSentinel(loot?.lootEntries);
 
-    if (lootItems.length > 0) {
+    const lootRowWritten = lootItems.length > 0;
+    if (lootRowWritten) {
         await logService.addEntry(campaignName, {
             type: 'loot',
             encounterName: 'Combat',
@@ -56,13 +57,15 @@ export async function autoAwardCombatRewards({ campaignName, combatSummary, char
             totalEncounterXp: loot.totalEncounterXp,
         }).catch((e) => { console.error('[autoRewards] loot log failed:', e); });
     }
+    // Producer-side suppression (2026-10-29-AC parity with useLootHandlers):
+    // the 'loot' row owns the per-line reward record, so the award row keeps
+    // only the xp fields — still a rewards record when no loot row was written.
     await logService.addEntry(campaignName, {
         type: 'encounter',
         action: 'loot_awarded',
         encounterName: 'Combat',
         xpPerChar,
         totalEncounterXp: loot.totalEncounterXp,
-        lootItems,
         auto: true,
     }).catch((e) => { console.error('[autoRewards] award log failed:', e); });
 

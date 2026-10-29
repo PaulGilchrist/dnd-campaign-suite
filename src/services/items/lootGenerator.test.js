@@ -30,7 +30,9 @@ import {
   normalizeCurrency,
   formatCurrencyString,
   parseCurrencyFromLootText,
+  parsePureCurrencyLine,
   calculateEncounterXp,
+  NO_LOOT_SENTINEL,
 } from './lootGenerator.js';
 
 describe('normalizeCurrency — canonical rounding table (#1163)', () => {
@@ -154,5 +156,30 @@ describe('parseCurrencyFromLootText — pure-currency-line parser', () => {
 
   it('"and"-joined currency line is credited', () => {
     expect(parseCurrencyFromLootText('10 gp and 5 sp')).toEqual({ pp: 0, gp: 10, sp: 5, cp: 0 });
+  });
+});
+
+// 2026-10-29-AC: shared pure-currency detector behind both the deposit parser
+// and the manual-award loot-row gate (currency-only = no duplicate 'loot' row).
+describe('parsePureCurrencyLine — single-line cash detector', () => {
+  it.each([
+    ['generator platinum line', '70 platinum pieces', [['pp', 70]]],
+    ['abbreviations with commas', '50 pp, 12 gp', [['pp', 50], ['gp', 12]]],
+    ['and-joined', '10 gp and 5 sp', [['gp', 10], ['sp', 5]]],
+  ])('%s → amounts', (_name, line, expected) => {
+    expect(parsePureCurrencyLine(line)).toEqual(expected);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['whitespace', '   '],
+    ['no-loot sentinel', NO_LOOT_SENTINEL],
+    ['item-value residue', 'Pearl, 100 gp'],
+    ['parens cost residue', 'Scale Mail (15 gp)'],
+    ['pouch phrasing', 'a pouch of 25 gp'],
+    ['magic item line', '"Shield +1" (Rare, Shield)'],
+    ['null', null],
+  ])('%s → null (stays an item line)', (_name, line) => {
+    expect(parsePureCurrencyLine(line)).toBeNull();
   });
 });

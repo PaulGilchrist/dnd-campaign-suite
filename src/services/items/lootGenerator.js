@@ -48,6 +48,16 @@ const jewelryTypes = [
 const commonGemValues = [1, 2, 3, 5, 10, 25, 50, 75, 100, 125, 150, 200, 300, 400, 500, 600, 750, 1000];
 const fineGemValues = [800, 1000, 1200, 1500, 1800, 2000, 2500, 3000, 4000, 5000, 6000, 7500, 10000];
 
+// Zero-loot sentinel (2026-10-29-AC): single owner of the text so every
+// consumer filters the identical string (useLootHandlers, autoRewardService).
+export const NO_LOOT_SENTINEL = 'No loot for these monsters';
+
+// Shared sentinel filter (2026-10-29-AC): the one idiom both award lanes use
+// so the sentinel is never persisted on any log row.
+export function filterNoLootSentinel(items) {
+  return (items || []).filter(item => item && item !== NO_LOOT_SENTINEL);
+}
+
 function randInt(min, max) {
   if (min > max) [min, max] = [max, min];
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -86,12 +96,34 @@ const CURRENCY_UNIT_KEYS = {
 };
 
 /**
+ * One PURE currency line → its amounts, else null (a line is cash only when
+ * it is fully consumed by currency amounts plus commas/"and" separators;
+ * item-value suffixes like "Pearl, 100 gp" or "Scale Mail (25 gp)" leave
+ * residue). Shared detector for the deposit parser AND the loot-row write
+ * gate (2026-10-29-AC criteria 2/6: currency-only awards are owned by the
+ * inventory_transfer deposit row, never a duplicate 'loot' row).
+ * @param {string} line - one trimmed loot line
+ * @returns {Array<[string,number]>|null} unit-key/amount pairs, null if not pure currency
+ */
+export function parsePureCurrencyLine(line) {
+  const trimmed = String(line ?? '').trim();
+  if (!trimmed) return null;
+
+  const amounts = [];
+  const residue = trimmed.replace(CURRENCY_AMOUNT_RE, (_match, num, unit) => {
+    amounts.push([CURRENCY_UNIT_KEYS[unit.toLowerCase()], parseInt(num.replace(/,/g, ''), 10)]);
+    return '';
+  });
+
+  if (amounts.length === 0) return null;
+  if (residue.replace(/[.,\s]+/g, '').replace(/and/gi, '')) return null;
+  return amounts;
+}
+
+/**
  * Parse party-depositable currency out of loot text — the inverse of
- * formatCurrencyString. Only PURE currency lines are credited: a line is
- * cash only when it is fully consumed by currency amounts (plus commas /
- * "and" separators). Item-value suffixes like "Pearl, 100 gp" or
- * "Scale Mail (25 gp)" leave residue and stay loot descriptions, never a
- * phantom deposit. Amounts across all currency lines are summed.
+ * formatCurrencyString. Only PURE currency lines are credited (see
+ * parsePureCurrencyLine). Amounts across all currency lines are summed.
  * @param {string} text - loot textarea content
  * @returns {{pp:number,gp:number,sp:number,cp:number}} zeroed when no currency lines exist
  */
@@ -100,17 +132,8 @@ export function parseCurrencyFromLootText(text) {
   if (!text) return currency;
 
   for (const rawLine of String(text).split('\n')) {
-    const line = rawLine.trim();
-    if (!line) continue;
-
-    const amounts = [];
-    const residue = line.replace(CURRENCY_AMOUNT_RE, (_match, num, unit) => {
-      amounts.push([CURRENCY_UNIT_KEYS[unit.toLowerCase()], parseInt(num.replace(/,/g, ''), 10)]);
-      return '';
-    });
-
-    if (amounts.length === 0 || residue.replace(/[.,\s]+/g, '').replace(/and/gi, '')) continue;
-
+    const amounts = parsePureCurrencyLine(rawLine);
+    if (!amounts) continue;
     for (const [key, value] of amounts) {
       if (key && Number.isFinite(value) && value > 0) currency[key] += value;
     }
@@ -370,7 +393,7 @@ function buildLootEntries(currencyGP, otherEntries) {
   }
 
   if (lootEntries.length === 0) {
-    lootEntries.push('No loot for these monsters');
+    lootEntries.push(NO_LOOT_SENTINEL);
   }
 
   return lootEntries;
