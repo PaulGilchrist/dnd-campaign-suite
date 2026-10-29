@@ -136,7 +136,12 @@ describe('NPCs live SSE sync', () => {
 
     // Closing consumes the skipped broadcast immediately — the list must never
     // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
+    // The draft is dirty, so ×/Cancel first NAMES the discard (improve
+    // 2026-10-29-V): accept it to exercise the close path.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByText('Cancel'));
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Draft Name Mid-Edit"?');
+    confirmSpy.mockRestore();
     await screen.findByLabelText('Edit NPC: QA Sync NPC A');
     expect(loadCallCount).toBe(2);
     expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();

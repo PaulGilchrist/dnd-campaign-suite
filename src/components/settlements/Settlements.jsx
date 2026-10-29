@@ -542,6 +542,21 @@ function Settlements({ campaignName, onBack }) {
     handleCloseModal();
   };
 
+  // ×/Cancel close path (improve 2026-10-29-V backlog): a dirty draft pays
+  // the house NAMED confirm — wizard precedent `Discard changes to "X"?` —
+  // naming the settlement the editor shows (typed name, else the row's
+  // original); an unnamed new draft falls back to the wizard's generic
+  // new-draft copy. A clean draft closes silently exactly as before. Kept
+  // OUT of handleCloseModal so internal closes (save/delete/reload) never
+  // double-confirm; dismiss is fully inert (banner, editor, draft).
+  const handleRequestClose = () => {
+    const name = (formData?.name || '').trim() || editingSettlement?.name;
+    if (!confirmDiscardDraft(
+      name ? `Discard changes to "${name}"?` : 'Discard this new settlement draft?'
+    )) return;
+    handleCloseModal();
+  };
+
   const handleFormChange = (field, value) => {
     if (field === 'size') {
       const descs = descDataRef.current;
@@ -772,7 +787,7 @@ function Settlements({ campaignName, onBack }) {
           deleting={deleting}
           error={error}
           errorConflict={errorIsConflict}
-          onClose={handleCloseModal}
+          onClose={handleRequestClose}
           onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}

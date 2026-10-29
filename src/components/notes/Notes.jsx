@@ -317,6 +317,23 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
     }
   };
 
+  // ×/Cancel close path (improve 2026-10-29-V backlog): a dirty draft pays
+  // the house NAMED confirm — wizard precedent `Discard changes to "X"?` —
+  // naming the note the same way rows/delete-confirm do (noteDisplayName:
+  // party location, else a plain-text excerpt of the description); a brand-
+  // new draft with neither falls back to the wizard's generic new-draft copy.
+  // A clean draft closes silently exactly as before. Kept OUT of
+  // handleCloseModal so internal closes (save/delete/reload) never double-
+  // confirm; dismiss is fully inert (banner, editor, draft, zero network).
+  const handleRequestClose = () => {
+    const name = noteDisplayName(formData || {}) ||
+      (editingNote ? noteDisplayName(editingNote) : '');
+    if (!confirmDiscardDraft(
+      name ? `Discard changes to "${name}"?` : 'Discard this new note draft?'
+    )) return;
+    handleCloseModal();
+  };
+
   // One-click guided recovery for the 409 banner: force the sanctioned stale
   // close path (close the editor + consume the list refresh) so the reopen
   // immediately seeds the fresh row — no trial-and-error. That recovery
@@ -467,7 +484,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
           deleting={deleting}
           error={error}
           errorConflict={errorIsConflict}
-          onClose={handleCloseModal}
+          onClose={handleRequestClose}
           onFieldChange={handleFormChange}
           onReloadList={handleReloadList}
           onSave={handleSave}

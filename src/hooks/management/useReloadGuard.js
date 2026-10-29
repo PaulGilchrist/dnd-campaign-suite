@@ -26,15 +26,21 @@ export function useReloadGuard({ modalOpen, formData, confirmMessage }) {
     draftSnapshot.current = null;
   }, []);
 
-  // Returns true when "Reload list" may proceed: only a modal-open, deep-
-  // different-from-seed draft pays the confirm toll.
-  const confirmDiscardDraft = useCallback(() => {
+  // Returns true when the caller may proceed with discarding the open draft.
+  // Two tolls share this one dirty-check: the 409 banner's "Reload list"
+  // (no argument → the lane's reload confirmMessage) and the ×/Cancel close
+  // path via each lane's handleRequestClose (improve 2026-10-29-V backlog),
+  // which passes the wizard-precedent NAMED copy — `Discard changes to "X"?`
+  // (CharacterCreationWizard.jsx handleRequestClose). Only a modal-open,
+  // deep-different-from-seed draft pays any confirm at all; the override is
+  // optional so every pre-existing reload call-site is unchanged.
+  const confirmDiscardDraft = useCallback((overrideMessage) => {
     if (
       modalOpen &&
       formData &&
       draftSnapshot.current &&
       !isEqual(formData, draftSnapshot.current) &&
-      !window.confirm(confirmMessage)
+      !window.confirm(overrideMessage || confirmMessage)
     ) {
       return false;
     }

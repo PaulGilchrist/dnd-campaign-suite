@@ -178,6 +178,21 @@ function Factions({ campaignName, onBack }) {
     handleCloseModal();
   };
 
+  // ×/Cancel close path (improve 2026-10-29-V backlog): a dirty draft pays
+  // the house NAMED confirm — wizard precedent `Discard changes to "X"?` —
+  // naming the faction the editor shows (typed name, else the row's
+  // original); an unnamed new draft falls back to the wizard's generic
+  // new-draft copy. A clean draft closes silently exactly as before. Kept
+  // OUT of handleCloseModal so internal closes (save/delete/reload) never
+  // double-confirm; dismiss is fully inert (banner, editor, draft).
+  const handleRequestClose = () => {
+    const name = (formData?.name || '').trim() || editingFaction?.name;
+    if (!confirmDiscardDraft(
+      name ? `Discard changes to "${name}"?` : 'Discard this new faction draft?'
+    )) return;
+    handleCloseModal();
+  };
+
   // Handle form field changes. Name edits also clear a sticky duplicate-name
   // error surfaced by a server 400 (the derived guard above only re-evaluates
   // against the locally-loaded list); unrelated errors stay until Save/Close.
@@ -343,7 +358,7 @@ function Factions({ campaignName, onBack }) {
               <h3>{editingFaction ? 'Edit Faction' : 'New Faction'}</h3>
               <button
                 className="ct-modal-close"
-                onClick={handleCloseModal}
+                onClick={handleRequestClose}
                 aria-label="Close"
               >
                 &times;
@@ -443,7 +458,7 @@ function Factions({ campaignName, onBack }) {
               <div className="ct-modal-buttons">
                 <button
                   className="ct-btn"
-                  onClick={handleCloseModal}
+                  onClick={handleRequestClose}
                   disabled={saving}
                 >
                   Cancel

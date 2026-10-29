@@ -269,6 +269,21 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     handleCloseModal();
   };
 
+  // ×/Cancel close path (improve 2026-10-29-V backlog): a dirty draft pays
+  // the house NAMED confirm — wizard precedent `Discard changes to "X"?` —
+  // naming the quest the editor shows (typed name, else the row's original);
+  // an unnamed new draft falls back to the wizard's generic new-draft copy.
+  // A clean draft closes silently exactly as before. Kept OUT of
+  // handleCloseModal so internal closes (save/delete/reload) never double-
+  // confirm; dismiss is fully inert (banner, editor, draft, zero network).
+  const handleRequestClose = () => {
+    const name = (formData?.name || '').trim() || editingQuest?.name;
+    if (!confirmDiscardDraft(
+      name ? `Discard changes to "${name}"?` : 'Discard this new quest draft?'
+    )) return;
+    handleCloseModal();
+  };
+
   // Name edits clear a sticky duplicate-name banner surfaced by a server 400
   // (the derived guard below re-evaluates live while typing); unrelated
   // save/delete errors stay until Save/Close. Mirrors Factions.jsx.
@@ -432,7 +447,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
           errorConflict={showErrorReload}
           saveDisabled={saveDisabled}
           onChange={handleFormChange}
-          onClose={handleCloseModal}
+          onClose={handleRequestClose}
           onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}

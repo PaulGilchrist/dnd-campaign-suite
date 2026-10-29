@@ -100,7 +100,12 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save/i }));
     await waitFor(() => expect(document.querySelector('.notes-form-error')).not.toBeNull());
 
+    // Cancel on a dirty draft first NAMES the discard (improve 2026-10-29-V)
+    // — accept it; the close still clears the banner.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "A stale edit"?');
+    confirmSpy.mockRestore();
     expect(document.querySelector('.notes-form-error')).toBeNull();
   });
 

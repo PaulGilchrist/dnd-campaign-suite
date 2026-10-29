@@ -166,6 +166,21 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     handleCloseModal();
   };
 
+  // ×/Cancel close path (improve 2026-10-29-V backlog): a dirty draft pays
+  // the house NAMED confirm — wizard precedent `Discard changes to "X"?` —
+  // naming the session the editor shows (typed name, else the row's
+  // original); an unnamed new draft falls back to the wizard's generic
+  // new-draft copy. A clean draft closes silently exactly as before. Kept
+  // OUT of handleCloseModal so internal closes (save/delete/mark-played/
+  // reload) never double-confirm; dismiss is fully inert.
+  const handleRequestClose = () => {
+    const name = (formData?.name || '').trim() || editingSession?.name;
+    if (!confirmDiscardDraft(
+      name ? `Discard changes to "${name}"?` : 'Discard this new session draft?'
+    )) return;
+    handleCloseModal();
+  };
+
   const hasDuplicateName = () => sessions.some(s =>
     s.name !== editingSession?.name && s.name.toLowerCase() === formData.name.trim().toLowerCase()
   );
@@ -457,7 +472,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
           deleting={deleting}
           error={error}
           errorConflict={errorIsConflict}
-          onClose={handleCloseModal}
+          onClose={handleRequestClose}
           onReloadList={handleReloadList}
           onSave={handleSave}
           onDelete={handleDelete}

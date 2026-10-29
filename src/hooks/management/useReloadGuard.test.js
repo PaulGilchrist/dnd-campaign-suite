@@ -85,4 +85,31 @@ describe('useReloadGuard', () => {
     expect(result.current.confirmDiscardDraft()).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
   });
+
+  // Improve 2026-10-29-V backlog: the ×/Cancel close path reuses this same
+  // dirty-check via an optional message override (wizard-precedent named
+  // copy) — no argument keeps the reload message, so every pre-existing
+  // reload call-site is byte-identical in behavior.
+  it('message override: dirty draft confirms with the override copy; clean stays silent', () => {
+    const seed = { name: 'The Lost Artifact' };
+    const { result, rerender } = setup({ formData: seed });
+    act(() => result.current.seedDraft(seed));
+
+    // Dirty + override → the NAMED close copy is what the user sees.
+    rerender({ modalOpen: true, formData: { name: 'Renamed Quest' } });
+    expect(result.current.confirmDiscardDraft('Discard changes to "Renamed Quest"?')).toBe(false);
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Renamed Quest"?');
+    expect(confirmSpy).not.toHaveBeenCalledWith(CONFIRM);
+
+    // Same dirty draft without an override → reload copy (legacy signature).
+    result.current.confirmDiscardDraft();
+    expect(confirmSpy).toHaveBeenCalledWith(CONFIRM);
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+
+    // Clean draft pays no toll, override or not.
+    rerender({ modalOpen: true, formData: seed });
+    expect(result.current.confirmDiscardDraft('Discard changes to "The Lost Artifact"?')).toBe(true);
+    result.current.confirmDiscardDraft();
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+  });
 });

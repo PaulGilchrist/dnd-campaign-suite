@@ -118,7 +118,12 @@ describe('Quests live SSE sync', () => {
 
     // Closing consumes the skipped broadcast immediately — the list must never
     // stay stale so a reopened editor re-seeds a fresh row (409 recovery).
+    // The draft is dirty, so × now NAMES the discard (improve 2026-10-29-V):
+    // accept it to exercise the close path.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Draft Quest"?');
+    confirmSpy.mockRestore();
     await findByText('The Sunken Shrine');
     expect(loadCallCount).toBe(2);
 
