@@ -1585,3 +1585,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 
 - Seeding Initiative for a solo-creature rig: a full-store `combatSummary` POST with ONE player entry causes the app to re-seed the whole 12-PC party into initiative on load (App re-seed behavior) — expected, not a defect; Admin clear-change-data wipes it all including combatSummary. There is NO `/change-data/<Char>` route (404): char-bucket read is `GET /api/campaigns/:c/<Char>`.
 - CLA-019 suppression contract (post-improve): `addCondition` returns `{suppressed:true, immunitySource}` (aura lane names `Aura of X from <host>`; player-immunity lane `'condition immunity'`); `handleApplyEffect` returns the outcome object (not the old `'suppressed'` string) and does NOT clear `effectAdderTarget` — EffectAdder renders `.ea-immunity-notice[role=alert]` and clears it on chip-select/tab-switch. Success lane still silent-closes. Pinned: `EffectAdder.suppression-notice.test.jsx`.
+
+## Improve run 2026-10-29 (effect-adder-search-word-order) — NEW durable entries
+
+- Effects search (post-improve): per-whitespace-token case-insensitive AND over `label + description + group + effect` key, word-order-irrelevant (`speed half` ≡ `half speed` → Resilient Sphere + Speed Halved with current 135-entry registry); empty/whitespace query = full registry; single-token ≡ old 4-face OR. No registry entry has ever had a "Half Speed" label (`speed_half` = "Speed Halved" matches via KEY, not label) — backlog prose naming that label is stale.
+- EffectAdder search text PERSISTS across tab switches inside the modal — reset the query before capturing "default" censuses or the read reflects the stale filter.
+- `browser_evaluate` wraps results as `### Result "<json-string>"` (double-encoded when the function returns JSON.stringify); `:has-text()` is Playwright-only and invalid inside `browser_evaluate` target selectors.

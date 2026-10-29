@@ -62,16 +62,17 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
   // Determine which fields to show for the selected effect
   const hasField = (field) => selectedEffectDef?.fields?.includes(field)
 
-  // Filter effects by search query
+  // Filter effects by search query: whitespace tokens AND-match against each
+  // effect's combined searchable text (label + description + group + effect
+  // key), so word order is irrelevant ("speed half" === "half speed").
+  // Single-token queries behave exactly like the old whole-string substring.
   const filteredDefinitions = React.useMemo(() => {
-    if (!searchQuery.trim()) return TARGET_EFFECT_DEFINITIONS
-    const q = searchQuery.toLowerCase()
-    return TARGET_EFFECT_DEFINITIONS.filter(def =>
-      def.label.toLowerCase().includes(q) ||
-      def.description.toLowerCase().includes(q) ||
-      def.group.toLowerCase().includes(q) ||
-      def.effect.toLowerCase().includes(q)
-    )
+    const tokens = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    if (!tokens.length) return TARGET_EFFECT_DEFINITIONS
+    return TARGET_EFFECT_DEFINITIONS.filter(def => {
+      const haystack = `${def.label} ${def.description} ${def.group} ${def.effect}`.toLowerCase()
+      return tokens.every(token => haystack.includes(token))
+    })
   }, [searchQuery])
 
   // Group effects, filtering out empty groups when searching
