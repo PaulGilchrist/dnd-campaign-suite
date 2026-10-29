@@ -916,13 +916,13 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                      {celestialResilienceModal && (
                         <CreatureSelectionModal
                             title="Celestial Resilience"
-                            icon="fa-shield-hart"
+                            icon="fa-shield-heart"
                             targets={celestialResilienceModal.creatureTargets}
                             maxTargets={celestialResilienceModal.maxTargets}
                             description={`Choose up to ${celestialResilienceModal.maxTargets} allies to gain temporary hit points from your Celestial Resilience.`}
                             note={`You gain ${celestialResilienceModal.selfTempHp} temporary hit points. Each selected ally gains ${celestialResilienceModal.allyTempHp} temporary hit points.`}
                             confirmLabel="Grant Resilience"
-                            confirmIcon="fa-shield-hart"
+                            confirmIcon="fa-shield-heart"
                             onConfirm={handleCelestialResilienceConfirm}
                             onSkip={handleCelestialResilienceSkip}
                         />

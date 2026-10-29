@@ -194,6 +194,11 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
         description: `Choose up to ${celestialPayload.maxTargets} allies to gain temporary hit points from your Celestial Resilience.`,
         note: /You gain 10 temporary hit points\. Each selected ally gains 5 temporary hit points\./,
         confirmLabel: 'Grant Resilience',
+        // Typo regression pin (bug-shortrest-celestial-icon-typo): Font Awesome 6
+        // has no `fa-shield-hart` glyph (renders content:none). Long-rest lane
+        // (LongRestButton.jsx / modals/CelestialResilienceModal.jsx) is the
+        // correct-class precedent.
+        icon: 'fa-shield-heart',
         skipHandler: null,
         skipPopup: /No allies selected\./,
         confirm: {
@@ -271,7 +276,7 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
 
     it.each(selectionHostCases)(
       'opens $name with its prompt and dismisses on Skip without side effects',
-      async ({ name, automation, config, stockKey, openResult, description, note, confirmLabel, skipHandler, skipPopup }) => {
+      async ({ name, automation, config, stockKey, openResult, description, note, confirmLabel, icon, skipHandler, skipPopup }) => {
         if (stockKey) mockRuntimeStore[stockKey] = 2;
         if (openResult) executeHandler.mockResolvedValue(openResult);
 
@@ -287,6 +292,13 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
         expect(screen.getByText(description)).toBeInTheDocument();
         if (note) expect(screen.getByText(note)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: confirmLabel })).toBeInTheDocument();
+        if (icon) {
+          // Header and confirm glyphs both carry the pinned class; the
+          // `fa-shield-hart` typo must not reappear at either site.
+          expect(screen.getByTestId('cs-header-icon')).toHaveClass('fa-shield-heart');
+          expect(screen.getByTestId('cs-confirm-icon')).toHaveClass('fa-shield-heart');
+          expect(document.querySelector('.fa-shield-hart')).toBeNull();
+        }
 
         fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 

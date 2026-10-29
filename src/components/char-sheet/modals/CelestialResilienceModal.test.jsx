@@ -12,9 +12,10 @@
 // confirm/skip payloads emitted at THIS seam (array of selected name strings).
 //
 // Icon note: the `fa-shield-hart` → `fa-shield-heart` typo was fixed at the product
-// level here (LongRestButton lane precedent); icons are pinned below. Remaining typo
-// sites flagged elsewhere (NOT fixed here): ShortRestModal.jsx L897/L903 and
-// CharSpecialActionsModals.jsx L382/L388 (separate inline Celestial lanes).
+// level here (LongRestButton lane precedent); icons are pinned below. The sibling
+// inline Celestial lanes (ShortRestModal.jsx, CharSpecialActionsModals.jsx) were
+// fixed and pinned in CharSpecialActions.modalsInline.test.jsx /
+// ShortRestModal.celestialResilience.test.jsx (bug-shortrest-celestial-icon-typo).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 

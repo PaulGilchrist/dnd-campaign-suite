@@ -73,7 +73,7 @@ vi.mock('../../services/automation/handlers/buffs/tempHpService.js', () => ({
 // selected NAMES array (CreatureSelectionModal.jsx:61-64,140).
 vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
   const { useState } = await import('react');
-  function CreatureSelectionModalStub({ title, description, note, confirmLabel, onConfirm, onSkip, targets, maxTargets }) {
+  function CreatureSelectionModalStub({ title, description, note, confirmLabel, icon, confirmIcon, onConfirm, onSkip, targets, maxTargets }) {
     const [selected, setSelected] = useState([]);
     const toggle = (name) =>
       setSelected((prev) =>
@@ -85,6 +85,7 @@ vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
       );
     return (
       <div data-testid="creature-selection-modal">
+        {icon && <i data-testid="modal-icon" className={`fa-solid ${icon}`} />}
         <span data-testid="modal-title">{title}</span>
         <span data-testid="modal-description">{description}</span>
         <span data-testid="modal-note">{note}</span>
@@ -104,6 +105,7 @@ vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
           disabled={selected.length === 0}
           onClick={() => onConfirm(selected)}
         >
+          {confirmIcon && <i data-testid="confirm-icon" className={`fa-solid ${confirmIcon}`} />}
           {confirmLabel || 'Confirm'} ({selected.length})
         </button>
         {onSkip && <button onClick={onSkip}>Skip</button>}
@@ -196,6 +198,20 @@ describe('ShortRestModal - Celestial Resilience', () => {
     expect(screen.getByRole('checkbox', { name: 'Ally1' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Ally2' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Ally3' })).toBeInTheDocument();
+  });
+
+  it('uses fa-shield-heart in header and confirm button (typo regression pin)', async () => {
+    // bug-shortrest-celestial-icon-typo: Font Awesome has no `fa-shield-hart`
+    // glyph (content:none → dead icon). Long-rest lane (LongRestButton.jsx) is
+    // the correct-class precedent.
+    renderModal();
+    const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+
+    await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant() });
+
+    expect(screen.getByTestId('modal-icon')).toHaveClass('fa-shield-heart');
+    expect(screen.getByTestId('confirm-icon')).toHaveClass('fa-shield-heart');
+    expect(document.querySelector('.fa-shield-hart')).toBeNull();
   });
 
   it.each([3, 5, 6])(

@@ -248,12 +248,16 @@ vi.mock('./modals/ClairvoyantCombatantModal.jsx', () => ({
 
 // Mock CreatureSelectionModal
 vi.mock('./modals/shared/CreatureSelectionModal.jsx', () => ({
-  default: ({ title, confirmLabel, description, onConfirm, onSkip, targets, note }) => (
+  default: ({ title, icon, confirmIcon, confirmLabel, description, onConfirm, onSkip, targets, note }) => (
     <div data-testid="creature-selection-modal">
+      {icon && <i data-testid="cs-header-icon" className={`fa-solid ${icon}`} />}
       <span>{title}</span>
       {description && <p>{description}</p>}
       {note && <p>{note}</p>}
-      <button onClick={() => onConfirm && onConfirm(targets.map(t => t.name))}>{confirmLabel}</button>
+      <button onClick={() => onConfirm && onConfirm(targets.map(t => t.name))}>
+        {confirmIcon && <i data-testid="cs-confirm-icon" className={`fa-solid ${confirmIcon}`} />}
+        {confirmLabel}
+      </button>
       <button onClick={onSkip}>Skip</button>
     </div>
   ),
