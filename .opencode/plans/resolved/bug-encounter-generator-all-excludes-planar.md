@@ -28,3 +28,23 @@ Add `'planar'` to the `All` preset array (one-token fix) and give it a selectabl
 
 ## Severity
 Minor UX issue / data-coverage gap — no crash or data loss, but an "All"-labelled control silently under-covers the bestiary and one authored monster (Tiamat, an endgame boss with a dedicated 155k-XP stat block) is permanently un-generatable. Close-but-not-exact per house verdict policy.
+
+## Resolution
+FIXED — the black-box diagnosis was confirmed exactly. Root cause in `src/components/encounter/EncounterGeneratorModal.jsx`:
+- `ENVIRONMENT_GROUPS` had 7 groups / 11 environments with no home for `'planar'`. This list is ALSO the source of the modal's default `selectedEnvs` (`flatMap` at :82), so even the out-of-the-box census missed planar-only monsters.
+- The `All` quick pick (`QUICK_PICKS`, :16) hardcoded the same 11 values.
+
+The suggestion service (`src/services/encounters/encounterGenerator.js`) does NOT hardcode the group list — it filters purely on the `environments` array it receives (:88-90), so no service change was needed. Ground truth per `public/data/monsters.json`: 636 monsters, 12 distinct environment values incl. `planar`, 2 with no `environments` (Monkey Clone, Otherworldly Steed), exactly 1 planar-ONLY (Tiamat) → 636−2−1 = 633 pre-fix, 634 post-fix.
+
+**Changes:**
+- `src/components/encounter/EncounterGeneratorModal.jsx` — added `{ label: 'Planar', environments: ['planar'] }` to `ENVIRONMENT_GROUPS` (standalone group, per the bug file's cleanest-option; also folds into the default selection via the existing flatMap) and added `'planar'` to the `All` quick-pick array.
+- `src/components/encounter/EncounterGeneratorModal.planar.test.jsx` — NEW regression test (3 cases): opens with a checked `planar` chip and counts a Tiamat-shaped planar-only monster in the census; the `All` quick pick keeps planar selected and passes `'planar'` in the generator payload; unselecting planar alone drops the planar-only monster and excludes it from the payload.
+
+**Not needed:** `EncounterGeneratorModal.test.jsx` census pins assert against small non-planar mock monsters (3/0/1), so all still pass unchanged — no pin updates required.
+
+**Verified:**
+- Live re-run of repro steps in test-campaign (Playwright, Vite :5173): Generate modal census now reads **`634 monsters available`**, an **`PLANAR (planar)`** group chip exists (8th group, 12 checkboxes, checked by default), Tiamat row still renders its Planar tag in the EB table. Sanity: unchecking planar drops census to 633; `All` quick pick restores 634 with planar checked; `Generate` produces 3 suggestions (Medium/Easy/Easy); modal × close works.
+- `npx vitest run src/components/encounter/EncounterGeneratorModal.planar.test.jsx` → 3/3 pass.
+- `npx vitest run src/components/encounter src/services/encounters` → 472 files / 3019 tests, all pass.
+- `npm run lint` → clean, zero warnings.
+- Cleanup: test-campaign change-data cleared (`{}`) and log cleared (`[]`) via admin API after verification.

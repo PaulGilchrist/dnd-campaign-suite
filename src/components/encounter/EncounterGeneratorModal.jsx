@@ -10,10 +10,11 @@ const ENVIRONMENT_GROUPS = [
   { label: 'Underground', environments: ['underdark'] },
   { label: 'Aquatic', environments: ['underwater'] },
   { label: 'Urban', environments: ['urban'] },
+  { label: 'Planar', environments: ['planar'] },
 ];
 
 const QUICK_PICKS = [
-  { label: 'All', environments: ['arctic', 'coastal', 'desert', 'forest', 'grassland', 'hill', 'mountain', 'swamp', 'underdark', 'underwater', 'urban'] },
+  { label: 'All', environments: ['arctic', 'coastal', 'desert', 'forest', 'grassland', 'hill', 'mountain', 'planar', 'swamp', 'underdark', 'underwater', 'urban'] },
   { label: 'Dungeon', environments: ['underdark', 'urban'] },
   { label: 'Wilderness', environments: ['forest', 'grassland', 'hill', 'mountain'] },
 ];
