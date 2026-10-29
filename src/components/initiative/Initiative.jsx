@@ -15,6 +15,7 @@ import {
     setupCreatures,
     mergeCombatSummaryWithCharacters,
     isPreviousDisabled,
+    isBareNpcPlaceholder,
 } from '../../services/encounters/initiativeService.js'
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
 import Subscriber from '../common/Subscriber.jsx'
@@ -367,7 +368,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setCombatSummary,
         setActiveCreatureName,
         characters,
-        numOfNpc: creaturesOrEmpty(combatSummary).filter(c => c.type === 'npc').length ?? 0,
+        // Only bare "+ NPC" placeholders carry over a Clear — EB-joined monsters
+        // and summons must never re-materialise as NPC stubs (bug-initiative-clear-monsters-become-npc-stubs).
+        numOfNpc: creaturesOrEmpty(combatSummary).filter(isBareNpcPlaceholder).length,
         isLocalhost,
     }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters])
 

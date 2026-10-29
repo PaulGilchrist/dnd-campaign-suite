@@ -40,6 +40,15 @@ function setupCreatures(characters, npcCount, getName) {
     return creatureList
 }
 
+// bug-initiative-clear-monsters-become-npc-stubs: Clear must remove EVERY monster
+// from the board (per its own confirm copy). Only untouched "+ NPC" placeholders —
+// auto-named "NPC N" with no bestiary binding — may survive the reset. EB-joined
+// monsters and summons carry monsterIndex (and/or a species name), so they never
+// match here and can no longer resurrect as anonymous NPC stubs.
+function isBareNpcPlaceholder(creature) {
+    return creature.type === 'npc' && !creature.monsterIndex && /^NPC \d+$/.test(creature.name || '')
+}
+
 function addNpc(combatSummary) {
     const maxNpcNum = combatSummary.creatures
         .filter(c => c.type === 'npc')
@@ -217,6 +226,7 @@ function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
 export {
     parseInitBonus,
     setupCreatures,
+    isBareNpcPlaceholder,
     addNpc,
     removeNpc,
     getNextCreatureName,

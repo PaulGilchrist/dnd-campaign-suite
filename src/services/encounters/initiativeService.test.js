@@ -48,6 +48,7 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import {
   parseInitBonus,
   setupCreatures,
+  isBareNpcPlaceholder,
   addNpc,
   removeNpc,
   getNextCreatureName,
@@ -364,6 +365,43 @@ describe('initiativeService', () => {
         round: 1,
         creatures: [playerByte('Aldric'), playerByte('Brenna'), npcDefault(1), npcDefault(2)],
       });
+    });
+
+    // bug-initiative-clear-monsters-become-npc-stubs: monsters cleared off the
+    // board must NEVER resurrect as anonymous NPC stubs — only untouched
+    // "+ NPC" placeholders count toward the carried-over number.
+    it('re-seeds players only when the cleared board held just EB monsters/summons (no bare placeholders)', () => {
+      const board = [
+        playerByte('Aldric'),
+        playerByte('Brenna'),
+        { name: 'Goblin', type: 'npc', monsterIndex: 'goblin', ac: 15, maxHp: 7, currentHp: 7 },
+        { name: 'Goblin 2', type: 'npc', monsterIndex: 'goblin', ac: 15, maxHp: 7, currentHp: 3 },
+        { name: 'Goblin', type: 'npc', monsterIndex: 'goblin', summonedBy: 'Aldric', summonSource: 'spell', ac: 15, maxHp: 7, currentHp: 7 },
+      ];
+      const carried = board.filter(isBareNpcPlaceholder).length;
+      expect(carried).toBe(0);
+      expect(clearCombat([{ name: 'Brenna' }, { name: 'Aldric' }], carried, getName)).toEqual({
+        round: 1,
+        creatures: [playerByte('Aldric'), playerByte('Brenna')],
+      });
+    });
+  });
+
+  describe('isBareNpcPlaceholder', () => {
+    it('matches untouched +NPC placeholder rows', () => {
+      expect(isBareNpcPlaceholder({ name: 'NPC 1', type: 'npc', ac: 10, maxHp: 10, currentHp: 10 })).toBe(true);
+      expect(isBareNpcPlaceholder({ name: 'NPC 12', type: 'npc' })).toBe(true);
+    });
+
+    it('rejects EB-joined monsters, summons, renamed placeholders, players, and nameless rows', () => {
+      expect(isBareNpcPlaceholder({ name: 'Goblin', type: 'npc', monsterIndex: 'goblin' })).toBe(false);
+      expect(isBareNpcPlaceholder({ name: 'Goblin 2', type: 'npc', monsterIndex: 'goblin' })).toBe(false);
+      expect(isBareNpcPlaceholder({ name: 'Bear', type: 'npc', monsterIndex: 'bear', summonedBy: 'Wild_Sage_Druid' })).toBe(false);
+      expect(isBareNpcPlaceholder({ name: 'Goblin', type: 'npc' })).toBe(false); // renamed NPC / index-less monster
+      expect(isBareNpcPlaceholder({ name: 'npc 1', type: 'npc' })).toBe(false); // case-exact name shape
+      expect(isBareNpcPlaceholder({ name: 'NPC 1', type: 'elemental' })).toBe(false);
+      expect(isBareNpcPlaceholder({ name: 'Alice', type: 'player' })).toBe(false);
+      expect(isBareNpcPlaceholder({ type: 'npc' })).toBe(false); // nameless row never matches
     });
   });
 
