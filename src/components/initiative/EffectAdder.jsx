@@ -36,6 +36,16 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
   const [spellName, setSpellName] = React.useState('')
   const [concentrationDc, setConcentrationDc] = React.useState(10)
 
+  // Escape closes the modal from any tab (benign UI dismissal listener, mirrors
+  // the DiceTray convention; the parent's onCancel only clears local modal state).
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
+
   // CLA-019: immunity-suppressed condition adds keep the modal open with a
   // visible inline notice naming the condition + immunity source.
   const [immunityNotice, setImmunityNotice] = React.useState(null)
@@ -202,29 +212,36 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
             />
 
             {!selectedEffectKey ? (
-              <div className='ea-scroll'>
-                {groupedEffects.map(({ group, effects }) => (
-                  <div key={group}>
-                    <div className='ea-group-label'>{group}</div>
-                    <div className='ea-group-effects'>
-                      {effects.map(def => (
-                        <button
-                          key={def.effect}
-                          className='ea-badge'
-                          onClick={() => handleSelectEffect(def.effect)}
-                          type='button'
-                          title={def.description}
-                        >
-                          <i className={`fa-solid ${def.icon}`}></i> {def.label}
-                        </button>
-                      ))}
+              <>
+                <div className='ea-scroll'>
+                  {groupedEffects.map(({ group, effects }) => (
+                    <div key={group}>
+                      <div className='ea-group-label'>{group}</div>
+                      <div className='ea-group-effects'>
+                        {effects.map(def => (
+                          <button
+                            key={def.effect}
+                            className='ea-badge'
+                            onClick={() => handleSelectEffect(def.effect)}
+                            type='button'
+                            title={def.description}
+                          >
+                            <i className={`fa-solid ${def.icon}`}></i> {def.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {groupedEffects.length === 0 && (
-                  <div className='ea-empty'>No effects match "{searchQuery}"</div>
-                )}
-              </div>
+                  ))}
+                  {groupedEffects.length === 0 && (
+                    <div className='ea-empty'>No effects match "{searchQuery}"</div>
+                  )}
+                </div>
+                {/* Exit affordance parity (2026-10-29-Y): the browse pane had no
+                    Cancel — the exit trap. Mirrors the Conditions/Concentration rows. */}
+                <div className='ea-actions'>
+                  <button onClick={onCancel} type='button'>Cancel</button>
+                </div>
+              </>
             ) : (
               <div className='ea-config'>
                 <div className='ea-config-header'>
@@ -304,6 +321,7 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
 
                 <div className='ea-actions'>
                   <button onClick={() => setSelectedEffectKey(null)} type='button'>Back</button>
+                  <button onClick={onCancel} type='button'>Cancel</button>
                   <button onClick={handleApplyEffect} type='button'>Apply</button>
                 </div>
               </div>

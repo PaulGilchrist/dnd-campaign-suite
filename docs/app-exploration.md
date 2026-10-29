@@ -162,7 +162,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run Y
 
-- **`effect-adder-effects-tab-no-cancel`** (2026-10-29-Y): the Effects tab of the EffectAdder modal renders NO Cancel/×/backdrop/Escape affordance — Cancel buttons exist only in the Conditions (EffectAdder.jsx:186) and Concentration (:339) `.ea-actions` rows. A GM who lands on/switches to Effects and selects nothing (or whose Apply is suppressed elsewhere) can only escape by first clicking a sibling tab — an exit trap for the simplest browse/search session. Suggested: give the Effects tab the same Cancel row (or one shared footer), and/or a header × + Escape handler on `.ea-overlay`. Low-risk, component-local.
 - **`condition-badge-saveless-dc-noise`** (2026-10-29-Y): conditions added via EffectAdder render with a DC even when they have no saving throw — Poisoned applied with the untouched default shows badge `Poisoned DC 10` (tooltip likewise). Saveless conditions (Poisoned, Blinded, Prone, …) displaying "DC 10" misleads GMs into thinking a save is wired. Suggested: omit the DC suffix unless the chosen condition declares a save (CONDITIONS metadata) or the GM explicitly typed one. `ConditionEffectBadges.jsx` label build + `EffectAdder.jsx` default `conditionDc`.
 
 ### Open items — 2026-10-29 run X
