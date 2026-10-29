@@ -99,6 +99,27 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     addEntry({ type: 'music', action: 'stop', message: 'GM stopped ambience' });
   }, [music, setMusic, addEntry]);
 
+  // Queue exhaustion (youtubePlayer.js handleError): every track failed
+  // back-to-back — un-arm the mood and tell the GM honestly instead of the
+  // transport claiming it is playing dead videos. Toast lane mirrors the
+  // editor-save errors; the log row follows the set_ambience/stop pattern.
+  useEffect(() => {
+    const handleQueueExhausted = (event) => {
+      const label = music.mood ? moodLabel(music.mood) : 'this mood';
+      const failedIds = (event.detail || {}).videoIds || [];
+      setMusic({ ...music, mood: null, playing: false });
+      showToast(`No playable tracks for ${label} ambience`, true);
+      addEntry({
+        type: 'music',
+        action: 'no_playable_tracks',
+        mood: music.mood,
+        message: `GM ambience stopped — no playable tracks for ${label}${failedIds.length > 0 ? ` (${failedIds.join(', ')})` : ''}`
+      });
+    };
+    window.addEventListener('music-queue-exhausted', handleQueueExhausted);
+    return () => window.removeEventListener('music-queue-exhausted', handleQueueExhausted);
+  }, [music, setMusic, showToast, addEntry]);
+
   const handleVolume = useCallback((event) => {
     const next = Number(event.target.value) / 100;
     setVolume(next);

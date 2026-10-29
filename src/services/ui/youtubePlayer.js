@@ -3,7 +3,11 @@
  *
  * A single hidden <iframe> is mounted (by MusicPlayer) and reused across
  * mood changes. Tracks play in a looping queue: when a video ends the next
- * track in the current mood plays, cycling forever until stopped.
+ * track in the current mood plays, cycling until stopped. Unplayable tracks
+ * are skipped, but a full queue-pass of back-to-back failures stops the loop
+ * and dispatches the 'music-queue-exhausted' window event (with the failed
+ * video ids) so the UI can un-arm the mood honestly — no infinite
+ * load → error → skip → wrap loop.
  *
  * The IFrame API rejects commands (PlayerProxy errors) until its internal
  * ready event fires, so all commands are gated behind `ready` and buffered
@@ -25,6 +29,7 @@ let queueIndex = 0;
 let pendingTrackIds = null;
 let pendingVolumePct = null;
 let intentStopped = true; // true until playTracks/play is invoked
+let consecutiveFailures = 0; // unplayable tracks hit back-to-back since the last successful PLAYING
 
 function handleStateChange(event) {
   const state = event.data;
@@ -32,6 +37,7 @@ function handleStateChange(event) {
   const { PLAYING, ENDED } = window.YT.PlayerState;
   if (state === PLAYING) {
     intentStopped = false;
+    consecutiveFailures = 0; // a track that actually played clears the failure streak
   } else if (state === ENDED && !intentStopped) {
     advanceQueue();
   }
@@ -39,8 +45,24 @@ function handleStateChange(event) {
 
 function handleError(event) {
   const failed = queue[queueIndex];
-  console.error(`YouTube playback error (code ${event.data}) for video ${failed}. Skipping to next track.`);
-  if (!intentStopped) advanceQueue();
+  if (intentStopped) {
+    console.error(`YouTube playback error (code ${event.data}) for video ${failed}. Skipping to next track.`);
+    return;
+  }
+  consecutiveFailures += 1;
+  if (consecutiveFailures >= queue.length) {
+    // One full pass of the queue has failed back-to-back — advancing again
+    // would modulo-wrap onto the same dead ids forever (error 150 loop).
+    // Arm the stop intent, halt the transport, and tell the UI via the
+    // repo-standard window CustomEvent so the mood can un-arm itself.
+    console.error(`YouTube playback error (code ${event.data}) for video ${failed}. No playable tracks left — stopping.`);
+    const failedIds = [...queue];
+    stop();
+    window.dispatchEvent(new CustomEvent('music-queue-exhausted', { detail: { videoIds: failedIds } }));
+  } else {
+    console.error(`YouTube playback error (code ${event.data}) for video ${failed}. Skipping to next track.`);
+    advanceQueue();
+  }
 }
 
 function playAt(index) {
@@ -119,6 +141,7 @@ export function playTracks(videoIds) {
     return;
   }
   intentStopped = false;
+  consecutiveFailures = 0;
   queue = [...videoIds];
   queueIndex = 0;
   if (!player) {
@@ -142,6 +165,7 @@ export function resume() {
 
 export function stop() {
   intentStopped = true;
+  consecutiveFailures = 0;
   queue = [];
   queueIndex = 0;
   pendingTrackIds = null;
@@ -160,6 +184,7 @@ export function setVolume(volume) {
 function resetModuleState() {
   queue = [];
   queueIndex = 0;
+  consecutiveFailures = 0;
   pendingTrackIds = null;
   pendingVolumePct = null;
   intentStopped = true;
