@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { getRuntimeValue, setRuntimeValue, getStore, notify } from '../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, getStore, notify, addStorageChangeListener } from '../../hooks/runtime/useRuntimeState.js'
 import { generateLootFromCombatSummary, parseCurrencyFromLootText, parsePureCurrencyLine, filterNoLootSentinel } from '../../services/items/lootGenerator.js'
 import { depositCurrency } from '../../services/campaign/inventoryService.js'
 import * as logService from '../../services/ui/logService.js'
@@ -27,6 +27,14 @@ function readStoredLootDraft() {
         lootEntries: Array.isArray(draft?.lootEntries) ? draft.lootEntries : [],
         totalEncounterXp: typeof draft?.totalEncounterXp === 'number' ? draft.totalEncounterXp : 0,
     }
+}
+
+// JSON of the CURRENT store draft, normalising an absent/corrupt key to the
+// empty-draft constant (the DELETE lane removes the key rather than storing
+// null, so absence IS the persisted-empty representation).
+function storedDraftJson() {
+    const draft = readStoredLootDraft()
+    return draftJson(draft.text, draft.lootEntries, draft.totalEncounterXp)
 }
 
 // Remove the key from the local campaign store (so an immediate remount
@@ -98,6 +106,30 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
         const draft = JSON.parse(pending)
         commitDraft(draft.text, draft.lootEntries, draft.totalEncounterXp)
     }, [commitDraft])
+
+    // Cross-tab staleness guard (bug-loot-panel-stale-cross-tab-double-award):
+    // the App.jsx clear-key lane already mirrors a remote key DELETE / POST-null
+    // into the local campaign store (key remove + notify), but this panel only
+    // hydrated at mount — a passive tab kept a fully-armed award stage after
+    // another client cleared/awarded the draft and could grant XP/loot/log rows
+    // a SECOND time with no server key behind it. Adopt external store changes
+    // (mirroring the concentration-prompt null-echo close, 6b1800fa2): removal
+    // retires the panel; a remote draft write live-mirrors it. Guards:
+    //  • storeJson === lastWrittenRef → our own commit/DELETE echo, ignore;
+    //  • draftRef !== lastWrittenRef → an un-flushed local edit wins (same
+    //    skip-while-editing doctrine as the .ct-* lanes) and the write-through
+    //    debounce re-commits it.
+    useEffect(() => addStorageChangeListener('campaign', () => {
+        const storeJson = storedDraftJson()
+        if (storeJson === lastWrittenRef.current) return
+        if (draftRef.current !== lastWrittenRef.current) return
+        const draft = readStoredLootDraft()
+        lastWrittenRef.current = storeJson
+        draftRef.current = storeJson
+        setLootData({ lootEntries: draft.lootEntries, totalEncounterXp: draft.totalEncounterXp })
+        setLootTextValue(draft.text)
+        setShowAwardLoot(false)
+    }), [])
 
     const handleGenerateLoot = useCallback(async () => {
         setGeneratingLoot(true)

@@ -38,6 +38,8 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getStore: vi.fn(() => new Map()),
     // L5-001: TurnEconomyStrip subscribes via useRuntimeValue; null ⇒ enforcement off.
     useRuntimeValue: vi.fn(() => null),
+    // useLootHandlers subscribes to cross-tab loot-draft echoes via addStorageChangeListener.
+    addStorageChangeListener: vi.fn(() => () => {}),
     useSyncedState: vi.fn(() => [null, vi.fn()]),
     listeners: new Map(),
     getRuntimeValue: vi.fn(),

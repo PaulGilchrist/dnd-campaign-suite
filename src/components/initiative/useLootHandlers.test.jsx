@@ -61,6 +61,11 @@ const xpSeed = new Map();
 
 const { campaignStore } = vi.hoisted(() => ({ campaignStore: new Map() }));
 
+// Campaign-store listener registry: production notify('campaign') fans out to
+// addStorageChangeListener subscribers; the cross-tab guard test drives a
+// remote key removal through exactly this lane (store.delete + notify).
+const { campaignListeners } = vi.hoisted(() => ({ campaignListeners: new Set() }));
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn((name, key) => {
         if (name === 'campaign') return campaignStore.has(key) ? campaignStore.get(key) : null;
@@ -70,7 +75,14 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
         if (name === 'campaign') campaignStore.set(key, value);
     }),
     getStore: vi.fn((name) => (name === 'campaign' ? campaignStore : new Map())),
-    notify: vi.fn(),
+    hasRuntimeValue: vi.fn((name, key) => name === 'campaign' && campaignStore.has(key)),
+    notify: vi.fn((name) => {
+        if (name === 'campaign') campaignListeners.forEach((fn) => fn());
+    }),
+    addStorageChangeListener: vi.fn((name, fn) => {
+        if (name === 'campaign') campaignListeners.add(fn);
+        return () => campaignListeners.delete(fn);
+    }),
 }));
 
 describe('useLootHandlers', () => {
@@ -87,6 +99,7 @@ describe('useLootHandlers', () => {
         vi.useFakeTimers(); // loot-draft save-debounce must never leak across tests
         xpSeed.clear();
         campaignStore.clear();
+        campaignListeners.clear();
         depositCalls.length = 0;
     });
 
@@ -590,6 +603,104 @@ describe('useLootHandlers', () => {
             expect(result.current.lootTextValue).toBe('');
             expect(result.current.lootData).toEqual(EMPTY);
             fetchSpy.mockRestore();
+        });
+    });
+
+    // Cross-tab staleness guard (bug-loot-panel-stale-cross-tab-double-award):
+    // another client's clear/award DELETEs the server key; the App.jsx
+    // clear-key lane mirrors it into the local campaign store (key remove +
+    // notify('campaign')). The mounted panel must ADOPT that change — a stale
+    // tab can no longer keep an armed award stage and grant XP a second time.
+    describe('cross-tab stale draft mirror', () => {
+        const DRAFT = { text: 'No loot for these monsters', lootEntries: ['No loot for these monsters'], totalEncounterXp: 50 };
+
+        it('live-retires the armed award stage when another client removes the draft key', () => {
+            campaignStore.set('loot-draft', DRAFT);
+            const fetchSpy = vi.spyOn(globalThis, 'fetch');
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            // Panel fully armed from the hydrated draft (repro step 5's face).
+            act(() => { result.current.setShowAwardLoot(true); });
+            expect(result.current.lootTextValue).toBe('No loot for these monsters');
+            expect(result.current.showAwardLoot).toBe(true);
+
+            // Remote clear echo: App.jsx stores it as key-REMOVE + notify.
+            act(() => {
+                campaignStore.delete('loot-draft');
+                notify('campaign');
+            });
+
+            // Panel retires: no text, no XP, no award stage…
+            expect(result.current.lootTextValue).toBe('');
+            expect(result.current.lootData).toEqual(EMPTY);
+            expect(result.current.showAwardLoot).toBe(false);
+            // …and retiring is local-only: the key is already gone server-side,
+            // so no resurrecting POST/DELETE may follow the echo.
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(fetchSpy).not.toHaveBeenCalled();
+
+            // The retired panel cannot re-grant: an award pass on empty state
+            // touches nobody's XP (the double-award lane is dead).
+            fetchSpy.mockRestore();
+        });
+
+        it('live-mirrors a replacement draft written by another client', () => {
+            campaignStore.set('loot-draft', DRAFT);
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            const REMOTE = { text: 'Pearl necklace', lootEntries: ['Pearl necklace'], totalEncounterXp: 500 };
+            act(() => {
+                campaignStore.set('loot-draft', REMOTE);
+                notify('campaign');
+            });
+
+            expect(result.current.lootTextValue).toBe('Pearl necklace');
+            expect(result.current.lootData).toEqual({ lootEntries: ['Pearl necklace'], totalEncounterXp: 500 });
+            expect(result.current.showAwardLoot).toBe(false);
+            // Adoption is a read — never echo the remote value back.
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it('ignores the echo of this client’s own commit (no self-reset loop)', () => {
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            act(() => { result.current.setLootTextValue('Local typed gem'); });
+            act(() => { vi.advanceTimersByTime(500); }); // commits + real lane notifies
+
+            // Same notify the production setRuntimeValue campaign branch fires:
+            // store value equals lastWrittenRef → the guard must no-op.
+            act(() => { notify('campaign'); });
+
+            expect(result.current.lootTextValue).toBe('Local typed gem');
+            expect(campaignStore.get('loot-draft')).toEqual({
+                text: 'Local typed gem', lootEntries: [], totalEncounterXp: 0,
+            });
+        });
+
+        it('an un-flushed local edit wins over a remote removal (skip-while-editing)', () => {
+            campaignStore.set('loot-draft', DRAFT);
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            // Local keystroke inside the debounce window (draftRef ≠ lastWritten).
+            act(() => { result.current.setLootTextValue('GM mid-edit rescue'); });
+            act(() => {
+                campaignStore.delete('loot-draft');
+                notify('campaign');
+            });
+
+            // The in-flight edit survives the echo and re-commits on debounce
+            // (the edit only touched text — the hydrated loot/XP half rides along).
+            expect(result.current.lootTextValue).toBe('GM mid-edit rescue');
+            act(() => { vi.advanceTimersByTime(500); });
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'loot-draft', {
+                text: 'GM mid-edit rescue',
+                lootEntries: ['No loot for these monsters'],
+                totalEncounterXp: 50,
+            }, campaignName);
         });
     });
 });
