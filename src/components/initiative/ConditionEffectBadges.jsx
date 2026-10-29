@@ -535,6 +535,65 @@ function dedupeByLabel(badges) {
     })
 }
 
+// The GM EffectAdder offers the WHOLE targetEffectDefinitions registry, but
+// BADGE_SPECS only covers effects with a dedicated spec. Any other stored
+// registry te must at least render a generic removable badge built from its
+// registry def (label/icon/cls/description) — otherwise the effect persists
+// invisibly with no × affordance (redirect_attack bug 2026-10-29). Effects
+// whose badge lives on CreatureCard itself are excluded to avoid rendering
+// that surface twice.
+const CARD_DEDICATED_TE_BADGES = new Set([
+    'polymorph', 'animal_shapes', 'shapechange', 'summoned',
+    'reckless_attack', 'resilient_sphere', 'starry_form',
+])
+
+function buildGenericBadges(targetEffects, creatureName, represented) {
+    const badges = []
+    if (!creatureName) return badges
+    const seen = new Set(represented)
+    for (const te of targetEffects || []) {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target
+        if (teTarget !== creatureName) continue
+        if (seen.has(te.effect) || CARD_DEDICATED_TE_BADGES.has(te.effect)) continue
+        const def = getEffectDefinition(te.effect)
+        // Honesty (common-lane contract): unknown keys get no fabricated badge.
+        if (!def) continue
+        seen.add(te.effect)
+        badges.push({
+            label: def.label,
+            cls: def.cls,
+            icon: def.icon,
+            removable: true,
+            removeAction: 'target_effect',
+            effectType: te.effect,
+            tooltip: `${def.description}${te.source ? ` (from ${te.source})` : ''}${te.notes ? ` — ${te.notes}` : ''}`,
+        })
+    }
+    return badges
+}
+
+// Runs the dedicated spec table, then the terminal registry-fallback pass.
+// Tracks which te effect keys a spec already represents (matched find, or a
+// built badge whose removal clears the key) so the fallback never duplicates
+// a dedicated or derived badge.
+function buildSpecBadges(ctx) {
+    const badges = []
+    const represented = new Set()
+    for (const spec of BADGE_SPECS) {
+        ctx.te = spec.find ? spec.find(ctx) : undefined
+        if (ctx.te) represented.add(ctx.te.effect)
+        if (!(spec.guard ? spec.guard(ctx) : ctx.te)) continue
+        const badge = spec.build(ctx)
+        badges.push(badge)
+        if (badge.effectType) represented.add(badge.effectType)
+        if (badge.effectTypes) badge.effectTypes.forEach(t => represented.add(t))
+        if (badge.removeAction === 'remove_haste') represented.add('haste')
+        if (badge.removeAction === 'remove_barkskin') represented.add('barkskin')
+    }
+    badges.push(...buildGenericBadges(ctx.targetEffects, ctx.creatureName, represented))
+    return badges
+}
+
 const REMOVE_HANDLERS = {
     condition: (badge, ctx) => removeConditionByKey(ctx.creatureName, badge.removeKey, ctx.campaignName),
     target_effect: (badge, ctx) => removeTargetEffect(ctx.creatureName, badge.effectType, ctx.campaignName),
@@ -615,14 +674,7 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
         coronaDisadvantage,
     }
 
-    const badges = []
-    for (const spec of BADGE_SPECS) {
-        ctx.te = spec.find ? spec.find(ctx) : undefined
-        if (!(spec.guard ? spec.guard(ctx) : ctx.te)) continue
-        badges.push(spec.build(ctx))
-    }
-
-    const uniqueBadges = dedupeByLabel(badges)
+    const uniqueBadges = dedupeByLabel(buildSpecBadges(ctx))
 
     return (
         <>
