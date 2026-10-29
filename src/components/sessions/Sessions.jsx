@@ -23,6 +23,10 @@ import SessionListItem from './SessionListItem.jsx';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
 import './Sessions.css';
 
+// The six entity lists whose changes must invalidate the picker cache below
+// (server publishes `<entity>-list-<campaign>` for each — see server/routes/*).
+const PICKER_ENTITIES = ['maps', 'encounters', 'npcs', 'quests', 'settlements', 'notes'];
+
 async function loadResourceOptions(campaignName) {
   const loaders = [
     ['maps', loadMaps], ['encounters', loadEncounters], ['npcs', loadNPCs],
@@ -30,16 +34,20 @@ async function loadResourceOptions(campaignName) {
   ];
   const settled = await Promise.allSettled(loaders.map(([, fn]) => fn(campaignName)));
   const raw = {};
+  // A failed list is filled with [] for display but marks the batch incomplete
+  // so it is never cached (dataLoader's "failure is a cache miss by law").
+  let complete = true;
   settled.forEach((r, i) => {
     const [key] = loaders[i];
     if (r.status !== 'fulfilled') {
       console.error(`Failed to load session picker resources for ${key}:`, r.reason);
       raw[key] = [];
+      complete = false;
     } else {
       raw[key] = Array.isArray(r.value) ? r.value : (r.value?.[key] || []);
     }
   });
-  return {
+  const options = {
     maps: raw.maps.map(m => ({ value: m.name, label: m.name })),
     encounters: raw.encounters.map(e => ({ value: e.name, label: e.name })),
     npcs: raw.npcs.map(n => ({ value: n.name, label: n.name, combatReady: npcHasStatBlock(n) })),
@@ -50,6 +58,7 @@ async function loadResourceOptions(campaignName) {
       label: (n.description || '').replace(/[#*_>`]/g, '').trim().substring(0, 60) || n.id,
     })),
   };
+  return { options, complete };
 }
 
 function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, onBack, onViewInitiative }) {
@@ -84,6 +93,15 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
     confirmMessage: 'Reload the session list and discard your unsaved edits?',
   });
   const [picker, setPicker] = useState({ maps: [], encounters: [], npcs: [], quests: [], settlements: [], notes: [] });
+  // Picker-options cache for the lifetime of this view mount (improve
+  // 2026-10-29-W backlog): re-fetching all six link lists on EVERY planner
+  // open meant a second open seconds later cost 6 more GETs with nothing
+  // changed. Component scope is the freshness contract — a view switch
+  // remounts Sessions and re-fetches (same-tab edits can never serve stale),
+  // and while mounted, any `<entity>-list-<campaign>` SSE broadcast (another
+  // tab editing a picker list) invalidates the cache so the NEXT open
+  // re-fetches. Failed batches are never cached (see loadResourceOptions).
+  const pickerCache = useRef(null); // { campaign, options }
   const [toast, setToast] = useState('');
 
   // Single choke point for the banner: every message carries whether it was a
@@ -101,8 +119,16 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   // tab created/updated/deleted a session). Skipped while the planner modal is
   // open so an in-progress draft is never squashed mid-edit; the miss is
   // applied on close (see handleCloseModal). Mirrors Notes.jsx/NPCs.jsx.
+  // Any of the six PICKER_ENTITIES list broadcasts additionally invalidates
+  // the picker cache so the next planner open re-fetches fresh options
+  // (improve 2026-10-29-W backlog — stale-data safety for link lists).
   const handleSSEEvent = useCallback((event) => {
-    if (!event || event.key !== `sessions-list-${campaignName}`) return;
+    if (!event || !event.key) return;
+    if (PICKER_ENTITIES.some(entity => event.key === `${entity}-list-${campaignName}`)) {
+      pickerCache.current = null;
+      return;
+    }
+    if (event.key !== `sessions-list-${campaignName}`) return;
     if (modalOpen) {
       missedListBroadcast.current = true;
       return;
@@ -112,9 +138,16 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
 
   useEffect(() => {
     if (!modalOpen || !campaignName) return;
+    const cached = pickerCache.current;
+    if (cached && cached.campaign === campaignName) {
+      setPicker(cached.options);
+      return;
+    }
     let cancelled = false;
-    loadResourceOptions(campaignName).then(opts => {
-      if (!cancelled) setPicker(opts);
+    loadResourceOptions(campaignName).then(({ options, complete }) => {
+      if (cancelled) return;
+      setPicker(options);
+      if (complete) pickerCache.current = { campaign: campaignName, options };
     });
     return () => { cancelled = true; };
   }, [modalOpen, campaignName]);

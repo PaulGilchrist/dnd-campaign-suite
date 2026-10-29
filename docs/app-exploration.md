@@ -157,7 +157,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run W
 
-- **Sessions planner re-fetches all six link-picker lists on EVERY open** (2026-10-29-W): each planner mount fires GETs for maps/encounters/npcs/quests/settlements/notes (observed two opens ~90s apart = 12 list GETs) even when nothing else mutated; the campaign entity lists are already client-cached by the `.ct-*` lanes themselves. Likely files: `src/components/sessions/SessionPlannerModal.jsx` (mount-time picker loads) / `Sessions.jsx`. Suggested approach: lift picker data to a shared per-campaign cache (or fetch lazily on first picker-open per session) — non-blocking polish.
+*(none — run-W backlog fully consumed by the 2026-10-29 improve run: `sessions-planner-picker-refetch` implemented — picker lists cached per Sessions view-mount, invalidated by the six `<entity>-list` SSE broadcasts, failed batches never cached; pinned by `Sessions.picker-cache.test.jsx` (8 tests), live-proven: 2nd open = 0 picker GETs, two-tab create/delete both re-fetched.)*
 
 ### Open items — 2026-10-29 run V
 
