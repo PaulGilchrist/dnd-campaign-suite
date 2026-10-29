@@ -21,7 +21,8 @@
 //   :180 target absent from characters                     → folded into that it.each (playerStats undefined)
 //   :150 suffix target match in characters                 → "matches a suffix target"
 //   :198 unknown condition key rejected                    → "unknown condition key ... zero side effects"
-//   (new) CLA-019 suppressed addCondition: aura args threaded, no writes, modal closes
+//   (new) CLA-019 suppressed addCondition: aura args threaded, no writes, modal stays
+//          open, refusal detail (label + immunitySource) returned to EffectAdder
 //   :233 effects all optional fields + :303 log shape    → it.each "exact te entry bytes" (full + wis default)
 //   :272 effects minimal fields                           → CUT, covered by falling.test.js :89-98
 //   :285 dedupe/re-append existing te                     → "replaces the matching te" (exact array bytes)
@@ -223,10 +224,10 @@ describe('createEffectAdderHandlers', () => {
             expect(setEffectAdderTarget).not.toHaveBeenCalled();
         });
 
-        it('CLA-019: an addCondition reported as suppressed writes nothing but still clears the target', async () => {
-            vi.mocked(conditionSaveService.addCondition).mockReturnValue({ suppressed: true });
+        it('CLA-019: an addCondition reported as suppressed writes nothing, keeps the modal open, and returns the refusal detail', async () => {
+            vi.mocked(conditionSaveService.addCondition).mockReturnValue({ suppressed: true, immunitySource: 'Aura of Courage from Alice' });
 
-            await handlers.handleApplyEffect('conditions', { conditionKey: 'frightened', target: 'Alice', dc: 12, ability: 'wis' });
+            const outcome = await handlers.handleApplyEffect('conditions', { conditionKey: 'frightened', target: 'Alice', dc: 12, ability: 'wis' });
 
             // immunity data is threaded to addCondition, which owns the suppression decision
             expect(conditionSaveService.addCondition).toHaveBeenCalledWith(
@@ -235,7 +236,19 @@ describe('createEffectAdderHandlers', () => {
             expect(storage.set).not.toHaveBeenCalled();
             expect(setCombatSummary).not.toHaveBeenCalled();
             expect(combatLoggingService.logConditionEvent).not.toHaveBeenCalled();
-            expect(setEffectAdderTarget).toHaveBeenCalledWith(null);
+            // refusal must be visible: the target is NOT cleared (modal stays open) and
+            // the condition label + immunity source ride back to EffectAdder's inline notice
+            expect(setEffectAdderTarget).not.toHaveBeenCalled();
+            expect(outcome).toEqual({ suppressed: true, conditionLabel: 'Frightened', immunitySource: 'Aura of Courage from Alice' });
+        });
+
+        it('suppressed add without a plumbed immunitySource falls back to a generic source label', async () => {
+            vi.mocked(conditionSaveService.addCondition).mockReturnValue({ suppressed: true });
+
+            const outcome = await handlers.handleApplyEffect('conditions', { conditionKey: 'frightened', target: 'Alice', dc: 12, ability: 'wis' });
+
+            expect(setEffectAdderTarget).not.toHaveBeenCalled();
+            expect(outcome).toEqual({ suppressed: true, conditionLabel: 'Frightened', immunitySource: 'condition immunity' });
         });
     });
 

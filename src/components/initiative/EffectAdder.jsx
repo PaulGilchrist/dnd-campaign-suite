@@ -36,6 +36,10 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
   const [spellName, setSpellName] = React.useState('')
   const [concentrationDc, setConcentrationDc] = React.useState(10)
 
+  // CLA-019: immunity-suppressed condition adds keep the modal open with a
+  // visible inline notice naming the condition + immunity source.
+  const [immunityNotice, setImmunityNotice] = React.useState(null)
+
   const creatureNames = React.useMemo(() => {
     const names = (creatures || []).map(c => c.name).filter(Boolean)
     return [...new Set(names)].sort((a, b) => a.localeCompare(b))
@@ -81,9 +85,14 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
     return groupOrder.filter(g => groups[g]?.length).map(g => ({ group: g, effects: groups[g] }))
   }, [filteredDefinitions])
 
-  const handleApplyCondition = () => {
+  const handleApplyCondition = async () => {
     if (!selectedCondition) return
-    onApply('conditions', { target: targetName, conditionKey: selectedCondition, dc: conditionDc, ability: conditionAbility })
+    const outcome = await onApply('conditions', { target: targetName, conditionKey: selectedCondition, dc: conditionDc, ability: conditionAbility })
+    // Suppressed add: the modal stays open (parent did not clear the target) and
+    // the refusal is shown inline. Success closes the modal via the parent — no notice.
+    if (outcome?.suppressed) {
+      setImmunityNotice(`${outcome.conditionLabel} not applied — immune via ${outcome.immunitySource}`)
+    }
   }
 
   const handleApplyEffect = () => {
@@ -119,7 +128,7 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
             <button
               key={tab.key}
               className={`ea-tab ${activeTab === tab.key ? 'ea-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => { setActiveTab(tab.key); setImmunityNotice(null) }}
               type='button'
             >
               {tab.label}
@@ -130,6 +139,9 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
         {/* ── Conditions Tab ── */}
         {activeTab === 'conditions' && (
           <div>
+            {immunityNotice && (
+              <div className='ea-immunity-notice' role='alert'>{immunityNotice}</div>
+            )}
             <div className='ea-grid'>
               {CONDITIONS.map(({ key, label }) => (
                 <button
@@ -137,6 +149,7 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
                   className={`ea-badge ${selectedCondition === key ? 'ea-badge--selected' : ''}`}
                   onClick={() => {
                     setSelectedCondition(key)
+                    setImmunityNotice(null)
                     const defaultAb = getDefaultAbility(key)
                     if (defaultAb) setConditionAbility(defaultAb)
                   }}

@@ -2,7 +2,7 @@ import { rollD20 } from '../../dice/diceRoller.js'
 import { getMonsterData } from '../../npcs/monsterUtils.js'
 import { getAbilitySaveBonus } from './conditionUtils.js'
 import { computeAuraBonus } from '../auras/auraOfProtection.js'
-import { auraCoversCondition, logAuraConditionImmunity } from '../auras/auraConditionImmunity.js'
+import { auraCoversCondition, describeAuraImmunity, logAuraConditionImmunity } from '../auras/auraConditionImmunity.js'
 import { playerIsImmuneToCondition } from '../automation/automationService.js'
 import { getAuraOfPuritySaveAdvantageConditions, isAuraOfPurityActive } from '../../automation/handlers/buffs/auraOfPurityHandler.js'
 import { isCircleOfPowerActive } from '../../automation/handlers/buffs/circleOfPowerHandler.js'
@@ -125,7 +125,8 @@ function auraSuppressesCondition(creatureName, conditionDef, campaignName, aura)
 // auraImmunities/auraImmunitySources: optional CLA-019 channel pre-computed by the
 // async seam via computeAuraComboEffects (Aura of Courage/Aura of Devotion). Callers
 // that omit it stay byte-identical. Returns { suppressed } so callers can keep the
-// log ledger honest (skip their own "applied" log when suppressed).
+// log ledger honest (skip their own "applied" log when suppressed); when suppressed,
+// also carries { immunitySource } naming the immunity for the GM's inline notice.
 function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats, auraImmunities, auraImmunitySources }) {
     if (!combatSummary || !combatSummary.creatures) {
         console.error(`[addCondition] combatSummary is null/undefined or missing creatures when adding ${conditionDef.key} to ${creatureName}`)
@@ -134,8 +135,9 @@ function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, 
     const creature = combatSummary.creatures.find(c => c.name === creatureName)
     if (!creature) return { suppressed: false }
 
-    if (auraSuppressesCondition(creatureName, conditionDef, campaignName, { immunities: auraImmunities, immunitySources: auraImmunitySources })) {
-        return { suppressed: true }
+    const aura = { immunities: auraImmunities, immunitySources: auraImmunitySources }
+    if (auraSuppressesCondition(creatureName, conditionDef, campaignName, aura)) {
+        return { suppressed: true, immunitySource: describeAuraImmunity(conditionDef.key, aura) }
     }
 
     if (playerStats && getRuntimeValue && campaignName) {
@@ -145,7 +147,7 @@ function addCondition({ combatSummary, creatureName, conditionDef, dc, ability, 
             getRuntimeValue,
             campaignName,
         })) {
-            return { suppressed: true }
+            return { suppressed: true, immunitySource: 'condition immunity' }
         }
     }
 

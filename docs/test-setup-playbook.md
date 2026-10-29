@@ -1580,3 +1580,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Across separate `browser_run_code_unsafe` calls the ACTIVE TAB PERSISTS (no implicit switch) — `browser_tabs select` between calls or you probe the wrong tab (`__noReload` marker undefined is the tell).
 - `docs/test-character-registry.json` top-level `subclass` fields can be STALE vs on-disk `public/campaigns/test-campaign/<Char>.json` (HexWarlock listed Celestial Patron, disk = Archfey) — verify feature hosts against the character file before planning a repro.
 - `GET /api/campaigns/test-campaign/<Char>` is the runtime change-data BUCKET (`{value:null}` when empty); the character JSON needs the `<Char>.json` suffix.
+
+## Improve run 2026-10-29 (effect-adder-suppression-silent-modal) — NEW durable entries
+
+- Seeding Initiative for a solo-creature rig: a full-store `combatSummary` POST with ONE player entry causes the app to re-seed the whole 12-PC party into initiative on load (App re-seed behavior) — expected, not a defect; Admin clear-change-data wipes it all including combatSummary. There is NO `/change-data/<Char>` route (404): char-bucket read is `GET /api/campaigns/:c/<Char>`.
+- CLA-019 suppression contract (post-improve): `addCondition` returns `{suppressed:true, immunitySource}` (aura lane names `Aura of X from <host>`; player-immunity lane `'condition immunity'`); `handleApplyEffect` returns the outcome object (not the old `'suppressed'` string) and does NOT clear `effectAdderTarget` — EffectAdder renders `.ea-immunity-notice[role=alert]` and clears it on chip-select/tab-switch. Success lane still silent-closes. Pinned: `EffectAdder.suppression-notice.test.jsx`.

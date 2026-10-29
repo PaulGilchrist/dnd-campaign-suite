@@ -10,6 +10,8 @@ import { cloneDeep } from 'lodash'
 
 // CLA-019: aura-granted condition immunities (Aura of Courage) gate the GM add seam —
 // addCondition suppresses + logs when the target is covered by an in-range aura.
+// The suppressed outcome is returned (not swallowed) so EffectAdder can keep the
+// modal open with a visible inline notice naming the immunity source.
 async function applyConditionTabEffect({ combatSummary, campaignName, characters, setCombatSummary, data }) {
     const conditionDef = CONDITIONS.find(c => c.key === data.conditionKey)
     if (!conditionDef) return false
@@ -17,7 +19,9 @@ async function applyConditionTabEffect({ combatSummary, campaignName, characters
     const targetStats = targetCharacter?.computedStats || targetCharacter
     const aura = await getAuraConditionImmunities({ targetName: data.target, characters })
     const result = addCondition({ combatSummary, creatureName: data.target, conditionDef, dc: data.dc, ability: data.ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats, auraImmunities: aura.immunities, auraImmunitySources: aura.immunitySources })
-    if (result?.suppressed) return 'suppressed'
+    if (result?.suppressed) {
+        return { suppressed: true, conditionLabel: conditionDef.label, immunitySource: result.immunitySource || 'condition immunity' }
+    }
     storage.set('combatSummary', combatSummary, campaignName)
     setCombatSummary(cloneDeep(combatSummary))
     logConditionEvent({ campaignName, action: 'applied', creatureName: data.target, conditionLabel: conditionDef.label, dc: data.dc, ability: data.ability })
@@ -79,9 +83,12 @@ export function createEffectAdderHandlers({
 
         if (tab === 'conditions') {
             const outcome = await applyConditionTabEffect({ combatSummary, campaignName, characters, setCombatSummary, data })
-            if (outcome === 'suppressed') {
-                setEffectAdderTarget(null)
-                return
+            if (outcome?.suppressed) {
+                // CLA-019 refusal must be visible: keep the modal open and hand the
+                // immunity info to EffectAdder for its inline notice (mirrors the
+                // CLA-011/232 rest-refusal doctrine). The immunity log row already
+                // persisted inside addCondition.
+                return outcome
             }
             if (!outcome) return
         } else if (tab === 'effects') {

@@ -30,18 +30,29 @@ const AURA_LABEL_BY_CONDITION = {
   charmed: 'Aura of Devotion',
 };
 
+function auraLabel(conditionKey) {
+  return AURA_LABEL_BY_CONDITION[String(conditionKey || '').toLowerCase()] || 'aura immunity';
+}
+
+// Human-readable immunity description for log copy AND the EffectAdder inline
+// notice (CLA-019 "refusal must be visible"): "Aura of Courage from ElderPaladin".
+export function describeAuraImmunity(conditionKey, auraImmunities) {
+  const lower = String(conditionKey || '').toLowerCase();
+  const host = auraImmunities?.immunitySources?.[lower] || null;
+  return `${auraLabel(lower)}${host ? ' from ' + host : ''}`;
+}
+
 export function logAuraConditionImmunity({ campaignName, targetName, conditionKey, auraImmunities, sourceAbility }) {
   const lower = String(conditionKey || '').toLowerCase();
   const host = auraImmunities?.immunitySources?.[lower] || null;
-  const auraName = AURA_LABEL_BY_CONDITION[lower] || 'aura immunity';
   const label = lower.charAt(0).toUpperCase() + lower.slice(1);
   return addEntry(campaignName, {
     type: 'automation',
     automationType: 'condition_immunity_aura',
     characterName: targetName,
     sourceName: host || undefined,
-    abilityName: sourceAbility || auraName,
-    description: `${targetName} is immune to ${label} (${auraName}${host ? ' from ' + host : ''}) — condition not applied.`,
+    abilityName: sourceAbility || auraLabel(lower),
+    description: `${targetName} is immune to ${label} (${describeAuraImmunity(lower, auraImmunities)}) — condition not applied.`,
     timestamp: Date.now(),
   }).catch((e) => { console.error('[auraConditionImmunity:log]', e); });
 }

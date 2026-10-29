@@ -68,7 +68,7 @@ describe('addCondition — CLA-019/020 aura-immunity gate (GM-add seam)', () => 
       auraImmunitySources: { frightened: 'ElderPaladin' },
     });
 
-    expect(result).toEqual({ suppressed: true });
+    expect(result).toEqual({ suppressed: true, immunitySource: 'Aura of Courage from ElderPaladin' });
     expect(rt.setCalls).toEqual([]);
     // gate order: the aura channel short-circuits before the stats-dependent auto-immunity lane
     expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe('addCondition — CLA-019/020 aura-immunity gate (GM-add seam)', () => 
       auraImmunitySources: { charmed: 'ElderPaladin' },
     });
 
-    expect(result).toEqual({ suppressed: true });
+    expect(result).toEqual({ suppressed: true, immunitySource: 'Aura of Devotion from ElderPaladin' });
     expect(rt.setCalls).toEqual([]);
     expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
     expect(logCalls).toHaveLength(1);

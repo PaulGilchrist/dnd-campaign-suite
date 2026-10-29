@@ -110,7 +110,7 @@ describe('addCondition', () => {
 
     const result = addCondition({ combatSummary: cs, creatureName: 'Hero', conditionDef: { key: 'charmed', label: 'Charmed' }, dc: 15, ability: 'wis', getRuntimeValue: rt.getRuntimeValue, setRuntimeValue: rt.setRuntimeValue, campaignName: 'Campaign', playerStats: { name: 'Hero', allFeatures: [] } });
 
-    expect(result).toEqual({ suppressed: true });
+    expect(result).toEqual({ suppressed: true, immunitySource: 'condition immunity' });
     expect(playerIsImmuneToCondition).toHaveBeenCalledTimes(1);
     expect(rt.setCalls).toEqual([]);
     expect(rt.getRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions')).toEqual([]);
