@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { sendConcentrationResult, clearConcentrationPrompt } from '../../services/combat/conditions/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
@@ -63,6 +63,13 @@ function ConcentrationActions({ hasResult, queueCount, onRoll, onDismiss, onNext
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
+  // PromptIds already adjudicated — rolled on this client or resolved by
+  // another client's concentrationResult-<Target> echo. One save per damage
+  // event: a stale queue entry can never re-roll (double-save bug).
+  const resolvedPromptIdsRef = useRef(new Set());
+  // Rolls awaiting their async settlement on this client — a same-tick
+  // second click must stay inert, never prune the check being resolved.
+  const rollingPromptIdsRef = useRef(new Set());
 
   const current = prompts.length > 0 ? prompts[0] : null;
 
@@ -71,24 +78,62 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
   }, []);
 
   const handleEvent = useCallback((event) => {
-    if (!event.key || event.data == null) return;
+    if (!event.key) return;
     const prefix = `change-${campaignName}-concentrationPrompt-`;
     if (!event.key.startsWith(prefix)) return;
     const targetName = event.key.slice(prefix.length);
     if (!targetName) return;
 
+    if (event.data == null) {
+      // Cleared-key echo (the server broadcasts null on key DELETE, as every
+      // client's Roll/Dismiss does via clearConcentrationPrompt): the prompt
+      // was answered on another client — drop this target's outstanding
+      // checks so a passive tab can never re-roll a resolved save. Keeps a
+      // check this client already adjudicated so its result panel survives
+      // until the user clicks Done.
+      setPrompts(prev => {
+        if (!prev.some(p => p.targetName === targetName && !p.result)) return prev;
+        return prev.filter(p => p.targetName !== targetName || p.result);
+      });
+      return;
+    }
+
     setPrompts(prev => {
       if (prev.some(p => p.promptId === event.data.promptId)) return prev;
       return [...prev, { targetName, ...event.data }];
-      });
-     }, [campaignName]);
+    });
+  }, [campaignName]);
+
+  const handleResultEvent = useCallback((event) => {
+    if (!event.key || event.data == null) return;
+    const prefix = `change-${campaignName}-concentrationResult-`;
+    if (!event.key.startsWith(prefix)) return;
+    // Any client's submitted result broadcasts here — stamp the promptId so
+    // an echo that races this tab's own Roll click still yields one roll.
+    if (event.data.promptId) resolvedPromptIdsRef.current.add(event.data.promptId);
+  }, [campaignName]);
 
   const handleDismiss = useCallback(() => {
+    if (!current) return;
+    // Mirror SavePromptModal.dismiss: a dismissed un-rolled prompt is a
+    // client-wide answer — clear the server key (the null echo closes every
+    // other client) so no orphan outlives the tab that dismissed it.
+    clearConcentrationPrompt(campaignName, current.targetName);
     advance();
-  }, [advance]);
+  }, [campaignName, current, advance]);
 
   const handleRoll = useCallback(async () => {
     if (!current) return;
+    const promptId = current.promptId;
+    if (resolvedPromptIdsRef.current.has(promptId)) {
+      // Already adjudicated on another client (result echo landed before the
+      // DELETE echo) — drop the stale queue entry instead of spending a
+      // second save for the same damage event.
+      setPrompts(prev => prev.filter(p => p.promptId !== promptId));
+      return;
+    }
+    if (rollingPromptIdsRef.current.has(promptId)) return; // in-flight double-click
+    rollingPromptIdsRef.current.add(promptId);
 
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName, allCreatures: getCombatSummary(campaignName)?.creatures });
     const { saveBonus, roll, rawRolls, total, success, bonusDetail, mode, advantageSources, disadvantageSource } =
@@ -133,6 +178,8 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
         : p
     ));
 
+    rollingPromptIdsRef.current.delete(promptId);
+    resolvedPromptIdsRef.current.add(promptId);
     clearConcentrationPrompt(campaignName, current.targetName);
   }, [campaignName, current, characters, activeMapName]);
 
@@ -150,6 +197,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
           campaignName={campaignName}
           handleEvent={(event) => {
             handleEvent(event);
+            handleResultEvent(event);
           }}
         />
       )}
