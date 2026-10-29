@@ -4,6 +4,7 @@ import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 import useLog from '../../hooks/runtime/useLog.js';
 import { MOODS, DEFAULT_VOLUME, getMood, getTracksForMood, extractVideoId } from '../../services/ui/musicConfig.js';
 import { saveMusicOverrides } from '../../services/ui/musicService.js';
+import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
 import './MusicPlayer.css';
 
@@ -34,6 +35,19 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   const [editMood, setEditMood] = useState(MOODS[0].key);
   const [trackText, setTrackText] = useState('');
   const [editorError, setEditorError] = useState(null);
+  // Dirty-draft guard for the inline editor (improve 2026-10-29-AE backlog,
+  // parity with the six .ct-* lanes' ×/Cancel NAMED discard, 4d4b1e69a, and
+  // the wizard, 4569f2d67): Cancel or a mood-select switch silently discarded
+  // a typed-but-unsaved track list. Shares the house useReloadGuard — seed
+  // the snapshot wherever the editor (re)seeds the textarea, re-baseline on
+  // Reset (save-lane stays open), clear on close; only a draft that
+  // deep-differs from its seed pays the confirm, naming the mood being LEFT.
+  const editorDraft = useMemo(() => ({ trackText }), [trackText]);
+  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+    modalOpen: editing,
+    formData: editorDraft,
+    confirmMessage: `Discard changes to the ${moodLabel(editMood)} track list?`,
+  });
   // Display-only save/reset confirmation toast (mirrors .sessions-toast /
   // .encounter-toast): names the mood so a closed editor still leaves a trace.
   const [toast, setToast] = useState(null);
@@ -181,18 +195,38 @@ function MusicPlayer({ campaignName, isLocalhost }) {
 
   const openEditor = useCallback(() => {
     const tracks = getTracksForMood(editMood, music.overrides);
-    setTrackText(tracks.map(t => t.videoId).join('\n'));
+    const text = tracks.map(t => t.videoId).join('\n');
+    setTrackText(text);
+    seedDraft({ trackText: text });
     setEditorError(null);
     setEditing(true);
-  }, [editMood, music.overrides]);
+  }, [editMood, music.overrides, seedDraft]);
 
   const changeEditMood = useCallback((event) => {
     const moodKey = event.target.value;
+    // Switching moods re-seeds the textarea — an unsaved draft pays the same
+    // NAMED confirm (naming the mood being LEFT). Dismiss keeps the edit on
+    // the original mood and resets the select by hand: editMood state never
+    // changes, so React has no re-render that would restore the DOM value.
+    if (!confirmDiscardDraft()) {
+      event.target.value = editMood;
+      return;
+    }
     setEditMood(moodKey);
     const tracks = getTracksForMood(moodKey, music.overrides);
-    setTrackText(tracks.map(t => t.videoId).join('\n'));
+    const text = tracks.map(t => t.videoId).join('\n');
+    setTrackText(text);
+    seedDraft({ trackText: text });
     setEditorError(null);
-  }, [music.overrides]);
+  }, [editMood, music.overrides, confirmDiscardDraft, seedDraft]);
+
+  // Cancel close path (parity with the .ct-* handleRequestClose doctrine): a
+  // dirty draft confirms first; a clean draft discards silently as before.
+  const cancelEdit = useCallback(() => {
+    if (!confirmDiscardDraft()) return;
+    clearDraft();
+    setEditing(false);
+  }, [confirmDiscardDraft, clearDraft]);
 
   const saveTracks = useCallback(async () => {
     const tracks = parseTrackList(trackText);
@@ -216,9 +250,10 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       youtubePlayer.playTracks(tracks.map(t => t.videoId));
     }
     setEditorError(null);
+    clearDraft();
     setEditing(false);
     showToast(`${moodLabel(editMood)} tracks saved`);
-  }, [trackText, editMood, music, campaignName, showToast]);
+  }, [trackText, editMood, music, campaignName, showToast, clearDraft]);
 
   const resetMood = useCallback(async () => {
     const overrides = { ...music.overrides };
@@ -230,10 +265,15 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     }
     setRuntimeObject('campaign', { music: saved }, campaignName, true);
     const tracks = getTracksForMood(editMood, saved.overrides);
-    setTrackText(tracks.map(t => t.videoId).join('\n'));
+    const text = tracks.map(t => t.videoId).join('\n');
+    setTrackText(text);
+    // Reset lands the editor on the defaults with the modal still open —
+    // re-baseline the guard so the fresh seed doesn't look like an unsaved
+    // edit (useReloadGuard doctrine: re-seed wherever a save stays open).
+    seedDraft({ trackText: text });
     setEditorError(null);
     showToast(`${moodLabel(editMood)} overrides reset to defaults`);
-  }, [editMood, music, campaignName, showToast]);
+  }, [editMood, music, campaignName, showToast, seedDraft]);
 
   if (!isLocalhost) return null;
 
@@ -299,7 +339,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
           <div className="music-editor-actions">
             <button className="music-btn" onClick={saveTracks}>Save</button>
             <button className="music-btn" onClick={resetMood} title="Restore starter tracks">Reset</button>
-            <button className="music-btn" onClick={() => setEditing(false)}>Cancel</button>
+            <button className="music-btn" onClick={cancelEdit}>Cancel</button>
           </div>
         </div>
       )}

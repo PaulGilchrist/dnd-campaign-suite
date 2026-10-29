@@ -89,7 +89,12 @@ describe('MusicPlayer invalid-save inline error', () => {
     expect(container.querySelector('.music-editor-error')).not.toBeNull();
     spy.mockRestore();
 
+    // Draft is dirty ('junk' ≠ seeded ids): the Cancel close now pays the
+    // named discard (improve 2026-10-29-AE) — accept it to reach the reopen.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByText('Cancel'));
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to the Town track list?');
+    confirmSpy.mockRestore();
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
     expect(container.querySelector('.music-editor-error')).toBeNull();
   });

@@ -205,7 +205,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run AE
 
-- **Music editor dirty-Cancel unguarded (2026-10-29-AE):** `MusicPlayer.jsx` Cancel is a bare `setEditing(false)` — a typed-but-unsaved track draft vanishes with zero confirm (live: `dirty-draft-not-saved` + Cancel → closed, no confirm, disk-inert), and switching the editor's mood select while dirty silently re-seeds the textarea. The six `.ct-*` lanes + wizard NAMED-discard since 4d4b1e69a/4569f2d67 — parity guard for this sibling (copy like `Discard changes to the <Mood> track list?`). Small surface, non-blocking.
 - **3D viewer camera affordances undiscoverable (2026-10-29-AE):** `map3dScene.js` ships OrbitControls (drag-pan, wheel-zoom) but the `.map3d` toolbar prints no hint and the canvas has no title/help — first-time users only discover 2D/Top-down/Labels/Torch. A one-line hint chip (`.travel-panel-hint` idiom) or `title` on the viewport would close it. Related audit gap (also in bug-music-player-no-remote-state-adoption): Pause writes no log row while set_ambience/stop do — `pause`/`resume` rows would make the music audit trail complete.
 
 ### Open items — 2026-10-29 run AC
