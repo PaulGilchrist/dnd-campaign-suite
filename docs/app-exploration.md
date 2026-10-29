@@ -196,9 +196,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run AC
 
-- **Loot textarea is the only edit surface with no persistence/discard affordance** (2026-10-29-AC, code-read — live-loss leg not walked) — hand-typed edits to `.initiative-loot-textarea` live only in component `useState` (`useLootHandlers.js:13`), so a view-switch unmounts the panel and (by code) drops the draft with zero warning; unlike the `.ct-*` family there is no discard affordance or autosave. Suggest: persist `lootTextValue` to the runtime store (survives view-switch like other GM scratch state) or add an unsaved-edit confirm on unmount.
-
-*(Run-AC item "Pre-await log-row class still open for the EB Join `joined` row" REMOVED 2026-10-29 improve run — BLOCKED/already-implemented: 26ffb4aa5 fixed the storage-layer swallow AND landed the exact pin the bullet asked for (`encounterToInitiative.join-write-failure.test.js`: zero rows pre-ack, `joined`+roll rows post-ack only); bug file in `resolved/`.)*
+*(none — run-AC backlog fully consumed by the 2026-10-29 improve run: `party-delete-fail-rollback` implemented (41ee2ccaa — optimistic item-delete rolled back in the `.catch` behind the `localRevRef` stale guard; live-proven poisoned-500 + success legs); `loot-award-row-pair-double-book` implemented (a0c9cc2b5 — owner-chosen producer-side suppression: `loot` row owns the per-line record, `loot_awarded` keeps xp only, sentinel never persisted, autoReward parity); `loot-textarea-no-persistence` implemented (this commit — `loot-draft` campaign scratch key hydrated/persisted/DELETE-wiped like the travel-* siblings; view-switch survives verbatim); `eb-join-joined-row-pre-await-pin` BLOCKED/already-implemented by 26ffb4aa5 with pins. Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-29 run AB
 

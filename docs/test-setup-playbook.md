@@ -1720,3 +1720,10 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Initiative Clear confirm is native `window.confirm`: in-run `page.on('dialog', accept)` consumes it and a later `browser_handle_dialog` errors "no related modal state" (double-handle pitfall re-proven) — judge by API rows.
 - Nested-snippet escaping: raw `\n`/`"` inside `browser_run_code_unsafe` code strings SyntaxError through the JSON layers — build strings with `String.fromCharCode(10/34)`.
 - After reload the SPA lands on campaign-select (`.campaign-name` waits time out until re-select). New award contract (this run): currency-only awards write NO `loot` row (deposit row owns the cash) — log audits must expect the pair only when a real item line exists.
+
+## Improve run 2026-10-29 (loot-textarea-no-persistence) — NEW durable entries
+
+- PITFALL: Initiative global `keydown '+'` shortcut (Initiative.jsx:565) opens the Add-NPC prompt — the loot textarea does NOT stop propagation, so `keyboard.type` of a `+`-prefixed draft spawns NPC-stub dialogs mid-rig. Recipe: use `locator.fill` (no key events) in the Initiative view; never `keyboard.type` board-adjacent.
+- Loot textarea renders ONLY when `hasLoot` — a blank board gives no typing surface. To test handwritten-draft legs, seed `POST /:campaign/loot-draft` then remount (hydration arms the textarea), or generate first.
+- EB `input.monster-checkbox` row name cell is `td[1]` (td[0] is the checkbox column) — `td.first()` name-matching false-misses.
+- Campaign scratch-key wipe recipe: local `getStore('campaign').delete(key)` + `notify('campaign')` + per-key `fetch DELETE` (a null-POST leaves a `key: null` corpse in change-data — clearCompletedTripKeys doctrine). New campaign keys must be registered in `src/services/automation/common/campaignKeys.js` for the SSE mirror lane.

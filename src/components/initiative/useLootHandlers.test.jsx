@@ -25,12 +25,12 @@
  *  clear when already cleared .......... removed (near-vacuous)
  */
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useLootHandlers } from './useLootHandlers.js';
 import { generateLootFromCombatSummary } from '../../services/items/lootGenerator.js';
 import { depositCurrency } from '../../services/campaign/inventoryService.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, notify } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../services/ui/logService.js', () => ({
     getLog: vi.fn(async () => []),
@@ -53,13 +53,24 @@ vi.mock('../../services/campaign/inventoryService.js', () => ({
     }),
 }));
 
-// The hook only touches getRuntimeValue/setRuntimeValue; mock the transport
-// minimally and seed existing XP so the accumulate-on-award contract is pinned.
+// The hook only touches getRuntimeValue/setRuntimeValue (XP lane) plus the
+// campaign-bucket loot-draft lane (getStore/notify); mock the transport
+// minimally with a fake campaign store so hydration/persistence/wipe are
+// observable, and seed existing XP so the accumulate-on-award contract is pinned.
 const xpSeed = new Map();
 
+const { campaignStore } = vi.hoisted(() => ({ campaignStore: new Map() }));
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn((name, key) => (key === 'xp' ? xpSeed.get(name) ?? 0 : 0)),
-    setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn((name, key) => {
+        if (name === 'campaign') return campaignStore.has(key) ? campaignStore.get(key) : null;
+        return key === 'xp' ? xpSeed.get(name) ?? 0 : 0;
+    }),
+    setRuntimeValue: vi.fn((name, key, value) => {
+        if (name === 'campaign') campaignStore.set(key, value);
+    }),
+    getStore: vi.fn((name) => (name === 'campaign' ? campaignStore : new Map())),
+    notify: vi.fn(),
 }));
 
 describe('useLootHandlers', () => {
@@ -73,8 +84,14 @@ describe('useLootHandlers', () => {
 
     beforeEach(() => {
         vi.clearAllMocks(); // preserves implementations, clears calls
+        vi.useFakeTimers(); // loot-draft save-debounce must never leak across tests
         xpSeed.clear();
+        campaignStore.clear();
         depositCalls.length = 0;
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     describe('handleGenerateLoot', () => {
@@ -276,7 +293,9 @@ describe('useLootHandlers', () => {
                 await result.current.handleAwardLoot();
             });
 
-            expect(getRuntimeValue).not.toHaveBeenCalled();
+            // characters null ⇒ zero XP-lane traffic. (getRuntimeValue is also
+            // called by loot-draft hydration — only the XP reads are forbidden.)
+            expect(getRuntimeValue.mock.calls.filter(([, key]) => key === 'xp')).toEqual([]);
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).toHaveBeenCalledTimes(2);
             expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, {
@@ -463,6 +482,114 @@ describe('useLootHandlers', () => {
             expect(result.current.showAwardLoot).toBe(false);
             expect(addEntry).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+    });
+
+    // 2026-10-29 improve: the loot panel is GM scratch state — text + generated
+    // lootData persist through the runtime store's campaign-bucket 'loot-draft'
+    // key so a view-switch (unmount → remount) re-displays the panel verbatim;
+    // award-complete and clear-× wipe the key via the per-key DELETE lane.
+    describe('loot draft persistence (campaign scratch key)', () => {
+        const DRAFT = { text: 'Gold coins (100)', lootEntries: ['Gold coins (100)'], totalEncounterXp: 200 };
+
+        it('hydrates text + generated lootData from the persisted draft on mount, without echo-writing', () => {
+            campaignStore.set('loot-draft', DRAFT);
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            expect(result.current.lootTextValue).toBe('Gold coins (100)');
+            expect(result.current.lootData).toEqual({ lootEntries: ['Gold coins (100)'], totalEncounterXp: 200 });
+            // Hydration is a read: mounting must never write the draft back.
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(notify).not.toHaveBeenCalled();
+        });
+
+        it('persists typed draft text to the campaign store after the save-debounce (not per keystroke)', () => {
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            act(() => { result.current.setLootTextValue('A hand-typed gem'); });
+            expect(setRuntimeValue).not.toHaveBeenCalled(); // debounced
+
+            act(() => { vi.advanceTimersByTime(500); });
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'loot-draft', {
+                text: 'A hand-typed gem', lootEntries: [], totalEncounterXp: 0,
+            }, campaignName);
+        });
+
+        it('flushes a pending draft synchronously on unmount, and the next mount re-hydrates it verbatim', () => {
+            const { result, unmount } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            act(() => { result.current.setLootTextValue('Switching views mid-debounce'); });
+            unmount(); // no timer advanced — the flush must be synchronous
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'loot-draft', {
+                text: 'Switching views mid-debounce', lootEntries: [], totalEncounterXp: 0,
+            }, campaignName);
+
+            const remount = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+            expect(remount.result.current.lootTextValue).toBe('Switching views mid-debounce');
+        });
+
+        it('generated suggestions + XP persist and re-display after an unmount/remount', async () => {
+            generateLootFromCombatSummary.mockResolvedValueOnce({ lootEntries: ['Pearl necklace'], totalEncounterXp: 500 });
+            const { result, unmount } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            await act(async () => { await result.current.handleGenerateLoot(); });
+            act(() => { vi.advanceTimersByTime(500); });
+            expect(campaignStore.get('loot-draft')).toEqual({ text: 'Pearl necklace', lootEntries: ['Pearl necklace'], totalEncounterXp: 500 });
+
+            unmount();
+            const remount = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+            expect(remount.result.current.lootTextValue).toBe('Pearl necklace');
+            expect(remount.result.current.lootData).toEqual({ lootEntries: ['Pearl necklace'], totalEncounterXp: 500 });
+        });
+
+        it('clear-× wipes the persisted draft via store-key removal + per-key DELETE, and a fresh mount shows empty', () => {
+            campaignStore.set('loot-draft', DRAFT);
+            const fetchSpy = vi.spyOn(globalThis, 'fetch');
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            act(() => { result.current.handleClearLoot(); });
+
+            expect(campaignStore.has('loot-draft')).toBe(false);
+            expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/loot-draft', { method: 'DELETE' });
+            expect(notify).toHaveBeenCalledWith('campaign');
+            expect(result.current.lootTextValue).toBe('');
+            expect(result.current.lootData).toEqual(EMPTY);
+
+            // Fresh mount post-wipe: honest empty panel, zero store writes.
+            const remount = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+            expect(remount.result.current.lootTextValue).toBe('');
+            expect(remount.result.current.lootData).toEqual(EMPTY);
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            fetchSpy.mockRestore();
+        });
+
+        it('award-complete wipes the persisted draft — XP grants stay the only setRuntimeValue writes', async () => {
+            campaignStore.set('loot-draft', DRAFT);
+            const fetchSpy = vi.spyOn(globalThis, 'fetch');
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            await act(async () => { await result.current.handleAwardLoot(); });
+
+            // Draft exits via the DELETE lane, never an empty-value POST.
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2); // 2 × XP grants
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'Alice', 'xp', 100, campaignName);
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'Bob', 'xp', 100, campaignName);
+            expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/loot-draft', { method: 'DELETE' });
+            expect(campaignStore.has('loot-draft')).toBe(false);
+            expect(result.current.lootTextValue).toBe('');
+            expect(result.current.lootData).toEqual(EMPTY);
+            fetchSpy.mockRestore();
         });
     });
 });
