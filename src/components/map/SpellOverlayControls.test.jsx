@@ -92,6 +92,16 @@ describe('SpellOverlayControls', () => {
     }
   });
 
+  it('shows a next-placement-only hint beside the param inputs on mount', () => {
+    const { container } = renderComponent({ isActive: true });
+    const hint = screen.getByText('Params apply to the next placement only');
+    expect(hint).toBeInTheDocument();
+    expect(hint).toHaveClass('spell-overlay-hint');
+    // Sits with/under the param row: sibling of the .spell-overlay-row holding the inputs
+    const paramRow = container.querySelector('.spell-overlay-row + .spell-overlay-hint');
+    expect(paramRow).toBe(hint);
+  });
+
   it('hides the active section when there are no overlays', () => {
     renderComponent();
     expect(screen.queryByText(/Active/)).not.toBeInTheDocument();

@@ -255,7 +255,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AK
 
-- `spell-overlay-param-edit-no-resize` — `.spell-overlay-controls` param row silently affects ONLY the next placement; placed overlays can never be resized/recolored/moved-by-numbers (no selection concept; single hardcoded red fill). Minimum fix: label the row "next placement" (or add per-item param edit + a color picker — five spell schools, one color today). Files: `SpellOverlayControls.jsx`, `useSpellHandlers.js`.
 - `spell-overlay-silent-invalid-actions` — `POST /spell-overlay` answers 200 `{ok:true}` to unknown actions and remove-of-missing-ids (switch default falls through to a broadcast; `spell-overlay.js:27-56`). A 400 + no publish on unrecognized action would match the rest of the API's validation hygiene (and would have made the run-AK ghost/lock probes louder). File: `server/routes/spell-overlay.js`.
 
 ### Open items — 2026-10-30 run AJ

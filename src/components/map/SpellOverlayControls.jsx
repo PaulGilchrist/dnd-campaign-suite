@@ -50,16 +50,21 @@ const ShapeParamsRow = ({ selectedShape, shapeParams, handleParamChange }) => {
         return null;
     }
     return (
-        <div className="spell-overlay-row">
-            {fields.map((field) => (
-                <ShapeParamField
-                    key={field.param}
-                    field={field}
-                    value={shapeParams[field.param]}
-                    onChange={handleParamChange}
-                />
-            ))}
-        </div>
+        <>
+            <div className="spell-overlay-row">
+                {fields.map((field) => (
+                    <ShapeParamField
+                        key={field.param}
+                        field={field}
+                        value={shapeParams[field.param]}
+                        onChange={handleParamChange}
+                    />
+                ))}
+            </div>
+            <div className="spell-overlay-hint">
+                Params apply to the next placement only
+            </div>
+        </>
     );
 };
 
