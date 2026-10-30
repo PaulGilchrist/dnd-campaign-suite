@@ -161,9 +161,23 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
             setError('A map with that name already exists');
             return;
         }
+        // Names with no letters/digits kebab to an empty file handle — the
+        // server create gate refuses them with this same message (an inline
+        // `.json` dotfile would be undeletable; bug-map-name-empty-kebab).
+        if (!mapsService.toKebabCase(name)) {
+            setError('Map name must contain letters or numbers');
+            return;
+        }
         try {
             setError(null);
-            await mapsService.createMap(campaignName, name, { type: mapType });
+            const result = await mapsService.createMap(campaignName, name, { type: mapType });
+            if (result?.alreadyExists) {
+                // Kebab collision the display-name dup-check above missed
+                // (e.g. '??' when '!!!' exists) — surface the server message
+                // instead of silently swallowing it.
+                setError(result.error || 'A map with that name already exists');
+                return;
+            }
             setCreateName('');
             await loadMapsList();
         } catch (err) {
@@ -194,6 +208,13 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
         }
         const existingMap = maps.find(m => m.fileName === oldFileName);
         if (existingMap && existingMap.name === newName) {
+            setRenamingMap(null);
+            return;
+        }
+        // Same empty-kebab gate as create/rename-server — an empty handle
+        // would move the file onto the undeletable `.json` dotfile slug.
+        if (!mapsService.toKebabCase(newName)) {
+            setError('Map name must contain letters or numbers');
             setRenamingMap(null);
             return;
         }

@@ -253,6 +253,15 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     return res.status(400).json({ error: 'Map name is required' });
   }
 
+  // Names whose kebab-case handle is empty (punctuation-only like '!!!', emoji,
+  // full non-Latin scripts) would write an empty-slug `.json` DOTFILE whose URL
+  // segment collapses to '' on every later lane (false-200 delete via the
+  // change-data wildcard, phantom blank open, 404 renames) — an undeletable
+  // one-way door. Refuse at the only seam that can (bug-map-name-empty-kebab).
+  if (toKebabCase(name.trim()) === '') {
+    return res.status(400).json({ error: 'Map name must contain letters or numbers' });
+  }
+
   const mapsDir = campaignMapsDir(campaign);
 
   if (!fs.existsSync(mapsDir)) {
@@ -369,6 +378,13 @@ router.put('/api/campaigns/:campaign/maps/:mapname/rename', asyncHandler((req, r
 
   if (!newName || newName.trim() === '') {
     return res.status(400).json({ error: 'New map name is required' });
+  }
+
+  // Same empty-kebab gate as POST create (:264) — renaming INTO an empty
+  // handle would just move the file onto the undeletable `.json` dotfile slug
+  // (bug-map-name-empty-kebab).
+  if (toKebabCase(newName.trim()) === '') {
+    return res.status(400).json({ error: 'Map name must contain letters or numbers' });
   }
 
   const mapsDir = campaignMapsDir(campaign);

@@ -9,6 +9,25 @@ const sanitizeMapName = (name) => toKebabCase(name) + '.json';
 // can never drift.
 const slugFromFileName = (fileName) => fileName.replace(/\.json$/i, '');
 
+// URL segment for every map lane (delete/rename/activate/GET/PUT/description).
+// NEVER emit an empty one: `/maps/` collapses onto the runtime-store wildcard
+// DELETE/GET `/:campaign/:key` — a false 200 "Data deleted successfully" that
+// lies about an untouched file, or a `{value:null}` phantom-blank open
+// (bug-map-name-empty-kebab). Kebab first (display names reach their file via
+// the server's resolveMapFileName fallback); when the name has no kebab bytes,
+// carry the raw name through — the list row's fileName (e.g. a legacy '.json'
+// dotfile) resolves exactly on the server lanes, so such rows stay deletable/
+// renamable; a fully empty name fails loudly with the server create gate's
+// message instead of mis-routing.
+const mapSegment = (name) => {
+  const raw = String(name ?? '');
+  const segment = toKebabCase(raw) || raw.replace(/^\/+/, '');
+  if (segment === '') {
+    throw new Error('Map name must contain letters or numbers');
+  }
+  return encodeURIComponent(segment);
+};
+
 export const loadMaps = async (campaignName) => {
   try {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/maps`, {
@@ -48,7 +67,11 @@ export const createMap = async (campaignName, mapName, options = {}) => {
         data = {};
       }
       if (data.error && /map.*already exists/i.test(data.error)) {
-        return { name: mapName, fileName: sanitizeMapName(mapName), alreadyExists: true };
+        // The encounter-spawn lane wants resolve-not-throw on a collision, but
+        // UI lanes must still be able to surface it — carry the server message
+        // so a kebab-collision the display-name dup-check missed is never a
+        // silent fake success (bug-map-name-empty-kebab).
+        return { name: mapName, fileName: sanitizeMapName(mapName), alreadyExists: true, error: data.error };
       }
       const error = new Error(data.error || 'Failed to create map');
      throw error;
@@ -60,7 +83,7 @@ export const createMap = async (campaignName, mapName, options = {}) => {
 export const deleteMap = async (campaignName, mapName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
+    const encodedMapName = mapSegment(mapName);
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
       method: 'DELETE',
     });
@@ -78,7 +101,7 @@ export const deleteMap = async (campaignName, mapName) => {
 export const renameMap = async (campaignName, oldMapName, newName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(toKebabCase(oldMapName));
+    const encodedMapName = mapSegment(oldMapName);
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/rename`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -98,7 +121,7 @@ export const renameMap = async (campaignName, oldMapName, newName) => {
 export const activateMap = async (campaignName, mapName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
+    const encodedMapName = mapSegment(mapName);
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/activate`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -117,7 +140,7 @@ export const activateMap = async (campaignName, mapName) => {
 export const saveMapData = async (campaignName, mapName, data) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
+    const encodedMapName = mapSegment(mapName);
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -137,7 +160,7 @@ export const saveMapData = async (campaignName, mapName, data) => {
 export const loadMapData = async (campaignName, mapName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
+    const encodedMapName = mapSegment(mapName);
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -156,7 +179,7 @@ export const loadMapData = async (campaignName, mapName) => {
 export const updateMapDescription = async (campaignName, mapName, description) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
+    const encodedMapName = mapSegment(mapName);
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/description`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

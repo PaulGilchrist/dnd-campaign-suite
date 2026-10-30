@@ -145,7 +145,9 @@ describe('mapsService', () => {
     ])('%s → alreadyExists object with sanitized fileName', async (name, fileName) => {
       global.fetch.mockResolvedValueOnce(http(400, { error: 'A map with this name already exists' }));
 
-      await expect(createMap('testCampaign', name)).resolves.toEqual({ name, fileName, alreadyExists: true });
+      // error rides along so UI lanes surface the collision instead of
+      // swallowing it (bug-map-name-empty-kebab); encounter lane ignores it.
+      await expect(createMap('testCampaign', name)).resolves.toEqual({ name, fileName, alreadyExists: true, error: 'A map with this name already exists' });
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 

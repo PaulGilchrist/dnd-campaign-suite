@@ -38,3 +38,25 @@ Server POST: after `sanitizeMapName`, `if (!toKebabCase(name.trim()))` → 400 `
 ## Severity
 
 Data integrity risk — the dotfile map is undeletable and invisible (hidden file, `slug:""`), silently accumulating while the UI lies about delete success; every non-Latin-script campaign name hits this on the first map.
+
+## Resolution
+
+**FIXED 2026-10-30 (fix-queue run).** Reproduced live first, exactly as described: create `!!!` → `.json` dotfile on disk (`fileName: ".json"`, `slug: ""`); UI delete → `DELETE /maps/` → 200, row survives; rename → HTML-404 surfaced only as a raw JSON-parse error string, row orphaned; `??` while `!!!` exists → server 400 silently swallowed (input cleared, no row, no message); wildcard control `DELETE /__no_such_key_xyz__` → 200 confirmed via curl.
+
+What was actually wrong (matches the diagnosis, one refinement): the MapsManager rows ALREADY carried/passed `fileName` to the service layer — the collapse happens one layer deeper: every `mapsService` lane ran `encodeURIComponent(toKebabCase(name))`, and `toKebabCase('.json')` is `''`, so even the carried fileName collapsed to the wildcard URL.
+
+### Changes
+
+- `server/routes/maps.js` — POST create AND `/rename` now 400 `Map name must contain letters or numbers` when `toKebabCase(name.trim()) === ''` (rename gate added too: renaming INTO an empty handle just relocates the file onto the undeletable dotfile).
+- `src/services/maps/mapsService.js` — new `mapSegment()` used by all six lanes (delete/rename/activate/GET/PUT/description): kebab when bytes exist, else carry the raw name through (the row's fileName `.json` resolves exactly server-side, so legacy dotfile rows become deletable/renamable — verified live), else throw the create-gate message instead of mis-routing. `createMap`'s alreadyExists resolve now carries the server `error` message (encounter-spawn lane keeps resolve-not-throw).
+- `src/components/maps-manager/MapsManager.jsx` — inline create gate (same predicate + message, zero POST) and same gate in `handleRenameSave`; a resolved `alreadyExists` create now surfaces the server message inline and keeps the typed name for editing.
+- Tests: NEW `server/routes/maps.empty-kebab-create.test.js` (POST + rename refuse `!!! ??? @$ 🎲 Привет 地城`, no dotfile written, original file untouched), NEW `src/services/maps/mapsService.empty-kebab.test.js` (lane URLs never collapse to `/maps/`; `.json` fileName targets `/maps/.json…`; empty names throw without fetching; collision carries the server message; normal fileName/slug/display-name bytes pinned), NEW `src/components/maps-manager/MapsManager.empty-kebab-gate.test.jsx` (inline create/rename gates, alreadyExists surfacing, happy-path pin). UPDATED `mapsService.test.js` (conflict envelope gains `error`), plus `toKebabCase: (name) => name` stubs added to the three sibling MapsManager test mocks (component now imports it).
+- Wildcard-DELETE false-200 (`campaigns-changedata.js:265`): NOT changed — deliberate, per the bug file's own judgement note. Blast radius touches every runtime-key delete app-wide (many callers tolerate/fire deletes of absent keys and would start logging 404s); the maps lanes can no longer reach the wildcard at all since `mapSegment` guarantees a non-empty segment. Recommend a separate ticket if Paul wants honest 404s there.
+
+Note: the running `dev:locked` API has no watcher, so the :80 process keeps the old route code until the orchestrator restarts it; the new server gates were proven live on a fresh throwaway boot (`PORT=8124 CAMPAIGN_LOCK=test-campaign node server.js` → all five refusal faces 400 `Map name must contain letters or numbers`, disk-inert, process killed).
+
+### Verification
+
+- Live (test-campaign, header-verified): `!!!` create → inline `Map name must contain letters or numbers`, **zero** maps POSTs, no dotfile; `??` → same inline gate; legacy `!!!` dotfile row (from the repro) → UI delete now WORKS (`DELETE /maps/.json` → file unlinked, row gone); `Café` exists + create `Caf` → inline `A map with this name already exists` (display dup-check misses it, server 400 no longer swallowed), input keeps `Caf`; adjacent sanity: `QA Fix` create → rename-to-`!!!` gate → rename to `QA Fixed` → open (editor mounts, no notice) → Activate → UI-deletes, all clean. Maps md5s byte-identical to baseline (94fcd0bf… / 8e40779e…).
+- Tests: `npx vitest run` over `src/services/maps`, `src/components/maps-manager`, `src/components/sessions`, all `server/routes/maps*.test.js`, `Map.editor-testid`, App map lanes → **38 files / 583 passed**. `npm run lint` clean (zero warnings). `node .opencode/plans/no-timers-guard.mjs` OK.
+- Cleanup: maps dir ends at Battle Arena + Test Map (no `.json` residue), change-data `{}` + log `[]` GET-verified two-pass from closed-tab quiet, zero campaign-lock denials in `/tmp/dnd-fixqueue.log`.

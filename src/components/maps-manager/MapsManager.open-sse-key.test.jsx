@@ -24,6 +24,7 @@ import MapsManager from './MapsManager.jsx';
 import useSSESync from '../map/hooks/useSSESync.js';
 
 vi.mock('../../services/maps/mapsService.js', () => ({
+    toKebabCase: (name) => name,
     loadMaps: vi.fn(),
     createMap: vi.fn(),
     deleteMap: vi.fn(),

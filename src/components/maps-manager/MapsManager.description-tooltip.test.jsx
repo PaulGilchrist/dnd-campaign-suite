@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MapsManager from './MapsManager.jsx';
 
 vi.mock('../../services/maps/mapsService.js', () => ({
+    toKebabCase: (name) => name,
     loadMaps: vi.fn(),
     createMap: vi.fn(),
     deleteMap: vi.fn(),
