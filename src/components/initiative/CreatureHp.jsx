@@ -28,8 +28,16 @@ function CurrentHpInput({ creature, currentHp, effectiveMaxHp, onChange }) {
                     // bug-initiative-hp-input-no-range-clamp: monster commits clamp
                     // into [0, effective max] and the input echoes the stored number
                     // so the card never shows an impossible value. Players keep
-                    // pass-through (temp-HP overshoot above max is legitimate).
+                    // the UNCLAMPED ceiling (temp-HP overshoot above max is legitimate).
                     value = Math.max(0, Math.min(value, effectiveMaxHp))
+                    e.target.value = value
+                }
+                else if (value < 0) {
+                    // bug-gm-hp-input-negative-player-hp: the player lane shares the
+                    // damage lane's death floor (applyDamage Math.max(0, …)) — a
+                    // mistyped minus sign echoes 0 instead of lingering as an
+                    // impossible negative.
+                    value = 0
                     e.target.value = value
                 }
                 onChange(creature.name, value)

@@ -5,7 +5,8 @@
 //   lane census: NPC remote badge / summoned numeric / localhost editable / player static (jsx:69-129)
 //   current HP commit (NPC lane): onChange(name, clamped 0..effectiveMax) — bug-initiative-hp-input-no-range-clamp
 //     (high clamps to effective max, negative clamps to 0, input echoes the stored number) (jsx:24-38)
-//   current HP commit (player lane): pass-through — temp-HP overshoot above max is legitimate (jsx:29-36)
+//   current HP commit (player lane): ceiling pass-through — temp-HP overshoot above max is
+//     legitimate; negatives floor to 0 — bug-gm-hp-input-negative-player-hp (jsx:25-45)
 //   Enter key blurs → commits once (jsx:25-27)
 //   max HP commit: onChange(name, clamped current, base max = value - aid - feast); prop is
 //     never mutated — #854 removed direct creature.maxHp/currentHp writes (frozen-pin below) (jsx:40-49)
@@ -109,16 +110,19 @@ describe('CreatureHp', () => {
         expect(input.value).toBe(echoValue);
     });
 
-    it('player current HP blur passes overshoot/negative through unclamped (temp-HP lane)', () => {
+    it('player current HP blur passes overshoot through unclamped (temp-HP lane) but floors negative at 0', () => {
         render(<CreatureHp {...props} creature={player} />);
         const input = currentInput('Alice');
         input.value = '99';
         fireEvent.blur(input);
         expect(props.onChange).toHaveBeenCalledWith('Alice', 99);
         expect(input.value).toBe('99');
+        // bug-gm-hp-input-negative-player-hp: player commits share the damage
+        // lane's death floor — echo and payload both land on 0.
         input.value = '-5';
         fireEvent.blur(input);
-        expect(props.onChange).toHaveBeenCalledWith('Alice', -5);
+        expect(props.onChange).toHaveBeenCalledWith('Alice', 0);
+        expect(input.value).toBe('0');
     });
 
     it('NPC clamp ceiling is the effective max (base + aid increase)', () => {

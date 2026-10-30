@@ -7,7 +7,8 @@
 //     app's monster death model, mirroring applyDamage's Math.max(0,…) floor)
 //   - every committed override logs an hp_change entry in the damage-lane shape
 //     (sourceName 'GM HP override', threshold 'dead'/'bloodied' stamps)
-//   - player lane stays pass-through (temp-HP overshoot is legitimate sheet state)
+//   - player lane keeps the UNCLAMPED ceiling (temp-HP overshoot is legitimate)
+//     but shares the damage lane's 0 death floor (bug-gm-hp-input-negative-player-hp)
 //   - max-edit third-arg lane bypasses the clamp (it pre-clamps against the NEW max)
 //   - placeholder rows without maxHp stay unclamped (legacy lane, cf. SP-069 table)
 // Mock set mirrors createCreatureHandlers.sp069.test.js (+ logService).
@@ -29,6 +30,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
     clearDeathSavePrompt: vi.fn(),
+    sendDeathSavePrompt: vi.fn(),
 }));
 vi.mock('../../services/encounters/initiativeService.js', () => ({
     clearCombat: vi.fn(),
@@ -210,7 +212,7 @@ describe('handleCreatureHpChange — hp_change audit log', () => {
     });
 });
 
-describe('handleCreatureHpChange — player lane untouched', () => {
+describe('handleCreatureHpChange — player lane (unclamped ceiling, shared 0 floor)', () => {
     it('player commit above max passes through unclamped (temp-HP overshoot)', () => {
         const { handlers, combatSummary } = makeHandlers([
             { name: 'Alice', type: 'player', currentHp: 10, maxHp: 20 },
@@ -223,14 +225,20 @@ describe('handleCreatureHpChange — player lane untouched', () => {
         expect(hpEntry()).toMatchObject({ delta: 89, currentHp: 99, maxHp: 20, isHealing: true, isUnconscious: false });
     });
 
-    it('player dropped to 0 logs the override (no monster-style clamp applied)', () => {
+    // bug-gm-hp-input-negative-player-hp: negatives used to persist straight into
+    // currentHitPoints with a self-contradicting dead row (threshold 'dead',
+    // isUnconscious false). The commit now floors at 0, mirroring applyDamage's
+    // Math.max(0, oldHp − damage) death floor.
+    it('player negative commit floors at 0 with a coherent dead row', () => {
         const { handlers } = makeHandlers([
             { name: 'Alice', type: 'player', currentHp: 10, maxHp: 20 },
         ]);
 
         handlers.handleCreatureHpChange('Alice', -5);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'currentHitPoints', -5, campaignName);
-        expect(hpEntry()).toMatchObject({ delta: -15, currentHp: -5, isUnconscious: false });
+        expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'currentHitPoints', 0, campaignName);
+        // No negative ever reaches the canonical HP key.
+        expect(setRuntimeValue.mock.calls.filter((c) => c[1] === 'currentHitPoints').every((c) => c[2] >= 0)).toBe(true);
+        expect(hpEntry()).toMatchObject({ delta: -10, currentHp: 0, threshold: 'dead', isUnconscious: true });
     });
 });

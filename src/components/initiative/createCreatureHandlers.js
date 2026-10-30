@@ -2,7 +2,8 @@ import { cloneDeep } from 'lodash'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
 import { addEntry } from '../../services/ui/logService.js'
-import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
+import { clearDeathSavePrompt, sendDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
+import utils from '../../services/ui/utils.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
 import { setSessionPhase } from '../../services/combat/sessionService.js'
 import { autoAwardCombatRewards } from '../../services/items/autoRewardService.js'
@@ -13,7 +14,9 @@ import { sweepNewCombatClocks } from '../../services/rules/effects/zoneDurationC
 
 /**
  * Player HP edits live in the runtime store (server-first); a revival across 0
- * also clears the death-save state and any pending prompt.
+ * also clears the death-save state and any pending prompt, and a drop to 0
+ * engages the death-save lane exactly like the damage lane's alive→down
+ * crossing (applyDamage handlePlayerZeroHpAndConcentration + :1258 reset).
  */
 function writePlayerHp(creatureName, newValue, oldHp, campaignName) {
     setRuntimeValue(creatureName, 'currentHitPoints', newValue, campaignName)
@@ -22,6 +25,14 @@ function writePlayerHp(creatureName, newValue, oldHp, campaignName) {
         setRuntimeValue(creatureName, 'deathFailures', [false, false, false], campaignName)
         setRuntimeValue(creatureName, 'isDead', 0, campaignName)
         clearDeathSavePrompt(campaignName, creatureName)
+    }
+    // bug-gm-hp-input-negative-player-hp: a GM override dropping a living PC to
+    // 0 must not leave the table without adjudication — reset this KO's fresh
+    // death-save counters and open the death-save prompt on every tab.
+    if (oldHp > 0 && newValue <= 0) {
+        setRuntimeValue(creatureName, 'deathSaves', [false, false, false], campaignName)
+        setRuntimeValue(creatureName, 'deathFailures', [false, false, false], campaignName)
+        sendDeathSavePrompt(campaignName, { promptId: utils.guid(), targetName: creatureName })
     }
 }
 
@@ -80,7 +91,10 @@ function logManualHpOverride({ campaignName, creature, oldHp, newHp }) {
         currentHp: newHp,
         maxHp,
         isHealing: delta > 0,
-        isUnconscious: !isPlayer && newHp <= 0,
+        // Mirrors logDamageApplication: isUnconscious: newHp <= 0 for BOTH lanes
+        // (the old !isPlayer exclusion contradicted the dead threshold stamp and
+        // the card's creature-unconscious styling — bug-gm-hp-input-negative-player-hp).
+        isUnconscious: newHp <= 0,
         note: 'Manual GM edit from the initiative card.',
     }
     const threshold = resolveOverrideThreshold(oldHp, newHp, maxHp)
@@ -124,8 +138,11 @@ export function createCreatureHandlers({
         const isMaxEdit = typeof newMaxHp === 'number'
         const oldHp = isPlayer ? (getRuntimeValue(creature.name, 'currentHitPoints') ?? 0) : creature.currentHp
         // bug-initiative-hp-input-no-range-clamp: monsters clamp via clampMonsterCommit
-        // (see helper); players stay UNCLAMPED (temp-HP overshoot is legitimate).
-        const newValue = isPlayer ? committedHp : clampMonsterCommit(creature, committedHp, isMaxEdit)
+        // (see helper); players keep the UNCLAMPED ceiling (temp-HP overshoot is
+        // legitimate sheet state) but share the damage lane's death floor
+        // (applyDamage :473/:491 Math.max(0, …)) — negative HP is never canonical
+        // runtime state (bug-gm-hp-input-negative-player-hp).
+        const newValue = isPlayer ? Math.max(0, committedHp) : clampMonsterCommit(creature, committedHp, isMaxEdit)
         const delta = newValue - oldHp
         if (delta === 0 && !isMaxEdit) return
 
