@@ -2,11 +2,41 @@ import React from 'react'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js'
-import { hasSaveModifier, hasBeaconOfHope } from '../../../services/combat/conditions/conditionEffects.js'
+import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js'
+import { getActiveTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js'
 import { addEntry } from '../../../services/ui/logService.js'
 import './CharSummary.css'
 
 const EMPTY_TRACK = [false, false, false]
+
+// Attribution mirrors concentrationPromptRoll.js's advantageSources pattern:
+// name each contributing source so the dying-track ADVANTAGE chip can say WHY.
+// Qualifier matches hasSaveModifier(mods, 'death_saving_throws') called with no
+// abilityName: ability-scoped mods never grant death-save advantage there, so
+// they must not be attributed here either.
+function collectDeathSaveAdvantageSources(saveModifiers, beaconEffect) {
+    const sources = []
+    ;(saveModifiers || []).forEach(mod => {
+        if (mod.target !== 'death_saving_throws' || mod.effect !== 'advantage') return
+        if (mod.abilities && mod.abilities.length > 0) return
+        if (mod.source && !sources.includes(mod.source)) sources.push(mod.source)
+    })
+    if (beaconEffect) {
+        const label = beaconEffect.source ? `Beacon of Hope (${beaconEffect.source})` : 'Beacon of Hope'
+        if (!sources.includes(label)) sources.push(label)
+    }
+    return sources
+}
+
+// Generic copy is reserved for genuinely unattributable advantage (bare DM-flag
+// mods with no source field); a named source always wins.
+function buildAdvantageTooltip(hasAdvantage, saveModifiers, beaconEffect) {
+    if (!hasAdvantage) return undefined
+    const sources = collectDeathSaveAdvantageSources(saveModifiers, beaconEffect)
+    return sources.length > 0
+        ? `Advantage from: ${sources.join(', ')}`
+        : 'Advantage — no source recorded'
+}
 
 function LastRollResult({ lastRoll }) {
     return (
@@ -45,7 +75,11 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
 
     const isStable = deathSaveRules.isStable(saves)
     const isDeadState = deathSaveRules.isDead(failures)
-    const hasAdvantage = hasSaveModifier(playerStats?.saveModifiers, 'death_saving_throws') || hasBeaconOfHope(name, campaignName)
+    // Reading the beacon targetEffect (not just hasBeaconOfHope) so the chip
+    // tooltip can name the caster — same truth source, richer payload.
+    const beaconEffect = getActiveTargetEffect(campaignName, name, 'beacon_of_hope')
+    const hasAdvantage = hasSaveModifier(playerStats?.saveModifiers, 'death_saving_throws') || !!beaconEffect
+    const advantageTooltip = buildAdvantageTooltip(hasAdvantage, playerStats?.saveModifiers, beaconEffect)
 
     const logEntry = (entry) => {
         addEntry(campaignName, entry).catch((e) => { console.error("[DeathSavingThrows] Error:", e); })
@@ -157,7 +191,7 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
             {isDeadState && <div className="death-saves-dead">Dead</div>}
             {!isStable && !isDeadState && (
                 <div className="death-saves-roll-area">
-                    {hasAdvantage && <span className="death-saves-advantage">ADVANTAGE</span>}
+                    {hasAdvantage && <span className="death-saves-advantage" title={advantageTooltip}>ADVANTAGE</span>}
                     <div className="death-saves-roll" onClick={rollDeathSave} role="button" tabIndex={0}>
                         <i className="fas fa-dice-d20"></i> Roll
                     </div>

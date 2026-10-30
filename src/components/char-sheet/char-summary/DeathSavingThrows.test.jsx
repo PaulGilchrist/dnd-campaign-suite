@@ -47,7 +47,10 @@ vi.mock('../../../services/combat/conditions/deathSaveRules.js', () => ({
 
 vi.mock('../../../services/combat/conditions/conditionEffects.js', () => ({
   hasSaveModifier: vi.fn(() => false),
-  hasBeaconOfHope: vi.fn(() => false),
+}));
+
+vi.mock('../../../services/combat/conditions/targetEffectDefinitions.js', () => ({
+  getActiveTargetEffect: vi.fn(() => null),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -59,6 +62,7 @@ import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js';
 import * as conditionEffects from '../../../services/combat/conditions/conditionEffects.js';
+import { getActiveTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addEntry } from '../../../services/ui/logService.js';
 
 const CAMPAIGN = 'test-campaign';
@@ -112,7 +116,7 @@ describe('DeathSavingThrows', () => {
     deathSaveRules.rollDeathSave.mockReturnValue(rollResult());
     deathSaveRules.rollDeathSaveWithAdvantage.mockReturnValue(rollResult());
     conditionEffects.hasSaveModifier.mockReturnValue(false);
-    conditionEffects.hasBeaconOfHope.mockReturnValue(false);
+    vi.mocked(getActiveTargetEffect).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -278,12 +282,12 @@ describe('DeathSavingThrows', () => {
     });
 
     it.each([
-      ['save modifier plus the nat18-as-20 passive', { saveModifiers: ['death_saving_throws'], automation: { passives: [{ type: 'passive_rule', effect: 'death_save_nat18_as_20' }] } }, true, false, true, true],
-      ['Beacon of Hope', {}, false, true, true, false],
-      ['no bonus', {}, false, false, false, false],
+      ['save modifier plus the nat18-as-20 passive', { saveModifiers: ['death_saving_throws'], automation: { passives: [{ type: 'passive_rule', effect: 'death_save_nat18_as_20' }] } }, true, null, true, true],
+      ['Beacon of Hope', {}, false, { target: CHARACTER, effect: 'beacon_of_hope', source: 'Cleric' }, true, false],
+      ['no bonus', {}, false, null, false, false],
     ])('routes the roll through the %s entry point with the synced tracks', (_source, extraStats, modifier, beacon, usesAdvantage, treat18AsNat20) => {
       conditionEffects.hasSaveModifier.mockReturnValue(modifier);
-      conditionEffects.hasBeaconOfHope.mockReturnValue(beacon);
+      vi.mocked(getActiveTargetEffect).mockReturnValue(beacon);
       deathSaveRules.rollDeathSaveWithAdvantage.mockReturnValue(rollResult({ roll: 17, rolls: [17, 8] }));
       runtimeStore.set(`${CHARACTER}:deathSaves`, [true, false, false]);
       runtimeStore.set(`${CHARACTER}:deathFailures`, [false, true, false]);
@@ -308,6 +312,80 @@ describe('DeathSavingThrows', () => {
         expect(deathSaveRules.rollDeathSave).toHaveBeenCalledWith(saves, failures, false);
         expect(deathSaveRules.rollDeathSaveWithAdvantage).not.toHaveBeenCalled();
       }
+    });
+  });
+
+  describe('ADVANTAGE chip tooltip attribution', () => {
+    it('names a save-modifier source in the tooltip', () => {
+      conditionEffects.hasSaveModifier.mockReturnValue(true);
+      renderComponent({
+        playerStats: {
+          saveModifiers: [
+            { source: 'Bardic Inspiration', target: 'death_saving_throws', effect: 'advantage' },
+          ],
+        },
+      });
+      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
+        'title',
+        'Advantage from: Bardic Inspiration'
+      );
+    });
+
+    it('names the Beacon of Hope caster from the target effect', () => {
+      vi.mocked(getActiveTargetEffect).mockReturnValue({
+        target: CHARACTER, effect: 'beacon_of_hope', source: 'Cleric',
+      });
+      renderComponent();
+      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
+        'title',
+        'Advantage from: Beacon of Hope (Cleric)'
+      );
+    });
+
+    it('enumerates every contributing source when several stack', () => {
+      conditionEffects.hasSaveModifier.mockReturnValue(true);
+      vi.mocked(getActiveTargetEffect).mockReturnValue({
+        target: CHARACTER, effect: 'beacon_of_hope', source: 'Cleric',
+      });
+      renderComponent({
+        playerStats: {
+          saveModifiers: [
+            { source: 'Bardic Inspiration', target: 'death_saving_throws', effect: 'advantage' },
+            { source: 'Bardic Inspiration', target: 'death_saving_throws', effect: 'advantage' },
+            { source: 'Aura', target: 'death_saving_throws', effect: 'advantage' },
+            { source: 'Not This', target: 'saving_throw', effect: 'advantage' },
+            { source: 'Not That', target: 'death_saving_throws', effect: 'reroll' },
+          ],
+        },
+      });
+      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
+        'title',
+        'Advantage from: Bardic Inspiration, Aura, Beacon of Hope (Cleric)'
+      );
+    });
+
+    it('marks unattributable advantage distinctly instead of naming a phantom source', () => {
+      conditionEffects.hasSaveModifier.mockReturnValue(true);
+      renderComponent({
+        playerStats: {
+          // Bare DM-flag mod with no source field, plus an ability-scoped mod
+          // that hasSaveModifier-without-abilityName would never credit.
+          saveModifiers: [
+            { target: 'death_saving_throws', effect: 'advantage' },
+            { source: 'Wrong Scope', target: 'death_saving_throws', effect: 'advantage', abilities: ['CON'] },
+          ],
+        },
+      });
+      expect(screen.getByText('ADVANTAGE')).toHaveAttribute(
+        'title',
+        'Advantage — no source recorded'
+      );
+    });
+
+    it('shows no chip and no tooltip on a plain dying track', () => {
+      renderComponent();
+      expect(screen.queryByText('ADVANTAGE')).not.toBeInTheDocument();
+      expect(document.querySelector('.death-saves-advantage')).toBeNull();
     });
   });
 
