@@ -401,16 +401,23 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
 
     const handleToolPanStart = useCallback((e) => {
         if (spellDragActiveRef.current) return;
-        if (tool === TOOL_PAINT || tool === TOOL_ERASE) {
-            handleGridPointerDown(e, setMapData);
-            return;
-        }
-        if (tool === TOOL_SELECT) {
-            handleSelectPointerDown(e, placedItems, mapData);
-            return;
+        // Back-stop interlock: with the ruler armed, a canvas gesture is a
+        // measurement and must NEVER mutate the map document. The toolbar
+        // interlock prevents dual-arming; this lane defends the map file
+        // regardless of how tool and rulerMode got armed together. Pan still
+        // runs so the measurement view stays draggable.
+        if (!rulerMode) {
+            if (tool === TOOL_PAINT || tool === TOOL_ERASE) {
+                handleGridPointerDown(e, setMapData);
+                return;
+            }
+            if (tool === TOOL_SELECT) {
+                handleSelectPointerDown(e, placedItems, mapData);
+                return;
+            }
         }
         handlePanStart(e, panX, panY);
-    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, handlePanStart, placedItems, mapData, setMapData, spellDragActiveRef]);
+    }, [tool, panX, panY, rulerMode, handleGridPointerDown, handleSelectPointerDown, handlePanStart, placedItems, mapData, setMapData, spellDragActiveRef]);
 
     const handleToolPointerMove = useCallback((e) => {
         handlePointerMove(e);
@@ -446,9 +453,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         setRulerMode(value);
         if (value) {
             setSpellMode(null);
+            // Interlock: arming the ruler disarms the paint/erase/select tools
+            // too (mirrors the spell clear above). Without it a dual-armed
+            // canvas click both measured AND committed wall edits to the map
+            // file (ruler-not-interlocked bug, face b).
+            setTool(TOOL_NONE);
             resetRuler();
         }
-    }, [setRulerMode, setSpellMode, resetRuler]);
+    }, [setRulerMode, setSpellMode, setTool, resetRuler]);
 
     if (!mapData) return null;
 

@@ -49,6 +49,10 @@ const MapToolbar = ({
             setSpellMode(null);
         } else {
             setTool('none');
+            // Interlock: arming the wand disarms the ruler. Without this the
+            // wand UI arms but useSpellHandlers' rulerMode gate silently
+            // swallows every canvas click (ruler-not-interlocked bug, face a).
+            if (rulerMode) setRulerMode(false);
             setSpellMode(selectedShape || OverlayShape.SPHERE);
         }
     };
@@ -86,7 +90,14 @@ const MapToolbar = ({
                             key={t}
                             className={tool === t ? 'active' : ''}
                             aria-label={label}
-                            onClick={() => setTool(tool === t ? 'none' : t)}
+                            onClick={() => {
+                                const next = tool === t ? 'none' : t;
+                                setTool(next);
+                                // Interlock: arming a canvas tool disarms the
+                                // ruler so one pointerdown is never both a
+                                // measurement point and a wall edit.
+                                if (next !== 'none' && rulerMode) setRulerMode(false);
+                            }}
                         >
                             <i className={`fa-solid ${icon}`}></i> {label}
                         </button>
