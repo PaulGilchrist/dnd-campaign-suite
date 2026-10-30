@@ -238,7 +238,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AH
 
-- **ai-hp-change-proposal-ungated-by-own-dice-rule** — REFEREE_SYSTEM rule 2 ("NEVER invent damage numbers without the dice that produce them") is not enforced by the schema: a bare `hp_change amount:-6` (chandelier) validated and landed a confirm card with zero dice provenance. Either require an expression/rollKind on hp_change or auto-downgrade bare-amount proposals to needs_human. (Human confirm contains it — consistency/polish gap.)
 - **ai-config-null-key-retained** — Admin "Turn AI off" resolves to `POST aiConfig {value:null}` and the key STAYS in change-data with a null value (`aiConfig:'aiConfig' in d → true, value null`), unlike the DELETE-wipe idiom used by travel-*/loot-draft scratch keys. Harmless (`aiConfigLive(null)` false, consoles unmount, L1–4 parity holds) but wildcard audits and snapshot diffs carry a zombie key; mirror the delete-after-ack lane.
 
 ### Open items — 2026-10-29 run AG

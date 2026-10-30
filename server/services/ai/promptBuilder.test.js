@@ -50,6 +50,21 @@ describe('buildRefereeMessages', () => {
         expect(msgs[1].content).toContain('HexWarlock');
         expect(msgs[1].content).toContain('"round":1');
     });
+
+    it('hp_change schema line carries the required expression (matches the enforced check)', () => {
+        const s = buildRefereeMessages({ action: 'x', characterName: null, state: {} })[0].content;
+        expect(s).toContain('{"type":"hp_change","targetName":"...","expression":"2d6+3","amount":-7');
+        expect(s).toMatch(/for type "hp_change", "expression" is REQUIRED/i);
+        expect(s).toMatch(/never a bare number/i);
+    });
+});
+
+describe('parseRulingAnswer — hp_change provenance gate', () => {
+    it('bare-amount hp_change is rejected; amount + dice expression parses', () => {
+        expect(parseRulingAnswer('{"type":"hp_change","targetName":"X","amount":-6,"explanation":"claws"}').ok).toBe(false);
+        expect(parseRulingAnswer('{"type":"hp_change","targetName":"X","expression":"2d6","amount":-6,"explanation":"claws"}'))
+            .toMatchObject({ ok: true, ruling: { type: 'hp_change', expression: '2d6', amount: -6 } });
+    });
 });
 
 describe('REFEREE_SYSTEM — target_effect key allowlist', () => {

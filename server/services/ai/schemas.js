@@ -12,7 +12,9 @@
  *  - 'automation'    → an existing named action to run through the existing
  *                      automation lanes (charged via assertCanAct in P3-b).
  *  - 'target_effect' → a targetEffect key for targetEffectDefinitions.js.
- *  - 'hp_change'     → a signed HP delta the engine applies (confirm-gated).
+ *  - 'hp_change'     → a signed HP delta the engine applies (confirm-gated),
+ *                      provenance-gated: must carry the dice expression that
+ *                      produces the amount (rule 2).
  *  - 'narrative'     → prose outcome logged for the table; mutates nothing.
  * 'needs_human' is engine-produced only (AI unavailable / invalid output).
  */
@@ -34,13 +36,16 @@ function trimmedNonEmpty(v) { return str(v) && v.trim() !== ''; }
  * checks live in a table (one row per ruling type), the shape sanity in the
  * dispatcher — so adding a ruling type never grows the dispatcher.
  */
+/** Shared NdM(+K) grammar gate — dice rulings and hp_change provenance. */
+function expressionField(r, errors, message) {
+    if (!str(r.expression) || !EXPR_RE.test(r.expression.trim())) errors.push(message);
+}
+
 const TYPE_CHECKS = {
     narrative: (r, e) => textField(r, e, 'text'),
     needs_human: (r, e) => textField(r, e, 'text'),
     dice: (r, e) => {
-        if (!str(r.expression) || !EXPR_RE.test(r.expression.trim())) {
-            e.push("dice ruling requires a valid expression 'NdM(+K)' — the engine rolls, the AI never states a result");
-        }
+        expressionField(r, e, "dice ruling requires a valid expression 'NdM(+K)' — the engine rolls, the AI never states a result");
         if (r.mode !== undefined && !DICE_MODES.has(r.mode)) e.push("dice.mode must be 'normal'|'advantage'|'disadvantage'");
     },
     automation: (r, e) => {
@@ -52,6 +57,10 @@ const TYPE_CHECKS = {
         if (!trimmedNonEmpty(r.targetName)) e.push('target_effect requires targetName');
     },
     hp_change: (r, e) => {
+        // REFEREE_SYSTEM rule 2: never invent damage numbers without the dice
+        // that produce them. The expression is provenance — the confirmed
+        // amount is what applies, the engine does not re-roll it.
+        expressionField(r, e, "hp_change requires the dice expression that produces the amount — add one in 'NdM(+K)' form (never invent damage numbers without the dice that produce them)");
         if (!Number.isInteger(r.amount) || r.amount === 0 || Math.abs(r.amount) > MAX_HP_MAGNITUDE) {
             e.push(`hp_change.amount must be a non-zero integer within ±${MAX_HP_MAGNITUDE}`);
         }

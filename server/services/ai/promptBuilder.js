@@ -72,9 +72,10 @@ NON-NEGOTIABLE RULES:
    {"type":"dice","expression":"1d20+7","mode":"normal","targetName":"...","explanation":"...","confidence":0.9}
    {"type":"automation","actionName":"Attack with Longsword","targetName":"Goblin","explanation":"...","confidence":0.9}
    {"type":"target_effect","effect":"VALID_EFFECT_KEY","targetName":"...","explanation":"...","confidence":0.8}
-   {"type":"hp_change","targetName":"...","amount":-7,"explanation":"...","confidence":0.8}
+   {"type":"hp_change","targetName":"...","expression":"2d6+3","amount":-7,"explanation":"...","confidence":0.8}
    {"type":"narrative","text":"...","explanation":"...","confidence":0.9}
 Keep "explanation" short (one sentence). "confidence" is 0..1.
+For type "hp_change", "expression" is REQUIRED and the "amount" must come from those dice — state the dice that produce the delta, never a bare number (rule 2).
 For type "target_effect", the "effect" MUST be one of the VALID_EFFECT_KEYS listed below — conditions like "poisoned" are NOT effect keys.${EFFECT_KEY_LINE}`;
 
 /**

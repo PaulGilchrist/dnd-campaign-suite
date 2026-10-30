@@ -276,7 +276,7 @@ describe('AiRefereeSection — proposal override (§10.4)', () => {
     it('hp_change untouched applies the AI’s amount unflagged; an edited override applies the human’s amount and records it', async () => {
         getRuntimeValue.mockImplementation((who, key) => (who === 'Rakan' && key === 'currentHitPoints' ? 20 : null));
         synced.aiConfig = CONFIGURED;
-        stubFetch({ referee: { ok: true, ruling: { type: 'hp_change', targetName: 'Rakan', amount: -7, explanation: 'claws rake Rakan' } } });
+        stubFetch({ referee: { ok: true, ruling: { type: 'hp_change', targetName: 'Rakan', expression: '2d6', amount: -7, explanation: 'claws rake Rakan' } } });
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
 
         // cycle 1 — accepted as proposed: original amount, no override flag

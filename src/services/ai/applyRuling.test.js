@@ -88,12 +88,12 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
 
     it('hp_change applies to runtime HP with a zero floor; no-runtime-track targets REFUSED', async () => {
         getRuntimeValue.mockImplementation((name, key) => (name === 'Hero' && key === 'currentHitPoints' ? 12 : null));
-        const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Hero', amount: -14 } });
+        const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Hero', expression: '2d8+1', amount: -14 } });
         expect(r.applied).toBe(true);
         expect(setRuntimeValue).toHaveBeenCalledWith('Hero', 'currentHitPoints', 0, CN);
         expect(r.detail).toMatch(/death saves/);
 
-        const npc = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Goblin', amount: -5 } });
+        const npc = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Goblin', expression: '1d6', amount: -5 } });
         expect(npc.applied).toBe(false);
         expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'currentHitPoints', expect.anything(), CN);
     });
@@ -117,7 +117,7 @@ describe('applyRuling — never-auto ops', () => {
         expect((await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'reality_rewrite' } })).applied).toBe(false);
         expect((await applyRuling({ campaignName: CN, enforcement: OFF, ruling: null })).applied).toBe(false);
         getRuntimeValue.mockImplementation(() => { throw new Error('store down'); });
-        const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Hero', amount: -1 } });
+        const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'hp_change', targetName: 'Hero', expression: '1d6', amount: -1 } });
         expect(r.applied).toBe(false);
         expect(r.detail).toMatch(/apply failed/);
     });

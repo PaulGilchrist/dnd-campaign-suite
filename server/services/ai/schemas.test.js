@@ -8,7 +8,7 @@ describe('validateRuling', () => {
         expect(validateRuling({ type: 'dice', expression: 'd8', mode: 'advantage' }).ok).toBe(true);
         expect(validateRuling({ type: 'automation', actionName: 'Attack with Longsword', targetName: 'Goblin' }).ok).toBe(true);
         expect(validateRuling({ type: 'target_effect', effect: 'bless', targetName: 'Hero' }).ok).toBe(true);
-        expect(validateRuling({ type: 'hp_change', targetName: 'Goblin', amount: -7 }).ok).toBe(true);
+        expect(validateRuling({ type: 'hp_change', targetName: 'Goblin', amount: -7, expression: '2d6+3' }).ok).toBe(true);
         expect(validateRuling({ type: 'narrative', text: 'The door creaks open.' }).ok).toBe(true);
         expect(validateRuling({ type: 'needs_human', text: 'GM call needed' }).ok).toBe(true);
     });
@@ -29,11 +29,24 @@ describe('validateRuling', () => {
     });
 
     it('hp_change is a bounded signed integer; target_effect needs a snake_case key', () => {
-        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: 0 }).ok).toBe(false);
-        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: 9999 }).ok).toBe(false);
-        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: 1.5 }).ok).toBe(false);
+        // amount checks carry a valid expression so ONLY the amount fails
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: 0, expression: '1d6' }).ok).toBe(false);
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: 9999, expression: '1d6' }).ok).toBe(false);
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: 1.5, expression: '1d6' }).ok).toBe(false);
         expect(validateRuling({ type: 'target_effect', effect: 'Bless You!', targetName: 'X' }).ok).toBe(false);
         expect(validateRuling({ type: 'target_effect', effect: 'bless' }).ok).toBe(false);
+    });
+
+    it('hp_change must carry the dice that produce the amount (rule 2 — no invented numbers)', () => {
+        // bare amount, zero provenance: invalid, fails closed to needs_human
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: -6 }).ok).toBe(false);
+        const bare = validateRuling({ type: 'hp_change', targetName: 'X', amount: -6 });
+        expect(bare.errors.join(' ')).toMatch(/hp_change requires the dice expression/i);
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: -6, expression: '2d6+3' }).ok).toBe(true);
+        // non-expressions never pass the grammar
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: -6, expression: 'chandelier!' }).ok).toBe(false);
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: -6, expression: '2d' }).ok).toBe(false);
+        expect(validateRuling({ type: 'hp_change', targetName: 'X', amount: -6, expression: '   ' }).ok).toBe(false);
     });
 
     it('caps text sizes and confidence range', () => {
