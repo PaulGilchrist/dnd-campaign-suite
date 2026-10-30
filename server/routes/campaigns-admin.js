@@ -207,6 +207,9 @@ router.delete('/api/campaigns/:campaign', asyncHandler((req, res) => {
     spellOverlayData.delete(campaign);
     activeMaps.delete(campaign);
     logCache.delete(campaign);
+    // Mounted map tabs must retire overlay geometry the server just wiped
+    // (same live-retire the in-editor Clear All gets from spell-overlay.js).
+    publish(`spell-overlay-${campaign}`, { action: 'clear' }, campaign);
 
     res.json({ message: 'Campaign deleted successfully' });
 }));
@@ -233,6 +236,8 @@ router.post('/api/campaigns/:campaign/admin/clear-change-data', asyncHandler((re
     activeMaps.delete(campaign);
     spellOverlayData.delete(campaign);
     publish(`change-${campaign}-combatSummary`, null, campaign);
+    // Mounted map tabs must retire overlay geometry the server just wiped
+    publish(`spell-overlay-${campaign}`, { action: 'clear' }, campaign);
 
     res.json({ message: 'Change data cleared' });
 }));
@@ -277,6 +282,8 @@ async function fullResetClearFiles(campaign, dir, safetyPath) {
     activeMaps.delete(campaign);
     spellOverlayData.delete(campaign);
     publish(`change-${campaign}-combatSummary`, null, campaign);
+    // Mounted map tabs must retire overlay geometry the server just wiped
+    publish(`spell-overlay-${campaign}`, { action: 'clear' }, campaign);
 
     try {
         if (fs.existsSync(campaignDataFile(campaign, 'campaign-log.json'))) {
