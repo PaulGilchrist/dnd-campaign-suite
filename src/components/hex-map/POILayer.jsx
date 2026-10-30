@@ -106,15 +106,23 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                             </g>
                         )}
 
-                        {/* Hit area for drag and context menu (non-enterable) or click-to-enter */}
+                        {/* Hit area for drag and context menu (non-enterable) or click-to-enter.
+                            The enterable rect MUST stopPropagation on pointerdown: the svg root
+                            calls setPointerCapture in its onPointerDown (pan/paint lanes), and
+                            pointer capture retargets the ensuing click to the svg — a real mouse
+                            click would never reach this rect's onClick (bug 2026-10-30). Same
+                            pattern as POIContextMenu's menu <g> and the non-enterable branch's
+                            handlePoiPointerDown. Height 56 covers the full golden Enter badge
+                            (rect + text) so no pixel of the affordance is inert. */}
                         {enterable ? (
                             <rect
                                 x={cx - 18}
                                 y={cy - 18}
                                 width={36}
-                                height={50}
+                                height={56}
                                 fill="transparent"
                                 style={{ cursor: 'pointer' }}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); onPoiEnter(poi); }}
                                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPoiContextMenu(poi.id, e); }}
                             />
