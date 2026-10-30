@@ -239,7 +239,7 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
     return (
       <MapsManager
         campaignName={campaignName}
-        onOpenMap={(mapName) => { setMapsView({ type: 'map', mapName }); setActiveMapName(mapName); }}
+        onOpenMap={(mapName, mapDisplayName) => { setMapsView({ type: 'map', mapName, mapDisplayName }); setActiveMapName(mapName); }}
         onBack={onBackFromManager}
       />
     );
@@ -255,6 +255,7 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
           npcs={npcs}
           isLocalhost={isLocalhost}
           mapName={mapsView.mapName}
+          mapDisplayName={mapsView.mapDisplayName}
           onBack={onBackFromMap}
           onEncounterCreated={onEncounterCreated}
           onPoiEntered={onEncounterCreated}
@@ -313,6 +314,9 @@ function App() {
    // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'settlements' | 'initiative'
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
+  // and mapDisplayName (optional) the manager row's display name — threads to the
+  // rejected-load notice (backlog map-load-notice-slug-naming). POI-entered maps
+  // carry no display name; the notice falls back to the slug there.
   // Navigation stack for indoor map entry (POI, encounter) — push on enter, pop on back
   const mapHistoryRef = useRef([]);
 
@@ -553,7 +557,7 @@ function App() {
       const activeMap = result.maps.find(m => m.isActive);
       if (activeMap) {
         const mapName = activeMap.fileName.replace(/\.json$/, '');
-        setMapsView({ type: 'map', mapName });
+        setMapsView({ type: 'map', mapName, mapDisplayName: activeMap.name });
         setActiveMapName(mapName);
       }
       // No active map: the MapsAreaView waiting placeholder stays visible —

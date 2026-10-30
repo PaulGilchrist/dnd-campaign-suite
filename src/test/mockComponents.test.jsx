@@ -325,13 +325,13 @@ describe('MockSidebar', () => {
 });
 
 describe('MockMapsManager', () => {
-  it('echoes the campaign and fires onOpenMap with the fixed "dungeon-1" id', () => {
+  it('echoes the campaign and fires onOpenMap with the fixed "dungeon-1" id + row display name', () => {
     const onOpenMap = vi.fn();
     const onBack = vi.fn();
     render(<MockMapsManager campaignName="my-campaign" onOpenMap={onOpenMap} onBack={onBack} />);
     expect(screen.getByTestId('mm-campaign')).toHaveTextContent('my-campaign');
     fireEvent.click(screen.getByTestId('open-map-btn'));
-    expect(onOpenMap).toHaveBeenCalledWith('dungeon-1');
+    expect(onOpenMap).toHaveBeenCalledWith('dungeon-1', 'Dungeon 1');
     fireEvent.click(screen.getByTestId('mm-back-btn'));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
@@ -342,6 +342,7 @@ describe('MockMap', () => {
     render(
       <MockMap
         mapName="dungeon-1"
+        mapDisplayName="Dungeon 1"
         campaignName="my-campaign"
         characters={['c1', 'c2']}
         npcs={['n1']}
@@ -350,6 +351,7 @@ describe('MockMap', () => {
       />,
     );
     expect(screen.getByTestId('map-name')).toHaveTextContent('dungeon-1');
+    expect(screen.getByTestId('map-display-name')).toHaveTextContent('Dungeon 1');
     expect(screen.getByTestId('map-campaign')).toHaveTextContent('my-campaign');
     expect(screen.getByTestId('map-char-count')).toHaveTextContent('2');
     expect(screen.getByTestId('map-npc-count')).toHaveTextContent('1');

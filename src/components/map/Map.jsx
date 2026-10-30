@@ -139,7 +139,7 @@ function mergeNewlyRevealed(visible, revealed) {
     return Array.from(current);
 }
 
-function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
+function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const svgRef = useRef(null);
@@ -164,7 +164,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const { message: loadNotice, show: handleLoadRejected } = useEphemeralToast(4000);
 
     const { mapData, setMapData, placedItems, setPlacedItems, flushSave } = useMapLoader({
-        campaignName, characters, mapName, gridSize, setGridSize, isLocalhost,
+        campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost,
         onLoadRejected: handleLoadRejected,
     });
 
@@ -467,6 +467,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 campaignName={campaignName}
                 mapName={mapName}
                 parentDisplayName={mapData.displayName}
+                mapDisplayName={mapDisplayName}
                 onBack={onBack}
                 characters={characters}
                 onEncounterCreated={onEncounterCreated}

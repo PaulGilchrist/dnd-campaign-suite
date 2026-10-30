@@ -244,8 +244,8 @@ vi.mock('./hooks/useMapDrops.js', () => ({
 }));
 
 vi.mock('../hex-map/HexMap.jsx', () => ({
-    default: ({ campaignName, mapName, onBack }) => (
-        <div data-testid="hex-map">{`${campaignName}|${mapName}`}
+    default: ({ campaignName, mapName, onBack, mapDisplayName, parentDisplayName }) => (
+        <div data-testid="hex-map">{`${campaignName}|${mapName}|${mapDisplayName ?? ''}|${parentDisplayName ?? ''}`}
             <button onClick={onBack}>hex-back</button>
         </div>
     ),
@@ -456,5 +456,21 @@ describe('Map container — availability & composition', () => {
         expect(toast).toBeTruthy();
         expect(toast).toHaveAttribute('role', 'status');
         expect(toast).toHaveTextContent('EvasiveFighter snapped back to 30 ft of movement.');
+    });
+
+    it('T10: threads the mapDisplayName prop into the loader options and down to HexMap (backlog map-load-notice-slug-naming)', async () => {
+        mockState.mapData = createMockMapData({ type: 'outdoor', displayName: 'Test Map Doc' });
+        const { container } = await act(async () => renderMap({ mapDisplayName: 'Test Map' }));
+
+        // Indoor seam: the loader receives the row name for its rejected-load notice.
+        expect(vi.mocked(useMapLoader).mock.calls.at(-1)[0]).toMatchObject({
+            mapName: 'test-map.json',
+            mapDisplayName: 'Test Map',
+        });
+
+        // Outdoor seam: the row name rides into HexMap (loader 5th arg there),
+        // while parentDisplayName keeps carrying the document's own name.
+        const hex = container.querySelector('[data-testid="hex-map"]');
+        expect(hex).toHaveTextContent('test-campaign|test-map.json|Test Map|Test Map Doc');
     });
 });

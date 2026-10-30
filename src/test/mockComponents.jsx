@@ -123,14 +123,15 @@ export const MockSidebar = vi.fn(({
 export const MockMapsManager = vi.fn(({ campaignName, onOpenMap, onBack }) => (
   <div data-testid="maps-manager">
     <span data-testid="mm-campaign">{campaignName}</span>
-    <button data-testid="open-map-btn" onClick={() => onOpenMap('dungeon-1')}>Open Map</button>
+    <button data-testid="open-map-btn" onClick={() => onOpenMap('dungeon-1', 'Dungeon 1')}>Open Map</button>
     <button data-testid="mm-back-btn" onClick={onBack}>Back</button>
   </div>
 ));
 
-export const MockMap = vi.fn(({ mapName, campaignName, characters, npcs, isLocalhost, onBack, onPoiEntered }) => (
+export const MockMap = vi.fn(({ mapName, mapDisplayName, campaignName, characters, npcs, isLocalhost, onBack, onPoiEntered }) => (
   <div data-testid="map-view">
     <span data-testid="map-name">{mapName}</span>
+    <span data-testid="map-display-name">{mapDisplayName || ''}</span>
     <span data-testid="map-campaign">{campaignName}</span>
     <span data-testid="map-char-count">{characters?.length || 0}</span>
     <span data-testid="map-npc-count">{npcs?.length || 0}</span>

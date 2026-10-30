@@ -336,7 +336,7 @@ describe('MapsManager', () => {
             expect(activateButtons[0].closest('li')).toHaveTextContent('Inactive Map');
         });
 
-        it('calls onOpenMap with each suffix-free map name (SSE key match)', async () => {
+        it('calls onOpenMap with each suffix-free map name plus display name (SSE key match + notice naming)', async () => {
             await renderWithMaps(
                 makeMap({ name: 'Map A', fileName: 'map-a.json' }),
                 makeMap({ name: 'Map B', fileName: 'map-b.json' }),
@@ -346,9 +346,9 @@ describe('MapsManager', () => {
                 name => screen.getByRole('button', { name: `Open "${name}"` }),
             );
             fireEvent.click(openButtons[0]);
-            expect(props.onOpenMap).toHaveBeenCalledWith('map-a');
+            expect(props.onOpenMap).toHaveBeenCalledWith('map-a', 'Map A');
             fireEvent.click(openButtons[1]);
-            expect(props.onOpenMap).toHaveBeenCalledWith('map-b');
+            expect(props.onOpenMap).toHaveBeenCalledWith('map-b', 'Map B');
         });
     });
 
@@ -607,7 +607,7 @@ describe('MapsManager', () => {
         it('role+name clicks still dispatch the same handlers', async () => {
             await renderWithMaps(makeMap({ name: 'Battle Arena', fileName: 'battle-arena.json' }));
             fireEvent.click(screen.getByRole('button', { name: 'Open "Battle Arena"' }));
-            expect(props.onOpenMap).toHaveBeenCalledWith('battle-arena');
+            expect(props.onOpenMap).toHaveBeenCalledWith('battle-arena', 'Battle Arena');
             fireEvent.click(screen.getByRole('button', { name: 'Rename "Battle Arena"' }));
             expect(screen.getByDisplayValue('Battle Arena')).toBeInTheDocument();
         });

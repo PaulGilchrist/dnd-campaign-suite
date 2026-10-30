@@ -58,8 +58,8 @@ describe('hex useMapLoader — rejected-load fallback (notice + zero-PUT gate)',
         vi.restoreAllMocks();
     });
 
-    const renderLoader = () =>
-        renderHook(() => useMapLoader(CAMPAIGN, MAP, CHARACTERS, noticeSpy));
+    const renderLoader = (mapDisplayName) =>
+        renderHook(() => useMapLoader(CAMPAIGN, MAP, CHARACTERS, noticeSpy, mapDisplayName));
 
     const settleLoad = async () => {
         await act(async () => {});
@@ -176,5 +176,31 @@ describe('hex useMapLoader — rejected-load fallback (notice + zero-PUT gate)',
         expect(mapsService.saveMapData).not.toHaveBeenCalled();
         expect(consoleErrorSpy).not.toHaveBeenCalled();
         expect(result.current.mapData.displayName).toBe('Good Map');
+    });
+
+    // Backlog map-load-notice-slug-naming: the list row / document display
+    // name threads in as the 5th arg so the hex notice reads
+    // `Could not load "QA Hex Live"` — the tests above, rendered WITHOUT a
+    // display name, pin the slug fallback (criterion 2).
+    it('rejected load with a threaded display name: notice quotes the DISPLAY name, and a name change never re-arms the load', async () => {
+        mapsService.loadMapData.mockRejectedValue(new Error('Map not found'));
+
+        const { rerender } = renderHook(
+            ({ mapDisplayName }) => useMapLoader(CAMPAIGN, MAP, CHARACTERS, noticeSpy, mapDisplayName),
+            { initialProps: { mapDisplayName: 'QA Hex Live' } },
+        );
+        await settleLoad();
+
+        expect(noticeSpy).toHaveBeenCalledTimes(1);
+        expect(noticeSpy).toHaveBeenCalledWith(buildMapLoadRejectedNotice('QA Hex Live'));
+        expect(noticeSpy.mock.calls[0][0]).toContain('Could not load "QA Hex Live"');
+        expect(noticeSpy.mock.calls[0][0]).not.toContain(MAP);
+
+        // The display name is notice-only data: a rename re-render must NOT
+        // re-fire the whole-document reload nor double the notice.
+        rerender({ mapDisplayName: 'Renamed Row' });
+        await settleLoad();
+        expect(mapsService.loadMapData).toHaveBeenCalledTimes(1);
+        expect(noticeSpy).toHaveBeenCalledTimes(1);
     });
 });

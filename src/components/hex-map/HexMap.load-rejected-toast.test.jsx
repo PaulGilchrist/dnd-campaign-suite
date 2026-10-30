@@ -149,11 +149,15 @@ describe('HexMap rejected-load notice wiring', () => {
     it('passes the loader a notice callback and renders its message in the shared toast slot, auto-hiding without game writes', () => {
         const addEntry = vi.fn();
         useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
-        render(<HexMap campaignName="test-campaign" mapName="qa-hex-dead" />);
+        render(<HexMap campaignName="test-campaign" mapName="qa-hex-dead" mapDisplayName="QA Hex Live" parentDisplayName="QA Hex Doc" />);
 
-        // Seam: the hex loader receives the notice callback as its 4th arg.
+        // Seam: the hex loader receives the notice callback as its 4th arg,
+        // and the display name for the notice as its 5th (backlog
+        // map-load-notice-slug-naming) — row name first, document name next,
+        // slug fallback lives in the loader.
         const loaderCall = vi.mocked(useMapLoader).mock.calls.at(-1);
         expect(typeof loaderCall[3]).toBe('function');
+        expect(loaderCall[4]).toBe('QA Hex Live');
 
         expect(toastNode()).toBeNull(); // nothing before the rejection lands
         act(() => { loaderCall[3](buildMapLoadRejectedNotice('qa-hex-dead')); });

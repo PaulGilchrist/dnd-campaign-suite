@@ -69,7 +69,17 @@ function HexHoverPreview({ hoveredHex, tool, rivers }) {
     return null;
 }
 
-function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName }) {
+// Name the rejected-load notice should quote (backlog
+// map-load-notice-slug-naming): the manager row's display name the user just
+// clicked wins, then the loaded document's own displayName (POI-entered hexes
+// carry no row), then nothing — the loader still falls back to the kebab slug
+// for a corrupt/null-content file. Hoisted out of the component so the naming
+// branch stays outside HexMap's render complexity.
+function rejectedNoticeName(mapDisplayName, parentDisplayName) {
+    return mapDisplayName || parentDisplayName;
+}
+
+function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName, mapDisplayName }) {
     const svgRef = useRef(null);
 
     // ── Display-only map toast (arrival + POI-enter refusal + rejected-load
@@ -99,7 +109,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const handleLoadRejected = useCallback((message) => showMapToast(message, 4000), [showMapToast]);
 
     // ── Core map data (load/init/save) ──
-    const mapLoader = useMapLoader(campaignName, mapName, characters, handleLoadRejected);
+    // 5th arg (backlog map-load-notice-slug-naming): name the rejected-load
+    // notice should display — resolution in rejectedNoticeName above; the
+    // loader still falls back to the slug if both are absent.
+    const mapLoader = useMapLoader(campaignName, mapName, characters, handleLoadRejected, rejectedNoticeName(mapDisplayName, parentDisplayName));
     const {
         loading, setMapData,
         gridSize, setGridSize,

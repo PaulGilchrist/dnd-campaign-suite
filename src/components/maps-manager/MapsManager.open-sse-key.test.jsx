@@ -67,9 +67,13 @@ describe('MapsManager open → editor SSE key (json-suffix regression)', () => {
         expect(props.onOpenMap).toHaveBeenCalledTimes(1);
 
         // The exact bug byte: 'test-map', never 'test-map.json'.
-        const [mapName] = props.onOpenMap.mock.calls[0];
+        const [mapName, displayName] = props.onOpenMap.mock.calls[0];
         expect(mapName).toBe('test-map');
         expect(mapName.endsWith('.json')).toBe(false);
+        // Backlog map-load-notice-slug-naming: the row's DISPLAY name rides as
+        // the 2nd arg so a rejected document load names the map the way the
+        // user just saw it (the slug stays the storage/SSE key).
+        expect(displayName).toBe('Test Map');
     });
 
     it('manager-open mount + server map-data event updates the editor walls state', async () => {

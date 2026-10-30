@@ -351,7 +351,7 @@ function isViewOnlyDrift(envelope, baseline) {
     );
 }
 
-function useMapLoader(campaignName, mapName, characters, onLoadRejected) {
+function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisplayName) {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState(null);
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
@@ -412,6 +412,12 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected) {
     // re-trigger whole-document reloads).
     const onLoadRejectedRef = useRef(onLoadRejected);
     onLoadRejectedRef.current = onLoadRejected;
+    // Display name for the rejected-load notice (backlog
+    // map-load-notice-slug-naming): the manager row / document name the user
+    // saw, read via ref so a name-identity change never re-arms the load
+    // effect. Falls back to the slug for POI-entered/corrupt maps.
+    const noticeDisplayNameRef = useRef(mapDisplayName);
+    noticeDisplayNameRef.current = mapDisplayName;
 
     const setTravelStateRef = useCallback((ts) => {
         travelStateRef.current = ts;
@@ -488,7 +494,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected) {
                 // stays silent.
                 applyRejectedFreshMap(mapName, characters, ctx);
                 if (onLoadRejectedRef.current) {
-                    onLoadRejectedRef.current(buildMapLoadRejectedNotice(mapName));
+                    onLoadRejectedRef.current(buildMapLoadRejectedNotice(noticeDisplayNameRef.current || mapName));
                 }
                 return;
             }

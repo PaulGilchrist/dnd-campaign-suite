@@ -154,4 +154,43 @@ describe('useMapLoader — rejected-load phantom-resurrect guard', () => {
     expect(saveMapDataSpy).not.toHaveBeenCalled();
     expect(result.current.mapData.walls).toEqual(new Set(['2,3']));
   });
+
+  // Backlog map-load-notice-slug-naming: the manager row's DISPLAY name
+  // threads through App/mapsView/Map into the loader so the notice reads
+  // `Could not load "Test Map"`, matching what the user clicked (the tests
+  // above, rendered WITHOUT a display name, pin the slug fallback for the
+  // corrupt/null-content + POI-enter lanes — criterion 2).
+  it('rejected load with a threaded display name: notice quotes the DISPLAY name, and a name change never re-arms the load', async () => {
+    const { rerender } = renderHook(
+      (props) => {
+        const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
+        return {
+          ...useMapLoader({ ...props, gridSize, setGridSize }),
+          gridSize,
+        };
+      },
+      {
+        initialProps: {
+          campaignName: CAMPAIGN, characters: CHARACTERS, mapName: MAP,
+          mapDisplayName: 'Test Map', onLoadRejected: noticeSpy,
+        },
+      },
+    );
+    await act(async () => {});
+
+    expect(noticeSpy).toHaveBeenCalledTimes(1);
+    expect(noticeSpy).toHaveBeenCalledWith(buildMapLoadRejectedNotice('Test Map'));
+    expect(noticeSpy.mock.calls[0][0]).toContain('Could not load "Test Map"');
+    expect(noticeSpy.mock.calls[0][0]).not.toContain(MAP);
+
+    // The display name is notice-only data: a rename re-render must NOT
+    // re-fire the whole-document reload nor double the notice.
+    rerender({
+      campaignName: CAMPAIGN, characters: CHARACTERS, mapName: MAP,
+      mapDisplayName: 'Renamed Row', onLoadRejected: noticeSpy,
+    });
+    await act(async () => {});
+    expect(loadMapDataSpy).toHaveBeenCalledTimes(1);
+    expect(noticeSpy).toHaveBeenCalledTimes(1);
+  });
 });

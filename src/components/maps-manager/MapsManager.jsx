@@ -371,8 +371,11 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                 {/* Strip the .json suffix at this seam: the server publishes
                                     map-data-<campaign>-<name> suffix-free (server/routes/maps.js:169),
                                     so the editor's SSE expectedKey only matches a suffix-free mapName
-                                    (same normalization as App.jsx loadActiveMapAndOpen). */}
-                                <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''))} aria-label={`Open "${map.name}"`}>Open</button>
+                                    (same normalization as App.jsx loadActiveMapAndOpen). The row's
+                                    display name rides along as the 2nd arg so a rejected document load
+                                    can name the map the way the user just saw it (backlog
+                                    map-load-notice-slug-naming) — the slug stays the storage key. */}
+                                <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''), map.name)} aria-label={`Open "${map.name}"`}>Open</button>
                                 {!map.isActive && <button onClick={() => handleActivate(map.fileName)} aria-label={`Activate "${map.name}"`}>Activate</button>}
                                 <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
                                 <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>

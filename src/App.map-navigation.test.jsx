@@ -298,6 +298,27 @@ describe('App - Map Navigation & View Management', () => {
       expect(window.alert).not.toHaveBeenCalled();
     });
 
+    // Backlog map-load-notice-slug-naming: the manager row's display name must
+    // reach the editor's mapsView so a rejected document load can name the
+    // map by what the user clicked, not its kebab slug. POI-entered maps
+    // carry no row — the notice falls back to the slug there.
+    it('manager-open threads the row display name into the editor; POI-enter drops it to the slug fallback', async () => {
+      clickMaps();
+      openMapFromManager();
+      await expectMapShowing('dungeon-1');
+      expect(screen.getByTestId('map-display-name').textContent).toBe('Dungeon 1');
+
+      fireEvent.click(screen.getByTestId('map-enter-poi-btn'));
+      await expectMapShowing('inner-cave');
+      expect(screen.getByTestId('map-display-name').textContent).toBe('');
+
+      // Popping the stack restores the map, but the history stack stores only
+      // slugs — the popped entry keeps the slug-fallback contract.
+      backFromMap();
+      await expectMapShowing('dungeon-1');
+      expect(screen.getByTestId('map-display-name').textContent).toBe('');
+    });
+
     // Regression (2026-10-28 improve run, QA 2026-10-27 run F): the Maps pane
     // could strand in the blank `activeView === 'mapsManager'` +
     // `mapsView.type === 'none'` sub-state — MapsAreaView renders null there

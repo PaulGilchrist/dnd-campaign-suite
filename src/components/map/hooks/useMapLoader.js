@@ -28,7 +28,7 @@ function buildSavePayload(mapData, gridSize, placedItems) {
     };
 }
 
-function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize, isLocalhost = true, onLoadRejected }) {
+function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost = true, onLoadRejected }) {
     const [mapData, setMapData] = useState(null);
     const [placedItems, setPlacedItems] = useState([]);
     const svgLoadInProgressRef = useRef(false);
@@ -40,6 +40,12 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
     // re-trigger whole-document reloads).
     const onLoadRejectedRef = useRef(onLoadRejected);
     onLoadRejectedRef.current = onLoadRejected;
+    // Display name for the rejected-load notice (backlog
+    // map-load-notice-slug-naming): the manager row's name the user clicked,
+    // read via ref so a name-identity change never re-arms the load effect.
+    // Falls back to the slug (undefined-safe) for POI-entered/corrupt maps.
+    const mapDisplayNameRef = useRef(mapDisplayName);
+    mapDisplayNameRef.current = mapDisplayName;
     // Dirty-tracking baseline: the last document bytes this instance is known
     // to have given the server (adopted on load, claimed on every flush). The
     // autosave effect compares each candidate payload against it and skips
@@ -133,7 +139,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                 // lane fires — the falsy-resolve create lane below stays
                 // silent.
                 if (onLoadRejectedRef.current) {
-                    onLoadRejectedRef.current(buildMapLoadRejectedNotice(mapName));
+                    onLoadRejectedRef.current(buildMapLoadRejectedNotice(mapDisplayNameRef.current || mapName));
                 }
             } else if (isLocalhost) {
                 // A falsy resolve is the legacy "no document yet" create lane
