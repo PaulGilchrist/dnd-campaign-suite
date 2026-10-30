@@ -255,7 +255,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AK
 
-- `spell-overlay-silent-invalid-actions` — `POST /spell-overlay` answers 200 `{ok:true}` to unknown actions and remove-of-missing-ids (switch default falls through to a broadcast; `spell-overlay.js:27-56`). A 400 + no publish on unrecognized action would match the rest of the API's validation hygiene (and would have made the run-AK ghost/lock probes louder). File: `server/routes/spell-overlay.js`.
+*(none — run-AK backlog fully consumed by the 2026-10-30 improve run: `spell-overlay-durability` implemented (0d75251a3 — overlays persist via `saveOverlayFiles()` called from `saveFile()`, riding the shared debounce; boot `loadCampaignOverlays` disk-authoritative, empty-array/clear/reset unlink `data/spell-overlays.json`, restart byte-identical GET live-proven); `spell-overlay-param-edit-no-resize` implemented (38412214e — owner-scoped minimum: `.spell-overlay-hint` `Params apply to the next placement only` under the param row, re-used Map.css class, zero handler change; per-item edit + color picker declined this run); `spell-overlay-silent-invalid-actions` implemented (this commit — `VALID_ACTIONS` gate + remove-of-missing-id refusal, 400-before-any-mutation with lock-403 ordering pinned, valid lanes byte-unchanged, live curl ladder + UI sphere round-trip clean). Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-30 run AJ
 

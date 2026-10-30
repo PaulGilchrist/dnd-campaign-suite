@@ -120,6 +120,52 @@ describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
             );
         });
 
+        it('403s a locked off-target POST with an UNKNOWN action — lock before validation', async () => {
+            // Ordering pin: action validation must never preempt the lock 403;
+            // a bad action on an off-target campaign still answers lock-canonical 403.
+            const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const res = await request(createTestApp())
+                .post('/spell-overlay?campaign=other-campaign')
+                .send({ action: 'frobnicate' });
+
+            expect(res.status).toBe(403);
+            expect(res.body).toEqual({
+                error: 'Campaign locked to "test-campaign" — POST /spell-overlay denied',
+            });
+            expect(errSpy).toHaveBeenCalledWith(
+                '[campaign-lock] BLOCKED POST /spell-overlay (locked to "test-campaign")'
+            );
+            expect(store.has('other-campaign')).toBe(false);
+            expect(publish).not.toHaveBeenCalled();
+            expect(markDirty).not.toHaveBeenCalled();
+            errSpy.mockRestore();
+        });
+
+        it('validates actions on on-target writes while locked: unknown action 400s silently', async () => {
+            const res = await request(createTestApp())
+                .post('/spell-overlay?campaign=test-campaign')
+                .send({ action: 'frobnicate' });
+
+            expect(res.status).toBe(400);
+            expect(res.body).toEqual({ error: 'Unknown spell-overlay action: "frobnicate"' });
+            expect(store.has('test-campaign')).toBe(false);
+            expect(publish).not.toHaveBeenCalled();
+            expect(markDirty).not.toHaveBeenCalled();
+        });
+
+        it('400s an on-target remove of a missing id while locked, before any mutation', async () => {
+            store.set('test-campaign', [{ id: 'ok-1', shape: 'sphere' }]);
+            const res = await request(createTestApp())
+                .post('/spell-overlay?campaign=test-campaign')
+                .send({ action: 'remove', overlayId: 'ghost' });
+
+            expect(res.status).toBe(400);
+            expect(res.body).toEqual({ error: 'No overlay with id ghost' });
+            expect(store.get('test-campaign')).toEqual([{ id: 'ok-1', shape: 'sphere' }]);
+            expect(publish).not.toHaveBeenCalled();
+            expect(markDirty).not.toHaveBeenCalled();
+        });
+
         it('still serves reads while locked (GET pass-through doctrine, incl. on-target)', async () => {
             store.set('test-campaign', [{ id: 'ok-1', name: 'Fireball' }]);
             const onTarget = await request(createTestApp())

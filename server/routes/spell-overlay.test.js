@@ -7,14 +7,18 @@ import { spellOverlayData } from '../utils/changeData.js';
 import spellOverlay from './spell-overlay.js';
 
 // POST now marks the campaign dirty for the shared debounced disk persist;
-// stub it so these route tests stay timer-free and disk-inert (the persistence
-// lane itself is covered in server/utils/changeData.test.js).
+// stub it (and publish) so these route tests stay timer-free and disk-inert
+// (the persistence lane itself is covered in server/utils/changeData.test.js)
+// and every test can assert publish/markDirty call counts.
 let markDirtySpy;
+let publishSpy;
 beforeEach(() => {
     markDirtySpy = vi.spyOn(changeDataModule, 'markDirty').mockImplementation(() => {});
+    publishSpy = vi.spyOn(changeDataModule, 'publish').mockImplementation(() => {});
 });
 afterEach(() => {
     markDirtySpy.mockRestore();
+    publishSpy.mockRestore();
 });
 
 // Create a test app with the routes
@@ -125,14 +129,41 @@ describe('spell-overlay - POST /spell-overlay', () => {
         expect(res.body.error).toBe('campaign query param required');
     });
 
-    it('should return success for unknown action', async () => {
+    it('should return 400 for an unknown action, without publishing or mutating', async () => {
         const app = createTestApp();
         const res = await request(app)
             .post('/spell-overlay?campaign=test-campaign')
             .send({ action: 'unknown-action' });
 
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('ok', true);
+        expect(res.status).toBe(400);
+        expect(res.body).toHaveProperty('error');
+        expect(res.body.error).toContain('unknown-action');
+        expect(publishSpy).not.toHaveBeenCalled();
+        expect(markDirtySpy).not.toHaveBeenCalled();
+        expect(spellOverlayData.has('test-campaign')).toBe(false);
+    });
+
+    it('should return 400 for a missing action field', async () => {
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/spell-overlay?campaign=test-campaign')
+            .send({ overlays: [] });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain('Unknown spell-overlay action');
+        expect(publishSpy).not.toHaveBeenCalled();
+        expect(markDirtySpy).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 for a non-string action', async () => {
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/spell-overlay?campaign=test-campaign')
+            .send({ action: 42 });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain('42');
+        expect(publishSpy).not.toHaveBeenCalled();
     });
 
     describe('add action', () => {
@@ -486,7 +517,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
             expect(stored.map(o => o.id)).toEqual(['overlay-1', 'overlay-3']);
         });
 
-        it('should do nothing when overlayId does not match any overlay', async () => {
+        it('should return 400 when overlayId does not match any overlay, without publishing', async () => {
             spellOverlayData.set('test-campaign', [
                 { id: 'overlay-1', name: 'Fireball', level: 3 },
                 { id: 'overlay-2', name: 'Shield', level: 1 },
@@ -500,13 +531,16 @@ describe('spell-overlay - POST /spell-overlay', () => {
                     overlayId: 'nonexistent',
                 });
 
-            expect(res.status).toBe(200);
+            expect(res.status).toBe(400);
+            expect(res.body).toEqual({ error: 'No overlay with id nonexistent' });
+            expect(publishSpy).not.toHaveBeenCalled();
+            expect(markDirtySpy).not.toHaveBeenCalled();
 
             const stored = spellOverlayData.get('test-campaign');
             expect(stored).toHaveLength(2);
         });
 
-        it('should do nothing when overlayId is missing', async () => {
+        it('should keep the current 200 no-op when the overlayId field is missing', async () => {
             spellOverlayData.set('test-campaign', [
                 { id: 'overlay-1', name: 'Fireball', level: 3 },
             ]);
@@ -544,7 +578,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
             expect(stored).toEqual([]);
         });
 
-        it('should handle removing from an empty overlay list', async () => {
+        it('should return 400 when removing an id from an empty overlay list', async () => {
             spellOverlayData.set('test-campaign', []);
 
             const app = createTestApp();
@@ -555,13 +589,16 @@ describe('spell-overlay - POST /spell-overlay', () => {
                     overlayId: 'overlay-1',
                 });
 
-            expect(res.status).toBe(200);
+            expect(res.status).toBe(400);
+            expect(res.body).toEqual({ error: 'No overlay with id overlay-1' });
+            expect(publishSpy).not.toHaveBeenCalled();
+            expect(markDirtySpy).not.toHaveBeenCalled();
 
             const stored = spellOverlayData.get('test-campaign');
             expect(stored).toEqual([]);
         });
 
-        it('should handle removing when campaign has no overlays', async () => {
+        it('should return 400 without creating a store entry when campaign has no overlays', async () => {
             expect(spellOverlayData.has('test-campaign')).toBe(false);
 
             const app = createTestApp();
@@ -572,11 +609,12 @@ describe('spell-overlay - POST /spell-overlay', () => {
                     overlayId: 'overlay-1',
                 });
 
-            expect(res.status).toBe(200);
+            expect(res.status).toBe(400);
+            expect(publishSpy).not.toHaveBeenCalled();
+            expect(markDirtySpy).not.toHaveBeenCalled();
 
-            // Should create an empty array for the campaign
-            expect(spellOverlayData.has('test-campaign')).toBe(true);
-            expect(spellOverlayData.get('test-campaign')).toEqual([]);
+            // Refused request never reaches the campaign-entry init
+            expect(spellOverlayData.has('test-campaign')).toBe(false);
         });
     });
 
@@ -639,9 +677,6 @@ describe('spell-overlay - POST /spell-overlay', () => {
 
     describe('publish (SSE) on post', () => {
         it('should call publish with the correct event key and data for add action', async () => {
-            const changeDataModule = await import('../utils/changeData.js');
-            const publishSpy = vi.spyOn(changeDataModule, 'publish');
-
             const app = createTestApp();
             await request(app)
                 .post('/spell-overlay?campaign=test-campaign')
@@ -655,13 +690,11 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 { action: 'add', overlays: [{ id: 'overlay-1', name: 'Fireball' }], overlayId: undefined },
                 'test-campaign'
             );
-
-            publishSpy.mockRestore();
+            expect(markDirtySpy).toHaveBeenCalledWith('test-campaign');
         });
 
         it('should publish remove action with overlayId', async () => {
-            const changeDataModule = await import('../utils/changeData.js');
-            const publishSpy = vi.spyOn(changeDataModule, 'publish');
+            spellOverlayData.set('test-campaign', [{ id: 'overlay-42', name: 'Fireball' }]);
 
             const app = createTestApp();
             await request(app)
@@ -676,14 +709,10 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 { action: 'remove', overlays: undefined, overlayId: 'overlay-42' },
                 'test-campaign'
             );
-
-            publishSpy.mockRestore();
+            expect(markDirtySpy).toHaveBeenCalledWith('test-campaign');
         });
 
         it('should publish clear action without overlays or overlayId', async () => {
-            const changeDataModule = await import('../utils/changeData.js');
-            const publishSpy = vi.spyOn(changeDataModule, 'publish');
-
             const app = createTestApp();
             await request(app)
                 .post('/spell-overlay?campaign=test-campaign')
@@ -696,13 +725,11 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 { action: 'clear', overlays: undefined, overlayId: undefined },
                 'test-campaign'
             );
-
-            publishSpy.mockRestore();
+            expect(markDirtySpy).toHaveBeenCalledWith('test-campaign');
         });
 
         it('should publish update action with overlays', async () => {
-            const changeDataModule = await import('../utils/changeData.js');
-            const publishSpy = vi.spyOn(changeDataModule, 'publish');
+            spellOverlayData.set('test-campaign', [{ id: 'overlay-1', name: 'Old' }]);
 
             const app = createTestApp();
             await request(app)
@@ -717,8 +744,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 { action: 'update', overlays: [{ id: 'overlay-1', name: 'Updated' }], overlayId: undefined },
                 'test-campaign'
             );
-
-            publishSpy.mockRestore();
+            expect(markDirtySpy).toHaveBeenCalledWith('test-campaign');
         });
     });
 
@@ -869,24 +895,30 @@ describe('spell-overlay - POST /spell-overlay', () => {
             clearOverlayStore();
         });
 
-        it('should return 500 when body is completely missing (bug: no null check on req.body)', async () => {
+        it('should return 400 when body is completely missing (no action to validate)', async () => {
             const app = createTestApp();
             const res = await request(app)
                 .post('/spell-overlay?campaign=test-campaign');
 
-            // BUG: production code crashes when req.body is undefined because
-            // it destructures without checking. Should return 200 with no-op.
-            expect(res.status).toBe(500);
+            // FIXED: was a 500 from destructuring undefined req.body; the
+            // missing action is now a validated 400 that names the value.
+            expect(res.status).toBe(400);
+            expect(res.body.error).toContain('Unknown spell-overlay action');
+            expect(publishSpy).not.toHaveBeenCalled();
+            expect(markDirtySpy).not.toHaveBeenCalled();
+            expect(spellOverlayData.has('test-campaign')).toBe(false);
         });
 
-        it('should return success when body has no action field', async () => {
+        it('should return 400 when body has no action field', async () => {
             const app = createTestApp();
             const res = await request(app)
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({});
 
-            expect(res.status).toBe(200);
-            expect(res.body).toHaveProperty('ok', true);
+            expect(res.status).toBe(400);
+            expect(res.body).toHaveProperty('error');
+            expect(res.body.error).toContain('Unknown spell-overlay action');
+            expect(publishSpy).not.toHaveBeenCalled();
         });
     });
 
