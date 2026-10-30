@@ -24,6 +24,10 @@ function audit(campaignName, proposal, outcome, detail) {
 async function addQuestDraft(campaignName, proposal) {
     const quests = await loadQuests(campaignName)
     const quest = {
+        // Every Quests CRUD consumer keys rows by id (list key, DELETE route,
+        // edit-map match) — stamp one exactly like the manual create lane
+        // (Quests.jsx handleSave) or the row is undeletable and collides.
+        id: crypto.randomUUID(),
         name: proposal.name,
         status: 'active',
         description: proposal.description,

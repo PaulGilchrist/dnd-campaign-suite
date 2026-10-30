@@ -38,3 +38,22 @@ In `addQuestDraft`, mirror the manual lane: `const quest = { id: crypto.randomUU
 ## Severity
 
 **Data integrity risk / broken feature** — the write poisons the shared ledger: an undeletable row from the GM UI (404 delete, no user-facing why), a live React key error every render, and with 2+ drafts editing any one of them is impossible — the client clobbers all id-less rows into one and the server duplicate-name guard refuses the result with a misleading 400 `A quest with that name already exists` (the accidental backstop means no silent disk corruption via this leg, but the AI feature's own create path is what introduced the pollution).
+
+## Resolution
+
+**Root cause — confirmed as diagnosed (producer-side, one-field omission):** `addQuestDraft()` in `src/services/ai/applyWorldProposal.js` appended `{ name, status, description, rewards, notes }` to the quests ledger with **no `id`**, while every Quests CRUD consumer keys rows by `id` (list `key`, `deleteQuest(quest.id)` → `DELETE /quests/<id>`, edit-map match, dup-name self-skip). No 2024 twin exists — this is the only CRUD-appending producer in `src/services/ai/` (the other AI apply modules write only log/runtime lanes).
+
+**Fix (producer-side, mirrors the manual create lane at `Quests.jsx:313`):**
+- `src/services/ai/applyWorldProposal.js` — `addQuestDraft` now stamps `id: crypto.randomUUID()` first in the quest object (with a comment naming the consumers the id serves). Defense-in-depth options (server id back-fill on array replace, `key={id ?? index}` fallback) were NOT taken: the producer is the single defect, the manual lane already sets the precedent, and the server list route is intentionally id-agnostic.
+- `src/services/ai/applyWorldProposal.test.js` — new regression test `quest_draft stamps a stable id like the manual create lane` (spies `crypto.randomUUID` per the `SpellOverlay.test.js` convention): asserts the appended draft carries the uuid and pre-existing rows are preserved.
+
+**Verified live in test-campaign (post-fix re-run of the original repro):**
+- AI config (`http://localhost:8000/v1` · `Qwen3.8-Flash-Next-oQ4e-mtp` · suggest) → World keeper → Quest draft → Generate → card renders → **Add quest to ledger** → toast `Applied: quest 'What the Caravans Carried' added to the ledger (AI-drafted)`.
+- `GET /quests` — new row carries `id: e4f2f680-6ecd-43fa-9299-9a6db08d2329` (uuid, same shape as the baseline row).
+- Quests view → open the AI row → **Delete** → accept named confirm → `DELETE /quests/e4f2f680-…` → **200**, row gone from UI and disk, modal closes (matches NPC/Notes/Factions delete semantics).
+- Console on a fresh load with clean data: **0 errors** (the `Quests` duplicate-key React error is gone).
+- Pre-fix repro first re-confirmed the exact filed behavior on this snapshot: id-less row in `GET /quests`, the key error, `DELETE /quests/undefined` → 404 + the 3-layer console chain, row refusing to disappear.
+
+**Tests/lint:** `npx vitest run src/services/ai/applyWorldProposal.test.js` → 6/6 pass; whole-folder `npx vitest run src/services/ai/` → 22/22 pass; `npm run lint` → clean (zero warnings).
+
+**Cleanup:** repro-era id-less row removed via scripted array-POST (the only recovery route — proving the UI lane cannot heal it); baseline `The Lost Artifact` byte-exact (id + content + updatedAt); change-data `{}` + log `[]` GET-verified via Admin clears; AI config toggled back off (`AI Referee not configured`).

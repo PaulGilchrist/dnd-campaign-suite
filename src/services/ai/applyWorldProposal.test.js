@@ -47,6 +47,29 @@ describe('applyWorldProposal', () => {
         ]));
     });
 
+    // Regression (bug-ai-world-quest-draft-missing-id): drafts saved without
+    // an id were undeletable (DELETE /quests/undefined → 404), tripped the
+    // React key warning, and collided on edit with every other id-less row.
+    // The manual create lane (Quests.jsx) stamps crypto.randomUUID() — so must this one.
+    it('quest_draft stamps a stable id like the manual create lane', async () => {
+        loadQuests.mockResolvedValue([{ id: 'q1', name: 'Existing' }]);
+        const uuidSpy = vi.spyOn(crypto, 'randomUUID').mockReturnValue('draft-uuid-1');
+        try {
+            const r = await applyWorldProposal({
+                campaignName: CN,
+                proposal: { kind: 'quest_draft', name: 'Silence on the North Road', description: 'Caravans missing.' },
+            });
+            expect(r.applied).toBe(true);
+            const [campaign, list] = saveQuests.mock.calls[0];
+            expect(campaign).toBe(CN);
+            const draft = list.find(q => q.name === 'Silence on the North Road');
+            expect(draft.id).toBe('draft-uuid-1');
+            expect(list.find(q => q.id === 'q1')).toBeTruthy(); // existing rows preserved
+        } finally {
+            uuidSpy.mockRestore();
+        }
+    });
+
     it('quest CRUD failure is caught + refused, never thrown at the console', async () => {
         saveQuests.mockRejectedValueOnce(new Error('ledger locked'));
         const r = await applyWorldProposal({ campaignName: CN, proposal: { kind: 'quest_draft', name: 'X', description: 'y' } });
