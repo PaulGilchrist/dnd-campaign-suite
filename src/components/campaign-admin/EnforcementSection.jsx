@@ -86,6 +86,17 @@ export default function EnforcementSection({ campaignName }) {
 
     const setFlag = (key, value) => writeDebounced({ ...flags, [key]: value })
 
+    // Bulk Select All / Clear All for the sub-flags (rides the same debounced
+    // lane as individual clicks, so a burst stays one POST). Distinct from the
+    // master switch: both buttons keep mode:'on' — Clear All disarms every
+    // rule but leaves enforcement armed, while master-off remains the one-click
+    // hard stop that zeroes the flags AND disables enforcement.
+    const setAllFlags = (value) => writeDebounced({
+        ...flags,
+        mode: 'on',
+        ...Object.fromEntries(FLAGS.map(f => [f.key, value])),
+    })
+
     // Master-off zeroes EVERY sub-flag in the written blob:
     // with the mode off nothing is gated, so a stale `true` riding along is
     // functionally inert but a confusing disk shape for harnesses. Flipping
@@ -114,6 +125,14 @@ export default function EnforcementSection({ campaignName }) {
             </div>
 
             <fieldset className="enforcement-flags" disabled={flags.mode !== 'on'}>
+                <div className="enforcement-bulk-actions">
+                    <button type="button" className="ct-btn" onClick={() => setAllFlags(true)}>
+                        <i className="fas fa-check-double"></i> Select All
+                    </button>
+                    <button type="button" className="ct-btn" onClick={() => setAllFlags(false)}>
+                        <i className="fas fa-eraser"></i> Clear All
+                    </button>
+                </div>
                 {FLAGS.map(f => (
                     <label key={f.key} className="enforcement-toggle" title={f.hint}>
                         <input

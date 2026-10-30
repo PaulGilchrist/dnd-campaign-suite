@@ -60,6 +60,20 @@ const SUB_FLAGS = [
     'Server dice',
 ];
 
+// Same 10 flags as store keys (order mirrors ENFORCEMENT_DEFAULTS) for bulk-write assertions.
+const SUB_FLAG_KEYS = [
+    'turnLock',
+    'actionEconomy',
+    'movementBudget',
+    'tokenMoving',
+    'autoEncounters',
+    'autoRewards',
+    'zones',
+    'lineOfSight',
+    'opportunityAttacks',
+    'serverDice',
+];
+
 const masterSwitch = () => screen.getByRole('checkbox', { name: /Enforcement/ });
 // Label text is "«label» «hint»" (the hint <em> sits inside the label), so match the leading label text.
 const subFlag = (label) => screen.getByRole('checkbox', { name: new RegExp(`^${label}`) });
@@ -259,6 +273,58 @@ describe('EnforcementSection (L5-001)', () => {
         expect(store.writes).toHaveLength(0);
         settle();
         expect(store.writes).toHaveLength(1);
+    });
+
+    it('Select All arms every sub-flag in one debounced write and keeps enforcement ON', () => {
+        // Bulk button on a partial flag set: one click, one coalesced POST with
+        // all 10 sub-flags true; every flag rides on top of the stored state.
+        store.seed = { enforcement: { mode: 'on', turnLock: true } };
+        render(<EnforcementSection campaignName={CAMPAIGN} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Select All/ }));
+        // UI lane is instant: every checkbox flips on the same tick, write is debounced.
+        SUB_FLAGS.forEach((label) => expect(subFlag(label)).toBeChecked());
+        expect(store.writes).toHaveLength(0);
+        settle();
+        expect(store.writes).toHaveLength(1);
+        expect(lastWrite()).toEqual({
+            ...ENFORCEMENT_DEFAULTS,
+            mode: 'on',
+            ...Object.fromEntries(SUB_FLAG_KEYS.map(k => [k, true])),
+        });
+    });
+
+    it('Clear All disarms every sub-flag but leaves enforcement armed (unlike master-off)', () => {
+        store.seed = {
+            enforcement: {
+                ...ENFORCEMENT_DEFAULTS,
+                mode: 'on',
+                turnLock: true,
+                autoRewards: true,
+                serverDice: true,
+            },
+        };
+        render(<EnforcementSection campaignName={CAMPAIGN} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Clear All/ }));
+        SUB_FLAGS.forEach((label) => expect(subFlag(label)).not.toBeChecked());
+        settle();
+        expect(store.writes).toHaveLength(1);
+        // mode stays 'on' — Clear All ≠ master-off; enforcement remains armed with nothing gated.
+        expect(lastWrite()).toEqual({ ...ENFORCEMENT_DEFAULTS, mode: 'on' });
+        expect(masterSwitch()).toBeChecked();
+        expect(flagsGroup()).not.toBeDisabled();
+    });
+
+    it('bulk buttons sit behind the same master gate as the sub-flags', () => {
+        render(<EnforcementSection campaignName={CAMPAIGN} />);
+        // While enforcement is OFF the fieldset disables the buttons natively.
+        expect(screen.getByRole('button', { name: /Select All/ })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /Clear All/ })).toBeDisabled();
+
+        fireEvent.click(masterSwitch());
+        expect(screen.getByRole('button', { name: /Select All/ })).toBeEnabled();
+        expect(screen.getByRole('button', { name: /Clear All/ })).toBeEnabled();
     });
 
     it('renders saved server state and every sub-flag toggle writes the full merged shape', () => {
