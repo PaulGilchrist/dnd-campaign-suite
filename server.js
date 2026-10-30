@@ -25,7 +25,7 @@ import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
 import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 import createServerConfigRouter from './server/routes/server-config.js';
-import { createCampaignLockMiddleware, createCampaignRenameGuard } from './server/utils/campaignLock.js';
+import { createCampaignLockMiddleware, createCampaignRenameGuard, setCampaignLock } from './server/utils/campaignLock.js';
 import { noStoreCampaignGets } from './server/utils/noStoreApi.js';
 
 const PORT = process.env.PORT || 80;
@@ -37,6 +37,9 @@ const PORT = process.env.PORT || 80;
 // Used during automated verification so subagents can never touch production
 // campaigns. Unset (normal use) = no behavior change.
 const CAMPAIGN_LOCK = process.env.CAMPAIGN_LOCK ? decodeURIComponent(process.env.CAMPAIGN_LOCK.trim()) : null;
+// Publish the decoded lock for out-of-namespace lanes (e.g. /spell-overlay)
+// that enforce it in-route — see server/utils/campaignLock.js.
+setCampaignLock(CAMPAIGN_LOCK);
 
 const app = express();
 

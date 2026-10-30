@@ -22,7 +22,24 @@
 const CAMPAIGNS_PREFIX = '/api/campaigns';
 const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
-function blockRequest(req, res, campaignLock) {
+// The decoded lock name, kept here as the runtime single source of truth so
+// routes OUTSIDE the /api/campaigns path namespace (e.g. the /spell-overlay
+// transport, which takes its campaign as a query param the path-based phase-1
+// middleware can never see) can apply the same rule. server.js sets it once
+// at boot from its env parse; null when unlocked.
+let activeCampaignLock = null;
+
+export function setCampaignLock(campaignLock) {
+    activeCampaignLock = campaignLock || null;
+}
+
+export function getCampaignLock() {
+    return activeCampaignLock;
+}
+
+// Canonical refusal shared by every lock enforcement point: one stderr
+// audit line + the 403 JSON shape clients already see from /api/campaigns.
+export function blockRequest(req, res, campaignLock) {
     console.error(`[campaign-lock] BLOCKED ${req.method} ${req.path} (locked to "${campaignLock}")`);
     return res.status(403).json({ error: `Campaign locked to "${campaignLock}" — ${req.method} ${req.path} denied` });
 }
