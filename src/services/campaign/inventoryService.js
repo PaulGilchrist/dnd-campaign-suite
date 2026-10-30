@@ -3,6 +3,8 @@
  * Data is stored in: public/campaigns/:campaign/data/inventory.json
  */
 
+import utils from '../ui/utils.js';
+
 const apiUrl = (campaignName) => `/api/campaigns/${encodeURIComponent(campaignName)}/inventory`;
 
 /**
@@ -24,7 +26,7 @@ export function normalizeInventory(raw) {
   const items = (Array.isArray(raw.items) ? raw.items : [])
     .filter(item => item && typeof item.name === 'string' && item.name.trim())
     .map(item => ({
-      id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(),
+      id: typeof item.id === 'string' && item.id ? item.id : utils.safeUuid(),
       name: item.name.trim(),
       quantity: Math.max(1, Math.floor(Number(item.quantity)) || 1),
       description: typeof item.description === 'string' ? item.description : '',

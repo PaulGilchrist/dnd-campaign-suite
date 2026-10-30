@@ -3,6 +3,7 @@ import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadNotes, saveNotes, deleteNote } from '../../services/campaign/notesService.js';
+import utils from '../../services/ui/utils.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import Subscriber from '../common/Subscriber.jsx';
@@ -285,7 +286,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   const handleNewNote = () => {
     showError(null);
     const seed = {
-      id: crypto.randomUUID(),
+      id: utils.safeUuid(),
       description: '',
       isPrivate: false,
       dateCreated: new Date().toISOString(),

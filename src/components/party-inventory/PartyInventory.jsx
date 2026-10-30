@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
+import utils from '../../services/ui/utils.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 import { loadInventory, saveInventory, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
@@ -614,7 +615,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost, onBack }) 
       : inv.items.findIndex(i => i.name.toLowerCase() === name.toLowerCase());
     const items = [...inv.items];
     if (existingIndex === -1) {
-      items.push({ id: crypto.randomUUID(), name, quantity: editForm.quantity, description: editForm.description });
+      items.push({ id: utils.safeUuid(), name, quantity: editForm.quantity, description: editForm.description });
     } else {
       items[existingIndex] = { ...items[existingIndex], ...editForm, name, quantity: Math.max(1, editForm.quantity) };
     }

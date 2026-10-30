@@ -43,3 +43,21 @@ Give `createOverlay` a secure-context-safe id — reuse the concentrationService
 
 ## Severity
 Broken feature — the one AoE tool deliberately granted to network players cannot ever succeed for them; silent-failure face (no feedback beyond console) compounds it.
+
+## Summary
+Spell overlay placement (and every client-generated-id lane) crashed with `TypeError: crypto.randomUUID is not a function` on non-secure origins because `crypto.randomUUID` only exists in secure contexts (HTTPS/localhost). Fixed by routing all client-generated ids through a new `utils.safeUuid()` helper (prefers `crypto.randomUUID`, falls back to the existing Math.random `guid()`), swept across all 7 bare call sites, with a co-located regression test.
+
+## Resolution
+Verified live 2026-10-30 before and after the fix (dev:locked, Vite :5173 + Express :80, CAMPAIGN_LOCK=test-campaign; LAN origin this machine = `http://192.168.0.239:5173`, `window.isSecureContext === false`).
+
+**Root cause — exactly as diagnosed:** `createOverlay()` in `src/models/SpellOverlay.js` called bare `crypto.randomUUID()`, which is `undefined` outside secure contexts. Repro re-run pre-fix reproduced byte-exact: LAN-origin player tab (test-campaign, GM-activated Battle Arena auto-adopt, Spell armed, sphere) → canvas click threw `TypeError: crypto.randomUUID is not a function at createOverlay (…/src/models/SpellOverlay.js:54:13) at useSpellHandlers.js:81 at Map.jsx:669`, zero `g.spell-overlay-group`, `GET /spell-overlay?campaign=test-campaign` stayed `{"overlays":[]}`; localhost control placed fine (server showed the sphere).
+
+**Fix (helper + sweep, per suggested approach):**
+- `src/services/ui/utils.js` — added `safeUuid()`: `crypto.randomUUID` when present (existing tests that mock it keep passing), else the existing `guid()` (RFC-4122-v4-format, ~122 random bits — no realistic session collisions). Guard idiom mirrors `concentrationService.js:115`, upgraded from `Date.now()-Math.random()` to guid().
+- Swept all 7 bare `crypto.randomUUID()` sites to `utils.safeUuid()`: `src/models/SpellOverlay.js` (player-reachable primary), `src/components/party-inventory/PartyInventory.jsx`, `src/services/campaign/inventoryService.js`, `src/services/ai/applyWorldProposal.js`, `src/components/quests/Quests.jsx`, `src/components/notes/Notes.jsx`, `src/components/factions/Factions.jsx`. Left `concentrationService.js` (already guarded) untouched. No 2024-ruleset split needed — all shared UI/model lanes.
+
+**New test:** `src/models/SpellOverlay.nonSecureOrigin.test.js` — with `crypto.randomUUID` forced `undefined`, `createOverlay()` (a) doesn't throw and returns a full overlay with non-empty id, (b) 50 placements get 50 distinct ids, (c) fallback id is UUID-v4-shaped.
+
+**Results:** new test 3/3; touched-folder runs `src/models src/services/campaign src/services/ai src/services/ui/utils.test.js` → 19 files/297 pass; `src/components/{party-inventory,quests,notes,factions}` → 25 files/184 pass; `npm run lint` clean (zero warnings); `no-timers-guard` OK; full `vitest run` — see fix-run record.
+
+**Live re-verification (exact repro steps re-run, LAN origin):** arm Spell → click canvas → sphere renders (`g.spell-overlay-group` 1, `circle.spell-overlay`), POST lands, server `{"overlays":[{id:"b7daae32-…-…",shape:"sphere",…}]}` (guid-format fallback id); second placement (cube, native-setter select change) → `rect.spell-overlay`, server 2 overlays; **active LAN tab console: 0 errors**; GM localhost tab live-mirrored both without reload (2 groups / circle+rect, mount-hydrate proven too). Control lanes: localhost placement still works (3rd overlay placed); Notes sweep site on localhost: New Note seed + save + delete round-trip clean (`Edit note: QA Sweep Note` persisted then removed). Cleanup: Clear All (server `[]`, `spell-overlays.json` unlinked), QA note deleted, admin clear-change-data + clear-log from closed-tab quiet (`{}` / `[]` GET-verified).

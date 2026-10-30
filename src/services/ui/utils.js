@@ -26,6 +26,14 @@ const utils = {
     // WARNING: Do NOT use guid() or crypto.randomUUID() to identify NPCs or characters.
     // Use their name as the unique identifier everywhere. GUIDs are only for internal
     // sub-objects (conditions, concentration, log entries, non-NPC map items).
+
+    // crypto.randomUUID() only exists in secure contexts (HTTPS or localhost), so
+    // LAN players on http://<ip> get undefined and bare calls crash. Prefer it when
+    // available; otherwise fall back to the guid() above (same guard idiom as
+    // concentrationService.js). Use this for ALL client-generated ids.
+    safeUuid: () => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : utils.guid()),
 }
 
 export const DEBUG_FORCE_CRIT = false;

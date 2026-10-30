@@ -1,3 +1,5 @@
+import utils from '../services/ui/utils.js';
+
 export const OverlayShape = {
   SPHERE: 'sphere',
   CYLINDER: 'cylinder',
@@ -55,7 +57,7 @@ export const DEFAULTS = {
 export const toGrid = (ft) => ft / 5;
 
 export const createOverlay = (shape, gridX, gridY, angle = 0, params = {}) => ({
-  id: crypto.randomUUID(),
+  id: utils.safeUuid(),
   shape,
   startGridX: gridX,
   startGridY: gridY,

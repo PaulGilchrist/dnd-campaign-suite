@@ -12,6 +12,7 @@
  */
 import { addEntry } from '../ui/logService.js'
 import { loadQuests, saveQuests } from '../campaign/questsService.js'
+import utils from '../ui/utils.js'
 
 function audit(campaignName, proposal, outcome, detail) {
     return addEntry(campaignName, {
@@ -27,7 +28,7 @@ async function addQuestDraft(campaignName, proposal) {
         // Every Quests CRUD consumer keys rows by id (list key, DELETE route,
         // edit-map match) — stamp one exactly like the manual create lane
         // (Quests.jsx handleSave) or the row is undeletable and collides.
-        id: crypto.randomUUID(),
+        id: utils.safeUuid(),
         name: proposal.name,
         status: 'active',
         description: proposal.description,

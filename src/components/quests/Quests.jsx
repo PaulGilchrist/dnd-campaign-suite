@@ -3,6 +3,7 @@ import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
+import utils from '../../services/ui/utils.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import Subscriber from '../common/Subscriber.jsx';
@@ -310,7 +311,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     try {
       const questsArray = editingQuest
         ? quests.map(q => q.id === editingQuest.id ? { ...formData } : q)
-        : [...quests, { id: crypto.randomUUID(), ...formData }];
+        : [...quests, { id: utils.safeUuid(), ...formData }];
       await saveQuestsList(questsArray);
       showError(null);
       missedListBroadcast.current = false;

@@ -4,6 +4,7 @@ import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadFactions, saveFactions, deleteFaction } from '../../services/campaign/factionsService.js';
+import utils from '../../services/ui/utils.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import './Factions.css';
@@ -135,7 +136,7 @@ function Factions({ campaignName, onBack }) {
   const handleNewFaction = () => {
     showError(null);
     const seed = {
-      id: crypto.randomUUID(),
+      id: utils.safeUuid(),
       name: '',
       description: '',
       goals: '',
