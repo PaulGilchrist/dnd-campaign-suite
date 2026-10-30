@@ -122,6 +122,27 @@
   font-size: 0.8em;
 }
 
+/* Live-validation hint (improve 2026-10-29-AF) — derived from the same
+   parseTrackList Save uses. Valid state: muted confirmation line
+   (.music-remote-note idiom). Zero-valid state: warning-styled banner
+   (.music-editor-error tokens, swapped to --color-warning) so a wiped or
+   garbled draft is visibly distinct while typing, before Save. */
+.music-editor-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-success-light);
+  font-size: 0.8em;
+  padding: 0 2px;
+}
+
+.music-editor-hint-warn {
+  padding: 4px 8px;
+  border: 1px solid var(--color-warning);
+  border-radius: 4px;
+  color: var(--color-warning);
+}
+
 .music-editor-actions {
   display: flex;
   gap: 4px;

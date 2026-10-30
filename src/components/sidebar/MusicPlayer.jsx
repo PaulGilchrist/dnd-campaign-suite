@@ -48,6 +48,14 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     formData: editorDraft,
     confirmMessage: `Discard changes to the ${moodLabel(editMood)} track list?`,
   });
+  // Live-validation hint (improve 2026-10-29-AF backlog, parity with the
+  // .ct-* lanes' typed-while-live duplicate banners, e.g. Quests.jsx
+  // getDuplicateState): the count is derived from the SAME parseTrackList
+  // Save uses — single source of truth, no second parser, no extra state,
+  // no writes while typing. Zero-valid input reads as a warning hint so a
+  // wiped/garbled draft is visible before the Save click pays the
+  // leaf-inline rejection.
+  const parsedTracks = useMemo(() => parseTrackList(trackText), [trackText]);
   // Display-only save/reset confirmation toast (mirrors .sessions-toast /
   // .encounter-toast): names the mood so a closed editor still leaves a trace.
   const [toast, setToast] = useState(null);
@@ -375,6 +383,20 @@ function MusicPlayer({ campaignName, isLocalhost }) {
             }}
             placeholder="One YouTube URL or video ID per line"
           />
+          {/* Live feedback while typing (see parsedTracks note above): a
+              valid count line, or a warning-style hint when nothing parses.
+              The Save-time .music-editor-error lane below stays unchanged. */}
+          {parsedTracks.length > 0 ? (
+            <div className="music-editor-hint" role="status">
+              <i className="fa-solid fa-circle-check"></i>
+              <span>{parsedTracks.length} valid track{parsedTracks.length === 1 ? '' : 's'}</span>
+            </div>
+          ) : (
+            <div className="music-editor-hint music-editor-hint-warn" role="status">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+              <span>No valid tracks yet — paste YouTube URLs or video ids</span>
+            </div>
+          )}
           {editorError && <div className="music-editor-error">{editorError}</div>}
           <div className="music-editor-actions">
             <button className="music-btn" onClick={saveTracks}>Save</button>

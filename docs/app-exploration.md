@@ -210,10 +210,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-### Open items — 2026-10-29 run AF
-
-- **Music editor validates only at Save** (2026-10-29-AF): you can wipe/garble `#music-editor-urls` and get zero feedback until clicking Save (then leaf-inline `No valid YouTube URLs or video ids entered`), while the `.ct-*` sibling forms live-validate while typing (dup banners). Cheap parity: derive validity from the same `parseTrackList` via useMemo and show a live "N valid tracks" count (or inline warning) as you type. `src/components/sidebar/MusicPlayer.jsx`.
-
 *(Both run-AE items consumed by the 2026-10-29 improve run: `music-editor-dirty-cancel-guard` implemented (9e829c328 — dirty Cancel + mood-switch now pay NAMED `Discard changes to the <Mood> track list?` via shared useReloadGuard, clean lanes silent, Reset re-baselines; live two-leg confirm-spy proof); `map3d-camera-hint` implemented (this commit — `.map3d-hint` chip `Left-drag to pan · Right-drag to orbit · Scroll to zoom` in the 3D toolbar, all three OrbitControls lanes live-proven, zero canvas pointer interception, no map PUT on open→exit). The bullet's Pause-log audit sub-clause was already delivered by 576be121d (pause/resume rows) — skipped as remainder. Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 *(2026-10-28 run-R backlog fully consumed by the 2026-10-28 improve run — 2 implemented (`char-shape-guard-abilities` 4b07c9cbf, `eb-generator-apply-toast` bad3f6e86), 1 blocked-premise-disproved live (EB toolbar aria-labels already pinned since b0cab1579), 1 skipped by owner (change-data wildcard allowlist — L, deferred; re-addable via e2e-explore). See `docs/test-setup-playbook.md` improve-run appends for dispositions.)*
