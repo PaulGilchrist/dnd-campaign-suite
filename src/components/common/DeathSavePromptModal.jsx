@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
+import { addEntry } from '../../services/ui/logService.js';
 import Subscriber from './Subscriber.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './DeathSavePromptModal.css';
@@ -23,6 +24,35 @@ function buildDeathSaveOutcome(current, result) {
     newFailures: result.newFailures,
     restoredToHp: result.restoredToHp,
   };
+}
+
+// Roll-less finality summary row — byte-parity with the sheet lane's rows
+// (DeathSavingThrows.jsx stable/dead logEntry copies; LogDeathSaveEntry
+// renders both via DEATH_SAVE_PRESENTATION). Before this, only the sheet
+// seam wrote these: a modal-rolled 3rd success/failure logged the roll row
+// (death-save-result listener) but never the terminal summary row.
+// RAW semantics (owner decision): stabilization leaves the creature at 0
+// HP — no currentHitPoints write here (nat20's restoredToHp=1 restore is
+// separate and stays).
+function logFinalityRow(campaignName, targetName, result) {
+  const entry = result.result === 'stable'
+    ? {
+        type: 'death_save',
+        characterName: targetName,
+        result: 'stable',
+        totalSuccesses: 3,
+        totalFailures: result.newFailures.filter(Boolean).length,
+      }
+    : {
+        type: 'death_save',
+        characterName: targetName,
+        result: 'dead',
+        totalSuccesses: result.newSaves.filter(Boolean).length,
+        totalFailures: 3,
+      };
+  addEntry(campaignName, entry).catch((e) => {
+    console.error('[DeathSavePromptModal] Error logging finality row:', e);
+  });
 }
 
 function readDeathSaveState(targetName) {
@@ -155,6 +185,14 @@ function DeathSavePromptModal({ campaignName }) {
     window.dispatchEvent(new CustomEvent('death-save-result', {
       detail: { ...sendPayload, targetName },
     }));
+
+    // Finality summary row after the roll row (the dispatch above logs the
+    // roll row synchronously via the page-singleton death-save-result
+    // listener). Stable/dead only — plain success/failure/nat20 write no
+    // summary row, matching the sheet lane.
+    if (result.result === 'stable' || result.result === 'dead') {
+      logFinalityRow(campaignName, targetName, result);
+    }
 
     setRuntimeValue(current.targetName, 'deathSaves', result.newSaves, campaignName);
     setRuntimeValue(current.targetName, 'deathFailures', result.newFailures, campaignName);

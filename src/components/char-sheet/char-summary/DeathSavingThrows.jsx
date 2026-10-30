@@ -99,10 +99,12 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
         }
 
         if (result.result === 'stable') {
-            // no-timers plan T2: stabilization writes HP=1 IMMEDIATELY (was a
-            // 1.5s setTimeout — state must never hang on a wall-clock delay;
-            // an unmount inside that window used to silently LOSE the write).
-            setRuntimeValue(name, 'currentHitPoints', 1, campaignName);
+            // RAW semantics (owner decision 2026-10-29): stabilization leaves
+            // the creature at 0 HP — NO HP write here (the old immediate
+            // currentHitPoints:1 diverged from the modal lane, which always
+            // stayed at 0; both seams now match). The summary row stays
+            // synchronous (no-timers plan T2: state must never hang on a
+            // wall-clock delay).
             logEntry({
                 type: 'death_save',
                 characterName: name,

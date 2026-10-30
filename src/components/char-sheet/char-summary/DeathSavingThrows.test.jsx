@@ -233,7 +233,7 @@ describe('DeathSavingThrows', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'deathFailures', [true, true, false], CAMPAIGN);
     });
 
-    it('writes HP=1 immediately when the roll stabilizes and logs it', () => {
+    it('leaves HP at 0 (RAW stabilization) and logs the stable summary row', () => {
       deathSaveRules.rollDeathSave.mockReturnValue(rollResult({
         roll: 12,
         result: 'stable',
@@ -243,8 +243,10 @@ describe('DeathSavingThrows', () => {
       renderComponent();
       clickRollButton();
 
-      // Stabilization must be synchronous — never deferred behind a timer.
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', 1, CAMPAIGN);
+      // Owner decision 2026-10-29: stabilization leaves the creature at 0 HP —
+      // the old HP=1 write is removed (modal lane never wrote it). Row stays
+      // synchronous — never deferred behind a timer.
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', expect.anything(), CAMPAIGN);
       expect(loggedEntries()).toContainEqual(expect.objectContaining({
         type: 'death_save',
         result: 'stable',
@@ -264,6 +266,8 @@ describe('DeathSavingThrows', () => {
       clickRollButton();
 
       expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'isDead', 1, CAMPAIGN);
+      // A dead outcome never writes HP (unchanged contract).
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', expect.anything(), CAMPAIGN);
       expect(loggedEntries()).toContainEqual(expect.objectContaining({
         type: 'death_save',
         result: 'dead',

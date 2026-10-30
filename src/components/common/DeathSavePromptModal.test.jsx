@@ -18,6 +18,13 @@ vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
   rollDeathSave: vi.fn(),
 }));
 
+// Finality summary rows (stable/dead) go straight to the log service —
+// capture instead of fetch. Row-shape pins live in
+// DeathSavePromptModal.finality-rows.test.jsx.
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),

@@ -1800,3 +1800,10 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 
 - DEATH-SAVE CROSS-TAB RETIREMENT RIG: GM HP drop `-50`+Enter floors to 0 and POSTs `deathSavePrompt-<Target>`; `.dsp-overlay` opens on all tabs ≤300 ms. Re-dropping requires **revive first** (typing into an already-0 HP input is a no-change no-op — no event, no prompt). Passive-tab auto-close measured with 300 ms polls (≤~350 ms observed, matching the concentration contract). Inject a synthetic second prompt mid-rig with `page.evaluate(fetch)` POSTing `change-data/<key>` externally, to exercise the acting-panel-until-Done vs remote-ghost-retirement asymmetry (acting tab shows `Next` with `(1 of 2)` while holding an adjudicated head).
 - PITFALL: one of two MCP tabs can silently vanish mid-session (observed post-admin-API-clear) — recover with `browser_tabs new` + full campaign re-select ceremony; always re-list tabs before cross-tab legs.
+
+## Improve run 2026-10-29 (death-save-modal-terminal-no-finality-row) — NEW durable entries
+
+- DEATH-FLOOR DROP ORDERING: the −50 GM-HP drop RESETS counters and only fires when the input commits a REAL change — externally seeding `currentHitPoints:0` first makes the fill a silent no-op (no row, no prompt). Correct order: revive → fill −50 (prompt opens) → seed counters AFTER the overlay → roll.
+- TERMINAL DETECTION: nat1 on the last empty failure slot = terminal `dead` but the modal label reads `NATURAL 1 — DOUBLE FAILURE` (resultLabel prioritizes nat flags) — detect terminality by char-bucket/log, never by label text.
+- ROLL-ROW VS SUMMARY-ROW ordering is a same-millisecond race (both POSTed from one tick) — the verifiable contract is PAIR EXISTENCE, not order.
+- OWNER DOCTRINE (2026-10-29): stabilization is RAW — leaves the creature at 0 HP. Both seams (sheet `DeathSavingThrows.jsx` + app-wide `DeathSavePromptModal.jsx`) write NO currentHitPoints on `stable`; the sheet's old HP=1 write is retired (T2 comment preserved). Nat20's `restoredToHp` restore is a separate, still-live lane.
