@@ -227,7 +227,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-29 run AG
 
-- **`death-save-result-key-never-deleted`** — `deathSaveResult-<Target>` (POSTed by the modal's roll via `savePromptService.sendDeathSaveResult`, ~line 45) is write-only hygiene-wise: nothing ever DELETEs it (contrast the concentration `concentrationResult-<Target>-<promptId>` key which self-deletes post-ack per 801017a91 — same file documents WHY). Live: key persisted across revive + every subsequent leg; it also would re-seed on a page reload into… nothing (no reader), but it clutters the store and any future adopter must not treat it as pending work. Fix mirrors the concentration lane: chain `DELETE …/deathSaveResult-<Target>` after the POST resolves. While there: the payload already carries the adjudicated `promptId` — wiring the prompt modal to consume/clear by promptId on the echo is the exact retirement channel for the filed stale-prompt bug.
 - **`death-save-advantage-source-invisible`** — sheet dying-track renders a bare `ADVANTAGE` chip (Bardic `hasSaveModifier`/Beacon-of-Hope composite) with no tooltip naming WHY (contrast concentration prompts' `advantageSources`); small attribution UX gap, unverified provenance. Files: `DeathSavingThrows.jsx:152`. *(not walked live this run — no Beacon host staged; noted from code + prior census.)*
 
 ### Open items — 2026-10-29 run AC

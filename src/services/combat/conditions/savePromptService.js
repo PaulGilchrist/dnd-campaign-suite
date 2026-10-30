@@ -41,13 +41,37 @@ export function clearDeathSavePrompt(campaignName, targetName) {
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
+export function clearDeathSaveResult(campaignName, targetName) {
+  const key = `deathSaveResult-${targetName}`;
+  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
+    method: 'DELETE',
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
+}
+
+// Same hygiene doctrine as the concentration result lane (801017a91): the
+// result key's only job is the SSE broadcast — every connected client stamps
+// resolvedPromptIds from the value echo (double-roll guard, 6eaf9b101). The
+// server publishes that echo synchronously BEFORE responding
+// (campaigns-changedata.js publish → res.json) and the shared SSE fans
+// messages out in order per connection, so once the POST response resolves,
+// each live client's socket already holds the echo ahead of anything a
+// DELETE could publish — the echo has served every connected client and the
+// key is swept immediately (backlog death-save-result-key-never-deleted:
+// stale result surviving until Admin Clear). Event-driven hygiene, no timers
+// (No Game Timers rule); the DELETE is chained AFTER the POST resolves on
+// purpose — issuing it in parallel could let the null echo reach a client
+// before the value echo and weaken the re-roll guard. A failed POST never
+// DELETEs (nothing was written). Trailing null echoes are inert in the
+// modal's result branch (it requires event.data?.promptId).
 export function sendDeathSaveResult(campaignName, targetName, resultData) {
   const key = `deathSaveResult-${targetName}`;
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: resultData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); });
+  })
+    .then(() => { clearDeathSaveResult(campaignName, targetName); })
+    .catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 // Concentration prompts are keyed per promptId so back-to-back damage on one

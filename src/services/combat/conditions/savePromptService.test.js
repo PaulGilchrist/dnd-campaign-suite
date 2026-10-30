@@ -10,8 +10,9 @@
 // mock; buildConditionPopup envelope is @#1004). Endpoint bytes are here.
 // Turn-based canon: the source uses no timers — adjudication prompts wait
 // indefinitely and are removed only by explicit clear* calls; the lone
-// exception-shaped lane is the concentration result's self-sweep, DELETEd
-// event-driven on its own POST response (no timer, backlog 2026-10-29-Z).
+// exception-shaped lane is the result keys' self-sweep (concentration
+// 2026-10-29-Z + death-save backlog death-save-result-key-never-deleted),
+// DELETEd event-driven on their own POST response (no timer).
 // Verified.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -22,6 +23,7 @@ import {
   sendDeathSavePrompt,
   clearDeathSavePrompt,
   sendDeathSaveResult,
+  clearDeathSaveResult,
   sendConcentrationPrompt,
   sendConcentrationResult,
   clearConcentrationPrompt,
@@ -61,6 +63,7 @@ const CLEARS = [
   { fn: clearDeathSavePrompt, key: 'deathSavePrompt-Fighter' },
   { fn: clearConcentrationPrompt, key: 'concentrationPrompt-Wizard' },
   { fn: clearConcentrationResult, key: 'concentrationResult-Goblin' },
+  { fn: clearDeathSaveResult, key: 'deathSaveResult-Fighter' },
   { fn: clearFleshToStonePrompt, key: 'fleshToStonePrompt-Goblin' },
 ];
 
@@ -189,6 +192,37 @@ describe('savePromptService', () => {
       globalThis.fetch.mockRejectedValueOnce(new Error('network fail'));
 
       sendConcentrationResult(CAMPAIGN, 'Wizard', { promptId: 'prompt-abc', success: true });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('death-save result hygiene lane (backlog death-save-result-key-never-deleted)', () => {
+    // Mirrors the concentration lane above: the target-wide key self-sweeps
+    // after its POST ack (no promptId in the death-save key shape).
+    it('deletes the result key once the POST resolves (echo has reached every connected client)', async () => {
+      let resolvePost;
+      globalThis.fetch.mockImplementationOnce(() => new Promise((res) => { resolvePost = res; }));
+
+      sendDeathSaveResult(CAMPAIGN, 'Fighter', { promptId: 'stage-1', success: false });
+      await Promise.resolve();
+      // No DELETE while the POST is still in flight — the server must publish
+      // the value echo before its null-echo can trail it on any SSE socket.
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+      resolvePost({ ok: true, json: () => Promise.resolve({}) });
+      await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+      const [url, init] = globalThis.fetch.mock.calls[1];
+      expect(url).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/deathSaveResult-Fighter`);
+      expect(init.method).toBe('DELETE');
+      expect(init.body).toBeUndefined();
+      expect(init.headers).toBeUndefined();
+    });
+
+    it('never deletes a result key when the POST fails (nothing was written)', async () => {
+      globalThis.fetch.mockRejectedValueOnce(new Error('network fail'));
+
+      sendDeathSaveResult(CAMPAIGN, 'Fighter', { promptId: 'stage-1', success: true });
       await new Promise((r) => setTimeout(r, 0));
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });

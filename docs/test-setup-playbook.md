@@ -1807,3 +1807,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - TERMINAL DETECTION: nat1 on the last empty failure slot = terminal `dead` but the modal label reads `NATURAL 1 — DOUBLE FAILURE` (resultLabel prioritizes nat flags) — detect terminality by char-bucket/log, never by label text.
 - ROLL-ROW VS SUMMARY-ROW ordering is a same-millisecond race (both POSTed from one tick) — the verifiable contract is PAIR EXISTENCE, not order.
 - OWNER DOCTRINE (2026-10-29): stabilization is RAW — leaves the creature at 0 HP. Both seams (sheet `DeathSavingThrows.jsx` + app-wide `DeathSavePromptModal.jsx`) write NO currentHitPoints on `stable`; the sheet's old HP=1 write is retired (T2 comment preserved). Nat20's `restoredToHp` restore is a separate, still-live lane.
+
+## Improve run 2026-10-29 (death-save-result-key-never-deleted) — NEW durable entries
+
+- PITFALL: a STAGED `deathSavePrompt-*` roll VOIDS on a sheet-hydrated tab — `getRuntimeValue(target,'currentHitPoints')` reads the client store, which a mounted sheet tab hydrates from the character FILE (e.g. 143) even when change-data is `{}` — the roll takes the zero-write void path (overlay silently closes, no `deathSaveResult` POST at all). For result-lane tests, KO via the Initiative GM-HP drop first.
+- Death-save result lane is now self-sweeping like concentration (POST→ack→DELETE chain in `sendDeathSaveResult`); trailing null echo is inert (modal result branch gates on `event.data?.promptId`). Post-adjudication residue audits should read `deathSaveResult-*: []`.
+- MCP `browser_click` arg is `target:` (ref/selector); `element:` is the description — a `ref:` key fails with `Invalid arguments … target: Missing key`. Code Mode `execute` has NO timers at all (`setTimeout` unavailable) — sequencing belongs in `browser_run_code_unsafe` with bounded waits.
