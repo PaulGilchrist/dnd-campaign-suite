@@ -120,6 +120,24 @@ describe('TravelPanel', () => {
       expect(screen.getByRole('button', { name: 'Camp' })).toBeEnabled();
     });
 
+    it('swaps the banner question for the camp-only face at max exhaustion', () => {
+      // Backlog 2026-10-30-AN: the FM button is natively disabled at max EX,
+      // so the "camp or forced march?" invite names an impossible verb — the
+      // question gates on the same predicate and the old copy must NEVER
+      // render at max.
+      const { rerender } = renderPanel({ dayExhausted: true, partyHasMaxExhaustion: true });
+      expect(screen.getByText('Travel budget exhausted — camp to rest.')).toBeInTheDocument();
+      expect(screen.queryByText('Travel budget exhausted — camp or forced march?')).not.toBeInTheDocument();
+      // Below max the honest invite returns byte-identical (no regression) —
+      // and an unexhausted day shows no banner face at all.
+      rerender(<TravelPanel {...makeProps({ dayExhausted: true, partyHasMaxExhaustion: false })} />);
+      expect(screen.getByText('Travel budget exhausted — camp or forced march?')).toBeInTheDocument();
+      expect(screen.queryByText('Travel budget exhausted — camp to rest.')).not.toBeInTheDocument();
+      rerender(<TravelPanel {...makeProps({ dayExhausted: false, partyHasMaxExhaustion: true })} />);
+      expect(screen.queryByText('Travel budget exhausted — camp to rest.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Camp' })).not.toBeInTheDocument();
+    });
+
     it('shows no max-exhaustion hint and no advance tooltip otherwise', () => {
       const { props, rerender } = renderPanel({ partyHasMaxExhaustion: false });
       expect(screen.queryByText(MAX_HINT)).not.toBeInTheDocument();
@@ -166,6 +184,8 @@ describe('TravelPanel', () => {
       {
         label: 'max exhaustion blocks forced march but not camp',
         props: { dayExhausted: true, partyHasMaxExhaustion: true },
+        visible: ['Travel budget exhausted — camp to rest.'],
+        absentText: ['Travel budget exhausted — camp or forced march?'],
         enabled: ['Camp'],
         disabled: ['Forced March', 'Advance One Hex'],
       },

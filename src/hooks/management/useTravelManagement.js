@@ -52,6 +52,16 @@ const lazyDailyBudget = () => getDailyHexBudget('normal');
 // too (improve 2026-10-26-D arrival-stale-destination).
 const COMPLETED_TRIP_KEYS = ['travel-destination', 'travel-path', 'travel-pathIndex'];
 
+// Max-exhaustion message lane (backlog 2026-10-26-C / 2026-10-30-AN). The
+// forcedMarch() refusal wording agrees with the panel's FM_MAX_EXHAUSTION_TITLE
+// tooltip and hint lane. While any PC sits at exhaustion 6 the FM button is
+// natively disabled, so the last successful march's header copy ("Forced
+// march — 1 exhaustion added…") invites an impossible verb and overstates
+// (no further march can add what it advertises) — the display gate below
+// swaps it for this honest refusal wording until the party rests below max.
+const FM_MAX_EXHAUSTION_MESSAGE = 'Cannot forced march — a party member has reached maximum exhaustion.';
+const FM_SUCCESS_COPY_PREFIX = 'Forced march — 1 exhaustion added';
+
 const buildPublishSnapshot = (s) => {
   if (s.travelMode === MODES.INACTIVE && !s.destination && (!s.path || s.path.length === 0)) {
     return null;
@@ -585,7 +595,7 @@ export default function useTravelManagement({
 
   const forcedMarch = useCallback(() => {
     if (partyHasMaxExhaustion()) {
-      setLastMessage('Cannot forced march — a party member has reached maximum exhaustion.');
+      setLastMessage(FM_MAX_EXHAUSTION_MESSAGE);
       return false;
     }
     addExhaustionToAll();
@@ -607,6 +617,19 @@ export default function useTravelManagement({
   const paceInfo = TRAVEL_PACES.find(p => p.id === travelPace) || TRAVEL_PACES[1];
 
   const hexesRemaining = Math.max(0, safePath.length - 1 - safePathIndex);
+
+  // Max-EX display gate (backlog 2026-10-30-AN): one render-time read feeds
+  // both the panel flag and the stale-march-copy swap. The press that LANDS
+  // max is covered without write-time ordering: addExhaustionToAll's
+  // setRuntimeValue updates the store synchronously, so the re-render this
+  // press triggers already reads 6 and the header shows honest copy instead
+  // of "Forced march — 1 exhaustion added…". Other messages (arrival, camp,
+  // events) are honest at max and pass through untouched.
+  const partyAtMax = partyHasMaxExhaustion();
+  const visibleLastMessage =
+    partyAtMax && typeof lastMessage === 'string' && lastMessage.startsWith(FM_SUCCESS_COPY_PREFIX)
+      ? FM_MAX_EXHAUSTION_MESSAGE
+      : lastMessage;
 
   // resumePausedMode: the SKIP leg re-joins the in-progress route, so it
   // restores the mode the event interrupted (traveling mid-route, planning on
@@ -660,7 +683,7 @@ export default function useTravelManagement({
     dailyBudget,
     dayExhausted,
     travelLog,
-    lastMessage,
+    lastMessage: visibleLastMessage,
     pendingEvent,
     eventFrequency,
     rerollsRemaining,
@@ -671,7 +694,7 @@ export default function useTravelManagement({
     horseback,
     forcedMarchHours,
     exhaustionMultiplier: getExhaustionMultiplierPercent(forcedMarchHours),
-    partyHasMaxExhaustion: partyHasMaxExhaustion(),
+    partyHasMaxExhaustion: partyAtMax,
     isTravelActive,
     MODES,
     startPlanning,

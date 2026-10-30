@@ -2,12 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/campaign/travelService.js';
 import { EVENT_FREQUENCIES } from '../../services/campaign/randomEventService.js';
 
+// Exhausted-banner question gate (backlog 2026-10-30-AN): at party-max
+// exhaustion the Forced March button is natively disabled, so the two-choice
+// invite names an impossible verb — gate the copy on the SAME predicate the
+// button uses and point at the only legal exit. Below max the invite stays
+// byte-identical (marching genuinely possible). Hoisted to keep the banner
+// under the complexity cap.
+const exhaustedBannerCopy = (partyHasMaxExhaustion) =>
+  partyHasMaxExhaustion
+    ? 'Travel budget exhausted — camp to rest.'
+    : 'Travel budget exhausted — camp or forced march?';
+
 function TravelExhaustedBanner({ exhausted, partyHasMaxExhaustion, onForceCamp, onForcedMarch }) {
   if (!exhausted) return null;
   return (
     <div className="travel-panel-exhausted">
       <i className="fa-solid fa-tent"></i>
-      <span>Travel budget exhausted — camp or forced march?</span>
+      <span>{exhaustedBannerCopy(partyHasMaxExhaustion)}</span>
       <button onClick={onForceCamp} className="travel-btn-camp">
         <i className="fa-solid fa-campground"></i> Camp
       </button>

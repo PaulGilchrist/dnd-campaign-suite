@@ -530,6 +530,43 @@ describe('useTravelManagement', () => {
     });
   });
 
+  describe('stale-march copy display gate (backlog 2026-10-30-AN)', () => {
+    // The persisted travel-lastMessage header keeps showing the last FM press's
+    // success copy even after the party hits max EX — while the FM button is
+    // natively disabled. The hook's returned lastMessage swaps ONLY that copy
+    // (prefix-matched) while maxed; every other message passes through.
+    const SUCCESS_COPY = 'Forced march — 1 exhaustion added to all party members. Speed reduced to 33%.';
+    const REFUSAL_COPY = 'Cannot forced march — a party member has reached maximum exhaustion.';
+    const seedMessage = (text) => getStore('campaign').set('travel-lastMessage', text);
+    const seedLevel = (level) =>
+      getRuntimeValue.mockImplementation((key, prop) =>
+        (key === 'Hero' && prop === 'exhaustionLevel' ? level : null));
+
+    it('replaces the success copy with the refusal wording while a member is maxed', () => {
+      seedLevel(6);
+      seedMessage(SUCCESS_COPY);
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      expect(result.current.partyHasMaxExhaustion).toBe(true);
+      expect(result.current.lastMessage).toBe(REFUSAL_COPY);
+      expect(result.current.lastMessage).not.toContain('1 exhaustion added');
+    });
+
+    it('passes the success copy through byte-identical below max (no regression)', () => {
+      seedLevel(5);
+      seedMessage(SUCCESS_COPY);
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      expect(result.current.partyHasMaxExhaustion).toBe(false);
+      expect(result.current.lastMessage).toBe(SUCCESS_COPY);
+    });
+
+    it('leaves unrelated messages untouched even at max (camp/arrival/event copy passes)', () => {
+      seedLevel(6);
+      seedMessage('A new day dawns. Travel budget refreshed.');
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      expect(result.current.lastMessage).toBe('A new day dawns. Travel budget refreshed.');
+    });
+  });
+
   describe('event handling', () => {
     it('returns the event from advanceOneHex when an event triggers', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
