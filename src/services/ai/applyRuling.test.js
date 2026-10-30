@@ -77,7 +77,8 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
 
         const bad = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'target_effect', effect: 'not_a_real_key', targetName: 'Hero' } });
         expect(bad.applied).toBe(false);
-        expect(bad.detail).toMatch(/registry/);
+        // byte-pin the honest refusal copy — the card pre-filter must not soften this lane
+        expect(bad.detail).toBe("unknown target effect 'not_a_real_key' — not in the effect registry (refused)");
 
         // Re-applying the same target+effect REPLACES (no stacking).
         await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'target_effect', effect: 'bless', targetName: 'Hero' } });

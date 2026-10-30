@@ -15,6 +15,7 @@ import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js'
 import { getAiStatus, askAiReferee } from '../../services/ai/aiClient.js'
 import { applyRuling, isAtomicRuling } from '../../services/ai/applyRuling.js'
+import { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } from '../../services/combat/conditions/targetEffectDefinitions.js'
 import AiConfigRow, { AiStatusBadge } from './AiConfigRow.jsx'
 import AiWorldConsole from './AiWorldConsole.jsx'
 import './AiRefereeSection.css'
@@ -116,9 +117,9 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
 
 // One-line prose description of a ruling (kept out of JSX so the card's
 // branch count stays under the lint complexity cap).
-function describeRuling(ruling) {
+function describeRuling(ruling, effectDisplay) {
     return [
-        ruling.text || ruling.expression || ruling.actionName || ruling.effect || '',
+        ruling.text || ruling.expression || ruling.actionName || effectDisplay || '',
         ruling.targetName ? ` → ${ruling.targetName}` : '',
         ruling.type === 'dice' && ruling.mode && ruling.mode !== 'normal' ? ` (${ruling.mode})` : '',
         ruling.type === 'hp_change' && ruling.amount !== undefined ? ` (${ruling.amount > 0 ? '+' : ''}${ruling.amount} HP)` : '',
@@ -130,8 +131,16 @@ function AiProposalCard({ ruling, onConfirm, onDismiss }) {
     // touches the sheet — AI proposes, the HUMAN disposes.
     const [amountOverride, setAmountOverride] = React.useState(
         ruling.type === 'hp_change' && ruling.amount !== undefined ? String(ruling.amount) : '')
+    // Pre-filter: a model-proposed effect key outside the te registry used to
+    // be a post-confirm dead end (the apply lane honestly refuses). Surface a
+    // registry picker instead so the GM repairs the key BEFORE confirming.
+    const effectInvalid = ruling.type === 'target_effect' && !getEffectDefinition(ruling.effect)
+    const [effectFix, setEffectFix] = React.useState('')
+    const effectRepaired = effectInvalid && !!getEffectDefinition(effectFix)
     const confirmClick = () => {
-        if (ruling.type === 'hp_change' && amountOverride !== '' && Number(amountOverride) !== ruling.amount) {
+        if (effectInvalid) {
+            onConfirm({ ...ruling, effect: effectFix, overridden: true })
+        } else if (ruling.type === 'hp_change' && amountOverride !== '' && Number(amountOverride) !== ruling.amount) {
             onConfirm({ ...ruling, amount: Number(amountOverride), overridden: true })
         } else {
             onConfirm(ruling)
@@ -143,7 +152,7 @@ function AiProposalCard({ ruling, onConfirm, onDismiss }) {
                 <b>AI proposes: {ruling.type}</b>
                 {typeof ruling.confidence === 'number' && <em className="ai-confidence">confidence {(ruling.confidence * 100).toFixed(0)}%</em>}
             </div>
-            <p className="ai-proposal-body">{describeRuling(ruling)}</p>
+            <p className="ai-proposal-body">{describeRuling(ruling, effectRepaired ? effectFix : ruling.effect)}</p>
             {ruling.explanation && <p className="ai-proposal-why">{ruling.explanation}</p>}
             {ruling.type === 'hp_change' && (
                 <label className="ai-override-row">
@@ -157,8 +166,36 @@ function AiProposalCard({ ruling, onConfirm, onDismiss }) {
                     />
                 </label>
             )}
+            {effectInvalid && (
+                <div className="ai-effect-fix">
+                    <div className="ai-notice ai-notice--refused" role="alert">
+                        “{ruling.effect}” is not in the effect registry — pick a valid effect key or Dismiss this proposal.
+                    </div>
+                    <label className="ai-override-row">
+                        Effect key
+                        <select
+                            className="ai-effect-select"
+                            value={effectFix}
+                            onChange={(e) => setEffectFix(e.target.value)}
+                            aria-label="Choose a valid effect key"
+                        >
+                            <option value="">Choose a valid effect key…</option>
+                            {TARGET_EFFECT_DEFINITIONS.map(def => (
+                                <option key={def.effect} value={def.effect}>{def.label} ({def.effect})</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+            )}
             <div className="ai-proposal-actions">
-                <button className="ct-btn ct-btn-primary" onClick={confirmClick}><i className="fas fa-check"></i> Confirm &amp; Apply</button>
+                <button
+                    className="ct-btn ct-btn-primary"
+                    disabled={effectInvalid && !effectRepaired}
+                    title={effectInvalid && !effectRepaired ? 'Pick a valid effect key first' : undefined}
+                    onClick={confirmClick}
+                >
+                    <i className="fas fa-check"></i> Confirm &amp; Apply
+                </button>
                 <button className="ct-btn" onClick={onDismiss}>Dismiss</button>
             </div>
         </div>

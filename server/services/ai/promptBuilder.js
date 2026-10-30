@@ -7,6 +7,7 @@
  */
 
 import { validateRuling, validateNpcIntent, validateWorldProposal } from './schemas.js';
+import { loadTargetEffectKeys } from './targetEffectKeys.js';
 
 // Compact the shared runtime state into a small context block — token budget
 // discipline (§16 "persistence of AI context"): capped lists, scalar fields
@@ -50,6 +51,16 @@ export function compactContext(state = {}) {
     };
 }
 
+// The referee may only propose effect keys the engine's registry actually
+// accepts — anything else is refused at apply time. The list is PARSED from
+// targetEffectDefinitions.js at module load (single source of truth; see
+// targetEffectKeys.js), so it can never drift from the registry.
+const EFFECT_KEY_LINE = (() => {
+    const keys = loadTargetEffectKeys();
+    if (!keys.length) return '';
+    return `\n\nVALID_EFFECT_KEYS — the ONLY accepted "effect" values for a target_effect proposal (never invent one; anything outside this list is refused by the engine):\n${keys.join(', ')}`;
+})();
+
 const REFEREE_SYSTEM = `You are the rules referee for a D&D (5e/2024) campaign running inside a turn-based virtual table. A player has described what their character does; you propose a ruling.
 
 NON-NEGOTIABLE RULES:
@@ -60,10 +71,11 @@ NON-NEGOTIABLE RULES:
 5. Answer with ONE JSON object and nothing else, matching exactly one of:
    {"type":"dice","expression":"1d20+7","mode":"normal","targetName":"...","explanation":"...","confidence":0.9}
    {"type":"automation","actionName":"Attack with Longsword","targetName":"Goblin","explanation":"...","confidence":0.9}
-   {"type":"target_effect","effect":"snake_case_key","targetName":"...","explanation":"...","confidence":0.8}
+   {"type":"target_effect","effect":"VALID_EFFECT_KEY","targetName":"...","explanation":"...","confidence":0.8}
    {"type":"hp_change","targetName":"...","amount":-7,"explanation":"...","confidence":0.8}
    {"type":"narrative","text":"...","explanation":"...","confidence":0.9}
-Keep "explanation" short (one sentence). "confidence" is 0..1.`;
+Keep "explanation" short (one sentence). "confidence" is 0..1.
+For type "target_effect", the "effect" MUST be one of the VALID_EFFECT_KEYS listed below — conditions like "poisoned" are NOT effect keys.${EFFECT_KEY_LINE}`;
 
 /**
  * Build the chat messages for a referee ruling request.

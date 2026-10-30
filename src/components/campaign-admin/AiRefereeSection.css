@@ -71,3 +71,7 @@
 .ai-override-input {
     width: 90px;
 }
+
+/* target_effect key pre-filter — repair a model-invented key before confirm. */
+.ai-referee-section .ai-effect-fix { margin-top: 0.35rem; }
+.ai-referee-section .ai-effect-select { min-width: 260px; }

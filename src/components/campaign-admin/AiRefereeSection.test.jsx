@@ -226,6 +226,51 @@ describe('AiRefereeSection — autopilot scope', () => {
     });
 });
 
+// target_effect pre-filter — a model-invented key must surface a registry
+// picker BEFORE confirming (bad key = post-confirm dead end otherwise).
+describe('AiRefereeSection — target_effect key pre-filter', () => {
+    const BAD = { type: 'target_effect', effect: 'poisoned', targetName: 'Rakan', explanation: 'venomous bite', confidence: 0.7 };
+
+    it('unknown effect key surfaces a picker; Confirm is disabled until a valid key is chosen, then the repaired key applies', async () => {
+        synced.aiConfig = CONFIGURED;
+        stubFetch({ referee: { ok: true, ruling: BAD } });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('I bite the guard with my venomous fangs');
+
+        await waitFor(() => expect(screen.getByText(/AI proposes: target_effect/)).toBeInTheDocument());
+        expect(screen.getByRole('alert').textContent).toContain('not in the effect registry');
+        const picker = screen.getByLabelText('Choose a valid effect key');
+        // the dead-end lane is gated: nothing applies while the key is un-repaired
+        expect(confirmButton()).toBeDisabled();
+        fireEvent.click(confirmButton());
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+
+        fireEvent.change(picker, { target: { value: 'speed_half' } }); // real registry key
+        expect(confirmButton()).toBeEnabled();
+        fireEvent.click(confirmButton());
+        await waitFor(() => expect(screen.getByText(/Applied: speed_half applied to Rakan/)).toBeInTheDocument());
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects',
+            [expect.objectContaining({ target: 'Rakan', effect: 'speed_half', source: 'AI referee' })], CN);
+        // the human repair is recorded in the audit, same doctrine as the HP override
+        expect(auditEntries().at(-1).ruling).toMatchObject({ type: 'target_effect', effect: 'speed_half', overridden: true });
+    });
+
+    it('a valid registry key renders no picker and confirms cleanly (lane unchanged)', async () => {
+        synced.aiConfig = CONFIGURED;
+        stubFetch({ referee: { ok: true, ruling: { ...BAD, effect: 'speed_half' } } });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('I hobble the guard');
+
+        await waitFor(() => expect(screen.getByText(/AI proposes: target_effect/)).toBeInTheDocument());
+        expect(screen.queryByLabelText('Choose a valid effect key')).toBeNull();
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(confirmButton()).toBeEnabled();
+        fireEvent.click(confirmButton());
+        await waitFor(() => expect(screen.getByText(/Applied: speed_half applied to Rakan/)).toBeInTheDocument());
+        expect(auditEntries().at(-1).ruling.overridden).toBeUndefined(); // accepted as proposed
+    });
+});
+
 // §10.4 — referee override on a proposal before it touches the sheet.
 describe('AiRefereeSection — proposal override (§10.4)', () => {
     it('hp_change untouched applies the AI’s amount unflagged; an edited override applies the human’s amount and records it', async () => {

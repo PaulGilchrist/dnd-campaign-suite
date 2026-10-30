@@ -1,6 +1,15 @@
 // L5 Phase 3 — prompt builder + answer parsing tests.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildRefereeMessages, compactContext, parseRulingAnswer } from './promptBuilder.js';
+
+// Drift pin: REFEREE_SYSTEM must enumerate the REAL registry keys. The
+// registry imports client runtime hooks — stub that boundary so the server
+// test can read the definitions the prompt is required to mirror.
+vi.mock('../../../src/hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(),
+}));
+import { TARGET_EFFECT_DEFINITIONS } from '../../../src/services/combat/conditions/targetEffectDefinitions.js';
 
 describe('compactContext', () => {
     it('compacts combat state to scalars with caps', () => {
@@ -40,6 +49,27 @@ describe('buildRefereeMessages', () => {
         expect(msgs[1].content).toContain('fire bolt');
         expect(msgs[1].content).toContain('HexWarlock');
         expect(msgs[1].content).toContain('"round":1');
+    });
+});
+
+describe('REFEREE_SYSTEM — target_effect key allowlist', () => {
+    const system = () => buildRefereeMessages({ action: 'x', characterName: null, state: {} })[0].content;
+
+    it('enumerates known registry keys and forbids inventing them', () => {
+        const s = system();
+        expect(s).toContain('speed_half');
+        expect(s).toContain('redirect_attack');
+        expect(s).toContain('VALID_EFFECT_KEYS');
+        expect(s).toMatch(/never invent one/i);
+        expect(s).toMatch(/conditions like "poisoned" are NOT effect keys/i);
+        // the old vague placeholder must be gone from the schema line
+        expect(s).not.toContain('snake_case_key');
+    });
+
+    it('is derived from the registry — every real key appears (no hand-copied subset)', () => {
+        const s = system();
+        const missing = TARGET_EFFECT_DEFINITIONS.filter(d => !s.includes(d.effect));
+        expect(missing.map(d => d.effect)).toEqual([]); // 100% coverage = single source of truth
     });
 });
 
