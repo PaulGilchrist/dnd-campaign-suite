@@ -34,11 +34,13 @@ function createTestApp() {
 describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
     let store;
     let publish;
+    let markDirty;
 
     beforeEach(async () => {
         const changeData = await import('../utils/changeData.js');
         store = changeData.spellOverlayData;
         publish = changeData.publish;
+        markDirty = changeData.markDirty;
         store.clear();
         vi.clearAllMocks();
         setCampaignLock('test-campaign');
@@ -64,9 +66,11 @@ describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
             expect(errSpy).toHaveBeenCalledWith(
                 '[campaign-lock] BLOCKED POST /spell-overlay (locked to "test-campaign")'
             );
-            // No phantom Map entry, no SSE broadcast into the fake campaign's room
+            // No phantom Map entry, no SSE broadcast into the fake campaign's
+            // room, and the disk-persist lane is never marked dirty.
             expect(store.has('nonexistent-campaign-xyz')).toBe(false);
             expect(publish).not.toHaveBeenCalled();
+            expect(markDirty).not.toHaveBeenCalled();
             errSpy.mockRestore();
         });
 
@@ -107,6 +111,8 @@ describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
             expect(res.status).toBe(200);
             expect(res.body).toEqual({ ok: true });
             expect(store.get('test-campaign')).toEqual([{ id: 'ok-1', name: 'Fireball' }]);
+            // On-target writes ride the shared debounced cache→disk lane
+            expect(markDirty).toHaveBeenCalledWith('test-campaign');
             expect(publish).toHaveBeenCalledWith(
                 'spell-overlay-test-campaign',
                 { action: 'add', overlays: [{ id: 'ok-1', name: 'Fireball' }], overlayId: undefined },

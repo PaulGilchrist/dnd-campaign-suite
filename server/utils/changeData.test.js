@@ -421,6 +421,214 @@ describe('changeData - saveFile', () => {
 });
 
 // ---------------------------------------------------------------------------
+// spell overlay persistence (readFile load + saveFile disk lane)
+// ---------------------------------------------------------------------------
+describe('changeData - spell overlay persistence', () => {
+    const OVERLAY_FILE = 'spell-overlays.json';
+
+    beforeEach(() => {
+        clearStores();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        clearStores();
+    });
+
+    describe('readFile boot load', () => {
+        it('should load an existing spell-overlays.json into spellOverlayData', () => {
+            const overlays = [{ id: 'overlay-1', shape: 'sphere', radiusFt: 20 }];
+            vi.spyOn(fs, 'readdirSync').mockReturnValue([
+                { name: 'overlay-campaign', isDirectory: () => true },
+            ]);
+            vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
+                const s = String(p);
+                // campaigns dir + overlay file exist; change-data file does not
+                return !s.includes('character-change-data');
+            });
+            vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+                if (String(p).endsWith(OVERLAY_FILE)) return JSON.stringify(overlays);
+                throw new Error('ENOENT');
+            });
+
+            readFile();
+
+            expect(spellOverlayData.get('overlay-campaign')).toEqual(overlays);
+        });
+
+        it('should leave the store empty and log nothing when no overlay file exists', () => {
+            const consoleSpy = vi.spyOn(console, 'error');
+            vi.spyOn(fs, 'readdirSync').mockReturnValue([
+                { name: 'fresh-campaign', isDirectory: () => true },
+            ]);
+            vi.spyOn(fs, 'existsSync').mockImplementation((p) => !String(p).includes('data'));
+
+            readFile();
+
+            expect(spellOverlayData.size).toBe(0);
+            expect(consoleSpy).not.toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+
+        it('should drop in-memory overlays when the disk file was removed (disk authoritative)', () => {
+            spellOverlayData.set('overlay-campaign', [{ id: 'ghost-1' }]);
+            vi.spyOn(fs, 'readdirSync').mockReturnValue([
+                { name: 'overlay-campaign', isDirectory: () => true },
+            ]);
+            vi.spyOn(fs, 'existsSync').mockImplementation((p) => !String(p).endsWith(OVERLAY_FILE));
+
+            readFile();
+
+            expect(spellOverlayData.has('overlay-campaign')).toBe(false);
+        });
+
+        it('should handle invalid overlay JSON gracefully', () => {
+            const consoleSpy = vi.spyOn(console, 'error');
+            vi.spyOn(fs, 'readdirSync').mockReturnValue([
+                { name: 'overlay-campaign', isDirectory: () => true },
+            ]);
+            vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+            vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+                if (String(p).endsWith(OVERLAY_FILE)) return 'not valid json{{{';
+                return '{}';
+            });
+
+            readFile();
+
+            expect(spellOverlayData.has('overlay-campaign')).toBe(false);
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'Failed to read spell overlays for campaign overlay-campaign:',
+                expect.any(String),
+            );
+            consoleSpy.mockRestore();
+        });
+
+        it('should refuse non-array overlay file content', () => {
+            const consoleSpy = vi.spyOn(console, 'error');
+            vi.spyOn(fs, 'readdirSync').mockReturnValue([
+                { name: 'overlay-campaign', isDirectory: () => true },
+            ]);
+            vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+            vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+                if (String(p).endsWith(OVERLAY_FILE)) return JSON.stringify({ sneaky: 'object' });
+                return '{}';
+            });
+
+            readFile();
+
+            expect(spellOverlayData.has('overlay-campaign')).toBe(false);
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'Failed to read spell overlays for campaign overlay-campaign:',
+                'file content is not an array',
+            );
+            consoleSpy.mockRestore();
+        });
+    });
+
+    describe('saveFile disk write', () => {
+        let writtenFiles;
+        let unlinked;
+
+        beforeEach(() => {
+            writtenFiles = [];
+            unlinked = [];
+            vi.spyOn(fs, 'writeFileSync').mockImplementation((filePath, data) => {
+                writtenFiles.push({ filePath, data });
+            });
+            vi.spyOn(fs, 'unlinkSync').mockImplementation((filePath) => {
+                unlinked.push(String(filePath));
+            });
+            vi.spyOn(fs, 'mkdirSync').mockImplementation(() => { /* no-op */ });
+            vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+                throw new Error('ENOENT');
+            });
+            vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+        });
+
+        it('should persist overlays to spell-overlays.json next to the change data', () => {
+            const overlays = [{ id: 'overlay-1', shape: 'cone', angle: 315 }];
+            spellOverlayData.set('test-campaign', overlays);
+
+            saveFile();
+
+            const file = writtenFiles.find(f => String(f.filePath).endsWith(OVERLAY_FILE));
+            expect(file).toBeDefined();
+            expect(String(file.filePath)).toContain('test-campaign/data');
+            expect(file.data).toBe(JSON.stringify(overlays, null, 2));
+        });
+
+        it('should write change data and overlays in one saveFile pass', () => {
+            characterChangeData.set('test-campaign', { Bob: { hp: 25 } });
+            spellOverlayData.set('test-campaign', [{ id: 'overlay-1' }]);
+
+            saveFile();
+
+            const paths = writtenFiles.map(f => String(f.filePath));
+            expect(paths.some(p => p.includes('character-change-data.json'))).toBe(true);
+            expect(paths.some(p => p.endsWith(OVERLAY_FILE))).toBe(true);
+        });
+
+        it('should not rewrite when disk content already matches', () => {
+            const overlays = [{ id: 'overlay-1' }];
+            spellOverlayData.set('test-campaign', overlays);
+            vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+                if (String(p).endsWith(OVERLAY_FILE)) return JSON.stringify(overlays, null, 2);
+                throw new Error('ENOENT');
+            });
+
+            saveFile();
+
+            expect(writtenFiles.filter(f => String(f.filePath).endsWith(OVERLAY_FILE))).toHaveLength(0);
+        });
+
+        it('should remove the disk file when overlays were cleared in memory', () => {
+            spellOverlayData.set('test-campaign', []);
+
+            saveFile();
+
+            expect(unlinked).toContainEqual(expect.stringContaining(OVERLAY_FILE));
+            expect(writtenFiles.filter(f => String(f.filePath).endsWith(OVERLAY_FILE))).toHaveLength(0);
+        });
+
+        it('should create no overlay file for a fresh boot with nothing placed', () => {
+            // Mirrors a fresh campaign boot: Maps empty → saveFile is a no-op
+            saveFile();
+
+            expect(writtenFiles).toHaveLength(0);
+            expect(unlinked).toHaveLength(0);
+        });
+
+        it('should never write for campaigns whose directory was deleted', () => {
+            spellOverlayData.set('phantom-campaign', [{ id: 'overlay-1' }]);
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+            saveFile();
+
+            expect(writtenFiles.filter(f => String(f.filePath).endsWith(OVERLAY_FILE))).toHaveLength(0);
+            expect(unlinked).toHaveLength(0);
+            consoleSpy.mockRestore();
+        });
+
+        it('should log and keep serving memory when the overlay write fails', () => {
+            spellOverlayData.set('test-campaign', [{ id: 'overlay-1' }]);
+            vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {
+                throw new Error('disk full');
+            });
+            const consoleSpy = vi.spyOn(console, 'error');
+
+            expect(() => saveFile()).not.toThrow();
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'Failed to save spell overlays for campaign test-campaign:',
+                'disk full',
+            );
+            expect(spellOverlayData.get('test-campaign')).toHaveLength(1);
+            consoleSpy.mockRestore();
+        });
+    });
+});
+
+// ---------------------------------------------------------------------------
 // debouncedSave
 // ---------------------------------------------------------------------------
 describe('changeData - debouncedSave', () => {

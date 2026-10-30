@@ -1,9 +1,21 @@
 import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
+import * as changeDataModule from '../utils/changeData.js';
 import { spellOverlayData } from '../utils/changeData.js';
 
 // Import the route module after the store is available
 import spellOverlay from './spell-overlay.js';
+
+// POST now marks the campaign dirty for the shared debounced disk persist;
+// stub it so these route tests stay timer-free and disk-inert (the persistence
+// lane itself is covered in server/utils/changeData.test.js).
+let markDirtySpy;
+beforeEach(() => {
+    markDirtySpy = vi.spyOn(changeDataModule, 'markDirty').mockImplementation(() => {});
+});
+afterEach(() => {
+    markDirtySpy.mockRestore();
+});
 
 // Create a test app with the routes
 function createTestApp() {

@@ -1,5 +1,5 @@
 import express from 'express';
-import { publish, spellOverlayData } from '../utils/changeData.js';
+import { publish, spellOverlayData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { getCampaignLock, blockRequest } from '../utils/campaignLock.js';
 
@@ -78,6 +78,11 @@ router.post('/spell-overlay', asyncHandler((req, res) => {
             spellOverlayData.set(campaign, []);
             break;
     }
+
+    // Ride the shared debounced cache→disk lane (same as change-data) so
+    // placed zones survive an API restart. Locked off-target writes already
+    // returned 403 above and never reach this.
+    markDirty(campaign);
 
     publish(`spell-overlay-${campaign}`, { action, overlays, overlayId }, campaign);
     res.json({ ok: true });

@@ -80,6 +80,7 @@ function createTestApp() { const app = express(); app.use(express.json()); app.u
 function ensureCampaign(name) { mockFsState.exists.add(`/mock/campaigns/${name}`); }
 function removeCampaign(name) { mockFsState.exists.delete(`/mock/campaigns/${name}`); }
 function getChangeDataPath(campaign) { return path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json'); }
+function getOverlayPath(campaign) { return path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'spell-overlays.json'); }
 
 describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/full-reset', () => {
     afterEach(() => {
@@ -109,6 +110,16 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/full-reset', () =
         expect(characterChangeData.has('test-campaign')).toBe(false);
         expect(spellOverlayData.has('test-campaign')).toBe(false);
         expect(activeMaps.has('test-campaign')).toBe(false);
+    });
+
+    it('should also wipe the persisted spell-overlays file so restarts cannot resurrect', async () => {
+        ensureCampaign('test-campaign');
+        const overlayPath = getOverlayPath('test-campaign');
+        mockFsState.exists.add(overlayPath);
+        mockFsState.files.set(overlayPath, '[{"id":"overlay-1","shape":"sphere"}]');
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/full-reset').set('Host', 'localhost');
+        expect(res.status).toBe(200); expect(res.body.message).toBe('Full reset complete');
+        expect(mockFsState.files.has(overlayPath)).toBe(false);
     });
 
     it('should clear log file and cache', async () => {

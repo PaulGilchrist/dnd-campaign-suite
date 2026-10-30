@@ -222,10 +222,16 @@ router.post('/api/campaigns/:campaign/admin/clear-change-data', asyncHandler((re
 
     const { campaign } = req.params;
     const filePath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json');
+    const overlayPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'spell-overlays.json');
 
     try {
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
+        }
+        // Wipe the persisted overlay copy too — otherwise a restart after a
+        // clear would resurrect the geometry the Map delete below retires.
+        if (fs.existsSync(overlayPath)) {
+            fs.unlinkSync(overlayPath);
         }
     } catch (err) {
         console.error(`Failed to delete change data file for ${campaign}:`, err.message);
@@ -269,9 +275,15 @@ router.post('/api/campaigns/:campaign/admin/clear-log', asyncHandler((req, res) 
 // POST /api/campaigns/:campaign/admin/full-reset
 async function fullResetClearFiles(campaign, dir, safetyPath) {
     const changeDataPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json');
+    const overlayPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'spell-overlays.json');
     try {
         if (fs.existsSync(changeDataPath)) {
             fs.unlinkSync(changeDataPath);
+        }
+        // Wipe the persisted overlay copy too — otherwise a restart after a
+        // reset would resurrect the geometry the Map delete below retires.
+        if (fs.existsSync(overlayPath)) {
+            fs.unlinkSync(overlayPath);
         }
     } catch (err) {
         console.error(`Failed to delete change data file for ${campaign}:`, err.message);

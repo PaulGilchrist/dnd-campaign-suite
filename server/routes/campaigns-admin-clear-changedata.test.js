@@ -63,6 +63,7 @@ function createTestApp() { const app = express(); app.use(express.json()); app.u
 function ensureCampaign(name) { mockFsState.exists.add(`/mock/campaigns/${name}`); }
 function removeCampaign(name) { mockFsState.exists.delete(`/mock/campaigns/${name}`); }
 function getChangeDataPath(campaign) { return path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json'); }
+function getOverlayPath(campaign) { return path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'spell-overlays.json'); }
 
 describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/clear-change-data', () => {
     afterEach(() => { removeCampaign('test-campaign'); vi.clearAllMocks(); });
@@ -80,6 +81,16 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/clear-change-data
         const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/clear-change-data').set('Host', 'localhost');
         expect(res.status).toBe(200); expect(res.body.message).toBe('Change data cleared');
         expect(mockFsState.files.has(filePath)).toBe(false);
+    });
+
+    it('should also wipe the persisted spell-overlays file so restarts cannot resurrect', async () => {
+        ensureCampaign('test-campaign');
+        const overlayPath = getOverlayPath('test-campaign');
+        mockFsState.exists.add(overlayPath);
+        mockFsState.files.set(overlayPath, '[{"id":"overlay-1","shape":"sphere"}]');
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/clear-change-data').set('Host', 'localhost');
+        expect(res.status).toBe(200);
+        expect(mockFsState.files.has(overlayPath)).toBe(false);
     });
 
     it('should succeed even if change data file does not exist', async () => {

@@ -60,6 +60,31 @@ function flattenNestedCampaignKeys(data, nestedKey) {
 }
 
 /**
+ * Loads persisted spell overlays for one campaign from its data folder.
+ * Disk is authoritative (mirrors the change-data load): a missing file
+ * clears any in-memory entry, so rollbacks/admin wipes never resurrect
+ * stale geometry after a reload. A simply-absent file is silent — fresh
+ * campaigns boot with zero overlays and zero console noise.
+ */
+function loadCampaignOverlays(campaignsDir, campaign) {
+    const filePath = path.join(campaignsDir, campaign, 'data', 'spell-overlays.json');
+    try {
+        if (!fs.existsSync(filePath)) {
+            spellOverlayData.delete(campaign);
+            return;
+        }
+        const overlays = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        if (!Array.isArray(overlays)) {
+            throw new Error('file content is not an array');
+        }
+        spellOverlayData.set(campaign, overlays);
+    } catch (err) {
+        console.error(`Failed to read spell overlays for campaign ${campaign}:`, err.message);
+        spellOverlayData.delete(campaign);
+    }
+}
+
+/**
  * Loads all campaign change data from disk into characterChangeData Map at startup
  */
 export const readFile = () => {
@@ -93,6 +118,7 @@ export const readFile = () => {
                 console.error(`Failed to read character change data for campaign ${campaign}:`, err.message);
                 characterChangeData.set(campaign, {});
             }
+            loadCampaignOverlays(campaignsDir, campaign);
         }
     } catch (err) {
         console.error('Failed to read campaigns directory for character change data:', err.message);
@@ -129,6 +155,46 @@ export const saveFile = () => {
             }
         } catch (err) {
             console.error(`Failed to save character change data for campaign ${campaign}:`, err.message);
+        }
+    }
+    saveOverlayFiles();
+}
+
+/**
+ * Persist all in-memory spell overlays to disk alongside the change data,
+ * only writing when content changed. An empty array REMOVES the file so a
+ * restart can never resurrect cleared overlays; campaigns whose directory
+ * is gone are skipped (never re-created, so no phantom regeneration).
+ * Called from saveFile so the shared debounce, the exit flush, snapshots and
+ * rollbacks all cover overlays without a second timer system.
+ */
+export const saveOverlayFiles = () => {
+    const campaignsRoot = path.join(process.cwd(), 'public', 'campaigns');
+    for (const [campaign, overlays] of spellOverlayData) {
+        const campaignDirPath = path.join(campaignsRoot, campaign);
+        if (!fs.existsSync(campaignDirPath)) {
+            continue;
+        }
+        const filePath = path.join(campaignDirPath, 'data', 'spell-overlays.json');
+        try {
+            if (!Array.isArray(overlays) || overlays.length === 0) {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+                continue;
+            }
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            const serialized = JSON.stringify(overlays, null, 2);
+            let current = '';
+            try { current = fs.readFileSync(filePath, 'utf-8'); } catch (_err) { /* file not found */ }
+            if (current !== serialized) {
+                fs.writeFileSync(filePath, serialized);
+            }
+        } catch (err) {
+            console.error(`Failed to save spell overlays for campaign ${campaign}:`, err.message);
         }
     }
 }
