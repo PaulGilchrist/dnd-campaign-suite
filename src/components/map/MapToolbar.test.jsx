@@ -308,6 +308,38 @@ describe('MapToolbar', () => {
             expect(setRulerMode).toHaveBeenLastCalledWith(false);
         });
 
+        // Ruler toggle must announce on/off to screen readers and harnesses
+        // (a11y parity with the Spell button): aria-pressed mirrors the .active
+        // class — both driven by the same rulerMode prop — and renders for the
+        // false state too (never null/absent).
+        it('Ruler button exposes pressed state via aria-pressed across arm/disarm', () => {
+            const setRulerMode = vi.fn();
+
+            // Inactive: attribute present and false.
+            const { unmount, getByRole } = renderMapToolbar({ rulerMode: false, setRulerMode });
+            const idle = getByRole('button', { name: 'Ruler' });
+            expect(idle).toHaveAttribute('aria-pressed', 'false');
+            expect(idle).not.toHaveClass('active');
+
+            // Arm: click requests ruler mode; parent re-render makes it pressed.
+            fireEvent.click(idle);
+            expect(setRulerMode).toHaveBeenCalledWith(true);
+            unmount();
+
+            const armedRender = renderMapToolbar({ rulerMode: true, setRulerMode });
+            const armed = armedRender.getByRole('button', { name: 'Ruler' });
+            expect(armed).toHaveAttribute('aria-pressed', 'true');
+            expect(armed).toHaveClass('active');
+
+            // Disarm: click flips rulerMode back to false.
+            fireEvent.click(armed);
+            expect(setRulerMode).toHaveBeenLastCalledWith(false);
+            armedRender.unmount();
+
+            const { getByRole: getIdle } = renderMapToolbar({ rulerMode: false, setRulerMode });
+            expect(getIdle('button', { name: 'Ruler' })).toHaveAttribute('aria-pressed', 'false');
+        });
+
         it('toggles the items panel via a functional updater', () => {
             const setItemsPanelOpen = vi.fn();
             renderMapToolbar({ setItemsPanelOpen });

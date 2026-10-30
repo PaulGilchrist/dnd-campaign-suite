@@ -114,9 +114,14 @@ const MapToolbar = ({
                     >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Spell
                     </button>
+                    {/* Ruler tool — binary toggle: aria-pressed mirrors the .active
+                        class (Spell-button/HexMapToolbar travel-button pattern) so
+                        SRs and harnesses can read armed/disarmed without probing
+                        the .ruler-hint panel. */}
                     <button
                         className={rulerMode ? 'active' : ''}
                         aria-label="Ruler"
+                        aria-pressed={!!rulerMode}
                         onClick={() => setRulerMode(!rulerMode)}
                     >
                         <i className="fa-solid fa-ruler"></i> Ruler

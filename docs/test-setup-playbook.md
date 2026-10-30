@@ -2002,3 +2002,7 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - **Mirror-path lesson for tool interlocks:** fixing one direction of a toggle interlock at the *state setter* (e.g. `handleSetRulerMode` clearing `tool`) does not close the reverse order — toolbar buttons that dispatch raw `setTool` still dual-arm. Pin BOTH edges (see `src/components/map/Map.tool-interlock.test.jsx`).
 - **md5-poll is a fast data-integrity proof for map-editor bugs:** stray writes land on disk within ~2s of the debounce poll, and the reverse edit re-baselines md5 within one cycle. Always capture map-file md5 before/after a repro.
 - **Clear-All/confirm lane:** native confirm auto-settles during `run_code_unsafe`; a follow-up `browser_handle_dialog` "no related modal state" error = handled-truth (run-AM idiom).
+
+## Improve run 2026-10-30 (post-AM backlog — item 1 ruler-no-aria-pressed)
+- Fingerprint UPDATE: `button[aria-label="Ruler"]` now exposes `aria-pressed` mirroring the `.active` class (both driven by `rulerMode`), same canon as Spell (a39455951). The run-AM ack line ("NO aria-pressed; ack = `.ruler-hint`") is STALE — harnesses/SRs read armed state directly. Arm-ack still must be read in a LATER evaluate (React async).
+- MapToolbar test idiom for pressed-state pins: render-swap false→true→false via repeated `renderMapToolbar({ rulerMode, setRulerMode })` + `getByRole('button',{name})` attribute asserts (mirrors the Spell pin).
