@@ -166,14 +166,22 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         campaignName, mapName, terrain, marchingOrder, onEncounterCreated, parentDisplayName
     });
 
-    // ── Arrival toast (display-only) ──
+    // ── Display-only map toast (arrival + POI-enter refusal share one slot) ──
     // ARRIVAL flips travel-mode inactive and TravelPanel unmounts, taking its
     // lastMessage with it — this top-level toast keeps "travel complete" legible
-    // when the panel auto-closes (backlog 2026-10-25 pm). Local ephemeral UI
-    // feedback (never game state); the timer only hides the display.
-    const [arrivalToast, setArrivalToast] = useState(null);
-    const arrivalToastTimerRef = useRef(null);
-    useEffect(() => () => clearTimeout(arrivalToastTimerRef.current), []);
+    // when the panel auto-closes (backlog 2026-10-25 pm). The stale-linked-POI
+    // refusal (bug-hex-poi-enter-deleted-map-phantom-resurrect) rides the same
+    // lane with a longer read window. Local ephemeral UI feedback (never game
+    // state); the timer only hides the display.
+    const [mapToast, setMapToast] = useState(null);
+    const mapToastTimerRef = useRef(null);
+    const showMapToast = useCallback((message, duration = 2500) => {
+        clearTimeout(mapToastTimerRef.current);
+        setMapToast(message);
+        // toast auto-hide (display only, no game state)
+        mapToastTimerRef.current = setTimeout(() => setMapToast(null), duration);
+    }, []);
+    useEffect(() => () => clearTimeout(mapToastTimerRef.current), []);
 
     // ── Own-hex dead-click hint (display-only) ──
     // Clicking the destination on the party's CURRENT hex (e.g. stale coords
@@ -194,9 +202,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // `opts` carries the optional event context and, for accepted combat
     // events, the battleMap label RESOLVED from the spawn result (never a
     // hard-coded string, backlog 2026-10-27 run F); the field stays absent on
-    // every other travel row so existing shapes remain byte-identical.
+    // every other travel row so existing shapes remain byte-identical. The
+    // linkedMap/refusal pair names the target and refusal reason on an
+    // enter_refused row (stale POI-link gate) with the same opt-in rule.
     const logTravel = useCallback((action, hex, tileTerrain, w, opts = {}) => {
-        const { evt, battleMap } = opts;
+        const { evt, battleMap, linkedMap, refusal } = opts;
         addEntry({
             type: 'travel', action,
             hex: hex || null,
@@ -206,6 +216,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             eventType: evt?.type || null,
             eventTitle: evt?.title || null,
             ...(battleMap ? { battleMap } : {}),
+            ...(linkedMap ? { linkedMap } : {}),
+            ...(refusal ? { refusal } : {}),
         });
     }, [addEntry]);
 
@@ -247,12 +259,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             if (result.arrived) {
                 // The panel just auto-closed (mode → inactive) — surface the
                 // completion where it stays visible (display only, no game state).
-                clearTimeout(arrivalToastTimerRef.current);
-                setArrivalToast('Arrived at destination — travel complete');
-                arrivalToastTimerRef.current = setTimeout(
-                    () => setArrivalToast(null), // toast auto-hide (display only, no game state)
-                    2500
-                );
+                showMapToast('Arrived at destination — travel complete');
             }
         } else if (travelMgmt.dayExhausted) {
             logTravel('day_exhausted', null, null, weather);
@@ -267,12 +274,18 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         }
 
         return result;
-    }, [travelMgmt, weather, terrain, partyPosition, logTravel]);
+    }, [travelMgmt, weather, terrain, partyPosition, logTravel, showMapToast]);
 
     // ── Indoor map linking ──
     const [indoorMaps, setIndoorMaps] = useState([]);
     const validLinkedMapsRef = useRef(new Set());
     const [validLinkedMaps, setValidLinkedMaps] = useState(new Set());
+    // Bumped by every maps-list SSE event (create/delete/rename/activate from
+    // any client) so both the picker list and the linked-map validity probe
+    // refresh live (stale-gate layer of bug-hex-poi-enter-deleted-map-phantom-
+    // resurrect: a deleted target used to leave the golden Enter chip live
+    // until remount because nothing invalidated the mount-time probe).
+    const [mapsListVersion, setMapsListVersion] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -281,7 +294,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             setIndoorMaps(result.maps.filter(m => m.type === 'indoor').map(m => m.name));
         }).catch(err => console.error('[HexMap] Failed to load indoor maps:', err));
         return () => { cancelled = true; };
-    }, [campaignName]);
+    }, [campaignName, mapsListVersion]);
 
     useEffect(() => {
         const linkedMaps = pois.filter(p => p.linkedMap).map(p => p.linkedMap);
@@ -303,10 +316,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             setValidLinkedMaps(valid);
         });
         return () => { cancelled = true; };
-    }, [campaignName, pois]);
+    }, [campaignName, pois, mapsListVersion]);
 
     // ── SSE sync ──
-    const { handleSSEEvent } = useHexMapSSESync({
+    const { handleSSEEvent: handleMapDataEvent } = useHexMapSSESync({
         campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois,
         setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData,
         setWeather,
@@ -316,6 +329,15 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             }
         },
     });
+
+    // Maps-list events (another tab created/deleted/renamed/activated a map)
+    // invalidate the linked-map probe; the own-map map-data lane is unchanged.
+    const handleSSEEvent = useCallback((event) => {
+        handleMapDataEvent(event);
+        if (event && event.key === `maps-list-${campaignName}`) {
+            setMapsListVersion(v => v + 1);
+        }
+    }, [campaignName, handleMapDataEvent]);
 
     // ── View reset on grid size change ──
     useLayoutEffect(() => {
@@ -339,11 +361,53 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }), [panX, panY, svgWidth, svgHeight, zoom]);
 
     // ── POI enter handler ──
+    // Click-seam freshness gate (bug-hex-poi-enter-deleted-map-phantom-
+    // resurrect): validLinkedMaps is a probe snapshot, so a linked map deleted
+    // under the mounted editor used to leave the golden chip live — entering
+    // the dead link mounted a blank indoor editor whose open-time create-save
+    // PUT the deleted file back on disk as a nameless ghost document. Re-check
+    // the named target against the LIVE maps list before navigating. Confirmed
+    // missing ⇒ honest NAMED refusal, retire the chip at once (gate ref + set)
+    // and self-heal the POI by unlinking it (the hex autosave persists the
+    // cleared linkedMap). List unreachable (transient blip) ⇒ refuse but keep
+    // the link — a failed GET is not proof the GM's link is dead.
+    const poiEnterCheckingRef = useRef(false);
     const handlePoiEnter = useCallback((poi) => {
-        if (poi.linkedMap && validLinkedMapsRef.current.has(poi.linkedMap) && onPoiEntered) {
-            onPoiEntered(poi.linkedMap);
-        }
-    }, [onPoiEntered]);
+        if (!poi.linkedMap || !onPoiEntered) return;
+        if (!validLinkedMapsRef.current.has(poi.linkedMap)) return;
+        if (poiEnterCheckingRef.current) return;
+        const linkedMap = poi.linkedMap;
+        const refusalPos = { q: poi.q, r: poi.r };
+        const refusalTerrain = terrain[hexKey(poi.q, poi.r)] || 'plains';
+        poiEnterCheckingRef.current = true;
+        mapsService.loadMaps(campaignName)
+            .then(result => {
+                // Existence mirrors the load URL: mapsService.loadMapData
+                // resolves by toKebabCase(displayName) → the row's slug.
+                const slug = mapsService.toKebabCase(linkedMap);
+                const exists = (result.maps || []).some(
+                    m => m.slug === slug || m.name === linkedMap
+                );
+                if (exists) {
+                    onPoiEntered(linkedMap);
+                    return;
+                }
+                validLinkedMapsRef.current.delete(linkedMap);
+                setValidLinkedMaps(prev => {
+                    const next = new Set(prev);
+                    next.delete(linkedMap);
+                    return next;
+                });
+                handleUnlinkMap(poi.id);
+                showMapToast(`Linked map "${linkedMap}" no longer exists — Enter link cleared.`, 4000);
+                logTravel('enter_refused', refusalPos, refusalTerrain, weather, { linkedMap, refusal: 'missing' });
+            })
+            .catch(() => {
+                showMapToast(`Could not verify linked map "${linkedMap}" — try again.`, 4000);
+                logTravel('enter_refused', refusalPos, refusalTerrain, weather, { linkedMap, refusal: 'unreachable' });
+            })
+            .finally(() => { poiEnterCheckingRef.current = false; });
+    }, [campaignName, onPoiEntered, handleUnlinkMap, terrain, weather, logTravel, showMapToast]);
 
     // ── Event handlers ──
     const handleEventAccept = useCallback(() => {
@@ -699,7 +763,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     onReroll={handleEventReroll}
                 />
 
-                <TravelToast message={arrivalToast} />
+                <TravelToast message={mapToast} />
             </div>
         </div>
     );

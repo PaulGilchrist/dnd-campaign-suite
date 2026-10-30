@@ -105,6 +105,9 @@ vi.mock('../../services/maps/mapsService.js', () => ({
     saveMapData: vi.fn(() => Promise.resolve({})),
     createMap: vi.fn(() => Promise.resolve({ name: 'test', alreadyExists: false })),
     formatMapName: vi.fn((name) => name || ''),
+    // Real kebab rules (mirrors the service) — the click-seam existence check
+    // resolves displayName → slug.
+    toKebabCase: vi.fn((name) => (name || '').toLowerCase().replace(/\.json$/i, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')),
 }));
 vi.mock('../../services/campaign/weatherService.js', () => ({
     generateWeather: vi.fn(() => ({ condition: 'clear', label: 'Clear', icon: 'sun', moveCostMod: 1, budgetMod: 1, encounterMod: 0, description: 'Clear skies' })),
@@ -316,7 +319,11 @@ describe('HexMap event & command wiring', () => {
         it('validates each unique linked map once and fires onPoiEntered only for validated links', async () => {
             mapsService.loadMapData.mockImplementation((campaign, name) =>
                 name === 'missing' ? Promise.reject(new Error('Map not found')) : Promise.resolve({}));
+            // Click-seam re-check (fresh maps list) still shows dungeon-1 alive.
+            mapsService.loadMaps.mockResolvedValue({ maps: [{ name: 'dungeon-1', slug: 'dungeon-1', type: 'indoor' }] });
             const onPoiEntered = vi.fn();
+            const handleUnlinkMap = vi.fn();
+            usePoiManagement.mockReturnValue(makePoiManagement({ handleUnlinkMap }));
             const pois = [
                 { id: 'poi-1', q: 10, r: 5, type: 'city', linkedMap: 'dungeon-1', visible: true },
                 { id: 'poi-2', q: 20, r: 10, type: 'dungeon', linkedMap: 'dungeon-1', visible: true },
@@ -332,10 +339,11 @@ describe('HexMap event & command wiring', () => {
             expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'dungeon-1');
             expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'missing');
             poiLayerProps.current.onPoiEnter(pois[0]);
-            expect(onPoiEntered).toHaveBeenCalledWith('dungeon-1');
-            poiLayerProps.current.onPoiEnter(pois[2]); // link failed validation
+            await vi.waitFor(() => expect(onPoiEntered).toHaveBeenCalledWith('dungeon-1'));
+            poiLayerProps.current.onPoiEnter(pois[2]); // link failed validation → early return, no list re-check
             poiLayerProps.current.onPoiEnter(pois[3]); // no linked map
-            expect(onPoiEntered).toHaveBeenCalledTimes(1);
+            await vi.waitFor(() => expect(onPoiEntered).toHaveBeenCalledTimes(1));
+            expect(handleUnlinkMap).not.toHaveBeenCalled();
         });
 
         it('exposes an empty valid set and performs no loads when no POI links a map', async () => {

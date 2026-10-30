@@ -10,14 +10,17 @@
  * useMapLoader.js; prior-pass refs :161/:188-210/:178/:210 map to these seams):
  *   :37    loadedMapNameRef guard keyed on mapName only — campaignName/characters
  *          changes never reload → stale outdoor map (#799) ... pinned below
- *   :60-62 silent catch — a failed GET falls through to overwriting the map
- *          with an empty one ... pinned below
  *   :50-57 reconciliation only ever runs at load time (stale-ref) ... pinned below
  *
  * FIXED here (backlog 2026-10-26): the #800 mount re-save — a zero-edit open
  * now dirties nothing (loaded document seeds the last-saved baseline; the
  * autosave effect deep-compares each candidate payload and skips clean ones,
  * also absorbing the own-write SSE echo re-post), so open+back ⇒ zero PUTs.
+ * FIXED here (bug-hex-poi-enter-deleted-map-phantom-resurrect): the old
+ * :60-62 failed-GET fallthrough auto-PUT an empty document over a REJECTED
+ * load (resurrecting deleted map files as nameless ghosts) — a rejected load
+ * now renders the blank grid but writes nothing until a real edit; the
+ * falsy-resolve create lane stays direct (pinned below).
  *
  * Old→new: initialization(4)+empty-create→1; existing-data(6)→2+3;
  * reconciliation(6)→4+5+7; error-handling(2)→6; re-render(4)→7+8;
@@ -283,9 +286,8 @@ describe('useMapLoader', () => {
     expect(result.current.mapData.players).toEqual(existing.players);
   });
 
-  it('falls through to an empty map and logs when load fails — FIXME(useMapLoader.js:60-62): silent catch overwrites on a transient GET failure', async () => {
-    loadMapDataSpy.mockRejectedValue(new Error('Network error'));
-    saveMapDataSpy.mockRejectedValue(new Error('Save failed'));
+  it('falls through to a blank editor WITHOUT persisting when load REJECTS (bug-hex-poi-enter-deleted-map-phantom-resurrect)', async () => {
+    loadMapDataSpy.mockRejectedValue(new Error('Map not found'));
 
     const { result } = renderLoader();
     await act(async () => {});
@@ -293,16 +295,15 @@ describe('useMapLoader', () => {
     expect(result.current.loadInProgressRef.current).toBe(false);
     expect(result.current.mapData.players).toEqual([]);
     expect(result.current.mapData.walls).toEqual(new Set());
-    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, {
-      players: [],
-      walls: [],
-      gridSize: DEFAULT_GRID_SIZE,
-      placedItems: [],
-    });
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Failed to save initial map data:',
+      'Failed to load map data (falling through to fresh map):',
       expect.any(Error),
     );
+    // The deleted document must NOT come back: zero saves through the whole
+    // debounce window and on manual flush (a rejected load is not a create).
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    act(() => result.current.flushSave());
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
   });
 
   it('ignores campaignName and characters changes while mapName is unchanged — FIXME(#799, useMapLoader.js:37): guard never resets, outdoor map stays stale', async () => {

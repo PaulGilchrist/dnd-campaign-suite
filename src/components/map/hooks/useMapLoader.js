@@ -75,6 +75,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
         svgLoadInProgressRef.current = true;
 
         const loadMap = async () => {
+            let loadRejected = false;
             try {
                 const existing = await mapsService.loadMapData(campaignName, mapName);
                 if (existing) {
@@ -103,23 +104,35 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                 // No-silent-fallback law (fix#337S #798): fall through to empty-map
                 // creation, but LOUD — swallowed load errors were invisible before.
                 console.error('Failed to load map data (falling through to fresh map):', err);
+                loadRejected = true;
             }
 
             const newData = { players: [], walls: new Set() };
             setMapData(newData);
-            // A read-only client that can't find the map renders an empty grid
-            // locally but must not create/overwrite the document (that authorship
-            // belongs to the GM). See bug-player-clients-clobber-fog-reset.
-            if (isLocalhost) {
-                const dataToSave = {
-                    ...newData,
-                    gridSize,
-                    walls: [],
-                    placedItems: [],
-                };
+            setPlacedItems([]);
+            if (loadRejected) {
+                // A REJECTED load must never auto-persist (bug-hex-poi-enter-
+                // deleted-map-phantom-resurrect): entering a stale POI link used
+                // to mount this blank document and the open-time save PUT the
+                // deleted file back as a nameless/typeless ghost. Render the
+                // empty grid, seed the dirty baseline with the exact payload the
+                // autosave effect would emit so a zero-edit open writes NOTHING,
+                // and let the first real edit persist via the normal debounced
+                // lane (user intent re-creates the document on purpose).
+                lastSavedRef.current = buildSavePayload(newData, gridSize, []);
+            } else if (isLocalhost) {
+                // A falsy resolve is the legacy "no document yet" create lane
+                // (every real create flow POSTs the file first, so its load
+                // resolves with bytes). Persist it once — baseline seeded with
+                // the SAME builder so the mount re-check compares clean instead
+                // of re-PUTting a Set-vs-array-mismatched twin document.
+                const dataToSave = buildSavePayload(newData, gridSize, []);
                 lastSavedRef.current = dataToSave;
                 mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
             }
+            // Read-only (network) clients render the empty grid locally but must
+            // not create/overwrite the document (that authorship belongs to the
+            // GM). See bug-player-clients-clobber-fog-reset.
         };
 
         loadMap().finally(() => { svgLoadInProgressRef.current = false; });

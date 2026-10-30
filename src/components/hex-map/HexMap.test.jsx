@@ -462,8 +462,14 @@ describe('HexMap', () => {
             onAdvance: expect.any(Function),
             onCancelTravel: tm.cancelTravel,
         });
-        // Single shared SSE connection: the container's sync handler must be forwarded.
-        expect(childProps.subscriber).toEqual({ campaignName: 'test', handleEvent: sse.handleSSEEvent });
+        // Single shared SSE connection: the container's sync handler must be
+        // forwarded. The container now wraps it (maps-list events additionally
+        // invalidate the linked-map probe), so pin identity via delegation.
+        expect(childProps.subscriber.campaignName).toBe('test');
+        expect(typeof childProps.subscriber.handleEvent).toBe('function');
+        const sseEvent = { key: 'map-data-test-test-map', data: {} };
+        childProps.subscriber.handleEvent(sseEvent);
+        expect(sse.handleSSEEvent).toHaveBeenCalledWith(sseEvent);
     });
 
     describe('POI drag and drop', () => {
