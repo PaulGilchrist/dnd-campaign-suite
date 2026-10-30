@@ -46,7 +46,11 @@ async function deleteAiConfig(campaignName) {
         method: 'DELETE',
     })
     const data = await res.json().catch(() => ({}))
-    return { ok: res.ok, reason: data.reason || data.error || '' }
+    // Wildcard DELETE honesty (2026-10-30): a 404 means the key is already
+    // gone — the exact end state this lane wants (e.g. another tab cleared
+    // it between the null-POST ack and here). Only non-404 failures are a
+    // refusal worth surfacing.
+    return { ok: res.ok || res.status === 404, reason: data.reason || data.error || '' }
 }
 
 export default function AiRefereeSection({ campaignName, characters = [] }) {

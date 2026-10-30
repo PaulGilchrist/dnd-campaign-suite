@@ -262,15 +262,28 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
 }));
 
 // DELETE /api/campaigns/:campaign/:key - Remove a key from the change data store
+// Honesty fix (backlog 2026-10-30-AO changedata-wildcard-false-success-on-missing-key):
+// a key that never existed no longer gets a blanket 200 "deleted successfully" —
+// 404 { error } matches every sibling DELETE route (npcs/maps/character/admin).
+// Side effects stay byte-identical: the null SSE echo is unconditional (it
+// honestly reports the post-request state — key absent — and lets stale local
+// copies on other tabs self-heal), and markDirty still fires for a live
+// campaign entry exactly as before.
 router.delete('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
     if (key === 'log') return next();
+    let existed = false;
     if (characterChangeData.has(campaign)) {
-        delete characterChangeData.get(campaign)[key];
+        const store = characterChangeData.get(campaign);
+        existed = Object.prototype.hasOwnProperty.call(store, key);
+        delete store[key];
         markDirty(campaign);
     }
     publish(`change-${campaign}-${key}`, null, campaign);
 
+    if (!existed) {
+        return res.status(404).json({ error: `Change-data key not found: ${key}` });
+    }
     res.json({ message: 'Data deleted successfully' });
 }));
 

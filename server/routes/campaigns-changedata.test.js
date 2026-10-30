@@ -241,11 +241,32 @@ describe('campaignsChangedata - DELETE /api/campaigns/:campaign/:key', () => {
         expect(characterChangeData.get('test-campaign')).toEqual({ character2: { hp: 10 } });
     });
 
-    it('should do nothing if campaign does not exist in store', async () => {
+    it('should 404 for a key in a campaign that does not exist in store', async () => {
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/nonexistent-campaign/somekey');
+        expect(res.status).toBe(404);
+        expect(res.body.error).toContain('somekey');
+    });
+
+    it('should 404 (not claim success) for a key missing from a live campaign', async () => {
+        characterChangeData.set('test-campaign', { character1: { hp: 25 } });
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/__no_such_key_xyz__');
+        expect(res.status).toBe(404);
+        expect(res.body.error).toContain('__no_such_key_xyz__');
+        // the false-200 regression face: no blanket success claim
+        expect(res.body.message).toBeUndefined();
+        // untouched siblings survive
+        expect(characterChangeData.get('test-campaign')).toEqual({ character1: { hp: 25 } });
+    });
+
+    it('should report deleted:true honesty surface for a live key', async () => {
+        characterChangeData.set('test-campaign', { __qa_key__: 1 });
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/__qa_key__');
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Data deleted successfully');
+        expect(characterChangeData.get('test-campaign')).toEqual({});
     });
 
     it('should delegate log key to next middleware', async () => {
@@ -417,5 +438,13 @@ describe('campaignsChangedata - DELETE /api/campaigns/:campaign/:key calls markD
         const app = createTestApp();
         await request(app).delete('/api/campaigns/nonexistent-campaign/somekey');
         expect(markDirty).not.toHaveBeenCalled();
+    });
+
+    it('should still publish the null echo for a missing key (self-heal face of the 404)', async () => {
+        characterChangeData.set('test-campaign', { character1: { hp: 25 } });
+        const app = createTestApp();
+        const res = await request(app).delete('/api/campaigns/test-campaign/__no_such_key_xyz__');
+        expect(res.status).toBe(404);
+        expect(publish).toHaveBeenCalledWith('change-test-campaign-__no_such_key_xyz__', null, 'test-campaign');
     });
 });

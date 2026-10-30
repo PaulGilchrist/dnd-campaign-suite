@@ -54,7 +54,7 @@ function stubFetch({ referee = { ok: true, ruling: DICE }, refereeStatus = 200, 
         }
         if (u.endsWith('/ai/referee')) return res(referee, refereeStatus === 200, refereeStatus);
         if (u.endsWith('/aiConfig')) {
-            if (opts?.method === 'DELETE') return res({}, remove.ok, remove.ok ? 200 : 403);
+            if (opts?.method === 'DELETE') return res({}, remove.ok, remove.status ?? (remove.ok ? 200 : 403));
             return res(save.ok ? { message: 'ok' } : { reason: save.reason }, save.ok, save.ok ? 200 : 400);
         }
         return res({});
@@ -200,6 +200,19 @@ describe('AiRefereeSection — Turn AI off wipes the key (delete-after-ack)', ()
         await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Server refused:'));
         expect(aiConfigCalls(fetchMock)[0].method).toBe('POST');
         expect(aiConfigCalls(fetchMock)[1].method).toBe('DELETE');
+    });
+
+    it('404 DELETE (key already gone — wildcard honesty 2026-10-30) is the desired end state, never a false notice', async () => {
+        synced.aiConfig = CONFIGURED;
+        const fetchMock = stubFetch({ remove: { ok: false, status: 404 } });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument()); // settle status fetch
+        armOff();
+        fireEvent.click(offButton());
+
+        await waitFor(() => expect(aiConfigCalls(fetchMock)).toHaveLength(2));
+        expect(aiConfigCalls(fetchMock)[1].method).toBe('DELETE');
+        expect(screen.queryByRole('alert')).toBeNull(); // key gone = success, stay quiet
     });
 });
 

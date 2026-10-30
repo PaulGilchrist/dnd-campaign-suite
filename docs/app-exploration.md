@@ -281,7 +281,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AO
 
-- **`changedata-wildcard-false-success-on-missing-key`** (2026-10-30-AO, live control-proven): `DELETE /api/campaigns/:c/<missingKey>` answers **200 `{"message":"Data deleted successfully"}`** for keys that never existed (control: `__no_such_key_xyz__` → 200). This is what let the filed map-dotfile bug's delete lane lie to the user (row survives, UI silent). Honest surface: 404 or `{deleted:false}` for absent keys, or at minimum keep the 200 idempotent-claim but expose whether anything was removed. Blast radius is API hygiene only (UI lanes delete known-live keys) — deliberately non-blocking.
+*(none — both run-AO items consumed by the 2026-10-30 improve run: `log-description-raw-html-sink-audit` implemented (d6c78c244 — `sanitizeHtml` from `services/ui/sanitize.js` applied at all four `entry.description` log sinks, producer audit: hundreds of GM-string interpolation sites so the sink is the boundary; live evil-payload inert + formatting survives, 226 log-folder tests, pinned by `LogSinks.sanitize.test.jsx`). `changedata-wildcard-false-success-on-missing-key` implemented (this commit — wildcard DELETE now 404s `{error}` for absent keys matching the sibling-route convention, live-key face byte-identical 200 + unconditional null SSE echo (self-heal face pinned); sole response-reading client lane `AiRefereeSection.deleteAiConfig` treats 404 as the desired end state, all other lanes fire-and-forget; server + client pins, live curl ladder 404/200 + Admin AI-off browser lane zero console errors, cleaned to `{}`/`[]`). Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-30 run AN
 
