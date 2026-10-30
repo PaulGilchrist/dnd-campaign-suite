@@ -263,7 +263,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AL
 
-- **spell-toolbar-no-pressed-state**: `button[aria-label="Spell"]` carries NO `aria-pressed` (live read `null` while armed) — the armed state is only inferable by probing `.spell-overlay-controls` presence, unlike the travel tool which exposes `aria-pressed` (27-M doctrine "read aria-pressed before pressing" is impossible here); a stale/absorbed click leaves user and harness alike blind to whether the tool is on. Cheap parity fix: set `aria-pressed={!!spellMode}` on the toolbar toggle (MapToolbar.jsx).
+*(none — run-AL backlog fully consumed by the 2026-10-30 improve run: `spell-overlay-player-clear-authority` implemented (ea138e30d — owner ruling: board stays a true party-collab space, no server actor concept; `Clear All` + per-item ×-remove now pay named native confirms at the `useSpellOverlay.js` POST chokepoint — `Clear all N spell overlays? This removes overlays placed by everyone.` / `Remove this <Shape> overlay?`, ghost-id generic fallback, cancel = zero-POST/zero-local-write; `SHAPE_LABELS` hoisted to `models/SpellOverlay.js` one-label-source; live-proven two-tab incl. ≤1s SSE mirror); `spell-toolbar-no-pressed-state` implemented (this commit — `aria-pressed={!!spellMode}` on `button[aria-label="Spell"]` mirroring the `.active` class per the HexMapToolbar travel-button canon, honest `false` with no overlay state; 2 new pins, live arm/disarm/placement legs read false→true→false, zero behavior change). Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-30 run AK
 

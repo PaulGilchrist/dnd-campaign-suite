@@ -223,6 +223,52 @@ describe('MapToolbar', () => {
             expect(setTool).toHaveBeenLastCalledWith('none');
         });
 
+        // Spell toggle must announce on/off to screen readers and harnesses.
+        // aria-pressed mirrors the .active class — both driven by the same
+        // spellMode prop (HexMapToolbar travel-button + SessionSection.jsx
+        // aria-pressed={boolean} pattern) — and renders for the false state
+        // too (never null/absent).
+        it('Spell button exposes pressed state via aria-pressed across arm/disarm', () => {
+            const setSpellMode = vi.fn();
+
+            // Inactive: attribute present and false.
+            const { unmount, getByRole } = renderMapToolbar({
+                spellOverlayState: createMockSpellOverlayState({ spellMode: null, setSpellMode }),
+            });
+            const idle = getByRole('button', { name: 'Spell' });
+            expect(idle).toHaveAttribute('aria-pressed', 'false');
+            expect(idle).not.toHaveClass('active');
+
+            // Arm: click requests the default shape; parent re-render makes it pressed.
+            fireEvent.click(idle);
+            expect(setSpellMode).toHaveBeenCalledWith(OverlayShape.SPHERE);
+            unmount();
+
+            const armedRender = renderMapToolbar({
+                spellOverlayState: createMockSpellOverlayState({ spellMode: OverlayShape.SPHERE, setSpellMode }),
+            });
+            const armed = armedRender.getByRole('button', { name: 'Spell' });
+            expect(armed).toHaveAttribute('aria-pressed', 'true');
+            expect(armed).toHaveClass('active');
+
+            // Disarm (button toggle or panel Cancel flips spellMode to null): false again.
+            fireEvent.click(armed);
+            expect(setSpellMode).toHaveBeenLastCalledWith(null);
+            armedRender.unmount();
+
+            const { getByRole: getIdle } = renderMapToolbar({
+                spellOverlayState: createMockSpellOverlayState({ spellMode: null, setSpellMode }),
+            });
+            expect(getIdle('button', { name: 'Spell' })).toHaveAttribute('aria-pressed', 'false');
+        });
+
+        // Defensive arm: with no overlay state the mode can never engage, so
+        // the button must still honestly report pressed=false (never absent).
+        it('Spell button reports aria-pressed=false with a null spellOverlayState', () => {
+            renderMapToolbar({ spellOverlayState: null });
+            expect(screen.getByRole('button', { name: 'Spell' })).toHaveAttribute('aria-pressed', 'false');
+        });
+
         it('toggles spell mode: inactive activates with default shape, active deactivates to null', () => {
             const setSpellMode = vi.fn();
             const setTool = vi.fn();

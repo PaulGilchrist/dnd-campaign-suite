@@ -91,9 +91,14 @@ const MapToolbar = ({
                             <i className={`fa-solid ${icon}`}></i> {label}
                         </button>
                     ))}
+                    {/* Spell tool — binary toggle: aria-pressed mirrors the .active
+                        class (HexMapToolbar travel-button pattern) so SRs and
+                        harnesses can read armed/disarmed without probing the
+                        controls panel. */}
                     <button
                         className={spellMode ? 'active' : ''}
                         aria-label="Spell"
+                        aria-pressed={!!spellMode}
                         onClick={toggleSpellMode}
                     >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Spell
