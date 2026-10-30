@@ -241,6 +241,10 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 *(2026-10-28 run-R backlog fully consumed by the 2026-10-28 improve run — 2 implemented (`char-shape-guard-abilities` 4b07c9cbf, `eb-generator-apply-toast` bad3f6e86), 1 blocked-premise-disproved live (EB toolbar aria-labels already pinned since b0cab1579), 1 skipped by owner (change-data wildcard allowlist — L, deferred; re-addable via e2e-explore). See `docs/test-setup-playbook.md` improve-run appends for dispositions.)*
 
+### Open items — 2026-10-30 (owner follow-up, post-AI)
+
+- `monsterjinx-consume-parity-audit` (2026-10-30, owner ruling (a) follow-up): with next-swing semantics ACCEPTED for `pendingRedirect` (CLOSED-RULING — the stale-stamp ride is the contract), audit `consumePendingJinxOnResolve` byte-parity with the redirect consume lane (`monsterJinx.js:287-291` `jinxConsumeMatch` — carries the `lastAttackNonce` stamp at `:179` but IGNORES it at consume, while redirect honors same-attacker/same-target identity). Decide per-leg whether the ignored stamp can mis-apply a pending jinx (e.g. convert an UNRELATED later hit), align the two gates to one identity contract, and pin with tests. Evidence pack: `docs/test-setup-playbook.md` § Improve run 2026-10-29 (pendingRedirect-nonce-gate BLOCKED audit, last two bullets). Optional parity follow-up, not a filed bug.
+
 ### Open items — 2026-10-30 run AI
 
 *(Run-AI backlog fully consumed by the 2026-10-30 improve run — `map-fresh-fallback-silent` implemented this commit: shared copy builder `src/services/maps/mapLoadNotice.js` (`Could not load "<map>" — opened a fresh copy. Make an edit to save it back.`) fires ONLY on the REJECTED lane in both loaders (the falsy-resolve "no document yet" create lane stays silent); indoor renders via new `MapNoticeToast` (`.map-toast`, role=status) + `useEphemeralToast`, hex rides the existing `.travel-toast` slot via a 4th `onLoadRejected` loader arg; hex rejected-load no longer POSTs on open — `applyRejectedFreshMap` mirrors the d737fe875 indoor gate (baseline seeded with the exact envelope + `awaitingFirstEditRef`/`isViewOnlyDrift` adoption so the needsResetViewRef centering pass doesn't count as intent), first real edit persists normally. The bullet's deleted-POI-link lane was already closed by fix d737fe875 (not re-implemented). Live-proven both loaders on 404-stub lanes: verbatim toast, zero PUTs on zero-edit open, PUT-200 on first paint. Details in `docs/test-setup-playbook.md` improve-run appends.)*
@@ -338,7 +342,7 @@ Fold requires this section EMPTY of open rows (see Fold-gate doctrine in the hea
 
 ### OPEN — owner decision needed (blocks fold)
 
-- **Redirect press-over-pending true two-tab UX** — owner-BLOCKED by 51eaa6f2c: either (a) ACCEPT next-swing semantics → row closes as by-design, the stale-stamp consume lane becomes the contract, `monsterJinx` parity follow-up optional; or (b) REBUILD press-over-pending (popup-identity/nonce clear) → becomes a backlog item to implement first. Evidence pack in `docs/test-setup-playbook.md` § 2026-10-29 improve run (pendingRedirect-nonce-gate BLOCKED audit). Paul to pick (a) or (b).
+*(none — 2026-10-30: Paul ruled (a) on the redirect press-over-pending row; moved to CLOSED below.)*
 
 ### DEEPEN — actionable next cycle (each must end CLOSED-fix or CLOSED-ruling before fold)
 
@@ -357,3 +361,4 @@ Fold requires this section EMPTY of open rows (see Fold-gate doctrine in the hea
 - *True-simultaneum deterministic repro* — CLOSED-RULING 2026-10-29 (both race faces observed across legs; which leg 409s is harness luck; the guard itself is deterministic and live-proven — nothing deeper is reachable from the UI).
 - *Rules view* — CLOSED-RULING (owner 2026-10-29: n/a — external dnd-tools tab by design, zero in-app surface; excluded from the shallow count).
 - *Campaign-create-under-lock probe* — CLOSED-FIX by design (2026-10-29 curl: `POST /api/campaigns` while locked → 403 at phase 1, disk-inert; run-R off-target verdict extended to the create path).
+- *Redirect press-over-pending true two-tab UX* — CLOSED-RULING 2026-10-30 (Paul picked (a)): next-swing semantics ACCEPTED as the contract — a granted `pendingRedirect` rides the next same-attacker swing resolve (the stale-stamp consume lane every live `redirect_attack_applied` relies on); no nonce/popup-death clear, no press-over-pending affordance (either would retire retargeting entirely per the 2026-10-29 improve-run reachability audit). `monsterJinx` parity follow-up opted IN → filed to the Improvement backlog (`monsterjinx-consume-parity-audit`).
