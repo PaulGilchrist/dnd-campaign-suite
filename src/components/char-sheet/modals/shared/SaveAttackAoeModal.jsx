@@ -2045,6 +2045,15 @@ function SaveAttackAoeModal({
             metamagicHeighten={metamagicHeighten}
             heightenTarget={heightenTarget}
             setHeightenTarget={setHeightenTarget}
+            // Overlay auto-select + distance badges (mirrors the working single-target
+            // CreatureTargetPopups.jsx:25-27 lane): CreatureSelectionModal's own effect
+            // resolves the attacker's armed `overlay-<id>` cs target via
+            // getCurrentOverlayTarget and pre-selects the creatures inside it. Without
+            // these three props the effect early-returns and arming an overlay was
+            // silently inert for AoE casts.
+            campaignName={campaignName}
+            attackerName={playerStats.name}
+            rangeFt={range}
         />
     );
 }

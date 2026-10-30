@@ -241,6 +241,12 @@ function HypnoticPatternModal({
             metamagicHeighten={metamagicHeighten}
             heightenTarget={heightenTarget}
             setHeightenTarget={setHeightenTarget}
+            // Overlay auto-select (mirrors the working single-target
+            // CreatureTargetPopups.jsx:25-27 lane): the picker's effect resolves the
+            // attacker's armed `overlay-<id>` cs target itself via
+            // getCurrentOverlayTarget and pre-selects creatures inside it.
+            campaignName={campaignName}
+            attackerName={playerStats.name}
         />
     );
 }

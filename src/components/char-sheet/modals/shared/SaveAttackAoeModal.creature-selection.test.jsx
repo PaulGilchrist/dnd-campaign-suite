@@ -3,9 +3,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 
-// Picker-lane tests use the REAL CreatureSelectionModal: SaveAttackAoeModal
-// never passes campaignName/attackerName to it, so its overlay-lookup effect
-// early-returns and it renders deterministically without map/network mocks.
+// Picker-lane tests use the REAL CreatureSelectionModal. SaveAttackAoeModal
+// DOES pass campaignName/attackerName/rangeFt (overlay auto-select wiring), but
+// every lookup seam resolves empty here: the mocked combatSummary has no
+// 'overlay-' targetName (getCurrentOverlayTarget → null) and the mocked
+// getRuntimeValue has no active map (getTargetMapStatuses → null), so the
+// effect auto-selects nothing and the picker still renders deterministically
+// without map/network mocks. The armed-overlay auto-select face is pinned in
+// SaveAttackAoeModal.overlay-auto-select.test.jsx.
 // AreaEffectTargetModalBase is never mounted on this lane (no 'overlay-'
 // targetName) — its lane lives in SaveAttackAoeModal.overlay.test.jsx.
 // maxTargets: SaveAttackAoeModal never passes it to the picker mount

@@ -649,6 +649,12 @@ function AOEConditionModal({
                     metamagicHeighten={metamagicHeighten}
                     heightenTarget={heightenTarget}
                     setHeightenTarget={setHeightenTarget}
+                    // Overlay auto-select + distance badges — mirrors the
+                    // SaveAttackAoeModal picker wiring (CreatureTargetPopups.jsx:25-27
+                    // pattern); the modal's effect self-resolves the armed cs target.
+                    campaignName={campaignName}
+                    attackerName={playerStats.name}
+                    rangeFt={range}
                 />
             </div>
             {showResults ? (
