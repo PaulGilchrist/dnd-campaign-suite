@@ -2010,3 +2010,7 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 ## Improve run 2026-10-30 (post-AM backlog — item 2 clear-all-count-grammar-singular)
 - PITFALL (extends absorbed-click family to canvas): a bare `new MouseEvent('click')` dispatched on the indoor map canvas (`line.grid-line` under `elementFromPoint`) is ABSORBED — zero handler. Synthetic placement needs the full sequence on the hit element: `pointerdown → mousedown → pointerup → mouseup → click` (each with `clientX/Y`, `button:0`, `pointerId:1`). `page.mouse.click` works because CDP input carries the whole sequence natively.
 - Fingerprint UPDATE: Clear All confirm now count-gated — 1 overlay reads `Clear all 1 spell overlay? …`, 2+ keep the plural face byte-identical. Per-item remove + unknown-id fallback + sibling map confirms are count-agnostic (family audit at gate time: `useSpellOverlay.js:109` was the only count-noun site in `src/components/map/**`).
+
+## Improve run 2026-10-30 (post-AM backlog — items 2+3 close-out)
+- Fingerprint UPDATE (supersedes run AM ruler row): zero-length ruler label now `0 ft (0 cells)` — the `<1` branch is retired (integer grids can't produce sub-cell legs); 1-cell legs stay singular (`5 ft (1 cell)`). Harnesses pinning `0 ft (<1 cells)` must update.
+- `browser_network_requests` numbers span the whole browser session across tabs — a single-layer fetch spy installed post-navigation is the reliable per-lane write auditor.

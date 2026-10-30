@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-14
+// @maintained-by-ai: 2026-10-30
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import RulerOverlay from './RulerOverlay.jsx';
@@ -47,10 +47,13 @@ describe('RulerOverlay', () => {
         ${{ gridX: 0, gridY: 0 }} | ${{ gridX: 1, gridY: 1 }} | ${'7 ft (1 cell)'}
         ${{ gridX: 0, gridY: 0 }} | ${{ gridX: 2, gridY: 0 }} | ${'10 ft (2 cells)'}
         ${{ gridX: -2, gridY: -1 }} | ${{ gridX: 1, gridY: 2 }} | ${'21 ft (4 cells)'}
-        ${{ gridX: 2, gridY: 3 }} | ${{ gridX: 2, gridY: 3 }} | ${'0 ft (<1 cells)'}
+        ${{ gridX: 2, gridY: 3 }} | ${{ gridX: 2, gridY: 3 }} | ${'0 ft (0 cells)'}
+        ${{ gridX: 5, gridY: 5 }} | ${{ gridX: 5, gridY: 4 }} | ${'5 ft (1 cell)'}
+        ${{ gridX: 0, gridY: 0 }} | ${{ gridX: 0, gridY: 4 }} | ${'20 ft (4 cells)'}
     `('displays "$expectedText"', ({ start, end, expectedText }) => {
         const { container } = renderRuler(start, end);
         expect(container.querySelector('g.ruler-label text').textContent).toBe(expectedText);
+        expect(container.querySelector('g.ruler-label text').textContent).not.toContain('<1');
     });
 
     it('scales pixel positions with cellSize without changing the distance label', () => {

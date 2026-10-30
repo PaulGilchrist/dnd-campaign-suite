@@ -269,7 +269,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AM
 
-- **ruler-zero-length-label**: same-cell double-click labels `0 ft (<1 cells)` — an exact 0 displays as "<1", and the singular gate `Math.round(cellDist)===1` renders "cell" nowhere near a "<1" read. `RulerOverlay.jsx:26`: special-case `cellDist === 0` → `0 cells` (or just `0 ft`), keep `<1` for genuine sub-cell diagonals is not even possible on integer grids — consider dropping `<1` entirely. Cosmetic copy nit; the ft number itself is exact.
+*(none — run-AM backlog fully consumed by the 2026-10-30 improve run: `ruler-no-aria-pressed` implemented (8e475ad21 — `aria-pressed={!!rulerMode}` on `button[aria-label="Ruler"]` mirroring the Spell-button canon a39455951, live false→true→false round-trip, 29/29 toolbar pins); `clear-all-count-grammar-singular` implemented (44216917e — count-noun gate `overlay${count === 1 ? '' : 's'}` in `useSpellOverlay.js` `clearOverlays`, singular face verbatim-live at 1 overlay, plural face byte-identical, family audit: sole count-noun site in `src/components/map/**`); `ruler-zero-length-label` implemented (this commit — `<1` branch dropped from `RulerOverlay.jsx` label: integer grids can't make sub-cell legs, zero-length now reads `0 ft (0 cells)`, genuine legs byte-unchanged incl. singular 1-cell, live CTM-precise both faces, ruler lane zero writes). Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-30 run AL
 

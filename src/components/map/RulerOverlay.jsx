@@ -23,7 +23,10 @@ const RulerOverlay = ({ start, end, cellSize }) => {
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
 
-    const label = `${feetDist} ft (${cellDist < 1 ? '<1' : Math.round(cellDist)} cell${Math.round(cellDist) === 1 ? '' : 's'})`;
+    // Integer grids can never produce a sub-cell distance (smallest non-zero leg is 1 cell),
+    // so no "<1" case: a zero-length leg reads "0 cells", a 1-cell leg is singular.
+    const cells = Math.round(cellDist);
+    const label = `${feetDist} ft (${cells} cell${cells === 1 ? '' : 's'})`;
     const labelWidth = label.length * 6.5 + 12;
 
     return (
