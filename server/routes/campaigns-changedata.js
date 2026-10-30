@@ -149,6 +149,25 @@ function warnDeprecatedLastAttack(campaign, key, value) {
     );
 }
 
+/**
+ * combatSummary concurrent-write guard (bug-initiative-concurrent-npc-spawn-lost-update):
+ * the board is a full-replace store — a read-modify-write off a stale mirror used to
+ * silently drop another GM tab's accepted mutation (last write wins, zero feedback).
+ * Guarded writers (the +NPC lane) POST a boardVersion stamp alongside the board: the
+ * version their copy was built from. If the stored board has moved on, refuse with 409
+ * (the .ct-* entity lanes' jsonEntityCrud doctrine) — the client re-reads, re-applies
+ * its single mutation once, or surfaces an honest toast. Writers without baseVersion
+ * (HP edits, Next/Prev, EB join) keep the exact pass-through behaviour of today; the
+ * stamp rides inside the stored value, so it travels/clears with every board write and
+ * the check always compares the sender's base against the CURRENT stored truth.
+ * Returns the live version when the sender's base is stale, null when the write is safe.
+ */
+function staleCombatSummaryBase(campaign, req) {
+    if (req.params.key !== 'combatSummary' || !req.body || !('baseVersion' in req.body)) return null;
+    const currentVersion = Number(characterChangeData.get(campaign)?.combatSummary?.boardVersion) || 0;
+    return (Number(req.body.baseVersion) || 0) !== currentVersion ? currentVersion : null;
+}
+
 // POST /api/campaigns/:campaign/:key - Generic POST to in-memory change data store
 router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
@@ -191,6 +210,16 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     }
 
     const value = 'value' in req.body ? req.body.value : req.body;
+
+    const staleBase = staleCombatSummaryBase(campaign, req);
+    if (staleBase !== null) {
+        console.warn(`[campaigns-changedata] Concurrent-edit conflict on combatSummary (${campaign}): base version ${req.body.baseVersion} vs current ${staleBase}`);
+        return res.status(409).json({
+            error: 'Initiative board was modified in another tab or session since you loaded it — re-read the board and retry.',
+            conflict: true,
+            boardVersion: staleBase,
+        });
+    }
 
     warnDeprecatedLastAttack(campaign, key, value);
 

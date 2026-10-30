@@ -41,6 +41,10 @@ vi.mock('../../services/encounters/initiativeService.js', () => ({
     setTarget: vi.fn(),
     removeNpc: vi.fn(),
     addNpc: vi.fn(),
+    // createCreatureHandlers imports the shared PC-merge used by the guarded
+    // +NPC lane (bug-initiative-concurrent-npc-spawn-lost-update) — the death-floor
+    // lanes below never reach it, but the module mock must carry the export.
+    mergeCombatSummaryWithCharacters: vi.fn((summary) => summary),
 }));
 vi.mock('../../services/combat/sessionService.js', () => ({ setSessionPhase: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/items/autoRewardService.js', () => ({ autoAwardCombatRewards: vi.fn(() => Promise.resolve()) }));

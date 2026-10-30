@@ -406,16 +406,27 @@ describe('handleRemoveNpc', () => {
 });
 
 describe('handleAddNpc', () => {
-    it('pushes the auto-named NPC and persists the summary', () => {
+    // Guarded spawn lane (bug-initiative-concurrent-npc-spawn-lost-update): fresh
+    // read → clone → merge → append → POST with baseVersion → ack-publish. The prop
+    // mirror must stay pristine until the write is accepted.
+    it('spawns the auto-named NPC onto the fresh-board clone and persists it with a baseVersion stamp', async () => {
         const { handlers, combatSummary, setCombatSummary } = makeHandlers([
             { name: 'Alice', type: 'player', currentHp: 20 },
         ]);
 
-        handlers.handleAddNpc();
+        await handlers.handleAddNpc();
 
         expect(window.confirm).toHaveBeenCalledWith('Add NPC with placeholder AC 10 / HP 10? Edit on the card.');
-        expect(addNpc).toHaveBeenCalledWith(combatSummary);
-        expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
+        // Mutated a CLONE — the shared mirror keeps its pristine single-creature bytes.
+        expect(combatSummary.creatures.map(c => c.name)).toEqual(['Alice']);
+        expect(addNpc).toHaveBeenCalledTimes(1);
+        const base = addNpc.mock.calls[0][0];
+        expect(base).not.toBe(combatSummary);
+        expect(base.creatures.map(c => c.name)).toEqual(['Alice', 'Bob', 'NPC 1']);
+        expect(base.boardVersion).toBe(1); // fresh read (null mock ⇒ mirror, unversioned → base 0)
+        expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({
+            creatures: expect.arrayContaining([expect.objectContaining({ name: 'NPC 1', type: 'npc' })]),
+        }), campaignName, { baseVersion: 0 });
         expect(setCombatSummary).toHaveBeenCalledWith(expect.objectContaining({
             creatures: expect.arrayContaining([expect.objectContaining({ name: 'NPC 1', type: 'npc' })]),
         }));
@@ -435,13 +446,13 @@ describe('handleAddNpc', () => {
         expect(msg).toMatch(/edit on the card/i);
     });
 
-    it('declined confirm spawns nothing — zero writes', () => {
+    it('declined confirm spawns nothing — zero writes', async () => {
         window.confirm = vi.fn(() => false);
         const { handlers, combatSummary, setCombatSummary } = makeHandlers([
             { name: 'Alice', type: 'player', currentHp: 20 },
         ]);
 
-        handlers.handleAddNpc();
+        await handlers.handleAddNpc();
 
         expect(window.confirm).toHaveBeenCalledTimes(1);
         expect(addNpc).not.toHaveBeenCalled();
@@ -450,15 +461,15 @@ describe('handleAddNpc', () => {
         expect(combatSummary.creatures.map(c => c.name)).toEqual(['Alice']);
     });
 
-    it('accepted confirm runs addNpc with the ac:10/maxHp:10/currentHp:10 contract intact', () => {
-        const { handlers, combatSummary, setCombatSummary } = makeHandlers([
+    it('accepted confirm runs addNpc with the ac:10/maxHp:10/currentHp:10 contract intact', async () => {
+        const { handlers, setCombatSummary } = makeHandlers([
             { name: 'Alice', type: 'player', currentHp: 20 },
         ]);
 
-        handlers.handleAddNpc();
+        await handlers.handleAddNpc();
 
         expect(window.confirm).toHaveBeenCalledTimes(1);
-        expect(addNpc).toHaveBeenCalledWith(combatSummary);
+        expect(addNpc).toHaveBeenCalledTimes(1);
         expect(setCombatSummary).toHaveBeenCalledWith(expect.objectContaining({
             creatures: expect.arrayContaining([
                 expect.objectContaining({ name: 'NPC 1', ac: 10, maxHp: 10, currentHp: 10 }),

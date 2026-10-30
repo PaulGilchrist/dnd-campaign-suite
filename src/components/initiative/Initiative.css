@@ -1221,3 +1221,25 @@
     background-color: rgba(239, 68, 68, 0.35);
 }
 
+
+/* ============ Board-write feedback toast ============ */
+/* Display-only conflict/failure feedback for guarded +NPC writes
+   (bug-initiative-concurrent-npc-spawn-lost-update). Mirrors the
+   .encounter-toast tokens in EncounterBuilder.css for app consistency. */
+.initiative .initiative-toast {
+    display: inline-block;
+    align-self: flex-start;
+    margin-bottom: 8px;
+    background: var(--color-primary-lighter);
+    border: 1px solid var(--color-success);
+    color: var(--color-success);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.initiative .initiative-toast-error {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: var(--color-error-border);
+    color: var(--color-error-light);
+}

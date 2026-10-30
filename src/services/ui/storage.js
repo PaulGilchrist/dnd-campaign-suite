@@ -31,7 +31,7 @@ const storage = {
         }
         return null;
     },
-    set: (key, value, campaignName) => {
+    set: (key, value, campaignName, opts) => {
         if (!campaignName) {
             console.error('storage.set called with undefined campaignName', { key, value, stack: new Error().stack });
             return Promise.resolve();
@@ -45,6 +45,13 @@ const storage = {
             // bug-eb-join-swallowed-network-fail-phantom-row). The queue chain itself
             // still swallows rejections: un-awaited writers keep the old fire-and-
             // forget behaviour, and one failed write cannot poison later ones.
+            // Guarded writers (bug-initiative-concurrent-npc-spawn-lost-update) pass
+            // opts.baseVersion — the board version their mutation was built from. The
+            // stamp rides in the POST body (server 409s a stale base, the .ct-* lanes'
+            // jsonEntityCrud doctrine) and the call resolves { ok, status } so the
+            // caller can tell a 409 conflict from a transport failure. Callers without
+            // opts keep the TRUE/FALSE bytes above unchanged.
+            const guarded = !!(opts && typeof opts.baseVersion === 'number');
             queue.pending = current.then(async () => {
                 const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`;
                 try {
@@ -52,12 +59,12 @@ const storage = {
                         method: 'POST',
                         mode: 'cors',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ value })
+                        body: JSON.stringify(guarded ? { value, baseVersion: opts.baseVersion } : { value })
                     });
-                    return response.ok;
+                    return guarded ? { ok: response.ok, status: response.status } : response.ok;
                 } catch (e) {
                     console.error("[storage:error]", e);
-                    return false;
+                    return guarded ? { ok: false, status: 0 } : false;
                 }
             });
             return queue.pending;

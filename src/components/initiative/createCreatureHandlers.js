@@ -4,7 +4,8 @@ import storage from '../../services/ui/storage.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { clearDeathSavePrompt, sendDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import utils from '../../services/ui/utils.js'
-import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
+import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc, mergeCombatSummaryWithCharacters } from '../../services/encounters/initiativeService.js'
+import { loadCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js'
 import { setSessionPhase } from '../../services/combat/sessionService.js'
 import { autoAwardCombatRewards } from '../../services/items/autoRewardService.js'
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
@@ -71,6 +72,18 @@ function resolveOverrideThreshold(oldHp, newHp, maxHp) {
     return null
 }
 
+// Guarded board-write result classification (storage.js combatSummary opts
+// lane): a plain-object { ok, status } arrives only from opted-in writers;
+// undefined/true (legacy mocks, un-awaited fire-and-forget semantics) is
+// success, `false` the honest transport-failure signal (26ffb4aa5 contract).
+function writeConflict(result) {
+    return !!result && typeof result === 'object' && result.ok === false && result.status === 409
+}
+
+function writeFailed(result) {
+    return result === false || (!!result && typeof result === 'object' && result.ok === false)
+}
+
 /**
  * Audit channel for manual GM HP overrides (bug-initiative-hp-input-no-range-
  * clamp): every committed card edit writes an hp_change entry in the exact
@@ -117,6 +130,7 @@ export function createCreatureHandlers({
     characters,
     numOfNpc,
     isLocalhost,
+    showToast = () => {},
 }) {
     // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
     const writeNpcHp = function writeNpcHp(creature, newValue, oldHp, isMaxEdit, newMaxHp) {
@@ -269,15 +283,67 @@ export function createCreatureHandlers({
         setCombatSummary(cloneDeep(combatSummary))
     }
 
+    // bug-initiative-concurrent-npc-spawn-lost-update: the board is a FULL-REPLACE
+    // store. A read-modify-write of the locally mirrored summary lost the
+    // last-writer race silently — two GM tabs clicking +NPC converged on ONE
+    // "NPC 1" with zero toast/log/console output (both names derived from each
+    // tab's local count, so the loss was visually indistinguishable). The spawn is
+    // now a guarded read-modify-write, mirroring the EB-join doctrine (26ffb4aa5)
+    // and the .ct-* lanes' jsonEntityCrud 409 guard:
+    //   • strict fresh read — a transport failure aborts honestly (never a silent
+    //     normalize of a possibly-live board);
+    //   • NPC numbering derives from that FRESH board, so racing tabs stamp
+    //     distinct names instead of duplicating "NPC 1";
+    //   • characters re-merge into the fresh board (client-side PCs are canonical
+    //     from the roster — same write shape the local mirror used to carry);
+    //   • the mutation applies to a fresh clone, leaving the prop mirror pristine
+    //     until the server accepts (no phantom card for sync cache readers);
+    //   • the POST carries the boardVersion its base was built from (storage opts
+    //     lane); a stale base 409s and the loser re-applies ONCE onto the fresh
+    //     board — a second conflict, or any transport/HTTP failure, is a named
+    //     toast. No timers, no silent retry beyond the single re-apply.
+    const spawnNpc = async function spawnNpc(attempt) {
+        let fresh
+        try {
+            fresh = await loadCombatSummary(campaignName, { strict: true })
+        } catch (e) {
+            console.error('[handleAddNpc] initiative board read failed:', e)
+            showToast('Failed to add NPC — could not read the initiative board', true)
+            return
+        }
+        const source = fresh && Array.isArray(fresh.creatures) ? fresh : combatSummary
+        const baseVersion = Number(source.boardVersion) || 0
+        const base = mergeCombatSummaryWithCharacters(source, characters, utils.getName)
+        base.boardVersion = baseVersion + 1
+        const nextNum = addNpc(base)
+        const npcName = `NPC ${nextNum}`
+        const result = await storage.set('combatSummary', base, campaignName, { baseVersion })
+        if (writeConflict(result)) {
+            if (attempt === 0) return spawnNpc(1)
+            console.error(`[handleAddNpc] ${npcName} write rejected — the initiative board kept changing in another tab (409)`)
+            showToast('Another tab kept changing the initiative board — your NPC was not added, try again', true)
+            return
+        }
+        if (writeFailed(result)) {
+            const status = result && typeof result === 'object' ? result.status : 'network'
+            console.error(`[handleAddNpc] combatSummary board write failed (${status}) — ${npcName} never reached the server`)
+            showToast(`Failed to add ${npcName}`, true)
+            return
+        }
+        // Board accepted — publish the spawned truth to sync cache readers and React
+        // state (same ack-then-publish order as addMonstersToInitiative).
+        setCombatSummaryCache(base, campaignName)
+        setCombatSummary(cloneDeep(base))
+    }
+
     const handleAddNpc = function handleAddNpc() {
         if (!combatSummary) return
         // Owner decision 2026-10-24: this lane stamps placeholder AC 10 / HP 10 (unlike the
         // NPC-page chip, which gates on authored stats) — name the defaults in a native
         // confirm before spawning so the spawn bar is explicit. Cancel ⇒ zero writes.
+        // The 409 re-apply (spawnNpc(1)) never re-prompts: the user already accepted.
         if (!window.confirm('Add NPC with placeholder AC 10 / HP 10? Edit on the card.')) return
-        addNpc(combatSummary)
-        storage.set('combatSummary', combatSummary, campaignName)
-        setCombatSummary(cloneDeep(combatSummary))
+        return spawnNpc(0)
     }
 
     return {

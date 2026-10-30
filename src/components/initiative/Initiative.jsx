@@ -210,6 +210,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }, [campaignName, combatSummary])
     const setActiveCreatureNameG = useSSEEqualityGuard(setActiveCreatureName)
     const [npcImages, setNpcImages] = React.useState({})
+    // Display-only feedback toast for guarded board writes (bug-initiative-
+    // concurrent-npc-spawn-lost-update — "+NPC conflict"). Mirrors the
+    // .encounter-toast pattern in EncounterBuilder.jsx; the auto-hide timer is a
+    // benign UI category (display only, no game state — AGENTS "No Game Timers").
+    const [toast, setToast] = React.useState(null)
+    const showToast = React.useCallback((message, isError = false) => {
+        setToast({ message, isError })
+        setTimeout(() => setToast(null), 2500)
+    }, [])
     const [viewingMonster, setViewingMonster] = useSyncedState('campaign', 'combat-ui-viewingMonster', null, campaignName)
     const [viewingMonsterCreatureName, setViewingMonsterCreatureName] = useSyncedState('campaign', 'combat-ui-viewingMonsterCreatureName', null, campaignName)
     const carouselRef = React.useRef(null)
@@ -372,7 +381,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         // and summons must never re-materialise as NPC stubs (bug-initiative-clear-monsters-become-npc-stubs).
         numOfNpc: creaturesOrEmpty(combatSummary).filter(isBareNpcPlaceholder).length,
         isLocalhost,
-    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters])
+        showToast,
+    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters, showToast])
 
     const { handleNpcClick } = React.useMemo(() => ({
         handleNpcClick: createNpcClickHandler({
@@ -636,6 +646,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     return (
         <div className='initiative'>
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
+            {toast && (
+                <div className={`initiative-toast${toast.isError ? ' initiative-toast-error' : ''}`} role='status'>
+                    {toast.message}
+                </div>
+            )}
             {combatSummary && combatSummary.creatures && characters.length > 0 ? (
              <>
              <h4>Initiative (round {combatSummary.round})</h4>
