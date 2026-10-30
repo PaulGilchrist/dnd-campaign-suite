@@ -60,6 +60,11 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   // the SSE echo of a local action never re-commands the local player.
   const localMusicRef = useRef(null);
 
+  // Last volume THIS tab committed with its own slider (or null until the
+  // first observation) — the volume sibling of localMusicRef, same echo-skip
+  // doctrine (see the adoption effect below).
+  const localVolumeRef = useRef(null);
+
   // All mood/playing transitions go through here so the adoption guard stays
   // in step with what this tab committed.
   const commitMusic = useCallback((next) => {
@@ -93,6 +98,24 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       console.info("[MusicPlayer] Ambience paused in another tab — pausing this tab's player");
     }
   }, [music.mood, music.playing, playerMounted]);
+
+  // Volume adoption (bug-music-volume-no-cross-tab-adoption): the useState
+  // seed above loses the race to async store hydration, so the shared key's
+  // volume is folded in whenever the hydrated/echoed value first changes
+  // after mount — a remote tab's slider move (or the hydration landing)
+  // re-seeds this tab's slider, and the useEffect([volume]) →
+  // youtubePlayer.setVolume below then drives the owner's iframe without a
+  // remount. Echo-safe like the transport guard: a value equal to the last
+  // observation, or to what THIS tab just committed via the slider, is never
+  // re-applied (the SSE echo of a local drag cannot clobber in-flight state).
+  useEffect(() => {
+    const seen = music.volume ?? DEFAULT_VOLUME;
+    const last = localVolumeRef.current;
+    localVolumeRef.current = seen;
+    if (last === null) return; // mount baseline — useState already holds it
+    if (seen === last) return; // own echo / no change
+    setVolume(seen);
+  }, [music.volume]);
 
   const showToast = useCallback((message, isError = false) => {
     setToast({ message, isError });
@@ -190,6 +213,10 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   const handleVolume = useCallback((event) => {
     const next = Number(event.target.value) / 100;
     setVolume(next);
+    // Record as this tab's own commit so the adoption effect skips the SSE
+    // echo (mirrors commitMusic's localMusic guard) — a late echo can never
+    // clobber an in-flight slider drag.
+    localVolumeRef.current = next;
     setMusic({ ...music, volume: next });
   }, [music, setMusic]);
 

@@ -30,3 +30,22 @@ Minimal: (1) seed-on-hydrate — an effect that adopts `music.volume` into local
 
 ## Severity
 Minor UX issue (with a small sync-correctness tail) — no game state is affected, but it is the one remaining field of a headline SSE-synced key that does not live-mirror, so two GMs at one machine hear/see different volumes than the shared state claims.
+
+## Summary
+Music volume was the write-only zombie field of the shared `music` key: seeded once from `DEFAULT_MUSIC` before async hydration and never re-seeded, so remote volume changes AND fresh reloads ignored the persisted value. Fixed by folding `volume` into the 576be121d adoption doctrine — a new echo-safe adoption effect (mount baseline → adopt on every external change of `music.volume`) plus recording the acting tab's own commit in a `localVolumeRef` sibling of `localMusicRef`, so the SSE echo can never clobber an in-flight slider drag. The existing `useEffect([volume]) → youtubePlayer.setVolume` then drives the owner's iframe with the adopted value, no remount. Live-verified two-tab in test-campaign: A↔B slider mirroring both directions with the owner frame intact, full-reload seed from the persisted value, control (acting tab) unaffected, and mood/playing adoption unregressed. 4 new vitest pins; sidebar folder 132/132; lint clean.
+
+## Resolution
+FIXED — the "Likely location" guess was accurate; nothing drifted.
+
+**What was actually wrong (confirmed live + in code):** exactly as filed — `useState(music.volume ?? DEFAULT_VOLUME)` (line 32) seeds before async store hydration lands, and the 576be121d adoption effect compares only `{mood,playing}`, so no path ever consumed `music.volume` after mount. Live repro at HEAD: B owned the player (frames B1/A0), A set 20% → server `music.volume:0.2`, B's slider stayed `60`; full reload of B + campaign re-select STILL showed `60`.
+
+**Fix (files changed):**
+- `src/components/sidebar/MusicPlayer.jsx` — (1) new `localVolumeRef` + volume adoption effect mirroring the transport guard: first observation = mount baseline (useState already holds it), then adopt any `music.volume` different from the last observation/commit; (2) `handleVolume` records its committed value in `localVolumeRef` (commitMusic-style self-echo guard) so the SSE echo of a local drag is skipped and cannot clobber in-flight state. The existing `[volume] → youtubePlayer.setVolume` effect drives the owner's iframe unchanged. No server change; state rides the existing shared `music` change-data key (server-first intact). 5e/2024 sibling question: N/A — music is ruleset-agnostic (single campaign key, no dual-ruleset path).
+- `src/components/sidebar/MusicPlayer.remote-adoption.test.jsx` — new `MusicPlayer volume adoption` describe (4 pins): sync-persisted mount seed (70), **hydrate-after-mount seed 60→20** (the core race), remote volume live-mirrors into owner slider + exactly one `setVolume(0.25)` iframe command, and echo-safety (own-echo fires zero player commands; subsequent foreign 0.45 still adopts).
+
+**Verification:**
+- `npx vitest run MusicPlayer.remote-adoption.test.jsx` → 11/11 (7 existing adoption pins unregressed).
+- `npx vitest run src/components/sidebar/` → 11 files, **132/132** passed (folder was ~119 at 576be121d; all green, re-pinned).
+- `npm run lint` → zero warnings/errors.
+- Playwright live re-run (test-campaign, two tabs @ :5173): post-fix reload of both tabs seeds BOTH sliders to the persisted 20; B plays Combat (owner frame 1), A sets 35 → **B's slider live-mirrors 35 zero-reload** (server 0.35); control: owner B drags 50 → B follows AND A mirrors 50 (server 0.5); full reload of B (marker-gone proven) re-seeds 50. Mood/playing sanity on the touched component: A's Pause makes owner-B pause with the canon INFO `Ambience paused in another tab — pausing this tab's player` and B KEEPS its frame; own Stop behaves as before (player stopped, frame mount unchanged — pre-existing semantics, not a regression). Audible loudness inside the cross-origin YT iframe remains unassertable (same caveat as prior music bugs; the `setVolume` command on the owner is test-pinned).
+- Cleanup: `admin/clear-change-data` + `admin/clear-log` POSTed, GET-verified `{}` / `[]` after close.

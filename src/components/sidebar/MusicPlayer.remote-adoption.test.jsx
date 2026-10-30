@@ -8,7 +8,12 @@
  * module was never commanded to). Own commits are skipped via the localMusic
  * ref guard, and mounting with a persisted state is a baseline, not a
  * transition. Remote echoes are simulated through setRuntimeObject(skipSync)
- * — the exact path the SSE apply uses. */
+ * — the exact path the SSE apply uses.
+ * Volume lane (bug-music-volume-no-cross-tab-adoption): the same adoption
+ * doctrine extended to the slider — remote volume live-mirrors into every
+ * tab (and drives the owner's iframe via the existing setVolume effect), a
+ * fresh mount/hydration seeds from the persisted value, and the echo of this
+ * tab's own commit never clobbers its in-flight slider state. */
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
@@ -155,5 +160,61 @@ describe('MusicPlayer remote-state adoption', () => {
     expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'music', action: 'resume', mood: 'town', message: 'GM resumed Town ambience'
     }));
+  });
+});
+
+// bug-music-volume-no-cross-tab-adoption: volume was the write-only zombie
+// field of the shared music key — a mount-time useState seed lost the async
+// hydration race (and nothing re-seeded it), so remote writes AND fresh
+// reloads ignored the persisted volume. These pin the adopt lane.
+describe('MusicPlayer volume adoption', () => {
+  const volumeInput = () => screen.getByTitle('Volume');
+
+  it('seeds the slider from a synchronously-persisted volume on mount', () => {
+    stubMusicServer();
+    getStore('campaign').set('music', { mood: null, playing: false, volume: 0.7, overrides: {} });
+    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    expect(volumeInput().value).toBe('70');
+  });
+
+  it('seeds the slider when the persisted volume lands AFTER mount (hydration race)', () => {
+    stubMusicServer();
+    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    expect(volumeInput().value).toBe('60'); // default before hydration arrives
+
+    remoteMusic({ mood: null, playing: false, volume: 0.2, overrides: {} }); // hydration/SSE
+
+    expect(volumeInput().value).toBe('20'); // re-seeded, not stuck at 60
+  });
+
+  it('live-mirrors another tab\'s volume into this owner\'s slider and iframe', () => {
+    stubMusicServer();
+    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    fireEvent.click(townButton()); // this tab owns the player
+    youtubePlayer.setVolume.mockClear();
+
+    remoteMusic({ mood: 'town', playing: true, volume: 0.25, overrides: {} });
+
+    expect(volumeInput().value).toBe('25');
+    expect(youtubePlayer.setVolume).toHaveBeenCalledTimes(1);
+    expect(youtubePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.25));
+  });
+
+  it('never re-commands the player for this tab\'s own volume echo, yet still adopts remote volume', () => {
+    stubMusicServer();
+    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    fireEvent.click(townButton());
+
+    fireEvent.change(volumeInput(), { target: { value: '30' } }); // local commit → 0.3
+    expect(youtubePlayer.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.3));
+    youtubePlayer.setVolume.mockClear();
+
+    remoteMusic({ mood: 'town', playing: true, volume: 0.3, overrides: {} }); // self echo
+    expect(youtubePlayer.setVolume).not.toHaveBeenCalled(); // echo skipped, in-flight state intact
+
+    remoteMusic({ mood: 'town', playing: true, volume: 0.45, overrides: {} }); // foreign change
+    expect(volumeInput().value).toBe('45');
+    expect(youtubePlayer.setVolume).toHaveBeenCalledTimes(1);
+    expect(youtubePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.45));
   });
 });
