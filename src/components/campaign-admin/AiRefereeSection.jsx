@@ -30,6 +30,25 @@ async function postAiConfig(campaignName, value) {
     return { ok: res.ok, reason: data.reason || data.error || '' }
 }
 
+// Key-hygiene twin of the death-save result lane (savePromptService.js
+// :51-65): POST null first so every live client receives the value-echo
+// (consumers gate on aiConfigLive/`live`, which null satisfies), then DELETE
+// the key so wildcard audits and snapshot diffs never carry a zombie
+// `aiConfig: null` (backlog ai-config-null-key-retained). Delete-after-ack,
+// event-driven, zero timers: the server publishes the echo synchronously
+// before responding (campaigns-changedata.js publish → res.json) and the
+// shared SSE is in-order per connection, so the DELETE's null-echo trails
+// every live client's value-echo — trailing null echoes are inert. A
+// refused POST (e.g. server lock 403) never fires the DELETE — nothing was
+// written to wipe.
+async function deleteAiConfig(campaignName) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/aiConfig`, {
+        method: 'DELETE',
+    })
+    const data = await res.json().catch(() => ({}))
+    return { ok: res.ok, reason: data.reason || data.error || '' }
+}
+
 export default function AiRefereeSection({ campaignName, characters = [] }) {
     const [aiConfig] = useSyncedState('campaign', 'aiConfig', null, campaignName)
     const [enforcement] = useSyncedState('campaign', 'enforcement', { ...ENFORCEMENT_DEFAULTS }, campaignName)
@@ -50,7 +69,12 @@ export default function AiRefereeSection({ campaignName, characters = [] }) {
     }
     const removeConfig = async () => {
         const r = await postAiConfig(campaignName, null)
-        setNotice(r.ok ? null : `Server refused: ${r.reason}`)
+        if (!r.ok) {
+            setNotice(`Server refused: ${r.reason}`)
+            return
+        }
+        const d = await deleteAiConfig(campaignName)
+        setNotice(d.ok ? null : `Server refused: ${d.reason}`)
     }
 
     return (

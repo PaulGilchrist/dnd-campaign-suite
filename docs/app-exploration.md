@@ -238,7 +238,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AH
 
-- **ai-config-null-key-retained** — Admin "Turn AI off" resolves to `POST aiConfig {value:null}` and the key STAYS in change-data with a null value (`aiConfig:'aiConfig' in d → true, value null`), unlike the DELETE-wipe idiom used by travel-*/loot-draft scratch keys. Harmless (`aiConfigLive(null)` false, consoles unmount, L1–4 parity holds) but wildcard audits and snapshot diffs carry a zombie key; mirror the delete-after-ack lane.
+*(Run-AH backlog fully consumed by the 2026-10-30 improve run — all three implemented: `ai-referee-prompt-no-effect-key-allowlist` (aff5193ef — referee prompt carries all 135 te keys parsed from the registry source via new `server/services/ai/targetEffectKeys.js`, drift-pinned vs the imported registry; card pre-filter picker + disabled Confirm for an off-registry key, apply-lane refusal copy byte-identical; live two-tab picker→speed_half apply proven, autopilot refusal leg live); `ai-hp-change-proposal-ungated-by-own-dice-rule` (a16f57485 — owner-chosen REQUIRE-expression: `schemas.js` shared `expressionField` gate, bare amounts invalid → retry-once → fail-closed needs_human proven live against a fake model server; prompt schema line agrees; confirmed amount still applies, zero re-roll rows); `ai-config-null-key-retained` (this commit — Turn AI off chains DELETE after POST-ack mirroring the savePromptService delete-after-ack idiom, refused POST never DELETEs; live: wire shows POST→DELETE, `GET change-data` zero aiConfig occurrences, reload no zombie, re-save returns the key, badge/consoles honest). Details in `docs/test-setup-playbook.md` improve-run appends.)*
 
 ### Open items — 2026-10-29 run AG
 

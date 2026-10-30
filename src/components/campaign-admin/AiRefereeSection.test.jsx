@@ -46,14 +46,17 @@ const res = (body, ok = true, status = ok ? 200 : 500) => ({ ok, status, json: a
  * payload assertions. The `save` object is read at call time, so tests may
  * flip `save.ok` mid-test to simulate a refused re-save.
  */
-function stubFetch({ referee = { ok: true, ruling: DICE }, refereeStatus = 200, save = { ok: true } } = {}) {
-    const fetchMock = vi.fn(async (url) => {
+function stubFetch({ referee = { ok: true, ruling: DICE }, refereeStatus = 200, save = { ok: true }, remove = { ok: true } } = {}) {
+    const fetchMock = vi.fn(async (url, opts) => {
         const u = String(url);
         if (u.includes('/ai/status')) {
             return res({ configured: !!synced.aiConfig, mode: synced.aiConfig?.mode || 'off', model: synced.aiConfig?.model || null, reachable: { reachable: true, models: ['x'] } });
         }
         if (u.endsWith('/ai/referee')) return res(referee, refereeStatus === 200, refereeStatus);
-        if (u.endsWith('/aiConfig')) return res(save.ok ? { message: 'ok' } : { reason: save.reason }, save.ok, save.ok ? 200 : 400);
+        if (u.endsWith('/aiConfig')) {
+            if (opts?.method === 'DELETE') return res({}, remove.ok, remove.ok ? 200 : 403);
+            return res(save.ok ? { message: 'ok' } : { reason: save.reason }, save.ok, save.ok ? 200 : 400);
+        }
         return res({});
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -137,6 +140,66 @@ describe('AiRefereeSection — gating (L1–4 parity)', () => {
         save.reason = 'aiConfig.endpoint must be a LOCAL http(s) URL (D3)';
         fireEvent.click(saveButton());
         await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('LOCAL http(s)'));
+    });
+});
+
+// ai-config-null-key-retained — Turn AI off must fully wipe the key
+// (delete-after-ack, mirroring the death-save result lane).
+describe('AiRefereeSection — Turn AI off wipes the key (delete-after-ack)', () => {
+    const offButton = () => screen.getByRole('button', { name: /Turn AI off/ });
+    const aiConfigCalls = (fetchMock) => fetchMock.mock.calls
+        .filter(([u]) => String(u).endsWith('/aiConfig'))
+        .map(([u, opts]) => ({ url: String(u), method: opts?.method, body: opts?.body ? JSON.parse(opts.body) : undefined }));
+
+    /** Set the mode select to off — the button flips to "Turn AI off". */
+    function armOff() {
+        fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'off' } });
+    }
+
+    it('POSTs null, and only after the ack DELETEs the key — in that order, quiet success face', async () => {
+        synced.aiConfig = CONFIGURED;
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument()); // settle status fetch
+        armOff();
+        fireEvent.click(offButton());
+
+        await waitFor(() => expect(aiConfigCalls(fetchMock)).toHaveLength(2));
+        const calls = aiConfigCalls(fetchMock);
+        expect(calls[0].method).toBe('POST');
+        expect(calls[0].url).toContain(`/campaigns/${CN}/aiConfig`);
+        expect(calls[0].body).toEqual({ value: null });
+        expect(calls[1].method).toBe('DELETE');
+        expect(calls[1].url).toContain(`/campaigns/${CN}/aiConfig`);
+        expect(calls[1].body).toBeUndefined();
+        expect(screen.queryByRole('alert')).toBeNull(); // off succeeded — no notice
+    });
+
+    it('refused POST (e.g. server lock) never fires the DELETE and shows the reason', async () => {
+        synced.aiConfig = CONFIGURED;
+        const save = { ok: false, reason: 'campaign is locked' };
+        const fetchMock = stubFetch({ save });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        armOff();
+        fireEvent.click(offButton());
+
+        await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Server refused: campaign is locked'));
+        const calls = aiConfigCalls(fetchMock);
+        expect(calls).toHaveLength(1); // POST only — nothing written, nothing to wipe
+        expect(calls[0].method).toBe('POST');
+    });
+
+    it('failed DELETE surfaces through the same honest notice lane without eating the POST echo', async () => {
+        synced.aiConfig = CONFIGURED;
+        const fetchMock = stubFetch({ remove: { ok: false } });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        armOff();
+        fireEvent.click(offButton());
+
+        await waitFor(() => expect(aiConfigCalls(fetchMock)).toHaveLength(2));
+        await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Server refused:'));
+        expect(aiConfigCalls(fetchMock)[0].method).toBe('POST');
+        expect(aiConfigCalls(fetchMock)[1].method).toBe('DELETE');
     });
 });
 
