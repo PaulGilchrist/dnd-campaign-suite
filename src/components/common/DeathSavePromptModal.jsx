@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
@@ -65,6 +65,11 @@ function DeathSaveResult({ result }) {
 
 function DeathSavePromptModal({ campaignName }) {
   const [prompts, setPrompts] = useState([]);
+  // PromptIds already adjudicated — rolled on this client or resolved by
+  // another client's deathSaveResult-<Target> echo. One save per down event:
+  // a stale queue entry on a passive tab can never re-roll (double-save bug).
+  // Mirrors ConcentrationPromptModal (6b1800fa2).
+  const resolvedPromptIdsRef = useRef(new Set());
 
   const current = prompts.length > 0 ? prompts[0] : null;
 
@@ -73,20 +78,54 @@ function DeathSavePromptModal({ campaignName }) {
   }, []);
 
   const handleEvent = useCallback((event) => {
-    if (!event.key || event.data == null) return;
-    const prefix = `change-${campaignName}-deathSavePrompt-`;
-    if (!event.key.startsWith(prefix)) return;
-    const targetName = event.key.slice(prefix.length);
-    if (!targetName) return;
+    if (!event.key) return;
 
-    setPrompts(prev => {
-      if (prev.some(p => p.promptId === event.data.promptId)) return prev;
-      return [...prev, { targetName, ...event.data }];
-     });
-    }, [campaignName]);
+    const promptPrefix = `change-${campaignName}-deathSavePrompt-`;
+    if (event.key.startsWith(promptPrefix)) {
+      const targetName = event.key.slice(promptPrefix.length);
+      if (!targetName) return;
+
+      if (event.data == null) {
+        // Cleared-key echo (the server broadcasts null on key DELETE, as
+        // every client's Roll does via clearDeathSavePrompt): the prompt was
+        // answered on another client — drop every un-adjudicated queued
+        // prompt for that target. The prompt key is target-wide (one live
+        // prompt per target server-side), so a ghost queued behind a
+        // resolved head is server-absent too and must not spend a save.
+        // Keeps a check this client already adjudicated so its result panel
+        // survives until the user clicks Done (acting-tab asymmetry, same as
+        // the concentration modal).
+        const isCleared = (p) => !p.result && p.targetName === targetName;
+        setPrompts(prev => (prev.some(isCleared) ? prev.filter(p => !isCleared(p)) : prev));
+        return;
+      }
+
+      setPrompts(prev => {
+        if (prev.some(p => p.promptId === event.data.promptId)) return prev;
+        return [...prev, { targetName, ...event.data }];
+      });
+      return;
+    }
+
+    const resultPrefix = `change-${campaignName}-deathSaveResult-`;
+    if (event.key.startsWith(resultPrefix) && event.data?.promptId) {
+      // Any client's submitted result broadcasts here — stamp the promptId
+      // so an echo that races this tab's stale queue entry still yields
+      // exactly one roll (see the resolved-id guard in handleRoll).
+      resolvedPromptIdsRef.current.add(event.data.promptId);
+    }
+  }, [campaignName]);
 
   const handleRoll = useCallback(() => {
     if (!current) return;
+
+    if (resolvedPromptIdsRef.current.has(current.promptId)) {
+      // Already adjudicated on another client (result echo landed before the
+      // DELETE echo) — drop the stale queue entry instead of spending a
+      // second death save for one down event.
+      setPrompts(prev => prev.filter(p => p.promptId !== current.promptId));
+      return;
+    }
 
     // #1400/#1403 voided-prompt guard (single-producer law): relentless rage
     // (or any heal) can lift this target off 0 HP while their death-save
@@ -133,6 +172,7 @@ function DeathSavePromptModal({ campaignName }) {
         ? { ...p, result: { ...result } }
         : p
     ));
+    resolvedPromptIdsRef.current.add(current.promptId);
   }, [advance, campaignName, current]);
 
   const handleNext = useCallback(() => {
