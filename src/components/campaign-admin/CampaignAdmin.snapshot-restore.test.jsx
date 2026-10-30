@@ -163,15 +163,22 @@ describe('CampaignAdmin - per-snapshot Restore rows', () => {
         expect(postCalls(fetchMock)).toHaveLength(1);
     });
 
-    it('top Rollback to Snapshot button still POSTs with no body (legacy newest lane)', async () => {
+    it('top Rollback to Snapshot button names the latest snapshot + age and POSTs with no body (legacy newest lane)', async () => {
         const fetchMock = stubFetch();
         renderAdmin();
 
+        // The modal-open snapshot fetch unlocks Confirm and swaps the copy
+        // from the anonymous placeholder to the exact newest file.
         fireEvent.click(screen.getByRole('button', { name: 'Rollback to Snapshot' }));
+        const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
+        await waitFor(() => expect(confirmBtn).toBeEnabled());
+
         const warning = screen.getByText(/overwrite ALL current campaign data/);
-        expect(warning.textContent).toContain('latest snapshot');
+        expect(warning.textContent).toContain(`"${CAMPAIGN}"`);
+        expect(warning.textContent).toContain(NEWER_ZIP);
         expect(warning.textContent).not.toContain(OLDER_ZIP);
-        fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+        expect(warning.textContent).toMatch(/\(\d+ (minute|hour|day)s? old\)/);
+        fireEvent.click(confirmBtn);
 
         await screen.findByText('Rollback complete');
         const posts = postCalls(fetchMock);

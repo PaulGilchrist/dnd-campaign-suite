@@ -59,7 +59,7 @@ const createDefaultProps = (overrides = {}) => ({
  * OK JSON. A handler may be a response object, an Error (rejects), or a
  * never-settling Promise (busy state).
  */
-function stubFetch({ rollback, upload, inspect } = {}) {
+function stubFetch({ rollback, upload, inspect, snapshots } = {}) {
     const fetchMock = vi.fn((url) => {
         let result;
         if (url.endsWith('/admin/rollback')) {
@@ -71,7 +71,13 @@ function stubFetch({ rollback, upload, inspect } = {}) {
         } else if (url.endsWith('/admin/upload')) {
             result = upload ?? jsonResponse({ message: 'Upload complete' });
         } else if (url.endsWith('/admin/snapshots')) {
-            result = jsonResponse({ snapshots: [] });
+            // Default: one snapshot exists so the toolbar rollback modal
+            // unlocks its Confirm once the modal-open fetch lands. The
+            // zero-count / naming / gating lanes live in
+            // CampaignAdmin.rollback-modal.test.jsx.
+            result = snapshots ?? jsonResponse({
+                snapshots: [{ filename: RESTORED_ZIP, size: 1024, timestamp: new Date(Date.now() - 3600e3).toISOString() }]
+            });
         } else {
             result = jsonResponse({});
         }
@@ -93,6 +99,17 @@ function selectFile(name, type = 'application/zip') {
 }
 
 const clickModalConfirm = () => fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+/**
+ * Open the toolbar rollback modal and wait for the modal-open snapshot-list
+ * fetch to land — Confirm unlocks once the list is ready and non-empty.
+ */
+async function openRollbackModal() {
+    fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+    const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
+    await waitFor(() => expect(confirmBtn).toBeEnabled());
+    return confirmBtn;
+}
 
 /**
  * Pick a zip the default inspect stub recognises and wait for the pre-flight
@@ -161,7 +178,7 @@ describe('CampaignAdmin - Rollback', () => {
         const fetchMock = stubFetch();
         renderAdmin({ campaignName: TRICKY });
 
-        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        await openRollbackModal();
         clickModalConfirm();
 
         const status = await screen.findByText('Rolled back');
@@ -196,7 +213,7 @@ describe('CampaignAdmin - Rollback', () => {
         const fetchMock = stubFetch({ rollback: handler });
         renderAdmin();
 
-        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        await openRollbackModal();
         clickModalConfirm();
 
         const status = await screen.findByText(statusText);
@@ -212,7 +229,7 @@ describe('CampaignAdmin - Rollback', () => {
         const fetchMock = stubFetch({ rollback: neverSettles() });
         renderAdmin();
 
-        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        await openRollbackModal();
         clickModalConfirm();
 
         const busy = await screen.findByText('Rolling back...');

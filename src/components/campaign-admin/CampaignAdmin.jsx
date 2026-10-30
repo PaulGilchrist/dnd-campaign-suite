@@ -33,6 +33,29 @@ function formatSnapshotDate(timestamp) {
     return date.toLocaleString();
 }
 
+// Human relative age for the rollback warning copy, e.g. "2 days old".
+// Floor-based so a snapshot from 2 days and 12 hours ago reads "2 days old".
+function formatRelativeAge(timestamp) {
+    const time = new Date(timestamp).getTime();
+    if (Number.isNaN(time)) return '';
+    const seconds = Math.floor((Date.now() - time) / 1000);
+    if (seconds < 60) return 'less than a minute old';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} old`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} old`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days === 1 ? '' : 's'} old`;
+}
+
+// Newest-first timestamp wins even if the server list order ever changes.
+function getLatestSnapshot(snapshots) {
+    return snapshots.reduce(
+        (latest, snapshot) => (!latest || String(snapshot.timestamp) > String(latest.timestamp) ? snapshot : latest),
+        null
+    );
+}
+
 // Fully deselect the upload control so a later pick of the SAME file fires a
 // change event (real browsers drop `files` with the value; assign the empty
 // list explicitly where FileList semantics are not emulated, e.g. tests).
@@ -186,6 +209,47 @@ function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit
     );
 }
 
+// Toolbar "Rollback to Snapshot" modal content, derived on every render from
+// the freshly fetched snapshot list (opened via handleRollback). A ready,
+// non-empty list names the EXACT newest file and its relative age — mirroring
+// the per-row Restore lane's naming. While the list is loading, failed to
+// load, or is empty, the destructive Confirm stays natively disabled behind
+// an explanatory note (fail-closed: this modal used to offer a blind confirm
+// that only learned "No snapshot found" AFTER the user accepted).
+function buildRollbackLatestModal(campaignName, snapshots, snapshotsState, onConfirm) {
+    const overwriteCopy = `This will overwrite ALL current campaign data for "${campaignName}" with the latest snapshot on the server.`;
+    if (snapshotsState === 'error') {
+        return {
+            title: 'Rollback Campaign',
+            message: overwriteCopy,
+            note: 'Could not load the snapshot list — close this dialog and try again.',
+            confirmDisabled: true
+        };
+    }
+    if (snapshotsState !== 'ready') {
+        return {
+            title: 'Rollback Campaign',
+            message: overwriteCopy,
+            note: 'Loading the snapshot list…',
+            confirmDisabled: true
+        };
+    }
+    const latest = getLatestSnapshot(snapshots);
+    if (!latest) {
+        return {
+            title: 'Rollback Campaign',
+            message: `There is nothing to roll back to — the server has no snapshots for "${campaignName}".`,
+            note: 'No snapshots exist',
+            confirmDisabled: true
+        };
+    }
+    return {
+        title: 'Rollback Campaign',
+        message: `This will overwrite ALL current campaign data for "${campaignName}" with snapshot ${latest.filename} (${formatRelativeAge(latest.timestamp)}). All changes since the snapshot will be lost. This cannot be undone.`,
+        onConfirm
+    };
+}
+
 function ConfirmModal({ modal, onClose }) {
     return (
         <div className="ct-modal-overlay">
@@ -198,10 +262,17 @@ function ConfirmModal({ modal, onClose }) {
                 </div>
                 <div className="ct-modal-body">
                     <p>{modal.message}</p>
+                    {modal.note && (
+                        <p className="admin-snapshots-empty" role="status">{modal.note}</p>
+                    )}
                 </div>
                 <div className="ct-modal-footer">
                     <button className="ct-btn ct-btn-secondary" onClick={onClose}>Cancel</button>
-                    <button className="ct-btn ct-btn-danger" onClick={() => { onClose(); modal.onConfirm(); }}>
+                    <button
+                        className="ct-btn ct-btn-danger"
+                        onClick={() => { onClose(); modal.onConfirm(); }}
+                        disabled={modal.confirmDisabled}
+                    >
                         <i className="fas fa-exclamation-triangle"></i> Confirm
                     </button>
                 </div>
@@ -247,7 +318,12 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
     const [renameError, setRenameError] = useState(null);
     const [renaming, setRenaming] = useState(false);
     const [confirmModal, setConfirmModal] = useState(null);
+    // Toolbar rollback lane: modal open flag + snapshot-list load state, so
+    // the warning copy names the exact snapshot the server would restore and
+    // Confirm can stay disabled until the list lands (or forever at zero).
+    const [rollbackModal, setRollbackModal] = useState(false);
     const [snapshots, setSnapshots] = useState([]);
+    const [snapshotsState, setSnapshotsState] = useState('loading');
     // Campaign-lock state from GET /api/server-config. Fail-open default:
     // the Rename button stays enabled until the server explicitly reports a
     // lock (mirrors the snapshots pattern — a failed GET never blocks the
@@ -279,18 +355,20 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
     }, []);
 
     const loadSnapshots = useCallback(async () => {
+        setSnapshotsState('loading');
         try {
             const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/snapshots`);
             const data = await res.json();
-            if (!res.ok) {
+            if (!res.ok || !Array.isArray(data.snapshots)) {
                 console.error('Failed to load snapshots:', data.error || res.status);
+                setSnapshotsState('error');
                 return;
             }
-            if (Array.isArray(data.snapshots)) {
-                setSnapshots(data.snapshots);
-            }
+            setSnapshots(data.snapshots);
+            setSnapshotsState('ready');
         } catch (err) {
             console.error('Failed to load snapshots:', err.message);
+            setSnapshotsState('error');
         }
     }, [campaignName]);
 
@@ -422,45 +500,53 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
         }
     };
 
-    // Shared destructive-confirm gate for both rollback lanes: the top button
-    // (no filename — server's legacy newest-first behavior) and per-snapshot
-    // row restores (exact filename body). Everything after Confirm — POST,
-    // postRestoreNotice handoff, acting-tab reload — is identical.
+    // Shared destructive machinery for both rollback lanes: the POST (no
+    // filename → server's legacy newest-first behavior, exact filename →
+    // per-row lane), postRestoreNotice handoff, acting-tab reload. Everything
+    // BEFORE this (which message, disabled gate) is lane-specific.
+    const runRollback = async (filename) => {
+        setStatus('rolling-back');
+        try {
+            const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/rollback`, {
+                method: 'POST',
+                ...(filename ? {
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                } : {})
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setStatus({ error: data.error });
+            } else {
+                setStatus({ success: data.message });
+                try {
+                    sessionStorage.setItem('postRestoreNotice', JSON.stringify({ campaign: campaignName, restored: data.restored }));
+                } catch (err) {
+                    console.error('Failed to store post-restore notice:', err);
+                }
+                window.location.reload();
+            }
+        } catch (err) {
+            setStatus({ error: err.message });
+        }
+    };
+
+    // Per-row Restore lane: static message naming the exact snapshot.
     const openRollbackConfirm = (message, filename) => {
         setConfirmModal({
             title: 'Rollback Campaign',
             message,
-            onConfirm: async () => {
-                setStatus('rolling-back');
-                try {
-                    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/rollback`, {
-                        method: 'POST',
-                        ...(filename ? {
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ filename })
-                        } : {})
-                    });
-                    const data = await res.json();
-                    if (!res.ok) {
-                        setStatus({ error: data.error });
-                    } else {
-                        setStatus({ success: data.message });
-                        try {
-                            sessionStorage.setItem('postRestoreNotice', JSON.stringify({ campaign: campaignName, restored: data.restored }));
-                        } catch (err) {
-                            console.error('Failed to store post-restore notice:', err);
-                        }
-                        window.location.reload();
-                    }
-                } catch (err) {
-                    setStatus({ error: err.message });
-                }
-            }
+            onConfirm: () => runRollback(filename)
         });
     };
 
+    // Toolbar lane: open the modal immediately and REFRESH the snapshot list
+    // so its copy names the exact newest file + age once loaded (Confirm is
+    // disabled until then, and permanently at zero). The POST stays body-less
+    // — the server's newest-first selection is unchanged.
     const handleRollback = () => {
-        openRollbackConfirm(`This will overwrite ALL current campaign data for "${campaignName}" with the latest snapshot. All changes since the snapshot will be lost. This cannot be undone.`);
+        setRollbackModal(true);
+        loadSnapshots();
     };
 
     const handleRestoreSnapshot = (snapshot) => {
@@ -698,6 +784,13 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
 
             {confirmModal && (
                 <ConfirmModal modal={confirmModal} onClose={handleConfirmModalClose} />
+            )}
+
+            {rollbackModal && (
+                <ConfirmModal
+                    modal={buildRollbackLatestModal(campaignName, snapshots, snapshotsState, () => runRollback())}
+                    onClose={() => setRollbackModal(false)}
+                />
             )}
         </div>
     );
