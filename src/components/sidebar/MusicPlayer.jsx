@@ -343,6 +343,19 @@ function MusicPlayer({ campaignName, isLocalhost }) {
           <i className="fa-solid fa-pen"></i>
         </button>
       </div>
+      {/* Remote-ownership chip (backlog 2026-10-29-AF): since 576be121d the
+          stand-down tab's transport WORKS (its Pause commands the owner via
+          adoption), but its UI was indistinguishable from the owner's — same
+          active mood + enabled buttons with zero local player. playerMounted
+          is the existing owner discriminator; when shared state says playing
+          but THIS tab holds no frame, the audio lives in another window.
+          Pure derived render state — .travel-panel-hint idiom. */}
+      {playing && !playerMounted && (
+        <div className="music-remote-note">
+          <i className="fa-solid fa-circle-info"></i>
+          <span>Playing in another window</span>
+        </div>
+      )}
       {editing && (
         <div className="music-editor">
           <label htmlFor="music-editor-mood">Mood</label>

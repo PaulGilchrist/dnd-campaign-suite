@@ -151,6 +151,21 @@
   color: var(--color-error-light);
 }
 
+/* Remote-ownership chip (backlog 2026-10-29-AF) — .travel-panel-hint idiom:
+   muted icon+text line shown while ambience plays but this tab holds no
+   local player (the audio lives in another window). */
+.music-remote-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+  padding: 2px 0;
+}
+
 /* Hidden YouTube iframe — kept tiny but rendered so playback works */
 .yt-music-frame {
   position: fixed;
