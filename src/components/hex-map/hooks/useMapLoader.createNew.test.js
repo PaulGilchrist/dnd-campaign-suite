@@ -2,12 +2,14 @@
 /*
  * useMapLoader — create-new-map lane (createAndSaveNewMap path).
  *
- * Owns here: when loadMapData misses or rejects, the hook builds a fresh
- * outdoor map from the REAL config defaults (DEFAULT_GRID_SIZE,
- * GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN — not fixture-pinned
- * numbers) and saves the exact create payload; exposed state matches that
- * payload byte-for-byte; a rejected initial save logs the exact console
- * bytes and leaves the fresh map intact.
+ * Owns here: when loadMapData MISSES (falsy resolve — the legitimate
+ * "no document yet" lane), the hook builds a fresh outdoor map from the REAL
+ * config defaults (DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM,
+ * DEFAULT_TERRAIN — not fixture-pinned numbers) and saves the exact create
+ * payload; exposed state matches that payload byte-for-byte; a rejected
+ * initial save logs the exact console bytes and leaves the fresh map intact.
+ * A load that THROWS (404/abort/corrupt) no longer creates-and-saves — that
+ * render-only fallback lane is owned by useMapLoader.rejected-load.test.js.
  *
  * Lane map (do NOT duplicate across these files):
  * - post-load setters + envelope persistence        -> useMapLoader.api.test.js
@@ -19,9 +21,7 @@
  * use a constant mapName, so the #801 seams (hexMapNameRef was never
  * updated after `useRef(mapName)`, dead-closing saves on an in-place
  * change) are exercised by the in-place switch arms of
- * useMapLoader.api.test.js, not here; the load-reject fall-through below
- * rides the silent catch at :178 and asserts the intended fall-through
- * outcome only.
+ * useMapLoader.api.test.js, not here.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
@@ -143,17 +143,6 @@ describe('useMapLoader - creating new map', () => {
         expectFreshCreateSave([]);
         expect(result.current.marchingOrder).toEqual([]);
         expect(result.current.partyPosition).toBeNull();
-    });
-
-    it('falls through to fresh-map creation when the load rejects', async () => {
-        mapsService.loadMapData.mockRejectedValue(new Error('Network error'));
-
-        const { result } = renderNewMap();
-        await waitForLoad(result);
-
-        expectFreshCreateSave();
-        expect(result.current.marchingOrder).toEqual(['Thorin', 'Gandalf']);
-        expect(result.current.needsResetViewRef.current).toBe(true);
     });
 
     it('logs and keeps the fresh map when the initial save rejects — the flip pass retries the envelope', async () => {

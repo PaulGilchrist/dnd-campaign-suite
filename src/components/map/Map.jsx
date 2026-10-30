@@ -48,11 +48,13 @@ import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
 import RulerOverlay from './RulerOverlay.jsx';
 import MapSnapToast from './MapSnapToast.jsx';
+import MapNoticeToast from './MapNoticeToast.jsx';
 import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
 import PlayerContextMenu from './PlayerContextMenu.jsx';
 import useMapLoader from './hooks/useMapLoader';
+import useEphemeralToast from './hooks/useEphemeralToast';
 import useZoomPan from './hooks/useZoomPan';
 import Map3D from './Map3D/Map3D.jsx';
 import useWallDrawing from './hooks/useWallDrawing';
@@ -154,8 +156,16 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [shapeParams, setShapeParams] = useState(DEFAULTS.sphere);
     const [viewMode, setViewMode] = useState('2d');
 
+    // Rejected-load notice (backlog map-fresh-fallback-silent): a named map
+    // whose load 404s/aborts/corrupts opens a fresh copy — the loader reports
+    // it here so the user sees WHY the editor is blank (the falsy-resolve
+    // "no document yet" create lane stays silent). Display-only ephemeral UI
+    // (never game state); rendered by MapNoticeToast.jsx.
+    const { message: loadNotice, show: handleLoadRejected } = useEphemeralToast(4000);
+
     const { mapData, setMapData, placedItems, setPlacedItems, flushSave } = useMapLoader({
         campaignName, characters, mapName, gridSize, setGridSize, isLocalhost,
+        onLoadRejected: handleLoadRejected,
     });
 
     const {
@@ -710,6 +720,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     characters={characters}
                 />
             )}
+
+            {/* Rejected-load notice (display-only — see MapNoticeToast.jsx):
+                names the dead/404/corrupt map the fresh editor replaced. */}
+            <MapNoticeToast message={loadNotice} />
         </div>
     );
 }

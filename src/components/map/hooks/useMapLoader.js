@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService';
+import { buildMapLoadRejectedNotice } from '../../../services/maps/mapLoadNotice';
 import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig';
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
@@ -27,13 +28,18 @@ function buildSavePayload(mapData, gridSize, placedItems) {
     };
 }
 
-function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize, isLocalhost = true }) {
+function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize, isLocalhost = true, onLoadRejected }) {
     const [mapData, setMapData] = useState(null);
     const [placedItems, setPlacedItems] = useState([]);
     const svgLoadInProgressRef = useRef(false);
     const loadedMapNameRef = useRef(null);
     const pendingSaveRef = useRef(null);
     const saveTimerRef = useRef(null);
+    // Latest rejection-notice callback, read via ref so the load effect never
+    // re-arms on callback identity (inline arrows from the caller would
+    // re-trigger whole-document reloads).
+    const onLoadRejectedRef = useRef(onLoadRejected);
+    onLoadRejectedRef.current = onLoadRejected;
     // Dirty-tracking baseline: the last document bytes this instance is known
     // to have given the server (adopted on load, claimed on every flush). The
     // autosave effect compares each candidate payload against it and skips
@@ -120,6 +126,15 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                 // and let the first real edit persist via the normal debounced
                 // lane (user intent re-creates the document on purpose).
                 lastSavedRef.current = buildSavePayload(newData, gridSize, []);
+                // No-silent-fallback law, USER-facing half (backlog
+                // map-fresh-fallback-silent): the console.error above is loud
+                // for developers; the user gets a named notice so a dead map
+                // never reads as a silently-blank editor. Only this REJECTED
+                // lane fires — the falsy-resolve create lane below stays
+                // silent.
+                if (onLoadRejectedRef.current) {
+                    onLoadRejectedRef.current(buildMapLoadRejectedNotice(mapName));
+                }
             } else if (isLocalhost) {
                 // A falsy resolve is the legacy "no document yet" create lane
                 // (every real create flow POSTs the file first, so its load

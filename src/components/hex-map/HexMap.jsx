@@ -72,8 +72,34 @@ function HexHoverPreview({ hoveredHex, tool, rivers }) {
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName }) {
     const svgRef = useRef(null);
 
+    // ── Display-only map toast (arrival + POI-enter refusal + rejected-load
+    // notice share one slot) ──
+    // ARRIVAL flips travel-mode inactive and TravelPanel unmounts, taking its
+    // lastMessage with it — this top-level toast keeps "travel complete" legible
+    // when the panel auto-closes (backlog 2026-10-25 pm). The stale-linked-POI
+    // refusal (bug-hex-poi-enter-deleted-map-phantom-resurrect) rides the same
+    // lane with a longer read window. Local ephemeral UI feedback (never game
+    // state); the timer only hides the display. Declared BEFORE the loader so
+    // the rejected-load notice below can wire into it (map-fresh-fallback-
+    // silent).
+    const [mapToast, setMapToast] = useState(null);
+    const mapToastTimerRef = useRef(null);
+    const showMapToast = useCallback((message, duration = 2500) => {
+        clearTimeout(mapToastTimerRef.current);
+        setMapToast(message);
+        // toast auto-hide (display only, no game state)
+        mapToastTimerRef.current = setTimeout(() => setMapToast(null), duration);
+    }, []);
+    useEffect(() => () => clearTimeout(mapToastTimerRef.current), []);
+
+    // Rejected-load notice (backlog map-fresh-fallback-silent): a named map
+    // whose load 404s/aborts/corrupts opens a fresh copy — the loader reports
+    // it here so the user sees WHY the editor is blank (only the falsy-resolve
+    // "no document yet" create lane stays silent).
+    const handleLoadRejected = useCallback((message) => showMapToast(message, 4000), [showMapToast]);
+
     // ── Core map data (load/init/save) ──
-    const mapLoader = useMapLoader(campaignName, mapName, characters);
+    const mapLoader = useMapLoader(campaignName, mapName, characters, handleLoadRejected);
     const {
         loading, setMapData,
         gridSize, setGridSize,
@@ -165,23 +191,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const { generateMonsterPlacements, handleStartEncounter } = useEncounterGeneration({
         campaignName, mapName, terrain, marchingOrder, onEncounterCreated, parentDisplayName
     });
-
-    // ── Display-only map toast (arrival + POI-enter refusal share one slot) ──
-    // ARRIVAL flips travel-mode inactive and TravelPanel unmounts, taking its
-    // lastMessage with it — this top-level toast keeps "travel complete" legible
-    // when the panel auto-closes (backlog 2026-10-25 pm). The stale-linked-POI
-    // refusal (bug-hex-poi-enter-deleted-map-phantom-resurrect) rides the same
-    // lane with a longer read window. Local ephemeral UI feedback (never game
-    // state); the timer only hides the display.
-    const [mapToast, setMapToast] = useState(null);
-    const mapToastTimerRef = useRef(null);
-    const showMapToast = useCallback((message, duration = 2500) => {
-        clearTimeout(mapToastTimerRef.current);
-        setMapToast(message);
-        // toast auto-hide (display only, no game state)
-        mapToastTimerRef.current = setTimeout(() => setMapToast(null), duration);
-    }, []);
-    useEffect(() => () => clearTimeout(mapToastTimerRef.current), []);
 
     // ── Own-hex dead-click hint (display-only) ──
     // Clicking the destination on the party's CURRENT hex (e.g. stale coords

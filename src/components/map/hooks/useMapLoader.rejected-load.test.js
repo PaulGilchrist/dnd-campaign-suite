@@ -7,14 +7,17 @@
  * placedItems}` listed under its raw slug, with zero user feedback.
  *
  * Locked here:
- *   1. rejected load ⇒ the blank editor mounts but writes NOTHING across the
- *      debounce window, a manual flush, and unmount;
+ *   1. rejected load ⇒ the blank editor mounts, the user-facing
+ *      `Could not load "<map>"` notice fires (backlog
+ *      map-fresh-fallback-silent), and writes NOTHING across the debounce
+ *      window, a manual flush, and unmount;
  *   2. the first REAL edit (explicit user intent) persists exactly once through
  *      the normal debounced lane — "must not auto-persist unless the user
  *      explicitly edits";
  *   3. the falsy-resolve create lane (legacy no-document answer) still direct-
- *      saves the exact empty payload EXACTLY once (no re-PUT twin: the
- *      baseline is seeded with the same builder as the persistence envelope).
+ *      saves the exact empty payload EXACTLY once, SILENTLY (no notice; the
+ *      baseline is seeded with the same builder as the persistence envelope);
+ *   4. a successful load stays silent and writes nothing (zero-edit open).
  *
  * Mirror of useMapLoader.test.js harness (fake timers, real gridSize state,
  * spies on mapsService).
@@ -24,6 +27,7 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMapLoader from './useMapLoader.js';
 import * as mapsService from '../../../services/maps/mapsService.js';
+import { buildMapLoadRejectedNotice } from '../../../services/maps/mapLoadNotice.js';
 import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig.js';
 
 const CAMPAIGN = 'test-campaign';
@@ -34,12 +38,14 @@ describe('useMapLoader — rejected-load phantom-resurrect guard', () => {
   let loadMapDataSpy;
   let saveMapDataSpy;
   let consoleErrorSpy;
+  let noticeSpy;
 
   beforeEach(() => {
     vi.useFakeTimers();
     loadMapDataSpy = vi.spyOn(mapsService, 'loadMapData').mockRejectedValue(new Error('Map not found'));
     saveMapDataSpy = vi.spyOn(mapsService, 'saveMapData').mockResolvedValue({});
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    noticeSpy = vi.fn();
   });
 
   afterEach(() => {
@@ -56,10 +62,10 @@ describe('useMapLoader — rejected-load phantom-resurrect guard', () => {
           gridSize,
         };
       },
-      { initialProps: { campaignName: CAMPAIGN, characters: CHARACTERS, mapName } },
+      { initialProps: { campaignName: CAMPAIGN, characters: CHARACTERS, mapName, onLoadRejected: noticeSpy } },
     );
 
-  it('mounts the blank fallthrough but NEVER re-creates the deleted document — zero writes on open, debounce, flush, and unmount', async () => {
+  it('mounts the blank fallthrough, NOTICES the user, and NEVER re-creates the deleted document — zero writes on open, debounce, flush, and unmount', async () => {
     const { result, unmount } = renderLoader();
     await act(async () => {});
 
@@ -68,6 +74,12 @@ describe('useMapLoader — rejected-load phantom-resurrect guard', () => {
       'Failed to load map data (falling through to fresh map):',
       expect.any(Error),
     );
+    // …and the rejected-load lane is now VISIBLE too (backlog
+    // map-fresh-fallback-silent): named notice, fresh-copy explanation.
+    expect(noticeSpy).toHaveBeenCalledTimes(1);
+    expect(noticeSpy).toHaveBeenCalledWith(buildMapLoadRejectedNotice(MAP));
+    expect(noticeSpy.mock.calls[0][0]).toContain('Could not load');
+    expect(noticeSpy.mock.calls[0][0]).toContain(MAP);
     // …but the open-time create-save that resurrected the file is GONE.
     await act(async () => { vi.advanceTimersByTime(5000); });
     act(() => result.current.flushSave());
@@ -96,7 +108,7 @@ describe('useMapLoader — rejected-load phantom-resurrect guard', () => {
     }));
   });
 
-  it('falsy-resolve create lane still direct-saves the exact empty payload exactly once (no re-PUT twin)', async () => {
+  it('falsy-resolve create lane still direct-saves the exact empty payload exactly once, SILENTLY (no re-PUT twin, no notice)', async () => {
     loadMapDataSpy.mockResolvedValue(null);
 
     const { result } = renderLoader();
@@ -109,6 +121,11 @@ describe('useMapLoader — rejected-load phantom-resurrect guard', () => {
       gridSize: DEFAULT_GRID_SIZE,
       placedItems: [],
     });
+    // The "no document yet" create lane is legitimate — it stays invisible
+    // (backlog map-fresh-fallback-silent distinguishes it from a REJECTED
+    // load, which alone gets the notice).
+    expect(noticeSpy).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
 
     // The baseline is seeded with the SAME builder the persistence effect uses
     // (walls normalized to an array), so the loading-flip pass compares clean
@@ -117,5 +134,24 @@ describe('useMapLoader — rejected-load phantom-resurrect guard', () => {
     act(() => result.current.flushSave());
     expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
     expect(result.current.mapData.walls).toEqual(new Set());
+  });
+
+  it('successful load: no notice, no writes, console stays clean', async () => {
+    loadMapDataSpy.mockResolvedValue({
+      players: [{ name: 'Thorin', x: 1, y: 1 }],
+      walls: ['2,3'],
+      gridSize: DEFAULT_GRID_SIZE,
+      placedItems: [],
+    });
+
+    const { result } = renderLoader();
+    await act(async () => {});
+    await act(async () => { vi.advanceTimersByTime(5000); });
+    act(() => result.current.flushSave());
+
+    expect(noticeSpy).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+    expect(result.current.mapData.walls).toEqual(new Set(['2,3']));
   });
 });

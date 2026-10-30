@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService.js';
+import { buildMapLoadRejectedNotice } from '../../../services/maps/mapLoadNotice.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -244,7 +245,13 @@ function buildInitialMapData(characters) {
     return { initialTerrain, initialOrder, initialPartyPos, newData };
 }
 
-async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
+// Shared fresh-document render for the create lane AND the rejected-load
+// fallback: identical setters and ref claims, so the fallback *renders*
+// exactly what a create renders (fresh editor visible) while the create lane
+// keeps its save semantics byte-identically. Returns the fresh document plus
+// a lazy envelope builder — the create lane reads travelStateRef AFTER its
+// save resolves, matching the pre-refactor sequencing exactly.
+function renderFreshMap(mapName, characters, ctx) {
     const { initialTerrain, initialOrder, initialPartyPos, newData } = buildInitialMapData(characters);
 
     ctx.setMapData(newData);
@@ -262,15 +269,15 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
     ctx.hexMapDisplayNameRef.current = mapName;
     ctx.heldMapTypeRef.current = 'outdoor';
     ctx.resumedTripRef.current = false;
+    // Claim the held-bytes name before the loading flip so the #800 flush
+    // commit passes the persistence name guard (see applyExistingMap). While
+    // `loading` is still true the persistence effect skips every commit, so
+    // claiming here (vs after the create-save await) is behaviour-neutral.
+    ctx.hexMapNameRef.current = mapName;
 
-    try {
-        await mapsService.saveMapData(campaignName, mapName, newData);
-        // Create landed: seed the persistence effect's envelope shape as the
-        // dirty baseline so the loading-flip commit does NOT schedule a
-        // second, normalization-only re-PUT of the same document
-        // (backlog 2026-10-26). Envelope extras (displayName/pan/weather/
-        // travelState) ride along with the next real edit.
-        ctx.lastSavedRef.current = buildHexEnvelope({
+    return {
+        newData,
+        buildEnvelope: () => buildHexEnvelope({
             displayName: mapName,
             gridSize: DEFAULT_GRID_SIZE,
             terrain: initialTerrain,
@@ -284,17 +291,27 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
             partyPosition: initialPartyPos,
             weather: null,
             travelState: ctx.travelStateRef.current,
-        });
+        }),
+    };
+}
+
+async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
+    const { newData, buildEnvelope } = renderFreshMap(mapName, characters, ctx);
+
+    try {
+        await mapsService.saveMapData(campaignName, mapName, newData);
+        // Create landed: seed the persistence effect's envelope shape as the
+        // dirty baseline so the loading-flip commit does NOT schedule a
+        // second, normalization-only re-PUT of the same document
+        // (backlog 2026-10-26). Envelope extras (displayName/pan/weather/
+        // travelState) ride along with the next real edit.
+        ctx.lastSavedRef.current = buildEnvelope();
     } catch (err) {
         // Create failed — keep the baseline null so the loading-flip
         // persistence pass retries the full envelope (no silent data loss).
         ctx.lastSavedRef.current = null;
         console.error('Failed to save initial hex map data:', err);
     }
-
-    // Claim the held-bytes name before the loading flip so the #800 flush
-    // commit passes the persistence name guard (:201) — see applyExistingMap.
-    ctx.hexMapNameRef.current = mapName;
 
     // Flipping `loading` here is the ONLY post-load signal the persistence
     // effect needs: it is state, so the re-render it causes re-runs that
@@ -303,7 +320,38 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
     ctx.setLoading(false);
 }
 
-function useMapLoader(campaignName, mapName, characters) {
+// Rejected-load fallback (backlog map-fresh-fallback-silent): a named map
+// whose load THREW (404/abort/corrupt JSON) must render the fresh editor but
+// touch the disk ZERO times — the create lane's immediate POST would
+// resurrect the corrupt/dead file on a zero-edit open. Mirrors the proven
+// indoor loadRejected gate (map/hooks/useMapLoader.js, d737fe875): seed the
+// dirty baseline with the EXACT envelope the persistence effect rebuilds on
+// the loading flip, so a zero-edit open compares clean and writes nothing;
+// the first real user edit persists normally (intent re-creates the doc).
+function applyRejectedFreshMap(mapName, characters, ctx) {
+    const { buildEnvelope } = renderFreshMap(mapName, characters, ctx);
+    ctx.lastSavedRef.current = buildEnvelope();
+    // The fresh map's needsResetViewRef centering pass (HexMap view-normalize
+    // layout effect) rewrites zoom/pan one commit after the flip. That drift
+    // is normalization, not user intent — the persistence effect adopts it
+    // while awaitingFirstEditRef is armed (see isViewOnlyDrift there).
+    ctx.awaitingFirstEditRef.current = true;
+    ctx.setLoading(false);
+}
+
+// True when `envelope` differs from `baseline` ONLY in the view slots
+// (zoom/panX/panY). Used by the rejected-load fallback gate: the fresh-map
+// needsResetViewRef centering pass rewrites exactly these bytes one commit
+// after the loading flip, and that normalization must not count as a user
+// edit dirtying a render-only document (backlog map-fresh-fallback-silent).
+function isViewOnlyDrift(envelope, baseline) {
+    return isEqual(
+        { ...envelope, zoom: baseline.zoom, panX: baseline.panX, panY: baseline.panY },
+        baseline,
+    );
+}
+
+function useMapLoader(campaignName, mapName, characters, onLoadRejected) {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState(null);
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
@@ -354,6 +402,16 @@ function useMapLoader(campaignName, mapName, characters) {
     // (no-timers-guard category), never game state.
     const pendingSaveRef = useRef(null);
     const saveTimerRef = useRef(null);
+    // Rejected-load fallback gate (backlog map-fresh-fallback-silent): armed
+    // only by applyRejectedFreshMap, disarmed by the first real (non-view)
+    // edit or after one view-normalize adoption. The persistence effect
+    // adopts view-only drift while armed so a zero-edit open PUTs nothing.
+    const awaitingFirstEditRef = useRef(false);
+    // Latest rejection-notice callback, read via ref so the load effect never
+    // re-arms on callback identity (inline arrows from the caller would
+    // re-trigger whole-document reloads).
+    const onLoadRejectedRef = useRef(onLoadRejected);
+    onLoadRejectedRef.current = onLoadRejected;
 
     const setTravelStateRef = useCallback((ts) => {
         travelStateRef.current = ts;
@@ -391,6 +449,9 @@ function useMapLoader(campaignName, mapName, characters) {
         if (isInitialized.current && hexMapNameRef.current === mapName) return;
         isInitialized.current = true;
         setLoading(true);
+        // Every fresh load owns its own fallback gate (a rejected-load
+        // fallback arms it below; successful/create lanes leave it false).
+        awaitingFirstEditRef.current = false;
 
         const ctx = {
             campaignName,
@@ -400,9 +461,11 @@ function useMapLoader(campaignName, mapName, characters) {
             hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
             heldMapTypeRef,
             travelStateRef, lastSavedRef, resumedTripRef,
+            awaitingFirstEditRef,
         };
 
         const loadMap = async () => {
+            let loadRejected = false;
             try {
                 const existing = await mapsService.loadMapData(campaignName, mapName);
                 if (existing) {
@@ -413,6 +476,21 @@ function useMapLoader(campaignName, mapName, characters) {
                 // No-silent-fallback law (fix#337S #798): fall through to empty-map
                 // creation, but LOUD — swallowed load errors were invisible before.
                 console.error('Failed to load hex map data (falling through to fresh map):', err);
+                loadRejected = true;
+            }
+
+            if (loadRejected) {
+                // A REJECTED load renders the fresh editor but never writes
+                // disk (mirror of the indoor d737fe875 gate) — and the console
+                // error alone is not enough: the user gets a named notice
+                // (backlog map-fresh-fallback-silent). Only this lane fires;
+                // the falsy-resolve create lane below is legitimate and
+                // stays silent.
+                applyRejectedFreshMap(mapName, characters, ctx);
+                if (onLoadRejectedRef.current) {
+                    onLoadRejectedRef.current(buildMapLoadRejectedNotice(mapName));
+                }
+                return;
             }
 
             await createAndSaveNewMap(campaignName, mapName, characters, ctx);
@@ -474,6 +552,23 @@ function useMapLoader(campaignName, mapName, characters) {
             weather,
             travelState: travelStateRef.current,
         });
+        // Rejected-load fallback gate (backlog map-fresh-fallback-silent):
+        // while armed, the fresh document is RENDER-ONLY until real intent.
+        // The needsResetViewRef centering pass (HexMap layout effect) rewrites
+        // zoom/pan one commit after the loading flip — that view-only drift is
+        // normalization, so adopt those bytes into the baseline instead of
+        // dirtying a document that must not exist on disk yet. Any non-view
+        // difference is the first real edit: disarm and persist normally.
+        if (awaitingFirstEditRef.current && lastSavedRef.current && !isEqual(dataToSave, lastSavedRef.current)) {
+            if (isViewOnlyDrift(dataToSave, lastSavedRef.current)) {
+                lastSavedRef.current = dataToSave;
+                awaitingFirstEditRef.current = false;
+                pendingSaveRef.current = null;
+                clearSaveTimer();
+                return;
+            }
+            awaitingFirstEditRef.current = false;
+        }
         const queued = pendingSaveRef.current;
         if (queued && queued.mapName === mapName && queued.campaignName === campaignName
             && isEqual(queued.dataToSave, dataToSave)) {
