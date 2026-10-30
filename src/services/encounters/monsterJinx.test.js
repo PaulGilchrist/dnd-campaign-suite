@@ -297,6 +297,7 @@ describe('MA-0895 resolve consumer — Done converts the stamped pending hit to 
     saveTotal: 5,
     attackTotal: 17,
     targetAc: 13,
+    lastAttackNonce: 'Scimitar:14:17',
     consumed: false,
   });
 
@@ -338,6 +339,42 @@ describe('MA-0895 resolve consumer — Done converts the stamped pending hit to 
     expect(deps.setRuntimeValue).not.toHaveBeenCalled();
     expect(store.logs).toHaveLength(0);
     expect(store.campaign.lastAttack).toBe(before);
+  });
+
+  // Owner ruling (a) 2026-10-30 (CLOSED-RULING, app-exploration backlog): the
+  // identity contract is (attackerName, targetName), NEVER the stamped nonce —
+  // a stale pendingJinx riding the next same-attacker same-hexer resolve is
+  // the ACCEPTED next-swing contract (redirect twin monsterRedirectAttack.js
+  // :258-264; redirect ride pinned in monsterRedirectAttack.test.js). These
+  // legs lock BOTH faces: the ride works, and mis-apply beyond the tuple is
+  // impossible (attacker/target inert table above).
+  it('ruling (a) next-swing ride: a stale stamp (nonce Scimitar:14:17) negates the NEXT same-attacker same-hexer resolve even on divergent roll bytes (fresh d20 8/total 11) — nonce is forensic, identity is the tuple', async () => {
+    const { store, deps } = consumeSetup();
+    // The original popup died unpressed (abandoned attack); a FRESH swing of
+    // the same attacker at the same hexer resolves Done through handlePlainDamage.
+    store.campaign.lastAttack = pendingHit({ d20: 8, total: 11, jinxResolved: true, jinxPending: true });
+    const context = { attackerName: 'Bandit 1', targetName: HEXER, attackName: 'Scimitar', damageType: 'Slashing' };
+    const outcome = await consumePendingJinxOnResolve(CAMPAIGN, context, deps);
+    expect(outcome.negated).toBe(true);
+    expect(store.campaign.pendingJinx).toBeNull();
+    // The miss merges over the NEW swing's preserved roll bytes (d20 8/total 11).
+    expect(store.campaign.lastAttack).toMatchObject({
+      hit: false, jinx_negated: true, negatedBy: HEXER, actualDamage: 0, damageApplied: false,
+      attackerName: 'Bandit 1', targetName: HEXER, d20: 8, total: 11,
+    });
+    expect(store.logs.some(l => l.automationType === 'jinx_attack_negated')).toBe(true);
+  });
+
+  it('one-shot apply: the ride consumes itself — a nulled stamp makes the second resolve byte-inert (no double-negation off one jinx)', async () => {
+    const { store, deps } = consumeSetup();
+    const context = { attackerName: 'Bandit 1', targetName: HEXER, attackName: 'Scimitar', damageType: 'Slashing' };
+    expect((await consumePendingJinxOnResolve(CAMPAIGN, context, deps)).negated).toBe(true);
+    const writesAfterFirst = deps.setRuntimeValue.mock.calls.length;
+    const logsAfterFirst = store.logs.length;
+    expect(await consumePendingJinxOnResolve(CAMPAIGN, context, deps)).toBeNull();
+    expect(deps.setRuntimeValue.mock.calls).toHaveLength(writesAfterFirst);
+    expect(store.logs).toHaveLength(logsAfterFirst);
+    expect(store.campaign.pendingJinx).toBeNull();
   });
 });
 

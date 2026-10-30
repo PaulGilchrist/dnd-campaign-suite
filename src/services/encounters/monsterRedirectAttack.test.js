@@ -367,6 +367,21 @@ describe('MA-0891 resolve consumer (Done → victim swap)', () => {
     expect(deps.addEntry).not.toHaveBeenCalled();
   });
 
+  // Owner ruling (a) 2026-10-30 (CLOSED-RULING, app-exploration backlog):
+  // next-swing ride IS the contract — identity is (attacker, original target),
+  // never the stamped nonce. Jinx twin monsterJinx.js pins the mirror leg
+  // (consumePendingJinxOnResolve) with the same tuple semantics.
+  it('ruling (a) next-swing ride: the real press stamp (nonce Scimitar:14:17) is consumed by the NEXT same-attacker same-original-target resolve even on divergent roll bytes (fresh d20 8/total 11) — nonce forensic, identity is the tuple', async () => {
+    const { result, deps } = await press();
+    expect(deps.store.campaign.pendingRedirect.lastAttackNonce).toBe('Scimitar:14:17');
+    // Original popup abandoned; a fresh d20-8 swing at the BOSS resolves Done.
+    deps.store.campaign.lastAttack = pendingHit({ d20: 8, total: 11, redirected: true });
+    const context = { damageType: 'Slashing', attackerName: ATTACKER, targetName: BOSS, d20: 8, total: 11 };
+    expect(await consumePendingRedirectOnResolve(CAMPAIGN, context, makeCs(), deps)).toEqual({ newTarget: result.allyName, originalTarget: BOSS });
+    expect(context.targetName).toBe(ALLY);
+    expect(deps.store.campaign.pendingRedirect).toBeNull();
+  });
+
   it('ARC lapsed: ALLY gone from the board at resolve — stamp cleared ONE write, redirect_attack_lapsed logged, damage stays on the popup target, reaction stays spent', async () => {
     const { deps } = await press();
     const context = { damageType: 'Slashing', attackerName: ATTACKER, targetName: BOSS };

@@ -176,6 +176,10 @@ export function buildJinxPendingStamp({ monsterName, lastAttack, spec, roll, mod
     attackTotal: lastAttack.total ?? null,
     targetAc: lastAttack.targetAc ?? null,
     round: Number(currentRound) || 0,
+    // Forensic/log byte ONLY — never read at consume (see jinxConsumeMatch):
+    // attackName:d20:total is not attack-instance-unique anyway (two identical
+    // rolls collide), and the resolve seam's context carries no d20/total.
+    // Redirect-stamp twin monsterRedirectAttack.js:180 — same rule, both lanes.
     lastAttackNonce: `${lastAttack.attackName || 'attack'}:${lastAttack.d20 ?? ''}:${lastAttack.total ?? ''}`,
     consumed: false,
     timestamp: Date.now(),
@@ -284,6 +288,20 @@ export async function resolveMonsterJinxRow({ action, monsterName, campaignName,
 // damage lands — lastAttack hit:false + jinx_negated:true + zero hp_change +
 // auto-miss popup "attack negated — Jinx". No armed jinx, attacker/target
 // mismatch, or consumed stamp → byte-inert null (legacy rows untouched).
+// IDENTITY CONTRACT (owner ruling (a) 2026-10-30, CLOSED-RULING next-swing
+// semantics; byte-parity with the redirect gate monsterRedirectAttack.js:258-
+// 264): the match is (attackerName, targetName) — NOT attack-instance. The
+// stamped lastAttackNonce is a forensic byte the seam cannot even recompute
+// (the Done-resolve context carries no d20/total fields), and reading
+// lastAttack to compare it would mean clearing the stamp on a fresh swing —
+// exactly the next-swing clear the ruling FORBADES (every live consume lane
+// is a stale stamp riding the next same-attacker same-target resolve).
+// Mis-apply faces are closed by the tuple itself: another attacker's swing
+// fails the attacker leg, a swing at any other target fails the target leg;
+// the surviving ride — the same attacker re-swinging at THIS hexer — is still
+// an attack against the jinxing defender (the RAW reaction's own scope), and
+// exactly one shot (the stamp nulls before the miss lands). Pinned by
+// monsterJinx.test.js ride + one-shot + inert-table legs.
 function jinxConsumeMatch(pending, context) {
   return Boolean(pending) && pending.consumed !== true && Boolean(context)
     && context.attackerName === pending.attackerName

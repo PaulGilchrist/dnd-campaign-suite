@@ -177,6 +177,9 @@ export function buildRedirectPendingStamp({ monsterName, lastAttack, allyName, c
     by: monsterName,
     attackName: lastAttack.attackName || null,
     round: Number(currentRound) || 0,
+    // Forensic/log byte ONLY — never read at consume (identity gate below
+    // matches attacker+target, owner ruling (a) 2026-10-30 next-swing ride).
+    // Jinx-stamp twin monsterJinx.js jinxConsumeMatch — same rule, both lanes.
     lastAttackNonce: `${lastAttack.attackName || 'attack'}:${lastAttack.d20 ?? ''}:${lastAttack.total ?? ''}`,
     timestamp: Date.now(),
   };
@@ -260,7 +263,13 @@ export async function consumePendingRedirectOnResolve(campaignName, context, com
   // Identity gate: only the attack whose popup is still armed on the ORIGINAL
   // victim may be rewritten — a fresh swing the attacker re-armed elsewhere
   // must stay byte-inert (E2E control: second Scimitar armed on Bandit 2
-  // must not consume the pending redirect).
+  // must not consume the pending redirect). Identity = (attackerName,
+  // targetName), NEVER the stamped nonce: a stale stamp riding the next
+  // same-attacker same-target resolve is the ACCEPTED contract (owner ruling
+  // (a) 2026-10-30, CLOSED-RULING; nonce/popup-death clears would retire the
+  // only live consume lane per the 2026-10-29 reachability audit). The jinx
+  // gate monsterJinx.js jinxConsumeMatch mirrors these exact comparison
+  // fields — one identity contract, both lanes.
   if (context.targetName !== pending.originalTarget) return null;
   const ally = (combatSummary?.creatures || []).find(c => c.name === pending.newTarget);
   if (!ally) {
