@@ -269,7 +269,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AM
 
-- **clear-all-count-grammar-singular**: named confirm copy hardcodes the plural — one overlay on the board reads `Clear all 1 spell overlays? This removes overlays placed by everyone.` (live-verbatim AM). Pluralize `overlay(s)` on `count === 1` in `useSpellOverlay.js` `clearOverlays` (and the family idiom if any sibling shares it). Cosmetic-only; confirm copy is otherwise honest.
 - **ruler-zero-length-label**: same-cell double-click labels `0 ft (<1 cells)` — an exact 0 displays as "<1", and the singular gate `Math.round(cellDist)===1` renders "cell" nowhere near a "<1" read. `RulerOverlay.jsx:26`: special-case `cellDist === 0` → `0 cells` (or just `0 ft`), keep `<1` for genuine sub-cell diagonals is not even possible on integer grids — consider dropping `<1` entirely. Cosmetic copy nit; the ft number itself is exact.
 
 ### Open items — 2026-10-30 run AL

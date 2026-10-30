@@ -106,7 +106,10 @@ function useSpellOverlay(campaignName, _mapName) {
     }, [sendAction]);
 
     const clearOverlays = useCallback(() => {
-        if (!window.confirm(`Clear all ${overlaysRef.current.length} spell overlays? This removes overlays placed by everyone.`)) return;
+        const count = overlaysRef.current.length;
+        // Count-noun gate (cosmetic, backlog 2026-10-30): 1 overlay reads
+        // "1 spell overlay", never "1 spell overlays".
+        if (!window.confirm(`Clear all ${count} spell overlay${count === 1 ? '' : 's'}? This removes overlays placed by everyone.`)) return;
         setOverlays([]);
         sendAction('clear');
     }, [sendAction]);

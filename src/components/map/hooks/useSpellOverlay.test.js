@@ -195,6 +195,32 @@ describe('useSpellOverlay', () => {
     expect(result.current.overlays).toEqual([]);
   });
 
+  // Count-noun gate (cosmetic backlog 2026-10-30): exactly 1 overlay reads
+  // singular; the 2+ plural face above stays byte-identical.
+  it('Clear All confirm is singular with exactly one overlay, plural with two', () => {
+    const sphere = { id: 'sp1', shape: 'sphere', radiusFt: 20 };
+    const cone = { id: 'cn1', shape: 'cone', distanceFt: 60, coneAngle: 53 };
+    const { result } = getHook();
+    act(() => { result.current.addOverlay(sphere); });
+    fetchSpy.mockClear();
+
+    act(() => { result.current.clearOverlays(); });
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Clear all 1 spell overlay? This removes overlays placed by everyone.',
+    );
+
+    // Restore the board, add a second overlay → plural face verbatim.
+    act(() => {
+      result.current.addOverlay(sphere);
+      result.current.addOverlay(cone);
+    });
+    confirmSpy.mockClear();
+    act(() => { result.current.clearOverlays(); });
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Clear all 2 spell overlays? This removes overlays placed by everyone.',
+    );
+  });
+
   it('logs and keeps optimistic state when the transport fails', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fetchSpy.mockRejectedValue(new Error('API fail'));
