@@ -154,6 +154,7 @@ function applyExistingMap(existing, mapName, characters, ctx) {
     const { loadedZoom, loadedPanX, loadedPanY, isOldDefault } = normalizeExistingView(existing);
 
     if (!existing.type) existing.type = 'outdoor';
+    ctx.heldMapTypeRef.current = existing.type;
 
     ctx.setMapData(existing);
     ctx.setGridSize(loadedGridSize);
@@ -259,6 +260,7 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
     // in-place switch cannot carry the previous map's displayName into the
     // new map's save envelope (#801).
     ctx.hexMapDisplayNameRef.current = mapName;
+    ctx.heldMapTypeRef.current = 'outdoor';
     ctx.resumedTripRef.current = false;
 
     try {
@@ -326,6 +328,12 @@ function useMapLoader(campaignName, mapName, characters) {
     // again, so an in-place mapName change opened the persistence guard's
     // stale side forever and saves silently died).
     const hexMapNameRef = useRef(null);
+    // Type of the held document, claimed by the load paths alongside
+    // hexMapNameRef (bug 2026-10-30 hex→indoor POI enter): a keyed remount or
+    // in-place switch can hand this component an INDOOR document — its
+    // persistence lane must then write nothing, because buildHexEnvelope emits
+    // an outdoor, players-less shape that the indoor URL can never accept.
+    const heldMapTypeRef = useRef(null);
     const hexMapDisplayNameRef = useRef(mapName);
     const travelStateRef = useRef(null);
     // True when a LOADED map file carried a live trip (improve 2026-10-26-D):
@@ -390,6 +398,7 @@ function useMapLoader(campaignName, mapName, characters) {
             setZoom, setPanX, setPanY, setWeather, setTravelInit,
             setMarchingOrder, setPartyPosition, setLoading,
             hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
+            heldMapTypeRef,
             travelStateRef, lastSavedRef, resumedTripRef,
         };
 
@@ -414,9 +423,10 @@ function useMapLoader(campaignName, mapName, characters) {
 
     // Persistence effect. The guards are: `loading` STATE (skip pre-load —
     // flushing there would clobber server data with empty defaults), the
-    // mapName-vs-held-bytes check below, and the DIRTY gate: the envelope is
-    // deep-compared against the last document known to be on the server
-    // (seeded from the normalized load snapshot), so a zero-edit open — and
+    // mapName-vs-held-bytes check below, the held-document-shape check (only
+    // outdoor documents may persist from this lane), and the DIRTY gate: the
+    // envelope is deep-compared against the last document known to be on the
+    // server (seeded from the normalized load snapshot), so a zero-edit open — and
     // the echo of this tab's own write — never re-PUTs the whole document
     // (backlog 2026-10-26: this lane emitted six no-op PUTs per open+back).
     // The ref guard is CROSS-MAP prevention, not de-dup: the save addresses
@@ -433,6 +443,21 @@ function useMapLoader(campaignName, mapName, characters) {
     useEffect(() => {
         if (loading) return;
         if (mapName !== hexMapNameRef.current) return;
+        // Cross-shape guard (bug 2026-10-30 hex→indoor POI enter): a name match
+        // is NOT enough — the held document must also be the OUTDOOR shape this
+        // envelope builder emits. Entering an indoor-linked POI can hand this
+        // component the indoor document (a keyed remount mounts fresh on the
+        // indoor name; an in-place switch re-arms the load effect): the name
+        // guard legitimately passes once the load claims it, and the
+        // view-normalize layout effect in HexMap (needsResetViewRef → zoom/pan
+        // rewrite) then dirties the just-seeded baseline — queuing a players-less
+        // outdoor envelope under the INDOOR URL, 400'd only by the server
+        // players guard. While the held document is not outdoor-shaped, nothing
+        // here may persist; an outdoor document queued BEFORE the switch keeps
+        // its queue and still flushes to its own URL (debounce or unmount
+        // chokepoint). Keyed on the load-path ref, not mapData state: mapData is
+        // a display slot (SSE merges into it), exactly like the held-name ref.
+        if (heldMapTypeRef.current !== 'outdoor') return;
 
         const dataToSave = buildHexEnvelope({
             displayName: hexMapDisplayNameRef.current,
