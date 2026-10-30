@@ -1,4 +1,5 @@
 import { formatTimestamp } from './log-utils.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 export function SpellEntry({ entry }) {
   const hasMetamagic = entry.metamagic && entry.metamagic.length > 0;
@@ -38,7 +39,7 @@ export function SpellEntry({ entry }) {
           <span className="log-no-metamagic">No Metamagic</span>
         )}
         {hasDescription && (
-          <span className="log-spell-description" dangerouslySetInnerHTML={{ __html: entry.description }} />
+          <span className="log-spell-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(entry.description) }} />
         )}
       </div>
     </div>

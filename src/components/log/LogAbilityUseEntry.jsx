@@ -1,4 +1,5 @@
 import { formatTimestamp } from './log-utils.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 export function AbilityUseEntry({ entry }) {
   const hasSaveDetails = entry.saveRoll != null;
@@ -13,7 +14,7 @@ export function AbilityUseEntry({ entry }) {
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-ability-details">
-        {entry.description && <span className="log-ability-description" dangerouslySetInnerHTML={{ __html: entry.description }} />}
+        {entry.description && <span className="log-ability-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(entry.description) }} />}
         {hasSaveDetails && (
           <div className="log-ability-save-details">
             <span className={`log-die log-die-selected`}>({entry.saveRoll})</span>

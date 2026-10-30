@@ -1,4 +1,5 @@
 import { formatTimestamp } from './log-utils.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 export function SummonsEntry({ entry }) {
   return (
@@ -10,7 +11,7 @@ export function SummonsEntry({ entry }) {
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-summons-details">
-        {entry.description && <span className="log-summons-description" dangerouslySetInnerHTML={{ __html: entry.description }} />}
+        {entry.description && <span className="log-summons-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(entry.description) }} />}
         {entry.summonedCreatures && entry.summonedCreatures.length > 0 && (
           <div className="log-summons-creatures">
             <span className="log-summons-label">Creatures:</span>

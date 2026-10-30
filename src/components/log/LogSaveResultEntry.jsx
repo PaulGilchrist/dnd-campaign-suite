@@ -1,4 +1,5 @@
 import { formatTimestamp } from './log-utils.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 export function SaveResultEntry({ entry }) {
   const isSuccess = entry.success;
@@ -18,7 +19,7 @@ export function SaveResultEntry({ entry }) {
           {isSuccess ? 'SAVE SUCCESS' : 'SAVE FAILURE'}
         </span>
         {entry.description && (
-          <span className="log-save-result-description" dangerouslySetInnerHTML={{ __html: entry.description }} />
+          <span className="log-save-result-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(entry.description) }} />
         )}
       </div>
     </div>
