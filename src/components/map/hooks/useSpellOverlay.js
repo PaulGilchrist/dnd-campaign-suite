@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard.js';
 import { fetchSpellOverlays } from '../../../services/maps/spellOverlayService.js';
+import { SHAPE_LABELS } from '../../../models/SpellOverlay.js';
 
 /**
  * WARNING: SSE re-render loop risk
@@ -10,6 +11,13 @@ import { fetchSpellOverlays } from '../../../services/maps/spellOverlayService.j
 const SSE_EVENT_KEY_PREFIX = 'spell-overlay-';
 const UPDATE_DEBOUNCE_MS = 150;
 
+// Named-confirm label for a placed overlay (shared-collab board ruling,
+// 2026-10-30): destructive lanes name what they destroy — the house pattern
+// of usePlacedItems.handleDeleteItem. Unknown ids get the honest generic
+// fallback rather than skipping the confirm.
+const overlayConfirmLabel = (overlay) =>
+    (overlay && (SHAPE_LABELS[overlay.shape] || overlay.shape)) || 'spell';
+
 function useSpellOverlay(campaignName, _mapName) {
     const [overlays, setOverlays] = useState([]);
     const setOverlaysG = useSSEEqualityGuard(setOverlays);
@@ -18,6 +26,10 @@ function useSpellOverlay(campaignName, _mapName) {
     const pendingRef = useRef(null);
     const campaignRef = useRef(campaignName);
     campaignRef.current = campaignName;
+    // Mirror of current overlays so the destructive-lane confirms can name the
+    // count/shape at click time without re-binding the useCallbacks.
+    const overlaysRef = useRef(overlays);
+    overlaysRef.current = overlays;
 
     useEffect(() => {
         if (!campaignName) return;
@@ -82,12 +94,19 @@ function useSpellOverlay(campaignName, _mapName) {
         sendAction('update', { overlays: [overlay] });
     }, [sendAction]);
 
+    // The board is a party-collab space (owner ruling 2026-10-30): every tab
+    // may remove/clear, but both lanes are destructive to EVERYONE's overlays,
+    // so each pays a named native confirm (house pattern: usePlacedItems).
+    // Cancel is fully inert — no local state write, no POST, SSE stays quiet.
     const removeOverlay = useCallback((overlayId) => {
+        const overlay = overlaysRef.current.find(o => o.id === overlayId);
+        if (!window.confirm(`Remove this ${overlayConfirmLabel(overlay)} overlay?`)) return;
         setOverlays(prev => prev.filter(o => o.id !== overlayId));
         sendAction('remove', { overlayId });
     }, [sendAction]);
 
     const clearOverlays = useCallback(() => {
+        if (!window.confirm(`Clear all ${overlaysRef.current.length} spell overlays? This removes overlays placed by everyone.`)) return;
         setOverlays([]);
         sendAction('clear');
     }, [sendAction]);

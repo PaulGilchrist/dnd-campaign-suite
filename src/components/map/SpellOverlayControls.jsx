@@ -1,12 +1,4 @@
-import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
-
-const SHAPE_LABELS = {
-    [OverlayShape.SPHERE]: 'Sphere',
-    [OverlayShape.CYLINDER]: 'Cylinder',
-    [OverlayShape.CUBE]: 'Cube',
-    [OverlayShape.CONE]: 'Cone',
-    [OverlayShape.LINE]: 'Line',
-};
+import { OverlayShape, SHAPE_LABELS, DEFAULTS } from '../../models/SpellOverlay.js';
 
 const PARAM_FIELDS = {
     [OverlayShape.SPHERE]: [

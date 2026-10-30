@@ -263,7 +263,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### Open items — 2026-10-30 run AL
 
-- **spell-overlay-player-clear-authority** (owner ruling needed): the Spell toolbar is deliberately granted to LAN players, and while ADDS fail for them today (non-secure-origin crash — filed), the destructive lanes are wide open at both layers: a player tab's `Clear All` POST succeeded live and wiped a GM-placed overlay server-side (`serverAfter:0`) with **no confirm dialog, no GM-only gate, no "yours-only" scoping** — once bug 1's id fix lands, any network client can erase the whole shared board (and remove others' zones by id) while GMs watch live-mirror. Decide: keep the board a true party-collab space (then add a NAMED confirm like sibling destructive lanes) or GM-scope the clear/remove actions server-side. Files: `server/routes/spell-overlay.js` (no actor concept), `SpellOverlayControls.jsx` (`Clear All` ×/buttons silent).
 - **spell-toolbar-no-pressed-state**: `button[aria-label="Spell"]` carries NO `aria-pressed` (live read `null` while armed) — the armed state is only inferable by probing `.spell-overlay-controls` presence, unlike the travel tool which exposes `aria-pressed` (27-M doctrine "read aria-pressed before pressing" is impossible here); a stale/absorbed click leaves user and harness alike blind to whether the tool is on. Cheap parity fix: set `aria-pressed={!!spellMode}` on the toolbar toggle (MapToolbar.jsx).
 
 ### Open items — 2026-10-30 run AK

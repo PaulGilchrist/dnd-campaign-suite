@@ -10,7 +10,9 @@
 //   sseHandlers-overlay.test.jsx #873 — initiative createOverlayHandler BODY (different module)
 //   Map*.test.jsx / container #865    — wiring + DOM routing (mocks this hook entirely)
 //   useSpellHandlers.test.js #913     — explicitly defers overlay persistence/SSE to this file
-//   THIS FILE                           — hook state adoption, POST body shapes, debounce, guard
+//   THIS FILE                           — hook state adoption, POST body shapes, debounce, guard,
+//                                         destructive-lane named confirms (remove/Clear All copy +
+//                                         cancel-inert contract, collab-board ruling 2026-10-30)
 //
 // Mock hygiene: spellOverlayService boundary-mocked (GET transport proven at owner);
 // global fetch mocked in beforeEach (zero real network, deterministic, #906); fake timers
@@ -42,11 +44,15 @@ describe('useSpellOverlay', () => {
   const o2 = { id: 'o2', name: 'Cone', angle: 60 };
 
   let fetchSpy;
+  let confirmSpy;
 
   beforeEach(() => {
     vi.useFakeTimers();
     fetchSpellOverlays.mockResolvedValue([]);
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
+    // Destructive lanes ride named native confirms (shared-board ruling
+    // 2026-10-30). Accept by default; cancel-leg tests override to false.
+    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -124,6 +130,69 @@ describe('useSpellOverlay', () => {
       [URL, 'POST', { action: 'remove', overlayId: 'o1' }],
       [URL, 'POST', { action: 'clear' }],
     ]);
+  });
+
+  // Shared-collab board ruling (2026-10-30): players keep add/remove/clear,
+  // but every destructive lane pays a named confirm — cancel is fully inert
+  // (zero POST, board byte-unchanged), accept fires exactly one action POST.
+  it('per-item remove confirm names the shape; cancel is inert, accept POSTs remove exactly once', () => {
+    const sphere = { id: 'sp1', shape: 'sphere', radiusFt: 20 };
+    const cube = { id: 'cb1', shape: 'cube', sizeFt: 15 };
+    const { result } = getHook();
+    act(() => {
+      result.current.addOverlay(sphere);
+      result.current.addOverlay(cube);
+    });
+    fetchSpy.mockClear();
+
+    confirmSpy.mockReturnValue(false);
+    act(() => { result.current.removeOverlay('sp1'); });
+    expect(confirmSpy).toHaveBeenCalledWith('Remove this Sphere overlay?');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.current.overlays).toEqual([sphere, cube]);
+
+    // Unknown id still asks honestly with the generic fallback (house pattern:
+    // usePlacedItems' 'placed item' fallback for miss-named tokens).
+    act(() => { result.current.removeOverlay('ghost'); });
+    expect(confirmSpy).toHaveBeenLastCalledWith('Remove this spell overlay?');
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValue(true);
+    act(() => { result.current.removeOverlay('sp1'); });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      URL,
+      expect.objectContaining({ body: JSON.stringify({ action: 'remove', overlayId: 'sp1' }) }),
+    );
+    expect(result.current.overlays).toEqual([cube]);
+  });
+
+  it('Clear All confirm names the count and EVERYONE (full-board wipe, not mine-only); cancel is inert, accept POSTs clear exactly once', () => {
+    const sphere = { id: 'sp1', shape: 'sphere', radiusFt: 20 };
+    const cone = { id: 'cn1', shape: 'cone', distanceFt: 60, coneAngle: 53 };
+    const { result } = getHook();
+    act(() => {
+      result.current.addOverlay(sphere);
+      result.current.addOverlay(cone);
+    });
+    fetchSpy.mockClear();
+
+    confirmSpy.mockReturnValue(false);
+    act(() => { result.current.clearOverlays(); });
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Clear all 2 spell overlays? This removes overlays placed by everyone.',
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.current.overlays).toEqual([sphere, cone]);
+
+    confirmSpy.mockReturnValue(true);
+    act(() => { result.current.clearOverlays(); });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      URL,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ action: 'clear' }) }),
+    );
+    expect(result.current.overlays).toEqual([]);
   });
 
   it('logs and keeps optimistic state when the transport fails', async () => {

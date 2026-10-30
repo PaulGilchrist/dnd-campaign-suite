@@ -8,6 +8,16 @@ export const OverlayShape = {
   LINE: 'line',
 };
 
+// Human labels for each shape — shared by the controls palette rows and the
+// hook's named confirms so a row and its confirm dialog name the same thing.
+export const SHAPE_LABELS = {
+  [OverlayShape.SPHERE]: 'Sphere',
+  [OverlayShape.CYLINDER]: 'Cylinder',
+  [OverlayShape.CUBE]: 'Cube',
+  [OverlayShape.CONE]: 'Cone',
+  [OverlayShape.LINE]: 'Line',
+};
+
 export const OVERLAY_FILL_ALPHA = 0.07;
 export const OVERLAY_STROKE_ALPHA = 0.2;
 
