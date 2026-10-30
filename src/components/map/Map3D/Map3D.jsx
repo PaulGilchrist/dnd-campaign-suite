@@ -60,10 +60,12 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
         };
     }, []);
 
+    // Full scene rebuild: structural map inputs only. Overlays and the
+    // Labels/Torch toggles have their own lightweight effects below — they
+    // must NOT tear down (and re-frame) the whole scene.
     useEffect(() => {
         const scene = sceneRef.current;
         if (!ready || !scene || !mapData) return;
-        scene.setToggles({ showLabels, showTorch });
         scene.buildMap({
             gridSize: gridSize || 30,
             walls: walls ? Array.from(walls) : [],
@@ -74,9 +76,25 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
             npcImages,
             playerAvatars,
             bgFill,
-            overlays: overlays || [],
         });
-    }, [ready, mapData, gridSize, walls, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars, overlays, showLabels, showTorch]);
+    }, [ready, mapData, gridSize, walls, bgFill, placedItems, players, fog, isLocalhost, npcImages, playerAvatars]);
+
+    // Labels/Torch are visibility flags applied by setToggles — no rebuild.
+    // Declared after the build effect so the first build sees the flags set.
+    useEffect(() => {
+        const scene = sceneRef.current;
+        if (!ready || !scene) return;
+        scene.setToggles({ showLabels, showTorch });
+    }, [ready, showLabels, showTorch]);
+
+    // Spell overlays are an additive sub-layer patched in place. mapData is a
+    // dep so a not-yet-built scene (overlays arriving before the map) repaints
+    // once the map lands and re-positions volumes for the new grid size.
+    useEffect(() => {
+        const scene = sceneRef.current;
+        if (!ready || !scene || !mapData) return;
+        scene.updateSpellOverlays(overlays || []);
+    }, [ready, mapData, overlays]);
 
     const handleTopDown = useCallback(() => {
         sceneRef.current?.topDown();

@@ -43,7 +43,9 @@ export class Map3DScene {
         this.camera = null;
         this.controls = null;
         this.mapGroup = null;
+        this.overlayGroup = null;
         this.wallMat = null;
+        this.framedFor = null;
         this.half = 0;
         this.showLabels = true;
         this.showTorch = true;
@@ -120,6 +122,12 @@ export class Map3DScene {
         this.mapGroup = new THREE.Group();
         scene.add(this.mapGroup);
 
+        // Spell overlays live OUTSIDE mapGroup so an overlay add/update/remove
+        // never tears down (or re-frames) the rest of the map — see
+        // updateSpellOverlays().
+        this.overlayGroup = new THREE.Group();
+        scene.add(this.overlayGroup);
+
         this._resizeObserver = new ResizeObserver(() => this._onResize());
         this._resizeObserver.observe(this.container);
 
@@ -145,6 +153,14 @@ export class Map3DScene {
     setToggles({ showLabels, showTorch }) {
         if (showLabels !== undefined) this.showLabels = showLabels;
         if (showTorch !== undefined) this.showTorch = showTorch;
+        // Labels and torch lights are always built (hidden via .visible), so a
+        // toggle is a cheap visibility pass — never a rebuild, never a camera reset.
+        if (this.mapGroup) {
+            this.mapGroup.traverse((o) => {
+                if (o.userData.isTokenLabel) o.visible = this.showLabels;
+                else if (o.userData.isTorchLight) o.visible = this.showTorch;
+            });
+        }
     }
 
     topDown() {
@@ -155,7 +171,12 @@ export class Map3DScene {
         this.controls.update();
     }
 
+    // Frames the default overview once per grid size. Repeat builds for the
+    // same map (overlay-adjacent dep churn, restacked props) must never yank
+    // the user's orbit/zoom back to default.
     _frameCamera(gridSize) {
+        if (this.framedFor === gridSize) return;
+        this.framedFor = gridSize;
         const size = gridSize * CELL_SIZE;
         this.camera.near = 1;
         this.camera.far = size * 12;
@@ -185,6 +206,8 @@ export class Map3DScene {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
         sprite.scale.set(56, 14, 1);
         sprite.renderOrder = 999; // just under the fog volume so fogged labels are covered
+        sprite.userData.isTokenLabel = true;
+        sprite.visible = this.showLabels;
         return sprite;
     }
 
@@ -362,7 +385,7 @@ export class Map3DScene {
         const gen = ++this.buildGen;
         const {
             gridSize, walls, items, players, fog, isLocalhost,
-            npcImages, playerAvatars, bgFill, overlays,
+            npcImages, playerAvatars, bgFill,
         } = data;
         this.gridSize = gridSize;
         this.half = (gridSize * CELL_SIZE) / 2;
@@ -379,14 +402,22 @@ export class Map3DScene {
         this._buildNpcs(items, fog, isLocalhost, npcImages, gen);
         this._buildPointLights(items, fog, isLocalhost);
         this._buildFog(fog, isLocalhost);
-        this._buildSpellOverlays(overlays);
         this._frameCamera(gridSize);
     }
 
-    _buildSpellOverlays(overlays) {
+    // Additive sub-layer patch: disposes and rebuilds ONLY the spell-overlay
+    // volumes in overlayGroup (never mapGroup, never the camera). Safe to call
+    // on every SSE overlay tick. No-op until the first buildMap has sized the
+    // grid (Map3D re-runs this effect when mapData arrives).
+    updateSpellOverlays(overlays) {
+        if (!this.renderer || !this.overlayGroup || this.gridSize === undefined) return;
+        for (const child of [...this.overlayGroup.children]) {
+            this.overlayGroup.remove(child);
+            this._disposeObject(child);
+        }
         for (const overlay of overlays || []) {
             const group = createOverlayGroup(this.THREE, overlay, this.cellX(overlay.startGridX), this.cellZ(overlay.startGridY));
-            if (group) this.mapGroup.add(group);
+            if (group) this.overlayGroup.add(group);
         }
     }
 
@@ -501,11 +532,11 @@ export class Map3DScene {
         ring.rotation.x = -Math.PI / 2;
         ring.position.y = 0.5;
         g.add(ring);
-        if (this.showLabels) {
-            const label = this._makeLabel(name);
-            label.position.y = 64;
-            g.add(label);
-        }
+        // Labels are always built; setToggles flips .visible so toggling
+        // never needs a scene rebuild.
+        const label = this._makeLabel(name);
+        label.position.y = 64;
+        g.add(label);
         return g;
     }
 
@@ -544,13 +575,16 @@ export class Map3DScene {
     }
 
     _buildPointLights(items, fog, isLocalhost) {
-        if (!this.showTorch) return;
         const THREE = this.THREE;
         let count = 0;
         for (const item of items || []) {
             if ((item.type === 'torch' || item.type === 'firepit') && isItemVisible(item, fog, isLocalhost) && count < MAX_POINT_LIGHTS) {
                 const l = new THREE.PointLight(0xff8833, 1.3, 130, 2);
                 l.position.set(this.cellX(item.gridX), 14, this.cellZ(item.gridY));
+                // Always built; setToggles flips .visible (invisible lights
+                // are skipped by the renderer), so toggling needs no rebuild.
+                l.userData.isTorchLight = true;
+                l.visible = this.showTorch;
                 this.mapGroup.add(l);
                 count += 1;
             }
@@ -617,6 +651,11 @@ export class Map3DScene {
                 this._disposeObject(this.mapGroup);
                 this.scene.remove(this.mapGroup);
                 this.mapGroup = null;
+            }
+            if (this.overlayGroup) {
+                this._disposeObject(this.overlayGroup);
+                this.scene.remove(this.overlayGroup);
+                this.overlayGroup = null;
             }
             this.renderer.dispose();
             this.renderer.domElement.remove();

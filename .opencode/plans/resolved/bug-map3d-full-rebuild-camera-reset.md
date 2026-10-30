@@ -38,3 +38,24 @@ Minor UX issue (no data-integrity risk) — but it makes the 3D viewer unusable 
 
 ## Evidence captures (run AL 2026-10-30)
 `.opencode/plans/runAL-3d-before.png` (default framing, cylinder volume composited), `runAL-3d-orbited.png` (user's orbit + zoom), `runAL-3d-after-remote-edit.png` (same moment a remote ×-remove mirrored — back to the default framing, pixel-comparable to the before shot), `runAL-3d-after-label-toggle.png` (labels off, camera snapped to default again).
+
+## Resolution (run AM 2026-10-30)
+**FIXED.** Reproduced live first (dev:locked, two localhost tabs, test-campaign, Battle Arena cylinder): orbit+zoom then remote ×-remove → viewer snapped back to the pixel-default overview (`runAM-3d-repro-orbited.png` vs `runAM-3d-repro-after-remote-edit.png`); Labels toggle produced the same snap.
+
+**Root cause confirmed as diagnosed** — but the investigation note mattered: `setToggles` alone did **NOT** rebuild the toggle meshes. Labels were created only when `this.showLabels` was true at build time (`_makeToken`) and torch point lights were skipped entirely when `showTorch` was false (`_buildPointLights` early-return). So simply dropping the toggle deps would have made both toggles dead after the first build.
+
+What actually changed:
+- `src/components/map/Map3D/map3dScene.js`
+  - Dedicated `overlayGroup` (scene child, created in `init`); `_buildSpellOverlays` replaced by public `updateSpellOverlays(overlays)` that disposes/rebuilds only that group (guarded no-op before the first `buildMap` sizes the grid and after `dispose`). `overlays` removed from the `buildMap` payload.
+  - `setToggles` now applies visibility in place: label sprites and torch point lights are **always built** (tagged `userData.isTokenLabel` / `isTorchLight`, `.visible` seeded from the flags), so a toggle is a cheap traverse — no rebuild, no camera touch.
+  - `_frameCamera` idempotent per grid size via a `framedFor` field (fresh mount still frames — new scene instance, `framedFor` null).
+  - `dispose()` tears down `overlayGroup` too.
+- `src/components/map/Map3D/Map3D.jsx` — the mega build-effect split into three: full `buildMap` (structural deps only, no `overlays`/`showLabels`/`showTorch`, no `overlays` in payload), a `[ready, showLabels, showTorch]` → `setToggles` effect, and a `[ready, mapData, overlays]` → `updateSpellOverlays` effect (`mapData` in deps/guard so overlays arriving before the map repaint once it lands).
+- Tests: new `src/components/map/Map3D/map3dScene.overlays.test.js` (real three, headless — overlay patch disposes/replaces only `overlayGroup` and never touches camera/`buildMap`; `setToggles` label/torch visibility without rebuild; `_frameCamera` frames once per gridSize; grid-positioning of volumes) and updated `Map3D.test.jsx` (mock gained `updateSpellOverlays`; fresh-mount payload no longer carries `overlays`; overlays-only change routes to `updateSpellOverlays` and must NEVER hit `buildMap`/`setToggles`; toggle changes never rebuild; fresh-mount build-before-overlay paint order pinned).
+
+Verified:
+- Live re-run of the repro, two tabs, test-campaign: remote **add** composites the volume with pixel-stable orbit framing (`runAM-3d-fixed-orbited.png` → `runAM-3d-fixed-after-remote-add.png`), remote **remove** retires it, same framing (`runAM-3d-fixed-after-remote-remove.png`); Labels off/on hides/restores the sprites with the camera held (`runAM-3d-fixed-labels-off.png`); Torch toggle holds; fresh 2D→3D mount frames the default overview again (`runAM-3d-fixed-fresh-mount.png`). Zero console errors/warnings on either tab.
+- `npx vitest run src/components/map/Map3D/ src/components/map/Map.test.jsx` → 36/36 pass. `npm run lint` → clean (zero warnings). `npm run guard:no-timers` → OK.
+- Cleanup: overlays removed (server `[]`, `spell-overlays.json` unlinked), change-data `{}` + log `[]` GET-verified after Admin clears from a quiet state; dev servers reaped.
+
+Note (accepted behavior change): switching between two maps that share the same `gridSize` no longer re-frames the camera (the `framedFor` guard); the Top-down button and a fresh mount remain the re-frame affordances.

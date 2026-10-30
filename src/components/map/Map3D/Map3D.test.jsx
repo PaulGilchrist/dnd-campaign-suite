@@ -8,13 +8,16 @@ import Map3D from './Map3D.jsx';
 // + counts + exit dispatch, the camera-control hint (backlog 2026-10-29-AE),
 // scene lifecycle (viewport identity, loading/error
 // states, dispose), the exact mapData→buildMap payload transform, toggle and
-// top-down forwarding. Overlay SHAPE geometry is owned by ./map3dSpellOverlays
-// .test.js — only verbatim overlay forwarding is pinned here. Map3DScene is
+// top-down forwarding, and the overlays → updateSpellOverlays patch lane (an
+// overlays prop change must NEVER reach buildMap — camera-reset bug
+// 2026-10-30). Overlay SHAPE geometry is owned by ./map3dSpellOverlays
+// .test.js — only overlay forwarding is pinned here. Map3DScene is
 // mocked with a full call-arg census surface (no undefined proxies); three.js
 // is never loaded in this file.
 
 const buildMapMock = vi.fn();
 const setTogglesMock = vi.fn();
+const updateOverlaysMock = vi.fn();
 const topDownMock = vi.fn();
 const disposeMock = vi.fn();
 const initMock = vi.fn();
@@ -33,6 +36,9 @@ vi.mock('./map3dScene.js', () => ({
         }
         setToggles(toggles) {
             setTogglesMock(toggles);
+        }
+        updateSpellOverlays(overlays) {
+            updateOverlaysMock(overlays);
         }
         topDown() {
             topDownMock();
@@ -133,8 +139,11 @@ describe('Map3D', () => {
             npcImages: { Orc: 'https://example.com/orc.jpg' },
             playerAvatars: { p1: 'campaigns/test-campaign/avatars/aria.png' },
             bgFill: '#1a1a1a',
-            overlays: [],
         });
+        // Overlays are NOT part of the full-build payload (they patch in place).
+        expect(buildMapMock.mock.calls[0][0]).not.toHaveProperty('overlays');
+        // An empty overlays prop still paints the (empty) sub-layer once ready.
+        expect(updateOverlaysMock).toHaveBeenCalledWith([]);
     });
 
     it('shows the WebGL error in the viewport and never builds when init rejects', async () => {
@@ -149,13 +158,20 @@ describe('Map3D', () => {
         spy.mockRestore();
     });
 
-    it('rebuilds once with the new overlays when only the overlays prop changes', async () => {
+    it('patches overlays via updateSpellOverlays WITHOUT a scene rebuild when only overlays change', async () => {
         const overlaysA = [{ id: 'o1', shape: 'sphere', startGridX: 1, startGridY: 1, radiusFt: 20 }];
         const { props, rerender } = renderMap3D({ overlays: overlaysA });
         await act(async () => {});
-        expect(buildMapMock).toHaveBeenLastCalledWith(expect.objectContaining({ overlays: overlaysA }));
+        expect(buildMapMock).toHaveBeenCalledTimes(1);
+        expect(updateOverlaysMock).toHaveBeenLastCalledWith(overlaysA);
+        // Fresh-mount ordering: the full build sizes the grid BEFORE the
+        // sub-layer paints, so overlay world positions are never NaN.
+        expect(buildMapMock.mock.invocationCallOrder[0])
+            .toBeLessThan(updateOverlaysMock.mock.invocationCallOrder[0]);
 
         buildMapMock.mockClear();
+        setTogglesMock.mockClear();
+        updateOverlaysMock.mockClear();
         const overlaysB = [
             ...overlaysA,
             { id: 'o2', shape: 'line', startGridX: 2, startGridY: 2, distanceFt: 60 },
@@ -163,18 +179,26 @@ describe('Map3D', () => {
         await act(async () => {
             rerender(<Map3D {...props} overlays={overlaysB} />);
         });
-        expect(buildMapMock).toHaveBeenCalledTimes(1);
-        expect(buildMapMock).toHaveBeenCalledWith(expect.objectContaining({ overlays: overlaysB }));
+        expect(updateOverlaysMock).toHaveBeenCalledTimes(1);
+        expect(updateOverlaysMock).toHaveBeenCalledWith(overlaysB);
+        // The camera-reset bug class: overlays must NEVER full-rebuild.
+        expect(buildMapMock).not.toHaveBeenCalled();
+        expect(setTogglesMock).not.toHaveBeenCalled();
     });
 
     it('forwards label and torch toggle changes to the scene as exact state', async () => {
         renderMap3D();
         await act(async () => {});
         setTogglesMock.mockClear();
+        buildMapMock.mockClear();
+        updateOverlaysMock.mockClear();
         fireEvent.click(screen.getByRole('checkbox', { name: 'Labels' }));
         fireEvent.click(screen.getByRole('checkbox', { name: 'Torch light' }));
         expect(setTogglesMock).toHaveBeenNthCalledWith(1, { showLabels: false, showTorch: true });
         expect(setTogglesMock).toHaveBeenNthCalledWith(2, { showLabels: false, showTorch: false });
+        // The camera-reset bug class: toggles must NEVER full-rebuild or repaint.
+        expect(buildMapMock).not.toHaveBeenCalled();
+        expect(updateOverlaysMock).not.toHaveBeenCalled();
     });
 
     it('requests the top-down view from the scene once ready', async () => {
