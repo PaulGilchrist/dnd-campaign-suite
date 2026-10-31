@@ -1,5 +1,8 @@
 /* Campaign Builder — GM draft-review hub (campaign-authoring plan Phase 3).
-   Component-scoped only; buttons/titles reuse global .ct-* classes. */
+   Component-scoped only; buttons/titles reuse global .ct-* classes.
+   NOTE: the JSX root carries `ct-container` alongside `campaign-builder` —
+   that ancestor is what makes the App.css `.ct-container .ct-btn*` canon
+   apply here (backlog drafts-panel-contrast-family). */
 
 .campaign-builder {
   padding: 1rem 1.25rem 2rem;

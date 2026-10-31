@@ -376,16 +376,30 @@ describe('App.css', () => {
         'background'
       );
       const danger = styleFor('.ct-container .ct-btn-danger');
-      expect(danger.color, 'danger buttons should read as error-colored').toBe('var(--color-error)');
+      // -light token keeps the ghost danger label ≥ AA on the secondary
+      // fill (pure red fell to ~3.2:1 — backlog drafts-panel-contrast-family).
+      expect(danger.color, 'danger buttons should read as error-colored').toBe(
+        'var(--color-error-light)'
+      );
       expectChanges(
         '.ct-container .ct-btn-danger',
         '.ct-container .ct-btn-danger:hover:not(:disabled)',
         'background'
       );
+      // Disabled canon (backlog drafts-panel-contrast-family): token-muted,
+      // never opacity-dimmed — dimming compounded below WCAG AA on dark
+      // surfaces. The label token must be the readable secondary text token
+      // and opacity must stay full-strength.
+      const disabled = styleFor('.ct-container .ct-btn:disabled');
       expectStyles('.ct-container .ct-btn:disabled', {
         cursor: 'not-allowed',
-        opacity: '0.5',
+        background: 'var(--background-color-disabled)',
+        color: 'var(--color-text-secondary)',
       });
+      expect(disabled.opacity ?? '1', 'disabled ct-btn must not opacity-dim').toBe('1');
+      // The disabled rule outranks both variants on specificity (0-3-0 vs
+      // 0-2-0), so one muted family covers default/primary/danger alike.
+      expect(danger.background ?? 'none', 'danger variant should stay ghost (no background)').toBe('none');
     });
   });
 

@@ -103,7 +103,7 @@ function CampaignBuilder({ campaignName }) {
 
   if (!groups) {
     return (
-      <div className="campaign-builder">
+      <div className="ct-container campaign-builder">
         {error && <div className="campaign-builder-error" role="alert">{error}</div>}
         <p>{busy ? 'Loading drafts…' : 'No AI drafts to review.'}</p>
         {!busy && !error && (
@@ -118,7 +118,10 @@ function CampaignBuilder({ campaignName }) {
   const total = Object.values(groups).reduce((sum, rows) => sum + rows.length, 0);
 
   return (
-    <div className="campaign-builder">
+    // ct-container is load-bearing: App.css scopes the whole .ct-btn canon
+    // under it (backlog drafts-panel-contrast-family — without it these
+    // buttons fell to base UA styling and the disabled state was illegible).
+    <div className="ct-container campaign-builder">
       <AiDesignerSection campaignName={campaignName} onGenerated={reload} />
       <div className="campaign-builder-header">
         <h2><i className="fa-solid fa-wand-magic-sparkles" /> Campaign Builder</h2>

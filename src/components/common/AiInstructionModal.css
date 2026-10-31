@@ -132,8 +132,12 @@
   background: var(--background-color-button-secondary-hover);
 }
 
+/* Disabled canon mirrored from App.css (token-identical, AA-legible — see
+   the note there for why opacity dimming was retired). */
 .ai-instruction-modal .ct-btn:disabled {
-  opacity: 0.5;
+  background: var(--background-color-disabled);
+  color: var(--color-text-secondary);
+  border-color: var(--border-color);
   cursor: not-allowed;
 }
 

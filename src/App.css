@@ -476,8 +476,16 @@ button.hidden {
   background: var(--background-color-button-secondary-hover);
 }
 
+/* Disabled canon (backlog drafts-panel-contrast-family): the old
+   opacity: 0.5 dim compounded over dark surfaces into <4.5:1 labels (and
+   illegible ghost text on the primary fill). Token-based muting keeps the
+   label ≥ WCAG AA while reading flat/non-interactive: dark #aaa-on-#222
+   ≈ 6.9:1, light #444-on-#f5f5f5 ≈ 8.9:1. Specificity (0-3-0) outranks the
+   -primary/-danger variants (0-2-0), so every disabled button shares it. */
 .ct-container .ct-btn:disabled {
-  opacity: 0.5;
+  background: var(--background-color-disabled);
+  color: var(--color-text-secondary);
+  border-color: var(--border-color);
   cursor: not-allowed;
 }
 
@@ -492,8 +500,10 @@ button.hidden {
   border-color: var(--color-primary-hover);
 }
 
+/* Ghost destructive variant. Label uses -light so it clears AA on the
+   secondary fill (#ff6b6b-on-#333 ≈ 4.6:1; pure red was ≈ 3.2:1). */
 .ct-container .ct-btn-danger {
-  color: var(--color-error);
+  color: var(--color-error-light);
   border-color: var(--color-error);
 }
 
