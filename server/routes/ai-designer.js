@@ -101,8 +101,13 @@ router.post('/api/campaigns/:campaign/ai/designer/generate', async (req, res) =>
             savePendingPlan(req.params.campaign, null); // plan consumed by the generate
             setDesignerError(req.params.campaign, 'generate', null);
         } else {
-            setDesignerError(req.params.campaign, 'generate',
-                (result.errors || [result.error || result.code || 'generation failed']).join('\n'));
+            // A mid-resume stop that still drafted rows keeps the stop copy AND
+            // the honest "n of m drafted" line in the persisted error.
+            const lines = [...(result.errors || [result.error || result.code || 'generation failed'])];
+            if (result.partial) {
+                lines.push(`Drafted ${result.partial.drafted} of ${result.partial.planned} planned entities as reviewable drafts — approve or reject each below`);
+            }
+            setDesignerError(req.params.campaign, 'generate', lines.join('\n'));
         }
         res.json(result);
     } catch (e) {

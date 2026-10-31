@@ -9,7 +9,9 @@
  * (the mega-prompt is huge — retrying it just burns minutes on slow local
  * models); only structurally-invalid-but-parsed JSON earns a repair retry.
  * Resume re-emits with the same story bible plus already-produced siblings in
- * context — truncation recovery, not piecemeal design.
+ * context — truncation recovery, not piecemeal design. A mid-resume stop
+ * keeps every already-validated row as an individually-approvable draft
+ * ("n of m drafted"); only a zero-success stop discards everything.
  *
  * Writes only ever happen through applyBlueprint (drafts, snapshot, SSE,
  * log). Chat/plan generate no campaign rows at all. Conversation persists to
@@ -36,6 +38,11 @@ const PLAN_KIND = {
     faction: 'factions', npc: 'npcs', settlement: 'settlements', quest: 'quests',
     encounter: 'encounters', session: 'sessions', mapPlan: 'mapPlans',
 };
+
+// Dependency spine the resume walks: every entity only references kinds
+// earlier in this list (plus live campaign rows), so a cut at any point
+// leaves a self-consistent partial set.
+const RESUME_ORDER = ['faction', 'settlement', 'npc', 'quest', 'encounter', 'session', 'mapPlan'];
 
 /** Existing approved names per kind, for the prompt's collision allowlist. */
 function existingNames(bible) {
@@ -112,6 +119,11 @@ export async function proposePlan({ campaign, aiConfig, log, chatFn = chat }) {
 export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn = chat }) {
     if (!aiConfigLive(aiConfig)) return { ok: false, code: 'AI_OFF' };
     if (!scope?.scope) return { ok: false, code: 'BAD_SCOPE' };
+    // The rehydrated pending plan carries designNotes' server-owned stamps
+    // (savePendingPlan adds savedAt; recordPlan adds proposedAt) straight back
+    // into the POST — strip them before the scope schema (additionalProperties:
+    // false) owns the blueprint, or every reload-then-regenerate self-rejects.
+    scope = stripServerStamps(scope);
 
     const notes = loadNotes(campaign);
     const bible = buildStoryBible(campaign, { notes });
@@ -174,9 +186,9 @@ async function finalize(campaign, blueprint, log, attempt) {
  *  dependency order, each anchored to the full story bible + finished siblings. */
 async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig }) {
     const blueprint = { scope };
-    const ordered = ['faction', 'settlement', 'npc', 'quest', 'encounter', 'session', 'mapPlan'];
     const plan = (scope.entityPlan || []).filter(p => PLAN_KIND[p.kind]);
-    for (const kind of ordered) {
+    const planned = plannedEntityCount(plan);
+    for (const kind of RESUME_ORDER) {
         const item = plan.find(p => p.kind === kind);
         const key = PLAN_KIND[kind];
         blueprint[key] = [];
@@ -184,15 +196,74 @@ async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chat
         for (let i = 0; i < item.count; i++) {
             const row = await generateOne({ campaign, scope, bible, allow, kind, item, siblings: blueprint, chatFn, aiConfig });
             if (!row) {
-                const errors = [`generation stopped at ${kind} #${i + 1}/${item.count} — model output kept failing validation`];
-                audit(log, campaign, { stage: 'generate-resume', errors }, 0);
-                return { ok: false, code: 'AI_NEEDS_HUMAN', errors, created: {}, snapshot: null };
+                return resumeStopped({ campaign, blueprint, kind, index: i, itemCount: item.count, planned, log });
             }
             blueprint[key].push(row);
         }
     }
     // Whole-set integrity is re-checked inside applyBlueprint before writing.
     return finalize(campaign, blueprint, log, 0);
+}
+
+// Server-owned stamps the scope schema (additionalProperties:false) never
+// accepts — designNotes writes them, the rehydrated plan POSTs them back.
+function stripServerStamps(scope) {
+    const clean = { ...scope };
+    delete clean.savedAt;
+    delete clean.proposedAt;
+    return clean;
+}
+
+/** Entities the plan asks the resume loop to generate (first item per kind,
+ *  mirroring the loop's own plan.find selection). */
+function plannedEntityCount(plan) {
+    return RESUME_ORDER.reduce((sum, kind) => {
+        const item = plan.find(p => p.kind === kind);
+        return sum + (item && item.count > 0 ? item.count : 0);
+    }, 0);
+}
+
+function draftedEntityCount(blueprint) {
+    return Object.values(PLAN_KIND).reduce((sum, key) => sum + (blueprint[key] || []).length, 0);
+}
+
+function createdTotal(created) {
+    return Object.values(created || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
+}
+
+/**
+ * Mid-resume stop lane (backlog designer-resume-discards-completed-entities):
+ * entities validated BEFORE the stop point persist individually as normal
+ * `draft:true` rows through the same applyBlueprint lane the whole-set path
+ * uses (snapshot-first, whole-set integrity re-check, SSE, audit rows) — each
+ * stays individually approvable in the Drafts panel. With zero prior success
+ * nothing is written and the audit/return stay byte-identical to the old
+ * whole-set discard; the stop point always rides the honest error copy.
+ */
+async function resumeStopped({ campaign, blueprint, kind, index, itemCount, planned, log }) {
+    const stopError = `generation stopped at ${kind} #${index + 1}/${itemCount} — model output kept failing validation`;
+    if (draftedEntityCount(blueprint) === 0) {
+        audit(log, campaign, { stage: 'generate-resume', errors: [stopError] }, 0);
+        return { ok: false, code: 'AI_NEEDS_HUMAN', errors: [stopError], created: {}, snapshot: null };
+    }
+    const applied = await applyBlueprint(campaign, blueprint, { log });
+    if (!applied.ok) {
+        // The completed subset itself failed whole-set integrity (e.g. it
+        // references an entity past the stop point) — discard exactly like
+        // the zero-success stop; nothing was written.
+        const errors = [stopError, ...(applied.errors || [])].slice(0, 5);
+        audit(log, campaign, { stage: 'generate-resume', errors }, 0);
+        return { ok: false, code: 'AI_NEEDS_HUMAN', errors, created: {}, snapshot: null };
+    }
+    const partial = { drafted: createdTotal(applied.created), planned };
+    audit(log, campaign, {
+        stage: 'generate-resume', errors: [stopError], partial,
+        created: applied.created, snapshot: applied.snapshot,
+    }, 0);
+    return {
+        ok: false, code: 'AI_NEEDS_HUMAN', errors: [stopError], partial,
+        created: applied.created, snapshot: applied.snapshot,
+    };
 }
 
 async function generateOne({ scope, allow, kind, item, siblings, chatFn, aiConfig }) {

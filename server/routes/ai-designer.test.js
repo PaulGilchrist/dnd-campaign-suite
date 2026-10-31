@@ -156,4 +156,23 @@ describe('ai-designer route authority', () => {
         expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', null);
         expect(setDesignerError).toHaveBeenLastCalledWith('test-campaign', 'generate', null);
     });
+
+    it('partial resume failure keeps the stop copy AND appends the drafted line; plan stays pending', async () => {
+        savePendingPlan.mockClear();
+        setDesignerError.mockClear();
+        store.set('test-campaign', { aiConfig: { mode: 'suggest', endpoint: 'http://localhost:1234/v1' } });
+        generateBlueprint.mockResolvedValueOnce({
+            ok: false, code: 'AI_NEEDS_HUMAN',
+            errors: ['generation stopped at quest #1/1 — model output kept failing validation'],
+            partial: { drafted: 1, planned: 2 },
+            created: { factions: 1 }, snapshot: 's.zip',
+        });
+        const res = await request(app).post('/api/campaigns/test-campaign/ai/designer/generate')
+            .set('Host', 'localhost').send({ scope: { scope: 'arc' } });
+        expect(res.body.partial).toEqual({ drafted: 1, planned: 2 }); // forwarded verbatim to the client
+        expect(setDesignerError).toHaveBeenLastCalledWith('test-campaign', 'generate',
+            'generation stopped at quest #1/1 — model output kept failing validation\nDrafted 1 of 2 planned entities as reviewable drafts — approve or reject each below');
+        // Not consumed: the GM can top up the rest
+        expect(savePendingPlan).not.toHaveBeenCalled();
+    });
 });

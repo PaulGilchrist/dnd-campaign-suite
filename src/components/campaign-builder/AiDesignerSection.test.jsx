@@ -114,6 +114,38 @@ describe('AiDesignerSection', () => {
         expect(alert.textContent).toContain('index unknown');
     });
 
+    it('reports a mid-resume stop honestly: stop copy + "n of m drafted" notice + draft refresh', async () => {
+        api.designerPlan.mockResolvedValue({
+            ok: true,
+            scope: { scope: 'arc', storySummary: 's', entityPlan: [{ kind: 'faction', count: 1 }, { kind: 'quest', count: 1 }] },
+        });
+        api.designerGenerate.mockResolvedValue({
+            ok: false,
+            code: 'AI_NEEDS_HUMAN',
+            errors: ['generation stopped at quest #1/1 — model output kept failing validation'],
+            partial: { drafted: 1, planned: 2 },
+            created: { factions: 1, maps: 0 },
+            snapshot: 'c-2026.zip',
+        });
+        const onGenerated = vi.fn();
+        render(<AiDesignerSection campaignName="c" onGenerated={onGenerated} />);
+        fireEvent.click(await screen.findByRole('button', { name: /propose build plan/i }));
+        await screen.findByText('Review the build plan');
+        fireEvent.click(screen.getByRole('button', { name: /generate drafts/i }));
+
+        // Failure explanation stays in the alert strip…
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toContain('stopped at quest #1/1');
+        // …alongside the honest partial count + restore point.
+        const notice = await screen.findByText(/1 of 2 planned entities drafted/);
+        expect(notice.textContent).toContain('c-2026.zip');
+        expect(notice.textContent).toContain('reviewable draft');
+        // Drafts landed on disk → the drafts panel is told to refresh, and the
+        // unconsumed plan stays editable for a top-up rerun.
+        expect(onGenerated).toHaveBeenCalled();
+        expect(screen.getByText('Review the build plan')).toBeTruthy();
+    });
+
     // --- designer-plan-state-volatile: persistence lanes -------------------
 
     it('rehydrates the PlanEditor (plan + edited counts) and the last error from stored notes on mount', async () => {

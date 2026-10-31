@@ -61,6 +61,25 @@ function PlanEditor({ plan, setPlan, busy, onGenerate, onCancel }) {
   );
 }
 
+// Post-generate status banner. Full success keeps the classic copy; a
+// mid-resume stop reports "n of m planned entities drafted" honestly
+// alongside the failure strip above it (backlog partial-draft lane).
+function ResultNotice({ result }) {
+  const maps = result.created?.maps || 0;
+  const mapsNote = maps ? ` (incl. ${maps} map${maps === 1 ? '' : 's'})` : '';
+  const head = result.partial
+    ? `${result.partial.drafted} of ${result.partial.planned} planned entities drafted`
+    : `Drafted ${Object.values(result.created || {}).reduce((a, b) => a + b, 0)} entities`;
+  const tail = result.partial
+    ? ' — the run stopped short (see above). Every drafted row survived as its own reviewable draft below.'
+    : '. Review them below.';
+  return (
+    <div className={`ai-designer-result${result.partial ? ' ai-designer-result-partial' : ''}`}>
+      {head}{mapsNote} — restore point <code>{result.snapshot}</code>{tail}
+    </div>
+  );
+}
+
 function AiDesignerSection({ campaignName, onGenerated }) {
   const [enabled, setEnabled] = useState(null); // null = probing
   const [messages, setMessages] = useState([]);
@@ -185,6 +204,12 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       onGenerated?.();
     } else {
       setError((res.errors || [res.error || res.code || 'generation failed']).join('\n'));
+      if (res.partial) {
+        // Mid-resume stop: the validated rows survived as individually
+        // approvable drafts — show the "n of m drafted" notice alongside.
+        setResult(res);
+        onGenerated?.();
+      }
     }
   };
 
@@ -201,13 +226,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     <div className="ai-designer-section">
       <h3><i className="fa-solid fa-wand-magic-sparkles" /> AI Designer</h3>
       {error && <div className="ai-designer-error" role="alert">{error}</div>}
-      {result && (
-        <div className="ai-designer-result">
-          Drafted {Object.values(result.created).reduce((a, b) => a + b, 0)} entities
-          {result.created?.maps ? ` (incl. ${result.created.maps} map${result.created.maps === 1 ? '' : 's'})` : ''}
-          — restore point <code>{result.snapshot}</code>. Review them below.
-        </div>
-      )}
+      {result && <ResultNotice result={result} />}
 
       {plan ? (
         <PlanEditor plan={plan} setPlan={editPlan} busy={busy} onGenerate={generate} onCancel={clearPendingPlan} />

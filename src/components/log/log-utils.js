@@ -162,7 +162,13 @@ function describeDesigner(entry) {
   const stage = asText(entry.stage) || 'run';
   const head = `Designer ${stage}${entry.fallback ? ` (fallback ${entry.fallback})` : ''}`;
   const failure = errorText(entry.error, entry.errors);
-  if (failure) return `${head} stopped — ${failure} (${attemptsPhrase(entry.attempts)})`;
+  if (failure) {
+    // Mid-resume stops carry partial { drafted, planned } — the drafted
+    // survivors must stay visible in the key line, never silently dropped.
+    const partial = entry.partial && typeof entry.partial === 'object' ? entry.partial : null;
+    const drafted = partial ? ` — drafted ${asText(partial.drafted) ?? '?'} of ${asText(partial.planned) ?? '?'} before stopping` : '';
+    return `${head} stopped — ${failure}${drafted} (${attemptsPhrase(entry.attempts)})`;
+  }
   const parts = [head];
   const plan = summarizeEntityPlan(entry.entityPlan);
   if (plan) parts.push(`plan ${plan}`);

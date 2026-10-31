@@ -2172,3 +2172,10 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Fact — change-data GET is FLAT for campaign-level keys: `aiConfig` sits TOP-level (`d['aiConfig']`), NOT under `d['<Campaign>']` (§16 nesting is per-character keys only; top-level specials include `aiConfig`). Probing `d['test-campaign'].aiConfig` false-empties.
 - Pitfall — Playwright MCP fill arg is `target` (ref), and snapshot refs may carry a sibling `[active]` flag that breaks `"<label>" \[ref=` regexes; prefer selector targets (`select[aria-label="…"]`). `browser_type text:''` does NOT reliably clear a React number input — native value-setter + `input` event via evaluate.
 - Fact — full `npm run test:run` takes ~3 min on this repo: foreground always truncates; background it and poll the log bounded.
+
+## Improve run 2026-11-01 (backlog AQ — designer-resume-discards-completed-entities)
+
+- Recipe — deterministic AI-lane rig: tiny plain-POST OpenAI-compatible stub server keyed off `response_format.json_schema.name` gives byte-exact entity valid/invalid scenarios without the flaky oMLX lane; point aiConfig at it via `POST /api/campaigns/test-campaign/aiConfig`. Kill it + rig files after.
+- Fact — `node server.js` has no hot-reload: server-side edits need the dev trio restarted (`npm run dev:locked`, verify CAMPAIGN_LOCK banner) — Vite alone never picks up `server/` changes.
+- Fact — mid-resume partial drafts ride `applyBlueprint` unchanged (snapshot-first + whole-set re-check); if the completed subset itself fails integrity it discards like a zero-success stop.
+- Pitfall — every applying designer run creates a restore-point zip; cap-4 prune retires the oldest. Run AQ+owner left 22-01-14/22-02-02 added, 10-28T14-17 + 10-31T11-53 pruned — map Baseline Fingerprints §55 snapshot list is now stale (lane-inherent churn, not a defect).

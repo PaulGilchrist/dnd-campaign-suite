@@ -41,6 +41,13 @@
   margin-bottom: 0.5rem;
 }
 
+/* Partial resume outcome: rows survived, but the run stopped short — keep it
+   visually distinct from a clean full draft (error-toned frame). */
+.ai-designer-result-partial {
+  background: var(--background-color-error);
+  border-color: var(--border-color-error);
+}
+
 /* Backlog ai-instruction-inputs-undersized: a conversation needs room — the
    thread scrolls comfortably (never below 480px, 60% of the viewport when
    taller) instead of the old 320px window. */

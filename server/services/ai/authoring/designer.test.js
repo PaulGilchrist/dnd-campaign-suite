@@ -215,3 +215,110 @@ describe('generateBlueprint — truncation → per-entity resume (fail-fast)', (
         expect(applyBlueprint).not.toHaveBeenCalled();
     });
 });
+
+describe('generateBlueprint — resume partial drafts (mid-set stop)', () => {
+    const scope = {
+        scope: 'arc', levelRange: { min: 3, max: 5 }, storySummary: 'x',
+        entityPlan: [{ kind: 'faction', count: 1 }, { kind: 'quest', count: 1 }],
+    };
+    // Batch emit truncates (fail-fast resume); the faction validates, the
+    // quest never does — the classic mid-set stop the backlog filed.
+    const resumeChat = () => vi.fn(async (cfg) => {
+        if (cfg.schemaName === 'campaign_blueprint') return 'garbage-not-json';
+        if (cfg.schemaName === 'draft_faction') return JSON.stringify({ name: 'The Salvage Court' });
+        return 'still not json';
+    });
+    const resumeAudit = () => log.mock.calls.map(([, entry]) => entry)
+        .find(e => e.type === 'ai_designer' && e.stage === 'generate-resume');
+
+    it('persists earlier validated rows as individually-approvable drafts', async () => {
+        const chatFn = resumeChat();
+        applyBlueprint.mockResolvedValue({ ok: true, created: { factions: 1, maps: 0 }, snapshot: 's.zip', errors: [] });
+
+        const res = await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        expect(res.ok).toBe(false);
+        expect(res.code).toBe('AI_NEEDS_HUMAN');
+        expect(res.partial).toEqual({ drafted: 1, planned: 2 });
+        expect(res.errors[0]).toMatch(/generation stopped at quest #1\/1/);
+        expect(res.created).toEqual({ factions: 1, maps: 0 });
+        expect(res.snapshot).toBe('s.zip');
+        // The completed subset goes through the SAME apply lane as the whole
+        // set (draft stamps, snapshot-first, SSE, ai_authoring row live there).
+        expect(applyBlueprint).toHaveBeenCalledTimes(1);
+        expect(applyBlueprint).toHaveBeenCalledWith('c',
+            expect.objectContaining({ factions: [{ name: 'The Salvage Court' }], quests: [] }),
+            { log });
+        // The ai_designer audit carries the partial outcome honestly.
+        expect(resumeAudit()).toMatchObject({
+            attempts: 0,
+            partial: { drafted: 1, planned: 2 },
+            created: { factions: 1, maps: 0 },
+            snapshot: 's.zip',
+        });
+        expect(resumeAudit().errors[0]).toMatch(/stopped at quest #1\/1/);
+    });
+
+    it('discards everything when the completed subset itself fails whole-set integrity', async () => {
+        const chatFn = resumeChat();
+        applyBlueprint.mockResolvedValue({
+            ok: false,
+            errors: ['quests cannot be audited — but nothing was written'],
+            created: {}, snapshot: null,
+        });
+
+        const res = await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        expect(res.ok).toBe(false);
+        expect(res.partial).toBeUndefined();
+        expect(res.created).toEqual({});
+        expect(res.snapshot).toBeNull();
+        expect(res.errors[0]).toMatch(/stopped at quest #1\/1/);
+        expect(res.errors[1]).toMatch(/nothing was written/);
+        const entry = resumeAudit();
+        expect(entry.partial).toBeUndefined();
+        expect(entry.errors).toHaveLength(2);
+    });
+
+    it('zero-success stop still writes nothing and keeps the old audit copy', async () => {
+        const chatFn = vi.fn(async (cfg) => (cfg.schemaName === 'campaign_blueprint' ? 'garbage-not-json' : 'still not json'));
+        const res = await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        expect(res).toMatchObject({ ok: false, code: 'AI_NEEDS_HUMAN', created: {}, snapshot: null });
+        expect(res.partial).toBeUndefined();
+        expect(applyBlueprint).not.toHaveBeenCalled();
+        expect(resumeAudit()).toEqual({
+            type: 'ai_designer', name: 'AI designer', attempts: 0, stage: 'generate-resume',
+            errors: ['generation stopped at faction #1/1 — model output kept failing validation'],
+        });
+    });
+
+    it('strips the rehydrated pending plan’s server stamps before the shape check', async () => {
+        // designNotes.savePendingPlan stamps savedAt; the client POSTs the
+        // rehydrated plan back — it must not self-reject the scope schema.
+        const dirtyScope = { ...scope, savedAt: 123, proposedAt: 456 };
+        const chatFn = vi.fn(async (cfg) => {
+            if (cfg.schemaName === 'campaign_blueprint') return 'garbage-not-json';
+            return JSON.stringify({ name: `E-${cfg.schemaName}` });
+        });
+        applyBlueprint.mockResolvedValue({ ok: true, created: { factions: 1, quests: 1 }, snapshot: 's.zip', errors: [] });
+        const res = await generateBlueprint({ campaign: 'c', scope: dirtyScope, aiConfig: AI, chatFn, log });
+        expect(res.ok).toBe(true);
+        const [, bp] = applyBlueprint.mock.calls[0];
+        expect(bp.scope.savedAt).toBeUndefined();
+        expect(bp.scope.proposedAt).toBeUndefined();
+        expect(bp.scope.entityPlan).toEqual(dirtyScope.entityPlan);
+    });
+
+    it('full-success resume is unchanged (single finalize, no partial copy)', async () => {        const chatFn = vi.fn(async (cfg) => {
+            if (cfg.schemaName === 'campaign_blueprint') return 'garbage-not-json';
+            return JSON.stringify({ name: `E-${cfg.schemaName}` });
+        });
+        applyBlueprint.mockResolvedValue({ ok: true, created: { factions: 1, quests: 1 }, snapshot: 's.zip', errors: [] });
+
+        const res = await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        expect(res.ok).toBe(true);
+        expect(res.partial).toBeUndefined();
+        expect(applyBlueprint).toHaveBeenCalledTimes(1);
+        const [, bp] = applyBlueprint.mock.calls[0];
+        expect(bp.factions).toEqual([{ name: 'E-draft_faction' }]);
+        expect(bp.quests).toEqual([{ name: 'E-draft_quest' }]);
+    });
+});

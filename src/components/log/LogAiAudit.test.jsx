@@ -144,6 +144,22 @@ describe('AI audit rows render labeled one-line summaries', () => {
     expect(line).not.toContain('undefined');
   });
 
+  it('designer resume PARTIAL stop: drafted count rides the key line honestly', () => {
+    setup(Log, [designer({
+      stage: 'generate-resume', attempts: 0,
+      errors: ['generation stopped at quest #1/1 — model output kept failing validation'],
+      partial: { drafted: 1, planned: 2 },
+      created: { factions: 1, maps: 0 },
+      snapshot: 'test-campaign-2026-11-01T09-00.zip',
+    })]);
+    const line = firstLine();
+    expect(line).toContain('Designer generate-resume stopped');
+    expect(line).toContain('stopped at quest #1/1');
+    expect(line).toContain('drafted 1 of 2 before stopping');
+    expect(line).not.toContain('undefined');
+    expect(line).not.toMatch(/[{}]/);
+  });
+
   // ── ai_world lanes ────────────────────────────────────────
 
   it('world audit with description: description is the readable line verbatim', () => {
