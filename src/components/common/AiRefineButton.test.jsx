@@ -53,4 +53,56 @@ describe('AiRefineButton', () => {
         fireEvent.click(screen.getByRole('button', { name: /close ai refine/i }));
         expect(screen.queryByPlaceholderText(/what should change/i)).toBeNull();
     });
+
+    // Backlog refine-no-op-silent: an echo-success must surface a hint, keep
+    // the row open, and NOT fire the caller's applied-success lane.
+    it('surfaces "no changes" hint when the replacement echoes the input (row stays open, form untouched)', async () => {
+        const onReplaced = vi.fn();
+        const entity = { id: 'n1', updatedAt: 5, draft: false, name: 'Marta', description: 'Innkeeper', attitude: 'neutral' };
+        render(<AiRefineButton campaignName="c" kind="npc" entity={entity} onReplaced={onReplaced} />);
+        fireEvent.click(screen.getByRole('button', { name: /refine with AI/i }));
+        fireEvent.change(screen.getByPlaceholderText(/what should change/i), { target: { value: 'keep as is' } });
+        // Server-owned stamps never round-trip in the proposal; key order differs.
+        refineEntity.mockResolvedValue({ ok: true, replacement: { description: 'Innkeeper', name: 'Marta', attitude: 'neutral' } });
+        fireEvent.click(screen.getByRole('button', { name: /apply to form/i }));
+
+        const hint = await screen.findByRole('status');
+        expect(hint.textContent).toMatch(/model proposed no changes/i);
+        expect(onReplaced).not.toHaveBeenCalled();
+        // Row stays open so the GM sees the hint, with the input ready for a new ask.
+        expect(screen.getByPlaceholderText(/what should change/i).value).toBe('');
+        fireEvent.click(screen.getByRole('button', { name: /close ai refine/i }));
+        expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    it('applies normally (no hint) when the replacement differs in any field', async () => {
+        const onReplaced = vi.fn();
+        const entity = { id: 'e1', name: 'Ambush', description: 'Few bandits', selectedMonsters: [{ index: 1, name: 'Bandit', qty: 2 }] };
+        render(<AiRefineButton campaignName="c" kind="encounter" entity={entity} onReplaced={onReplaced} />);
+        fireEvent.click(screen.getByRole('button', { name: /refine with AI/i }));
+        fireEvent.change(screen.getByPlaceholderText(/what should change/i), { target: { value: 'more guards' } });
+        refineEntity.mockResolvedValue({
+            ok: true,
+            replacement: { name: 'Ambush', description: 'Few bandits', selectedMonsters: [{ index: 1, name: 'Bandit', qty: 3 }] },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /apply to form/i }));
+
+        await waitFor(() => expect(onReplaced).toHaveBeenCalledWith(expect.objectContaining({
+            selectedMonsters: [{ index: 1, name: 'Bandit', qty: 3 }],
+        })));
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(screen.getByRole('button', { name: /refine with AI/i })).toBeTruthy();
+    });
+
+    it('treats a proposal that drops a filled-in field as a change, not an echo', async () => {
+        const onReplaced = vi.fn();
+        render(<AiRefineButton campaignName="c" kind="quest" entity={{ id: 'q1', name: 'Lost Artifact', rewards: '500gp' }} onReplaced={onReplaced} />);
+        fireEvent.click(screen.getByRole('button', { name: /refine with AI/i }));
+        fireEvent.change(screen.getByPlaceholderText(/what should change/i), { target: { value: 'polish it' } });
+        refineEntity.mockResolvedValue({ ok: true, replacement: { name: 'Lost Artifact' } });
+        fireEvent.click(screen.getByRole('button', { name: /apply to form/i }));
+
+        await waitFor(() => expect(onReplaced).toHaveBeenCalledWith({ name: 'Lost Artifact' }));
+        expect(screen.queryByRole('status')).toBeNull();
+    });
 });

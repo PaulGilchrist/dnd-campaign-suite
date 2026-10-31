@@ -21,3 +21,16 @@
   padding: 0.3rem 0.5rem;
   font-size: 0.8rem;
 }
+
+/* No-op refine success (backlog refine-no-op-silent) — same inline-strip
+   vocabulary as .ai-refine-error, honest neutral warning tokens. */
+.ai-refine-notice {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text);
+  background: var(--background-color-warning);
+  border: 1px solid var(--border-color-warning);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+}
