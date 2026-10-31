@@ -53,6 +53,22 @@ async function deleteAiConfig(campaignName) {
     return { ok: res.ok || res.status === 404, reason: data.reason || data.error || '' }
 }
 
+/**
+ * Merge-on-save (backlog ai-config-ui-clobbers-api-overrides): the config row
+ * owns ONLY the keys it sends; any other key already in the store (API-set
+ * jsonSchema/temperature, future additions) survives a UI Save untouched.
+ * A key sent as explicit `undefined` (blanked in the row) is REMOVED — the
+ * row opts out of an override it once saved.
+ */
+function mergeAiConfig(current, updates) {
+    const merged = { ...(current || {}) };
+    for (const [key, value] of Object.entries(updates)) {
+        if (value === undefined) delete merged[key];
+        else merged[key] = value;
+    }
+    return merged;
+}
+
 export default function AiRefereeSection({ campaignName, characters = [] }) {
     const [aiConfig] = useSyncedState('campaign', 'aiConfig', null, campaignName)
     const [enforcement] = useSyncedState('campaign', 'enforcement', { ...ENFORCEMENT_DEFAULTS }, campaignName)
@@ -68,7 +84,7 @@ export default function AiRefereeSection({ campaignName, characters = [] }) {
     }, [campaignName, aiConfig])
 
     const saveConfig = async (value) => {
-        const r = await postAiConfig(campaignName, value)
+        const r = await postAiConfig(campaignName, mergeAiConfig(aiConfig, value))
         setNotice(r.ok ? null : `Server refused: ${r.reason}`)
     }
     const removeConfig = async () => {

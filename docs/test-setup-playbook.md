@@ -2166,3 +2166,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Recipe — log-row work seed/cleanup: POST synthetic entries straight to `/api/campaigns/<c>/log` and clean via `POST /admin/clear-log` with plain fetch — no confirm dialog (dialog is admin-UI-nav-only), and cleared rows are NOT resurrected by loaded tabs. Copy payload shapes from the real producers (server/services/ai/{authoring,world,index}) so tests match disk reality.
 - Fact — server `ai_world` audit already stamps `description` (services/ai/index.js worldAudit); raw-blob render was `ai_designer`/`ai_refine` (structured-only payloads). New `AiAuditEntry` field priority: message→description→noteText→summary→type-formatter→key-line.
 - Residual (future backlog candidate): `ai_dress` and `ai_authoring` types still render raw blobs (ai_authoring's readable field is `summary`, which GenericEntry's chain ignores).
+
+## Improve run 2026-11-01 (backlog AQ — ai-config-ui-clobbers-api-overrides)
+
+- Fact — change-data GET is FLAT for campaign-level keys: `aiConfig` sits TOP-level (`d['aiConfig']`), NOT under `d['<Campaign>']` (§16 nesting is per-character keys only; top-level specials include `aiConfig`). Probing `d['test-campaign'].aiConfig` false-empties.
+- Pitfall — Playwright MCP fill arg is `target` (ref), and snapshot refs may carry a sibling `[active]` flag that breaks `"<label>" \[ref=` regexes; prefer selector targets (`select[aria-label="…"]`). `browser_type text:''` does NOT reliably clear a React number input — native value-setter + `input` event via evaluate.
+- Fact — full `npm run test:run` takes ~3 min on this repo: foreground always truncates; background it and poll the log bounded.

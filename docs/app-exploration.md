@@ -57,7 +57,6 @@
 
 ## Improvement Backlog
 
-- **(2026-10-31 AQ) ai-config-ui-clobbers-api-overrides:** `AiConfigRow.onSave` POSTs only {mode, endpoint, model, provider} — any API-set `jsonSchema`/`temperature` is silently wiped by the next UI Save; and there is no UI surface for either override at all. Fix: preserve unknown aiConfig keys (merge over replace in AiRefereeSection.saveConfig) and/or expose a "constrained decoding" tri-state (probe/on/off) + temperature in the row.
 - **(2026-10-31 AQ) designer-resume-discards-completed-entities:** per-entity resume validates entities one-by-one but throws away every earlier success when a later entity fails (whole-set integrity at `designer.js resumeEntityGeneration` → `created:{}` after mapPlan #1 died). Honest audit copy exists, but draft-per-success + "n of m drafted" (each still individually approvable) would make long plans survivable. Alternative starting point: retry loop already 2-attempt per entity; consider a third relaxed-decoding retry before abandoning the whole set.
 - **(2026-10-31 AQ) session-planner-refine-gate-confuses:** the session refine button only renders when editing an EXISTING session (gated on `editingSession`), so from New Session the button is absent with no hint — unlike NPCs where the button is always in the footer. At minimum a title tooltip on why; better: allow refine on unsaved-new too (preflight doesn't need the disk row).
 

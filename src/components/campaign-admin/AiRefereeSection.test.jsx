@@ -442,3 +442,96 @@ describe('AiRefereeSection — Model dropdown', () => {
         expect(modelField().tagName).toBe('INPUT');
     });
 });
+
+// ai-config-ui-clobbers-api-overrides — the row owns only the keys it sends;
+// merge-over-replace in saveConfig preserves everything else, and the new
+// decoding/temperature controls map tri-state ⇄ key absent/true/false and
+// blank ⇄ key absent.
+describe('AiRefereeSection — override preservation + decoding/temperature controls', () => {
+    const OVERRIDDEN = { ...CONFIGURED, jsonSchema: true, temperature: 0.7, futureKey: 'keep-me' };
+    const aiConfigPosts = (fetchMock) => fetchMock.mock.calls
+        .filter(([u, opts]) => String(u).endsWith('/aiConfig') && opts?.method === 'POST')
+        .map(([, opts]) => JSON.parse(opts.body).value);
+    const decodingSelect = () => screen.getByLabelText('Constrained decoding');
+    const tempInput = () => screen.getByLabelText('Temperature');
+
+    it('UI Save keeps API-set jsonSchema/temperature AND unknown keys (merge, not replace)', async () => {
+        synced.aiConfig = OVERRIDDEN;
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument()); // settle status fetch
+        // the new controls reflect the stored overrides
+        expect(decodingSelect()).toHaveValue('on');
+        expect(tempInput().value).toBe('0.7');
+
+        fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'autopilot' } });
+        fireEvent.click(saveButton());
+        await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(1));
+        expect(aiConfigPosts(fetchMock)[0]).toEqual({
+            mode: 'autopilot',
+            endpoint: 'http://localhost:11434',
+            model: 'llama3.1:8b',
+            provider: 'openai',
+            jsonSchema: true,   // survives the UI save untouched
+            temperature: 0.7,   // survives the UI save untouched
+            futureKey: 'keep-me', // any unknown key survives too
+        });
+    });
+
+    it('decoding tri-state writes absent/true/false; blank temperature writes absent', async () => {
+        synced.aiConfig = CONFIGURED; // no overrides stored
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument());
+        expect(decodingSelect()).toHaveValue(''); // probe = key absent
+        expect(tempInput().value).toBe('');
+
+        // on → jsonSchema:true, temperature 1.4 → number
+        fireEvent.change(decodingSelect(), { target: { value: 'on' } });
+        fireEvent.change(tempInput(), { target: { value: '1.4' } });
+        fireEvent.click(saveButton());
+        await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(1));
+        expect(aiConfigPosts(fetchMock)[0]).toMatchObject({ jsonSchema: true, temperature: 1.4 });
+
+        // off → jsonSchema:false
+        fireEvent.change(decodingSelect(), { target: { value: 'off' } });
+        fireEvent.click(saveButton());
+        await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(2));
+        expect(aiConfigPosts(fetchMock)[1]).toMatchObject({ jsonSchema: false, temperature: 1.4 });
+
+        // probe + blank temperature → both keys REMOVED from the merged blob
+        fireEvent.change(decodingSelect(), { target: { value: '' } });
+        fireEvent.change(tempInput(), { target: { value: '' } });
+        fireEvent.click(saveButton());
+        await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(3));
+        expect('jsonSchema' in aiConfigPosts(fetchMock)[2]).toBe(false);
+        expect('temperature' in aiConfigPosts(fetchMock)[2]).toBe(false);
+        expect(aiConfigPosts(fetchMock)[2]).toMatchObject({ mode: 'suggest', model: 'llama3.1:8b' });
+    });
+
+    it('blanking an API-set override removes ONLY that key — the rest is preserved', async () => {
+        synced.aiConfig = OVERRIDDEN;
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument());
+        fireEvent.change(tempInput(), { target: { value: '' } }); // clear temperature, leave decoding alone
+        fireEvent.click(saveButton());
+        await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(1));
+        const value = aiConfigPosts(fetchMock)[0];
+        expect('temperature' in value).toBe(false); // explicitly blanked ⇒ removed
+        expect(value).toMatchObject({ jsonSchema: true, futureKey: 'keep-me' }); // untouched
+    });
+
+    it('an untouched save never invents override keys (payload stays minimal)', async () => {
+        synced.aiConfig = CONFIGURED;
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument());
+        fireEvent.click(saveButton()); // save as-is
+        await waitFor(() => expect(aiConfigPosts(fetchMock)).toHaveLength(1));
+        const value = aiConfigPosts(fetchMock)[0];
+        expect('jsonSchema' in value).toBe(false);
+        expect('temperature' in value).toBe(false);
+        expect(value).toMatchObject(CONFIGURED);
+    });
+});

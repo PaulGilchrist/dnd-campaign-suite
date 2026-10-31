@@ -29,16 +29,23 @@ export function AiStatusBadge({ status }) {
 }
 
 export default function AiConfigRow({ aiConfig, onSave, onRemove, isLocalhost = true }) {
-    const [mode, setMode] = React.useState(aiConfig?.mode || 'off')
-    const [provider, setProvider] = React.useState(aiConfig?.provider || 'openai')
-    const [endpoint, setEndpoint] = React.useState(aiConfig?.endpoint || defaultEndpoint('openai'))
-    const [model, setModel] = React.useState(aiConfig?.model || '')
+    const cfg = aiConfig || {} // one `||` instead of six `?.` — keeps the row under the complexity cap
+    const [mode, setMode] = React.useState(cfg.mode || 'off')
+    const [provider, setProvider] = React.useState(cfg.provider || 'openai')
+    const [endpoint, setEndpoint] = React.useState(cfg.endpoint || defaultEndpoint('openai'))
+    const [model, setModel] = React.useState(cfg.model || '')
     const [models, setModels] = React.useState([])
     const [modelError, setModelError] = React.useState(null)
     const [refreshTick, setRefreshTick] = React.useState(0)
+    // Constrained-decoding override: 'probe' (key absent — provider probes),
+    // 'on' (jsonSchema:true), 'off' (jsonSchema:false). Temperature stays a
+    // string; blank ⇒ key absent (provider default). See buildConfigPayload.
+    const [decoding, setDecoding] = React.useState(triFromJsonSchema(cfg.jsonSchema))
+    const [temperature, setTemperature] = React.useState(temperatureInput(cfg.temperature))
     React.useEffect(() => {
         setMode(aiConfig?.mode || 'off'); setProvider(aiConfig?.provider || 'openai')
         setEndpoint(aiConfig?.endpoint || defaultEndpoint(aiConfig?.provider || 'openai')); setModel(aiConfig?.model || '')
+        setDecoding(triFromJsonSchema(aiConfig?.jsonSchema)); setTemperature(temperatureInput(aiConfig?.temperature))
     }, [aiConfig])
 
     // Query the endpoint for its model list whenever the URL settles.
@@ -92,12 +99,26 @@ export default function AiConfigRow({ aiConfig, onSave, onRemove, isLocalhost = 
                         <ModelField models={models} model={model} onError={setModelError} onChange={setModel} onRefresh={() => setRefreshTick((t) => t + 1)} />
                         {modelError && <em className="ai-model-error">{modelError}</em>}
                     </label>
+                    <label title="Constrained decoding override. probe: ask the endpoint once and remember (key absent); on: always send the JSON grammar; off: never send it">
+                        <span>Decoding</span>
+                        <select aria-label="Constrained decoding" value={decoding} onChange={(e) => setDecoding(e.target.value)}>
+                            <option value="">probe (auto)</option>
+                            <option value="on">on (force json_schema)</option>
+                            <option value="off">off (never send)</option>
+                        </select>
+                    </label>
+                    <label title="Sampling temperature 0–2 — blank leaves the provider default (key absent)">
+                        <span>Temperature</span>
+                        <input type="number" aria-label="Temperature" min="0" max="2" step="0.1"
+                            placeholder="default" value={temperature} onChange={(e) => setTemperature(e.target.value)} />
+                    </label>
                 </>
             )}
             <button
                 className="ct-btn ct-btn-primary"
                 disabled={mode === 'off' && !aiConfig}
-                onClick={() => (mode === 'off' ? onRemove() : onSave({ mode, endpoint, model: model || models[0] || '', provider }))}
+                onClick={() => (mode === 'off' ? onRemove() : onSave(
+                    buildConfigPayload({ mode, endpoint, model: model || models[0] || '', provider, decoding, temperature })))}
             >
                 <i className="fas fa-save"></i> {mode === 'off' ? 'Turn AI off' : 'Save AI config'}
             </button>
@@ -131,6 +152,24 @@ function ModelField({ models, model, onChange, onRefresh }) {
 }
 
 const defaultEndpoint = (provider) => (provider === 'ollama' ? 'http://localhost:11434' : 'http://localhost:8000/v1')
+// Constrained-decoding tri-state ⇄ aiConfig.jsonSchema (key absent ⇄ probe).
+const triFromJsonSchema = (v) => (v === true ? 'on' : v === false ? 'off' : '')
+const temperatureInput = (v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : '')
+/**
+ * Row → aiConfig payload. `undefined` values are deliberate REMOVALS (the
+ * merge in AiRefereeSection.saveConfig deletes those keys); anything the row
+ * never sends stays untouched. Keys must stay in sync with the field states.
+ */
+function buildConfigPayload({ mode, endpoint, model, provider, decoding, temperature }) {
+    return {
+        mode,
+        endpoint,
+        model,
+        provider,
+        jsonSchema: decoding === 'on' ? true : decoding === 'off' ? false : undefined,
+        temperature: temperature.trim() === '' ? undefined : Number(temperature),
+    };
+}
 // Client-side mirror of the server's D3 contract — skip pointless probes
 // while the GM is mid-typing a non-local URL (the server re-checks anyway).
 const looksLocal = (url) => {
