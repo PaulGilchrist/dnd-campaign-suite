@@ -49,3 +49,43 @@ is the minimum fix and also protects already-persisted note files.
 Minor UX issue — no visible breakage observed yet, but it is a guaranteed console
 error on every Drafts render and an unsupported React state that can drop/duplicate
 messages on future updates.
+
+## Resolution
+FIXED 2026-10-31 — client-side composite key only (the mandatory minimum fix).
+
+**What was wrong (confirmed as diagnosed):** `designNotes.appendMessages` stamps
+both entries of one round-trip with the same `Date.now()`, and
+`AiDesignerSection` keyed the thread `key={`${m.at || i}`}` — so each persisted
+gm+ai pair collides on rehydrate. Reproduced live first: configured AI (mode
+suggest, `http://localhost:8000/v1`, `Qwen3.8-Flash-Next-oQ4e-mtp`), sent "Hi",
+disk showed `gm 1793463251978 / ai 1793463251978`, and the Log→Drafts rehydrate
+printed `Encountered two children with the same key, 1793463251978`.
+
+**Fix:** `src/components/campaign-builder/AiDesignerSection.jsx:158` —
+`key={`${m.at ?? i}-${m.role}-${i}`}` (index guarantees uniqueness even if two
+messages ever share `at` AND role; optimistic pre-persist messages without `at`
+still key distinctly). The shared `at` is kept server-side as a per-round-trip
+stamp — it is semantically the "one exchange" timestamp, ordering is index-based,
+and the client fix also protects already-persisted files. **Server-side per-entry
+stamp deliberately NOT added** (optional item; choosing minimal surface).
+
+**Files changed:**
+- `src/components/campaign-builder/AiDesignerSection.jsx` (key fix)
+- `src/components/campaign-builder/AiDesignerSection.test.jsx` (new lock test:
+  persisted gm+ai pair sharing one `at` renders without a console "same key" error)
+
+**Verification:**
+- New test fails against the pre-fix key (negative check run: 1 failed | 4 passed)
+  and passes with the fix; full folder run `npx vitest run
+  src/components/campaign-builder/` = 10/10 pass; `npm run lint` clean.
+- Live re-verify (Vite HMR): after the fix, a second round-trip persisted another
+  shared-`at` pair (2 pairs / 4 messages on disk), full page reload + fresh Drafts
+  mount + Log→Drafts rehydrate each rendered all 4 messages in GM/Designer order
+  with ZERO new duplicate-key console errors (console error count stayed flat at
+  the 3 pre-fix occurrences across post-fix renders; sending still works).
+
+**Baseline restored:** AI turned off via Admin, tab closed, `clear-change-data` +
+`clear-log` via API (change-data `{}`, log `[]`, ai status off), and
+`design-notes.json` residue removed — mirroring the AP baseline fingerprint which
+records that exact file as prior AP-session residue deleted the same way.
+

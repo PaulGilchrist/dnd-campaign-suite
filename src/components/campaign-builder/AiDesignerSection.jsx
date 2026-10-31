@@ -155,7 +155,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
               <p className="ai-designer-empty">Tell the AI your story ideas — a whole campaign, an arc for the next few levels, or prep for the next session. It reads the current campaign before answering.</p>
             )}
             {messages.map((m, i) => (
-              <div key={`${m.at || i}`} className={`ai-designer-msg ai-designer-msg-${m.role === 'gm' ? 'gm' : 'ai'}`}>
+              <div key={`${m.at ?? i}-${m.role}-${i}`} className={`ai-designer-msg ai-designer-msg-${m.role === 'gm' ? 'gm' : 'ai'}`}>
                 <span className="ai-designer-msg-who">{m.role === 'gm' ? 'GM' : 'Designer'}</span>
                 <span className="ai-designer-msg-text">{m.content}</span>
               </div>

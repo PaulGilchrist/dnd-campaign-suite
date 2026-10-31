@@ -43,6 +43,26 @@ describe('AiDesignerSection', () => {
         expect(screen.getByText('A frost cult')).toBeTruthy();
     });
 
+    it('renders persisted gm+ai messages sharing one at-timestamp without duplicate React keys', async () => {
+        // designNotes.appendMessages stamps both messages of a round-trip with the
+        // SAME Date.now() — the thread must still key each row uniquely (bug: the
+        // shared `at` produced "two children with the same key" on every rehydrate).
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        api.loadDesignerConversation.mockResolvedValue({
+            messages: [
+                { role: 'gm', content: 'Hi there', at: 1793447128891 },
+                { role: 'ai', content: 'Hello GM', at: 1793447128891 },
+            ],
+        });
+        render(<AiDesignerSection campaignName="c" />);
+        expect(await screen.findByText('Hi there')).toBeTruthy();
+        expect(screen.getByText('Hello GM')).toBeTruthy();
+
+        const dupKeyCall = errSpy.mock.calls.find(args => String(args[0]).includes('same key'));
+        errSpy.mockRestore();
+        expect(dupKeyCall).toBeUndefined();
+    });
+
     it('proposes a plan, GM edits a count, generation lands as drafts', async () => {
         api.designerPlan.mockResolvedValue({
             ok: true,
