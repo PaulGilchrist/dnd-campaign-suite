@@ -5,9 +5,11 @@
  * parse+validate → bounded retry → honest failure), plus the owner-ruling
  * generation model: the WHOLE blueprint is emitted in ONE schema-constrained
  * call against the full story bible (a single model holds the whole narrative);
- * if the response truncates or fails twice, generation RESUMES entity-by-entity
- * with the same story bible plus already-produced siblings in context —
- * truncation recovery, not piecemeal design.
+ * a truncated/non-JSON response FAILS FAST straight to entity-by-entity resume
+ * (the mega-prompt is huge — retrying it just burns minutes on slow local
+ * models); only structurally-invalid-but-parsed JSON earns a repair retry.
+ * Resume re-emits with the same story bible plus already-produced siblings in
+ * context — truncation recovery, not piecemeal design.
  *
  * Writes only ever happen through applyBlueprint (drafts, snapshot, SSE,
  * log). Chat/plan generate no campaign rows at all. Conversation persists to
@@ -128,15 +130,24 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
                 ...decode('campaign_blueprint', ENTITY_SCHEMAS.blueprint),
             });
         } catch (e) {
+            // Provider throws ONLY on transport/non-JSON faces (validation never throws) —
+            // re-sending the whole mega-prompt just burns minutes on slow local models,
+            // so fail straight to the per-entity resume instead of retrying the batch.
             lastErrors = [`${e.code || 'ERROR'}: ${String(e.message || e).slice(0, 160)}`];
-            continue;
+            break;
         }
         const parsed = extractJsonObject(content);
-        if (!parsed.ok) { lastErrors = ['blueprint was not valid JSON (likely truncated output)']; continue; }
+        if (!parsed.ok) {
+            // Truncation face: same fail-fast ruling — resume, never a second full-size attempt.
+            lastErrors = ['blueprint was not valid JSON (likely truncated output)'];
+            break;
+        }
         const errors = collectBlueprintErrors(campaign, { ...parsed.value, scope });
         if (errors.length === 0) {
             return finalize(campaign, { ...parsed.value, scope }, log, attempt);
         }
+        // Parsed-but-structurally-invalid: the small repair prompt is genuinely useful —
+        // keep the two-attempt repair lane for this face only.
         lastErrors = errors;
         repairMessages = buildRepairMessages(messages, String(content).slice(0, 60000), errors);
     }

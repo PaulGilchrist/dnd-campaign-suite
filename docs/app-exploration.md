@@ -48,8 +48,6 @@
 
 ## Improvement Backlog
 
-- **2026-10-31 (AP) generate-batch-prompt-huge:** the whole-schema batch call embeds the full bestiary menu + story bible and routinely truncates to non-JSON on ~38-tok/s local models (AP run: batch failed `AI_UNAVAILABLE: non-JSON`, per-entity resume did all work). Consider defaulting small scopes straight to the resume path (or chunking the batch) to halve wall-time for local backends.
-
 ### AP visual-polish pass (2026-10-31, owner-directed — evidence shots `.opencode/plans/runAP-ai-*.png`)
 
 - **2026-10-31 (AP-visual) ai-instruction-inputs-undersized (OWNER DIRECTION):** every AI instruction box is too small to converse with the AI effectively, measured live against the server's generous limits — MapsManager dress input **297×22px** for a 2000-char instruction (fits ~45 chars per glance), NPC-editor refine input ~200×22 single-line, designer composer **586×37px (rows=2)** for an 8000-char message (longer instructions scroll invisibly inside a one-visual-line box), referee describe textarea also rows=2, and the chat thread caps at `max-height:320px`. Owner ruling: **promote these to modals or another size-appropriate pattern** (e.g. a designer chat modal with a multi-rows auto-growing composer + scrollable thread; refine/dress could open a small modal with a 4–6-row textarea mirroring the accepted limits). Files: `AiDressButton.css` (`flex:1 1 220px` single-line input), `AiRefineButton.css`, `AiDesignerSection.jsx:166-167`, `AiRefereeSection.jsx:121-123`.
