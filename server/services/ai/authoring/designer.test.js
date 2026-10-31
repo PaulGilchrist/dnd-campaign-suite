@@ -97,6 +97,46 @@ describe('generateBlueprint — whole-set path', () => {
     });
 });
 
+describe('generateBlueprint — stage:generate audit shape', () => {
+    const scope = { scope: 'arc', levelRange: { min: 1, max: 3 } };
+    const blueprint = { scope, npcs: [], factions: [], quests: [], settlements: [], sessions: [], encounters: [], mapPlans: [] };
+
+    const generateAudit = () => log.mock.calls
+        .map(([, entry]) => entry)
+        .find(e => e.type === 'ai_designer' && e.stage === 'generate');
+
+    it('persists rejection reasons (capped at 5) when applyBlueprint rejects', async () => {
+        const chatFn = vi.fn(async () => JSON.stringify(blueprint));
+        const rejectionErrors = [
+            'encounters[0] "Ambush": unknown bestiary index "monster-index-1"',
+            'npcs[0] "Cultist": shadow-name collision',
+            'quests[0] "Rite": unknown faction reference',
+            'settlements[0] "Villa": unknown map reference',
+            'sessions[0] "Finale": unknown quest reference',
+            'sixth error must be truncated away',
+        ];
+        applyBlueprint.mockResolvedValue({ ok: false, errors: rejectionErrors, created: {}, snapshot: null });
+        const res = await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        expect(res.ok).toBe(false);
+        const entry = generateAudit();
+        expect(entry).toBeTruthy();
+        expect(entry.created).toEqual({});
+        expect(entry.errors).toEqual(rejectionErrors.slice(0, 5));
+        expect(entry.errors).toHaveLength(5);
+    });
+
+    it('keeps the success-path payload byte-clean (no errors key)', async () => {
+        const chatFn = vi.fn(async () => JSON.stringify(blueprint));
+        applyBlueprint.mockResolvedValue({ ok: true, errors: [], created: { npcs: 1 }, snapshot: 's.zip' });
+        const res = await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        expect(res.ok).toBe(true);
+        const entry = generateAudit();
+        expect(entry).toBeTruthy();
+        expect('errors' in entry).toBe(false);
+        expect(Object.keys(entry).sort()).toEqual(['attempts', 'created', 'name', 'snapshot', 'stage', 'type']);
+    });
+});
+
 describe('generateBlueprint — truncation → per-entity resume', () => {
     const scope = { scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'faction', count: 2 }], storySummary: 'x' };
     it('resumes entity-by-entity when the whole-set emit fails twice', async () => {

@@ -147,7 +147,15 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
 
 async function finalize(campaign, blueprint, log, attempt) {
     const applied = await applyBlueprint(campaign, blueprint, { log });
-    audit(log, campaign, { stage: 'generate', created: applied.created, snapshot: applied.snapshot, attempts: attempt }, attempt);
+    // Persist rejection reasons on the audit (AGENTS: log event details) —
+    // omitted on success so the clean-path payload keeps its shape (§144 idiom).
+    audit(log, campaign, {
+        stage: 'generate',
+        created: applied.created,
+        snapshot: applied.snapshot,
+        attempts: attempt,
+        ...(applied.errors?.length ? { errors: applied.errors.slice(0, 5) } : {}),
+    }, attempt);
     return applied;
 }
 

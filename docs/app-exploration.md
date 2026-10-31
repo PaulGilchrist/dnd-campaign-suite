@@ -48,7 +48,6 @@
 
 ## Improvement Backlog
 
-- **2026-10-31 (AP) designer-apply-audit-omits-errors:** when `applyBlueprint` rejects on referential errors, the `ai_designer` stage:generate log entry records `created:{}` WITHOUT the rejection reasons (`designer.js:150` audit payload omits `applied.errors`) — the UI shows them once, a reload loses why. AGENTS "every automation must log … event details" wants the reasons persisted. Cheap fix: spread `errors: (applied.errors||[]).slice(0,5)` into the stage:generate audit.
 - **2026-10-31 (AP) refine-no-op-silent:** refine success that changes nothing (model echoes the input — EB encounter face) closes the row with zero feedback; GM can't tell "applied no-change" from "applied change". Suggest comparing replacement to input and surfacing a "model proposed no changes" hint in AiRefineButton success path.
 - **2026-10-31 (AP) dress-remove-preview-raw-uuid:** `dressMap.js:192` previews removes as `remove <uuid>` while adds print `type@x,y` — the removed row object is in hand; print `remove ${gone.type||gone.name||gone.label||gone.id} @x,y` so GMs can read what they approve.
 - **2026-10-31 (AP) placeholder-name-accepted:** model-authored quest landed literally named `"quest"` (shape example leakage) and validateEntity accepted it — reject names equal (case-insensitively) to the kind or a placeholder blacklist, or add a discriminating `examples[]` to the schema prompt.
