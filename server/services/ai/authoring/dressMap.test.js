@@ -100,7 +100,7 @@ describe('dressMapProposal — indoor happy lane', () => {
         expect(chatFn.mock.calls[0][0].responseSchema).toBe(liveDressPlanSchema);
         expect(res.preview).toEqual([
             'add chest at 2,2',
-            `remove ${torch.id}`,
+            `remove ${torch.type} at ${torch.gridX},${torch.gridY}`,
             'move Goblin → 9,6',
         ]);
         const chest = res.updated.placedItems.find(i => i.type === 'chest' && i.gridX === 2 && i.gridY === 2);
@@ -164,6 +164,53 @@ describe('dressMapProposal — reject-before-propose (all-or-nothing)', () => {
         const res = await dressMapProposal({ campaign: 'unit', mapName: 'sunken-temple', instruction: 'x', aiConfig: AI, chatFn });
         expect(res.ok).toBe(false);
         expect(res.errors.join(' ')).toMatch(/must be one of/);
+    });
+});
+
+describe('applyDressOps — remove previews read as plain English, never raw ids', () => {
+    const doc = (over) => ({ type: 'indoor', gridSize: 10, placedItems: [], items: [], pois: [], ...over });
+    const UUID = '94fcd0bfe9e4cf6e1118f736b920e7a2';
+
+    it('types the removed row with its own fields using the add ops\' `at x,y` idiom', () => {
+        const res = applyDressOps(doc({
+            placedItems: [{ id: UUID, type: 'chest', gridX: 4, gridY: 5, visible: true }],
+            items: [{ id: 'tok-1', name: 'Goblin', gridX: 1, gridY: 2 }],
+            pois: [{ id: 'poi-1', label: 'Temple Door', gridX: 3, gridY: 7 }],
+        }), [
+            { op: 'remove', target: 'item', id: UUID },
+            { op: 'remove', target: 'token', id: 'tok-1' },
+            { op: 'remove', target: 'poi', id: 'poi-1' },
+        ]);
+        expect(res.preview).toEqual([
+            'remove chest at 4,5',
+            'remove Goblin at 1,2',
+            'remove Temple Door at 3,7',
+        ]);
+        for (const line of res.preview) expect(line).not.toContain(UUID);
+    });
+
+    it('falls back to a readable noun (never a UUID) when the row has no type/name/label', () => {
+        const res = applyDressOps(doc({
+            placedItems: [{ id: UUID, gridX: 6, gridY: 1 }],
+        }), [
+            { op: 'remove', target: 'item', id: UUID },
+        ]);
+        expect(res.preview).toEqual(['remove row at 6,1']);
+        expect(res.preview[0]).not.toContain(UUID);
+    });
+
+    it('speaks q,r on hex maps', () => {
+        const res = applyDressOps(
+            doc({ type: 'outdoor', terrain: { '2,3': 'forest' }, pois: [{ id: 'poi-1', label: 'Gate', q: 2, r: 3 }] }),
+            [{ op: 'remove', target: 'poi', id: 'poi-1' }],
+        );
+        expect(res.preview).toEqual(['remove Gate at 2,3']);
+    });
+
+    it('an unplaceable row still names itself without a phantom coordinate', () => {
+        const res = applyDressOps(doc({ items: [{ id: 'tok-x', name: 'Ogre' }] }),
+            [{ op: 'remove', target: 'token', id: 'tok-x' }]);
+        expect(res.preview).toEqual(['remove Ogre']);
     });
 });
 

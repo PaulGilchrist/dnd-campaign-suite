@@ -48,7 +48,6 @@
 
 ## Improvement Backlog
 
-- **2026-10-31 (AP) dress-remove-preview-raw-uuid:** `dressMap.js:192` previews removes as `remove <uuid>` while adds print `type@x,y` — the removed row object is in hand; print `remove ${gone.type||gone.name||gone.label||gone.id} @x,y` so GMs can read what they approve.
 - **2026-10-31 (AP) placeholder-name-accepted:** model-authored quest landed literally named `"quest"` (shape example leakage) and validateEntity accepted it — reject names equal (case-insensitively) to the kind or a placeholder blacklist, or add a discriminating `examples[]` to the schema prompt.
 - **2026-10-31 (AP) designer-plan-state-volatile:** PlanEditor contents (AI plan + GM count edits) live only in `AiDesignerSection` useState — navigating away (Log, Admin) silently discards an unrevised plan + last generate error. Persist the pending plan in design-notes (it already stores `plans[]`) or warn on unmount.
 - **2026-10-31 (AP) gm-note-label-casing:** log view renders type `gm-note` as "Gm-note" (naive capitalize) — cosmetic label polish for non-alphanumeric type labels.

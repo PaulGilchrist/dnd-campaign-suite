@@ -189,7 +189,15 @@ function applyOne(doc, op, i, ctx) {
     }
     if (op.op === 'remove') {
         const [gone] = rows.splice(idx, 1);
-        ctx.preview.push(`remove ${gone.id}`);
+        // GMs approve previews in plain English: describe the removed row with
+        // its own fields (never an opaque id), reusing the add ops' ` at x,y`
+        // idiom so adds and removes read consistently.
+        const label = gone.type || gone.name || gone.label || 'row';
+        const x = Number.isInteger(gone.q) ? gone.q : gone.gridX;
+        const y = Number.isInteger(gone.q) ? gone.r : gone.gridY;
+        ctx.preview.push(Number.isInteger(x) && Number.isInteger(y)
+            ? `remove ${label} at ${x},${y}`
+            : `remove ${label}`);
         return;
     }
     moveRow(rows[idx], op, at, ctx);
