@@ -7,7 +7,8 @@ import extractZip from 'extract-zip';
 import multerLib from 'multer';
 import yauzlLib from 'yauzl';
 import asyncHandler from '../utils/asyncHandler.js';
-import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile, campaignSnapshotDir, campaignSnapshotFile, snapshotTimestamp } from '../utils/campaignPaths.js';
+import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile, campaignSnapshotDir, campaignSnapshotFile } from '../utils/campaignPaths.js';
+import { createSnapshot, listSnapshotFiles } from '../utils/campaignSnapshots.js';
 import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish, readFile } from '../utils/changeData.js';
 import { logCache } from './log.js';
 
@@ -333,73 +334,9 @@ router.post('/api/campaigns/:campaign/admin/full-reset', asyncHandler(async (req
 }));
 
 // --- Snapshot helpers ---
-
-// Keep at most 4 restore points per campaign (owner cap 2026-10-28; pruned
-// per-campaign in pruneSnapshots — the shared .snapshots/ dir holds every
-// campaign's files but each prune pass only counts its own campaign's).
-const SNAPSHOT_RETENTION = 4;
-
-function listSnapshotFiles(campaign) {
-    const snapshotDir = campaignSnapshotDir();
-    if (!fs.existsSync(snapshotDir)) return [];
-
-    const timestampedPrefix = `${campaign}-`;
-    const legacyName = `${campaign}.zip`;
-
-    return fs.readdirSync(snapshotDir)
-        .filter((name) => name.endsWith('.zip') && (name.startsWith(timestampedPrefix) || name === legacyName))
-        .map((filename) => {
-            const stats = fs.statSync(path.join(snapshotDir, filename));
-            return { filename, size: stats.size, timestamp: stats.mtime.toISOString() };
-        })
-        .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-}
-
-function pruneSnapshots(campaign) {
-    const excess = listSnapshotFiles(campaign).slice(SNAPSHOT_RETENTION);
-    for (const { filename } of excess) {
-        fs.rmSync(path.join(campaignSnapshotDir(), filename), { force: true });
-    }
-}
-
-function createSnapshot(campaign) {
-    return new Promise((resolve, reject) => {
-        saveFile();
-
-        const snapshotDir = campaignSnapshotDir();
-        if (!fs.existsSync(snapshotDir)) {
-            fs.mkdirSync(snapshotDir, { recursive: true });
-        }
-
-        const filename = `${campaign}-${snapshotTimestamp()}.zip`;
-        const snapshotPath = path.join(snapshotDir, filename);
-        const archive = new archiverLib.ZipArchive({ zlib: { level: 9 } });
-        const outputStream = fs.createWriteStream(snapshotPath);
-
-        const rejectWith = (err) => {
-            archive.abort();
-            reject(err);
-        };
-
-        archive.on('error', rejectWith);
-        outputStream.on('error', rejectWith);
-
-        archive.pipe(outputStream);
-        archive.directory(campaignDir(campaign), false, (entry) => {
-            if (entry.name.includes('.snapshots')) {
-                return false;
-            }
-            return entry;
-        });
-        archive.finalize();
-
-        archive.on('end', () => {
-            const size = outputStream.bytesWritten;
-            pruneSnapshots(campaign);
-            resolve({ filename, size });
-        });
-    });
-}
+// listSnapshotFiles/pruneSnapshots/createSnapshot now live in
+// utils/campaignSnapshots.js (shared with the AI authoring service —
+// Phase 2 of the campaign-authoring plan); imported at the top of this file.
 
 function extractZipToDir(source, targetDir) {
     return new Promise((resolve, reject) => {

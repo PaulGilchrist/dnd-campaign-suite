@@ -8,6 +8,8 @@ import PreviewToggle from '../common/PreviewToggle.jsx';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import './Quests.css';
+import DraftFlag from '../common/DraftFlag.jsx';
+import AiRefineButton from '../common/AiRefineButton.jsx';
 
 const STATUS_OPTIONS = ['active', 'completed', 'failed'];
 
@@ -68,7 +70,7 @@ function QuestEmptyState({ searchQuery }) {
   );
 }
 
-function QuestFormModal({ editingQuest, formData, saving, deleting, error, errorConflict, saveDisabled, onChange, onClose, onReloadList, onSave, onDelete }) {
+function QuestFormModal({ editingQuest, formData, setFormData, campaignName, saving, deleting, error, errorConflict, saveDisabled, onChange, onClose, onReloadList, onSave, onDelete }) {
   return (
     <div className="ct-modal-overlay">
       <div className="ct-modal quests-modal">
@@ -160,6 +162,14 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, error
                 <i className="fa-solid fa-trash-can" />{' '}
                 {deleting ? 'Deleting\u2026' : 'Delete'}
               </button>
+            )}
+            {editingQuest && campaignName && (
+              <AiRefineButton
+                campaignName={campaignName}
+                kind="quest"
+                entity={formData}
+                onReplaced={setFormData}
+              />
             )}
           </div>
           <div className="ct-modal-buttons">
@@ -411,6 +421,7 @@ function Quests({ campaignName, isLocalhost }) {
               >
                 <div className="ct-list-item-header">
                   <span className="ct-list-name">{quest.name}</span>
+                  <DraftFlag row={quest} />
                   <div className="ct-list-meta">
                     <span
                       className="quests-list-status"
@@ -439,6 +450,8 @@ function Quests({ campaignName, isLocalhost }) {
         <QuestFormModal
           editingQuest={editingQuest}
           formData={formData}
+          setFormData={setFormData}
+          campaignName={campaignName}
           saving={saving}
           deleting={deleting}
           error={visibleError}

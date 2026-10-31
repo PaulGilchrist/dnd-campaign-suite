@@ -17,6 +17,7 @@ const VIEW_LABELS = {
     quests: { label: 'Quests', icon: 'fa-scroll' },
     sessions: { label: 'Sessions', icon: 'fa-calendar-check' },
     settlements: { label: 'Settlements', icon: 'fa-city' },
+    campaignBuilder: { label: 'Drafts', icon: 'fa-wand-magic-sparkles' },
     campaignRepair: { label: 'Admin', icon: 'fa-gears' },
 };
 
@@ -27,6 +28,9 @@ const RULES_URL = 'https://paulgilchrist.github.io/dnd-tools/rules/general';
 const DICE_POPUP_AUTO_HIDE_MS = 4000;
 
 const NAV_ITEMS = [
+    // NAV_ITEMS render verbatim — the nav-order test pins alphabetical-by-label,
+    // so a new view slots by its label, not by insertion time.
+    { view: 'campaignBuilder', onClick: 'onCampaignBuilderClick', localhostOnly: true },
     { view: 'encounter', onClick: 'onEncounterClick', localhostOnly: true },
     { view: 'factions', onClick: 'onFactionsClick', localhostOnly: true },
     { view: 'initiative', onClick: 'onInitiativeClick' },
@@ -125,7 +129,7 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError }) {
     const [diceResult, setDiceResult] = useState(null);
 
     // Auto-hide timer (display only, no game state). A re-roll replaces
@@ -151,7 +155,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
       };
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
-    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick };
+    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
 
     return (
         <>

@@ -1,6 +1,7 @@
 import { npcHasStatBlock, npcHasAttacks } from '../../services/encounters/npcStatBlockUtils.js';
 import { getAttitudeStyle } from '../../services/npcs/npcFormUtils.js';
 import AvatarImage from '../common/AvatarImage.jsx';
+import DraftFlag from '../common/DraftFlag.jsx';
 
 function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
   const hasStats = npcHasStatBlock(npc);
@@ -27,6 +28,7 @@ function NPCListItem({ npc, campaignName, onEdit, onAddToInitiative }) {
             <AvatarImage name={npc.name} imagePath={npc.imagePath} campaignName={campaignName} size={36} />
           )}
           <span className="ct-list-name">{npc.name}</span>
+          <DraftFlag row={npc} />
         </div>
         <div className="ct-list-meta">
           {npcHasStatBlock(npc) && (

@@ -1,15 +1,22 @@
 import express from 'express';
 import { publish } from '../utils/changeData.js';
 import { readEncounters, writeEncounters } from '../utils/encounterUtils.js';
+import { isLocalHost } from '../utils/jsonEntityCrud.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
+
+// Draft invisibility (campaign-authoring plan Phase 3): AI-drafted encounters
+// are GM planning surfaces — non-GM callers never see them in the list or by
+// name (404 like an absent row), mirroring jsonEntityCrud's factory seams.
+const isDraft = (enc) => enc?.draft === true;
 
 // GET /api/campaigns/:campaign/encounters - List all encounters
 router.get('/api/campaigns/:campaign/encounters', asyncHandler((req, res) => {
   const { campaign } = req.params;
   const data = readEncounters(campaign);
-  const encounters = data.encounters.map(e => ({ name: e.name, savedAt: e.savedAt, effectiveXP: e.effectiveXP }));
+  const visible = isLocalHost(req) ? data.encounters : data.encounters.filter(e => !isDraft(e));
+  const encounters = visible.map(e => ({ name: e.name, savedAt: e.savedAt, effectiveXP: e.effectiveXP, draft: e.draft === true || undefined }));
   res.json({ encounters });
 }));
 
@@ -54,7 +61,7 @@ router.get('/api/campaigns/:campaign/encounters/:encountername', asyncHandler((r
   const { campaign, encountername } = req.params;
   const data = readEncounters(campaign);
   const encounter = data.encounters.find(e => e.name === encountername);
-  if (!encounter) {
+  if (!encounter || (isDraft(encounter) && !isLocalHost(req))) {
     return res.status(404).json({ error: 'Encounter not found' });
   }
   res.json(encounter);

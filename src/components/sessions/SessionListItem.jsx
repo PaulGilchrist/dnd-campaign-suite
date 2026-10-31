@@ -1,4 +1,5 @@
 import { checklistProgress, countLinks, hasNotes } from '../../services/campaign/sessionPlannerUtils.js';
+import DraftFlag from '../common/DraftFlag.jsx';
 
 function SessionListItem({ session, onEdit }) {
   const handleKeyDown = (e) => {
@@ -24,6 +25,7 @@ function SessionListItem({ session, onEdit }) {
       <div className="sessions-list-header">
         <div className="sessions-list-name-row">
           <span className="ct-list-name">{session.name}</span>
+          <DraftFlag row={session} />
           {session.date && <span className="sessions-list-date"><i className="fa-solid fa-calendar" /> {session.date}</span>}
         </div>
         <div className="ct-list-meta">

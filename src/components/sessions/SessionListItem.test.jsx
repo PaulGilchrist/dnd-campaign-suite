@@ -73,3 +73,15 @@ describe('SessionListItem — notes indicator dot', () => {
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Cave Raid' }));
   });
 });
+
+describe('SessionListItem — AI draft badge (campaign-authoring Phase 3)', () => {
+  it('badges draft rows for the GM and never badge approved ones', () => {
+    const { container: drafted } = renderRow(makeSession({ draft: true }));
+    const flag = drafted.querySelector('.ct-draft-flag');
+    expect(flag).not.toBeNull();
+    expect(flag.textContent).toBe('draft');
+
+    const { container: live } = renderRow(makeSession());
+    expect(live.querySelector('.ct-draft-flag')).toBeNull();
+  });
+});

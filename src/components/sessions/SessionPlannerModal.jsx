@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AiRefineButton from '../common/AiRefineButton.jsx';
 import {
   LINK_TYPES,
   CONTINGENCY_BRANCHES,
@@ -204,7 +205,7 @@ function ChecklistSection({ checklist, onToggle, onAddItem, onRemoveItem }) {
 }
 
 function SessionModalFooter({
-  editingSession, formData, saving, deleting,
+  editingSession, formData, setFormData, campaignName, saving, deleting,
   onClose, onSave, onDelete, onMarkPlayed,
 }) {
   const canMarkPlayed = editingSession && editingSession.status !== 'played';
@@ -219,6 +220,14 @@ function SessionModalFooter({
           >
             <i className="fa-solid fa-trash-can" /> {deleting ? 'Deleting…' : 'Delete'}
           </button>
+        )}
+        {editingSession && campaignName && (
+          <AiRefineButton
+            campaignName={campaignName}
+            kind="session"
+            entity={formData}
+            onReplaced={setFormData}
+          />
         )}
         {canMarkPlayed && (
           <button className="ct-btn sessions-played-btn" onClick={onMarkPlayed}>
@@ -242,6 +251,7 @@ function SessionModalFooter({
 
 function SessionPlannerModal({
   formData,
+  setFormData,
   editingSession,
   otherSessions,
   resourceOptions,
@@ -417,6 +427,8 @@ function SessionPlannerModal({
         <SessionModalFooter
           editingSession={editingSession}
           formData={formData}
+          setFormData={setFormData}
+          campaignName={campaignName}
           saving={saving}
           deleting={deleting}
           onClose={onClose}

@@ -6,6 +6,7 @@ import Subscriber from '../common/Subscriber.jsx';
 import GenerateDungeonModal from './GenerateDungeonModal.jsx';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
 import './MapsManager.css';
+import DraftFlag from '../common/DraftFlag.jsx';
 
 const GENERATE_BUTTONS = {
     indoor: {
@@ -376,6 +377,7 @@ function MapsManager({ campaignName, onOpenMap }) {
                                 ) : (
                                     <span className="maps-manager-item-name">
                                         {map.name}
+                                        <DraftFlag row={map} />
                                         {map.type && (
                                             <span className={`map-type-badge ${map.type === 'outdoor' ? 'outdoor' : 'indoor'}`}>
                                                 {map.type === 'outdoor' ? 'Outdoor' : 'Indoor'}

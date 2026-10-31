@@ -186,3 +186,19 @@ describe('NPCListItem', () => {
     });
   });
 });
+
+describe('NPCListItem — AI draft badge (campaign-authoring Phase 3)', () => {
+  it('badges draft rows and leaves approved rows clean', () => {
+    const { container: drafted } = render(
+      <NPCListItem npc={{ name: 'Oldhem', draft: true }} onEdit={vi.fn()} onAddToInitiative={vi.fn()} campaignName="test-campaign" />
+    );
+    const flag = drafted.querySelector('.ct-draft-flag');
+    expect(flag).not.toBeNull();
+    expect(flag.textContent).toBe('draft');
+
+    const { container: live } = render(
+      <NPCListItem npc={{ name: 'Marta' }} onEdit={vi.fn()} onAddToInitiative={vi.fn()} campaignName="test-campaign" />
+    );
+    expect(live.querySelector('.ct-draft-flag')).toBeNull();
+  });
+});

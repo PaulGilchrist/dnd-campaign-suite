@@ -10,7 +10,7 @@
  *   node hex-terrain-generator.mjs --grid-size 20 --weights '{"water":0.5,"forest":1.5}'
  */
 
-import { generateHexTerrain } from './src/services/hexTerrainGenerator.js';
+import { generateHexTerrain } from './src/services/maps/hexTerrainGenerator.js';
 
 const args = process.argv.slice(2);
 const get = (flag) => {

@@ -189,6 +189,52 @@ function findConcurrentWrite(diskEntities, incomingEntities, idField, displayFie
   return null;
 }
 
+/**
+ * File-level list operations, hoisted so non-HTTP callers (the AI authoring
+ * service — plan Phase 2) compose the EXACT lane semantics: missing file
+ * initializes to `[]`, list rows persist pretty-printed like every route does.
+ */
+export function entityDataFile(campaign, entityName) {
+  return campaignDataFile(campaign, `${entityName}.json`);
+}
+
+export function loadEntityList(campaign, entityName) {
+  const filePath = entityDataFile(campaign, entityName);
+  if (!fs.existsSync(filePath)) {
+    ensureDataDir(campaign);
+    fs.writeFileSync(filePath, JSON.stringify([], null, 2));
+    return [];
+  }
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  return Array.isArray(data) ? data : [];
+}
+
+export function saveEntityList(campaign, entityName, rows) {
+  ensureDataDir(campaign);
+  fs.writeFileSync(entityDataFile(campaign, entityName), JSON.stringify(rows, null, 2));
+}
+
+// ---------------------------------------------------------------------------
+// Draft invisibility (campaign-authoring plan Phase 3, owner ruling): AI
+// drafts (draft:true, forced by services/ai/authoring/apply.js) are GM
+// planning surfaces — a draft quest title alone can spoil the story. Players
+// must never receive them, and that must be a SERVER fact, not a UI convention
+// (only quests/maps historically gated non-localhost reads; the other list
+// lanes relied on client-side authority alone). Two seams here cover every
+// entity sharing this factory: list GETs omit draft rows for non-GM callers,
+// and single GETs answer the same 404 an absent row gets, so a draft's very
+// existence stays invisible. localhost (the GM machine) sees drafts badged.
+// ---------------------------------------------------------------------------
+
+export const isLocalHost = (req) =>
+  req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+export function hideDraftsFromPlayers(entities, req) {
+  return isLocalHost(req)
+    ? entities
+    : (entities || []).filter(row => row?.draft !== true);
+}
+
 export function createJsonEntityRouter(entityName, options = {}) {
   const {
     idField = 'id',
@@ -215,24 +261,15 @@ export function createJsonEntityRouter(entityName, options = {}) {
   } = options;
 
   const router = Router();
-  const getFilePath = (campaign) => campaignDataFile(campaign, `${entityName}.json`);
+  const getFilePath = (campaign) => entityDataFile(campaign, entityName);
 
-  const loadOrInit = (campaign) => {
-    const filePath = getFilePath(campaign);
-    if (!fs.existsSync(filePath)) {
-      ensureDataDir(campaign);
-      fs.writeFileSync(filePath, JSON.stringify([], null, 2));
-      return [];
-    }
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return Array.isArray(data) ? data : [];
-  };
+  const loadOrInit = (campaign) => loadEntityList(campaign, entityName);
 
   // GET /api/campaigns/:campaign/[entityName] — list all
   router.get(`/api/campaigns/:campaign/${entityName}`, asyncHandler((req, res) => {
     try {
       const { campaign } = req.params;
-      const entities = loadOrInit(campaign);
+      const entities = hideDraftsFromPlayers(loadOrInit(campaign), req);
       const result = transformList ? transformList(entities, req) : entities;
       res.json({ [responseWrapper]: result });
     } catch (error) {
@@ -270,9 +307,7 @@ export function createJsonEntityRouter(entityName, options = {}) {
           : undefined,
         now
       ));
-      const filePath = getFilePath(campaign);
-      ensureDataDir(campaign);
-      fs.writeFileSync(filePath, JSON.stringify(stamped, null, 2));
+      saveEntityList(campaign, entityName, stamped);
       if (broadcast) broadcast('replaced', campaign, {});
       res.json({ success: true });
     } catch (error) {
@@ -297,6 +332,13 @@ export function createJsonEntityRouter(entityName, options = {}) {
       const entity = entities.find(e => e[idField] === decodedId);
 
       if (!entity) {
+        return res.status(404).json({ error: `${singularDisplayName} not found` });
+      }
+
+      // A draft answers 404 to non-GM callers (same body as an absent row) —
+      // even probing by id cannot confirm a draft exists. See the draft
+      // invisibility block above for the ruling.
+      if (entity.draft === true && !isLocalHost(req)) {
         return res.status(404).json({ error: `${singularDisplayName} not found` });
       }
 

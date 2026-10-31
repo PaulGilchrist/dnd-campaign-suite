@@ -51,8 +51,7 @@ export async function askWorldKeeper({ campaignName, kind, focus = null }) {
     return data
 }
 
-/** Server dice oracle (§7.4) — the honest roller when enforcement.serverDice is on. */
-export async function serverRoll({ campaignName, expression, mode = 'normal', reason = '' }) {
+/** Server dice oracle (§7.4) — the honest roller when enforcement.serverDice is on. */export async function serverRoll({ campaignName, expression, mode = 'normal', reason = '' }) {
     const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/roll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,4 +75,63 @@ export async function fetchAiModels({ endpoint, provider }) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     if (!res.ok) return { ok: false, error: data.error || `HTTP ${res.status}` }
     return { ok: true, models: data.models || [] }
+}
+
+// --- AI Campaign Authoring designer (plan Phase 4) -------------------------
+// Thin transport to server/routes/ai-designer.js. Generation lands DRAFTS
+// only — the Campaign Builder review flow is what makes content live.
+
+export async function loadDesignerConversation({ campaignName }) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/conversation`)
+    if (!res.ok) throw new Error(`designer conversation returned ${res.status}`)
+    return res.json()
+}
+
+export async function designerChat({ campaignName, message }) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+    })
+    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
+    if (!res.ok && !data.code) return { ok: false, code: res.status === 403 ? 'AI_OFF' : 'AI_ERROR', error: data.error }
+    return data
+}
+
+export async function designerPlan({ campaignName }) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    })
+    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
+    if (!res.ok && !data.code) return { ok: false, code: res.status === 403 ? 'AI_OFF' : 'AI_ERROR', error: data.error }
+    return data
+}
+
+export async function designerGenerate({ campaignName, scope }) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope }),
+    })
+    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
+    if (!res.ok && !data.code) return { ok: false, code: res.status === 403 ? 'AI_OFF' : 'AI_ERROR', error: data.error }
+    return data
+}
+
+/**
+ * Phase 6 per-entity refine: PROPOSAL ONLY — the caller feeds the returned
+ * replacement into the editor form; the GM's normal save (with their echoed
+ * stamp) is what persists, so concurrent-tab 409s keep protecting edits.
+ * @returns {Promise<{ok:true, replacement}|{ok:false, errors?|code?}>}
+ */
+export async function refineEntity({ campaignName, kind, entity, instruction }) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/refine/${encodeURIComponent(kind)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entity, instruction }),
+    })
+    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
+    if (!res.ok && !data.code) return { ok: false, code: res.status === 403 ? 'AI_OFF' : 'AI_ERROR', error: data.error }
+    return data
 }

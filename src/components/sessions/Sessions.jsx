@@ -520,6 +520,7 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       {modalOpen && formData && (
         <SessionPlannerModal
           formData={formData}
+          setFormData={setFormData}
           editingSession={editingSession}
           otherSessions={otherSessions}
           resourceOptions={picker}

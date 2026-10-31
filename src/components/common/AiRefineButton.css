@@ -1,0 +1,23 @@
+/* AiRefineButton (campaign-authoring Phase 6) — component-scoped. */
+
+.ai-refine-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ai-refine-row input[type='text'] {
+  flex: 1 1 200px;
+}
+
+.ai-refine-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text);
+  background: var(--background-color-error);
+  border: 1px solid var(--border-color-error);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+}

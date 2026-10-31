@@ -7,6 +7,8 @@ import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 import './Settlements.css';
+import DraftFlag from '../common/DraftFlag.jsx';
+import AiRefineButton from '../common/AiRefineButton.jsx';
 
 const SIZE_OPTIONS = [
   { value: 'village', label: 'Village' },
@@ -76,6 +78,7 @@ function SettlementListItem({ settlement, onEdit }) {
       <div className="settlements-list-header">
         <div className="settlements-list-name-row">
           <span className="ct-list-name">{settlement.name}</span>
+          <DraftFlag row={settlement} />
         </div>
         <div className="ct-list-meta">
           {settlement.size && (
@@ -115,7 +118,7 @@ function SettlementListItem({ settlement, onEdit }) {
 }
 
 function SettlementModal({
-  formData, editingSettlement, saving, deleting, error, errorConflict,
+  formData, setFormData, campaignName, editingSettlement, saving, deleting, error, errorConflict,
   onClose, onReloadList, onSave, onDelete, onFormChange,
   onAddService, onServiceChange, onRemoveService,
   onAddNPC, onNPCChange, onRemoveNPC,
@@ -365,6 +368,14 @@ function SettlementModal({
                 <i className="fa-solid fa-trash-can" />{' '}
                 {deleting ? 'Deleting…' : 'Delete'}
               </button>
+            )}
+            {editingSettlement && campaignName && (
+              <AiRefineButton
+                campaignName={campaignName}
+                kind="settlement"
+                entity={formData}
+                onReplaced={setFormData}
+              />
             )}
           </div>
           <div className="ct-modal-buttons">
@@ -794,6 +805,8 @@ function Settlements({ campaignName }) {
       {modalOpen && formData && (
         <SettlementModal
           formData={formData}
+          setFormData={setFormData}
+          campaignName={campaignName}
           editingSettlement={editingSettlement}
           saving={saving}
           deleting={deleting}

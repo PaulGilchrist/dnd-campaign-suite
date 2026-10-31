@@ -269,6 +269,23 @@ button.hidden {
   color: var(--color-text);
 }
 
+/* AI draft badge (campaign-authoring plan Phase 3): marks rows awaiting GM
+   approval in the Campaign Builder. Server-side filtering keeps drafts off
+   player clients entirely — this badge is the GM-side companion. Global (not
+   .ct-container-prefixed) so every list lane — ct-* editors and the maps
+   manager alike — can use the one chip. */
+.ct-draft-flag {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--background-color-warning);
+  color: var(--color-text);
+  border: 1px solid var(--border-color-warning);
+}
+
 .ct-container .ct-list-meta {
   display: flex;
   align-items: center;

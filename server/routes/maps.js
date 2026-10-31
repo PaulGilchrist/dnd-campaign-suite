@@ -88,12 +88,17 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     // Carried through so the manager list can surface read-only descriptions
     // (row hover tooltip) without a per-row document fetch (backlog 2026-10-26).
     let description = '';
+    let isDraftMap = false;
     try {
       const mapContent = JSON.parse(fs.readFileSync(path.join(mapsDir, f), 'utf-8'));
       mapType = mapContent.type || 'indoor';
       if (mapContent.displayName) displayName = mapContent.displayName;
       description = mapContent.description || '';
+      isDraftMap = mapContent.draft === true;
     } catch (_e) { /* ignore */ }
+    // Draft invisibility (campaign-authoring plan Phase 3): an AI-drafted map
+    // never appears in a non-GM listing.
+    if (isDraftMap && !isLocalhost(req)) return null;
 
     return {
       name: displayName,
@@ -101,9 +106,10 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
       slug: slugFromFileName(f),
       type: mapType,
       description,
+      draft: isDraftMap || undefined,
       isActive: slugFromFileName(f) === activeMap
     };
-  });
+  }).filter(Boolean);
 
   res.json({ maps });
 }));
@@ -302,6 +308,11 @@ router.get('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   }
 
   const mapData = pruneRevealedToGrid(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
+  // Draft invisibility (campaign-authoring plan Phase 3): non-GM callers get
+  // the same 404 an absent map gets — even a name probe confirms nothing.
+  if (mapData?.draft === true && !isLocalhost(req)) {
+    return res.status(404).json({ error: 'Map not found' });
+  }
   res.json(mapData);
 }));
 
@@ -444,6 +455,14 @@ router.put('/api/campaigns/:campaign/maps/:mapname/activate', asyncHandler((req,
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'Map not found' });
+  }
+
+  // Draft maps are never table-visible: approve in the Campaign Builder first
+  // (campaign-authoring plan Phase 3 — "players only ever see an activated,
+  // approved map"). 409 so the GM UI can offer the approve-and-activate path.
+  const stored = readStoredMapDocument(filePath);
+  if (stored?.draft === true) {
+    return res.status(409).json({ error: 'That map is still a draft — approve it before activating.' });
   }
 
   const mapKey = fileName.replace(/\.json$/, '');

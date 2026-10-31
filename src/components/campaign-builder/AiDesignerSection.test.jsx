@@ -1,0 +1,85 @@
+// @maintained-by-ai
+// Campaign-authoring Phase 4 — designer section lanes: AI-off hint, chat
+// round-trip, plan proposal → editable counts → generate → draft summary,
+// and honest failure surfacing.
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { vi } from 'vitest';
+
+const api = vi.hoisted(() => ({
+    getAiStatus: vi.fn(),
+    loadDesignerConversation: vi.fn(),
+    designerChat: vi.fn(),
+    designerPlan: vi.fn(),
+    designerGenerate: vi.fn(),
+}));
+vi.mock('../../services/ai/aiClient.js', () => api);
+
+import AiDesignerSection from './AiDesignerSection.jsx';
+
+beforeEach(() => {
+    Object.values(api).forEach(fn => fn.mockReset());
+    api.getAiStatus.mockResolvedValue({ configured: true });
+    api.loadDesignerConversation.mockResolvedValue({ messages: [{ role: 'ai', content: 'What are we building?', at: 1 }] });
+});
+
+describe('AiDesignerSection', () => {
+    it('points to Admin config when AI is off', async () => {
+        api.getAiStatus.mockResolvedValue({ configured: false });
+        render(<AiDesignerSection campaignName="c" />);
+        expect(await screen.findByText(/configure AI in Admin/i)).toBeTruthy();
+    });
+
+    it('loads the persisted conversation and sends a chat turn', async () => {
+        api.designerChat.mockResolvedValue({ ok: true, reply: 'Love the cult idea — what is its public face?' });
+        render(<AiDesignerSection campaignName="c" />);
+        await screen.findByText('What are we building?');
+
+        fireEvent.change(screen.getByPlaceholderText('What are we building?'), { target: { value: 'A frost cult' } });
+        fireEvent.click(screen.getByRole('button', { name: /send/i }));
+
+        await waitFor(() => expect(api.designerChat).toHaveBeenCalledWith({ campaignName: 'c', message: 'A frost cult' }));
+        expect(await screen.findByText(/public face/)).toBeTruthy();
+        expect(screen.getByText('A frost cult')).toBeTruthy();
+    });
+
+    it('proposes a plan, GM edits a count, generation lands as drafts', async () => {
+        api.designerPlan.mockResolvedValue({
+            ok: true,
+            scope: { scope: 'session', sessionNumber: 4, storySummary: 'The ferry ambush', entityPlan: [{ kind: 'encounter', count: 1 }, { kind: 'npc', count: 1 }] },
+        });
+        api.designerGenerate.mockResolvedValue({ ok: true, created: { encounters: 1, npcs: 1, factions: 0, quests: 0, settlements: 0, sessions: 0, maps: 0 }, snapshot: 'c-2026.zip', errors: [] });
+        const onGenerated = vi.fn();
+        render(<AiDesignerSection campaignName="c" onGenerated={onGenerated} />);
+
+        fireEvent.click(await screen.findByRole('button', { name: /propose build plan/i }));
+        await screen.findByText('Review the build plan');
+
+        // Editable: bump the encounter count from 1 → 2.
+        const encounterInput = screen.getByLabelText('encounters');
+        fireEvent.change(encounterInput, { target: { value: '2' } });
+
+        fireEvent.click(screen.getByRole('button', { name: /generate drafts/i }));
+        await waitFor(() => expect(api.designerGenerate).toHaveBeenCalledWith(
+            expect.objectContaining({ campaignName: 'c' })
+        ));
+        const sentScope = api.designerGenerate.mock.calls[0][0].scope;
+        expect(sentScope.entityPlan.find(p => p.kind === 'encounter').count).toBe(2);
+        expect(sentScope.sessionNumber).toBe(4); // untouched fields ride through
+
+        expect(await screen.findByText(/restore point/)).toBeTruthy();
+        expect(onGenerated).toHaveBeenCalled();
+    });
+
+    it('surfaces generation validation errors verbatim', async () => {
+        api.designerPlan.mockResolvedValue({ ok: true, scope: { scope: 'bespoke', entityPlan: [] } });
+        api.designerGenerate.mockResolvedValue({ ok: false, errors: ['npcs: "Ogre" is a bestiary monster', 'encounters[0]: index unknown'] });
+        render(<AiDesignerSection campaignName="c" />);
+        fireEvent.click(await screen.findByRole('button', { name: /propose build plan/i }));
+        await screen.findByText('Review the build plan');
+        fireEvent.click(screen.getByRole('button', { name: /generate drafts/i }));
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toContain('bestiary monster');
+        expect(alert.textContent).toContain('index unknown');
+    });
+});

@@ -8,6 +8,8 @@ import utils from '../../services/ui/utils.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import './Factions.css';
+import DraftFlag from '../common/DraftFlag.jsx';
+import AiRefineButton from '../common/AiRefineButton.jsx';
 
 const INFLUENCE_COLORS = {
   low: { bg: '#1a472a', color: '#90ee90', border: '#2d6a4f' },
@@ -84,7 +86,7 @@ function Factions({ campaignName }) {
 
   const {
     searchQuery, setSearchQuery, filteredItems: filteredFactions,
-    modalOpen, editingItem: editingFaction, formData,
+    modalOpen, editingItem: editingFaction, formData, setFormData,
     saving, setSaving,
     openNew, openEdit, closeModal, updateFormField,
   } = useCrudList(factions, ['name']);
@@ -324,6 +326,7 @@ function Factions({ campaignName }) {
             >
               <div className="ct-list-item-header">
                 <span className="ct-list-name">{faction.name}</span>
+                <DraftFlag row={faction} />
                 <div className="ct-list-meta">
                   {faction.influence != null && (
                     <span
@@ -443,14 +446,22 @@ function Factions({ campaignName }) {
             <div className="ct-modal-footer no-print">
               <div className="ct-modal-actions">
                 {editingFaction && (
-                  <button
-                    className="ct-btn ct-btn-danger"
-                    onClick={handleDelete}
-                    disabled={deleting}
-                  >
-                    <i className="fa-solid fa-trash-can" />{' '}
-                    {deleting ? 'Deleting…' : 'Delete'}
-                  </button>
+                  <>
+                    <button
+                      className="ct-btn ct-btn-danger"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                    >
+                      <i className="fa-solid fa-trash-can" />{' '}
+                      {deleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                    <AiRefineButton
+                      campaignName={campaignName}
+                      kind="faction"
+                      entity={formData}
+                      onReplaced={setFormData}
+                    />
+                  </>
                 )}
               </div>
               <div className="ct-modal-buttons">

@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js';
 import AvatarImage from '../common/AvatarImage.jsx';
 import AvatarModal from '../common/AvatarModal.jsx';
+import AiRefineButton from '../common/AiRefineButton.jsx';
 import NPCRoleplayForm from './NPCRoleplayForm.jsx';
 import NPCStatBlockForm from './NPCStatBlockForm.jsx';
 
 function NPCFormFooter({
   editingNPC,
   formData,
+  setFormData,
+  campaignName,
   saving,
   deleting,
   disabled,
@@ -28,6 +31,14 @@ function NPCFormFooter({
             <i className="fa-solid fa-trash-can" />{' '}
             {deleting ? 'Deleting…' : 'Delete'}
           </button>
+        )}
+        {editingNPC && campaignName && (
+          <AiRefineButton
+            campaignName={campaignName}
+            kind="npc"
+            entity={formData}
+            onReplaced={setFormData}
+          />
         )}
         {npcHasStatBlock(formData) && onSaveAndAddToInitiative && (
           <button
@@ -209,6 +220,8 @@ function NPCFormModal({
           <NPCFormFooter
             editingNPC={editingNPC}
             formData={formData}
+            setFormData={setFormData}
+            campaignName={campaignName}
             saving={saving}
             deleting={deleting}
             disabled={disabled}

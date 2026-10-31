@@ -18,6 +18,7 @@ import campaignsBasic from './server/routes/campaigns-basic.js';
 import campaignsCharacter from './server/routes/campaigns-character.js';
 import campaignsRoll from './server/routes/campaigns-roll.js';
 import campaignsAi from './server/routes/campaigns-ai.js';
+import aiDesignerRoutes from './server/routes/ai-designer.js';
 import aiKeyRoutes from './server/routes/ai-key.js';
 import aiModelRoutes from './server/routes/ai-models.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
@@ -183,6 +184,8 @@ app.use(campaignsRoll);
 // segments than the generic :campaign/:key route, but mount beside the roll
 // oracle anyway: L5 server surfaces live together.
 app.use(campaignsAi);
+// AI designer — campaign authoring chat/plan/generate (draft-write lane)
+app.use(aiDesignerRoutes);
 // AI bearer-key management (localhost-only; never enters change-data/SSE)
 app.use(aiKeyRoutes);
 // AI model discovery for the admin config dropdown (localhost-only)

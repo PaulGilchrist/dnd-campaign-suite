@@ -33,6 +33,7 @@ import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
 import Settlements from './components/settlements/Settlements.jsx';
+import CampaignBuilder from './components/campaign-builder/CampaignBuilder.jsx';
 import Sessions from './components/sessions/Sessions.jsx';
 import Factions from './components/factions/Factions.jsx';
 import PartyInventory from './components/party-inventory/PartyInventory.jsx';
@@ -272,6 +273,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     settlements: <Settlements campaignName={campaignName} />,
     sessions: <Sessions campaignName={campaignName} characters={characters} onViewInitiative={() => setActiveView('initiative')} />,
     factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
+    campaignBuilder: <CampaignBuilder campaignName={campaignName} />,
     partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
     campaignRepair: (
@@ -706,6 +708,7 @@ function App() {
            onInventoryClick={handleInventoryClick}
            onSessionsClick={() => setActiveView('sessions')}
            onSettlementsClick={handleSettlementsClick}
+           onCampaignBuilderClick={() => setActiveView('campaignBuilder')}
            onFactionsClick={handleFactionsClick}
           onLogClick={handleLogClick}
           onRepairClick={() => setActiveView('campaignRepair')}

@@ -10,7 +10,7 @@
  *   node dungeon-generator.mjs --grid-size 30 --density 0.5 --count 5 --output batch.json
  */
 
-const { generateDungeon, visualize } = await import('./src/services/dungeonGenerator.js');
+const { generateDungeon, visualize } = await import('./src/services/maps/dungeonGenerator.js');
 
 const args = process.argv.slice(2);
 const get = function (flag) {
