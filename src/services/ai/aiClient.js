@@ -61,3 +61,19 @@ export async function serverRoll({ campaignName, expression, mode = 'normal', re
     if (!res.ok) throw new Error(`server dice refused (${res.status})`)
     return res.json()
 }
+
+/**
+ * Admin model discovery — asks the LOCAL endpoint (via the server, which
+ * attaches the server-local bearer key) for its model list. Returns
+ * { ok, models?, error? } so the config row can surface failures honestly.
+ */
+export async function fetchAiModels({ endpoint, provider }) {
+    const res = await fetch('/api/ai/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint, provider }),
+    })
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    if (!res.ok) return { ok: false, error: data.error || `HTTP ${res.status}` }
+    return { ok: true, models: data.models || [] }
+}

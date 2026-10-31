@@ -6,7 +6,7 @@
 // by applyRuling.test.js; world keeper cards by AiWorldConsole.test.jsx —
 // not re-tested here.
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { vi } from 'vitest';
 
 // Boundary stubs: the synced-store hook and runtime store stand in for the
@@ -23,6 +23,10 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(async () => ({})) }));
+vi.mock('../../services/ai/aiClient.js', async () => {
+    const actual = await vi.importActual('../../services/ai/aiClient.js');
+    return { ...actual, fetchAiModels: vi.fn(async () => ({ ok: false, error: 'no probe' })) };
+});
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(() => ({ total: 9, rolls: [4, 5] })),
     rollAdvantage: vi.fn(() => ({ total: 17, rolls: [8, 17] })),
@@ -31,6 +35,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { fetchAiModels } from '../../services/ai/aiClient.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import AiRefereeSection from './AiRefereeSection.jsx';
 
@@ -85,6 +90,7 @@ const auditEntries = () => addEntry.mock.calls.map(c => c[1]).filter(e => e.type
 beforeEach(() => {
     for (const k of Object.keys(synced)) delete synced[k];
     vi.clearAllMocks();
+    fetchAiModels.mockResolvedValue({ ok: false, error: 'no probe' }); // default: dropdown stays a text input
     getRuntimeValue.mockReturnValue(null); // clearAllMocks keeps implementations — reset explicitly
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -372,5 +378,63 @@ describe('AiRefereeSection — proposal override (§10.4)', () => {
         await waitFor(() => expect(screen.getByText(/Applied: Rakan: 20 → 17 HP/)).toBeInTheDocument());
         expect(setRuntimeValue).toHaveBeenCalledWith('Rakan', 'currentHitPoints', 17, CN);
         expect(auditEntries().at(-1).ruling).toMatchObject({ type: 'hp_change', amount: -3, overridden: true });
+    });
+});
+
+// Endpoint → model discovery: typing an Endpoint queries it and the Model
+// field becomes a dropdown of the endpoint's real model ids.
+describe('AiRefereeSection — Model dropdown', () => {
+    const modelField = () => screen.getByLabelText('Model');
+
+    it('fills the dropdown after the debounce and saves the chosen model', async () => {
+        vi.useFakeTimers();
+        try {
+            fetchAiModels.mockResolvedValue({ ok: true, models: ['llama3.1:8b', 'qwen2.5:7b'] });
+            const fetchMock = stubFetch();
+            render(<AiRefereeSection campaignName={CN} characters={characters} />);
+            fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'suggest' } });
+            fireEvent.change(screen.getByLabelText(/Endpoint/), { target: { value: 'http://localhost:11434' } });
+
+            await act(async () => { vi.advanceTimersByTime(500); });
+            const dropdown = screen.getByRole('combobox', { name: 'Model' }); // dropdown replaces the text input
+            expect(fetchAiModels).toHaveBeenCalledWith({ endpoint: 'http://localhost:11434', provider: 'openai' });
+            expect(dropdown.tagName).toBe('SELECT');
+            ['llama3.1:8b', 'qwen2.5:7b'].forEach((m) => expect(within(dropdown).getByText(m)).toBeInTheDocument());
+            expect(screen.queryByPlaceholderText(/exact id/)).toBeNull();
+
+            fireEvent.change(dropdown, { target: { value: 'qwen2.5:7b' } });
+            fireEvent.click(saveButton());
+            const posts = fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/aiConfig'));
+            expect(JSON.parse(posts.at(-1)[1].body).value).toMatchObject({ endpoint: 'http://localhost:11434', model: 'qwen2.5:7b' });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('endpoint down ⇒ honest error hint, Model stays a free-text input', async () => {
+        vi.useFakeTimers();
+        try {
+            fetchAiModels.mockResolvedValueOnce({ ok: false, error: 'endpoint refused to connect' });
+            stubFetch();
+            render(<AiRefereeSection campaignName={CN} characters={characters} />);
+            fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'suggest' } });
+            fireEvent.change(screen.getByLabelText(/Endpoint/), { target: { value: 'http://localhost:9999/v1' } });
+
+            await act(async () => { vi.advanceTimersByTime(500); });
+            expect(screen.getByText('endpoint refused to connect')).toBeInTheDocument();
+            expect(modelField().tagName).toBe('INPUT');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('non-local URLs are never probed (D3 mirror)', async () => {
+        stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'suggest' } });
+        fireEvent.change(screen.getByLabelText(/Endpoint/), { target: { value: 'https://api.openai.com/v1' } });
+        await new Promise((r) => setTimeout(r, 600)); // past the debounce window, real timers
+        expect(fetchAiModels).not.toHaveBeenCalled();
+        expect(modelField().tagName).toBe('INPUT');
     });
 });

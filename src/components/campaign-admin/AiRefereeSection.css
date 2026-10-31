@@ -28,6 +28,14 @@
     min-width: 180px;
 }
 
+/* Model picker — dropdown + re-query button once the endpoint answers. */
+.ai-referee-section .ai-model-picker {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.ai-referee-section .ai-model-error { color: #d29922; font-size: 0.7rem; }
+
 .ai-referee-section .ai-console { margin-top: 0.75rem; }
 .ai-referee-section .ai-action-input {
     width: 100%;

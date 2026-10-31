@@ -19,6 +19,7 @@ import campaignsCharacter from './server/routes/campaigns-character.js';
 import campaignsRoll from './server/routes/campaigns-roll.js';
 import campaignsAi from './server/routes/campaigns-ai.js';
 import aiKeyRoutes from './server/routes/ai-key.js';
+import aiModelRoutes from './server/routes/ai-models.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
@@ -184,6 +185,8 @@ app.use(campaignsRoll);
 app.use(campaignsAi);
 // AI bearer-key management (localhost-only; never enters change-data/SSE)
 app.use(aiKeyRoutes);
+// AI model discovery for the admin config dropdown (localhost-only)
+app.use(aiModelRoutes);
 
 // Change data routes (after character file route so .json files aren't captured by :key)
 app.use(campaignsChangedata);
