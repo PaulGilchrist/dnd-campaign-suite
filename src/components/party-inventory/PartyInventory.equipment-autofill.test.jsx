@@ -41,7 +41,6 @@ const defaultProps = {
   campaignName: 'test-campaign',
   isLocalhost: true,
   characters: [],
-  onBack: vi.fn(),
 };
 
 const emptyInventory = () => ({

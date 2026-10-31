@@ -40,7 +40,7 @@ function renderWithQuests(quests) {
     deleteItem: vi.fn().mockResolvedValue(undefined),
   });
   return render(
-    <Quests campaignName="test-campaign" isLocalhost onBack={vi.fn()} />
+    <Quests campaignName="test-campaign" isLocalhost />
   );
 }
 

@@ -42,7 +42,7 @@ describe('MapsManager — empty-kebab create/rename gate', () => {
         // is exactly what shipped for storage keys.
         mapsService.loadMaps.mockResolvedValue({ maps: [] });
         mapsService.createMap.mockResolvedValue({});
-        props = { campaignName: 'test-campaign', onOpenMap: vi.fn(), onBack: vi.fn() };
+        props = { campaignName: 'test-campaign', onOpenMap: vi.fn() };
     });
 
     const createInput = () => screen.getByPlaceholderText('New map name...');

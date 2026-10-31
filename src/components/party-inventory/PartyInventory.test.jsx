@@ -48,7 +48,6 @@ const defaultProps = {
       },
     },
   ],
-  onBack: vi.fn(),
 };
 
 const baseInventory = () => ({

@@ -33,7 +33,6 @@ function mockServerConfig(config) {
 function renderAdmin() {
     const props = {
         campaignName: CAMPAIGN,
-        onBack: vi.fn(),
         theme: 'dark',
         toggleTheme: vi.fn(),
         onRenameCampaign: vi.fn(),

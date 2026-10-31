@@ -11,7 +11,7 @@ import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
 import { generateNPC } from '../../services/npcs/npcGenerator.js';
 import './NPCs.css';
 
-function NPCs({ campaignName, onBack, onViewInitiative }) {
+function NPCs({ campaignName, onViewInitiative }) {
   const { items: npcs, loading, loadItems: loadNPCsList, deleteItem: deleteNPCAction } =
     useEntityManagement(campaignName, { load: loadNPCs, save: saveNPCs, delete: deleteNPC }, { responseKey: 'npcs', loadOnMount: false });
 
@@ -252,9 +252,6 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
 
       <div className="ct-header">
-        <button className="ct-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left" /> Back
-        </button>
         <h2 className="ct-title">
           <i className="fa-solid fa-users" /> NPCs
         </h2>

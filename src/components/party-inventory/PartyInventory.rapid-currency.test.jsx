@@ -41,7 +41,6 @@ const defaultProps = {
   characters: [
     { name: 'War Cleric', inventory: { backpack: [], equipped: [], gold: 10, magicItems: [] } },
   ],
-  onBack: vi.fn(),
 };
 
 const baseInventory = () => ({

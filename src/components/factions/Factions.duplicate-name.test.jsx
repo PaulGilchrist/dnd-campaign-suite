@@ -46,7 +46,7 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 const ERROR_TEXT = 'A faction with that name already exists';
 
 describe('Factions live duplicate-name validation', () => {
-  const defaultProps = { campaignName: 'test-campaign', onBack: vi.fn() };
+  const defaultProps = { campaignName: 'test-campaign' };
   const nameInput = () => screen.getByRole('textbox', { name: 'Faction Name *' });
 
   beforeEach(() => {

@@ -117,12 +117,9 @@ async function inspectUploadArchive(campaignName, file, setStatus, input) {
     return true;
 }
 
-function AdminHeader({ campaignName, onBack }) {
+function AdminHeader({ campaignName }) {
     return (
         <div className="ct-header">
-            <button className="ct-back-btn" onClick={onBack}>
-                <i className="fas fa-arrow-left"></i> Back
-            </button>
             <h2>Admin — {campaignName}</h2>
         </div>
     );
@@ -311,7 +308,7 @@ function SnapshotList({ snapshots, onRestore, disabled }) {
     );
 }
 
-function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [] }) {
+function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [] }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
     const [newName, setNewName] = useState('');
@@ -658,7 +655,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
 
     return (
         <div className="ct-container campaign-admin">
-            <AdminHeader campaignName={campaignName} onBack={onBack} />
+            <AdminHeader campaignName={campaignName} />
 
             {restoredSnapshot && (
                 <div className="admin-status admin-status--success" role="status">

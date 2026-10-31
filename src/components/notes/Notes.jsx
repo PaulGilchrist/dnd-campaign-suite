@@ -219,7 +219,7 @@ function NoteModal({
   );
 }
 
-function Notes({ campaignName, characters, isLocalhost, onBack }) {
+function Notes({ campaignName, characters, isLocalhost }) {
   const { items: notes, loading, loadItems: loadNotesList, saveItems: saveNotesList, deleteItem: deleteNoteAction } =
     useEntityManagement(campaignName, { load: loadNotes, save: saveNotes, delete: deleteNote }, { responseKey: 'notes', loadOnMount: false });
 
@@ -412,9 +412,6 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
       {/* Header */}
       <div className="ct-header">
-        <button className="ct-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left" /> Back
-        </button>
         <h2 className="ct-title">
           <i className="fa-solid fa-book-open" /> Notes
         </h2>

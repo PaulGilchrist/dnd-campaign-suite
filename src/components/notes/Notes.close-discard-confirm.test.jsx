@@ -65,7 +65,7 @@ const CONFLICT_MESSAGE =
 const conflictError = () => Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
 
 const renderNotes = () =>
-  render(<Notes campaignName="test-campaign" characters={[]} isLocalhost onBack={vi.fn()} />);
+  render(<Notes campaignName="test-campaign" characters={[]} isLocalhost />);
 
 const openEditor = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Edit note: old note' }));

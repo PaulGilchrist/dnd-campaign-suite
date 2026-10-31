@@ -49,7 +49,7 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
 }));
 
 const renderSettlements = () =>
-  render(<Settlements campaignName="test-campaign" onBack={vi.fn()} />);
+  render(<Settlements campaignName="test-campaign" />);
 
 const openEditor = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Edit settlement: Ironhaven' }));

@@ -70,7 +70,7 @@ vi.mock('../../services/npcs/npcGenerator.js', () => ({
 }));
 
 const renderNPCs = () =>
-  render(<NPCs campaignName="test-campaign" onBack={vi.fn()} onViewInitiative={vi.fn()} />);
+  render(<NPCs campaignName="test-campaign" onViewInitiative={vi.fn()} />);
 
 describe('NPCs live SSE sync', () => {
   beforeEach(() => {

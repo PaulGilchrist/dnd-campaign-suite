@@ -22,7 +22,6 @@ const SNAPSHOT_FILE = 'test-campaign-2026-10-10T12-34-56-789.zip';
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
-    onBack: vi.fn(),
     theme: 'dark',
     toggleTheme: vi.fn(),
     onRenameCampaign: vi.fn(),

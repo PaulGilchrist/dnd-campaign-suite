@@ -92,7 +92,7 @@ const changeSize = (size) =>
 // is only read on size change), then open the New Settlement modal.
 const openNewModal = async (data = descriptionsData) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: () => Promise.resolve(data) });
-  render(<Settlements campaignName={campaignName} onBack={() => {}} />);
+  render(<Settlements campaignName={campaignName} />);
   await act(async () => {});
   fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
 };

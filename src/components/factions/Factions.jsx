@@ -78,7 +78,7 @@ function getInfluenceStyle(influence) {
   };
 }
 
-function Factions({ campaignName, onBack }) {
+function Factions({ campaignName }) {
   const { items: factions, loading, loadItems: loadFactionsList, saveItems: saveFactionsList, deleteItem: deleteFactionAction } =
     useEntityManagement(campaignName, { load: loadFactions, save: saveFactions, delete: deleteFaction }, { responseKey: 'factions', loadOnMount: false });
 
@@ -264,9 +264,6 @@ function Factions({ campaignName, onBack }) {
 
       {/* Header */}
       <div className="ct-header">
-        <button className="ct-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left" /> Back
-        </button>
         <h2 className="ct-title">
           <i className="fa-solid fa-handshake" /> Factions
         </h2>

@@ -40,7 +40,6 @@ const defaultProps = {
   campaignName: 'test-campaign',
   isLocalhost: true,
   characters: [{ name: 'War Cleric', inventory: { backpack: [], equipped: [], gold: 0, magicItems: [] } }],
-  onBack: vi.fn(),
 };
 
 const baseInventory = () => ({

@@ -86,7 +86,7 @@ describe('Settlements - duplicate-name guard', () => {
     ['a case-insensitive collision', 'qa riverside hamlet'],
     ['a whitespace-padded collision', '  QA Riverside Hamlet  '],
   ])('blocks creating a new settlement with %s: inline error, modal stays open, never saves', (_case, name) => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
+    render(<Settlements campaignName="test" />);
 
     openNewSettlement();
     typeSetName(name);
@@ -103,7 +103,7 @@ describe('Settlements - duplicate-name guard', () => {
       { name: 'QA Riverside Hamlet' },
       { name: 'Ironhaven' },
     ];
-    render(<Settlements campaignName="test" onBack={() => {}} />);
+    render(<Settlements campaignName="test" />);
 
     openEditSettlement('Ironhaven');
     typeSetName('QA RIVERSIDE HAMLET');
@@ -119,7 +119,7 @@ describe('Settlements - duplicate-name guard', () => {
       { name: 'QA Riverside Hamlet' },
       { name: 'Ironhaven' },
     ];
-    render(<Settlements campaignName="test" onBack={() => {}} />);
+    render(<Settlements campaignName="test" />);
 
     openEditSettlement('Ironhaven');
     typeSetName('Ironhaven');
@@ -139,7 +139,7 @@ describe('Settlements - duplicate-name guard', () => {
   });
 
   it('clears the duplicate-name error when the modal is closed and reopened', () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
+    render(<Settlements campaignName="test" />);
 
     openNewSettlement();
     typeSetName('QA Riverside Hamlet');
@@ -154,7 +154,7 @@ describe('Settlements - duplicate-name guard', () => {
   it('surfaces a server-side rejection message inline and keeps the modal open', async () => {
     mockSaveSettlement.mockRejectedValue(new Error(DUPLICATE_ERROR));
 
-    render(<Settlements campaignName="test" onBack={() => {}} />);
+    render(<Settlements campaignName="test" />);
 
     openNewSettlement();
     typeSetName('Brand New Hamlet');

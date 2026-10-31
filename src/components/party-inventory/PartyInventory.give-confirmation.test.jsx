@@ -37,7 +37,6 @@ const defaultProps = {
   characters: [
     { name: 'War Cleric', inventory: { backpack: [], equipped: [], gold: 10, magicItems: [] } },
   ],
-  onBack: vi.fn(),
 };
 
 // gp mirrors the incident balance (205) that used to ride into the focused input.

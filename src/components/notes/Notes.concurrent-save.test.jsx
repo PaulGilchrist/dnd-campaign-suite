@@ -69,7 +69,7 @@ describe('Notes — concurrent-save conflict surfacing', () => {
   it('renders the server 409 message in the modal instead of failing silently', async () => {
     mockHook(vi.fn().mockRejectedValue(new Error(CONFLICT_MESSAGE)));
     render(
-      <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
+      <Notes campaignName="test" characters={[]} isLocalhost={true} />
     );
 
     fireEvent.click(screen.getByRole('button', { name: /new note/i }));
@@ -90,7 +90,7 @@ describe('Notes — concurrent-save conflict surfacing', () => {
   it('clears the conflict message when the editor is closed', async () => {
     mockHook(vi.fn().mockRejectedValue(new Error(CONFLICT_MESSAGE)));
     render(
-      <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
+      <Notes campaignName="test" characters={[]} isLocalhost={true} />
     );
 
     fireEvent.click(screen.getByRole('button', { name: /new note/i }));
@@ -112,7 +112,7 @@ describe('Notes — concurrent-save conflict surfacing', () => {
   it('successful saves still close the modal with no error shown', async () => {
     mockHook(vi.fn().mockResolvedValue({ success: true }));
     render(
-      <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
+      <Notes campaignName="test" characters={[]} isLocalhost={true} />
     );
 
     fireEvent.click(screen.getByRole('button', { name: /new note/i }));
@@ -131,7 +131,7 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const hook = mockHook(vi.fn().mockRejectedValue(conflictError()));
     render(
-      <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
+      <Notes campaignName="test" characters={[]} isLocalhost={true} />
     );
 
     openEditorWithStaleEdit(screen);
@@ -165,7 +165,7 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockHook(vi.fn().mockRejectedValue(new Error('Failed to save notes')));
     render(
-      <Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />
+      <Notes campaignName="test" characters={[]} isLocalhost={true} />
     );
 
     openEditorWithStaleEdit(screen);

@@ -55,7 +55,7 @@ describe('Factions', () => {
   let defaultProps;
 
   beforeEach(() => {
-    defaultProps = { campaignName: 'test-campaign', onBack: vi.fn() };
+    defaultProps = { campaignName: 'test-campaign' };
     factionsState = {
       factions: [],
       loading: false,
@@ -70,15 +70,13 @@ describe('Factions', () => {
   const saveButton = () => screen.getByRole('button', { name: 'Save' });
 
   describe('list states', () => {
-    it('loads on mount and renders header, back button, and empty state; Back invokes onBack', () => {
+    it('loads on mount and renders header and empty state', () => {
       render(<Factions {...defaultProps} />);
       expect(factionsState.loadFactionsList).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('heading', { name: /Factions/ })).toBeInTheDocument();
       expect(screen.getByPlaceholderText(/Search factions/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /New Faction/ })).toBeInTheDocument();
       expect(screen.getByText(/No factions yet/)).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /Back/ }));
-      expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
     });
 
     it('shows the loading state instead of the list', () => {

@@ -45,7 +45,6 @@ const neverSettles = () => new Promise(() => {});
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
-    onBack: vi.fn(),
     theme: 'dark',
     toggleTheme: vi.fn(),
     onRenameCampaign: vi.fn(),

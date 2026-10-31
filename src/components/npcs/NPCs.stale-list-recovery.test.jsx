@@ -86,7 +86,7 @@ vi.mock('../../services/npcs/npcGenerator.js', () => ({
 }));
 
 const renderNPCs = () =>
-  render(<NPCs campaignName="test-campaign" onBack={vi.fn()} onViewInitiative={vi.fn()} />);
+  render(<NPCs campaignName="test-campaign" onViewInitiative={vi.fn()} />);
 
 describe('NPCs 409-recovery: close refreshes the stale list', () => {
   beforeEach(() => {

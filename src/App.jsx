@@ -227,13 +227,12 @@ function seedCampaignRuntimeData(serverData) {
   }
 }
 
-function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onBackFromManager, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
+function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
   if (mapsView.type === 'manager') {
     return (
       <MapsManager
         campaignName={campaignName}
         onOpenMap={(mapName, mapDisplayName) => { setMapsView({ type: 'map', mapName, mapDisplayName }); setActiveMapName(mapName); }}
-        onBack={onBackFromManager}
       />
     );
   }
@@ -267,19 +266,18 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
 function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme, toggleTheme, onRenameCampaign, onDeleteCampaign, setActiveView, restoredSnapshot }) {
   const views = {
     encounter: <EncounterBuilder characters={characters} campaignName={campaignName} onJoinEncounter={() => setActiveView('initiative')} />,
-    notes: <Notes campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
-    quests: <Quests campaignName={campaignName} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
-    npcs: <NPCs campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} onViewInitiative={() => setActiveView('initiative')} />,
-    settlements: <Settlements campaignName={campaignName} onBack={() => setActiveView(null)} />,
-    sessions: <Sessions campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} onViewInitiative={() => setActiveView('initiative')} />,
-    factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
-    partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
+    notes: <Notes campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
+    quests: <Quests campaignName={campaignName} isLocalhost={isLocalhost} />,
+    npcs: <NPCs campaignName={campaignName} characters={characters} onViewInitiative={() => setActiveView('initiative')} />,
+    settlements: <Settlements campaignName={campaignName} />,
+    sessions: <Sessions campaignName={campaignName} characters={characters} onViewInitiative={() => setActiveView('initiative')} />,
+    factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
+    partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
     campaignRepair: (
       <CampaignAdmin
         campaignName={campaignName}
         characters={characters}
-        onBack={() => setActiveView(null)}
         theme={theme}
         toggleTheme={toggleTheme}
         onRenameCampaign={onRenameCampaign}
@@ -442,14 +440,6 @@ function App() {
       setMapsView({ type: isLocalhost ? 'manager' : 'none' });
     }
   }, [isLocalhost]);
-
-  // Manager Back closes the maps area — but 'mapsManager' must not stay the
-  // active view over a null MapsAreaView (a blank pane with the sidebar still
-  // on "Maps"). Match every other view's Back → setActiveView(null) convention.
-  const handleBackFromManager = useCallback(() => {
-    setMapsView({ type: 'none' });
-    setActiveView(null);
-  }, []);
 
   const [combatSummaryLoaded, setCombatSummaryLoaded] = useState(false);
 
@@ -753,7 +743,6 @@ function App() {
             isLocalhost={isLocalhost}
             mapsView={mapsView}
             onBackFromMap={handleBackFromMap}
-            onBackFromManager={handleBackFromManager}
             onEncounterCreated={handleEnterMap}
             setMapsView={setMapsView}
             setActiveMapName={setActiveMapName}

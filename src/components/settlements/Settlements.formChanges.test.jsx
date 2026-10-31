@@ -41,7 +41,7 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 
 const renderEditingSettlement = (settlement) => {
   settlementMockStore.items = [settlement];
-  render(<Settlements campaignName="test" onBack={() => {}} />);
+  render(<Settlements campaignName="test" />);
   fireEvent.click(
     screen.getByRole('button', { name: new RegExp(`edit settlement: ${settlement.name}`, 'i') }),
   );

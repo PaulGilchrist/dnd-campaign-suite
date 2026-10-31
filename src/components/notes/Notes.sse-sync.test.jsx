@@ -59,7 +59,7 @@ vi.mock('../common/MarkdownPreview.jsx', () => ({
 }));
 
 const renderNotes = () =>
-  render(<Notes campaignName="test-campaign" characters={[]} isLocalhost onBack={vi.fn()} />);
+  render(<Notes campaignName="test-campaign" characters={[]} isLocalhost />);
 
 describe('Notes live SSE sync', () => {
   beforeEach(() => {

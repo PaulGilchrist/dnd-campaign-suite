@@ -74,7 +74,6 @@ vi.mock('../../services/npcs/npcsService.js', () => ({
 
 const defaultProps = {
   campaignName: 'test-campaign',
-  onBack: vi.fn(),
   onViewInitiative: vi.fn(),
 };
 
@@ -131,13 +130,11 @@ describe('NPCs', () => {
   // ── Initial Render ────────────────────────────────────────────────
 
   describe('Initial render', () => {
-    it('renders Back, New NPC, Generate NPC, and the search input; Back fires onBack', () => {
+    it('renders New NPC, Generate NPC, and the search input', () => {
       renderNPCs();
       expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
       expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /Back/i }));
-      expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
     });
 
     it('loads NPCs on mount and again when campaignName changes', () => {

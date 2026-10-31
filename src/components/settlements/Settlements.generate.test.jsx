@@ -88,7 +88,7 @@ describe('Settlements - generate settlement', () => {
   });
 
   const renderAndGenerate = () => {
-    render(<Settlements campaignName="test" onBack={() => {}} />);
+    render(<Settlements campaignName="test" />);
     fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
   };
 
@@ -143,7 +143,7 @@ describe('Settlements - generate settlement', () => {
 
     it('asks for confirmation before replacing a half-typed form, and Cancel keeps every value byte-exact with zero POSTs', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-      render(<Settlements campaignName="test" onBack={() => {}} />);
+      render(<Settlements campaignName="test" />);
       typeCustomDetails();
 
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
@@ -165,7 +165,7 @@ describe('Settlements - generate settlement', () => {
 
     it('fills the form with generator output when the confirmation is accepted', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-      render(<Settlements campaignName="test" onBack={() => {}} />);
+      render(<Settlements campaignName="test" />);
       typeCustomDetails();
 
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
@@ -184,7 +184,7 @@ describe('Settlements - generate settlement', () => {
 
     it('also prompts when the only entered content is an added service, NPC, or rumor row', () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-      render(<Settlements campaignName="test" onBack={() => {}} />);
+      render(<Settlements campaignName="test" />);
       fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
       fireEvent.click(screen.getByRole('button', { name: /add service/i }));
 
@@ -196,7 +196,7 @@ describe('Settlements - generate settlement', () => {
 
     it('never prompts on an empty/default form — generate proceeds directly', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm');
-      render(<Settlements campaignName="test" onBack={() => {}} />);
+      render(<Settlements campaignName="test" />);
 
       // No modal open (formData null).
       fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));

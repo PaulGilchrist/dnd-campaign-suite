@@ -120,11 +120,10 @@ export const MockSidebar = vi.fn(({
   );
 });
 
-export const MockMapsManager = vi.fn(({ campaignName, onOpenMap, onBack }) => (
+export const MockMapsManager = vi.fn(({ campaignName, onOpenMap }) => (
   <div data-testid="maps-manager">
     <span data-testid="mm-campaign">{campaignName}</span>
     <button data-testid="open-map-btn" onClick={() => onOpenMap('dungeon-1', 'Dungeon 1')}>Open Map</button>
-    <button data-testid="mm-back-btn" onClick={onBack}>Back</button>
   </div>
 ));
 
@@ -148,34 +147,30 @@ export const MockEncounterBuilder = vi.fn(({ characters, campaignName }) => (
   </div>
 ));
 
-export const MockNotes = vi.fn(({ campaignName, isLocalhost, onBack }) => (
+export const MockNotes = vi.fn(({ campaignName, isLocalhost }) => (
   <div data-testid="notes-view">
     <span data-testid="notes-campaign">{campaignName}</span>
     <span data-testid="notes-localhost">{String(isLocalhost)}</span>
-    <button data-testid="notes-back-btn" onClick={onBack}>Back from Notes</button>
   </div>
 ));
 
-export const MockQuests = vi.fn(({ campaignName, isLocalhost, onBack }) => (
+export const MockQuests = vi.fn(({ campaignName, isLocalhost }) => (
   <div data-testid="quests-view">
     <span data-testid="quests-campaign">{campaignName}</span>
     <span data-testid="quests-localhost">{String(isLocalhost)}</span>
-    <button data-testid="quests-back-btn" onClick={onBack}>Back from Quests</button>
   </div>
 ));
 
-export const MockNPCs = vi.fn(({ campaignName, characters, onBack }) => (
+export const MockNPCs = vi.fn(({ campaignName, characters }) => (
   <div data-testid="npcs-view">
     <span data-testid="npcs-campaign">{campaignName}</span>
     <span data-testid="npcs-char-count">{characters?.length || 0}</span>
-    <button data-testid="npcs-back-btn" onClick={onBack}>Back from NPCs</button>
   </div>
 ));
 
-export const MockSettlements = vi.fn(({ campaignName, onBack }) => (
+export const MockSettlements = vi.fn(({ campaignName }) => (
   <div data-testid="settlements-view">
     <span data-testid="settlements-campaign">{campaignName}</span>
-    <button data-testid="settlements-back-btn" onClick={onBack}>Back from Settlements</button>
   </div>
 ));
 
@@ -186,19 +181,17 @@ export const MockLog = vi.fn(({ campaignName, characters }) => (
   </div>
 ));
 
-export const MockFactions = vi.fn(({ campaignName, isLocalhost, onBack }) => (
+export const MockFactions = vi.fn(({ campaignName, isLocalhost }) => (
   <div data-testid="factions-view">
     <span data-testid="factions-campaign">{campaignName}</span>
     <span data-testid="factions-localhost">{String(isLocalhost)}</span>
-    <button data-testid="factions-back-btn" onClick={onBack}>Back from Factions</button>
   </div>
 ));
 
-export const MockCampaignAdmin = vi.fn(({ campaignName, onBack, theme, toggleTheme, onRenameCampaign, onDeleteCampaign }) => (
+export const MockCampaignAdmin = vi.fn(({ campaignName, theme, toggleTheme, onRenameCampaign, onDeleteCampaign }) => (
   <div data-testid="campaign-admin">
     <span data-testid="admin-campaign">{campaignName}</span>
     <span data-testid="admin-theme">{theme}</span>
-    <button data-testid="admin-back-btn" onClick={onBack}>Back from Admin</button>
     <button data-testid="admin-toggle-theme-btn" onClick={toggleTheme}>Toggle Theme</button>
     <button data-testid="admin-rename-btn" onClick={onRenameCampaign}>Rename Campaign</button>
     <button data-testid="admin-delete-btn" onClick={onDeleteCampaign}>Delete Campaign</button>

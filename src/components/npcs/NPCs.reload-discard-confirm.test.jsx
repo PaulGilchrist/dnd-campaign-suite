@@ -81,7 +81,7 @@ vi.mock('../../services/npcs/npcGenerator.js', () => ({
 }));
 
 const renderNPCs = () =>
-  render(<NPCs campaignName="test-campaign" onBack={vi.fn()} onViewInitiative={vi.fn()} />);
+  render(<NPCs campaignName="test-campaign" onViewInitiative={vi.fn()} />);
 
 // Open the editor, dirty the draft, attempt a save → 409 banner showing.
 const openConflictWithDraft = async (draftNotes) => {

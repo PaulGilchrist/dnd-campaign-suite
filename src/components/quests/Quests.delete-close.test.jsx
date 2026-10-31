@@ -30,7 +30,6 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 const defaultProps = {
   campaignName: 'test-campaign',
   isLocalhost: true,
-  onBack: vi.fn(),
 };
 
 const quest = (overrides = {}) => ({

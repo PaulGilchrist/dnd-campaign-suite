@@ -48,7 +48,7 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 }));
 
 const renderFactions = () =>
-  render(<Factions campaignName="test-campaign" onBack={vi.fn()} />);
+  render(<Factions campaignName="test-campaign" />);
 
 describe('Factions live SSE sync', () => {
   beforeEach(() => {

@@ -43,7 +43,6 @@ const baseProps = {
       },
     },
   ],
-  onBack: vi.fn(),
 };
 
 const baseInventory = () => ({

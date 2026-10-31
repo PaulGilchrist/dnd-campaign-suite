@@ -51,7 +51,7 @@ const CONFLICT_MESSAGE =
 const conflictError = () => Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
 
 const renderQuests = () =>
-  render(<Quests campaignName="test-campaign" isLocalhost onBack={vi.fn()} />);
+  render(<Quests campaignName="test-campaign" isLocalhost />);
 
 const openEditorAndSave = async (findByText) => {
   await findByText('The Lost Artifact');

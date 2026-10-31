@@ -82,7 +82,7 @@ function renderSessions(overrides = {}) {
       campaignName="test-campaign"
       characters={[]}
       isLocalhost={true}
-      onBack={vi.fn()}
+     
       onViewInitiative={onViewInitiative}
       {...overrides}
     />

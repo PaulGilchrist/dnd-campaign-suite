@@ -40,7 +40,7 @@ describe('Settlements - accessibility and keyboard', () => {
   const campaignName = 'test-campaign';
 
   const renderSettlements = () =>
-    render(<Settlements campaignName={campaignName} onBack={() => {}} />);
+    render(<Settlements campaignName={campaignName} />);
 
   const getSearchInput = () => screen.getByLabelText('Search settlements');
 
@@ -63,7 +63,6 @@ describe('Settlements - accessibility and keyboard', () => {
 
   describe('Header controls', () => {
     it.each([
-      { regex: /back/i, accessibleName: 'Back' },
       { regex: /new settlement/i, accessibleName: 'New Settlement' },
       { regex: /generate settlement/i, accessibleName: 'Generate Settlement' },
     ])('gives the %p button an accessible name of "$accessibleName"', ({ regex, accessibleName }) => {

@@ -59,7 +59,7 @@ describe('Settlements - draft discard (behavioral)', () => {
     // getDefaultFormData() fills any missing fields on edit, so a name-only
     // settlement is enough to exercise the open → edit → cancel → reopen flow.
     settlementMockStore.items = [{ name: 'Old Town' }];
-    render(<Settlements campaignName="test-campaign" onBack={() => {}} />);
+    render(<Settlements campaignName="test-campaign" />);
     openEditSettlement();
 
     fireEvent.click(screen.getByRole('button', { name: /add service/i }));

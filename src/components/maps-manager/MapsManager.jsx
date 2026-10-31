@@ -92,7 +92,7 @@ function DescriptionEditModal({ map, description, onDescriptionChange, loading, 
     );
 }
 
-function MapsManager({ campaignName, onOpenMap, onBack }) {
+function MapsManager({ campaignName, onOpenMap }) {
     const [maps, setMaps] = useState([]);
     const setMapsGuarded = useSSEEqualityGuard(setMaps);
     const [loading, setLoading] = useState(true);
@@ -307,9 +307,6 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
 
             <div className="maps-manager-header">
                 <h2>Maps</h2>
-                <button className="back-button" onClick={onBack} aria-label="Back">
-                    <i className="fa-solid fa-arrow-left"></i> Back
-                </button>
             </div>
 
             <div className="maps-manager-create">

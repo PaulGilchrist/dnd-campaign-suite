@@ -67,19 +67,22 @@ import * as mapsService from '../../services/maps/mapsService.js';
 const MAP_ROW = { fileName: 'battle-arena.json', name: 'Battle Arena', type: 'indoor', isActive: true };
 
 // Single-live-instance harness mirroring App.jsx MapsAreaView + sidebar:
-// list → map on Open, map → list on editor Back, list → sheet on manager
-// Back, sheet → list on the Maps sidebar button. The sheet view must NEVER
-// carry the editor testid.
+// list → map on Open, map → list on editor Back, list → sheet on the
+// sidebar Character stand-in (the manager has no Back button), sheet → list
+// on the Maps sidebar button. The sheet view must NEVER carry the editor
+// testid.
 function NavHarness() {
     const [view, setView] = useState('list'); // 'list' | 'map' | 'sheet'
     const [activeMap, setActiveMap] = useState(null);
     if (view === 'list') {
         return (
-            <MapsManager
-                campaignName="test-campaign"
-                onOpenMap={(name) => { setActiveMap(name); setView('map'); }}
-                onBack={() => setView('sheet')}
-            />
+            <>
+                <MapsManager
+                    campaignName="test-campaign"
+                    onOpenMap={(name) => { setActiveMap(name); setView('map'); }}
+                />
+                <button onClick={() => setView('sheet')}>Character</button>
+            </>
         );
     }
     if (view === 'map') {
@@ -144,8 +147,8 @@ describe('map editor mount-proof testid (list → Open navigation)', () => {
         await waitFor(() => expect(editorTestids()).toHaveLength(0));
         expect(openButton()).toBeInTheDocument();
 
-        // Manager Back → sheet stand-in: still zero.
-        fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+        // Sidebar Character → sheet stand-in: still zero.
+        fireEvent.click(screen.getByRole('button', { name: 'Character' }));
         await waitFor(() => expect(screen.getByTestId('char-sheet')).toBeInTheDocument());
         expect(editorTestids()).toHaveLength(0);
 

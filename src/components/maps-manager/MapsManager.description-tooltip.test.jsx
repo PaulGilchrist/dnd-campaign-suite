@@ -44,7 +44,6 @@ import * as mapsService from '../../services/maps/mapsService.js';
 const props = {
     campaignName: 'test-campaign',
     onOpenMap: vi.fn(),
-    onBack: vi.fn(),
 };
 
 const rowFor = (name) => screen.getByRole('button', { name: `Open "${name}"` }).closest('li');

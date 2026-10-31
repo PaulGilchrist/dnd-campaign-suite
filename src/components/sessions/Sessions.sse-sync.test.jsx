@@ -86,7 +86,7 @@ const renderSessions = () =>
       campaignName="test-campaign"
       characters={[]}
       isLocalhost={true}
-      onBack={vi.fn()}
+     
       onViewInitiative={vi.fn()}
     />
   );

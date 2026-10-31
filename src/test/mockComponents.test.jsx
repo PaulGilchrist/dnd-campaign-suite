@@ -327,13 +327,10 @@ describe('MockSidebar', () => {
 describe('MockMapsManager', () => {
   it('echoes the campaign and fires onOpenMap with the fixed "dungeon-1" id + row display name', () => {
     const onOpenMap = vi.fn();
-    const onBack = vi.fn();
-    render(<MockMapsManager campaignName="my-campaign" onOpenMap={onOpenMap} onBack={onBack} />);
+    render(<MockMapsManager campaignName="my-campaign" onOpenMap={onOpenMap} />);
     expect(screen.getByTestId('mm-campaign')).toHaveTextContent('my-campaign');
     fireEvent.click(screen.getByTestId('open-map-btn'));
     expect(onOpenMap).toHaveBeenCalledWith('dungeon-1', 'Dungeon 1');
-    fireEvent.click(screen.getByTestId('mm-back-btn'));
-    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -398,34 +395,25 @@ describe.each([
   ['MockQuests', MockQuests, 'quests'],
   ['MockFactions', MockFactions, 'factions'],
 ])('%s', (_name, Component, prefix) => {
-  it('echoes campaign and localhost, and back fires onBack', () => {
-    const onBack = vi.fn();
-    render(<Component campaignName="my-campaign" isLocalhost={true} onBack={onBack} />);
+  it('echoes campaign and localhost', () => {
+    render(<Component campaignName="my-campaign" isLocalhost={true} />);
     expect(screen.getByTestId(`${prefix}-campaign`)).toHaveTextContent('my-campaign');
     expect(screen.getByTestId(`${prefix}-localhost`)).toHaveTextContent('true');
-    fireEvent.click(screen.getByTestId(`${prefix}-back-btn`));
-    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('MockNPCs', () => {
-  it('echoes campaign, char count, and back fires onBack', () => {
-    const onBack = vi.fn();
-    render(<MockNPCs campaignName="my-campaign" characters={['c1', 'c2']} onBack={onBack} />);
+  it('echoes campaign and char count', () => {
+    render(<MockNPCs campaignName="my-campaign" characters={['c1', 'c2']} />);
     expect(screen.getByTestId('npcs-campaign')).toHaveTextContent('my-campaign');
     expect(screen.getByTestId('npcs-char-count')).toHaveTextContent('2');
-    fireEvent.click(screen.getByTestId('npcs-back-btn'));
-    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('MockSettlements', () => {
-  it('echoes campaign and back fires onBack', () => {
-    const onBack = vi.fn();
-    render(<MockSettlements campaignName="my-campaign" onBack={onBack} />);
+  it('echoes campaign', () => {
+    render(<MockSettlements campaignName="my-campaign" />);
     expect(screen.getByTestId('settlements-campaign')).toHaveTextContent('my-campaign');
-    fireEvent.click(screen.getByTestId('settlements-back-btn'));
-    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -442,13 +430,12 @@ describe('MockLog', () => {
 
 describe('MockCampaignAdmin', () => {
   it('echoes campaign name and theme', () => {
-    render(<MockCampaignAdmin campaignName="my-campaign" theme="dark" onBack={vi.fn()} />);
+    render(<MockCampaignAdmin campaignName="my-campaign" theme="dark" />);
     expect(screen.getByTestId('admin-campaign')).toHaveTextContent('my-campaign');
     expect(screen.getByTestId('admin-theme')).toHaveTextContent('dark');
   });
 
   const ADMIN_BUTTONS = [
-    ['admin-back-btn', 'onBack'],
     ['admin-toggle-theme-btn', 'toggleTheme'],
     ['admin-rename-btn', 'onRenameCampaign'],
     ['admin-delete-btn', 'onDeleteCampaign'],
@@ -458,7 +445,6 @@ describe('MockCampaignAdmin', () => {
     'clicking %s fires %s and no other admin callback',
     (testid, prop) => {
       const handlers = {
-        onBack: vi.fn(),
         toggleTheme: vi.fn(),
         onRenameCampaign: vi.fn(),
         onDeleteCampaign: vi.fn(),

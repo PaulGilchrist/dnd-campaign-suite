@@ -241,7 +241,7 @@ describe('App.css', () => {
   });
 
   describe('campaign tool container and header', () => {
-    it('fills the content area with a spread header and actionable back/new buttons', () => {
+    it('fills the content area with a spread header and an actionable new button', () => {
       expectStyles('.ct-container', { flex: '1', width: '100%' });
       expectStyles('.ct-container .ct-header', {
         display: 'flex',
@@ -249,11 +249,6 @@ describe('App.css', () => {
         'align-items': 'center',
       });
       expectStyles('.ct-container .ct-title', { color: 'var(--color-header)' });
-      expectStyles('.ct-container .ct-back-btn', {
-        cursor: 'pointer',
-        border: '1px solid var(--border-color)',
-      });
-      expectChanges('.ct-container .ct-back-btn', '.ct-container .ct-back-btn:hover', 'background');
       expectStyles('.ct-container .ct-new-btn', {
         background: 'var(--color-primary)',
         color: 'var(--color-text-inverse)',

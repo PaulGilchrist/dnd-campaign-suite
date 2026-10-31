@@ -399,7 +399,7 @@ function getSizeStyle(size) {
   };
 }
 
-function Settlements({ campaignName, onBack }) {
+function Settlements({ campaignName }) {
   const { items: settlements, loading, loadItems, deleteItem: deleteSettlementAction } =
     useEntityManagement(campaignName, { load: loadSettlements, save: saveSettlement, delete: deleteSettlement }, { responseKey: 'settlements', loadOnMount: false });
 
@@ -713,9 +713,6 @@ function Settlements({ campaignName, onBack }) {
       <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
 
       <div className="ct-header">
-        <button className="ct-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left" /> Back
-        </button>
         <h2 className="ct-title">
           <i className="fa-solid fa-city" /> Settlements
         </h2>

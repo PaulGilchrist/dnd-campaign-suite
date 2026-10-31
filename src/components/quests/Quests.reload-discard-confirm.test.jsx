@@ -55,7 +55,7 @@ const DISCARD_CONFIRM = 'Reload the quest list and discard your unsaved edits?';
 const conflictError = () => Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
 
 const renderQuests = () =>
-  render(<Quests campaignName="test-campaign" isLocalhost onBack={vi.fn()} />);
+  render(<Quests campaignName="test-campaign" isLocalhost />);
 
 // Open the editor, dirty the description draft, attempt a save → banner up.
 const openConflictWithDraft = async (draftDescription) => {

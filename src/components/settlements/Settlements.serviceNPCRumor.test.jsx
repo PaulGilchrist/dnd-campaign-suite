@@ -40,7 +40,7 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 
 // Renders the list view and opens the new-settlement modal.
 const openNewSettlementModal = () => {
-  const result = render(<Settlements campaignName="test" onBack={() => {}} />);
+  const result = render(<Settlements campaignName="test" />);
   fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
   return result;
 };

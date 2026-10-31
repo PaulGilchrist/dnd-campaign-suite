@@ -53,7 +53,7 @@ vi.mock('../common/MarkdownPreview.jsx', () => ({
 }));
 
 const renderQuests = () =>
-  render(<Quests campaignName="test-campaign" isLocalhost onBack={vi.fn()} />);
+  render(<Quests campaignName="test-campaign" isLocalhost />);
 
 describe('Quests live SSE sync', () => {
   beforeEach(() => {

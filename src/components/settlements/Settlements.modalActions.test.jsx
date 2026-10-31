@@ -55,7 +55,7 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
 }));
 
 const renderSettlements = () =>
-  render(<Settlements campaignName="test-campaign" onBack={() => {}} />);
+  render(<Settlements campaignName="test-campaign" />);
 
 describe('Settlements - modal actions', () => {
   beforeEach(() => {

@@ -60,7 +60,7 @@ const expectNoResults = () => {
 };
 
 const renderSettlements = () =>
-  render(<Settlements campaignName="test" onBack={() => {}} />);
+  render(<Settlements campaignName="test" />);
 
 const searchSettlements = (query) =>
   fireEvent.change(screen.getByLabelText('Search settlements'), { target: { value: query } });

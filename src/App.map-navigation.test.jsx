@@ -5,10 +5,9 @@
  *
  * GM (localhost):
  *  - "Maps" from the character sheet opens the maps manager listing; the
- *    manager opens a map; the map's back button returns to the listing; the
- *    manager's back button closes the maps area entirely (blank canvas) and
- *    deselects the Maps view — a single re-entry click re-opens the listing,
- *    and a campaign switch can never strand the blank 'none' sub-state.
+ *    manager opens a map; the map's back button returns to the listing,
+ *    which stays open until another sidebar view replaces it (the manager
+ *    has no Back button — the sidebar is the exit).
  *  - Entering a POI pushes the current map onto a navigation stack: back
  *    walks the stack (inner map → original map → manager).
  *  - Clicking "Maps" while viewing a map exits the stack to the manager and
@@ -270,7 +269,7 @@ describe('App - Map Navigation & View Management', () => {
       await renderInCampaign('localhost');
     });
 
-    it('Maps opens the manager, the manager opens a map, map-back returns to the listing, and manager-back closes the maps area', async () => {
+    it('Maps opens the manager, the manager opens a map, and map-back returns to the listing', async () => {
       clickMaps();
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
@@ -285,14 +284,10 @@ describe('App - Map Navigation & View Management', () => {
         expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       });
-
-      // Manager's back button closes the maps area entirely — localhost
-      // never sees the player waiting placeholder; the shell stays intact.
-      fireEvent.click(screen.getByTestId('mm-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-      });
-      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      // The manager has no Back button: the sidebar is the only exit, so the
+      // listing stays open and Maps remains the active view.
+      expect(screen.queryByTestId('mm-back-btn')).not.toBeInTheDocument();
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
       expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
       expect(screen.getByTestId('sidebar')).toBeInTheDocument();
       expect(window.alert).not.toHaveBeenCalled();
@@ -324,27 +319,21 @@ describe('App - Map Navigation & View Management', () => {
     // `mapsView.type === 'none'` sub-state — MapsAreaView renders null there
     // while the sidebar still read "Maps", and the first re-entry click was
     // swallowed by handleMapsClick's "already on mapsManager" early return
-    // (hence the observed "second sidebar click to populate").
-    it('manager-back deselects the Maps view and one Maps click re-opens the listing', async () => {
+    // (hence the observed "second sidebar click to populate"). Manager Back
+    // no longer exists (sidebar is the exit), so the self-heal below guards
+    // the campaign-switch path that can still reach the blank sub-state.
+    it('re-clicking Maps while the listing is open is a no-op (sidebar stays on Maps)', async () => {
       clickMaps();
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       });
       expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
 
-      fireEvent.click(screen.getByTestId('mm-back-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-      });
-      // The blank canvas must not keep claiming Maps as the active view.
-      expect(screen.queryByTestId('sidebar-active-indicator')).not.toBeInTheDocument();
-
-      // Single re-entry click repopulates the manager.
+      // Second click must not blank the pane or reset the stack.
       clickMaps();
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-        expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
-      });
+      await flushEffects();
+      expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
     });
 
     it('a campaign switch to a characterless campaign cannot strand a blank Maps pane', async () => {

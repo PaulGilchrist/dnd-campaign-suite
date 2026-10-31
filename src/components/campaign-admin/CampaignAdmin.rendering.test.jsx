@@ -9,7 +9,7 @@
  * Interaction flows are covered by sibling files and are deliberately NOT
  * repeated here: rename (incl. modal chrome), delete, data-management,
  * backup-restore, rollback-upload (incl. the restoredSnapshot banner
- * positive path), and theme-toggle/Back interactions — the theme-toggle
+ * positive path), and theme-toggle interactions — the theme-toggle
  * sibling also fully covers the static toggle labels (both modes, with
  * icons), so no static label assertions live here.
  * EnforcementSection, SessionSection, and AiRefereeSection have their own
@@ -27,7 +27,6 @@ const CAMPAIGN = 'test-campaign';
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
-    onBack: vi.fn(),
     theme: 'dark',
     toggleTheme: vi.fn(),
     onRenameCampaign: vi.fn(),
@@ -100,11 +99,10 @@ const ACTION_CARDS = [
 const BUSY_TEXTS = ['Creating snapshot...', 'Rolling back...', 'Preparing download...', 'Uploading and extracting...', 'Clearing change data...', 'Clearing log...', 'Performing full reset...'];
 
 describe('CampaignAdmin - Rendering', () => {
-    it('renders the admin container with the campaign name and a Back button in the header', () => {
+    it('renders the admin container with the campaign name in the header', () => {
         const { container } = renderAdmin();
         expect(container.querySelector('.ct-container.campaign-admin')).toBeInTheDocument();
         expect(screen.getByRole('heading', { level: 2, name: `Admin — ${CAMPAIGN}` })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
     });
 
     it('renders all section headings, mounting the Enforcement, Session, and AI Referee consoles', () => {

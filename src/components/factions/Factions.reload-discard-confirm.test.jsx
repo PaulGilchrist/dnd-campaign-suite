@@ -50,7 +50,7 @@ const DISCARD_CONFIRM = 'Reload the faction list and discard your unsaved edits?
 const conflictError = () => Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
 
 const renderFactions = () =>
-  render(<Factions campaignName="test-campaign" onBack={vi.fn()} />);
+  render(<Factions campaignName="test-campaign" />);
 
 // Open the editor, dirty the description draft, attempt a save → banner up.
 const openConflictWithDraft = async (draftDescription) => {

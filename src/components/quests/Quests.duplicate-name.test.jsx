@@ -37,7 +37,6 @@ const DUPLICATE_ERROR = 'A quest with that name already exists';
 const defaultProps = {
   campaignName: 'test-campaign',
   isLocalhost: true,
-  onBack: vi.fn(),
 };
 
 const nameInput = () => screen.getByRole('textbox', { name: /Name/ });

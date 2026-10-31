@@ -57,7 +57,7 @@ describe('MapsManager open → editor SSE key (json-suffix regression)', () => {
     beforeEach(() => {
         vi.resetAllMocks();
         mapsService.loadMaps.mockResolvedValue({ maps: [TEST_MAP_ROW] });
-        props = { campaignName: 'test-campaign', onOpenMap: vi.fn(), onBack: vi.fn() };
+        props = { campaignName: 'test-campaign', onOpenMap: vi.fn() };
     });
 
     it('Open emits the suffix-free mapName that matches the server publish key', async () => {

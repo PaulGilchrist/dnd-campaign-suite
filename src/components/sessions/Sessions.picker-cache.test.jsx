@@ -94,7 +94,7 @@ const renderSessions = (campaignName = 'test-campaign') =>
       campaignName={campaignName}
       characters={[]}
       isLocalhost={true}
-      onBack={vi.fn()}
+     
       onViewInitiative={vi.fn()}
     />
   );
@@ -251,7 +251,7 @@ describe('Sessions link-picker list cache', () => {
         campaignName="other-campaign"
         characters={[]}
         isLocalhost={true}
-        onBack={vi.fn()}
+       
         onViewInitiative={vi.fn()}
       />
     );

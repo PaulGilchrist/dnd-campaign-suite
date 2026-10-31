@@ -64,7 +64,7 @@ async function loadResourceOptions(campaignName) {
   return { options, complete };
 }
 
-function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, onBack, onViewInitiative }) {
+function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, onViewInitiative }) {
   const { items: sessions, loading, loadItems, deleteItem: deleteSessionAction } =
     useEntityManagement(campaignName, { load: loadSessions, save: saveSessions, delete: deleteSession }, { responseKey: 'sessions', loadOnMount: false });
 
@@ -456,9 +456,6 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
 
       <div className="ct-header">
-        <button className="ct-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left" /> Back
-        </button>
         <h2 className="ct-title">
           <i className="fa-solid fa-calendar-check" /> Sessions
         </h2>

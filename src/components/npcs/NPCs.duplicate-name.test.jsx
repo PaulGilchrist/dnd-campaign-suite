@@ -79,7 +79,7 @@ function renderNPCs() {
     deleteItem: vi.fn(),
   });
   return render(
-    <NPCs campaignName="test-campaign" onBack={vi.fn()} onViewInitiative={vi.fn()} />
+    <NPCs campaignName="test-campaign" onViewInitiative={vi.fn()} />
   );
 }
 

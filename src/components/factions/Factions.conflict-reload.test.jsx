@@ -46,7 +46,7 @@ const CONFLICT_MESSAGE =
 const conflictError = () => Object.assign(new Error(CONFLICT_MESSAGE), { conflict: true });
 
 const renderFactions = () =>
-  render(<Factions campaignName="test-campaign" onBack={vi.fn()} />);
+  render(<Factions campaignName="test-campaign" />);
 
 const openEditorAndSave = async (findByText) => {
   await findByText('The Iron Consortium');

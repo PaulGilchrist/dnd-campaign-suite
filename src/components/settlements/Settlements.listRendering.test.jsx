@@ -38,7 +38,7 @@ const makeSettlement = (name, overrides = {}) => ({
 
 const renderSettlements = (...items) => {
   settlementMockStore.items = items;
-  render(<Settlements campaignName="test" onBack={() => {}} />);
+  render(<Settlements campaignName="test" />);
 };
 
 // Scope every query to one settlement's list item so text/title/class queries

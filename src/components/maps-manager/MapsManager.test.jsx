@@ -72,7 +72,6 @@ describe('MapsManager', () => {
         props = {
             campaignName: 'test-campaign',
             onOpenMap: vi.fn(),
-            onBack: vi.fn(),
         };
     });
 
@@ -110,11 +109,10 @@ describe('MapsManager', () => {
     // Header, Loading & Empty States
     // -----------------------------------------------------------------------
     describe('Header, Loading & Empty States', () => {
-        it('renders the "Maps" heading and calls onBack when Back is clicked', () => {
+        it('renders the "Maps" heading with no Back button (sidebar is the exit)', () => {
             render(<MapsManager {...props} />);
             expect(screen.getByRole('heading', { name: 'Maps' })).toBeInTheDocument();
-            fireEvent.click(screen.getByRole('button', { name: /back/i }));
-            expect(props.onBack).toHaveBeenCalledTimes(1);
+            expect(screen.queryByRole('button', { name: /back/i })).not.toBeInTheDocument();
         });
 
         it('shows a loading indicator while maps are being fetched', () => {
@@ -579,7 +577,6 @@ describe('MapsManager', () => {
             // Acceptance query: zero unlabelled buttons inside the list.
             expect(container.querySelectorAll('.maps-manager-list button:not([aria-label])')).toHaveLength(0);
             // Manager-level buttons reachable by accessible name too.
-            expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('aria-label', 'Back');
             expect(screen.getByRole('button', { name: 'Create Map' })).toHaveAttribute('aria-label', 'Create Map');
 
             const row = screen.getByText('Battle Arena').closest('li');

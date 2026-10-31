@@ -185,7 +185,7 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, error, error
   );
 }
 
-function Quests({ campaignName, isLocalhost, onBack }) {
+function Quests({ campaignName, isLocalhost }) {
   const { items: quests, loading, loadItems: loadQuestsList, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest });
   const {
     searchQuery, setSearchQuery, filteredItems: filteredQuests,
@@ -352,9 +352,6 @@ function Quests({ campaignName, isLocalhost, onBack }) {
       <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
 
       <div className="ct-header">
-        <button className="ct-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left" /> Back
-        </button>
         <h2 className="ct-title">
           <i className="fa-solid fa-scroll" /> Quests
         </h2>

@@ -63,7 +63,7 @@ const makeSettlement = (name) => ({
 
 // Open the new-settlement modal with the name filled in (which enables Save).
 const openNewForm = (name = 'My Settlement') => {
-  render(<Settlements campaignName="test" onBack={() => {}} />);
+  render(<Settlements campaignName="test" />);
   fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
   fireEvent.change(screen.getByRole('textbox', { name: /name\s?\*/i }), { target: { value: name } });
 };
@@ -72,7 +72,7 @@ const openNewForm = (name = 'My Settlement') => {
 const openEditForm = (name, confirmResult = true) => {
   vi.spyOn(globalThis.window, 'confirm').mockReturnValue(confirmResult);
   settlementMockStore.items = [makeSettlement(name)];
-  render(<Settlements campaignName="test" onBack={() => {}} />);
+  render(<Settlements campaignName="test" />);
   fireEvent.click(screen.getByRole('button', { name: /edit settlement/i }));
 };
 

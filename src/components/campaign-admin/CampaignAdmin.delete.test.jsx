@@ -24,7 +24,6 @@ const MISMATCH_ALERT = 'Campaign name did not match. Deletion cancelled.';
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
-    onBack: vi.fn(),
     theme: 'dark',
     toggleTheme: vi.fn(),
     onRenameCampaign: vi.fn(),

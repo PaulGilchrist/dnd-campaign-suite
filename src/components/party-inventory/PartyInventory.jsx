@@ -439,7 +439,7 @@ function PlayersPanel({ characters, campaignName, onMoved }) {
   );
 }
 
-function PartyInventory({ campaignName, characters = [], isLocalhost, onBack }) {
+function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   const [inventory, setInventory] = useState({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -738,9 +738,6 @@ function PartyInventory({ campaignName, characters = [], isLocalhost, onBack }) 
   return (
     <div className="ct-container pi-container">
       <div className="ct-header">
-        <button className="ct-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left" /> Back
-        </button>
         <h2 className="ct-title">
           <i className="fa-solid fa-boxes-stacked" /> Party Inventory
         </h2>

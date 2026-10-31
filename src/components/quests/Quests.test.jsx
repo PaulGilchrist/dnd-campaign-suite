@@ -26,7 +26,6 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 const defaultProps = {
   campaignName: 'test-campaign',
   isLocalhost: true,
-  onBack: vi.fn(),
 };
 
 const quest = (overrides = {}) => ({
@@ -98,13 +97,11 @@ describe('Quests', () => {
   });
 
   describe('header', () => {
-    it('renders back button, title, New Quest button, and search input', () => {
+    it('renders title, New Quest button, and search input', () => {
       renderWithQuests([]);
       expect(screen.getByRole('heading', { name: /Quests/ })).toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: /Search Quests/ })).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /Back/ }));
-      expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: /New Quest/ })).toBeInTheDocument();
     });
 
     it('renders the search placeholder with a real ellipsis (not a literal \\u2026 escape)', () => {

@@ -57,7 +57,7 @@ const renderNotes = (props = {}) =>
       campaignName="test"
       characters={[]}
       isLocalhost={true}
-      onBack={() => {}}
+     
       {...props}
     />,
   );
@@ -85,7 +85,6 @@ describe('Notes', () => {
     it('renders header, new note button, search bar, and empty state', () => {
       renderNotes();
       expect(screen.getByRole('heading', { name: /notes/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /new note/i })).toBeInTheDocument();
       expect(screen.getByLabelText('Search notes')).toBeInTheDocument();
       expect(screen.getByText(/no notes yet/i)).toBeInTheDocument();

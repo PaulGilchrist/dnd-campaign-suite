@@ -52,7 +52,7 @@ const renderAdmin = () =>
     render(
         <CampaignAdmin
             campaignName={CAMPAIGN}
-            onBack={vi.fn()}
+           
             theme="dark"
             toggleTheme={vi.fn()}
             onRenameCampaign={vi.fn()}

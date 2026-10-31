@@ -53,7 +53,7 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
 // component is rendered; freshness is judged by loadCallCount + the form's
 // seeded notes value (the refetch itself proves the list refreshed).
 const renderSettlements = () =>
-  render(<Settlements campaignName="test-campaign" onBack={vi.fn()} />);
+  render(<Settlements campaignName="test-campaign" />);
 
 const openEditor = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Edit settlement: Ironhaven' }));
