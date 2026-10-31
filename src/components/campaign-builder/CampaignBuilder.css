@@ -86,17 +86,6 @@
   font-weight: 600;
 }
 
-.campaign-builder-row-status {
-  margin-left: 0.5rem;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0 0.3rem;
-}
-
 .campaign-builder-row-detail {
   margin: 0.25rem 0 0;
   color: var(--color-text-secondary);

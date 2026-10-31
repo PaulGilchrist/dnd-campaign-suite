@@ -31,7 +31,7 @@ import CampaignBuilder from './CampaignBuilder.jsx';
 const GROUPS = {
     factions: [{ id: 'f1', name: 'Cult of the Frostmaw', influence: 4, draft: true }],
     settlements: [{ name: 'Mudport', size: 'village', notableNPCs: ['Oldhem the Ferryman'], draft: true }],
-    npcs: [{ name: 'Oldhem the Ferryman', description: '', personality: 'Gruff', draft: true }],
+    npcs: [{ name: 'Oldhem the Ferryman', description: '', personality: 'Gruff', status: 'active', draft: true }],
     quests: [{ id: 'q1', name: 'Silence the Bell', status: 'active', description: 'Ring nothing.', draft: true }],
     encounters: [{ name: 'Ferry Ambush', selectedMonsters: [{ index: 'goblin', name: 'Goblin', qty: 2 }], draft: true }],
     sessions: [{ name: 'Session 4', links: { npcs: ['Oldhem the Ferryman'] }, draft: true }],
@@ -79,6 +79,34 @@ describe('CampaignBuilder', () => {
             'test-campaign', 'npcs', expect.objectContaining({ name: 'Oldhem the Ferryman' })
         ));
         expect(loadDrafts.mock.calls.length).toBeGreaterThanOrEqual(3); // mount + both refreshes
+    });
+
+    it('draft rows carry the shared draft badge, never a lifecycle status chip', async () => {
+        render(<CampaignBuilder campaignName="test-campaign" />);
+        const questName = await screen.findByText('Silence the Bell');
+        const questRow = questName.closest('.campaign-builder-row');
+
+        // The ACTIVE chip is gone from the status slot (backlog AP-visual).
+        expect(questRow.querySelector('.campaign-builder-row-status')).toBeNull();
+        expect(questRow.textContent).not.toContain('active');
+        expect(questRow.textContent).not.toContain('ACTIVE');
+        // Shipped treatment: shared DraftFlag badge (ct-draft-flag idiom).
+        const flag = questRow.querySelector('.ct-draft-flag');
+        expect(flag).toBeTruthy();
+        expect(flag.textContent).toBe('draft');
+
+        // Consistent treatment for every kind — NPC row (fixture also carries
+        // a status) shows the same badge and suppresses the chip.
+        const npcName = screen.getAllByText('Oldhem the Ferryman')
+            .find(el => el.classList.contains('campaign-builder-row-name'));
+        const npcRow = npcName.closest('.campaign-builder-row');
+        expect(npcRow.querySelector('.campaign-builder-row-status')).toBeNull();
+        expect(npcRow.textContent).not.toContain('active');
+        expect(npcRow.querySelector('.ct-draft-flag')).toBeTruthy();
+
+        // Every rendered draft row wears the badge.
+        expect(document.querySelectorAll('.campaign-builder-row').length)
+            .toBe(document.querySelectorAll('.campaign-builder-row .ct-draft-flag').length);
     });
 
     it('empty state tells the GM where drafts come from', async () => {

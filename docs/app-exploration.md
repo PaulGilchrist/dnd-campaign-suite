@@ -51,7 +51,6 @@
 ### AP visual-polish pass (2026-10-31, owner-directed — evidence shots `.opencode/plans/runAP-ai-*.png`)
 
 - **2026-10-31 (AP-visual) drafts-panel-contrast-family:** disabled AI buttons (`Send`, `Propose build plan`, `Refresh`) render at near-illegible contrast on the dark theme; in the draft rows the primary-variant **Approve** (dark-on-light-grey) and default-variant **Reject** (light-on-dark) sit side-by-side with inverted contrast so the affirmative action reads as disabled and the destructive one reads as primary; per-section `Approve all npcs/quests` buttons are near-invisible dark-on-dark. Pick one enabled/disabled treatment that stays ≥ WCAG-AA on the dark theme and keep Approve visually ≥ Reject weight. Evidence: `runAP-shots-ai-designer-visual.png`, `runAP-shots-ai-drafts-visual.png`. Files: `CampaignBuilder.css`, global `ct-btn*` classes.
-- **2026-10-31 (AP-visual) draft-rows-show-lifecycle-chips:** the Campaign-Builder quest draft row renders its `ACTIVE` status chip as its "status" slot (`DraftRow` shows `row.status`), which is noise in a draft-review context — consider replacing it with a DRAFT tag or suppressing lifecycle chips there (NPC rows show none; consistent treatment either way). File: `CampaignBuilder.jsx:26`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

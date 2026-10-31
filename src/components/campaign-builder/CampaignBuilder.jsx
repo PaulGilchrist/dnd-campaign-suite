@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DRAFT_KINDS, loadDrafts, approveDraft, rejectDraft, draftRowIdentity } from '../../services/campaign/draftActions.js';
+import DraftFlag from '../common/DraftFlag.jsx';
 import AiDesignerSection from './AiDesignerSection.jsx';
 import './CampaignBuilder.css';
 
@@ -23,7 +24,10 @@ function DraftRow({ kind, row, busy, onApprove, onReject }) {
     <div className="campaign-builder-row">
       <div className="campaign-builder-row-main">
         <span className="campaign-builder-row-name">{row.name || row.displayName || row.fileName}</span>
-        {row.status && <span className="campaign-builder-row-status">{row.status}</span>}
+        {/* Draft-review context: never surface lifecycle chips (an `active`
+            quest status here is noise). Every row in this panel is a draft,
+            so every kind gets the same shared draft badge in the status slot. */}
+        <DraftFlag row={row} />
         {detail && <p className="campaign-builder-row-detail">{detail}</p>}
         {ties.length > 0 && (
           <div className="campaign-builder-row-ties" title="Story ties">
