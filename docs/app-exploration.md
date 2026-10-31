@@ -48,7 +48,6 @@
 
 ## Improvement Backlog
 
-- **2026-10-31 (AP) designer-plan-state-volatile:** PlanEditor contents (AI plan + GM count edits) live only in `AiDesignerSection` useState — navigating away (Log, Admin) silently discards an unrevised plan + last generate error. Persist the pending plan in design-notes (it already stores `plans[]`) or warn on unmount.
 - **2026-10-31 (AP) gm-note-label-casing:** log view renders type `gm-note` as "Gm-note" (naive capitalize) — cosmetic label polish for non-alphanumeric type labels.
 - **2026-10-31 (AP) generate-batch-prompt-huge:** the whole-schema batch call embeds the full bestiary menu + story bible and routinely truncates to non-JSON on ~38-tok/s local models (AP run: batch failed `AI_UNAVAILABLE: non-JSON`, per-entity resume did all work). Consider defaulting small scopes straight to the resume path (or chunking the batch) to halve wall-time for local backends.
 

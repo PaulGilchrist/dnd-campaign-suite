@@ -4,7 +4,13 @@
  *   POST /api/campaigns/:campaign/ai/designer/chat     { message }      → { reply }
  *   POST /api/campaigns/:campaign/ai/designer/plan     {}               → { scope }   (GM edits/confirms this)
  *   POST /api/campaigns/:campaign/ai/designer/generate { scope }        → applyBlueprint result (drafts)
+ *   POST /api/campaigns/:campaign/ai/designer/pending-plan { scope|null } → persist/clear the GM's un-revised plan
  *   GET  /api/campaigns/:campaign/ai/designer/conversation              → design-notes.json
+ *
+ * The pending-plan/conversation pair keeps the PlanEditor crash-proof: plan +
+ * count edits + last error ride in design-notes, rehydrated by the client on
+ * mount (backlog designer-plan-state-volatile). Success consumes them
+ * (pending cleared, error cleared); failures record them.
  *
  * Authority mirrors every other AI surface (§12): localhost (the GM) only,
  * and 403 while aiConfig is off — zero new traffic for non-AI campaigns.
@@ -18,7 +24,7 @@ import { aiConfigLive } from '../services/ai/index.js';
 import { designChat, proposePlan, generateBlueprint } from '../services/ai/authoring/designer.js';
 import { refineEntity } from '../services/ai/authoring/refine.js';
 import { dressMapProposal } from '../services/ai/authoring/dressMap.js';
-import { loadNotes } from '../services/ai/authoring/designNotes.js';
+import { loadNotes, savePendingPlan, setDesignerError } from '../services/ai/authoring/designNotes.js';
 
 const router = express.Router();
 
@@ -54,9 +60,11 @@ router.post('/api/campaigns/:campaign/ai/designer/chat', async (req, res) => {
         const message = typeof req.body?.message === 'string' ? req.body.message.trim().slice(0, 8000) : '';
         if (!message) return res.status(400).json({ error: 'message is required' });
         const result = await designChat({ campaign: req.params.campaign, message, aiConfig: cfg });
+        setDesignerError(req.params.campaign, 'chat', result.ok ? null : (result.error || result.code));
         res.json(result);
     } catch (e) {
         console.error('[ai-designer:chat]', e);
+        setDesignerError(req.params.campaign, 'chat', 'ai designer chat failed');
         res.status(500).json({ error: 'ai designer chat failed' });
     }
 });
@@ -66,9 +74,16 @@ router.post('/api/campaigns/:campaign/ai/designer/plan', async (req, res) => {
         const cfg = gate(req, res);
         if (!cfg) return;
         const result = await proposePlan({ campaign: req.params.campaign, aiConfig: cfg, log: addEntry });
+        if (result.ok) {
+            savePendingPlan(req.params.campaign, result.scope);
+            setDesignerError(req.params.campaign, 'plan', null);
+        } else {
+            setDesignerError(req.params.campaign, 'plan', result.error || result.code);
+        }
         res.json(result);
     } catch (e) {
         console.error('[ai-designer:plan]', e);
+        setDesignerError(req.params.campaign, 'plan', 'ai designer plan request failed');
         res.status(500).json({ error: 'ai designer plan request failed' });
     }
 });
@@ -82,10 +97,42 @@ router.post('/api/campaigns/:campaign/ai/designer/generate', async (req, res) =>
             return res.status(400).json({ error: 'scope (the confirmed build plan) is required' });
         }
         const result = await generateBlueprint({ campaign: req.params.campaign, scope, aiConfig: cfg, log: addEntry });
+        if (result.ok) {
+            savePendingPlan(req.params.campaign, null); // plan consumed by the generate
+            setDesignerError(req.params.campaign, 'generate', null);
+        } else {
+            setDesignerError(req.params.campaign, 'generate',
+                (result.errors || [result.error || result.code || 'generation failed']).join('\n'));
+        }
         res.json(result);
     } catch (e) {
         console.error('[ai-designer:generate]', e);
+        setDesignerError(req.params.campaign, 'generate', 'ai designer generation failed');
         res.status(500).json({ error: 'ai designer generation failed' });
+    }
+});
+
+/**
+ * Persist (or clear with scope:null) the GM's in-progress plan edits — counts,
+ * scope, story spine — so navigating away never discards them. GM-only like
+ * the conversation read lane (deliberately not aiConfigLive-gated: a stored
+ * plan must stay clearable/editable even after the config is removed).
+ */
+router.post('/api/campaigns/:campaign/ai/designer/pending-plan', (req, res) => {
+    try {
+        if (!isGM(req)) return res.status(403).json({ error: 'GM-only' });
+        const scope = req.body?.scope;
+        if (scope != null && (typeof scope !== 'object' || Array.isArray(scope))) {
+            return res.status(400).json({ error: 'scope must be a build-plan object or null' });
+        }
+        if (scope != null && JSON.stringify(scope).length > 64000) {
+            return res.status(400).json({ error: 'pending plan is too large' });
+        }
+        const notes = savePendingPlan(req.params.campaign, scope);
+        res.json({ ok: true, pending: !!notes.pendingPlan });
+    } catch (e) {
+        console.error('[ai-designer:pending-plan]', e);
+        res.status(500).json({ error: 'pending plan save failed' });
     }
 });
 

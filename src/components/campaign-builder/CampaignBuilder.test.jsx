@@ -21,6 +21,7 @@ vi.mock('../../services/campaign/draftActions.js', async () => {
 vi.mock('../../services/ai/aiClient.js', () => ({
     getAiStatus: vi.fn(async () => ({ configured: false })),
     loadDesignerConversation: vi.fn(async () => ({ messages: [] })),
+    saveDesignerPendingPlan: vi.fn(async () => ({ ok: true })),
     designerChat: vi.fn(), designerPlan: vi.fn(), designerGenerate: vi.fn(),
 }));
 

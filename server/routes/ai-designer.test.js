@@ -8,12 +8,13 @@ import { request } from '../test-utils/localhostSupertest.js';
 
 vi.mock('../services/ai/index.js', () => ({ aiConfigLive: (c) => !!(c && c.mode && c.mode !== 'off') }));
 const designChat = vi.fn(async () => ({ ok: true, reply: 'hi' }));
+const proposePlan = vi.fn(async () => ({ ok: true, scope: { scope: 'arc' } }));
 const generateBlueprint = vi.fn(async () => ({ ok: true, created: {} }));
 const refineEntity = vi.fn(async () => ({ ok: true, replacement: { name: 'X' } }));
 const dressMapProposal = vi.fn(async () => ({ ok: true, map: 'battle-arena', ops: [], preview: [], updated: {} }));
 vi.mock('../services/ai/authoring/designer.js', () => ({
     designChat: (...a) => designChat(...a),
-    proposePlan: vi.fn(async () => ({ ok: true, scope: {} })),
+    proposePlan: (...a) => proposePlan(...a),
     generateBlueprint: (...a) => generateBlueprint(...a),
 }));
 vi.mock('../services/ai/authoring/refine.js', () => ({
@@ -22,7 +23,13 @@ vi.mock('../services/ai/authoring/refine.js', () => ({
 vi.mock('../services/ai/authoring/dressMap.js', () => ({
     dressMapProposal: (...a) => dressMapProposal(...a),
 }));
-vi.mock('../services/ai/authoring/designNotes.js', () => ({ loadNotes: () => ({ messages: [], plans: [] }) }));
+const savePendingPlan = vi.fn((c, scope) => ({ pendingPlan: scope ? { ...scope, savedAt: 1 } : null }));
+const setDesignerError = vi.fn((c, stage, error) => ({ lastError: error ? { stage, error } : null }));
+vi.mock('../services/ai/authoring/designNotes.js', () => ({
+    loadNotes: () => ({ messages: [], plans: [], pendingPlan: null, lastError: null }),
+    savePendingPlan: (...a) => savePendingPlan(...a),
+    setDesignerError: (...a) => setDesignerError(...a),
+}));
 
 const store = new Map();
 vi.mock('../utils/changeData.js', () => ({
@@ -101,5 +108,52 @@ describe('ai-designer route authority', () => {
         const res = await request(app).post('/api/campaigns/test-campaign/ai/designer/generate').set('Host', 'localhost').send({});
         expect(res.status).toBe(400);
         expect(generateBlueprint).not.toHaveBeenCalled();
+    });
+
+    // --- designer-plan-state-volatile: persistence lanes ---------------------
+
+    it('pending-plan endpoint persists/clears the GM plan — GM-only, shape-checked', async () => {
+        savePendingPlan.mockClear();
+        const url = '/api/campaigns/test-campaign/ai/designer/pending-plan';
+        const lan = await request(app).post(url).set('Host', '10.0.0.5').send({ scope: { scope: 'arc' } });
+        expect(lan.status).toBe(403);
+        expect(savePendingPlan).not.toHaveBeenCalled();
+
+        const junk = await request(app).post(url).set('Host', 'localhost').send({ scope: [1] });
+        expect(junk.status).toBe(400);
+
+        const ok = await request(app).post(url).set('Host', 'localhost').send({ scope: { scope: 'arc', entityPlan: [] } });
+        expect(ok.status).toBe(200);
+        expect(ok.body).toMatchObject({ ok: true, pending: true });
+        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', { scope: 'arc', entityPlan: [] });
+
+        const clear = await request(app).post(url).set('Host', 'localhost').send({ scope: null });
+        expect(clear.body).toEqual({ ok: true, pending: false });
+        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', null);
+    });
+
+    it('plan/generate/chat outcomes ride into design-notes: plan stored, errors recorded, plan consumed on success', async () => {
+        savePendingPlan.mockClear();
+        setDesignerError.mockClear();
+        store.set('test-campaign', { aiConfig: { mode: 'suggest', endpoint: 'http://localhost:1234/v1' } });
+
+        // proposed plan becomes the stored pending plan immediately
+        await request(app).post('/api/campaigns/test-campaign/ai/designer/plan').set('Host', 'localhost').send({});
+        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', { scope: 'arc' });
+
+        // failed chat is recorded with its message
+        designChat.mockResolvedValueOnce({ ok: false, code: 'AI_UNREACHABLE', error: 'local model endpoint unreachable' });
+        await request(app).post(CHAT).set('Host', 'localhost').send({ message: 'x' });
+        expect(setDesignerError).toHaveBeenLastCalledWith('test-campaign', 'chat', 'local model endpoint unreachable');
+
+        // failed generate persists its whole error list
+        generateBlueprint.mockResolvedValueOnce({ ok: false, code: 'AI_NEEDS_HUMAN', errors: ['bad ref', 'placeholder name'] });
+        await request(app).post('/api/campaigns/test-campaign/ai/designer/generate').set('Host', 'localhost').send({ scope: { scope: 'arc' } });
+        expect(setDesignerError).toHaveBeenLastCalledWith('test-campaign', 'generate', 'bad ref\nplaceholder name');
+
+        // successful generate consumes the pending plan and clears the error
+        await request(app).post('/api/campaigns/test-campaign/ai/designer/generate').set('Host', 'localhost').send({ scope: { scope: 'arc' } });
+        expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', null);
+        expect(setDesignerError).toHaveBeenLastCalledWith('test-campaign', 'generate', null);
     });
 });

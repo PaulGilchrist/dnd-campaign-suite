@@ -87,6 +87,21 @@ export async function loadDesignerConversation({ campaignName }) {
     return res.json()
 }
 
+/**
+ * Persist (or clear, with scope:null) the GM's pending build plan + count
+ * edits so view navigation/reload rehydrates the PlanEditor from design-notes.
+ */
+export async function saveDesignerPendingPlan({ campaignName, scope }) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/pending-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope }),
+    })
+    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
+    if (!res.ok) return { ok: false, error: data.error }
+    return data
+}
+
 export async function designerChat({ campaignName, message }) {
     const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/chat`, {
         method: 'POST',

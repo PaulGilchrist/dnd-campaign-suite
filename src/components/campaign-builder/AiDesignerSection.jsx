@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAiStatus, loadDesignerConversation, designerChat, designerPlan, designerGenerate } from '../../services/ai/aiClient.js';
+import { getAiStatus, loadDesignerConversation, saveDesignerPendingPlan, designerChat, designerPlan, designerGenerate } from '../../services/ai/aiClient.js';
 import './AiDesignerSection.css';
 
 const PLAN_KINDS = ['faction', 'settlement', 'npc', 'quest', 'encounter', 'session', 'mapPlan'];
+
+// network/save debounce — coalesce per-keystroke plan edits into one pending-plan POST
+const PLAN_SAVE_DEBOUNCE_MS = 400;
 
 function PlanEditor({ plan, setPlan, busy, onGenerate, onCancel }) {
   const setCount = (kind, value) => {
@@ -50,7 +53,8 @@ function PlanEditor({ plan, setPlan, busy, onGenerate, onCancel }) {
         <button type="button" className="ct-btn ct-btn-primary" disabled={busy} onClick={() => onGenerate(plan)}>
           <i className="fa-solid fa-wand-magic-sparkles" /> {busy ? 'Drafting… (local models can take a while)' : 'Generate drafts'}
         </button>
-        <button type="button" className="ct-btn" disabled={busy} onClick={onCancel}>Back to chat</button>
+        <button type="button" className="ct-btn" disabled={busy} onClick={onCancel}
+          title="Discard this plan and return to chat">Back to chat</button>
       </div>
       <p className="ai-designer-note">Everything generated lands as a draft below, invisible to players until you approve it.</p>
     </div>
@@ -66,9 +70,45 @@ function AiDesignerSection({ campaignName, onGenerated }) {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const threadEnd = useRef(null);
+  const saveTimerRef = useRef(null); // debounce handle (network only — the server holds the truth)
+  const stagedPlanRef = useRef(null); // latest plan edit not yet POSTed to design-notes
+
+  const stopPlanDebounce = () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    stagedPlanRef.current = null;
+  };
+
+  // GM edits (counts/scope/levels/spine) persist to design-notes so view
+  // navigation and page reloads restore the PlanEditor verbatim.
+  const editPlan = (next) => {
+    setPlan(next);
+    stagedPlanRef.current = next;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => { // network/save debounce tick — flush latest plan POST
+      saveTimerRef.current = null;
+      stagedPlanRef.current = null;
+      saveDesignerPendingPlan({ campaignName, scope: next })
+        .catch(err => console.error('[ai-designer] pending plan save failed', err));
+    }, PLAN_SAVE_DEBOUNCE_MS);
+  };
+
+  const clearPendingPlan = () => {
+    stopPlanDebounce();
+    setPlan(null);
+    saveDesignerPendingPlan({ campaignName, scope: null })
+      .catch(err => console.error('[ai-designer] pending plan clear failed', err));
+  };
 
   useEffect(() => {
     let cancelled = false;
+    // Clean slate per campaign — never bleed a previous campaign's plan/error.
+    setMessages([]);
+    setPlan(null);
+    setError(null);
+    setResult(null);
     (async () => {
       try {
         const status = await getAiStatus(campaignName);
@@ -76,13 +116,28 @@ function AiDesignerSection({ campaignName, onGenerated }) {
         setEnabled(!!status.configured);
         if (status.configured) {
           const notes = await loadDesignerConversation({ campaignName });
-          if (!cancelled) setMessages(notes.messages || []);
+          if (cancelled) return;
+          setMessages(notes.messages || []);
+          if (notes.pendingPlan) setPlan(notes.pendingPlan);
+          if (notes.lastError?.error) setError(notes.lastError.error);
         }
       } catch {
         if (!cancelled) setEnabled(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // Flushing on unmount is what makes "navigate away" lossless.
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+        if (stagedPlanRef.current) {
+          saveDesignerPendingPlan({ campaignName, scope: stagedPlanRef.current })
+            .catch(err => console.error('[ai-designer] pending plan flush failed', err));
+        }
+      }
+      stagedPlanRef.current = null;
+    };
   }, [campaignName]);
 
   useEffect(() => {
@@ -103,22 +158,30 @@ function AiDesignerSection({ campaignName, onGenerated }) {
   };
 
   const proposePlan = async () => {
+    stopPlanDebounce(); // a fresh proposal replaces any half-edited plan
     setBusy(true);
     setError(null);
     const res = await designerPlan({ campaignName });
-    if (res.ok) setPlan(res.scope);
+    if (res.ok) setPlan(res.scope); // route already persisted it as the pending plan
     else setError(res.error || res.code || 'plan request failed');
     setBusy(false);
   };
 
   const generate = async (confirmedScope) => {
+    const hadUnsaved = saveTimerRef.current !== null || stagedPlanRef.current !== null;
+    stopPlanDebounce();
     setBusy(true);
     setError(null);
+    // Make sure the exact scope we are generating from is what the server holds.
+    if (hadUnsaved) {
+      await saveDesignerPendingPlan({ campaignName, scope: confirmedScope })
+        .catch(err => console.error('[ai-designer] pending plan flush failed', err));
+    }
     const res = await designerGenerate({ campaignName, scope: confirmedScope });
     setBusy(false);
     if (res.ok) {
       setResult(res);
-      setPlan(null);
+      setPlan(null); // route cleared the server-side pending — plan consumed
       onGenerated?.();
     } else {
       setError((res.errors || [res.error || res.code || 'generation failed']).join('\n'));
@@ -147,7 +210,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
       )}
 
       {plan ? (
-        <PlanEditor plan={plan} setPlan={setPlan} busy={busy} onGenerate={generate} onCancel={() => setPlan(null)} />
+        <PlanEditor plan={plan} setPlan={editPlan} busy={busy} onGenerate={generate} onCancel={clearPendingPlan} />
       ) : (
         <>
           <div className="ai-designer-thread">
