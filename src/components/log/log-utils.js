@@ -99,10 +99,11 @@ export function formatEntryTypeLabel(type) {
 }
 
 // ── AI audit one-line summaries (backlog ai-audit-log-rows-raw-json) ──
-// ai_designer/ai_refine/ai_world audit rows carry structured payload fields
-// (stage/kind/instruction/created/errors…) and no message/description, so the
-// generic fallback dumped raw JSON. These helpers collapse the plausible
-// producer shapes into one human-readable line: kind + instruction + outcome.
+// ai_designer/ai_refine/ai_world/ai_authoring/ai_dress audit rows carry
+// structured payload fields (stage/kind/instruction/created/errors…) and no
+// message/description, so the generic fallback dumped raw JSON. These helpers
+// collapse the plausible producer shapes into one human-readable line: kind +
+// instruction + outcome.
 
 function truncateLine(text, max = 260) {
   const s = String(text).replace(/\s+/g, ' ').trim();
@@ -202,10 +203,45 @@ function describeWorld(entry) {
   return `World keeper proposed ${kind}${body ? ` — “${truncateLine(body, 180)}”` : ''}${needsHuman ? ' (the GM supplies this)' : ''}`;
 }
 
+// apply.js audit rows (bug-log-ai-authoring-raw-json). Successes stamp a
+// `summary` and never reach here (formatAiAuditLine prefers it verbatim); this
+// covers the failMidBatch shape ({error, snapshot}) and legacy no-summary rows.
+function describeAuthoring(entry) {
+  const failure = errorText(entry.error, entry.errors);
+  if (failure) {
+    const snap = asText(entry.snapshot);
+    return `AI authoring stopped — ${failure}${snap ? ` (restore point ${snap})` : ''}`;
+  }
+  const parts = ['AI authoring'];
+  const scope = asText(entry.scope);
+  if (scope) parts.push(`scope ${scope}`);
+  const created = summarizeCounts(entry.created);
+  if (created) parts.push(`created ${created}`);
+  else if ('created' in entry) parts.push('created nothing');
+  if (asText(entry.snapshot)) parts.push(`restore point ${entry.snapshot}`);
+  return parts.join(' — ');
+}
+
+// dressMap.js proposal rows + the AiDressButton applied row. ops is always the
+// op COUNT (never the array), so nothing here can leak [object Object].
+function describeDress(entry) {
+  const map = asText(entry.map) || 'map';
+  const ops = asText(entry.ops);
+  const opsPhrase = ops === null ? '' : ` ${ops} op${ops === '1' ? '' : 's'}`;
+  if (entry.action === 'applied') return `AI dress applied to ${map}${opsPhrase}`;
+  const instruction = entry.instruction ? ` “${truncateLine(entry.instruction, 140)}”` : '';
+  const outcome = Number(entry.attempts) > 0
+    ? `proposed${opsPhrase} ${attemptsPhrase(entry.attempts)}`
+    : 'gave up — the model produced no valid ops';
+  return `AI dress ${map}${instruction} — ${outcome}`;
+}
+
 const AI_AUDIT_DESCRIBERS = {
   ai_designer: describeDesigner,
   ai_refine: describeRefine,
-  ai_world: describeWorld
+  ai_world: describeWorld,
+  ai_authoring: describeAuthoring,
+  ai_dress: describeDress
 };
 
 // Keys that never belong in the readable line (chrome, or handled explicitly).

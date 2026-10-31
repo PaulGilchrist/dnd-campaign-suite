@@ -54,7 +54,9 @@ const ENTRY_COMPONENTS = {
   ai_designer: AiAuditEntry,
   ai_refine: AiAuditEntry,
   ai_world: AiAuditEntry,
-  ai_world_applied: AiAuditEntry
+  ai_world_applied: AiAuditEntry,
+  ai_authoring: AiAuditEntry,
+  ai_dress: AiAuditEntry
 };
 
 function LogEntryRenderer({ entry }) {

@@ -1,11 +1,15 @@
 // @maintained-by-ai
 // AI AUDIT ROWS lane (backlog 2026-10-31 ai-audit-log-raw-json) — leaf content +
-// registry routing for the ai_designer/ai_refine/ai_world(+_applied) audit sinks.
+// registry routing for the ai_designer/ai_refine/ai_world(+_applied) and
+// ai_authoring/ai_dress (bug-log-ai-authoring-raw-json) audit sinks.
 // Payload shapes are copied from the real producers:
 //   ai_designer     → server/services/ai/authoring/designer.js audit() spread
 //   ai_refine       → server/services/ai/authoring/refine.js audit()
 //   ai_world        → server/services/ai/index.js worldAudit()
 //   ai_world_applied→ src/services/ai/applyWorldProposal.js audit()
+//   ai_authoring    → server/services/ai/authoring/apply.js logSuccess()/failMidBatch()
+//   ai_dress        → server/services/ai/authoring/dressMap.js audit() +
+//                     src/components/maps-manager/AiDressButton.jsx apply()
 // Regression guard included: ai_director(_applied) keep their pre-existing
 // GenericEntry labeled rows (LogGeneric.test.jsx owns their bytes).
 
@@ -24,6 +28,13 @@ const refine = (o = {}) => ({
   id: 'rf', type: 'ai_refine', name: 'AI refine', kind: 'npc',
   instruction: 'make Marta grumpier but keep her secrets', attempts: 1, timestamp: TS, ...o,
 });
+const authoring = (o = {}) => ({
+  id: 'au', type: 'ai_authoring', name: 'AI designer', timestamp: TS, ...o,
+});
+const dress = (o = {}) => ({
+  id: 'dr', type: 'ai_dress', name: 'AI dress', map: 'battle-arena',
+  instruction: 'add a trapped chest guarding the entrance', ops: 4, attempts: 1, timestamp: TS, ...o,
+});
 
 const firstLine = () => q('.log-ai-audit .log-ai-audit-text').textContent;
 
@@ -37,6 +48,8 @@ describe('AI audit rows render labeled one-line summaries', () => {
     ['ai_refine', refine()],
     ['ai_world', { id: 'w', type: 'ai_world', name: 'AI world keeper', attempts: 1, timestamp: TS, description: 'AI world keeper proposed rumor: the wards flicker', proposal: { kind: 'rumor', text: 'the wards flicker' } }],
     ['ai_world_applied', { id: 'wa', type: 'ai_world_applied', name: 'AI world keeper', timestamp: TS, description: 'AI world keeper applied: rumor — logged.' }],
+    ['ai_authoring', authoring({ scope: 'session', created: { encounters: 1 }, snapshot: 's.zip', summary: 'AI drafted 1 entity' })],
+    ['ai_dress', dress({ action: 'applied', ops: 4 })],
   ])('%s routes to the ai-audit row (never the raw-JSON generic fallback)', (type, entry) => {
     setup(Log, [entry]);
     expect(q(`.log-entry.log-ai-audit`)).toBeInTheDocument();
@@ -218,6 +231,73 @@ describe('AI audit rows render labeled one-line summaries', () => {
       description: "AI world keeper applied: quest_draft — quest 'The Lost Relic' added to the ledger (AI-drafted)",
     }]);
     expect(firstLine()).toContain("quest 'The Lost Relic' added to the ledger");
+  });
+
+  // ── ai_authoring rows (bug-log-ai-authoring-raw-json) ─────
+
+  it('authoring success: summary is the readable line verbatim', () => {
+    setup(Log, [authoring({
+      scope: 'session',
+      created: { factions: 0, settlements: 0, npcs: 0, quests: 0, sessions: 0, encounters: 1, maps: 0 },
+      snapshot: 'test-campaign-2026-10-31T22-40-56-044.zip',
+      summary: 'AI drafted 1 entity',
+    })]);
+    expect(firstLine()).toBe('AI drafted 1 entity');
+  });
+
+  it('authoring failMidBatch: error + restore point readable, no JSON', () => {
+    setup(Log, [authoring({
+      error: 'map plan itemIndex 42 out of bounds for 20x20 grid',
+      snapshot: 'test-campaign-2026-11-01T09-00-00-000.zip',
+    })]);
+    const line = firstLine();
+    expect(line).toContain('AI authoring stopped');
+    expect(line).toContain('itemIndex 42 out of bounds');
+    expect(line).toContain('restore point test-campaign-2026-11-01T09-00-00-000.zip');
+    expect(line).not.toMatch(/[{}]/);
+  });
+
+  it('authoring legacy row without summary: scope + counts collapse readably', () => {
+    setup(Log, [authoring({
+      scope: 'bespoke',
+      created: { npcs: 1, encounters: 1, maps: 0 },
+      snapshot: 'test-campaign-2026-11-01T09-00.zip',
+    })]);
+    const line = firstLine();
+    expect(line).toContain('AI authoring — scope bespoke');
+    expect(line).toContain('created npcs 1, encounters 1, maps 0');
+    expect(line).toContain('restore point test-campaign-2026-11-01T09-00.zip');
+    expect(line).not.toMatch(/[{}]/);
+  });
+
+  // ── ai_dress rows ─────────────────────────────────────────
+
+  it('dress proposal success: map + instruction + op count + attempts', () => {
+    setup(Log, [dress()]);
+    const line = firstLine();
+    expect(line).toContain('AI dress battle-arena');
+    expect(line).toContain('trapped chest');
+    expect(line).toContain('proposed 4 ops after 1 attempt');
+    expect(line).not.toMatch(/[{}]/);
+  });
+
+  it('dress refusal (attempts 0): honest gave-up line, no JSON', () => {
+    setup(Log, [dress({ instruction: 'line the gallery with banners', ops: 0, attempts: 0 })]);
+    const line = firstLine();
+    expect(line).toContain('AI dress battle-arena');
+    expect(line).toContain('line the gallery with banners');
+    expect(line).toContain('gave up — the model produced no valid ops');
+    expect(line).not.toMatch(/[{}]/);
+  });
+
+  it('dress applied row (client AiDressButton shape): map + op count', () => {
+    setup(Log, [dress({ action: 'applied', instruction: undefined, attempts: undefined })]);
+    expect(firstLine()).toBe('AI dress applied to battle-arena 4 ops');
+  });
+
+  it('dress singular op count reads "1 op"', () => {
+    setup(Log, [dress({ ops: 1 })]);
+    expect(firstLine()).toContain('proposed 1 op after 1 attempt');
   });
 
   // ── robustness + sanitization ─────────────────────────────
