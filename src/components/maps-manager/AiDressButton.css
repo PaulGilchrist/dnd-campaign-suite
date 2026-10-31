@@ -22,6 +22,19 @@
   font-size: 0.82rem;
 }
 
+/* Map-view mount (backlog ai-dress-belongs-in-map-view): point the GM at the
+   canvas markers animating behind the docked panel. */
+.ai-dress-preview-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.ai-dress-preview-hint i {
+  color: #22d3ee;
+  margin-right: 4px;
+}
+
 .ai-dress-error {
   margin: 0;
   color: var(--color-text);

@@ -147,3 +147,19 @@
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
 }
+
+/* Map-view dress mount (backlog ai-dress-belongs-in-map-view): dock the
+   panel to the RIGHT edge with a near-clear backdrop so the open grid stays
+   readable while the GM instructs and previews. Placement-only modifier —
+   every token above still applies; centered mounts are untouched. */
+.ai-instruction-overlay-dock {
+  justify-content: flex-end;
+  align-items: flex-start;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 12px;
+}
+
+.ai-instruction-overlay-dock .ai-instruction-modal {
+  width: 480px;
+  max-height: calc(100vh - 24px);
+}

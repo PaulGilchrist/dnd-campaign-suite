@@ -40,7 +40,18 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
              ...prev,
             players: mergedField(data.players, prev?.players).map(({ ...rest }) => rest),
             walls: new Set(mergedField(data.walls, prev?.walls)),
-            revealed: mergedField(data.revealed, prev?.revealed)
+            revealed: mergedField(data.revealed, prev?.revealed),
+            // items (creature-token lane) and pois are full-array document
+            // lanes the dress/add/remove flows author: an AI Dress applied
+            // while this editor is open arrives as a snapshot, and leaving
+            // these out let the debounced autosave re-PUT the stale rows
+            // back to disk (dress-remove resurrected live 2026-11-01).
+            // Conditional present-lands (a PRESENT key lands, null coerced
+            // to the honest [] domain; an ABSENT key preserves prev via the
+            // spread) — unlike the legacy three, they are only emitted when
+            // carried, so documents without those lanes keep their shape.
+            ...(data.items !== undefined ? { items: data.items ?? [] } : {}),
+            ...(data.pois !== undefined ? { pois: data.pois ?? [] } : {}),
           }));
         if (data.placedItems !== undefined) {
             setPlacedItemsGuarded(data.placedItems);

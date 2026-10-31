@@ -17,28 +17,33 @@ import './AiInstructionModal.css';
  * INSIDE the NPC/quest/faction modals (z-index 1000), so the shell uses
  * 1100 for the sanctioned modal-over-modal face. While `busy` the modal is
  * non-dismissible, matching the old inline rows' disabled × semantics.
+ *
+ * `overlayClassName` (backlog ai-dress-belongs-in-map-view) lets a host add
+ * a placement modifier — the map-view dress mount docks the panel right with
+ * a near-clear backdrop so the GM reads the grid WHILE instructing. The
+ * default (refine everywhere, list-row dress) stays centered, byte-identical.
  */
-function AiInstructionModal({ title, closeLabel, busy = false, onClose, children }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
+function AiInstructionModal({ title, closeLabel, busy = false, onClose, overlayClassName, children }) {
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [busy, onClose]);
 
-  return (
-    <div className="ai-instruction-overlay">
-      <div className="ai-instruction-modal" role="dialog" aria-modal="true" aria-label={title}>
-        <div className="ai-instruction-header">
-          <h3>{title}</h3>
-          <button type="button" className="ai-instruction-close" onClick={onClose}
-            disabled={busy} aria-label={closeLabel} title={closeLabel}>
-            &times;
-          </button>
+    return (
+        <div className={`ai-instruction-overlay${overlayClassName ? ` ${overlayClassName}` : ''}`}>
+            <div className="ai-instruction-modal" role="dialog" aria-modal="true" aria-label={title}>
+                <div className="ai-instruction-header">
+                    <h3>{title}</h3>
+                    <button type="button" className="ai-instruction-close" onClick={onClose}
+                        disabled={busy} aria-label={closeLabel} title={closeLabel}>
+                        &times;
+                    </button>
+                </div>
+                {children}
+            </div>
         </div>
-        {children}
-      </div>
-    </div>
-  );
+    );
 }
 
 export default AiInstructionModal;

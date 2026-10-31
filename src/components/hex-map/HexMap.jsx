@@ -12,6 +12,7 @@ import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
 import MapDescriptionPanel from '../common/MapDescriptionPanel.jsx';
+import { useDressMount } from '../../hooks/ui/useDressMount.js';
 import POILayer from './POILayer.jsx';
 import POIPanel from './POIPanel.jsx';
 import POIContextMenu from './POIContextMenu.jsx';
@@ -153,6 +154,15 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // ── Terrain painting ──
     const terrainPainting = useTerrainPainting({ hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers });
     const { handleTerrainPointerDown, handleTerrainPointerMove, handleTerrainPointerUp } = terrainPainting;
+
+    // AI Dress in-view mount (backlog ai-dress-belongs-in-map-view): the hook
+    // owns the ops mirror + GM gating and hands back the ready toolbar button
+    // and canvas overlay elements (hex q,r lane; both null-wiped on
+    // close/Apply/unmount).
+    const dress = useDressMount({
+        surface: 'hex', campaignName, mapName, mapDisplayName, isLocalhost,
+        mapData: mapLoader.mapData, pois, terrain,
+    });
 
     // ── Travel management ──
     const { monsters } = useMonstersData();
@@ -573,6 +583,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 gridSize={gridSize} setGridSize={setGridSize}
                 marchingOrderOpen={marchingOpen} setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
+                // AI Dress in the hex toolbar (GM-only, POI/q,r lane) — the
+                // same component as the list-row shortcut, docked variant;
+                // its ops drive the canvas overlay preview (hook nulls both
+                // for LAN players / cleared proposals).
+                dressButton={dress.button}
             />
             {/* Read-only header description panel (backlog 2026-10-26) —
                 indoor twin in Map.jsx; the panel self-gates on empty/missing
@@ -684,6 +699,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         />
 
                         <HexHoverPreview hoveredHex={hoveredHex} tool={tool} rivers={rivers} />
+
+                        {/* AI Dress overlay preview — above terrain/POIs so
+                            every proposed hex reads; null-wiped by the hook on
+                            close/Apply (zero residue). */}
+                        {dress.overlay}
 
                         <POIContextMenu
                             selectedPoi={selectedPoiMenu}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import Subscriber from '../common/Subscriber.jsx';
 import MapToolbar from './MapToolbar.jsx';
+import { useDressMount } from '../../hooks/ui/useDressMount.js';
 import { loadMonsters } from '../../services/ui/dataLoader.js';
 import { computeEffectiveWalls } from '../../services/maps/effectiveWalls.js';
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
@@ -462,6 +463,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         }
     }, [setRulerMode, setSpellMode, setTool, resetRuler]);
 
+    // AI Dress in-view mount (backlog ai-dress-belongs-in-map-view): the hook
+    // owns the ops mirror + GM gating and hands back the ready toolbar button
+    // and canvas overlay elements (both null-wiped on close/Apply/unmount).
+    const dress = useDressMount({
+        surface: 'square', campaignName, mapName, mapDisplayName, isLocalhost,
+        mapData, placedItems, gridSize, gridCenterX, gridCenterY,
+    });
+
     if (!mapData) return null;
 
     // Outdoor hex maps render entirely through HexMap (everything below is the
@@ -545,6 +554,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     removeOverlay,
                     clearOverlays,
                 }}
+                // AI Dress in the map-view toolbar (GM-only like the other
+                // authoring tools) — same component as the list-row shortcut,
+                // docked variant; its ops drive the canvas overlay preview.
+                // The hook already nulls both pieces for LAN players.
+                dressButton={dress.button}
             />
             {/* Read-only header description panel (backlog 2026-10-26) — the
                 panel self-gates on empty/missing description, so this call
@@ -686,6 +700,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     end={rulerEnd || rulerPreview}
                     cellSize={CELL_SIZE}
                 />
+
+                {/* AI Dress overlay preview — above fog/tokens/spell layers so
+                    every proposed cell reads; null-wiped by the hook on
+                    close/Apply (zero residue, criterion 5). */}
+                {dress.overlay}
             </svg>
             {/* Enforcement snap-back toast (display-only visibility for the
                 movement-budget clamp — see MapSnapToast.jsx) */}

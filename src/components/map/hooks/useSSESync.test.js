@@ -128,6 +128,31 @@ describe('useSSESync', () => {
             .toEqual({ players: [{ id: 'new' }], walls: new Set(['w1']), revealed: ['r1'], tokens: [7] });
     });
 
+    // Backlog ai-dress-belongs-in-map-view live find: an AI Dress applied while
+    // the editor is open echoed its snapshot, but the items/pois lanes were not
+    // merged — the debounced autosave then re-PUT the stale rows (a dress
+    // REMOVE resurrected the token on disk). The lanes now obey the same
+    // present-lands law: present lands (null → honest []), absent preserves.
+    it('lands items/pois lanes carried by the snapshot; null clears honestly, absence preserves prev', () => {
+        const { args, result } = renderSync();
+        const prev = { players: [], walls: new Set(), revealed: [], items: [{ id: 'gob-1' }], pois: [{ id: 'poi-a' }] };
+
+        act(() => { result.current.handleSSEEvent(mapEvent({ items: [], pois: [{ id: 'poi-a' }, { id: 'poi-b' }] })); });
+        expect(args.setMapData.mock.calls[0][0](prev))
+            .toEqual({ players: [], walls: new Set(), revealed: [], items: [], pois: [{ id: 'poi-a' }, { id: 'poi-b' }] });
+
+        act(() => { result.current.handleSSEEvent(mapEvent({ items: null })); });
+        expect(args.setMapData.mock.calls[1][0](prev))
+            .toEqual({ players: [], walls: new Set(), revealed: [], items: [], pois: [{ id: 'poi-a' }] });
+
+        // Event carries neither lane → prev's items/pois survive byte-identical,
+        // and no phantom empty arrays are invented for lane-less documents.
+        act(() => { result.current.handleSSEEvent(mapEvent({ gridSize: 5 })); });
+        expect(args.setMapData.mock.calls[2][0](prev)).toEqual(prev);
+        expect(args.setMapData.mock.calls[2][0]({ players: [], walls: new Set(), revealed: [] }))
+            .toEqual({ players: [], walls: new Set(), revealed: [] });
+    });
+
     it.each([
         {
             title: 'converts walls array to a Set',

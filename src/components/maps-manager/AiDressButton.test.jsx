@@ -112,4 +112,80 @@ describe('AiDressButton', () => {
         expect(screen.queryByText('add chest at 12,8')).toBeNull();
         expect(saveMapData).not.toHaveBeenCalled();
     });
+
+    // Backlog ai-dress-belongs-in-map-view: the SAME component mounted in the
+    // open map view's toolbar. Behaviour (ask/Apply/log) is identical to the
+    // list shortcut — what the map mount adds is the right-docked shell (the
+    // grid stays readable) and the ops mirror out through onProposalChange
+    // for the canvas overlay preview (null on close/Apply/unmount).
+    describe('map-view mount', () => {
+        it('docks the shell to the side (grid stays visible) and hints at the canvas markers', async () => {
+            const { container } = render(
+                <AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={vi.fn()} />
+            );
+            fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+            expect(container.querySelector('.ai-instruction-overlay-dock')).not.toBeNull();
+            fireEvent.change(screen.getByPlaceholderText(/how should this map change/i), { target: { value: 'add a chest' } });
+            dressMapProposal.mockResolvedValue(PROPOSAL);
+            fireEvent.click(screen.getByRole('button', { name: /dress map/i }));
+            await waitFor(() => expect(screen.getByText('add chest at 12,8')).toBeInTheDocument());
+            expect(screen.getByText(/markers show on the map/i)).toBeInTheDocument();
+        });
+
+        it('mirrors the proposed ops out for the canvas overlay', async () => {
+            const onProposalChange = vi.fn();
+            render(
+                <AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={onProposalChange} />
+            );
+            await askForProposal();
+            expect(onProposalChange).toHaveBeenLastCalledWith(PROPOSAL.ops);
+        });
+
+        it('the list shortcut keeps the plain centered modal (no dock, no canvas hint)', async () => {
+            const { container } = render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            await askForProposal();
+            expect(container.querySelector('.ai-instruction-overlay')).not.toHaveClass('ai-instruction-overlay-dock');
+            expect(screen.queryByText(/markers show on the map/i)).toBeNull();
+        });
+
+        it('close after a propose pushes null and POSTs nothing (disk byte-clean)', async () => {
+            const onProposalChange = vi.fn();
+            render(
+                <AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={onProposalChange} />
+            );
+            await askForProposal();
+            onProposalChange.mockClear();
+            fireEvent.click(screen.getByRole('button', { name: /close ai dress/i }));
+            expect(onProposalChange).toHaveBeenCalledWith(null);
+            expect(saveMapData).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('unmounting mid-preview (e.g. the 2D↔3D toolbar switch) wipes the mirror too', async () => {
+            const onProposalChange = vi.fn();
+            const { unmount } = render(
+                <AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={onProposalChange} />
+            );
+            await askForProposal();
+            onProposalChange.mockClear();
+            unmount();
+            expect(onProposalChange).toHaveBeenCalledWith(null);
+        });
+
+        it('Apply passthrough is UNCHANGED: same save lane, same applied log, mirror cleared', async () => {
+            const onProposalChange = vi.fn();
+            render(
+                <AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={onProposalChange} />
+            );
+            await askForProposal();
+            onProposalChange.mockClear();
+            fireEvent.click(screen.getByRole('button', { name: /apply to map/i }));
+            await waitFor(() => expect(saveMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena', PROPOSAL.updated));
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ai_dress', action: 'applied', map: 'battle-arena', ops: 1,
+            }));
+            // Apply → close() → the ops mirror wipes (canvas preview vanishes).
+            await waitFor(() => expect(onProposalChange).toHaveBeenLastCalledWith(null));
+        });
+    });
 });

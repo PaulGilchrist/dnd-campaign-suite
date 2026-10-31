@@ -26,6 +26,7 @@ const MapToolbar = ({
     setRulerMode,
     onEnter3D,
     spellOverlayState,
+    dressButton,
 }) => {
     const {
         spellMode,
@@ -131,6 +132,11 @@ const MapToolbar = ({
                             <i className="fa-solid fa-cube"></i> 3D
                         </button>
                     )}
+                    {/* AI Dress mount (backlog ai-dress-belongs-in-map-view): the host
+                        Map.jsx supplies the localhost-gated AiDressButton so the GM
+                        dresses THIS map with the grid in view; the toolbar stays a
+                        presentational shell (players pass nothing → no button). */}
+                    {dressButton}
                     {isLocalhost && (
                         <button onClick={() => setItemsPanelOpen(prev => !prev)} aria-label="Items">
                             <i className="fa-solid fa-box"></i> Items

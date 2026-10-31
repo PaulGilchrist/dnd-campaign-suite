@@ -22,6 +22,7 @@ function HexMapToolbar({
     marchingOrderOpen,
     setMarchingOrderOpen,
     marchingOrder,
+    dressButton,
 }) {
     const poiLabel = toggleLabel(poiPanelOpen, 'Open POI panel', 'Close POI panel');
     const marchingLabel = toggleLabel(marchingOrderOpen, 'Manage marching order', 'Close marching order');
@@ -118,6 +119,12 @@ function HexMapToolbar({
                     <span className="hex-map-poi-indicator">{marchingOrder.length}</span>
                 )}
             </button>
+
+            {/* AI Dress mount (backlog ai-dress-belongs-in-map-view): the host
+                HexMap supplies the localhost-gated AiDressButton (hex maps dress
+                POIs via q,r addressing) so the GM instructs with the grid in
+                view. Players/hosts without the prop pass nothing → no button. */}
+            {dressButton}
 
             {/* Print */}
             <button onClick={() => window.print()} title="Print map" aria-label="Print map" className="no-print">

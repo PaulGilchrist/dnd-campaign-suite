@@ -1,0 +1,60 @@
+/* DressPreviewOverlay — AI Dress overlay preview (backlog
+   ai-dress-belongs-in-map-view). Rides INSIDE the host map's svg, above fog
+   and tokens, so it must stay visually distinct from every existing layer:
+   cyan = proposed add, fuchsia = proposed remove, amber = move source.
+   Text labels get a dark halo (paint-order) so they stay legible over any
+   terrain or wall colour without a background plate. */
+
+.dress-preview-layer {
+    pointer-events: none;
+}
+
+.dress-preview-dot {
+    fill: rgba(34, 211, 238, 0.75);
+    stroke: #22d3ee;
+    stroke-width: 2.5;
+}
+
+.dress-preview-marker-remove .dress-preview-cell {
+    fill: rgba(232, 121, 249, 0.22);
+    stroke: #e879f9;
+    stroke-width: 2.5;
+    stroke-dasharray: 5 3;
+}
+
+.dress-preview-marker-move-from .dress-preview-cell {
+    fill: rgba(251, 191, 36, 0.18);
+    stroke: #fbbf24;
+    stroke-width: 2;
+    stroke-dasharray: 3 3;
+}
+
+.dress-preview-x {
+    fill: #e879f9;
+    font-size: 16px;
+    font-weight: bold;
+    text-anchor: middle;
+}
+
+.dress-preview-label {
+    fill: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    text-anchor: middle;
+    stroke: rgba(0, 0, 0, 0.8);
+    stroke-width: 3px;
+    paint-order: stroke;
+}
+
+/* Honest off-grid / unresolvable indicator (defensive — server validation
+   is all-or-nothing, so these normally never render). */
+.dress-preview-invalid .dress-preview-dot,
+.dress-preview-invalid .dress-preview-cell {
+    fill: rgba(239, 68, 68, 0.25);
+    stroke: #ef4444;
+    stroke-dasharray: 2 2;
+}
+
+.dress-preview-invalid .dress-preview-label {
+    fill: #fca5a5;
+}
