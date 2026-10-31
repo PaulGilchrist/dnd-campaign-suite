@@ -21,7 +21,7 @@ describe('Log generic fallback entries', () => {
       { id: 'g1', type: 'gm-note', message: 'RUNQ SSE PROBE NOTE', timestamp: 1700000000000 },
     ]);
     expect(q('.log-entry.log-generic')).toBeInTheDocument();
-    expect(q('.log-generic-type').textContent).toBe('Gm-note');
+    expect(q('.log-generic-type').textContent).toBe('GM Note');
     expect(q('.log-generic-text').textContent).toBe('RUNQ SSE PROBE NOTE');
     expect(q('.log-generic .log-time').textContent).toMatch(/\d{2}:\d{2}:\d{2}/);
     expect(q('.log-generic i.fa-circle-info')).toBeInTheDocument();
@@ -31,7 +31,7 @@ describe('Log generic fallback entries', () => {
     setup(Log, [
       { id: 'g2', type: 'enforcement_denied', origin: 'server-validator', key: 'targetEffects', reason: 'bad write', description: 'Server rejected write to targetEffects: bad write', timestamp: 1700000000000 },
     ]);
-    expect(q('.log-generic-type').textContent).toBe('Enforcement denied');
+    expect(q('.log-generic-type').textContent).toBe('Enforcement Denied');
     expect(q('.log-generic-text').textContent).toBe('Server rejected write to targetEffects: bad write');
   });
 

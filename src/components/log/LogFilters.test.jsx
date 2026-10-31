@@ -120,7 +120,7 @@ describe('Log Roll type sub-facet', () => {
     const options = within(rollSelect).getAllByRole('option');
     expect(options.map(o => o.value)).toEqual(['', 'attack', 'damage', 'save-fireball']);
     expect(options.map(o => o.textContent)).toEqual(
-      ['All roll types', 'Attack', 'Damage', 'Save-fireball']
+      ['All roll types', 'Attack', 'Damage', 'Save Fireball']
     );
     expect(rollSelect).toHaveValue('');
   });

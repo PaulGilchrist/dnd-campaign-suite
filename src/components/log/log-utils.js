@@ -81,7 +81,19 @@ export function getRollTypeOptions(entries) {
   )].sort();
 }
 
-// 'death_save' -> 'Death save'
+// Whole-word initialisms corrected by formatEntryTypeLabel.
+const LABEL_INITIALISMS = { gm: 'GM', ai: 'AI' };
+
+// Shared log type/rollType → display label (generic rows + filter facets).
+// Splits hyphen/underscore-bearing types into words with per-word
+// capitalization, correcting known initialisms:
+// 'gm-note' -> 'GM Note', 'ai_designer' -> 'AI Designer',
+// 'death_save' -> 'Death Save', 'note' -> 'Note'
 export function formatEntryTypeLabel(type) {
-  return type.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+  return String(type)
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map(word => LABEL_INITIALISMS[word.toLowerCase()]
+      || word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }

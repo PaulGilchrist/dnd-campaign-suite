@@ -163,10 +163,24 @@ describe('log-utils filter helpers', () => {
   });
 
   describe('formatEntryTypeLabel', () => {
-    it('humanises snake_case type keys', () => {
-      expect(formatEntryTypeLabel('death_save')).toBe('Death save');
-      expect(formatEntryTypeLabel('long_rest')).toBe('Long rest');
+    it('splits hyphen/underscore types into per-word capitalised labels', () => {
+      expect(formatEntryTypeLabel('gm-note')).toBe('GM Note');
+      expect(formatEntryTypeLabel('hp_change')).toBe('Hp Change');
+      expect(formatEntryTypeLabel('save_result')).toBe('Save Result');
+      expect(formatEntryTypeLabel('death_save')).toBe('Death Save');
+      expect(formatEntryTypeLabel('long_rest')).toBe('Long Rest');
+    });
+
+    it('uppercases known initialism words (GM, AI)', () => {
+      expect(formatEntryTypeLabel('ai_designer')).toBe('AI Designer');
+      expect(formatEntryTypeLabel('ai_dress')).toBe('AI Dress');
+    });
+
+    it('keeps single-word labels byte-identical (regression pins)', () => {
       expect(formatEntryTypeLabel('note')).toBe('Note');
+      expect(formatEntryTypeLabel('roll')).toBe('Roll');
+      expect(formatEntryTypeLabel('automation')).toBe('Automation');
+      expect(formatEntryTypeLabel('unknown')).toBe('Unknown');
     });
   });
 
