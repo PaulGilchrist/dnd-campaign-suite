@@ -2154,3 +2154,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Pitfall — `browser_snapshot` YAML in this MCP build truncates ~11k chars: modal/footer refs past the cut vanish from regexes, mimicking "affordance absent" — DOM probes via `browser_evaluate` are the reliable fallback.
 - Pitfall — Admin "Clear Change Data"/"Clear Campaign Log" confirms double-fire as two SEQUENTIAL dialogs: loop `browser_handle_dialog` accept until "No dialogs within 5000ms", then judge by API (refines §150).
 - Fact — small local oMLX models frequently echo the input entity on refine asks (empty/lazy fields); the app's "model proposed no changes" no-op notice honestly catches this. For live apply-to-form proofs use a directive field-swap instruction ("Change the name field to: X").
+
+## Improve run 2026-11-01 (backlog AQ — drafts-panel-no-live-sync)
+
+- Recipe — deterministic stale-tab rig: `context().newPage()` + `page.route('**/subscribe*', () => {})` (HANG the SSE route, don't abort → zero console errors) reproduces pre-fix staleness so the 409 copy can be proven race-free while live tabs prove the sync.
+- Fact — drafts-panel SSE sync lands ~200ms per hop (server publishes the `<kind>-list-<campaign>` broadcast before the approve response returns); re-fetch-on-broadcast (not echo-payload-apply) sidesteps the skipSync seam entirely.
+- Pitfall — `getByRole('button', { name: 'Approve' })` matches 3+ buttons in the Drafts panel — use `exact: true`.
