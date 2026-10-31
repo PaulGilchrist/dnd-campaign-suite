@@ -104,7 +104,6 @@ function logSaveOutcome(campaignName, config, detail) {
 
 export function createSaveListener(campaignName, config) {
     const promptId = utils.guid();
-    console.debug(`[saveDebug] createSaveListener creating prompt`, { promptId, campaignName, targetName: config.targetName, saveType: config.saveType, saveDc: config.saveDc });
 
     const payload = buildPromptPayload(config);
 

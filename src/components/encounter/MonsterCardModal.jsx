@@ -452,11 +452,6 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     return;
   }
   const fire = () => {
-    console.debug(`[saveDebug] MonsterCardModal.handleSaveRoll`, {
-      monsterName, actionName: spellName || action.name, saveDc: action.save_dc, saveType,
-      target: target ? { name: target.name, type: target.type } : null,
-      creaturesAvailable: Array.isArray(creatures),
-    });
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType, animalSpiritVariant, animalSpiritFortifyHp,

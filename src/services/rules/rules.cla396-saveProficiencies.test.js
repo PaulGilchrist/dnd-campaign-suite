@@ -307,7 +307,6 @@ describe('CLA-396 saveProficiencies not feat-gated', () => {
 
   it('feat-holding character merges feat + subclass grants after applyFeatBuffs — exact order', async () => {
     const mod = await import('../character/featBuffService.js')
-    console.log('[debug] featBuffService keys:', Object.keys(mod), 'hasOnce:', typeof mod.computeAllFeatBuffs?.mockImplementationOnce)
     mod.computeAllFeatBuffs.mockImplementationOnce(() => ({
       abilityScoreIncreases: [],
       proficiencies: [],

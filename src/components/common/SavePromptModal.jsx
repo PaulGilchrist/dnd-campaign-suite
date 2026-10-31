@@ -365,7 +365,6 @@ function appendSavePrompt(prev, event, prefix) {
   const targetName = dataTargetName || event.key.slice(prefix.length) || null;
   const newPrompt = { targetName, attackerName: eventDataAttackerName || sourceAttackerName, ...restData };
 
-  console.debug(`[saveDebug] SavePromptModal.handleEvent SSE prompt received`, { promptId: newPrompt.promptId, targetName: newPrompt.targetName, sourceName: newPrompt.sourceName, saveType: newPrompt.saveType, saveDc: newPrompt.saveDc, keys: Object.keys(newPrompt) });
   return [...prev, newPrompt];
 }
 
