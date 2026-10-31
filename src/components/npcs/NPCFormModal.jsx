@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js';
+import { projectNPCForRefine } from '../../services/npcs/npcFormUtils.js';
 import AvatarImage from '../common/AvatarImage.jsx';
 import AvatarModal from '../common/AvatarModal.jsx';
 import AiRefineButton from '../common/AiRefineButton.jsx';
@@ -36,8 +37,13 @@ function NPCFormFooter({
           <AiRefineButton
             campaignName={campaignName}
             kind="npc"
-            entity={formData}
-            onReplaced={setFormData}
+            entity={projectNPCForRefine(formData)}
+            onReplaced={(replacement) =>
+              // Merge, never replace: the schema-clean proposal carries no
+              // GM-owned image fields or row stamps — a bare setFormData
+              // would drop them and a later Save would wipe the avatar.
+              setFormData((prev) => ({ ...prev, ...replacement }))
+            }
           />
         )}
         {npcHasStatBlock(formData) && onSaveAndAddToInitiative && (

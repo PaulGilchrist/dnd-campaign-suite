@@ -71,6 +71,34 @@ export function cleanNPCData(data) {
   return cleaned;
 }
 
+/**
+ * Project editor state into the AUTHORED-ROW shape for the AI refine lane
+ * (server/services/ai/authoring/entitySchemas.js npcSchema). The CRUD lane
+ * legitimately carries the GM-owned avatar upload fields, but npcSchema is
+ * additionalProperties:false with integer-typed armorClass/hitPoints — so
+ * refine must never send them. Server preflight already strips the
+ * server-owned stamps (id/updatedAt/savedAt/draft); initiativeBonus stays a
+ * STRING (the schema's type for it), so it needs no coercion here.
+ */
+export function projectNPCForRefine(data) {
+  const projected = cleanNPCData(data);
+  for (const field of ['image', 'imageName', 'imagePath']) {
+    delete projected[field];
+  }
+  // cleanNPCData only maps '' → null for HP; the HP input keeps the raw
+  // string the GM typed, so numeric-string → integer coercion happens here.
+  if (typeof projected.hitPoints === 'string') {
+    const parsed = parseInt(projected.hitPoints, 10);
+    if (Number.isNaN(parsed)) {
+      console.error(`[HP] NPC "${projected.name}" has non-numeric HP: ${projected.hitPoints}. Refining without HP.`);
+      projected.hitPoints = null;
+    } else {
+      projected.hitPoints = parsed;
+    }
+  }
+  return projected;
+}
+
 export function getAttitudeStyle(attitude) {
   const colors = ATTITUDE_COLORS[attitude] || ATTITUDE_COLORS.neutral;
   return {
