@@ -122,7 +122,23 @@ export const PROVIDERS = {
         // servers (observed: oMLX) makes them emit chunk arrays instead of
         // the contract object. The prompt pins the shape and the schema
         // validator fails closed — that pairing is the real guarantee.
-        body: ({ model, messages, temperature }) => ({ model, messages, temperature }),
+        // constrained decoding is the OPT-IN upgrade on top: acceptsResponseFormat
+        // lets chat() attempt response_format:{type:'json_schema'} on the
+        // llama.cpp-family servers that honour it, with the probe/fallback
+        // below covering the servers that don't (400 or the oMLX chunk-array
+        // misbehaviour both drop back to this prompt-pinned jsonMode lane).
+        acceptsResponseFormat: true,
+        body: ({ model, messages, temperature, responseSchema, schemaName }) => ({
+            model,
+            messages,
+            temperature,
+            ...(responseSchema ? {
+                response_format: {
+                    type: 'json_schema',
+                    json_schema: { name: schemaName || 'entity', schema: responseSchema },
+                },
+            } : {}),
+        }),
         extract: (data) => data?.choices?.[0]?.message?.content,
     },
     ollama: {
@@ -151,27 +167,49 @@ function shapeFor(endpoint, provider) {
 }
 
 /**
- * chat({ endpoint, model, temperature, messages, provider, jsonMode, timeoutMs })
- *   → assistant content string
- * Throws { code: 'AI_BAD_ENDPOINT' | 'AI_UNAVAILABLE' } — callers fall back.
+ * Constrained-decoding capability is PROBED, never assumed (plan residual
+ * item 3): per endpoint+model we remember whether a response_format attempt
+ * actually produced a usable answer. aiConfig.jsonSchema overrides the
+ * probe — true forces the header (GM swears the backend accepts it), false
+ * never sends it. Unknown endpoints take the optimistic first attempt; both
+ * refusal shapes (HTTP 400/422 and the oMLX chunk-array answer) mark the
+ * endpoint and silently fall back to the jsonMode/prompt lane.
  */
-export async function chat(cfg) {
-    const { endpoint, model, messages } = cfg || {};
-    if (!isLocalEndpoint(endpoint)) throw endpointError(`ai endpoint must be a local http(s) URL, got: ${JSON.stringify(endpoint)}`);
-    if (!Array.isArray(messages) || messages.length === 0) throw new Error('chat requires a non-empty messages array');
+const schemaSupport = new Map(); // `endpoint|model` → true | false
 
-    const shape = shapeFor(endpoint, cfg.provider);
+/** Test seam (and config-reset hygiene): forget every probed capability. */
+export function resetJsonSchemaProbe() { schemaSupport.clear(); }
+
+function isPlainObject(v) {
+    return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function wantResponseFormat(cfg, shape) {
+    if (!shape.acceptsResponseFormat || !isPlainObject(cfg.responseSchema)) return false;
+    if (cfg.jsonSchema === false) return false;
+    if (cfg.jsonSchema === true) return true;
+    return schemaSupport.get(`${cfg.endpoint}|${cfg.model || ''}`) !== false;
+}
+
+function schemaRefusedError(message) {
+    const e = new Error(message);
+    e.code = 'AI_SCHEMA_REFUSED'; // internal — chat() consumes or re-wraps
+    return e;
+}
+
+async function postChat(cfg, shape, responseSchema) {
     const body = shape.body({
-        model: model || '',
-        messages,
+        model: cfg.model || '',
+        messages: cfg.messages,
         temperature: typeof cfg.temperature === 'number' ? cfg.temperature : 0.7,
         jsonMode: cfg.jsonMode !== false, // structured by default (Principle 3)
+        ...(responseSchema ? { responseSchema, schemaName: cfg.schemaName } : {}),
     });
     const timeoutMs = Number.isFinite(cfg.timeoutMs) && cfg.timeoutMs > 0 ? Math.min(cfg.timeoutMs, 300_000) : DEFAULT_TIMEOUT_MS;
 
     let res;
     try {
-        res = await fetch(joinApi(endpoint, shape.chatPath), {
+        res = await fetch(joinApi(cfg.endpoint, shape.chatPath), {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(body),
@@ -180,7 +218,10 @@ export async function chat(cfg) {
     } catch (e) {
         throw unavailableError('local model endpoint unreachable', e);
     }
-    if (!res.ok) throw unavailableError(`local model endpoint returned ${res.status}`);
+    if (!res.ok) {
+        if (responseSchema && (res.status === 400 || res.status === 422)) throw schemaRefusedError(`endpoint rejected response_format (HTTP ${res.status})`);
+        throw unavailableError(`local model endpoint returned ${res.status}`);
+    }
 
     let data;
     try {
@@ -189,8 +230,42 @@ export async function chat(cfg) {
         throw unavailableError('local model endpoint returned non-JSON', e);
     }
     const content = shape.extract(data);
-    if (typeof content !== 'string' || content.trim() === '') throw unavailableError('local model returned empty content');
+    if (typeof content !== 'string' || content.trim() === '') {
+        // A schema attempt that answers with junk (observed: oMLX chunk
+        // arrays) is a CAPABILITY refusal, not an outage — retry plain.
+        if (responseSchema) throw schemaRefusedError('endpoint answered unusably to response_format');
+        throw unavailableError('local model returned empty content');
+    }
     return content;
+}
+
+/**
+ * chat({ endpoint, model, temperature, messages, provider, jsonMode, timeoutMs,
+ *        responseSchema?, schemaName?, jsonSchema? })
+ *   → assistant content string
+ * responseSchema (plain JSON Schema — see authoring/entitySchemas.js, the ONE
+ * source of truth) requests constrained decoding on capable backends; the
+ * probe above guarantees the plain jsonMode lane on every other one.
+ * Throws { code: 'AI_BAD_ENDPOINT' | 'AI_UNAVAILABLE' } — callers fall back.
+ */
+export async function chat(cfg) {
+    const { endpoint, model, messages } = cfg || {};
+    if (!isLocalEndpoint(endpoint)) throw endpointError(`ai endpoint must be a local http(s) URL, got: ${JSON.stringify(endpoint)}`);
+    if (!Array.isArray(messages) || messages.length === 0) throw new Error('chat requires a non-empty messages array');
+
+    const shape = shapeFor(endpoint, cfg.provider);
+    if (wantResponseFormat(cfg, shape)) {
+        const key = `${endpoint}|${model || ''}`;
+        try {
+            const content = await postChat(cfg, shape, cfg.responseSchema);
+            schemaSupport.set(key, true);
+            return content;
+        } catch (e) {
+            if (e.code !== 'AI_SCHEMA_REFUSED') throw e;
+            schemaSupport.set(key, false);
+        }
+    }
+    return postChat(cfg, shape, null);
 }
 
 /** Health probe for the Referee console / status surfaces. */

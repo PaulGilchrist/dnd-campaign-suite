@@ -10,6 +10,7 @@ vi.mock('../services/ai/index.js', () => ({ aiConfigLive: (c) => !!(c && c.mode 
 const designChat = vi.fn(async () => ({ ok: true, reply: 'hi' }));
 const generateBlueprint = vi.fn(async () => ({ ok: true, created: {} }));
 const refineEntity = vi.fn(async () => ({ ok: true, replacement: { name: 'X' } }));
+const dressMapProposal = vi.fn(async () => ({ ok: true, map: 'battle-arena', ops: [], preview: [], updated: {} }));
 vi.mock('../services/ai/authoring/designer.js', () => ({
     designChat: (...a) => designChat(...a),
     proposePlan: vi.fn(async () => ({ ok: true, scope: {} })),
@@ -17,6 +18,9 @@ vi.mock('../services/ai/authoring/designer.js', () => ({
 }));
 vi.mock('../services/ai/authoring/refine.js', () => ({
     refineEntity: (...a) => refineEntity(...a),
+}));
+vi.mock('../services/ai/authoring/dressMap.js', () => ({
+    dressMapProposal: (...a) => dressMapProposal(...a),
 }));
 vi.mock('../services/ai/authoring/designNotes.js', () => ({ loadNotes: () => ({ messages: [], plans: [] }) }));
 
@@ -70,6 +74,26 @@ describe('ai-designer route authority', () => {
         const lan = await request(app).post('/api/campaigns/test-campaign/ai/refine/npc')
             .set('Host', '10.0.0.5').send({ entity: {}, instruction: 'x' });
         expect(lan.status).toBe(403);
+    });
+
+    it('dress routes the map name + instruction to the service, GM + aiConfig gated', async () => {
+        store.set('test-campaign', { aiConfig: { mode: 'suggest', endpoint: 'http://localhost:1234/v1' } });
+        const res = await request(app).post('/api/campaigns/test-campaign/ai/dress/battle-arena')
+            .set('Host', 'localhost').send({ instruction: 'add a trapped chest in the throne room' });
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ ok: true, map: 'battle-arena' });
+        expect(dressMapProposal).toHaveBeenCalledWith(expect.objectContaining({
+            campaign: 'test-campaign', mapName: 'battle-arena', instruction: 'add a trapped chest in the throne room',
+        }));
+
+        const lan = await request(app).post('/api/campaigns/test-campaign/ai/dress/battle-arena')
+            .set('Host', '10.0.0.5').send({ instruction: 'x' });
+        expect(lan.status).toBe(403);
+
+        store.set('test-campaign', { aiConfig: { mode: 'off' } });
+        const off = await request(app).post('/api/campaigns/test-campaign/ai/dress/battle-arena')
+            .set('Host', 'localhost').send({ instruction: 'x' });
+        expect(off.status).toBe(403);
     });
 
     it('generate requires a scope body', async () => {

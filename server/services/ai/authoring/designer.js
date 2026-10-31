@@ -23,11 +23,11 @@ import {
     buildDesignMessages, buildPlanMessages, buildBlueprintMessages,
     buildRepairMessages, buildSingleEntityMessages, KIND_FIELD_RULES,
 } from './designerPrompts.js';
-import { validateEntity, ENTITY_SCHEMAS } from './entitySchemas.js';
+import { validateEntity, resolveSchemaRefs, ENTITY_SCHEMAS } from './entitySchemas.js';
 import { validateAgainstSchema } from './schemaValidator.js';
 import { applyBlueprint, collectBlueprintErrors } from './apply.js';
 
-const chatOpts = (cfg) => ({ endpoint: cfg.endpoint, model: cfg.model, temperature: cfg.temperature, provider: cfg.provider, timeoutMs: cfg.timeoutMs });
+const chatOpts = (cfg) => ({ endpoint: cfg.endpoint, model: cfg.model, temperature: cfg.temperature, provider: cfg.provider, timeoutMs: cfg.timeoutMs, jsonSchema: cfg.jsonSchema });
 
 // Maps scope.plan kind → blueprint list key + apply lane singular.
 const PLAN_KIND = {
@@ -48,8 +48,13 @@ function existingNames(bible) {
     };
 }
 
-async function callJson(chatFn, opts, messages) {
-    const content = await chatFn({ ...opts, messages, jsonMode: true });
+// Constrained decoding fed from the SAME schema objects the validator uses
+// (plan residual item 3); on backends that reject response_format the provider
+// silently stays on the jsonMode/prompt lane.
+const decode = (schemaName, schema) => ({ responseSchema: resolveSchemaRefs(schema), schemaName });
+
+async function callJson(chatFn, opts, messages, decoding) {
+    const content = await chatFn({ ...opts, messages, jsonMode: true, ...(decoding || {}) });
     return extractJsonObject(content);
 }
 
@@ -80,7 +85,7 @@ export async function proposePlan({ campaign, aiConfig, log, chatFn = chat }) {
     for (let attempt = 1; attempt <= 2; attempt++) {
         let result;
         try {
-            result = await callJson(chatFn, chatOpts(aiConfig), messages);
+            result = await callJson(chatFn, chatOpts(aiConfig), messages, decode('build_plan', ENTITY_SCHEMAS.scope));
         } catch (e) {
             lastError = `${e.code || 'ERROR'}: ${String(e.message || e).slice(0, 160)}`;
             continue;
@@ -118,7 +123,10 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
     for (let attempt = 1; attempt <= 2; attempt++) {
         let content;
         try {
-            content = await chatFn({ ...chatOpts(aiConfig), messages: repairMessages, jsonMode: true });
+            content = await chatFn({
+                ...chatOpts(aiConfig), messages: repairMessages, jsonMode: true,
+                ...decode('campaign_blueprint', ENTITY_SCHEMAS.blueprint),
+            });
         } catch (e) {
             lastErrors = [`${e.code || 'ERROR'}: ${String(e.message || e).slice(0, 160)}`];
             continue;
@@ -184,7 +192,7 @@ async function generateOne({ scope, allow, kind, item, siblings, chatFn, aiConfi
         ];
         let result;
         try {
-            result = await callJson(chatFn, chatOpts(aiConfig), attemptMessages);
+            result = await callJson(chatFn, chatOpts(aiConfig), attemptMessages, decode(`draft_${kind}`, ENTITY_SCHEMAS[kind]));
         } catch {
             continue;
         }

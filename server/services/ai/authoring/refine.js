@@ -14,7 +14,7 @@
 import { chat } from '../providers/localProvider.js';
 import { aiConfigLive } from '../index.js';
 import { extractJsonObject } from '../promptBuilder.js';
-import { validateEntity } from './entitySchemas.js';
+import { validateEntity, resolveSchemaRefs, ENTITY_SCHEMAS } from './entitySchemas.js';
 import { buildCampaignContext, validateBlueprintReferences } from './referential.js';
 import { buildStoryBible } from './storyBible.js';
 import { KIND_FIELD_RULES } from './designerPrompts.js';
@@ -65,6 +65,13 @@ export async function refineEntity({ campaign, kind, entity, instruction, aiConf
 
     const bible = buildStoryBible(campaign);
     const messages = buildRefineMessages({ kind, entity: clean, instruction: ask, storyBible: bible });
+    // Constrained decoding where the backend takes it — the SAME row schema
+    // the validator enforces (server-owned fields are forbidden inside it).
+    const decoding = {
+        responseSchema: resolveSchemaRefs(ENTITY_SCHEMAS[kind]),
+        schemaName: `refine_${kind}`,
+        jsonSchema: aiConfig.jsonSchema,
+    };
 
     let lastErrors = ['no attempt made'];
     let repairOf = null;
@@ -80,6 +87,7 @@ export async function refineEntity({ campaign, kind, entity, instruction, aiConf
                 endpoint: aiConfig.endpoint, model: aiConfig.model,
                 temperature: aiConfig.temperature, provider: aiConfig.provider,
                 timeoutMs: aiConfig.timeoutMs, messages: call, jsonMode: true,
+                ...decoding,
             });
         } catch (e) {
             lastErrors = [`${e.code || 'ERROR'}: ${String(e.message || e).slice(0, 160)}`];
@@ -104,7 +112,7 @@ export async function refineEntity({ campaign, kind, entity, instruction, aiConf
 /** Outward refs for a single replacement row, waiving collisions with itself. */
 function checkOutwardRefs(campaign, kind, current, replacement) {
     const key = { faction: 'factions', npc: 'npcs', settlement: 'settlements', quest: 'quests', encounter: 'encounters', session: 'sessions' }[kind];
-    if (!key) return []; // mapPlans refine dresses via the Phase 5 pipeline later
+    if (!key) return []; // mapPlan has no per-row lane — live dressing is dressMap.js's job (residual item 2)
     const ctx = buildCampaignContext(campaign);
     const bp = { scope: { scope: 'bespoke' }, [key]: [replacement] };
     const res = validateBlueprintReferences(bp, ctx);

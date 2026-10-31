@@ -80,4 +80,15 @@ describe('refineEntity — proposal only, validation-gated', () => {
         expect((await refineEntity({ campaign: 'c', kind: 'npc', entity: npc, instruction: '  ', aiConfig: AI, chatFn })).code).toBe('NO_INSTRUCTION');
         expect(chatFn).not.toHaveBeenCalled();
     });
+
+    it('feeds the SAME (ref-resolved, server-fields-forbidding) entity schema to constrained decoding', async () => {
+        const chatFn = vi.fn(async () => JSON.stringify({ name: 'Oldhem', attitude: 'neutral' }));
+        await refineEntity({ campaign: 'c', kind: 'npc', entity: npc, instruction: 'x', aiConfig: { ...AI, jsonSchema: true }, chatFn });
+        const opts = chatFn.mock.calls[0][0];
+        expect(opts.schemaName).toBe('refine_npc');
+        expect(opts.jsonSchema).toBe(true);
+        expect(opts.responseSchema).toMatchObject({ type: 'object', additionalProperties: false });
+        expect(JSON.stringify(opts.responseSchema)).not.toContain('$ref'); // self-contained for grammar compilers
+        expect(JSON.stringify(opts.responseSchema)).not.toMatch(/"id"|"updatedAt"/); // never allow server-owned fields
+    });
 });

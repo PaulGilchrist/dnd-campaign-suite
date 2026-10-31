@@ -11,6 +11,7 @@ import EncounterModal from './EncounterModal.jsx';
 import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
+import AiRefineButton from '../common/AiRefineButton.jsx';
 import { formatEncounterName } from '../../services/encounters/encountersService.js';
 import { addMonstersToInitiative } from '../../services/encounters/encounterToInitiative.js';
 import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounters/encounterGenerator.js';
@@ -153,6 +154,40 @@ function stripMonsters(monsters) {
     name: m.name,
     qty: m.qty || 1,
   }));
+}
+
+// Resolve saved/refined monster refs back into bestiary rows (bestiary-first,
+// ref-fallback) — shared by the load lane and the AI-refine proposal lane so
+// the hydration rule lives in exactly one place.
+function resolveMonsterRefs(refs, monsters) {
+  return (refs || []).map(ref => {
+    const full = (monsters || []).find(m => m.index === ref.index);
+    return full ? { ...full, qty: ref.qty || 1 } : { ...ref, qty: ref.qty || 1 };
+  });
+}
+
+// AI-refine proposal → working-draft state (kept out of the component to stay
+// under the complexity cap — same idiom as EncounterValidationBanner).
+function refinedEncounterToState(replacement, monsters) {
+  return {
+    description: replacement.description || '',
+    selectedMonsters: resolveMonsterRefs(replacement.selectedMonsters, monsters),
+  };
+}
+
+// The refine button belongs to the SAVED-encounter editing surface only — an
+// unnamed draft has no row to refine (server lane: POST .../ai/refine/
+// encounter). Own component so EncounterBuilder keeps its complexity.
+function EncounterAiRefine({ campaignName, encounterName, description, selectedMonsters, onApplied }) {
+  if (!encounterName) return null;
+  return (
+    <AiRefineButton
+      campaignName={campaignName}
+      kind="encounter"
+      entity={{ name: encounterName, description, selectedMonsters: stripMonsters(selectedMonsters) }}
+      onReplaced={onApplied}
+    />
+  );
 }
 
 // Inline validate-with-error banner (empty-draft save gate) — extracted so
@@ -436,13 +471,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
       setDescription(data.description || '');
 
       const monsterRefs = data.selectedMonsters || [];
-       const resolvedMonsters = monsterRefs.map(ref => {
-         const fullMonster = (monsters || []).find(m => m.index === ref.index);
-         if (fullMonster) {
-           return { ...fullMonster, qty: ref.qty || 1 };
-         }
-         return { ...ref, qty: ref.qty || 1 };
-       });
+       const resolvedMonsters = resolveMonsterRefs(monsterRefs, monsters);
 
        setSelectedMonsters(resolvedMonsters);
 
@@ -489,6 +518,18 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
     }
     setSelectedMonsters(monsters);
     };
+
+  // AI refine (campaign-authoring Phase 6 residual): the proposal lands in the
+  // working draft ONLY — nothing persists here. The toolbar Update button
+  // (updateEncounter lane) stays the single path to disk, exactly like the
+  // generator's handleApplySuggestion above. The row keeps its loaded name —
+  // renaming belongs to the rename lane, not a proposal side effect.
+  const handleAiRefineApply = (replacement) => {
+    const next = refinedEncounterToState(replacement, monsters);
+    setDescription(next.description);
+    setSelectedMonsters(next.selectedMonsters);
+    showToast('AI proposal applied — press Update to save');
+  };
 
   const handleReset = () => {
     setEncounterTitle('Encounter Builder');
@@ -629,6 +670,15 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
                  <i className="fa-solid fa-rotate-left" /> Reset
                 </button>
               )}
+              {/* Saved-encounter editing surface only — an unnamed draft has no
+                  row to refine (server lane: POST .../ai/refine/encounter). */}
+              <EncounterAiRefine
+                campaignName={campaignName}
+                encounterName={currentEncounterName}
+                description={description}
+                selectedMonsters={selectedMonsters}
+                onApplied={handleAiRefineApply}
+              />
            </div>
          </div>
 

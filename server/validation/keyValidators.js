@@ -186,6 +186,10 @@ function validateAiConfig(value) {
     }
     if (value.temperature !== undefined && !isTemperature(value.temperature)) return { ok: false, reason: 'aiConfig.temperature must be a number 0..2' };
     if (value.provider !== undefined && !PROVIDERS[value.provider]) return { ok: false, reason: `aiConfig.provider must be one of: ${Object.keys(PROVIDERS).join(', ')}` };
+    // Constrained-decoding override (campaign-authoring residual item 3):
+    // true forces response_format json_schema, false never sends it, absent
+    // lets the provider probe. Only meaningful as an explicit boolean.
+    if (value.jsonSchema !== undefined && typeof value.jsonSchema !== 'boolean') return { ok: false, reason: 'aiConfig.jsonSchema must be a boolean' };
     return { ok: true };
 }
 

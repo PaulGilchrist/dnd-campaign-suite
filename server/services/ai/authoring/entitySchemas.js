@@ -303,6 +303,70 @@ export const mapPlanSchema = {
     },
 };
 
+// -- live-map dressing (AI Dress residual — in-place ops on a LIVE document) --
+
+/**
+ * The map-dressing refine lane never regenerates a map (owner ruling): the
+ * model emits IN-PLACE OPS addressing the live document. move/remove carry
+ * the entity's REAL document id (e.g. `torch-0-2-4`) — a live map has
+ * drifted from whatever the generator once emitted, so generated-index
+ * addressing is banned by construction. There are deliberately NO verbs for
+ * walls, painting, fog/revealed or images: the op set cannot express them.
+ */
+const DOC_ID = { type: 'string', minLength: 1, maxLength: 120 };
+const KEBAB = { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{0,99}$' };
+const CELL = { type: 'integer', minimum: 0, maximum: 200 };
+
+export const liveDressPlanSchema = {
+    type: 'object',
+    required: ['ops'],
+    additionalProperties: false,
+    properties: {
+        ops: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 60,
+            items: {
+                type: 'object',
+                required: ['op', 'target'],
+                additionalProperties: false,
+                properties: {
+                    op: { type: 'string', enum: ['add', 'move', 'remove'] },
+                    // item = placed prop (indoor placedItems lane)
+                    // poi  = labelled point of interest (both map kinds)
+                    // token = monster/npc marker (indoor items[] lane)
+                    target: { type: 'string', enum: ['item', 'poi', 'token'] },
+                    id: DOC_ID,
+                    gridX: CELL,
+                    gridY: CELL,
+                    item: {
+                        type: 'object',
+                        required: ['type'],
+                        additionalProperties: false,
+                        properties: { type: SHORT, name: SHORT },
+                    },
+                    poi: {
+                        type: 'object',
+                        required: ['name'],
+                        additionalProperties: false,
+                        properties: { name: NAME, description: TEXT, targetMap: KEBAB },
+                    },
+                    token: {
+                        type: 'object',
+                        required: ['name'],
+                        additionalProperties: false,
+                        properties: {
+                            name: NAME,
+                            kind: { type: 'string', enum: ['monster', 'npc'] },
+                            fromEncounter: NAME,
+                        },
+                    },
+                },
+            },
+        },
+    },
+};
+
 // -- designer protocol (Phase 4 contract) ------------------------------------
 
 const ENTITY_KINDS = ['faction', 'npc', 'settlement', 'quest', 'encounter', 'session', 'mapPlan'];
@@ -389,4 +453,33 @@ export function validateEntity(kind, row) {
 /** Whole-blueprint shape check (structure only — refs are referential.js's job). */
 export function validateBlueprintShape(blueprint) {
     return validateAgainstSchema(blueprint, blueprintSchema, { schemas: ENTITY_SCHEMAS });
+}
+
+/** Live-dress plan shape (the AI Dress funnel's model-output gate). */
+export function validateLiveDressPlan(plan) {
+    return validateAgainstSchema(plan, liveDressPlanSchema);
+}
+
+/**
+ * Deep-inline the sibling-map `$ref: '#/name'` roots into a SELF-CONTAINED
+ * standard JSON Schema. Our validator resolves those refs against
+ * ENTITY_SCHEMAS at walk time; a backend's grammar compiler cannot — so this
+ * is the bridge that lets constrained decoding feed off the SAME schema
+ * objects as validation (one source of truth, plan residual item 3). Refs are
+ * acyclic by construction (blueprint → scope/entity kinds, kinds never ref
+ * back); a cycle throws as an authoring bug rather than recursing forever.
+ */
+export function resolveSchemaRefs(schema, seen = new Set()) {
+    if (Array.isArray(schema)) return schema.map(part => resolveSchemaRefs(part, seen));
+    if (!schema || typeof schema !== 'object') return schema;
+    if (typeof schema.$ref === 'string') {
+        const name = schema.$ref.replace(/^#\//, '');
+        const target = ENTITY_SCHEMAS[name];
+        if (!target) throw new Error(`schema authoring bug: unresolvable $ref '${schema.$ref}'`);
+        if (seen.has(name)) throw new Error(`schema authoring bug: circular $ref '#/${name}'`);
+        return resolveSchemaRefs(target, new Set([...seen, name]));
+    }
+    const out = {};
+    for (const [key, value] of Object.entries(schema)) out[key] = resolveSchemaRefs(value, seen);
+    return out;
 }

@@ -585,6 +585,8 @@ describe('MapsManager', () => {
             within(row).getByRole('button', { name: 'Rename "Battle Arena"' });
             const desc = within(row).getByRole('button', { name: 'Edit description for "Battle Arena"' });
             const del = within(row).getByRole('button', { name: 'Delete "Battle Arena"' });
+            // AI Dress (campaign-authoring residual item 2) — same naming lane.
+            within(row).getByRole('button', { name: 'Dress "Battle Arena" with AI' });
             // Sibling consistency (2026-10-25 tooltip-discoverability walk): the pen
             // button carries the same visible word label as Open/Rename/Delete — a
             // hover-only title is not enough for players. title + aria-label remain

@@ -5,6 +5,7 @@ import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import GenerateDungeonModal from './GenerateDungeonModal.jsx';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
+import AiDressButton from './AiDressButton.jsx';
 import './MapsManager.css';
 import DraftFlag from '../common/DraftFlag.jsx';
 
@@ -399,6 +400,10 @@ function MapsManager({ campaignName, onOpenMap }) {
                                 {!map.isActive && <button onClick={() => handleActivate(map.fileName)} aria-label={`Activate "${map.name}"`}>Activate</button>}
                                 <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
                                 <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>
+                                {/* AI Dress (campaign-authoring residual item 2): in-place op
+                                    proposal on the live document — preview first, GM Apply is
+                                    the only write, through the normal map save lane. */}
+                                <AiDressButton campaignName={campaignName} map={map} />
                                 <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)} aria-label={`Delete "${map.name}"`}>Delete</button>
                             </div>
                         </li>

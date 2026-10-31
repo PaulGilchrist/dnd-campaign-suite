@@ -17,6 +17,7 @@ import { addEntry } from './log.js';
 import { aiConfigLive } from '../services/ai/index.js';
 import { designChat, proposePlan, generateBlueprint } from '../services/ai/authoring/designer.js';
 import { refineEntity } from '../services/ai/authoring/refine.js';
+import { dressMapProposal } from '../services/ai/authoring/dressMap.js';
 import { loadNotes } from '../services/ai/authoring/designNotes.js';
 
 const router = express.Router();
@@ -98,6 +99,22 @@ router.post('/api/campaigns/:campaign/ai/refine/:kind', async (req, res) => {
     } catch (e) {
         console.error('[ai-designer:refine]', e);
         res.status(500).json({ error: 'ai refine failed' });
+    }
+});
+
+// AI Dress (campaign-authoring residual item 2): PROPOSAL ONLY — in-place ops
+// on the live map document, returned pre-validated for the GM's preview.
+// Nothing is written here; the client saves through the normal map PUT lane.
+router.post('/api/campaigns/:campaign/ai/dress/:mapname', async (req, res) => {
+    try {
+        const cfg = gate(req, res);
+        if (!cfg) return;
+        const instruction = typeof req.body?.instruction === 'string' ? req.body.instruction : '';
+        const result = await dressMapProposal({ campaign: req.params.campaign, mapName: req.params.mapname, instruction, aiConfig: cfg, log: addEntry });
+        res.json(result);
+    } catch (e) {
+        console.error('[ai-designer:dress]', e);
+        res.status(500).json({ error: 'ai map dress failed' });
     }
 });
 

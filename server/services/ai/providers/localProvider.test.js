@@ -1,10 +1,11 @@
 // L5 Phase 3 — local provider tests (fetch stubbed; D3 privacy contract live here).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { chat, probe, isLocalEndpoint, resolveApiKey, inferProvider } from './localProvider.js';
+import { chat, probe, isLocalEndpoint, resolveApiKey, inferProvider, resetJsonSchemaProbe } from './localProvider.js';
 
 afterEach(() => {
     vi.unstubAllGlobals();
     vi.clearAllMocks();
+    resetJsonSchemaProbe(); // capability probe cache is module state — isolate legs
 });
 
 const cfg = { endpoint: 'http://localhost:11434', model: 'llama3.1:8b', temperature: 0.7 };
@@ -152,5 +153,82 @@ describe('inferProvider — different people, different local servers', () => {
         expect(inferProvider('http://localhost:8000/v1', 'ollama')).toBe('ollama');
         expect(inferProvider('http://localhost:11434', 'openai')).toBe('openai');
         expect(inferProvider('http://localhost:8000/v1', 'bogus')).toBe('openai');
+    });
+});
+
+// Campaign-authoring residual item 3 — response_format json_schema
+// pass-through, PROBED per endpoint+model, silent fallback to the jsonMode/
+// prompt lane on backends that refuse or misbehave.
+describe('constrained decoding (response_format json_schema)', () => {
+    const openai = { endpoint: 'http://localhost:8000/v1', provider: 'openai', model: 'qwen' };
+    const schema = { type: 'object', required: ['name'], properties: { name: { type: 'string' } } };
+    const good = { choices: [{ message: { content: '{"name":"x"}' } }] };
+
+    function stubSchemaSensitive({ refuseWith, junkAnswer = false } = {}) {
+        const bodies = [];
+        vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+            const body = JSON.parse(init.body);
+            bodies.push(body);
+            if (body.response_format) {
+                if (refuseWith) return { ok: false, status: refuseWith, json: async () => ({}) };
+                if (junkAnswer) return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: ['chunk', 'array'] } }] }) };
+                return { ok: true, status: 200, json: async () => good };
+            }
+            return { ok: true, status: 200, json: async () => good };
+        }));
+        return bodies;
+    }
+
+    it('aiConfig.jsonSchema=true forces the header with the fed schema verbatim', async () => {
+        const bodies = stubSchemaSensitive();
+        const out = await chat({ ...openai, messages: msgs, responseSchema: schema, schemaName: 'npc', jsonSchema: true });
+        expect(out).toContain('name');
+        expect(bodies[0].response_format).toEqual({ type: 'json_schema', json_schema: { name: 'npc', schema } });
+    });
+
+    it('aiConfig.jsonSchema=false never sends it, even with a schema available', async () => {
+        const bodies = stubSchemaSensitive();
+        await chat({ ...openai, messages: msgs, responseSchema: schema, jsonSchema: false });
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0].response_format).toBeUndefined();
+    });
+
+    it('unknown backends probe once: a 400 refusal retries plain and is cached (later calls skip the probe)', async () => {
+        const bodies = stubSchemaSensitive({ refuseWith: 400 });
+        expect(await chat({ ...openai, messages: msgs, responseSchema: schema })).toContain('name');
+        expect(bodies).toHaveLength(2);
+        expect(bodies[0].response_format).toBeDefined();
+        expect(bodies[1].response_format).toBeUndefined(); // silent jsonMode fallback
+
+        await chat({ ...openai, messages: msgs, responseSchema: schema });
+        expect(bodies).toHaveLength(3);
+        expect(bodies[2].response_format).toBeUndefined(); // probed, not assumed
+    });
+
+    it('the oMLX chunk-array answer counts as a refusal, not an outage', async () => {
+        const bodies = stubSchemaSensitive({ junkAnswer: true });
+        expect(await chat({ ...openai, messages: msgs, responseSchema: schema })).toContain('name');
+        expect(bodies).toHaveLength(2);
+        expect(bodies[1].response_format).toBeUndefined();
+    });
+
+    it('a capable backend caches the hit and keeps using constrained decoding', async () => {
+        const bodies = stubSchemaSensitive();
+        await chat({ ...openai, messages: msgs, responseSchema: schema });
+        await chat({ ...openai, messages: msgs, responseSchema: schema });
+        expect(bodies).toHaveLength(2);
+        expect(bodies.every(b => b.response_format)).toBe(true);
+    });
+
+    it('the ollama dialect never receives response_format', async () => {
+        const stub = stubFetch({ json: { message: { content: 'ok' } } });
+        await chat({ endpoint: 'http://localhost:11434', model: 'llama', messages: msgs, responseSchema: schema });
+        expect(JSON.parse(stub.mock.calls[0][1].body).response_format).toBeUndefined();
+    });
+
+    it('endpoint errors still surface honestly (only refusal shapes fall back)', async () => {
+        stubFetch({ ok: false, status: 500 });
+        await expect(chat({ ...openai, messages: msgs, responseSchema: schema }))
+            .rejects.toMatchObject({ code: 'AI_UNAVAILABLE' });
     });
 });
