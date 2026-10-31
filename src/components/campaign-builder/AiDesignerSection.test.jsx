@@ -67,6 +67,13 @@ describe('AiDesignerSection', () => {
         expect(dupKeyCall).toBeUndefined();
     });
 
+    it('gives the composer a ≥4-row textarea so long briefs stay readable', async () => {
+        render(<AiDesignerSection campaignName="c" />);
+        const box = await screen.findByPlaceholderText('What are we building?');
+        expect(box.tagName).toBe('TEXTAREA');
+        expect(box.rows).toBeGreaterThanOrEqual(4);
+    });
+
     it('proposes a plan, GM edits a count, generation lands as drafts', async () => {
         api.designerPlan.mockResolvedValue({
             ok: true,

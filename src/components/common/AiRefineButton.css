@@ -1,18 +1,9 @@
-/* AiRefineButton (campaign-authoring Phase 6) — component-scoped. */
-
-.ai-refine-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.ai-refine-row input[type='text'] {
-  flex: 1 1 200px;
-}
+/* AiRefineButton (campaign-authoring Phase 6) — component-scoped. The
+   instruction surface itself moved into the shared AiInstructionModal shell
+   (backlog ai-instruction-inputs-undersized); only the outcome strips remain
+   here. */
 
 .ai-refine-error {
-  flex-basis: 100%;
   margin: 0;
   color: var(--color-text);
   background: var(--background-color-error);
@@ -22,10 +13,9 @@
   font-size: 0.8rem;
 }
 
-/* No-op refine success (backlog refine-no-op-silent) — same inline-strip
-   vocabulary as .ai-refine-error, honest neutral warning tokens. */
+/* No-op refine success (backlog refine-no-op-silent) — same strip vocabulary
+   as .ai-refine-error, honest neutral warning tokens. */
 .ai-refine-notice {
-  flex-basis: 100%;
   margin: 0;
   color: var(--color-text);
   background: var(--background-color-warning);

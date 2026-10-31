@@ -120,7 +120,7 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
         <div className="ai-console">
             <textarea
                 className="ai-action-input"
-                rows={2}
+                rows={5}
                 placeholder="Describe what a player does… e.g. 'I cast Fire Bolt at Goblin 1 from the doorway'"
                 value={action}
                 onChange={(e) => setAction(e.target.value)}

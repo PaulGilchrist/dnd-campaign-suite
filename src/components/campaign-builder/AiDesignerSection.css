@@ -41,8 +41,11 @@
   margin-bottom: 0.5rem;
 }
 
+/* Backlog ai-instruction-inputs-undersized: a conversation needs room — the
+   thread scrolls comfortably (never below 480px, 60% of the viewport when
+   taller) instead of the old 320px window. */
 .ai-designer-thread {
-  max-height: 320px;
+  max-height: max(480px, 60vh);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -86,9 +89,29 @@
   flex-wrap: wrap;
 }
 
+/* The composer grows with the message up to a cap, so long instructions stay
+   readable instead of collapsing into one visual line (field-sizing mirrors
+   the Initiative.css hp-inline-input precedent; rows=4 is the floor and the
+   fallback for unsupported browsers). */
 .ai-designer-composer textarea {
   flex: 1 1 240px;
-  resize: vertical;
+  background: var(--background-color-input);
+  color: var(--color-text);
+  border: 1px solid var(--border-color-input);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  min-height: calc(4 * 1.5em + 18px);
+  max-height: 260px;
+  field-sizing: content;
+  overflow-y: auto;
+  resize: none;
+}
+
+.ai-designer-composer textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .ai-designer-plan {

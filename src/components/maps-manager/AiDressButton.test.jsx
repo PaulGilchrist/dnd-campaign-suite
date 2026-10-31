@@ -91,6 +91,19 @@ describe('AiDressButton', () => {
         expect(screen.getByText('add chest at 12,8')).toBeInTheDocument(); // retry stays possible
     });
 
+    // Backlog ai-instruction-inputs-undersized: the row became a modal.
+    it('opens a dialog with a ≥4-row instruction textarea, dismissable via Escape', async () => {
+        render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+        fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+        const dialog = screen.getByRole('dialog', { name: /ai dress/i });
+        const box = screen.getByPlaceholderText(/how should this map change/i);
+        expect(dialog.contains(box)).toBe(true);
+        expect(box.tagName).toBe('TEXTAREA');
+        expect(box.rows).toBeGreaterThanOrEqual(4);
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(screen.queryByPlaceholderText(/how should this map change/i)).toBeNull();
+    });
+
     it('cancel clears the prompt and every proposal state', async () => {
         render(<AiDressButton campaignName="test-campaign" map={MAP} />);
         await askForProposal();

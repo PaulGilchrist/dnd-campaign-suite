@@ -37,10 +37,28 @@
 .ai-referee-section .ai-model-error { color: #d29922; font-size: 0.7rem; }
 
 .ai-referee-section .ai-console { margin-top: 0.75rem; }
+/* Backlog ai-instruction-inputs-undersized: 5 visible rows as the floor,
+   grows with the description up to a cap (internal scroll), and themed with
+   the input tokens instead of the white UA default. */
 .ai-referee-section .ai-action-input {
     width: 100%;
     box-sizing: border-box;
+    background: var(--background-color-input);
+    color: var(--color-text);
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    min-height: calc(5 * 1.5em + 18px);
+    max-height: 16em;
+    field-sizing: content;
+    overflow-y: auto;
     resize: vertical;
+}
+.ai-referee-section .ai-action-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
 }
 .ai-referee-section .ai-console-row {
     display: flex;

@@ -94,6 +94,26 @@ describe('AiRefineButton', () => {
         expect(screen.getByRole('button', { name: /refine with AI/i })).toBeTruthy();
     });
 
+    // Backlog ai-instruction-inputs-undersized: the row became a modal.
+    it('opens a dialog whose instruction surface is a ≥4-row textarea, closed by × or Escape (backdrop inert)', () => {
+        render(<AiRefineButton campaignName="c" kind="npc" entity={{ name: 'X' }} onReplaced={vi.fn()} />);
+        fireEvent.click(screen.getByRole('button', { name: /refine with AI/i }));
+        const dialog = screen.getByRole('dialog', { name: /refine npc with ai/i });
+        const box = screen.getByPlaceholderText(/what should change/i);
+        expect(dialog.contains(box)).toBe(true);
+        expect(box.tagName).toBe('TEXTAREA');
+        expect(box.rows).toBeGreaterThanOrEqual(4);
+        // Backdrop click is inert (house modal canon).
+        fireEvent.click(document.querySelector('.ai-instruction-overlay'));
+        expect(screen.getByPlaceholderText(/what should change/i)).toBeTruthy();
+        // Escape and the named × both dismiss.
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(screen.queryByPlaceholderText(/what should change/i)).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: /refine with AI/i }));
+        fireEvent.click(screen.getByRole('button', { name: /close ai refine/i }));
+        expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
     it('treats a proposal that drops a filled-in field as a change, not an echo', async () => {
         const onReplaced = vi.fn();
         render(<AiRefineButton campaignName="c" kind="quest" entity={{ id: 'q1', name: 'Lost Artifact', rewards: '500gp' }} onReplaced={onReplaced} />);

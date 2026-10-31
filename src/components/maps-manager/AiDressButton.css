@@ -1,23 +1,12 @@
-/* AiDressButton (campaign-authoring residual item 2) — component-scoped,
-   mirrors the .ai-refine-row conventions from AiRefineButton.css. */
-
-.ai-dress-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  flex-basis: 100%;
-}
-
-.ai-dress-row input[type='text'] {
-  flex: 1 1 220px;
-}
+/* AiDressButton (campaign-authoring residual item 2) — component-scoped.
+   The ask/preview surface moved into the shared AiInstructionModal shell
+   (backlog ai-instruction-inputs-undersized); the readable op-preview list
+   and the error strip stay here. */
 
 .ai-dress-preview {
-  flex-basis: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .ai-dress-preview-title {
@@ -34,7 +23,6 @@
 }
 
 .ai-dress-error {
-  flex-basis: 100%;
   margin: 0;
   color: var(--color-text);
   background: var(--background-color-error);

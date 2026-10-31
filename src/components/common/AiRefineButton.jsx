@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { isEqual } from 'lodash';
 import { refineEntity } from '../../services/ai/aiClient.js';
+import AiInstructionModal from './AiInstructionModal.jsx';
 import './AiRefineButton.css';
 
 // Server-owned stamps never round-trip in a proposal — the same strip the
@@ -9,10 +10,11 @@ const SERVER_OWNED_KEYS = ['id', 'updatedAt', 'savedAt', 'draft'];
 
 /**
  * Backlog refine-no-op-silent: a success whose replacement echoes the input
- * must not close the row looking like an applied change. No-change holds when
- * every field the proposal offers back matches the current input AND the
- * proposal doesn't drop a field the GM actually filled in (that WOULD alter
- * the form via setFormData). Server-owned keys and empty inputs are exempt.
+ * must not close the prompt looking like an applied change. No-change holds
+ * when every field the proposal offers back matches the current input AND
+ * the proposal doesn't drop a field the GM actually filled in (that WOULD
+ * alter the form via setFormData). Server-owned keys and empty inputs are
+ * exempt.
  */
 function proposedNoChange(entity, replacement) {
   if (!replacement || typeof replacement !== 'object') return false;
@@ -30,6 +32,13 @@ function proposedNoChange(entity, replacement) {
  * CALLER drops into its editor form. Nothing is saved here: the GM still
  * presses the editor's own save, so the normal lane (stamps, 409 guards,
  * broadcasts) stays the only path to disk.
+ *
+ * Backlog ai-instruction-inputs-undersized (owner ruling): the instruction
+ * surface is a small modal with a 4-row auto-growing textarea — long asks
+ * stay readable, and the old single-line row no longer crowds the host
+ * editor's footer. All lanes are unchanged: apply-to-form, the no-change
+ * notice (modal stays open with the hint), the error strip, and the
+ * non-dismissible-while-busy × (aria-label "Close AI refine").
  */
 function AiRefineButton({ campaignName, kind, entity, onReplaced }) {
   const [open, setOpen] = useState(false);
@@ -49,7 +58,7 @@ function AiRefineButton({ campaignName, kind, entity, onReplaced }) {
     const res = await refineEntity({ campaignName, kind, entity, instruction: text });
     setBusy(false);
     if (res.ok && proposedNoChange(entity, res.replacement)) {
-      // Echo: keep the row open with an honest hint — nothing was applied,
+      // Echo: keep the modal open with an honest hint — nothing was applied,
       // so the caller's applied-success affordances must NOT fire.
       setNotice('The model proposed no changes — the form is unchanged.');
       setInstruction('');
@@ -72,25 +81,30 @@ function AiRefineButton({ campaignName, kind, entity, onReplaced }) {
   }
 
   return (
-    <div className="ai-refine-row">
-      <input
-        type="text"
-        autoFocus
-        placeholder="What should change? e.g. “make him a reluctant cult spy”"
-        value={instruction}
-        disabled={busy}
-        onChange={(e) => setInstruction(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') ask(); }}
-      />
-      <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !instruction.trim()} onClick={ask}>
-        <i className="fa-solid fa-wand-magic-sparkles" /> {busy ? 'Thinking…' : 'Apply to form'}
-      </button>
-      <button type="button" className="ct-btn" disabled={busy} aria-label="Close AI refine" onClick={close}>
-        <i className="fa-solid fa-times" />
-      </button>
+    <AiInstructionModal title={`Refine ${kind} with AI`} closeLabel="Close AI refine"
+      busy={busy} onClose={close}>
+      <label className="ai-instruction-field">
+        Instruction
+        <textarea
+          className="ai-instruction-input"
+          rows="4"
+          autoFocus
+          placeholder="What should change? e.g. “make him a reluctant cult spy — he keeps a ledger of the offerings”"
+          value={instruction}
+          disabled={busy}
+          onChange={(e) => setInstruction(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) ask(); }}
+        />
+      </label>
+      <p className="ai-instruction-hint">⌘/Ctrl+Enter applies the proposal to the form — nothing is saved until you press the editor’s Save.</p>
       {error && <p className="ai-refine-error" role="alert">{error}</p>}
       {notice && <p className="ai-refine-notice" role="status">{notice}</p>}
-    </div>
+      <div className="ai-instruction-actions">
+        <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !instruction.trim()} onClick={ask}>
+          <i className="fa-solid fa-wand-magic-sparkles" /> {busy ? 'Thinking…' : 'Apply to form'}
+        </button>
+      </div>
+    </AiInstructionModal>
   );
 }
 

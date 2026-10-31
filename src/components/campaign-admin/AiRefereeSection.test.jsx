@@ -119,6 +119,10 @@ describe('AiRefereeSection — gating (L1–4 parity)', () => {
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         await waitFor(() => expect(screen.getByText(/· suggest/)).toBeInTheDocument()); // settle status fetch
         const box = screen.getByPlaceholderText(/Describe what a player does/);
+        // Backlog ai-instruction-inputs-undersized: the describe box is a
+        // full conversational surface, not a two-line strip.
+        expect(box.tagName).toBe('TEXTAREA');
+        expect(box.rows).toBeGreaterThanOrEqual(4);
         expect(askButton()).toBeDisabled();
         fireEvent.change(box, { target: { value: '   ' } });
         expect(askButton()).toBeDisabled();

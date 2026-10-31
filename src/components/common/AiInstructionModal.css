@@ -1,0 +1,149 @@
+/* AiInstructionModal — shared shell for the AI refine/dress instruction
+   surfaces. Token mirror of `.ct-modal` (App.css) so the chrome matches the
+   CRUD editors, but un-scoped so it also renders on the faces that live
+   outside `.ct-container` (EncounterBuilder refine, MapsManager dress rows). */
+
+.ai-instruction-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* Host editor modals sit at 1000 — this opens ON TOP of them by design. */
+  z-index: 1100;
+}
+
+.ai-instruction-modal {
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 560px;
+  max-width: 92vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.ai-instruction-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-instruction-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.ai-instruction-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.ai-instruction-close:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.ai-instruction-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Instruction textarea — sized for real conversation (backlog
+   ai-instruction-inputs-undersized): 4 visible rows as the floor, grows with
+   typed/pasted content via field-sizing (precedent: Initiative.css
+   .hp-inline-input), capped so long text scrolls INSIDE the box. Unsupported
+   browsers keep the rows attribute height. */
+.ai-instruction-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.ai-instruction-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--background-color-input);
+  color: var(--color-text);
+  border: 1px solid var(--border-color-input);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  field-sizing: content;
+  min-height: calc(4 * 1.5em + 18px);
+  max-height: 420px;
+  overflow-y: auto;
+  resize: vertical;
+}
+
+.ai-instruction-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.ai-instruction-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.ai-instruction-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ct-btn look for faces outside .ct-container (token-identical to App.css,
+   so inside the CRUD editors both rules agree). */
+.ai-instruction-modal .ct-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 0.88rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--background-color-button-secondary);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ai-instruction-modal .ct-btn:hover:not(:disabled) {
+  background: var(--background-color-button-secondary-hover);
+}
+
+.ai-instruction-modal .ct-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-instruction-modal .ct-btn-primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+}
+
+.ai-instruction-modal .ct-btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}

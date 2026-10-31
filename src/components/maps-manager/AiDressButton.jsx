@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { dressMapProposal } from '../../services/ai/aiClient.js';
 import { saveMapData } from '../../services/maps/mapsService.js';
 import { addEntry } from '../../services/ui/logService.js';
+import AiInstructionModal from '../common/AiInstructionModal.jsx';
 import './AiDressButton.css';
 
 /**
@@ -12,6 +13,12 @@ import './AiDressButton.css';
  * map PUT lane (draft maps keep their draft flag). Walls, paint, fog and
  * image layers are untouchable — the op set has no verbs for them. Nothing
  * reaches disk without this button's second click.
+ *
+ * Backlog ai-instruction-inputs-undersized (owner ruling): the ask and its
+ * preview now live in a small modal with a 4-row auto-growing textarea sized
+ * for the server's 2000-char instruction, instead of a 22px-high single-line
+ * input wedged into the list row. Propose→preview→Apply, the busy lane and
+ * the error strip are unchanged.
  */
 function failureText(res) {
   return (res.errors || [res.error || res.code || 'dress failed']).join(' · ');
@@ -20,18 +27,25 @@ function failureText(res) {
 function AiDressAsk({ instruction, setInstruction, busy, onAsk }) {
   return (
     <>
-      <input
-        type="text"
-        autoFocus
-        placeholder="How should this map change? e.g. “add a trapped chest guarding the throne room”"
-        value={instruction}
-        disabled={busy}
-        onChange={(e) => setInstruction(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') onAsk(); }}
-      />
-      <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !instruction.trim()} onClick={onAsk}>
-        <i className="fa-solid fa-wand-magic-sparkles" /> {busy ? 'Thinking…' : 'Dress map'}
-      </button>
+      <label className="ai-instruction-field">
+        Instruction
+        <textarea
+          className="ai-instruction-input"
+          rows="4"
+          autoFocus
+          placeholder="How should this map change? e.g. “add a trapped chest guarding the throne room, then line the gallery with banners”"
+          value={instruction}
+          disabled={busy}
+          onChange={(e) => setInstruction(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onAsk(); }}
+        />
+      </label>
+      <p className="ai-instruction-hint">⌘/Ctrl+Enter proposes — nothing saves until you preview and Apply.</p>
+      <div className="ai-instruction-actions">
+        <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !instruction.trim()} onClick={onAsk}>
+          <i className="fa-solid fa-wand-magic-sparkles" /> {busy ? 'Thinking…' : 'Dress map'}
+        </button>
+      </div>
     </>
   );
 }
@@ -43,9 +57,11 @@ function AiDressPreview({ proposal, busy, onApply }) {
       <ul>
         {proposal.preview.map((line, i) => <li key={`${i}-${line}`}>{line}</li>)}
       </ul>
-      <button type="button" className="ct-btn ct-btn-primary" disabled={busy} onClick={onApply}>
-        <i className="fa-solid fa-floppy-disk" /> {busy ? 'Saving…' : 'Apply to map'}
-      </button>
+      <div className="ai-instruction-actions">
+        <button type="button" className="ct-btn ct-btn-primary" disabled={busy} onClick={onApply}>
+          <i className="fa-solid fa-floppy-disk" /> {busy ? 'Saving…' : 'Apply to map'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -99,15 +115,13 @@ function AiDressButton({ campaignName, map }) {
   }
 
   return (
-    <div className="ai-dress-row">
+    <AiInstructionModal title={`AI Dress — “${map.name}”`} closeLabel="Close AI dress"
+      busy={busy} onClose={close}>
       {proposal
         ? <AiDressPreview proposal={proposal} busy={busy} onApply={apply} />
         : <AiDressAsk instruction={instruction} setInstruction={setInstruction} busy={busy} onAsk={ask} />}
-      <button type="button" className="ct-btn" disabled={busy} aria-label="Close AI dress" onClick={close}>
-        <i className="fa-solid fa-times" />
-      </button>
       {error && <p className="ai-dress-error" role="alert">{error}</p>}
-    </div>
+    </AiInstructionModal>
   );
 }
 

@@ -227,7 +227,8 @@ function AiDesignerSection({ campaignName, onGenerated }) {
           </div>
           <div className="ai-designer-composer">
             <textarea
-              rows="2"
+              className="ai-designer-composer-input"
+              rows="4"
               value={draft}
               placeholder="What are we building?"
               onChange={(e) => setDraft(e.target.value)}
