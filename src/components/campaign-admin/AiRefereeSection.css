@@ -1,10 +1,24 @@
 /* L5-005 — AI Referee console (scoped to .ai-referee-section). */
 .ai-referee-section .ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
     font-size: 0.75rem;
     margin-left: 0.5rem;
     padding: 2px 8px;
     border-radius: 10px;
     vertical-align: middle;
+    text-transform: none; /* section h3s are uppercase; model ids/modes keep their own casing */
+}
+/* Long model ids ellipsize instead of printing a full-width caps run;
+   the title attribute carries the full id. */
+.ai-referee-section .ai-badge-model {
+    min-width: 0;
+    max-width: 20ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .ai-referee-section .ai-badge--on { background: rgba(46, 160, 67, 0.18); color: #3fb950; }
 .ai-referee-section .ai-badge--off { background: rgba(139, 148, 158, 0.18); color: #8b949e; }
@@ -20,13 +34,62 @@
 .ai-referee-section .ai-config-row label {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    font-size: 0.8rem;
+    gap: 3px;
+    font-size: 0.85rem;
 }
-.ai-referee-section .ai-config-row input[type="text"],
-.ai-referee-section .ai-config-row select {
+/* One dark field family across the console — the config line, the referee
+   picker and the world-keeper line (AiWorldConsole only ever renders inside
+   .ai-referee-section). Same tokens as the global .ct-input/.ct-select in
+   App.css, so inputs and selects read as one family on both themes. */
+.ai-referee-section .ai-config-row input,
+.ai-referee-section .ai-config-row select,
+.ai-referee-section .ai-console-row select,
+.ai-referee-section .ai-world-row input,
+.ai-referee-section .ai-world-row select {
     min-width: 180px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    background: var(--background-color-input);
+    color: var(--color-text);
+    box-sizing: border-box;
+    transition: border-color 0.2s;
 }
+.ai-referee-section .ai-config-row input:focus,
+.ai-referee-section .ai-console-row select:focus,
+.ai-referee-section .ai-world-row input:focus,
+.ai-referee-section .ai-world-row select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+.ai-referee-section .ai-config-row input::placeholder,
+.ai-referee-section .ai-world-row input::placeholder {
+    color: var(--color-text-secondary);
+    opacity: 1;
+}
+
+/* API-key block — its own comfortable line under the main controls
+   (flex-basis 100%), readable label, input that grows to a usable width,
+   Clear/Save button aligned with it. */
+.ai-referee-section .ai-key-field {
+    flex: 1 1 100%;
+    gap: 4px;
+}
+.ai-referee-section .ai-key-input {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+.ai-referee-section .ai-key-input input[type="password"] {
+    flex: 1 1 240px;
+    min-width: 0;
+    max-width: 420px;
+}
+.ai-referee-section .ai-key-set { color: var(--color-success); font-style: normal; }
+.ai-referee-section .ai-key-none { color: var(--color-text-secondary); font-style: normal; }
+.ai-referee-section .ai-key-note { color: var(--color-text-secondary); font-size: 0.85rem; }
 
 /* Model picker — dropdown + re-query button once the endpoint answers. */
 .ai-referee-section .ai-model-picker {
@@ -62,7 +125,7 @@
 }
 .ai-referee-section .ai-console-row {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
     align-items: center;
     margin-top: 0.5rem;
 }

@@ -7,10 +7,25 @@ import { fetchAiModels } from '../../services/ai/aiClient.js'
 export function AiStatusBadge({ status }) {
     if (!status) return <span className="ai-badge ai-badge--off">checking…</span>
     if (!status.configured) return <span className="ai-badge ai-badge--off">not configured</span>
+    // The model id lives in its own span so long ids ellipsize (CSS) instead
+    // of running full-width across the header — title keeps the full id.
+    // The " · mode" tail stays direct text of the badge for test pinning.
     if (status.reachable?.reachable) {
-        return <span className="ai-badge ai-badge--on"><i className="fas fa-plug"></i> {status.model} · {status.mode}</span>
+        return (
+            <span className="ai-badge ai-badge--on">
+                <i className="fas fa-plug"></i>
+                <span className="ai-badge-model" title={status.model}>{status.model}</span>
+                {`· ${status.mode}`}
+            </span>
+        )
     }
-    return <span className="ai-badge ai-badge--down"><i className="fas fa-plug"></i> {status.model} · endpoint down</span>
+    return (
+        <span className="ai-badge ai-badge--down">
+            <i className="fas fa-plug"></i>
+            <span className="ai-badge-model" title={status.model}>{status.model}</span>
+            {'· endpoint down'}
+        </span>
+    )
 }
 
 export default function AiConfigRow({ aiConfig, onSave, onRemove, isLocalhost = true }) {
@@ -77,7 +92,6 @@ export default function AiConfigRow({ aiConfig, onSave, onRemove, isLocalhost = 
                         <ModelField models={models} model={model} onError={setModelError} onChange={setModel} onRefresh={() => setRefreshTick((t) => t + 1)} />
                         {modelError && <em className="ai-model-error">{modelError}</em>}
                     </label>
-                    <ApiKeyField isLocalhost={isLocalhost} />
                 </>
             )}
             <button
@@ -87,6 +101,8 @@ export default function AiConfigRow({ aiConfig, onSave, onRemove, isLocalhost = 
             >
                 <i className="fas fa-save"></i> {mode === 'off' ? 'Turn AI off' : 'Save AI config'}
             </button>
+            {/* Sits on its own comfortable line under the main controls. */}
+            {mode !== 'off' && <ApiKeyField isLocalhost={isLocalhost} />}
         </div>
     )
 }
@@ -160,7 +176,7 @@ function ApiKeyField({ isLocalhost }) {
 
     if (!isLocalhost) return null
     return (
-        <label title="Optional — stored server-side only (never sent to other players)">
+        <label className="ai-key-field" title="Optional — stored server-side only (never sent to other players)">
             <span>API key {status?.set ? <em className="ai-key-set">set {status.hint}</em> : <em className="ai-key-none">none</em>}</span>
             <span className="ai-key-input">
                 <input type="password" value={value} onChange={(e) => setValue(e.target.value)} placeholder="optional bearer token" autoComplete="off" />

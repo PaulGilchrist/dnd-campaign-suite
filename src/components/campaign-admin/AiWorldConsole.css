@@ -1,19 +1,21 @@
 /* L5-006 §9.4 — World keeper console (scoped to .ai-world-console). */
 .ai-world-console {
-    margin-top: 0.9rem;
+    /* Same 0.75rem top rhythm as .ai-console above it, and its row reuses
+       the dark field family + 180px control widths from AiRefereeSection.css
+       so both lines share one spacing/typography cadence. */
+    margin-top: 0.75rem;
     padding-top: 0.6rem;
     border-top: 1px dashed rgba(139, 148, 158, 0.3);
 }
-.ai-world-console h4 { margin: 0 0 0.4rem; }
+.ai-world-console h4 { margin: 0 0 0.5rem; }
 .ai-world-console .ai-world-row {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
     align-items: center;
     flex-wrap: wrap;
 }
 .ai-world-console .ai-world-row input[type="text"] {
     flex: 1 1 220px;
-    min-width: 180px;
 }
 .ai-world-console .ai-world-card {
     margin-top: 0.6rem;
