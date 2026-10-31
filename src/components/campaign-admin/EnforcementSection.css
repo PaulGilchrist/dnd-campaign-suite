@@ -33,7 +33,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 4px;
+    /* Sits above the flag fieldset (never inside it — a disabled fieldset
+       occludes descendant clicks). Mirrors the fieldset's 10px top spacing
+       so the buttons keep the same visual position as before. */
+    margin: 10px 0 2px;
 }
 
 .enforcement-hint {

@@ -316,15 +316,57 @@ describe('EnforcementSection (L5-001)', () => {
         expect(flagsGroup()).not.toBeDisabled();
     });
 
-    it('bulk buttons sit behind the same master gate as the sub-flags', () => {
+    it('bulk buttons sit OUTSIDE the flag fieldset: Select All always armed-able, Clear All gated', () => {
+        // Regression (bug-admin-select-all-inert-when-enforcement-off): the bulk
+        // row used to live INSIDE the disabled fieldset, so native fieldset
+        // occlusion made Select All a silent no-op in the default OFF state —
+        // exactly the case its mode:'on' self-arm exists for. jsdom bypasses
+        // that occlusion on fireEvent.click, so lock the DOM position + the
+        // :disabled semantics directly instead of simulating a real-browser click.
         render(<EnforcementSection campaignName={CAMPAIGN} />);
-        // While enforcement is OFF the fieldset disables the buttons natively.
-        expect(screen.getByRole('button', { name: /Select All/ })).toBeDisabled();
-        expect(screen.getByRole('button', { name: /Clear All/ })).toBeDisabled();
+        const selectAll = screen.getByRole('button', { name: /Select All/ });
+        const clearAll = screen.getByRole('button', { name: /Clear All/ });
 
+        // Neither bulk button is a descendant of the gating fieldset.
+        const fieldset = flagsGroup();
+        expect(fieldset.contains(selectAll)).toBe(false);
+        expect(fieldset.contains(clearAll)).toBe(false);
+
+        // While OFF: Select All is interactive (the whole point); Clear All is
+        // inert via its own disabled attribute, not fieldset occlusion.
+        expect(selectAll).toBeEnabled();
+        expect(clearAll).toBeDisabled();
+
+        // Once armed, both are live.
         fireEvent.click(masterSwitch());
-        expect(screen.getByRole('button', { name: /Select All/ })).toBeEnabled();
-        expect(screen.getByRole('button', { name: /Clear All/ })).toBeEnabled();
+        expect(selectAll).toBeEnabled();
+        expect(clearAll).toBeEnabled();
+    });
+
+    it('Select All self-arms from the disarmed OFF state: one write with mode:on and all flags true', () => {
+        // Headline affordance from bug-admin-select-all-inert-when-enforcement-off:
+        // from the default OFF blob, one click on Select All must persist
+        // { mode:'on', every sub-flag true } through the debounced lane and
+        // flip the master label + every checkbox optimistically on the same tick.
+        store.seed = { enforcement: { ...ENFORCEMENT_DEFAULTS, mode: 'off' } };
+        render(<EnforcementSection campaignName={CAMPAIGN} />);
+
+        const selectAll = screen.getByRole('button', { name: /Select All/ });
+        expect(selectAll).toBeEnabled(); // not shadowed by the disabled fieldset
+
+        fireEvent.click(selectAll);
+        // UI lane is instant: master flips on and every flag checks immediately.
+        expect(masterSwitch()).toBeChecked();
+        expect(screen.getByText('Enforcement ON')).toBeInTheDocument();
+        SUB_FLAGS.forEach((label) => expect(subFlag(label)).toBeChecked());
+        expect(store.writes).toHaveLength(0); // network write stays debounced
+        settle();
+        expect(store.writes).toHaveLength(1);
+        expect(lastWrite()).toEqual({
+            ...ENFORCEMENT_DEFAULTS,
+            mode: 'on',
+            ...Object.fromEntries(SUB_FLAG_KEYS.map(k => [k, true])),
+        });
     });
 
     it('renders saved server state and every sub-flag toggle writes the full merged shape', () => {

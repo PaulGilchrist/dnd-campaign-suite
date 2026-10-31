@@ -91,6 +91,13 @@ export default function EnforcementSection({ campaignName }) {
     // master switch: both buttons keep mode:'on' — Clear All disarms every
     // rule but leaves enforcement armed, while master-off remains the one-click
     // hard stop that zeroes the flags AND disables enforcement.
+    // The bulk row lives OUTSIDE the flag fieldset: a disabled fieldset
+    // occludes every descendant click in real browsers (silent no-op), which
+    // made Select All dead in exactly the default OFF state its mode:'on'
+    // self-arm exists to shortcut (bug-admin-select-all-inert-when-
+    // enforcement-off). Select All therefore stays always-clickable; Clear All
+    // is inert until armed via its own disabled attribute (an all-false blob
+    // under a disarmed master is already the disk shape).
     const setAllFlags = (value) => writeDebounced({
         ...flags,
         mode: 'on',
@@ -124,15 +131,27 @@ export default function EnforcementSection({ campaignName }) {
                 </p>
             </div>
 
+            <div className="enforcement-bulk-actions">
+                <button
+                    type="button"
+                    className="ct-btn"
+                    title="Arm enforcement and enable every sub-flag in one click"
+                    onClick={() => setAllFlags(true)}
+                >
+                    <i className="fas fa-check-double"></i> Select All
+                </button>
+                <button
+                    type="button"
+                    className="ct-btn"
+                    title="Disable every sub-flag (enforcement stays armed)"
+                    disabled={flags.mode !== 'on'}
+                    onClick={() => setAllFlags(false)}
+                >
+                    <i className="fas fa-eraser"></i> Clear All
+                </button>
+            </div>
+
             <fieldset className="enforcement-flags" disabled={flags.mode !== 'on'}>
-                <div className="enforcement-bulk-actions">
-                    <button type="button" className="ct-btn" onClick={() => setAllFlags(true)}>
-                        <i className="fas fa-check-double"></i> Select All
-                    </button>
-                    <button type="button" className="ct-btn" onClick={() => setAllFlags(false)}>
-                        <i className="fas fa-eraser"></i> Clear All
-                    </button>
-                </div>
                 {FLAGS.map(f => (
                     <label key={f.key} className="enforcement-toggle" title={f.hint}>
                         <input
