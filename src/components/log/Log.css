@@ -384,6 +384,26 @@
     word-break: break-word;
 }
 
+/* AI audit rows (designer/refine/world + applied) — labeled one-line
+   summaries instead of the generic raw-JSON fallback */
+.log-ai-audit {
+    border-left: 3px solid #b07cc6;
+}
+
+.log-ai-audit .log-ai-audit-type {
+    font-weight: 600;
+    color: #b07cc6;
+    font-size: 0.8rem;
+}
+
+.log-ai-audit .log-ai-audit-text {
+    flex: 1;
+    padding-left: 28px;
+    color: var(--color-text);
+    font-size: 0.88rem;
+    word-break: break-word;
+}
+
 /* Travel entries */
 .log-travel {
     border-left: 3px solid #4a90d9;

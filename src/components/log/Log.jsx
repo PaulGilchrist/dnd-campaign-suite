@@ -22,6 +22,7 @@ import { SpellEffectEntry } from './LogSpellEffectEntry.jsx';
 import { BuffEntry } from './LogBuffEntry.jsx';
 import { MusicEntry } from './LogMusicEntry.jsx';
 import { GenericEntry } from './LogGenericEntry.jsx';
+import { AiAuditEntry } from './LogAiAuditEntry.jsx';
 
 const ENTRY_COMPONENTS = {
   roll: RollEntry,
@@ -46,7 +47,14 @@ const ENTRY_COMPONENTS = {
   summons: SummonsEntry,
   spell_effect: SpellEffectEntry,
   buff: BuffEntry,
-  music: MusicEntry
+  music: MusicEntry,
+  // AI audit lanes (backlog ai-audit-log-rows-raw-json). ai_director /
+  // ai_director_applied / ai_ruling* keep their described GenericEntry rows
+  // (producers already stamp a readable description).
+  ai_designer: AiAuditEntry,
+  ai_refine: AiAuditEntry,
+  ai_world: AiAuditEntry,
+  ai_world_applied: AiAuditEntry
 };
 
 function LogEntryRenderer({ entry }) {

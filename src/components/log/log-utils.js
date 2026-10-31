@@ -97,3 +97,136 @@ export function formatEntryTypeLabel(type) {
       || word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
+
+// ── AI audit one-line summaries (backlog ai-audit-log-rows-raw-json) ──
+// ai_designer/ai_refine/ai_world audit rows carry structured payload fields
+// (stage/kind/instruction/created/errors…) and no message/description, so the
+// generic fallback dumped raw JSON. These helpers collapse the plausible
+// producer shapes into one human-readable line: kind + instruction + outcome.
+
+function truncateLine(text, max = 260) {
+  const s = String(text).replace(/\s+/g, ' ').trim();
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+// Only render scalars as text — objects/arrays never reach "[object Object]".
+function asText(value) {
+  return (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    ? String(value)
+    : null;
+}
+
+function attemptsPhrase(attempts) {
+  const n = Number(attempts);
+  if (n > 1) return `after ${n} attempts`;
+  if (n === 1) return 'after 1 attempt';
+  return 'gave up after retries';
+}
+
+// { npc: 1, mapPlan: 2 } → "npc 1, mapPlan 2" (scalar values only; empty → null).
+function summarizeCounts(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const parts = Object.entries(obj)
+    .map(([key, value]) => {
+      const text = asText(value);
+      return text === null ? null : `${key} ${text}`;
+    })
+    .filter(Boolean);
+  return parts.length ? parts.join(', ') : null;
+}
+
+// entityPlan rows [{kind, count}] → "npc 1, encounter 1, mapPlan 1".
+function summarizeEntityPlan(plan) {
+  if (!Array.isArray(plan)) return null;
+  const parts = plan.map(item => {
+    if (item && typeof item === 'object' && item.kind) {
+      const count = asText(item.count);
+      return count ? `${item.kind} ${count}` : String(item.kind);
+    }
+    return asText(item);
+  }).filter(Boolean);
+  return parts.length ? parts.join(', ') : null;
+}
+
+// error (string) or errors (array) → joined message ('' when absent).
+function errorText(error, errors) {
+  const value = error ?? errors;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    return value.map(item => asText(item) ?? '').filter(Boolean).join('; ');
+  }
+  return '';
+}
+
+function describeDesigner(entry) {
+  const stage = asText(entry.stage) || 'run';
+  const head = `Designer ${stage}${entry.fallback ? ` (fallback ${entry.fallback})` : ''}`;
+  const failure = errorText(entry.error, entry.errors);
+  if (failure) return `${head} stopped — ${failure} (${attemptsPhrase(entry.attempts)})`;
+  const parts = [head];
+  const plan = summarizeEntityPlan(entry.entityPlan);
+  if (plan) parts.push(`plan ${plan}`);
+  const created = summarizeCounts(entry.created);
+  if (created) parts.push(`created ${created}`);
+  else if ('created' in entry) parts.push('created nothing');
+  if (entry.snapshot) parts.push(`restore point ${entry.snapshot}`);
+  parts.push(attemptsPhrase(entry.attempts));
+  return parts.join(' — ');
+}
+
+function describeRefine(entry) {
+  const kind = asText(entry.kind) || 'entity';
+  const instruction = entry.instruction ? `“${truncateLine(entry.instruction, 140)}”` : '';
+  const outcome = Number(entry.attempts) > 0
+    ? `proposed a replacement ${attemptsPhrase(entry.attempts)}`
+    : 'refused — the proposed JSON failed validation';
+  return `Refine ${kind}${instruction ? ` ${instruction} — ` : ' — '}${outcome}`;
+}
+
+function describeWorld(entry) {
+  const proposal = (entry.proposal && typeof entry.proposal === 'object') ? entry.proposal : {};
+  const kind = asText(proposal.kind) || asText(entry.kind) || 'proposal';
+  const body = asText(proposal.text) || asText(proposal.name) || '';
+  const needsHuman = kind === 'needs_human';
+  return `World keeper proposed ${kind}${body ? ` — “${truncateLine(body, 180)}”` : ''}${needsHuman ? ' (the GM supplies this)' : ''}`;
+}
+
+const AI_AUDIT_DESCRIBERS = {
+  ai_designer: describeDesigner,
+  ai_refine: describeRefine,
+  ai_world: describeWorld
+};
+
+// Keys that never belong in the readable line (chrome, or handled explicitly).
+const AUDIT_SUMMARY_SKIP = new Set([
+  'id', 'type', 'name', 'timestamp', 'characterName',
+  'message', 'description', 'noteText', 'summary'
+]);
+
+// Last-resort readable line for unrecognised AI audit shapes: key: value for
+// scalars, item counts for arrays, key names for objects — never full JSON.
+function summarizeResidualPayload(entry) {
+  const parts = [];
+  for (const [key, value] of Object.entries(entry)) {
+    if (AUDIT_SUMMARY_SKIP.has(key) || value === null || value === undefined) continue;
+    const scalar = asText(value);
+    if (scalar !== null) {
+      parts.push(`${key} ${scalar}`);
+    } else if (Array.isArray(value)) {
+      parts.push(`${key} ${value.length} item${value.length === 1 ? '' : 's'}`);
+    } else if (typeof value === 'object') {
+      const counts = summarizeCounts(value);
+      parts.push(`${key} ${counts || Object.keys(value).join('/')}`);
+    }
+  }
+  return parts.length ? parts.join(' · ') : 'No detail recorded';
+}
+
+export function formatAiAuditLine(entry) {
+  const direct = asText(entry.message) ?? asText(entry.description)
+    ?? asText(entry.noteText) ?? asText(entry.summary);
+  if (direct && direct.trim()) return truncateLine(direct, 400);
+  const describe = AI_AUDIT_DESCRIBERS[entry.type];
+  if (describe) return truncateLine(describe(entry), 400);
+  return truncateLine(summarizeResidualPayload(entry), 400);
+}

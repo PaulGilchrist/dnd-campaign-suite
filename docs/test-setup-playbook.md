@@ -2160,3 +2160,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Recipe — deterministic stale-tab rig: `context().newPage()` + `page.route('**/subscribe*', () => {})` (HANG the SSE route, don't abort → zero console errors) reproduces pre-fix staleness so the 409 copy can be proven race-free while live tabs prove the sync.
 - Fact — drafts-panel SSE sync lands ~200ms per hop (server publishes the `<kind>-list-<campaign>` broadcast before the approve response returns); re-fetch-on-broadcast (not echo-payload-apply) sidesteps the skipSync seam entirely.
 - Pitfall — `getByRole('button', { name: 'Approve' })` matches 3+ buttons in the Drafts panel — use `exact: true`.
+
+## Improve run 2026-11-01 (backlog AQ — ai-audit-log-rows-raw-json)
+
+- Recipe — log-row work seed/cleanup: POST synthetic entries straight to `/api/campaigns/<c>/log` and clean via `POST /admin/clear-log` with plain fetch — no confirm dialog (dialog is admin-UI-nav-only), and cleared rows are NOT resurrected by loaded tabs. Copy payload shapes from the real producers (server/services/ai/{authoring,world,index}) so tests match disk reality.
+- Fact — server `ai_world` audit already stamps `description` (services/ai/index.js worldAudit); raw-blob render was `ai_designer`/`ai_refine` (structured-only payloads). New `AiAuditEntry` field priority: message→description→noteText→summary→type-formatter→key-line.
+- Residual (future backlog candidate): `ai_dress` and `ai_authoring` types still render raw blobs (ai_authoring's readable field is `summary`, which GenericEntry's chain ignores).
