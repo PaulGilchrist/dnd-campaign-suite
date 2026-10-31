@@ -133,6 +133,36 @@ describe('AI audit rows render labeled one-line summaries', () => {
     expect(line).toContain('restore point test-campaign-2026-10-31T20-15.zip');
   });
 
+  // Regression (bug-designer-resume-success-says-gave-up): the per-entity
+  // resume success audits attempts: 0 + resumed: true — the verdict line must
+  // credit the resume lane, never claim the run gave up.
+  it('designer resume success: via per-entity resume, never "gave up"', () => {
+    setup(Log, [designer({
+      stage: 'generate', attempts: 0, resumed: true,
+      created: { factions: 0, settlements: 0, npcs: 0, quests: 0, sessions: 0, encounters: 1, maps: 0 },
+      snapshot: 'test-campaign-2026-10-31T22-40-56-044.zip',
+    })]);
+    const line = firstLine();
+    expect(line).toContain('Designer generate');
+    expect(line).toContain('created factions 0, settlements 0, npcs 0, quests 0, sessions 0, encounters 1, maps 0');
+    expect(line).toContain('restore point test-campaign-2026-10-31T22-40-56-044.zip');
+    expect(line).toContain('(via per-entity resume)');
+    expect(line).not.toContain('gave up after retries');
+    expect(line).not.toMatch(/attempt/);
+  });
+
+  it('legacy resume success (attempts 0, un-marked): no contradictory verdict', () => {
+    setup(Log, [designer({
+      stage: 'generate', attempts: 0,
+      created: { encounters: 1 },
+      snapshot: 'test-campaign-2026-10-31T22-40-56-044.zip',
+    })]);
+    const line = firstLine();
+    expect(line).toContain('created encounters 1');
+    expect(line).not.toContain('gave up after retries');
+    expect(line).not.toMatch(/attempt/);
+  });
+
   it('designer resume stop: errors array joined, honest "created nothing"', () => {
     setup(Log, [designer({
       stage: 'generate', fallback: 'per-entity resume', attempts: 0,

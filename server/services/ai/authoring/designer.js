@@ -168,7 +168,7 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
     return resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig });
 }
 
-async function finalize(campaign, blueprint, log, attempt) {
+async function finalize(campaign, blueprint, log, attempt, extra = {}) {
     const applied = await applyBlueprint(campaign, blueprint, { log });
     // Persist rejection reasons on the audit (AGENTS: log event details) —
     // omitted on success so the clean-path payload keeps its shape (§144 idiom).
@@ -177,6 +177,7 @@ async function finalize(campaign, blueprint, log, attempt) {
         created: applied.created,
         snapshot: applied.snapshot,
         attempts: attempt,
+        ...extra,
         ...(applied.errors?.length ? { errors: applied.errors.slice(0, 5) } : {}),
     }, attempt);
     return applied;
@@ -202,7 +203,10 @@ async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chat
         }
     }
     // Whole-set integrity is re-checked inside applyBlueprint before writing.
-    return finalize(campaign, blueprint, log, 0);
+    // resumed:true marks this as the per-entity lane's success (attempts: 0 =
+    // zero batch attempts survived), so the Log view renders the honest
+    // "via per-entity resume" verdict instead of the give-up phrase.
+    return finalize(campaign, blueprint, log, 0, { resumed: true });
 }
 
 // Server-owned stamps the scope schema (additionalProperties:false) never

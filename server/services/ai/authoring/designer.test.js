@@ -321,4 +321,26 @@ describe('generateBlueprint — resume partial drafts (mid-set stop)', () => {
         expect(bp.factions).toEqual([{ name: 'E-draft_faction' }]);
         expect(bp.quests).toEqual([{ name: 'E-draft_quest' }]);
     });
+
+    // Regression (bug-designer-resume-success-says-gave-up): the resume success
+    // audit must carry a truthful resumed marker — attempts: 0 alone rendered
+    // as "gave up after retries" in the Log view despite a full success payload.
+    it('full-success resume audits resumed:true alongside the success payload', async () => {
+        const chatFn = vi.fn(async (cfg) => {
+            if (cfg.schemaName === 'campaign_blueprint') return 'garbage-not-json';
+            return JSON.stringify({ name: `E-${cfg.schemaName}` });
+        });
+        applyBlueprint.mockResolvedValue({ ok: true, created: { factions: 1, quests: 1 }, snapshot: 's.zip', errors: [] });
+
+        await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        const successAudit = log.mock.calls.map(([, entry]) => entry)
+            .find(e => e.type === 'ai_designer' && e.stage === 'generate' && !e.fallback);
+        expect(successAudit).toMatchObject({
+            attempts: 0,
+            resumed: true,
+            created: { factions: 1, quests: 1 },
+            snapshot: 's.zip',
+        });
+        expect('errors' in successAudit).toBe(false);
+    });
 });
