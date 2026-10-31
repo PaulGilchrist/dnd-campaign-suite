@@ -115,6 +115,28 @@ export function checklistProgress(checklist) {
   return { done, total, pct: total === 0 ? 0 : Math.round((done / total) * 100) };
 }
 
+/**
+ * Project editor state into the AUTHORED-ROW shape for the AI refine lane
+ * (server/services/ai/authoring/entitySchemas.js sessionSchema). The planner
+ * row legitimately carries the GM-owned lifecycle fields (playedAt/checklist
+ * — seeded by getDefaultSessionData and persisted to sessions.json) plus
+ * structured contingency rows ({id,ifText,thenText,branch}; rows loaded from
+ * designer output can even be bare strings or null), but sessionSchema is
+ * additionalProperties:false with a STRING_LIST contingencies — so every
+ * editor-sourced refine died at the server preflight before the model was
+ * ever called. These three are planner/GM-owned — the model must never
+ * rewrite them — so they are hidden here and pinned back on apply (mirrors
+ * the NPC avatar-trio precedent, projectNPCForRefine). The server preflight
+ * already strips the server-owned stamps (id/updatedAt/savedAt/draft).
+ */
+export function projectSessionForRefine(data) {
+  const projected = { ...data };
+  for (const field of ['playedAt', 'checklist', 'contingencies']) {
+    delete projected[field];
+  }
+  return projected;
+}
+
 export function buildXpBudgetPrompt(session, characters = []) {
   const levels = characters.map(c => c.level).filter(l => Number.isFinite(l));
   const partySize = levels.length || characters.length;

@@ -8,6 +8,7 @@ import {
   buildXpBudgetPrompt,
   buildRumorPrompt,
   copyTextToClipboard,
+  projectSessionForRefine,
 } from '../../services/campaign/sessionPlannerUtils.js';
 
 function LinkPicker({ linkType, options, linked, otherSessions, onAdd, onRemove, onMove, onQuickAction }) {
@@ -225,8 +226,15 @@ function SessionModalFooter({
           <AiRefineButton
             campaignName={campaignName}
             kind="session"
-            entity={formData}
-            onReplaced={setFormData}
+            entity={projectSessionForRefine(formData)}
+            onReplaced={(replacement) =>
+              // Merge, never replace: the schema-clean proposal carries no
+              // GM-owned lifecycle fields (playedAt/checklist) and its
+              // contingencies are strings at best — a bare setFormData
+              // would drop them and a later Save would wipe the planner's
+              // structured contingency rows.
+              setFormData((prev) => ({ ...prev, ...replacement, contingencies: prev.contingencies }))
+            }
           />
         )}
         {canMarkPlayed && (
