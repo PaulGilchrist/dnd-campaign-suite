@@ -14,6 +14,11 @@ const DEFAULT_MUSIC = { mood: null, playing: false, volume: DEFAULT_VOLUME, over
 
 const moodLabel = (moodKey) => (getMood(moodKey) || {}).label || moodKey;
 
+// Sidebar display order: mood labels A–Z. MOODS itself stays in canonical
+// catalogue order (tests pin MOODS[0]='town', MOODS[1]='outdoors'), so we
+// render from a sorted copy.
+const MOODS_ALPHABETICAL = [...MOODS].sort((a, b) => a.label.localeCompare(b.label));
+
 function parseTrackList(text) {
   return text
     .split(/[\n,]+/)
@@ -320,7 +325,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
         <i className="fa-solid fa-music"></i> Music
       </div>
       <div className="music-moods">
-        {MOODS.map((mood) => (
+        {MOODS_ALPHABETICAL.map((mood) => (
           <button
             key={mood.key}
             className={`music-mood-btn${playing && music.mood === mood.key ? ' active' : ''}`}
@@ -368,7 +373,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
         <div className="music-editor">
           <label htmlFor="music-editor-mood">Mood</label>
           <select id="music-editor-mood" value={editMood} onChange={changeEditMood}>
-            {MOODS.map((mood) => (
+            {MOODS_ALPHABETICAL.map((mood) => (
               <option key={mood.key} value={mood.key}>{mood.label}</option>
             ))}
           </select>
