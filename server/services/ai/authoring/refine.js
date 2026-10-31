@@ -17,7 +17,7 @@ import { extractJsonObject } from '../promptBuilder.js';
 import { validateEntity, resolveSchemaRefs, ENTITY_SCHEMAS } from './entitySchemas.js';
 import { buildCampaignContext, validateBlueprintReferences } from './referential.js';
 import { buildStoryBible } from './storyBible.js';
-import { KIND_FIELD_RULES } from './designerPrompts.js';
+import { KIND_FIELD_RULES, namingRule } from './designerPrompts.js';
 
 const lower = (v) => String(v || '').trim().toLowerCase();
 
@@ -28,6 +28,7 @@ function buildRefineMessages({ kind, entity, instruction, storyBible }) {
             content: `You revise one D&D campaign entity for the Game Master.
 Output ONLY the complete replacement ${kind} as a single JSON object — every field of the shape below, edited per the GM's instruction; untouched fields carried through unchanged.
 Shape: ${KIND_FIELD_RULES[kind]}
+${namingRule(kind)}
 Rules: never add id/updatedAt/savedAt/draft fields; names stay unique campaign-wide; if the entity is a monster-bearing encounter, monster refs use real bestiary index+name pairs.
 CAMPAIGN CONTEXT (keep the edit coherent with it): ${JSON.stringify(storyBible)}`,
         },

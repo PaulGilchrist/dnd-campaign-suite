@@ -37,6 +37,33 @@ const PLAN_SYSTEM = `You turn a GM design conversation into a BUILD PLAN. Output
 
 Counts must be proportional to scope (a session prep ≠ 40 entities) and consistent with storySummary. Reference only existing canon from the STORY BIBLE; the plan describes NEW content alongside it.`;
 
+/**
+ * Anti-placeholder naming guidance (backlog 2026-10-31 AP: a quest landed
+ * literally named "quest" — the shape word `quest{...}` leaked into `name`).
+ * Owner ruling: SOFT prompt fix only — validators untouched. One shared
+ * fragment injected at all three schema-bearing seams (blueprint batch,
+ * per-entity resume, refine via refine.js), so wherever a shape is embedded
+ * the model also sees a discriminating example and an explicit prohibition.
+ */
+export const NAME_EXAMPLES = {
+    faction: 'The Ember Guild',
+    npc: 'Marta Copperkettle',
+    settlement: 'Thornhaven',
+    quest: 'The Sunken Chime',
+    encounter: 'Ambush at Wolf Hollow',
+    session: 'Session 3: The Sunken Chime',
+    mapPlan: 'fungal-hollows / Fungal Hollows',
+};
+
+/** Whole-roster line (batch) or targeted one-liner (resume/refine, per kind). */
+export function namingRule(kind) {
+    if (kind) {
+        return `Name it with a proper, unique in-world name like "${NAME_EXAMPLES[kind]}" — NEVER "${kind}" or the kind word, and NEVER a placeholder ("placeholder", "example", "test", "TBD", "Untitled", "New ${kind}").`;
+    }
+    const pairs = Object.entries(NAME_EXAMPLES).map(([k, v]) => `${k} "${v}"`).join(', ');
+    return `EVERY name must be a proper, unique in-world name (e.g. ${pairs}) — NEVER name an entity after its kind ("quest", "npc", "faction", "settlement", "encounter", "session", "mapPlan") and NEVER a placeholder ("placeholder", "example", "test", "TBD", "Untitled").`;
+}
+
 // Field-shape one-liners per kind (rule text mirrors entitySchemas.js).
 export const KIND_FIELD_RULES = {
     faction: 'faction{name,description,goals,influence 1-10,notes}',
@@ -58,7 +85,7 @@ function blueprintRules({ scope, allow }) {
 }
 
 Hard rules — violating any one makes the whole batch fail validation:
-1. EVERY name must be unique in the batch AND not collide with existing names: ${json(allow.existingNames)}.
+1. EVERY name must be unique in the batch AND not collide with existing names: ${json(allow.existingNames)}. ${namingRule()}
 2. encounter.selectedMonsters entries: {"index","name","qty"} using ONLY this bestiary menu (index+name verbatim): ${json(allow.monsters)}.
 3. settlement.notableNPCs and session.links values must name existing campaign rows OR rows you create in this same blueprint.
 4. No "id", "updatedAt", "savedAt" or "draft" fields — the server assigns those.
@@ -113,6 +140,7 @@ export function buildSingleEntityMessages({ scope, kind, planNotes, siblings, al
             role: 'system',
             content: `Emit exactly ONE ${kind} as a single JSON object — nothing else.
 Shape: ${fieldRule}
+${namingRule(kind)}
 Hard rules: no id/updatedAt/savedAt/draft fields; names must not collide with ${json(allow.existingNames)}; monster refs use ONLY index+name from ${json(allow.monsters)}.
 Story spine: ${json(scope.storySummary || scope)}
 Party: ${json(allow.party)}

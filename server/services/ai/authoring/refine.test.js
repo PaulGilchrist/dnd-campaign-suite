@@ -19,6 +19,7 @@ vi.mock('./referential.js', async () => {
 });
 
 import { refineEntity } from './refine.js';
+import { NAME_EXAMPLES } from './designerPrompts.js';
 
 const AI = { mode: 'autopilot', endpoint: 'http://localhost:1234/v1', model: 'm' };
 const npc = { name: 'Oldhem', personality: 'Gruff', attitude: 'neutral', draft: true, updatedAt: 7 };
@@ -90,5 +91,21 @@ describe('refineEntity — proposal only, validation-gated', () => {
         expect(opts.responseSchema).toMatchObject({ type: 'object', additionalProperties: false });
         expect(JSON.stringify(opts.responseSchema)).not.toContain('$ref'); // self-contained for grammar compilers
         expect(JSON.stringify(opts.responseSchema)).not.toMatch(/"id"|"updatedAt"/); // never allow server-owned fields
+    });
+
+    // Backlog 2026-10-31 (AP) placeholder-name-accepted — refine seam carries
+    // the same anti-kind-word/anti-placeholder guidance as batch + resume.
+    it('refine prompt embeds the anti-placeholder naming guidance for the kind', async () => {
+        const chatFn = vi.fn(async () => JSON.stringify({ name: 'Oldhem', attitude: 'neutral' }));
+        await refineEntity({ campaign: 'c', kind: 'npc', entity: npc, instruction: 'x', aiConfig: AI, chatFn });
+        const system = chatFn.mock.calls[0][0].messages[0].content;
+        expect(system).toContain('Shape: npc{');
+        expect(system).toContain(`like "${NAME_EXAMPLES.npc}"`);
+        expect(system).toMatch(/NEVER "npc"/);
+        expect(system).toMatch(/NEVER a placeholder/i);
+
+        const questChat = vi.fn(async () => JSON.stringify({ name: 'The Sunken Chime', status: 'active' }));
+        await refineEntity({ campaign: 'c', kind: 'quest', entity: { name: 'The Lost Artifact', status: 'active' }, instruction: 'x', aiConfig: AI, chatFn: questChat });
+        expect(questChat.mock.calls[0][0].messages[0].content).toMatch(/NEVER "quest"/);
     });
 });
