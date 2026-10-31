@@ -2179,3 +2179,9 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Fact — `node server.js` has no hot-reload: server-side edits need the dev trio restarted (`npm run dev:locked`, verify CAMPAIGN_LOCK banner) — Vite alone never picks up `server/` changes.
 - Fact — mid-resume partial drafts ride `applyBlueprint` unchanged (snapshot-first + whole-set re-check); if the completed subset itself fails integrity it discards like a zero-success stop.
 - Pitfall — every applying designer run creates a restore-point zip; cap-4 prune retires the oldest. Run AQ+owner left 22-01-14/22-02-02 added, 10-28T14-17 + 10-31T11-53 pruned — map Baseline Fingerprints §55 snapshot list is now stale (lane-inherent churn, not a defect).
+
+## Improve run 2026-11-01 (backlog AQ — session-planner-refine-gate-confuses)
+
+- Fact — the refine lane is ALREADY ad-hoc-entity based: client `refineEntity` POSTs `{entity, instruction}` (no id/disk lookup; route passes body straight to preflight) — un-gating a refine button for unsaved-new is pure client footer-gate work. A truly blank form fails schema preflight (name minLength) in the modal error strip = honest hint.
+- Pitfall — registering an inline `page.on('dialog')` handler inside `browser_run_code_unsafe` AND calling `browser_handle_dialog` externally = "no related modal state" error; pick ONE route (inline handler accepted is enough).
+- Pitfall — never `cd` into the approved temp dir via shell/write (permission-rejected); heredoc-create rig files there and launch with absolute paths.

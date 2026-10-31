@@ -11,7 +11,7 @@
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
-import { getDefaultSessionData, projectSessionForRefine } from '../../services/campaign/sessionPlannerUtils.js';
+import { getDefaultSessionData, projectSessionForRefine, emptyLinks } from '../../services/campaign/sessionPlannerUtils.js';
 import { refineEntity } from '../../services/ai/aiClient.js';
 
 vi.mock('../../services/ai/aiClient.js', () => ({
@@ -36,14 +36,14 @@ const DIRTY_ROW = {
   updatedAt: 1793124887756,
 };
 
-function renderEditor(formOverrides = {}) {
+function renderEditor(formOverrides = {}, { editing = true } = {}) {
   const formData = getDefaultSessionData({ ...DIRTY_ROW, ...formOverrides });
   const setFormData = vi.fn();
   render(
     <SessionPlannerModal
       formData={formData}
       setFormData={setFormData}
-      editingSession={{ name: formData.name, status: 'planned' }}
+      editingSession={editing ? { name: formData.name, status: 'planned' } : null}
       otherSessions={[]}
       resourceOptions={{ maps: [], encounters: [], npcs: [], quests: [], settlements: [], notes: [] }}
       pickerLoadError={null}
@@ -150,6 +150,65 @@ describe('SessionPlannerModal AI refine (authored-row projection)', () => {
     // Failed proposal: the editor form never moved (instruction text is
     // AiRefineButton-local state, so setFormData is not touched at all).
     expect(setFormData).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionPlannerModal AI refine — unsaved NEW session (backlog session-planner-refine-gate-confuses)', () => {
+  it('renders the refine button in the same footer slot with no disk row and opens the modal', () => {
+    renderEditor({ name: 'Draft Dawn' }, { editing: false });
+
+    // Same footer placement as the existing-session lane; row-only actions
+    // (Delete / Mark as Played) stay gated.
+    const refine = screen.getByRole('button', { name: /refine with AI/i });
+    expect(refine.closest('.ct-modal-footer .ct-modal-actions')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /^delete/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /mark as played/i })).toBeNull();
+
+    fireEvent.click(refine);
+    expect(screen.getByRole('dialog', { name: /refine session with AI/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/what should change/i)).toBeInTheDocument();
+  });
+
+  it('refines from the LIVE FORM DATA (projection, no id/row needed) and applies to the form only', async () => {
+    const NEW_FORM = {
+      name: 'Draft Dawn',
+      date: '2026-11-09',
+      summary: 'Rough outline: the tide temple opens at dusk.',
+      notes: '',
+    };
+    const { formData, setFormData } = renderEditor(NEW_FORM, { editing: false });
+    refineEntity.mockResolvedValue({
+      ok: true,
+      replacement: {
+        ...NEW_FORM,
+        name: 'Refined New Dawn',
+        status: 'planned',
+        contingencies: [],
+        links: emptyLinks(),
+      },
+    });
+    await openRefineAndAsk('Change the name field to: Refined New Dawn');
+
+    // Preflight input came from the unsaved form: no playedAt/checklist/
+    // contingencies (GM-owned, projected away), no id/updatedAt — the server
+    // never needed a disk row.
+    const sent = refineEntity.mock.calls[0][0];
+    expect(sent.kind).toBe('session');
+    const entity = sent.entity;
+    expect(entity.name).toBe('Draft Dawn');
+    expect(entity.summary).toBe('Rough outline: the tide temple opens at dusk.');
+    expect(entity).not.toHaveProperty('playedAt');
+    expect(entity).not.toHaveProperty('checklist');
+    expect(entity).not.toHaveProperty('contingencies');
+
+    // Proposal lands in the FORM via the functional updater; nothing else is
+    // touched (no CRUD service is even mounted here — Save is the only write).
+    expect(setFormData).toHaveBeenCalledTimes(1);
+    const [updater] = setFormData.mock.calls[0];
+    const applied = updater(formData);
+    expect(applied.name).toBe('Refined New Dawn');
+    expect(applied.playedAt).toBeNull();
+    expect(applied.checklist).toHaveLength(2);
   });
 });
 

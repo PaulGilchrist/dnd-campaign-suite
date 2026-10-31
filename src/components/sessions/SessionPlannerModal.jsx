@@ -222,7 +222,14 @@ function SessionModalFooter({
             <i className="fa-solid fa-trash-can" /> {deleting ? 'Deleting…' : 'Delete'}
           </button>
         )}
-        {editingSession && campaignName && (
+        {/* Ungated for unsaved-new sessions (backlog session-planner-refine-gate-confuses):
+            the refine lane is proposal-only and never needs the disk row — the
+            server preflight validates the ENTITY the footer projects from the
+            LIVE form (projectSessionForRefine), so a brand-new session refines
+            exactly like an existing one. A truly blank form fails the schema
+            preflight (name minLength) in the modal's error strip, which is the
+            honest hint to type a name first. Delete/played stay row-only. */}
+        {campaignName && (
           <AiRefineButton
             campaignName={campaignName}
             kind="session"

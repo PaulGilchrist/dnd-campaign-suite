@@ -57,7 +57,7 @@
 
 ## Improvement Backlog
 
-- **(2026-10-31 AQ) session-planner-refine-gate-confuses:** the session refine button only renders when editing an EXISTING session (gated on `editingSession`), so from New Session the button is absent with no hint — unlike NPCs where the button is always in the footer. At minimum a title tooltip on why; better: allow refine on unsaved-new too (preflight doesn't need the disk row).
+_(empty — all 2026-10-31 AQ items resolved by the 2026-11-01 improve run; see that run's summary and `docs/test-setup-playbook.md` for the record)_
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
