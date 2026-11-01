@@ -95,12 +95,24 @@ function CampaignBuilder({ campaignName }) {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const runAction = useCallback(async (action, kind, row) => {
+  // Display name of a draft row — same fallback chain DraftRow renders, so a
+  // batch banner names rows exactly as the GM sees them.
+  const rowDisplayName = row => row.name || row.displayName || row.fileName || 'Draft row';
+
+  // `options.deferError` marks a step inside an "Approve all" batch (backlog
+  // 2026-11-01 AU: mid-loop failures go invisible). The batch is ONE gesture,
+  // so a row-k 409 must not flash and then be erased by row-k+1's opening
+  // setError(null) — deferred failures are returned to approveAll, which
+  // surfaces them as one accumulated banner after the loop. Single-row calls
+  // keep the e1f282a42 contract: banner set only after the error-path reload
+  // settles (ghost-row re-fetch survives), cleared by the next plain reload.
+  const runAction = useCallback(async (action, kind, row, options) => {
     setBusy(true);
-    setError(null);
+    if (options?.deferError !== true) setError(null);
     try {
       await action(campaignName, kind, row);
       await reload();
+      return null;
     } catch (err) {
       console.error(`[CampaignBuilder] ${kind} action failed:`, err);
       // Sync the list even after a FAILED action (bug-drafts-double-reject-
@@ -111,16 +123,31 @@ function CampaignBuilder({ campaignName }) {
       // a stale, fully-actionable ghost. reload() clears the banner itself,
       // so surface the failure message only after it settles.
       await reload();
-      setError(err.message || 'Draft action failed');
+      const message = err.message || 'Draft action failed';
+      if (options?.deferError === true) return message;
+      setError(message);
       setBusy(false);
+      return message;
     }
   }, [campaignName, reload]);
 
   const approveAll = useCallback(async (kind, rows) => {
+    // Gesture boundary: a fresh batch replaces any previous banner (the old
+    // per-row clear lived in runAction; deferred steps don't touch it).
+    setError(null);
     // Sequential: uuid-array kinds (quests/factions) overwrite the whole list
     // per save — parallel saves would trip their concurrent-edit guards.
+    const failures = [];
     for (const row of rows) {
-      await runAction(approveDraft, kind, row);
+      const message = await runAction(approveDraft, kind, row, { deferError: true });
+      if (message) failures.push(`“${rowDisplayName(row)}”: ${message}`);
+    }
+    if (failures.length > 0) {
+      // Accumulate (functional set): the header "Approve all (n)" fires one
+      // approveAll per kind concurrently — later kinds must not overwrite an
+      // earlier kind's failures.
+      const batch = `${failures.length} of ${rows.length} ${kind} rows failed — they were NOT saved: ${failures.join('; ')}`;
+      setError(prev => (prev ? `${prev} ${batch}` : batch));
     }
   }, [runAction]);
 

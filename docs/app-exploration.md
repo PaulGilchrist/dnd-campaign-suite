@@ -55,8 +55,6 @@
 
 ## Improvement Backlog
 
-- **2026-11-01 AU — approve-all mid-loop failures go invisible.** A batch "Approve all (n)" that 409s on row k shows the honest banner only until row k+1's `runAction` opens with `setError(null)` (CampaignBuilder.jsx:74) — one GM gesture, then zero DOM trace of "was modified… NOT saved" (console + disk stay honest). e1f282a42 fixed the SSE-erase lane; the loop-continuation erase is by the code-comment contract but the batch arguably IS the one action. Suggest: collect per-row failures in `approveAll` and surface them as one accumulated banner after the loop (or key the clear on gesture boundaries). Likely files: `src/components/campaign-builder/CampaignBuilder.jsx` (runAction/approveAll). Non-blocking.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - OPEN (infra): llama.cpp-style refusing-backend face for constrained decoding fallback — no such backend on this machine (unchanged since AQ).
