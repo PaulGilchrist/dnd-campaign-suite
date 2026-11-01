@@ -78,6 +78,11 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   // doctrine (see the adoption effect below).
   const localVolumeRef = useRef(null);
 
+  // Latest {music, playerMounted} for the unmount lane below (refs so the
+  // []-dep effect never re-runs during the component's life).
+  const leaveViewRef = useRef(null);
+  leaveViewRef.current = { music, playerMounted };
+
   // All mood/playing transitions go through here so the adoption guard stays
   // in step with what this tab committed.
   const commitMusic = useCallback((next) => {
@@ -140,6 +145,21 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     youtubePlayer.ensurePlayer(YT_FRAME_ID);
     return () => youtubePlayer.dispose();
   }, [isLocalhost, playerMounted]);
+
+  // The panel now lives in the main content area (it used to be pinned to the
+  // sidebar footer, always mounted): navigating to another view unmounts it,
+  // the mount effect's cleanup destroys the iframe, and the audio really
+  // stops. Un-arm the shared mood on that unmount so no tab is left claiming
+  // playback this window no longer owns (the stop button's honest state, plus
+  // a log row naming the seam).
+  useEffect(() => () => {
+    const state = leaveViewRef.current;
+    if (!state || !state.playerMounted || !state.music.playing) return;
+    youtubePlayer.stop();
+    commitMusic({ ...state.music, mood: null, playing: false });
+    addEntry({ type: 'music', action: 'stop', message: 'GM stopped ambience (left Music view)' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     youtubePlayer.setVolume(volume);
@@ -321,10 +341,13 @@ function MusicPlayer({ campaignName, isLocalhost }) {
 
   return (
     <div className="music-player">
-      <div className="sidebar-section-header sidebar-section-header-static">
-        <i className="fa-solid fa-music"></i> Music
+      <div className="ct-header">
+        <h2 className="ct-title">
+          <i className="fa-solid fa-music" /> Music
+        </h2>
       </div>
-      <div className="music-moods">
+      <div className="music-panel">
+        <div className="music-moods">
         {MOODS_ALPHABETICAL.map((mood) => (
           <button
             key={mood.key}
@@ -415,6 +438,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
           {toast.message}
         </div>
       )}
+      </div>
       {playerMounted && (
         <div className="yt-music-frame"><div id={YT_FRAME_ID}></div></div>
       )}

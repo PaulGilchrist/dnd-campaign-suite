@@ -44,7 +44,7 @@
  * campaign keys in this module).
  *
  * Caller-boundary table (#1544 exporter->caller census):
- *   youtubePlayer.export   | caller (src/components/sidebar/MusicPlayer.jsx)
+ *   youtubePlayer.export   | caller (src/components/music/MusicPlayer.jsx)
  *   ensurePlayer           | :36   | dispose     | :37   | setVolume   | :41
  *   playTracks            | :51,:75,:118 | pause | :65  | resume       | :77
  *   stop                  | :84

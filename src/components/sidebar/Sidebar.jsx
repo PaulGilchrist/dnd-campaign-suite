@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
-import MusicPlayer from './MusicPlayer.jsx';
 import { addEntry } from '../../services/ui/logService.js';
 import './Sidebar.css';
 
@@ -12,6 +11,7 @@ const VIEW_LABELS = {
     partyInventory: { label: 'Inventory', icon: 'fa-boxes-stacked' },
     campaignLog: { label: 'Log', icon: 'fa-book-journal-whills' },
     mapsManager: { label: 'Maps', icon: 'fa-map' },
+    music: { label: 'Music', icon: 'fa-music' },
     notes: { label: 'Notes', icon: 'fa-book' },
     npcs: { label: 'NPCs', icon: 'fa-users' },
     quests: { label: 'Quests', icon: 'fa-scroll' },
@@ -37,6 +37,9 @@ const NAV_ITEMS = [
     { view: 'partyInventory', onClick: 'onInventoryClick' },
     { view: 'campaignLog', onClick: 'onLogClick' },
     { view: 'mapsManager', onClick: 'onMapsClick', playerLabel: 'Map' },
+    // GM-only: the music panel moved out of the sidebar footer into the
+    // main content area (activeView 'music').
+    { view: 'music', onClick: 'onMusicClick', localhostOnly: true },
     { view: 'notes', onClick: 'onNotesClick' },
     { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
     { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true },
@@ -129,7 +132,7 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError }) {
     const [diceResult, setDiceResult] = useState(null);
 
     // Auto-hide timer (display only, no game state). A re-roll replaces
@@ -155,7 +158,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
       };
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
-    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
+    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
 
     return (
         <>
@@ -204,7 +207,6 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                         </button>
                     </div>
                 )}
-                <MusicPlayer campaignName={campaignName} isLocalhost={isLocalhost} />
                 <DiceTray onRoll={handleDiceRoll} />
             </nav>
             {diceResult && <DicePopup result={diceResult} onClose={() => setDiceResult(null)} />}

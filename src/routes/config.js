@@ -103,6 +103,13 @@ export const VIEWS = {
     component: 'Log',
     description: 'Campaign dice roll and activity log'
    },
+  MUSIC: {
+    name: 'music',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'MusicPlayer',
+    description: 'GM ambience player — mood playback, transport, volume, and track editor'
+  },
   CAMPAIGN_BUILDER: {
     name: 'campaignBuilder',
     stateVar: 'activeView',
@@ -162,10 +169,11 @@ export const SIDEBAR_BUTTONS = [
   { label: 'Settlements', icon: 'fa-city', view: 'settlements' },
   { label: 'Drafts', icon: 'fa-wand-magic-sparkles', view: 'campaignBuilder' },
   { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' },
+  { label: 'Music', icon: 'fa-music', view: 'music' },
   { label: 'Admin', icon: 'fa-gears', view: 'campaignRepair' }
 ];
 
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'campaignRepair'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'music', 'campaignRepair'];

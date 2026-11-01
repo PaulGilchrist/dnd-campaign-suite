@@ -19,9 +19,8 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: mockAddEntry,
 }));
 
-// MusicPlayer owns its own timers/SSE — stub it so this lane's fake-timer
-// advancement only drives the dice popup countdown.
-vi.mock('./MusicPlayer.jsx', () => ({ default: () => null }));
+// (The music panel moved out of the sidebar into a main-area view — its
+// timers/SSE no longer need stubbing here.)
 
 const AUTO_HIDE_MS = 4000;
 

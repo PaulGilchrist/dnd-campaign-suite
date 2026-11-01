@@ -38,6 +38,7 @@ import Sessions from './components/sessions/Sessions.jsx';
 import Factions from './components/factions/Factions.jsx';
 import PartyInventory from './components/party-inventory/PartyInventory.jsx';
 import Log from './components/log/Log.jsx';
+import MusicPlayer from './components/music/MusicPlayer.jsx';
 import CampaignAdmin from './components/campaign-admin/CampaignAdmin.jsx';
 import SavePromptModal from './components/common/SavePromptModal.jsx';
 import DeathSavePromptModal from './components/common/DeathSavePromptModal.jsx';
@@ -276,6 +277,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     campaignBuilder: <CampaignBuilder campaignName={campaignName} />,
     partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
+    music: <MusicPlayer campaignName={campaignName} isLocalhost={isLocalhost} />,
     campaignRepair: (
       <CampaignAdmin
         campaignName={campaignName}
@@ -698,6 +700,7 @@ function App() {
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}
           onMapsClick={handleMapsClick}
+          onMusicClick={() => setActiveView('music')}
           onNotesClick={handleNotesClick}
           onQuestsClick={handleQuestsClick}
           onEncounterClick={handleEncounterClick}

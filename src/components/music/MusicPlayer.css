@@ -1,35 +1,41 @@
-/* GM background music mini-player (sidebar footer) */
+/* GM background music view (main content area — opened from the sidebar's
+   Music nav item). Root follows the .ct-container layout of the other
+   campaign-tool views; the player itself sits in a .music-panel card. */
 
 .music-player {
-  border-top: 1px solid var(--border-color);
-  padding: 6px 12px 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex: 1;
+  padding: 20px;
+  width: 100%;
 }
 
-.music-player .sidebar-section-header {
-  padding: 4px 0;
-  font-size: 0.95em;
+.music-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 640px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-color-card);
 }
 
 .music-moods {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 
 .music-mood-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 6px;
+  padding: 6px 12px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.8em;
+  font-size: 0.9em;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
