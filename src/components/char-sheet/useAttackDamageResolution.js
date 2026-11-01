@@ -584,7 +584,8 @@ export default function useAttackDamageResolution({
 
         // Apply immediate effects (push, speed reduction, etc.)
         // fix#167 single-source (cf. fix#158 class; pipeline-lane idiom in
-        // contextBuilder-sync.js logBrutalStrikeGrant, which logs te.value):
+        // contextBuilder-sync.js via combat/brutalStrikeGrants.js
+        // buildBrutalStrikeGrantEntry, which logs te.value):
         // the applied distance is computed ONCE and feeds BOTH the stored
         // targetEffect and the log sentence. Previously the speed-reduction log
         // hardcoded "15 feet" while te.value stored option.value, so any
