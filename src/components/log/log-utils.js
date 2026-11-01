@@ -242,7 +242,9 @@ function describeDress(entry) {
   const map = asText(entry.map) || 'map';
   const ops = asText(entry.ops);
   const opsPhrase = ops === null ? '' : ` ${ops} op${ops === '1' ? '' : 's'}`;
-  if (entry.action === 'applied') return `AI dress applied to ${map}${opsPhrase}`;
+  // Connector mirrors the proposal row's " — " below; opsPhrase carries its own
+  // leading space, so prepend just the dash and skip it entirely when empty.
+  if (entry.action === 'applied') return `AI dress applied to ${map}${opsPhrase ? ` —${opsPhrase}` : ''}`;
   const instruction = entry.instruction ? ` “${truncateLine(entry.instruction, 140)}”` : '';
   const outcome = Number(entry.attempts) > 0
     ? `proposed${opsPhrase} ${attemptsPhrase(entry.attempts)}`

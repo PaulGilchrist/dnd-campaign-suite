@@ -303,7 +303,17 @@ describe('AI audit rows render labeled one-line summaries', () => {
 
   it('dress applied row (client AiDressButton shape): map + op count', () => {
     setup(Log, [dress({ action: 'applied', instruction: undefined, attempts: undefined })]);
-    expect(firstLine()).toBe('AI dress applied to battle-arena 4 ops');
+    expect(firstLine()).toBe('AI dress applied to battle-arena — 4 ops');
+  });
+
+  it('dress applied row reads "1 op" singular', () => {
+    setup(Log, [dress({ action: 'applied', ops: 1, instruction: undefined, attempts: undefined })]);
+    expect(firstLine()).toBe('AI dress applied to battle-arena — 1 op');
+  });
+
+  it('dress applied row with no ops count: no doubled separator', () => {
+    setup(Log, [dress({ action: 'applied', ops: undefined, instruction: undefined, attempts: undefined })]);
+    expect(firstLine()).toBe('AI dress applied to battle-arena');
   });
 
   it('dress singular op count reads "1 op"', () => {
