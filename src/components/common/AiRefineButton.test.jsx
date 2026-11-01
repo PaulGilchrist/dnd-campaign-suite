@@ -100,13 +100,20 @@ describe('AiRefineButton', () => {
         return { status, onReplaced };
     };
 
-    it('echo + aiConfig.jsonSchema=true adds the Decoding="on" probe hint', async () => {
+    it('echo + aiConfig.jsonSchema=true adds the Decoding="on" hint naming "off" first', async () => {
         runtime.aiConfig = { mode: 'suggest', jsonSchema: true };
         const { status, onReplaced } = await echoAsk();
         expect(status.textContent).toMatch(/model proposed no changes/i);
         expect(status.textContent).toMatch(/Decoding is set to "on"/);
         expect(status.textContent).toMatch(/echo the input verbatim/i);
-        expect(status.textContent).toMatch(/"probe"/);
+        // Backlog refine-no-op-grammar-hint-copy: "off" is the only verified
+        // cure on this backend family — it must be named FIRST; "probe" may
+        // appear only as a caveat, never as the first suggestion.
+        expect(status.textContent).toMatch(/try setting Decoding to "off"/);
+        const offIdx = status.textContent.indexOf('"off"');
+        const probeIdx = status.textContent.indexOf('"probe"');
+        expect(offIdx).toBeGreaterThanOrEqual(0);
+        expect(probeIdx).toBeGreaterThan(offIdx);
         expect(status.textContent).toMatch(/campaign admin/i);
         expect(onReplaced).not.toHaveBeenCalled();
     });

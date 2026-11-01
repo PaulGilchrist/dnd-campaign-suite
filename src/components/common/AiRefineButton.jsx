@@ -16,10 +16,13 @@ const NO_CHANGE_NOTICE = 'The model proposed no changes — the form is unchange
 // === true, forced grammar) commonly makes the model echo the input verbatim.
 // Shown ONLY when the stored config says so — otherwise we can't attribute a
 // cause and stay honest with the base sentence alone.
+// Backlog refine-no-op-grammar-hint-copy (live AS 2026-10-31): "probe" ALSO
+// echoes on this family (the provider auto-forces the grammar), so only
+// "off" is a verified cure — name it first and sole.
 const GRAMMAR_ECHO_HINT = ' If Decoding is set to "on" (a forced JSON grammar),'
   + ' this backend family commonly makes the model echo the input verbatim —'
-  + ' try setting Decoding to "probe" (or "off") in the campaign admin’s AI'
-  + ' config row and retry.';
+  + ' try setting Decoding to "off" in the campaign admin’s AI'
+  + ' config row and retry ("probe" re-forces the grammar here, too).';
 
 /**
  * Backlog refine-no-op-silent: a success whose replacement echoes the input
