@@ -95,6 +95,14 @@ function CampaignBuilder({ campaignName }) {
       await reload();
     } catch (err) {
       console.error(`[CampaignBuilder] ${kind} action failed:`, err);
+      // Sync the list even after a FAILED action (bug-drafts-double-reject-
+      // ghost-row): two GM tabs rejecting one draft — the loser's DELETE 404s
+      // because the winner already removed the row server-side, and the
+      // winner's `<kind>-list` broadcast lands inside this tab's busy window
+      // and is skipped. Without this re-fetch the deleted row would linger as
+      // a stale, fully-actionable ghost. reload() clears the banner itself,
+      // so surface the failure message only after it settles.
+      await reload();
       setError(err.message || 'Draft action failed');
       setBusy(false);
     }
@@ -112,8 +120,9 @@ function CampaignBuilder({ campaignName }) {
   // approving/rejecting/creating a draft edits the entity behind this panel,
   // so any `<kind>-list-<campaign>` broadcast re-fetches the rows — the
   // Refresh button is no longer the only invalidation. Skipped while this
-  // tab has an action in flight (runAction reloads when it completes, and a
-  // concurrent reload would race its busy flag). Mirrors Settlements.jsx /
+  // tab has an action in flight (runAction reloads when it completes — on
+  // both the success and the failure path — and a concurrent
+  // reload would race its busy flag). Mirrors Settlements.jsx /
   // Notes.jsx via the shared Subscriber (one EventSource per campaign).
   const handleSSEEvent = useCallback((event) => {
     if (!event || !draftListKeys(campaignName).has(event.key)) return;

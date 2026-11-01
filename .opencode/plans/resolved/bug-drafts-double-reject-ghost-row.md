@@ -31,3 +31,20 @@ In `runAction`'s `catch`, also `await reload()` before/after surfacing the error
 
 ## Severity
 Minor UX issue — server data integrity was verified intact (no resurrection, ghost-Approve is a benign re-read+identical overwrite), but a stale actionable row contradicts the panel's live-sync promise and invites confusing double-clicks.
+
+## Resolution
+**FIXED 2026-10-31.** Diagnosis confirmed exactly as guessed — both halves of the sync gap were real in the current code:
+- `runAction`'s `catch` set the error banner + `busy=false` but never re-fetched, so the 404'd row stayed in `groups`.
+- The winner's `factions-list-<campaign>` broadcast landed inside the loser's `busy` window and `handleSSEEvent` skipped it (by design), so nothing ever replayed it.
+
+**Fix** (`src/components/campaign-builder/CampaignBuilder.jsx`): the `catch` branch now `await reload()`s before surfacing the error. Order matters — `reload()` clears the error banner itself, so `setError(err.message)` runs after the re-fetch settles; the GM still sees "Faction not found" while the list becomes truthful immediately (this covers ALL failed actions, e.g. a 409 approve-conflict also re-syncs). The SSE comment was updated to state the reload covers both success and failure paths. No service-layer, server, or 2024-twin changes needed (authoring UI is ruleset-agnostic; `loadDrafts` is read-only).
+
+**Live verification (Playwright, test-campaign, two tabs, Vite HMR-served fix):**
+- Pre-fix repro: two `page.evaluate` Reject clicks stamped identical ms (`1793497679818`) — loser tab showed the "Faction not found" alert, console DELETE `factions/qa-as-d1 → 404` + `[CampaignBuilder] factions action failed`, and the ghost "QA AS Draft One" row remained with both buttons `disabled:false`. Winner clean.
+- Post-fix, two fresh same-ms races (`1793497815979`, `1793497833732`): losers showed the banner **and** dropped the ghost row (rows list = remaining drafts only); winner tabs clean with no banner. 0/2 ghosts (was 2/2 pre-fix).
+- Adjacent sanity: sequential Reject on the last draft row — row gone, no banner, empty state renders; the other tab SSE-synced the removal; normal success-path reload unchanged.
+- Cleanup verified: server factions list restored byte-identical (`The Iron Consortium`, stamp `1793127696761`, on disk too), change-data `{}`, campaign log `[]`, all QA rows deleted, both tabs closed before clears.
+
+**Tests/lint:** new regression `CampaignBuilder.action-error-reload.test.jsx` (3 tests: failed reject re-fetches + drops ghost + keeps banner; failed action keeps a row that still exists server-side; post-failure SSE sync still armed) — 3/3 pass. Folder run `src/components/campaign-builder/` 25/25, `src/services/campaign/draftActions.test.js` 7/7, `npm run lint` clean (zero warnings).
+
+**Files changed:** `src/components/campaign-builder/CampaignBuilder.jsx`, new `src/components/campaign-builder/CampaignBuilder.action-error-reload.test.jsx`.
