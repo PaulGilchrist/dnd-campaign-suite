@@ -1,10 +1,12 @@
 // @maintained-by-ai
 // Unit tests for the client-side log filter/window helpers in log-utils.js:
 // filterLogEntries (AND-semantics facets), getEntrySearchText (recursive
-// string harvest, ids skipped), formatEntryTypeLabel, LOG_WINDOW_SIZE.
+// string harvest + AI audit one-liner fold, ids skipped), formatEntryTypeLabel,
+// LOG_WINDOW_SIZE.
 
 import {
   filterLogEntries,
+  formatAiAuditLine,
   formatEntryTypeLabel,
   getEntrySearchText,
   getRollTypeOptions,
@@ -19,6 +21,20 @@ const entry = (o = {}) => ({
   noteText: 'Quest begins.',
   ...o
 });
+
+// Pre-fold expectation: raw recursive string harvest (ids skipped), exactly
+// what getEntrySearchText did before the AI audit one-liner fold.
+const expectedRawSearchText = (obj) => {
+  const parts = [];
+  (function harvest(v) {
+    if (typeof v === 'string') parts.push(v);
+    else if (Array.isArray(v)) v.forEach(harvest);
+    else if (v && typeof v === 'object') {
+      Object.entries(v).forEach(([k, item]) => { if (k !== 'id') harvest(item); });
+    }
+  })(obj);
+  return parts.join(' ').toLowerCase();
+};
 
 describe('log-utils filter helpers', () => {
   describe('filterLogEntries', () => {
@@ -159,6 +175,71 @@ describe('log-utils filter helpers', () => {
 
     it('ignores numeric values (timestamps are not text)', () => {
       expect(getEntrySearchText(entry())).not.toContain('1700000000000');
+    });
+  });
+
+  describe('getEntrySearchText AI audit one-liner fold', () => {
+    // Real ai_refine shape from server/services/ai/authoring/refine.js —
+    // no message/description, so the outcome words only exist in the
+    // rendered line (derived by describeRefine/attemptsPhrase).
+    const refineEntry = {
+      id: 'aud1',
+      type: 'ai_refine',
+      name: 'AI refine',
+      timestamp: 1700000000000,
+      kind: 'npc',
+      instruction: 'Make him more menacing',
+      attempts: 1,
+    };
+
+    it('folds the rendered one-liner so derived outcome words are searchable', () => {
+      const line = formatAiAuditLine(refineEntry);
+      expect(line).toContain('proposed a replacement after 1 attempt');
+      const text = getEntrySearchText(refineEntry);
+      expect(text).toContain(line.toLowerCase());
+      const found = filterLogEntries([refineEntry], { text: 'replacement' });
+      expect(found.map(e => e.id)).toEqual(['aud1']);
+      expect(filterLogEntries([refineEntry], { text: 'proposed a replacement' }).map(e => e.id)).toEqual(['aud1']);
+    });
+
+    it('makes the retry give-up phrase searchable too', () => {
+      const givenUp = { ...refineEntry, id: 'aud2', attempts: 0 };
+      expect(formatAiAuditLine(givenUp)).toContain('refused — the proposed JSON failed validation');
+      const designer = {
+        id: 'aud3',
+        type: 'ai_designer',
+        name: 'AI designer',
+        timestamp: 1700000000000,
+        stage: 'batch',
+        error: 'validation failed',
+        attempts: 0,
+      };
+      expect(formatAiAuditLine(designer)).toContain('gave up after retries');
+      expect(filterLogEntries([givenUp, designer], { text: 'gave up after retries' }).map(e => e.id)).toEqual(['aud3']);
+    });
+
+    it('keeps raw audit fields searchable (pure addition)', () => {
+      const text = getEntrySearchText(refineEntry);
+      expect(text).toContain('menacing');
+      expect(text).toContain('npc');
+      expect(text).toContain('ai refine');
+    });
+
+    it('leaves non-audit entry search text byte-identical', () => {
+      // Even a note carrying a summary (an AUDIT_SUMMARY_SKIP key) must not
+      // gain folded text — the fold is scoped to AI_AUDIT_DESCRIBERS types.
+      const plain = entry({ noteText: 'Ambush at dawn' });
+      const withSummary = entry({ noteText: undefined, summary: 'Restored 5 hp' });
+      const roll = entry({ id: 'r', type: 'roll', noteText: undefined, name: 'Attack', rollType: 'attack', rolls: [20] });
+      for (const e of [plain, withSummary, roll]) {
+        expect(getEntrySearchText(e)).toBe(expectedRawSearchText(e));
+      }
+    });
+
+    it('skips the fold for audit rows already carrying direct text', () => {
+      const withMessage = { ...refineEntry, id: 'aud4', message: 'Refined the npc' };
+      expect(getEntrySearchText(withMessage)).toBe(expectedRawSearchText(withMessage));
+      expect(getEntrySearchText(withMessage)).toContain('refined the npc');
     });
   });
 

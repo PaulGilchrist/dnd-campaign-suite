@@ -56,8 +56,6 @@
 
 ## Improvement Backlog
 
-- 2026-10-31 (AR): `getEntrySearchText` recursively collects raw entry strings (instruction/kind/description all findable), but the rendered one-liner's outcome words ("gave up after retries", "proposed a replacement") are derived and not searchable — minor: fold `formatAiAuditLine` into search text once the raw-JSON leak is fixed. `src/components/log/log-utils.js:54`.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - OPEN (infra): llama.cpp-style refusing-backend face for constrained decoding fallback — no such backend on this machine (unchanged from AQ).

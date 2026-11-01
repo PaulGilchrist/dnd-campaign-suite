@@ -54,6 +54,16 @@ function collectSearchableStrings(value, parts) {
 export function getEntrySearchText(entry) {
   const parts = [];
   collectSearchableStrings(entry, parts);
+  // Fold in the rendered audit one-liner (below) so its derived outcome
+  // phrases — "proposed a replacement", "gave up after retries" — become
+  // searchable. Scoped to known AI audit types AND only when the line is
+  // describer prose: rows with a direct message/summary already expose that
+  // text via the raw harvest, and non-audit entries stay byte-identical
+  // (their fallback line is a generic key: value summary, not prose).
+  const direct = directAuditText(entry);
+  if (AI_AUDIT_DESCRIBERS[entry.type] && !(direct && direct.trim())) {
+    parts.push(formatAiAuditLine(entry));
+  }
   return parts.join(' ').toLowerCase();
 }
 
@@ -269,9 +279,17 @@ function summarizeResidualPayload(entry) {
   return parts.length ? parts.join(' · ') : 'No detail recorded';
 }
 
-export function formatAiAuditLine(entry) {
-  const direct = asText(entry.message) ?? asText(entry.description)
+// Direct human/model-authored text a row carries verbatim (the generic rows
+// render it as-is). Shared guard: formatAiAuditLine prefers it over describer
+// prose, and getEntrySearchText skips the fold when it exists (raw harvest
+// already covers it).
+function directAuditText(entry) {
+  return asText(entry.message) ?? asText(entry.description)
     ?? asText(entry.noteText) ?? asText(entry.summary);
+}
+
+export function formatAiAuditLine(entry) {
+  const direct = directAuditText(entry);
   if (direct && direct.trim()) return truncateLine(direct, 400);
   const describe = AI_AUDIT_DESCRIBERS[entry.type];
   if (describe) return truncateLine(describe(entry), 400);

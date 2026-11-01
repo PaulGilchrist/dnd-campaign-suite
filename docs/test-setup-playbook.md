@@ -2206,3 +2206,5 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Fact — Qwen-mtp obeys the referee prompt's VALID_EFFECT_KEYS guard: it REFUSES off-registry keys (schema-valid `needs_human` naming the key) — model-rigged invalid keys are effectively unreachable; use the transport rig deliberately.
 - Fact — referee lane never passes responseSchema, so aiConfig `jsonSchema` tri-state doesn't constrain referee asks (only refine/designer lanes get grammar-constrained); referee POST needs only mode/endpoint/model/provider.
 - Pitfall — `browser_click` `button.ct-btn-primary >> nth=-1` can silently resolve to the WRONG primary button (e.g. Save AI config); always re-find for a fresh ref.
+- Recipe — drive a React-controlled log/filter text input headlessly: native value-setter + dispatch `input` event via `browser_evaluate` (no `slowly` typing needed).
+- Fact — `formatAiAuditLine` never returns '' (falls back to direct text or a generic key: value residual); search-fold guards must key on AI_AUDIT_DESCRIBERS[type] + absence of directAuditText, not on emptiness (since fecbf4c8a-era log-utils).
