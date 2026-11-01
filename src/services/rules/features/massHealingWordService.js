@@ -1,187 +1,28 @@
-import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
-import { getCombatContext } from '../combat/damageUtils.js';
-import { applyHealingToTarget } from '../combat/applyHealing.js';
-import { isWithinRange } from '../combat/rangeCheck.js';
-import { rangeToFeet } from '../combat/rangeValidation.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
+import { createMassHealSpellTrigger } from './massHealSpellFactory.js';
 
 const MASS_HEALING_WORD_NAME = 'Mass Healing Word';
+
 // Disk 5e spells.json:6760 'up to six creatures of your choice that you can
 // see within range' — 'of your choice' with no friendly/allies wording, so
-// hostile selection is RAW-legal (#1385 choice-clause verdict). Fallback for
-// rows without automation.maxTargets only; disk value wins (:6794 = 6).
-const DEFAULT_MAX_TARGETS = 6;
+// hostile selection is RAW-legal (#1385 choice-clause verdict). The shared
+// factory enforces the #1385 selection law: candidates pass canonical
+// isWithinRange(caster, name, rangeToFeet(spell.range)) — disk '60 feet'
+// enforced, no hardcoded feet. maxTargets reads automation.maxTargets
+// (:6794 = 6); defaultMaxTargets 6 below is the disk-text fallback for rows
+// without it. Lawful pool keeps combatSummary array order.
+//
+// UNIQUE vs the Mass Cure Wounds twin: NO postCastHealService import —
+// CLA-038 blessed-healer does NOT fire from this lane (postCastSelfHeal
+// config stays absent; the factory therefore never pulls that module in).
 
-function isMassHealingWord(spell) {
-    // fix#349 #1385: same case-normalization fold the dispatcher uses —
-    // triggerSpells.js:430 `spell.name && spell.name.toLowerCase() ===
-    // 'mass healing word'` lets a case-drift name THROUGH to this gate, which
-    // pre-fix was strict-equality and silently nulled the cast. Fold BOTH
-    // sides (fix#109 dual-literal-case-fold precedent): constant stays the
-    // disk-canonical PascalCase, the comparison is case-insensitive.
-    return (spell.name || '').toLowerCase() === MASS_HEALING_WORD_NAME.toLowerCase();
-}
-
-function getSpellCastingMod(playerStats, spell) {
-    const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
-    if (cantripSpellAbility && playerStats.abilities) {
-        const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
-        if (ability) {
-            return ability.bonus;
-        }
-    }
-    if (playerStats.spellAbilities) {
-        return playerStats.spellAbilities.modifier || 0;
-    }
-    return 0;
-}
-
-function resolveHealExpression(spell, slotLevel, spellCastingMod) {
-    const healAtSlotLevel = spell.heal_at_slot_level;
-    if (!healAtSlotLevel) {
-        return null;
-    }
-
-    let expression = healAtSlotLevel[slotLevel];
-    if (!expression) {
-        const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
-        const highestBelow = levels.filter(l => l <= slotLevel).pop();
-        if (highestBelow) {
-            expression = healAtSlotLevel[highestBelow];
-        }
-    }
-
-    if (!expression) {
-        return null;
-    }
-
-    if (spellCastingMod !== null && spellCastingMod !== undefined) {
-        expression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
-    }
-
-    return expression;
-}
-
-function requireCreatures(combatSummary) {
-    const x = combatSummary.creatures;
-    if (x == null) {
-        console.error('[massHealingWordService] Missing array:', x);
-        throw new Error('Expected array, got ' + x);
-    }
-    return x;
-}
-
-function buildHealFormula(healExpression, bonusDetails) {
-    const formulaParts = [healExpression];
-    if (bonusDetails.length > 0) {
-        const bonusParts = bonusDetails.map(d => `${d.amount} ${d.name}`).join(' + ');
-        formulaParts.push(`(${bonusParts})`);
-    }
-    return formulaParts.join(' + ');
-}
-
-function healMassTarget(combatSummary, target, ctx) {
-    const { playerStats, campaignName, casterName, healExpression, bonusHeal, bonusDetails, maximize } = ctx;
-    const targetName = target.name;
-    const maxHp = target.maxHp || playerStats.hitPoints || 0;
-    const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-    const targetMaximize = hasHealingMaximizationForTarget(playerStats, targetName, campaignName);
-    const rollResult = targetMaximize || maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
-    if (!rollResult) return null;
-
-    const targetHealAmount = rollResult.total + bonusHeal;
-    const actualHeal = Math.min(targetHealAmount, maxHp - currentHp);
-
-    if (actualHeal > 0) {
-        applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
-    }
-
-    const newHp = Math.min(maxHp, currentHp + actualHeal);
-
-    addEntry(campaignName, {
-        type: 'hp_change',
-        targetName,
-        delta: actualHeal,
-        currentHp: newHp,
-        maxHp,
-        isHealing: true,
-        sourceName: casterName,
-        note: MASS_HEALING_WORD_NAME,
-        formula: buildHealFormula(healExpression, bonusDetails),
-        bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[massHealingWord] Error:", e); });
-
-    return { targetName, healAmount: actualHeal, rolls: rollResult.rolls, rawTotal: rollResult.total + bonusHeal };
-}
-
-// #1385 selection law: candidates pass canonical isWithinRange(caster, name,
-// rangeToFeet(spell.range)) — disk '60 feet' enforced, no hardcoded feet.
-// Choice clause (:6760) says 'up to six creatures of your choice that you
-// can see within range' — 'of your choice' with no friendly/allies wording,
-// so hostiles are RAW-legal and affiliation is deliberately unfiltered.
-// maxTargets reads automation.maxTargets (:6794 = 6) else disk-text default.
-// Lawful pool keeps combatSummary array order.
-async function selectLawfulTargets(spell, combatSummary, casterName) {
-    const maxTargets = spell.automation?.maxTargets || DEFAULT_MAX_TARGETS;
-    const rangeFt = rangeToFeet(spell.range);
-    const lawful = [];
-    for (const creature of requireCreatures(combatSummary)) {
-        if (await isWithinRange(casterName, creature.name, rangeFt)) {
-            lawful.push(creature);
-        }
-    }
-    return lawful.slice(0, maxTargets);
-}
-
-export async function triggerMassHealingWord(spell, metaCtx, playerStats, campaignName, _mapName) {
-    if (!isMassHealingWord(spell)) {
-        return null;
-    }
-
-    const slotLevel = metaCtx?.slotLevel || spell.level || 3;
-    const spellCastingMod = getSpellCastingMod(playerStats, spell);
-    const healExpression = resolveHealExpression(spell, slotLevel, spellCastingMod);
-
-    if (!healExpression) {
-        return null;
-    }
-
-    const maximize = hasHealingMaximization(playerStats);
-    const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
-    const combatSummary = await getCombatContext(campaignName);
-    if (!combatSummary) {
-        return null;
-    }
-
-    const casterName = playerStats.name;
-    const targets = await selectLawfulTargets(spell, combatSummary, casterName);
-
-    if (targets.length === 0) {
-        return { noTargets: true };
-    }
-
-    const results = [];
-    const allRolls = [];
-    let totalHealed = 0;
-    const healCtx = { playerStats, campaignName, casterName, healExpression, bonusHeal, bonusDetails, maximize };
-
-    for (const target of targets) {
-        const result = healMassTarget(combatSummary, target, healCtx);
-        if (!result) continue;
-        results.push(result);
-        allRolls.push(...result.rolls);
-        totalHealed += result.healAmount;
-    }
-
-    if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
-        await markFortifiedHealthUsed(playerStats, campaignName);
-    }
-
-    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
-    return { targets: results, formula: healExpression, totalHealed, rolls: allRolls, rawTotal: results.reduce((sum, r) => sum + r.rawTotal, 0) };
-}
+// fix#349 #1385: the dispatcher at triggerSpells.js `spell.name.toLowerCase() ===
+// 'mass healing word'` lets any casing through to the factory gate, which
+// folds case on BOTH sides (fix#109 dual-literal-case-fold precedent): the
+// constant stays disk-canonical PascalCase, the comparison is case-insensitive.
+export const triggerMassHealingWord = createMassHealSpellTrigger({
+    spellName: MASS_HEALING_WORD_NAME,
+    defaultSlotLevel: 3,
+    defaultMaxTargets: 6,
+    serviceTag: '[massHealingWordService]',
+    logTag: '[massHealingWord]',
+});

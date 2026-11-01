@@ -2,14 +2,17 @@
 /**
  * massHealingWordService lane — AoE PRODUCER (bonus-action, multi-target,
  * per-target d4 dice). Twin of the #1384 massCureWoundsService lane; this
- * file pins ITS OWN bytes at ITS OWN lane (#1344 family verdict method:
- * structurally identical slice(0,6)/clamp/MOD idioms stay duplicated here
- * on purpose — each service keeps its own copy; nothing folded).
+ * file pins ITS OWN bytes at ITS OWN lane. The structurally identical
+ * slice(0,6)/clamp/MOD twin idioms now live once in massHealSpellFactory.js
+ * (createMassHealSpellTrigger) and this service is a thin config wrapper;
+ * behavior and this lane's module graph are unchanged.
  *
  * TWIN DIFF vs massCureWoundsService.js (read side-by-side):
  *  - UNIQUE here: NO postCastHealService import — CLA-038 blessed-healer
- *    does NOT fire from this lane (grep: source imports 6 modules, none is
- *    postCastHealService; upstream postCastHealService.js:19 lists the
+ *    does NOT fire from this lane (grep: neither this wrapper nor the shared
+ *    factory imports postCastHealService — the factory takes it as an
+ *    optional config callback only the twin passes; upstream
+ *    postCastHealService.js:19 lists the
  *    spell-name for its own caller lane). No unique-vs-twin test needed
  *    beyond the name/note/default-slot bytes below.
  *  - DIFFERENT here: default slot :113 `|| 3` (twin || 5); name gate
