@@ -1,55 +1,86 @@
-# Analysis Report — `src/`
+# Analysis Report — `src/` (2026-11-01)
 
-Scope: 3,624 `*.js|jsx` files (~910k lines incl. 2,399 tests). ts/tsx: none.
+**Scope:** 1,279 non-test `*.js|jsx` files (229,796 lines); ts/tsx: none. Tests, `dist/`, `build/`, `node_modules/` excluded from findings (used only to prove symbol usage).
+
+**Method:** full import-graph walk (all relative specifiers resolved, incl. dynamic `import()`); word-boundary export-usage scan over all files; shingle-based clone detection (10-line normalized windows, comments/whitespace stripped) followed by exact common-run extraction; brace-depth + approximate cyclomatic-complexity (CC) measurement per function ≥120 lines.
+
+**Freshness:** this replaces the prior edition of this report. Items it marked RESOLVED (savageAttacker twins, warlock `beguilingTwistHandler.js`, both deleted in `234d56073`) stay gone; `FearModal.jsx` has since been folded into the shared modal base. Everything below is verified against the current working tree.
+
+---
 
 ## Duplication
 
-1. **Area-effect save modals** — `src/components/char-sheet/modals/shared/`
-   - `FearModal.jsx` (397 L), `HypnoticPatternModal.jsx` (403 L), `TashasLaughterModal.jsx` (381 L), `CalmEmotionsModal.jsx` (375 L).
-   - Measured identical non-blank lines: Fear vs HypnoticPattern **84%** of the smaller file; vs Tashas 63%; vs CalmEmotions 56%. All four already import `AreaEffectTargetModalBase.utils.jsx` (persistAndNotify, saveResultLogging, CreatureSelectionModal) — yet the save-prompt loop bodies remain near-identical, i.e. the base wasn't carried to completion.
+Clone pairs are ranked by *exact* shared ≥10-line runs (normalized), which undercounts structurally-similar-but-reworded code; the shingle count is given as an upper signal.
 
-2. **"Identity refusal" probes** — `src/components/encounter/MonsterCardHelpers.js:1518, :1570, :1622` — `hellishRebukeIdentityRefusal`, `mindCorrosionIdentityRefusal`, `reflexiveAntennaeIdentityRefusal` are the same event-identity gate with per-feature refusal-message maps; the in-file comments literally say *"mirrors hellishRebukeIdentityRefusal"* (L1564, L1617-18).
+1. **Sanctuary save fork (placement since unified, bodies still forked)** — `src/hooks/combat/handlers/handleSanctuarySave.js` (damage path) vs `src/hooks/combat/handlers/sanctuarySave.js` (attack path, moved from `combat/` on 2026-11-01).
+   Shared runs: 21 exact lines; shingle 15. Both export `handleSanctuarySave` doing the same ritual — find `sanctuary` targetEffect → build `pendingSavePrompts` row (same 12-field literal, same "defaulting to 8" console.error fallback) → `sendSavePrompt`. They have **diverged signatures** (`(characterName, campaignName, context, logEntry)` vs `(attackerName, targetName, campaignName, setPopupHtml, logEntry)`) and each is imported by exactly one production caller: `useLoggedDiceRollDamage.js:12` and `useLoggedDiceRollAttack.js:27`. Both files now carry cross-reference NOTE comments; merging the bodies is a behavioral change, deferred.
 
-3. **Monster reaction service family** — `src/services/encounters/monster{Jinx,RedirectAttack,GrantReaction,LairActions,GuardianProtection,ShapeShift,SelfBuff,SelfAura,SpellReflection,UtilitySpellCast,Summon}.js` — each repeats the same scaffolding: exported `handle()` + `buildXRefusalPopup` + `buildXSpendLog`/`buildXRefusalLog` builders + round/uses latch checks (same pattern of exported-but-never-imported builders; see Unused Symbols).
+2. **Maneuver execution twins** — `src/services/automation/handlers/class-fighter-rogue/executeActionManeuvers.js` vs `executeManeuver.js` (same folder): runs `:68-89 == :350-371`, `:103-119 == :233-249`, `:285-295 == :312-322`, `:332-345 == :309-322` (64 exact lines; shingle 26). The batch executor and the single executor each grew their own copy of the same per-maneuver rider logic.
 
-4. **Two Savage Attacker implementations** — `src/services/rules/core/savageAttacker.js` (94 L) and `src/services/combat/steps/features/savageAttacker.js` (43 L) both implement "roll damage twice, keep higher" + the identical passive predicate `passives.some(p => p.type === 'passive_rule' && p.effect === 'reroll_damage_once_per_turn')`. **Neither is imported by any production file** — the live logic is inline in `handlePlainDamage.js`/`DiceRollResult.*`. RESOLVED: both files deleted in 234d56073.
+3. **Revivify-adjacent handlers** — `src/services/automation/handlers/class-cleric-paladin/undyingSentinelHandler.js:27-38, :40-51, :57-67` == `src/services/automation/handlers/healing/revivificationHandler.js:25-36, :38-49, :55-65` (35 exact lines; shingle 33): same creature-target validation + revive plumbing, split by folder for no functional reason.
 
-5. **Two `beguilingTwistHandler.js`** — `automation/handlers/class-ranger/` (105 L, registered at `automation/index.js:121`) vs `class-warlock/` (175 L, orphaned, diverged implementation, 3 test files). Beguiling Twist is a Ranger (Gloom Stalker) feature; the warlock copy is an unreferenced fork. RESOLVED: warlock copy deleted in 234d56073.
+4. **Modal ↔ handler copy/logic bleed** — `src/components/char-sheet/modals/shared/TashasLaughterModal.jsx:110-123, :131-148` == `src/services/automation/handlers/spells/tashasLaughterHandler.js:56-69, :88-105` (32 exact lines; shingle 26). UI component re-implements the handler's effect-side logic (the shared `AreaEffectTargetModalBase` extraction stopped short for the remaining trio: `HypnoticPatternModal` 254 L, `TashasLaughterModal` 356 L, `CalmEmotionsModal` 362 L still share scaffolding via handlers/each other).
 
-## Dead Code
+5. **Spell popup pair** — `src/components/char-sheet/CharActionSpellPopups.jsx:206-216, :221-243` == `src/components/char-sheet/char-spells/TargetSpellPopups.jsx:14-24, :34-56` (34 exact lines; shingle 16): same targeted-spell popup builder in two locations.
 
-Verified: no importer anywhere (imports resolved incl. case-insensitive; only one `import.meta.glob` exists, in `map3dAssets.js`; no lazy imports; namespace imports checked). Removing these strands also orphans their co-located tests.
+6. **Smaller confirmed clones** (each an exact ≥10-line run; candidates for a shared util, listed without prescription):
+    - `modals/arcane/SavantModal.jsx:52-77` == `SignatureSpellsModal.jsx:46-71` (26 L)
+    - `spells/animalFriendshipHandler.js` shares runs with 5 sibling charm/domination handlers (shingles 21/20/19/17/16/17) — no `charmSpellUtils` reuse on these legs despite the util existing
+    - `spells/baneHandler.js:16-26, :34-44` == `blessHandler.js:16-26, :34-44` (22 L)
+    - `modals/WarMagicCantripModal.jsx:16-31` == `WarMagicSpellModal.jsx:17-32` (16 L)
+    - `cockatricePetrifyService.js:146-159` == `paralyzingBreathService.js:156-169` (14 L)
+    - `hex-map/hooks/useZoomPan.js:134-147` == `map/hooks/useZoomPan.js:98-111` (14 L) — two same-named zoom/pan hooks, partially cloned (see Inconsistency #1)
+    - `animateDeadHandler.js:49-59` == `createUndeadHandler.js:48-58` (11 L)
+    - `giantAncestryDispatch.js:249-259` == `giantAncestryTraits.js:265-275` (11 L)
 
-- **CORRECTION**: `src/encounters/combatData.js` is NOT an orphan — `../../../encounters/combatData.js` imports from `src/services/combat/steps/*.js` resolve to it. Keep.
-- **`vi.mock`-referenced UI components** (no production importers; kept because surviving CharSpells/CharActionModals tests mock these paths): `popups/{MultiTargetCountPopup,SingleTargetPopup,TargetWithCheckboxesPopup,TargetWithTypePopup}.jsx`, `modals/shared/{ChoiceListModal,HealingIllusionModal}.jsx`.
-- **Unreferenced module** with caveat: `src/routes/config.js` — only its test imports it, but AGENTS.md calls it "canonical view config"; App.jsx hardcodes views. Document drift, not automatic removal.
+7. **Template duplication inside one file** — `src/components/encounter/MonsterCardHelpers.js:1581, :1633, :1685, plus the MA-0399 probe at :1952` — four `*IdentityRefusal` probes; the in-file comments literally say *"mirrors hellishRebukeIdentityRefusal"* (`:1627`, `:1731`, `:1952`). Same gate skeleton (target check → origin check → already-resolved stamp → attacker sanity → null) with per-feature predicates and message maps.
 
-## Unused Symbols
+8. **Dual-ruleset core drift (by design, flagged for awareness)** — `src/services/rules/core/attackCalc.js:277-290, :338-361, :363-374` == `attackCalc2024.js:117-130, :151-174, :176-187` (50 exact lines; shingle 46); `spellCalc.js` vs `spellCalc2024.js` (shingle 13). The parallel-module pattern is mandated by the architecture, but these blocks are byte-identical today — a bug fixed in one will silently stay broken in the other.
 
-Exports whose names appear **nowhere outside their defining file** (and dynamic-dispatch via namespace import ruled out):
+---
 
-- Lower-confidence tier (used in-file once, never imported): ~40 `build*Popup/RefusalPopup/SpendLog/…Log` helpers across the `monster*.js` services listed above — safe to drop the `export` keyword only.
+## Hygiene Notes (informational — nothing to action)
+
+**Orphan check (clean):** only `src/test/setup.js` (vitest config entry) and `src/components/common/__mocks__/ConcentrationPromptModalMocks.jsx` (auto-mock convention) are import-unreferenced — both legitimate. Production `console.log`: **zero** across all non-test files. `TODO/FIXME`: 9 hits, all in test files and all pointing at tracked ledger bugs (#799, PFE-G charm immunity, save-margin rider, ram-prone) — no stray production debt.
+
+---
 
 ## Complexity
 
-Brace-nesting depth / function-length scan of the largest production files:
+Function-level hotspots (brace-nesting depth = max `{}` depth incl. function frame; CC ≈ 1 + decision tokens, an approximation):
 
-- `components/char-sheet/CharReactions.jsx` — component body **474 lines** (L404+), max nesting depth **6** (L254).
-- `components/char-sheet/modals/shared/SaveAttackAoeModal.jsx` — component body **591 lines** (L1208+), depth 4.
-- `components/encounter/MonsterCardModal.jsx` — 2,635 L file; `buildAbilitySaveRollContext` **132 L, cyclomatic ≈ 24** (L1564); depth 5.
-- `services/rules/combat/applyDamage.js` — depth **5** (L246), 1,083 L.
-- `hooks/combat/handlers/handlePlainDamage.js` — 1,128 L, depth 4; `saveProcessing.js` 1,502 L; `MonsterCardHelpers.js` 3,403 L (mitigated: many small helpers).
+| Location | Lines | Nesting | CC≈ | Note |
+|---|---|---|---|---|
+| `src/App.jsx:296-786` `App` | 491 | 6 | 74 | Single component holding routing, SSE, campaign lifecycle, modals |
+| `src/components/hex-map/hooks/useMapLoader.js:354-623` | 270 | 5 | 29 | One effect-dense loader; 8 test facets already probe its seams |
+| `src/services/combat/automation/automationModifiers.js:1-250` `saveAbilities` | 250 | 5 | 28 | Flat but very long sequential pass |
+| `src/components/char-sheet/DiceRollResult.handlers.js:3-246` `createDiceRollHandlers` | 244 | 5 | 48 | Factory returning many closures; high branch count |
+| `src/hooks/wizard/useWizardFeatAbilityChoices.js:98-306` | 209 | **8** | 58 | Deepest nesting + high CC in the tree |
+| `src/services/automation/handlers/healing/massHealUtils.js:44-243` `createMassHealHandler` | 200 | 5 | 37 | |
+| `src/components/char-sheet/useCharActionsAutomation.js:276-472` `handleAutomationAction` | 197 | 7 | 21 | Deep dispatch chain |
+| `src/components/initiative/useLootHandlers.js:54-267` | 214 | 7 | 20 | Deeply nested modal-confirm flows |
+| `src/services/rules/core/maneuvers.js:10-176` `processManeuvers` | 167 | 7 | 48 | Long switch-style maneuver dispatch |
+| `src/components/char-sheet/modals/HurlThroughHellModal.jsx:23-215` `handleConfirm` | 193 | 5 | 14 | Long but linear |
+
+File-size hotspots (whole-file context, not single functions): `MonsterCardHelpers.js` 3,485 L · `MonsterCardModal.jsx` 2,944 L · `SaveAttackAoeModal.jsx` 2,060 L (component body at `:1444-1570` is only 127 L — most of the file is module-level helpers) · `saveProcessing.js` 1,746 L · `targetEffectDefinitions.js` 1,552 L (registry — long by design) · `handlePlainDamage.js` 1,272 L.
+
+Dependency tangle signal: `App.jsx` and `MonsterCardHelpers.js` are the two widest-fan files; `handleSanctuarySave`’s fork (Duplication #1) sits on both the attack and damage roll paths, doubling the blast radius of any sanctuary fix.
+
+---
 
 ## Inconsistency
 
-1. ~~**Filename-case mismatches**~~ — FIXED (63deb3844 `Subscriber.jsx`, 88f1ebb23 `Initiative.jsx`).
-2. **Inline styles**: `style={{…}}` in **89 non-test JSX files** (max 15 in `CombatSuperiorityModal.jsx`), vs the "no inline styles" rule.
-3. **`!important`**: 15 in `EncounterBuilder.css`, 11 in `Initiative.css`, etc. — vs "never use !important".
-4. **Folder naming**: `automationInfoBuilder/`, `skillValidation/`, `spellCastService/`, `useSpellMetamagicFlow/` are camelCase dirs vs the kebab-case convention.
-5. **Dice rolls bypassing the dice utility**: `services/dice/diceRoller.js` exists, yet raw `Math.floor(Math.random()*n)+1` appears in ~60 places (WeatherOverlay.jsx ×27, npcGenerator.js ×13, DiceRollResult.handlers.js ×9…). One instance (`rules/core/savageAttacker.js`) even rolls with the wrong die bounds (`Math.random()*roll`) with an admitted *"placeholder"* comment — dead code, so no runtime impact.
-6. **Layering drift**: initiative components (`initiative.jsx`, `npcClickFormHandlers.js`) import `getRuntimeValue/setRuntimeValue` from `hooks/runtime/` — services/components reaching into the hooks layer.
-7. **Test-utility naming drift**: `*.test-utils.js|jsx` (35 files) vs `log-test-utils.jsx` (hyphen) and `CharSpecialActions.modalMocks.jsx` / `__mocks__/`.
+1. **Two hook-location conventions with colliding names.** `src/hooks/{combat,management,wizard,ui,ui}/…` vs component-local `src/components/<name>/hooks/…`. Consequence: **two `useMapLoader.js`** (`hex-map/hooks/`, `map/hooks/`) and **two `useZoomPan.js`** (same pair, 14-L shared run) — a reader (or agent) resolving a bare hook name can hit the wrong file. Descriptive, not prescriptive: a naming or re-export convention would disambiguate.
+2. **Filename-suffix drift.** Component conventions elsewhere are `PascalCase.jsx` folders/files; `CharActionModals.SecondaryModals.jsx` introduces a second capitalized segment, and `contextBuilder-sync.js` a kebab suffix, in an otherwise camelCase service directory.
+3. **Half-finished extraction.** `AreaEffectTargetModalBase` exists, yet the three surviving area modals that import it still duplicate save-prompt legs against their handlers (Duplication #4).
+4. **Identical blocks in the dual-ruleset twins** (Duplication #8) — the architecture mandates *separate* modules, but byte-identical stretches inside them mean fixes must be applied twice; worth a standing note for anyone touching `attackCalc*`.
+
+---
 
 ## Prioritized Low-Risk Opportunities
 
-1. Cosmetic backlog (deferred, not zero-risk / architectural): camelCase dirs → kebab-case, inline styles (89 files), `!important` usages, dice rolls → `diceRoller.js` (changes RNG call order), hooks-layer imports in initiative components.
+Ranked by safety:
+
+1. **Defer:** identity-refusal template extraction in `MonsterCardHelpers.js`, dual-ruleset dedup (#8), and the App.jsx decomposition — real smells, but every slice of them is a behavioral-refactor campaign, not a low-risk cleanup.
+
+All higher-priority items were completed 2026-11-01: dead file + dead exports + test fixtures removed; sanctuary fork placement unified; Brutal Strike bonuses folded into `brutalStrikeGrants.js`; mass-heal pair into `massHealSpellFactory.js`; shake pair into `wakeOnDamageShake.js`. CharActions "27-L twin" proved a false positive (hook destructure vs return list).
