@@ -2,6 +2,7 @@
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import PlacedItems, { baseProps } from './PlacedItems.test-utils';
+import { HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 
 function makeItem(type, overrides = {}) {
   return {
@@ -48,13 +49,13 @@ describe('PlacedItems - Fog of war hiding', () => {
     expect(container.querySelectorAll('rect[fill="#8B5A2B"]')).toHaveLength(0);
   });
 
-  it('shows localhost invisible items at reduced opacity even when fog covers cell', () => {
+  it('shows localhost invisible items at the shared hidden-marker opacity even when fog covers cell', () => {
     const { container } = render(
       placedItemsEl([makeItem('barrel', { visible: false })], new Map([['0,0', true]]), true),
     );
     const el = container.querySelector('use[href="#barrel"]');
     expect(el).toBeInTheDocument();
-    expect(el.getAttribute('opacity')).toBe('0.5');
+    expect(el.getAttribute('opacity')).toBe(String(HIDDEN_MARKER_OPACITY));
   });
 
   it('hides remote invisible items even when fog does not cover the cell', () => {

@@ -1,4 +1,5 @@
 import { HEX_SIZE } from '../../config/outdoorConfig';
+import { HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 import { hexToPixel, hexDistance } from '../../services/maps/hexMapUtils';
 
 function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHover, isLocalhost = false, partyPosition, onPoiEnter, validLinkedMaps, roadStartPoiId }) {
@@ -31,7 +32,7 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                     <g
                         key={poi.id}
                         className={`poi-item${enterable ? ' poi-item-enterable' : ''}`}
-                        opacity={poi.visible !== false ? 1 : 0.4}
+                        opacity={poi.visible !== false ? 1 : HIDDEN_MARKER_OPACITY}
                     >
                         {/* Road-start selection ring */}
                         {roadStartPoiId === poi.id && (

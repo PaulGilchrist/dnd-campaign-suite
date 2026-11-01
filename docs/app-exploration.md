@@ -68,7 +68,6 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 AZ2: **Hidden-marker dim values diverge** — hidden POI dims `use` opacity 0.4 (AY) while hidden creature tokens dim `.npc-circle` opacity 0.5 (AZ2), both GM-only. Harmless today; a shared constant would keep GM-readable dimming consistent across lanes. `IndoorPoiLayer.jsx` / `PlacedItems.jsx`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

@@ -10,6 +10,7 @@
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import PlacedItems, { baseProps } from './PlacedItems.test-utils';
+import { HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 
 const renderItems = (items, over = {}) =>
     render(<PlacedItems {...baseProps} {...over} placedItems={items} />);
@@ -44,7 +45,7 @@ describe('PlacedItems — creature token lane (monster rows render)', () => {
         const hidden = monster({ visible: false });
         const gm = renderItems([hidden]);
         expect(gm.container.querySelectorAll('g.npc-group')).toHaveLength(1);
-        expect(gm.container.querySelector('circle.npc-circle')).toHaveStyle({ opacity: 0.5 });
+        expect(gm.container.querySelector('circle.npc-circle')).toHaveStyle({ opacity: HIDDEN_MARKER_OPACITY });
 
         const lan = renderItems([hidden], { isLocalhost: false });
         expect(lan.container.querySelectorAll('g.npc-group')).toHaveLength(0);

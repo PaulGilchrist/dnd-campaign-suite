@@ -10,8 +10,11 @@
  *   - GM (localhost) hit area for the right-click menu,
  *   - hidden POIs (visible === false) stay invisible to players,
  *   - fogged cells hide the marker from players (same fog rule as
- *     PlacedItems.jsx:21) while the GM sees it through the veil at 0.4.
+ *     PlacedItems.jsx:21) while the GM sees it through the veil dimmed by
+ *     the shared HIDDEN_MARKER_OPACITY.
  */
+import { HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
+
 function IndoorPoiLayer({ pois, isLocalhost, fog, gridCenterX, gridCenterY, handlePoiContextMenu, selectedPoi }) {
     const rows = Array.isArray(pois) ? pois : [];
 
@@ -32,7 +35,7 @@ function IndoorPoiLayer({ pois, isLocalhost, fog, gridCenterX, gridCenterY, hand
                 return (
                     <g key={poi.id} className="poi-item">
                         {/* POI icon (shared LandmarkSVG def) + label */}
-                        <use href="#poi-landmark" x={cx - 18} y={cy - 18} opacity={dimmed ? 0.4 : 1} />
+                        <use href="#poi-landmark" x={cx - 18} y={cy - 18} opacity={dimmed ? HIDDEN_MARKER_OPACITY : 1} />
                         {poi.label && (
                             <text
                                 x={cx}
@@ -41,7 +44,7 @@ function IndoorPoiLayer({ pois, isLocalhost, fog, gridCenterX, gridCenterY, hand
                                 fontSize="9"
                                 fontWeight="bold"
                                 className="poi-label"
-                                opacity={dimmed ? 0.4 : 1}
+                                opacity={dimmed ? HIDDEN_MARKER_OPACITY : 1}
                             >
                                 {poi.label}
                             </text>

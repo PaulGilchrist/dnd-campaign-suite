@@ -1,4 +1,4 @@
-import { CELL_SIZE } from '../../../config/mapConfig.js';
+import { CELL_SIZE, HIDDEN_MARKER_OPACITY } from '../../../config/mapConfig.js';
 import { getAssetUrl } from './map3dAssets.js';
 import { createOverlayGroup } from './map3dSpellOverlays.js';
 import { computeEffectiveWalls } from '../../../services/maps/effectiveWalls.js';
@@ -508,14 +508,15 @@ export class Map3DScene {
         }
     }
 
-    // Dim a hidden (secret) item for the GM, like the 2D GM view (opacity 0.5).
+    // Dim a hidden (secret) item for the GM, like the 2D GM view — both ride
+    // the shared HIDDEN_MARKER_OPACITY (config/mapConfig.js).
     _setDimmed(obj) {
         obj.traverse((o) => {
             if (o.isMesh && o.material) {
                 const mats = Array.isArray(o.material) ? o.material : [o.material];
                 for (const m of mats) {
                     m.transparent = true;
-                    m.opacity = 0.5;
+                    m.opacity = HIDDEN_MARKER_OPACITY;
                     m.depthWrite = false;
                 }
             }

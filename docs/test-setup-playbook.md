@@ -2372,3 +2372,7 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 
 ## Improve run 2026-11-01 (map3d-toolbar-aria-labels) — residual closure
 - CLOSED: the §972/§1764 residual "Map3D `2D` / `Top-down` are the only unlabelled toolbar buttons" is DEAD — both buttons now carry title-mirroring `aria-label` ("Back to 2D map" / "Top-down view") pinned in `Map3D.test.jsx` (getByRole name queries + getByTitle identity pin). getByTitle locators from those runs still work; getByRole(name) now resolves too.
+
+## Improve run 2026-11-01 (hidden-marker-dim-constant) — facts
+- FACT — hidden-marker dim canon (post-improve): ONE constant `HIDDEN_MARKER_OPACITY = 0.4` in `src/config/mapConfig.js` feeds all four GM dim lanes — indoor props/creature tokens (`PlacedItems.itemOpacity`), indoor POI `use`+label (`IndoorPoiLayer`), hex POI `g` (`POILayer`), 3D hidden meshes (`map3dScene._setDimmed`, was 0.5). Hidden creature-token GM dim is now 0.4 (AZ2-era 0.5 fingerprints and AY's divergent-values note are DEAD); player lanes unchanged (hidden = fully invisible — visibility filters untouched). Decorative 0.5s (door planks, disabled buttons) and fog 0.45 stay literal by design.
+- PITFALL — the SVG ctxmenu cannot be READ in the same evaluate that dispatches `contextmenu` (React flush lands after the dispatch tick) — arm in one call, read/click the `text.menu-option` in the next; menu stays open after Hide/Show (labels re-render from state, ✕ not needed for visibility toggles).

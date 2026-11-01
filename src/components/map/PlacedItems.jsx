@@ -1,5 +1,5 @@
 
-import { CELL_SIZE } from '../../config/mapConfig';
+import { CELL_SIZE, HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 // One label, one source of truth (ItemDetailsDock.jsx uses the same fn):
 // renamed/AI-Dressed items title as their plain `name`; unnamed props as
 // `type (x,y)` so two same-type markers are distinguishable by a pure DOM
@@ -28,7 +28,7 @@ function PlacedItems({
         return isLocalhost || (item.visible && !fog?.has(`${item.gridX},${item.gridY}`));
     };
 
-    const itemOpacity = (item) => (isLocalhost ? (item.visible ? 1 : 0.5) : 1);
+    const itemOpacity = (item) => (isLocalhost ? (item.visible ? 1 : HIDDEN_MARKER_OPACITY) : 1);
 
     const isDragging = (item) => itemDragging?.itemId === item.id;
 

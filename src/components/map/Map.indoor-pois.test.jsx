@@ -16,6 +16,7 @@ import { render, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Map from './Map.jsx';
 import { clearRuntimeState } from '../../hooks/runtime/useRuntimeState.js';
+import { HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 
 vi.mock('../../services/maps/mapsService.js', () => ({
     toKebabCase: (name) => name,
@@ -109,7 +110,7 @@ describe('indoor map POI lane', () => {
         const hidden = { ...POI, visible: false };
         const gm = await renderGmWithPoi([hidden]);
         expect(gm.container.querySelector('.poi-label')?.textContent).toBe('QA Fix Shrine');
-        expect(gm.container.querySelector('use')?.getAttribute('opacity')).toBe('0.4');
+        expect(gm.container.querySelector('use')?.getAttribute('opacity')).toBe(String(HIDDEN_MARKER_OPACITY));
         gm.unmount();
 
         mockLoadedMap({ pois: [hidden] });
@@ -159,7 +160,7 @@ describe('indoor map POI lane', () => {
         const menu = container.querySelector('.poi-context-menu');
         fireEvent.click([...menu.querySelectorAll('text')].find(t => t.textContent === 'Hide'));
 
-        expect(container.querySelector('use')?.getAttribute('opacity')).toBe('0.4');
+        expect(container.querySelector('use')?.getAttribute('opacity')).toBe(String(HIDDEN_MARKER_OPACITY));
         await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalled(), { timeout: 3000 });
         const saved = mapsService.saveMapData.mock.calls.at(-1)[2];
         expect(saved.pois).toEqual([{ ...POI, visible: false }]);

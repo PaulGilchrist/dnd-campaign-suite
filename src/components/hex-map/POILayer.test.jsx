@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import POILayer from './POILayer.jsx';
 import { hexToPixel, hexDistance } from '../../services/maps/hexMapUtils.js';
 import { HEX_SIZE } from '../../config/outdoorConfig';
+import { HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 
 // Oracle: the real hexToPixel/hexDistance run un-mocked (precedent:
 // PartyMarkerLayer.test.jsx). POI toggle STATE is owned by
@@ -87,7 +88,7 @@ describe('POILayer', () => {
         it.each([
             { isLocalhost: true, hiddenExpected: true },
             { isLocalhost: false, hiddenExpected: false },
-        ])('GM view ($isLocalhost) renders the exact visible set, hidden POIs faded at opacity 0.4', ({ isLocalhost, hiddenExpected }) => {
+        ])('GM view ($isLocalhost) renders the exact visible set, hidden POIs faded at the shared HIDDEN_MARKER_OPACITY', ({ isLocalhost, hiddenExpected }) => {
             const { container } = renderLayer({
                 isLocalhost,
                 pois: [
@@ -98,7 +99,7 @@ describe('POILayer', () => {
             expect(renderedPoiIds(container)).toEqual(hiddenExpected ? ['Visible POI', 'Hidden POI'] : ['Visible POI']);
             if (hiddenExpected) {
                 const [visibleGroup, hiddenGroup] = container.querySelectorAll('g.poi-item');
-                expect(hiddenGroup.getAttribute('opacity')).toBe('0.4');
+                expect(hiddenGroup.getAttribute('opacity')).toBe(String(HIDDEN_MARKER_OPACITY));
                 expect(visibleGroup.getAttribute('opacity')).toBe('1');
             }
         });
