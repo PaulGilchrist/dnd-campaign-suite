@@ -1,9 +1,23 @@
 
-function menuHeightFor(isNpc, isDoor, showViewStats) {
-    if (isDoor) return 116;
-    const hasExtra = isNpc || showViewStats;
-    if (!hasExtra) return 76;
-    return showViewStats ? 138 : 120;
+// Rotation-invariance audit (backlog 2026-11-01 BA): creature tokens (npc +
+// monster, which is what AI-Dress `ai-dress-token-*` rows are) have NO
+// transform consumer in either render lane — 2D PlacedItems.jsx
+// renderCreature and 3D map3dScene._buildNpcs both ignore `rotation` — so
+// Rotate was a silent persisted knob for them. Every other placedItems type
+// consumes rotation in at least one lane (2D furniture/door transforms, 3D
+// mesh rotation), so they keep the entry. Same pattern as showRenameOption:
+// menu visibility is derived from the item type inside the entries builder.
+function isRotationInvariant(item) {
+    return !!item && (item.type === 'npc' || item.type === 'monster');
+}
+
+function menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption) {
+    let height;
+    if (isDoor) height = 116;
+    else if (isNpc || showViewStats) height = showViewStats ? 138 : 120;
+    else height = 76;
+    // Rotate is always the last row (22px pitch); drop its slot when hidden.
+    return showRotateOption ? height : height - 22;
 }
 
 function rotateOffsetFor(showViewStats, showRenameOption, isDoor) {
@@ -17,8 +31,9 @@ function buildMenuModel(item, monsterFound, menuY) {
     const isDoor = item && item.type === 'door';
     const showRenameOption = isNpc;
     const showViewStats = isNpc && monsterFound;
+    const showRotateOption = !isRotationInvariant(item);
 
-    const effectiveHeight = menuHeightFor(isNpc, isDoor, showViewStats);
+    const effectiveHeight = menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption);
     const yRotate = rotateOffsetFor(showViewStats, showRenameOption, isDoor);
 
     const entries = [
@@ -34,7 +49,9 @@ function buildMenuModel(item, monsterFound, menuY) {
     if (showViewStats) {
         entries.push({ id: 'stats', y: menuY + 86, label: 'View Stats' });
     }
-    entries.push({ id: 'rotate', y: menuY + yRotate, label: 'Rotate' });
+    if (showRotateOption) {
+        entries.push({ id: 'rotate', y: menuY + yRotate, label: 'Rotate' });
+    }
 
     return { entries, effectiveHeight, yRotate };
 }

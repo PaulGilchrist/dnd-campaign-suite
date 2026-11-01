@@ -7,13 +7,21 @@
 //   state                        labels
 //   token visible              → ['Hide','Delete','Rotate','✕']
 //   token hidden             → ['Show','Delete','Rotate','✕']
-//   npc, monster not found   → ['Hide','Delete','Rename','Rotate','✕']
-//   npc, monster found       → ['Hide','Delete','Rename','View Stats','Rotate','✕']
+//   monster token            → ['Hide','Delete','✕']          (no Rotate — rotation-invariant lane)
+//   npc, monster not found   → ['Hide','Delete','Rename','✕'] (no Rotate)
+//   npc, monster found       → ['Hide','Delete','Rename','View Stats','✕'] (no Rotate)
+//   rotatable prop (table)   → ['Hide','Delete','Rotate','✕']
 //   door closed              → ['Hide','Delete','Open Door','Rotate','✕']
 //   door open                → ['Hide','Delete','Close Door','Rotate','✕']
 //   unknown type             → ['Hide','Delete','Rotate','✕']
 //   id not in placedItems    → ['Hide','Delete','Rotate','✕']
 //   no selection (null)      → renders nothing
+//
+// Rotate visibility is type-derived (showRotateOption, mirroring
+// showRenameOption): creature types npc/monster have zero transform consumers
+// in either render lane (2D PlacedItems renderCreature, 3D map3dScene
+// _buildNpcs), so Rotate is hidden for them — silent persisted knob
+// (backlog 2026-11-01 BA).
 //
 // NOT OWNED — cited to owner lanes (dispatch args pinned here only):
 //   door open/closed pane swap + resulting placed state → PlacedItems lanes (#899/#909)
@@ -101,8 +109,11 @@ describe('menu content census', () => {
     it.each([
         ['token visible', { type: 'token', visible: true }, false, ['Hide', 'Delete', 'Rotate', '✕']],
         ['token hidden', { type: 'token', visible: false }, false, ['Show', 'Delete', 'Rotate', '✕']],
-        ['npc monster not found', { type: 'npc' }, false, ['Hide', 'Delete', 'Rename', 'Rotate', '✕']],
-        ['npc monster found', { type: 'npc' }, true, ['Hide', 'Delete', 'Rename', 'View Stats', 'Rotate', '✕']],
+        ['npc monster not found', { type: 'npc' }, false, ['Hide', 'Delete', 'Rename', '✕']],
+        ['npc monster found', { type: 'npc' }, true, ['Hide', 'Delete', 'Rename', 'View Stats', '✕']],
+        ['monster token', { type: 'monster', name: 'Goblin' }, false, ['Hide', 'Delete', '✕']],
+        ['monster token hidden', { type: 'monster', name: 'Goblin', visible: false }, false, ['Show', 'Delete', '✕']],
+        ['rotatable prop (table)', { type: 'table' }, false, ['Hide', 'Delete', 'Rotate', '✕']],
         ['door closed, monster found', { type: 'door', open: false }, true, ['Hide', 'Delete', 'Open Door', 'Rotate', '✕']],
         ['door open', { type: 'door', open: true }, false, ['Hide', 'Delete', 'Close Door', 'Rotate', '✕']],
         ['unknown type', { type: 'chest' }, true, ['Hide', 'Delete', 'Rotate', '✕']],
@@ -119,6 +130,50 @@ describe('menu content census', () => {
         const mocks = createMocks();
         const { container } = renderMenu(mocks, { placedItems: [] });
         expect(menuLabels(container)).toEqual(['Hide', 'Delete', 'Rotate', '✕']);
+    });
+});
+
+// ── Rotation-invariant creature tokens: Rotate menu is unreachable ──
+// Backlog 2026-11-01 BA: npc/monster render lanes (2D PlacedItems
+// renderCreature, 3D map3dScene._buildNpcs) never consume `rotation`, so the
+// menu must not advertise Rotate for them — every creature-menu click must
+// leave handleRotate unfired (no silent persisted knob).
+
+describe('creature tokens never dispatch rotate', () => {
+    it.each([
+        ['npc', { type: 'npc', name: 'Marta' }],
+        ['monster', { type: 'monster', name: 'Goblin' }],
+    ])('%s dress-token row: clicking every menu entry leaves handleRotate untouched', (_label, item) => {
+        const mocks = createMocks();
+        const { container } = renderMenu(mocks, { placedItems: [placedItem(item)] });
+        expect(screen.queryByText('Rotate')).not.toBeInTheDocument();
+        container.querySelectorAll('.menu-option').forEach(option => fireEvent.click(option));
+        expect(mocks.handleRotate).not.toHaveBeenCalled();
+        // Sanity: the menu is live, not a dead render — sibling entries fired.
+        expect(mocks.handleToggleItemVisibility).toHaveBeenCalledTimes(1);
+        expect(mocks.handleDeleteItem).toHaveBeenCalledTimes(1);
+    });
+});
+
+// ── Panel height tracks the entry count (Rotate row removed ⇒ −22) ──
+
+describe('menu panel height', () => {
+    const menuRectHeight = (container) =>
+        Number(container.querySelector('.item-context-menu rect').getAttribute('height'));
+
+    it.each([
+        ['monster (Hide/Delete only)', { type: 'monster', name: 'Goblin' }, false, 54],
+        ['npc (Rename, no Rotate)', { type: 'npc' }, false, 98],
+        ['npc + stats (no Rotate)', { type: 'npc' }, true, 116],
+        ['rotatable prop keeps Rotate row', { type: 'table' }, false, 76],
+        ['door keeps Rotate row', { type: 'door' }, false, 116],
+    ])('%s', (_label, item, monsterFound, expected) => {
+        const mocks = createMocks();
+        const { container } = renderMenu(mocks, {
+            placedItems: [placedItem(item)],
+            monsterFound,
+        });
+        expect(menuRectHeight(container)).toBe(expected);
     });
 });
 

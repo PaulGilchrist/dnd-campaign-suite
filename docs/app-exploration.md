@@ -56,7 +56,6 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 BA: **Rotate menu on creature tokens is a silent persisted knob** — ctx-menu offers Rotate for Hide/Delete/Rename(±) and it writes `rotation:90` to the placedItems row + map doc, but the creature lane (`.npc-circle` + label) has zero transform consumer; the value silently accumulates (rotation survives hide/show, invisible forever). Either hide Rotate for rotation-invariant types (compute from type like `showRenameOption` does) or render a label/arrow orientation hint. `src/components/map/PlacedItems.jsx` creature branch + `ItemContextMenu.jsx:37` entries builder.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
