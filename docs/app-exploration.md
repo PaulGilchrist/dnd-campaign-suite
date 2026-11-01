@@ -61,7 +61,7 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 AW: Dress toolbar button remains reachable during preview (dialog overlays the toolbar); clicking it mid-preview behavior unverified — cheap follow for the dressModal owner.
+*(empty — all 2026-11-01 AW bullets consumed by the 2026-11-01 improve run; see that run's commit summary)*
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

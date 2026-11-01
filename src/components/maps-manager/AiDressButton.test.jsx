@@ -187,5 +187,29 @@ describe('AiDressButton', () => {
             // Apply → close() → the ops mirror wipes (canvas preview vanishes).
             await waitFor(() => expect(onProposalChange).toHaveBeenLastCalledWith(null));
         });
+
+        // Backlog (2026-11-01 AW): "toolbar dress button reachable during preview" —
+        // live-proved benign: the component REPLACES its toolbar button with the
+        // modal (button + modal are mutually exclusive render arms), so while any
+        // dress dialog is open there is no second trigger to click — mid-preview
+        // re-clicks are structurally impossible (trusted clicks hit the fixed
+        // overlay, synthetic clicks find no element). This pins that invariant so
+        // a future split of the two arms into simultaneous mounts trips here.
+        it('the toolbar trigger unmounts while the dialog is open (no mid-preview re-click target)', async () => {
+            const trigger = () => screen.queryByRole('button', { name: /dress "battle arena" with ai/i });
+            render(
+                <AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={vi.fn()} />
+            );
+            expect(trigger()).toBeTruthy(); // closed → the button is the only surface
+            fireEvent.click(trigger());
+            expect(trigger()).toBeNull();   // ask stage → button gone, dialog up
+            fireEvent.change(screen.getByPlaceholderText(/how should this map change/i), { target: { value: 'add a chest' } });
+            dressMapProposal.mockResolvedValue(PROPOSAL);
+            fireEvent.click(screen.getByRole('button', { name: /dress map/i }));
+            await waitFor(() => expect(screen.getByText('add chest at 12,8')).toBeInTheDocument());
+            // preview stage → still exactly one dialog, still no trigger to stack
+            expect(trigger()).toBeNull();
+            expect(screen.getAllByRole('dialog')).toHaveLength(1);
+        });
     });
 });
