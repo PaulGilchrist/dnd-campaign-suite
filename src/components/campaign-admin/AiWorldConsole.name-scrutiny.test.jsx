@@ -104,7 +104,10 @@ describe('AiWorldConsole — quest_draft accept-scrutiny chip', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Add quest to ledger' }));
         await waitFor(() => expect(applyWorldProposal).toHaveBeenCalledWith({ campaignName: CN, proposal: fabricatedQuest }));
-        await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Applied: quest added.'));
-        expect(advisory()).toBeNull(); // card cleared once routed, exactly as before
+        // Success notice, anchored by text — the applied card (with its
+        // advisory still riding along, role=status) means getByRole('status')
+        // now finds two nodes (backlog AV applied-state copy).
+        await waitFor(() => expect(screen.getByText('Applied: quest added.')).toBeInTheDocument());
+        expect(advisory()).not.toBeNull(); // the receipt card (and its scrutiny note) stay mounted
     });
 });

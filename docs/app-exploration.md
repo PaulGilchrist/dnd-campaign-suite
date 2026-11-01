@@ -57,8 +57,6 @@
 
 ## Improvement Backlog
 
-- **2026-11-01 AV — world card lingers after apply:** "Add quest to ledger" succeeds (log pair + disk row) but the proposal card stays mounted unchanged; an applied-state copy or auto-dismiss would close the loop (same pattern AU noted referee card clears on apply).
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - OPEN (infra): llama.cpp-style refusing-backend face for constrained decoding fallback — no such backend on this machine (unchanged since AQ).

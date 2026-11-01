@@ -43,3 +43,11 @@
     background: rgba(210, 153, 34, 0.16);
     color: #d29922;
 }
+/* Backlog 2026-11-01 (AV) — applied-state receipt badge: reuses the .ai-badge
+   pill + .ai-badge--on green from AiRefereeSection.css as-is; the only tweak
+   is dropping its header-context left margin, since here it is the sole child
+   of the flex action row. Higher specificity wins over the referee rule
+   regardless of CSS import order. */
+.ai-referee-section .ai-world-console .ai-badge {
+    margin-left: 0;
+}

@@ -28,6 +28,12 @@ export default function AiWorldConsole({ campaignName }) {
     const [proposal, setProposal] = React.useState(null)
     const [result, setResult] = React.useState(null)
     const [asking, setAsking] = React.useState(false)
+    // Backlog 2026-11-01 (AV) — applied-state copy: after a SUCCESSFUL apply
+    // the card stays mounted as a receipt with its action row swapped for an
+    // Applied badge, so the referee sees exactly what was committed and the
+    // same apply cannot be re-fired. Failed applies keep the old behaviour
+    // (card clears, honest refusal notice only) — never a premature badge.
+    const [applied, setApplied] = React.useState(false)
     // Backlog 2026-11-01 — client-side quest_draft accept-scrutiny: the
     // ledgers are fetched when a quest card surfaces so the referee gets a
     // non-blocking "check spelling" advisory BEFORE applying. Failure to
@@ -48,7 +54,7 @@ export default function AiWorldConsole({ campaignName }) {
     }, [proposal, campaignName])
 
     const ask = async () => {
-        setAsking(true); setResult(null); setProposal(null)
+        setAsking(true); setResult(null); setProposal(null); setApplied(false)
         let res
         try {
             res = await askWorldKeeper({ campaignName, kind, focus: focus.trim() || null })
@@ -64,7 +70,8 @@ export default function AiWorldConsole({ campaignName }) {
     const act = async () => {
         const r = await applyWorldProposal({ campaignName, proposal })
         setResult(r)
-        setProposal(null)
+        if (r.applied) { setApplied(true); return } // receipt stays mounted, actions become the badge
+        setProposal(null) // refused/failed: unchanged — clear the card, notice carries the reason
     }
 
     return (
@@ -79,7 +86,7 @@ export default function AiWorldConsole({ campaignName }) {
                     <i className={`fas ${asking ? 'fa-spinner' : 'fa-feather'}`}></i> {asking ? 'Writing…' : 'Generate'}
                 </button>
             </div>
-            {proposal && <WorldProposalCard proposal={proposal} ledgerNames={ledgerNames} onAct={act} onDismiss={() => setProposal(null)} />}
+            {proposal && <WorldProposalCard proposal={proposal} ledgerNames={ledgerNames} applied={applied} onAct={act} onDismiss={() => setProposal(null)} />}
             {result && (
                 <div className={`ai-notice ${result.applied ? 'ai-notice--ok' : 'ai-notice--refused'}`} role="status">
                     {result.applied ? 'Applied: ' : 'Not applied: '}{result.detail}
@@ -89,7 +96,13 @@ export default function AiWorldConsole({ campaignName }) {
     )
 }
 
-function WorldProposalCard({ proposal, ledgerNames, onAct, onDismiss }) {
+// Short name for the applied receipt badge: quest cards name their ledger
+// row, narrative cards name their kind (the body already carries the text).
+function appliedLabel(proposal) {
+    return proposal.kind === 'quest_draft' ? `quest '${proposal.name}'` : proposal.kind.replace('_', ' ')
+}
+
+function WorldProposalCard({ proposal, ledgerNames, applied, onAct, onDismiss }) {
     const body = proposal.kind === 'quest_draft'
         ? `${proposal.name} — ${proposal.description}${proposal.rewards ? ` (rewards: ${proposal.rewards})` : ''}`
         : `${proposal.kind === 'npc_dialogue' ? `${proposal.npcName}: ` : ''}${proposal.text}`
@@ -108,12 +121,23 @@ function WorldProposalCard({ proposal, ledgerNames, onAct, onDismiss }) {
                 </div>
             )}
             <div className="ai-world-actions">
-                {proposal.kind !== 'needs_human' && (
-                    <button className="ct-btn ct-btn-primary" onClick={onAct}>
-                        <i className="fas fa-plus-circle"></i> {proposal.kind === 'quest_draft' ? 'Add quest to ledger' : 'Log it'}
-                    </button>
+                {applied ? (
+                    /* Applied receipt — reuses the .ai-badge pill + green (AiRefereeSection.css).
+                       No Dismiss either: the card is a terminal record until the next ask. */
+                    <span className="ai-badge ai-badge--on">
+                        <i className="fas fa-circle-check" aria-hidden="true"></i>
+                        {` Applied: ${appliedLabel(proposal)}`}
+                    </span>
+                ) : (
+                    <>
+                        {proposal.kind !== 'needs_human' && (
+                            <button className="ct-btn ct-btn-primary" onClick={onAct}>
+                                <i className="fas fa-plus-circle"></i> {proposal.kind === 'quest_draft' ? 'Add quest to ledger' : 'Log it'}
+                            </button>
+                        )}
+                        <button className="ct-btn" onClick={onDismiss}>Dismiss</button>
+                    </>
                 )}
-                <button className="ct-btn" onClick={onDismiss}>Dismiss</button>
             </div>
         </div>
     )

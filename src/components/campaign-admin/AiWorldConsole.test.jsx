@@ -92,7 +92,9 @@ describe('AiWorldConsole — the card waits; kind chooses the exit', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Log it' }));
         await waitFor(() => expect(applyWorldProposal).toHaveBeenCalledWith({ campaignName: CN, proposal: recap }));
         await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Applied: logged.'));
-        expect(screen.queryByText('Ash and ember.')).toBeNull(); // card clears once routed
+        // Backlog 2026-11-01 (AV) — applied-state copy: the card stays mounted
+        // as a receipt (its badge lane is pinned in .applied-state.test.jsx).
+        expect(screen.getByText('Ash and ember.')).toBeInTheDocument();
     });
 
     it('quest_draft routes to the ledger lane — rewards rendered, no Log it offered', async () => {
