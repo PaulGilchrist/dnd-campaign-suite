@@ -56,7 +56,6 @@
 
 ## Improvement Backlog
 
-- 2026-10-31 (AR): when a refine returns a byte-identical echo under forced grammar decoding, the no-op notice is honest but silent about WHY — hint could mention Decoding=on is the usual cause on this backend family ("model proposed no changes" + "if Decoding is 'on', try probe"). `AiRefineButton.jsx:63`.
 - 2026-10-31 (AR): effect-repair picker in `AiProposalCard` never surfaced during AR's asks — worth a deliberate invalid-key rig in the next referee descent to prove the gate (code-confirmed only).
 - 2026-10-31 (AR): `getEntrySearchText` recursively collects raw entry strings (instruction/kind/description all findable), but the rendered one-liner's outcome words ("gave up after retries", "proposed a replacement") are derived and not searchable — minor: fold `formatAiAuditLine` into search text once the raw-JSON leak is fixed. `src/components/log/log-utils.js:54`.
 

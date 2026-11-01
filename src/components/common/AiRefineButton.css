@@ -24,3 +24,10 @@
   padding: 0.3rem 0.5rem;
   font-size: 0.8rem;
 }
+
+/* Grammar-echo cause hint (backlog refine-no-op-grammar-hint) — the shared
+   muted hint style, broken onto its own line inside the notice strip. */
+.ai-refine-notice .ai-instruction-hint {
+  display: block;
+  margin-top: 0.25rem;
+}

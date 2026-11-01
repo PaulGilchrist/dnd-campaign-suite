@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import { isEqual } from 'lodash';
 import { refineEntity } from '../../services/ai/aiClient.js';
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import AiInstructionModal from './AiInstructionModal.jsx';
 import './AiRefineButton.css';
 
 // Server-owned stamps never round-trip in a proposal — the same strip the
 // server refine preflight applies to the input before validating it.
 const SERVER_OWNED_KEYS = ['id', 'updatedAt', 'savedAt', 'draft'];
+
+const NO_CHANGE_NOTICE = 'The model proposed no changes — the form is unchanged.';
+
+// Backlog refine-no-op-grammar-hint: on this backend family (oMLX Qwen-mtp,
+// docs/app-exploration.md Depth Seeds) Decoding = "on" (aiConfig.jsonSchema
+// === true, forced grammar) commonly makes the model echo the input verbatim.
+// Shown ONLY when the stored config says so — otherwise we can't attribute a
+// cause and stay honest with the base sentence alone.
+const GRAMMAR_ECHO_HINT = ' If Decoding is set to "on" (a forced JSON grammar),'
+  + ' this backend family commonly makes the model echo the input verbatim —'
+  + ' try setting Decoding to "probe" (or "off") in the campaign admin’s AI'
+  + ' config row and retry.';
 
 /**
  * Backlog refine-no-op-silent: a success whose replacement echoes the input
@@ -41,11 +54,12 @@ function proposedNoChange(entity, replacement) {
  * non-dismissible-while-busy × (aria-label "Close AI refine").
  */
 function AiRefineButton({ campaignName, kind, entity, onReplaced }) {
+  const aiConfig = useRuntimeValue('campaign', 'aiConfig', campaignName);
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
+  const [notice, setNotice] = useState(null); // 'echo' | 'echo-grammar' | null
 
   const close = () => { setOpen(false); setError(null); setNotice(null); };
 
@@ -59,8 +73,9 @@ function AiRefineButton({ campaignName, kind, entity, onReplaced }) {
     setBusy(false);
     if (res.ok && proposedNoChange(entity, res.replacement)) {
       // Echo: keep the modal open with an honest hint — nothing was applied,
-      // so the caller's applied-success affordances must NOT fire.
-      setNotice('The model proposed no changes — the form is unchanged.');
+      // so the caller's applied-success affordances must NOT fire. With the
+      // stored config forcing a grammar (Decoding "on"), name the usual cause.
+      setNotice(aiConfig?.jsonSchema === true ? 'echo-grammar' : 'echo');
       setInstruction('');
     } else if (res.ok) {
       onReplaced(res.replacement);
@@ -98,7 +113,12 @@ function AiRefineButton({ campaignName, kind, entity, onReplaced }) {
       </label>
       <p className="ai-instruction-hint">⌘/Ctrl+Enter applies the proposal to the form — nothing is saved until you press the editor’s Save.</p>
       {error && <p className="ai-refine-error" role="alert">{error}</p>}
-      {notice && <p className="ai-refine-notice" role="status">{notice}</p>}
+      {notice && (
+        <p className="ai-refine-notice" role="status">
+          {NO_CHANGE_NOTICE}
+          {notice === 'echo-grammar' && <span className="ai-instruction-hint">{GRAMMAR_ECHO_HINT}</span>}
+        </p>
+      )}
       <div className="ai-instruction-actions">
         <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !instruction.trim()} onClick={ask}>
           <i className="fa-solid fa-wand-magic-sparkles" /> {busy ? 'Thinking…' : 'Apply to form'}

@@ -9,9 +9,19 @@ import { vi } from 'vitest';
 const refineEntity = vi.fn();
 vi.mock('../../services/ai/aiClient.js', () => ({ refineEntity: (...a) => refineEntity(...a) }));
 
+// Backlog refine-no-op-grammar-hint: the notice reads the campaign's stored
+// aiConfig from the runtime store; tests drive that read directly.
+const runtime = vi.hoisted(() => ({ aiConfig: null }));
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    useRuntimeValue: () => runtime.aiConfig,
+}));
+
 import AiRefineButton from './AiRefineButton.jsx';
 
-beforeEach(() => refineEntity.mockReset());
+beforeEach(() => {
+    refineEntity.mockReset();
+    runtime.aiConfig = null;
+});
 
 describe('AiRefineButton', () => {
     it('collapsed until opened, then proposes into the editor form on success', async () => {
@@ -73,6 +83,51 @@ describe('AiRefineButton', () => {
         expect(screen.getByPlaceholderText(/what should change/i).value).toBe('');
         fireEvent.click(screen.getByRole('button', { name: /close ai refine/i }));
         expect(screen.queryByRole('status')).toBeNull();
+    });
+
+    // Backlog refine-no-op-grammar-hint: with Decoding "on" (jsonSchema true)
+    // stored in aiConfig, the echo notice names the usual cause; otherwise the
+    // base sentence stands alone (no unattributable speculation).
+    const echoEntity = { id: 'n1', name: 'Marta', description: 'Innkeeper' };
+    const echoAsk = async () => {
+        const onReplaced = vi.fn();
+        render(<AiRefineButton campaignName="c" kind="npc" entity={echoEntity} onReplaced={onReplaced} />);
+        fireEvent.click(screen.getByRole('button', { name: /refine with AI/i }));
+        fireEvent.change(screen.getByPlaceholderText(/what should change/i), { target: { value: 'keep as is' } });
+        refineEntity.mockResolvedValue({ ok: true, replacement: { name: 'Marta', description: 'Innkeeper' } });
+        fireEvent.click(screen.getByRole('button', { name: /apply to form/i }));
+        const status = await screen.findByRole('status');
+        return { status, onReplaced };
+    };
+
+    it('echo + aiConfig.jsonSchema=true adds the Decoding="on" probe hint', async () => {
+        runtime.aiConfig = { mode: 'suggest', jsonSchema: true };
+        const { status, onReplaced } = await echoAsk();
+        expect(status.textContent).toMatch(/model proposed no changes/i);
+        expect(status.textContent).toMatch(/Decoding is set to "on"/);
+        expect(status.textContent).toMatch(/echo the input verbatim/i);
+        expect(status.textContent).toMatch(/"probe"/);
+        expect(status.textContent).toMatch(/campaign admin/i);
+        expect(onReplaced).not.toHaveBeenCalled();
+    });
+
+    it('echo without jsonSchema in aiConfig shows the base sentence only', async () => {
+        runtime.aiConfig = { mode: 'suggest' };
+        const { status } = await echoAsk();
+        expect(status.textContent).toMatch(/model proposed no changes/i);
+        expect(status.textContent).not.toMatch(/Decoding/i);
+    });
+
+    it('echo with aiConfig absent (null) shows the base sentence only', async () => {
+        runtime.aiConfig = null;
+        const { status } = await echoAsk();
+        expect(status.textContent).toBe('The model proposed no changes — the form is unchanged.');
+    });
+
+    it('echo with aiConfig.jsonSchema=false shows the base sentence only', async () => {
+        runtime.aiConfig = { mode: 'suggest', jsonSchema: false };
+        const { status } = await echoAsk();
+        expect(status.textContent).toBe('The model proposed no changes — the form is unchanged.');
     });
 
     it('applies normally (no hint) when the replacement differs in any field', async () => {
