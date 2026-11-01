@@ -39,6 +39,7 @@ vi.mock('./hooks/useSpellOverlay.js', () => ({
 }));
 
 import * as mapsService from '../../services/maps/mapsService.js';
+import { createOverlay } from '../../models/SpellOverlay.js';
 import Map from './Map.jsx';
 
 function defaultOverlayState(overrides = {}) {
@@ -96,6 +97,40 @@ describe('spell-overlay confirm dialog mount (Map.jsx)', () => {
         await waitFor(() => expect(document.querySelector('svg.grid-svg')).toBeTruthy());
         expect(screen.queryByRole('dialog')).toBeNull();
         expect(confirmSpy).not.toHaveBeenCalled();
+    });
+
+    // Mount condition (backlog 2026-11-01 BB): the management panel surfaces in
+    // the map view whenever overlays exist — WITHOUT the toolbar Spell toggle
+    // being armed — and unmounts again at zero overlays + disarmed.
+    it('surfaces the overlay management panel while overlays exist, never armed', async () => {
+        overlayState = defaultOverlayState({
+            overlays: [createOverlay('sphere', 2, 2)],
+        });
+        const { container } = renderMap();
+        await waitFor(() => expect(document.querySelector('svg.grid-svg')).toBeTruthy());
+
+        expect(container.querySelector('.spell-overlay-controls')).toBeInTheDocument();
+        expect(screen.getByText('Active (1)')).toBeInTheDocument();
+        expect(container.querySelectorAll('.spell-overlay-item')).toHaveLength(1);
+        expect(container.querySelector('.spell-overlay-clear-btn')).toBeInTheDocument();
+        // Placement stays disarmed the whole time.
+        expect(screen.getByRole('button', { name: 'Spell' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('hides the management panel again once the last overlay is gone (still disarmed)', async () => {
+        overlayState = defaultOverlayState({
+            overlays: [createOverlay('sphere', 2, 2)],
+        });
+        const { container, rerender } = renderMap();
+        await waitFor(() => expect(document.querySelector('svg.grid-svg')).toBeTruthy());
+        expect(container.querySelector('.spell-overlay-controls')).toBeInTheDocument();
+
+        overlayState = { ...overlayState, overlays: [] };
+        rerender(
+            <Map campaignName="test-campaign" characters={[]} isLocalhost mapName="test-map"
+                onBack={vi.fn()} onEncounterCreated={vi.fn()} onPoiEntered={vi.fn()} />
+        );
+        expect(container.querySelector('.spell-overlay-controls')).not.toBeInTheDocument();
     });
 
     it('arms the Remove Overlay dialog tier for a remove descriptor and routes Yes, Remove/Cancel to the hook', async () => {

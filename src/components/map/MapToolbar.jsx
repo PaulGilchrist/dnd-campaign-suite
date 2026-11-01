@@ -8,6 +8,10 @@ const TOGGLE_TOOLS = [
     { tool: 'select', icon: 'fa-arrow-pointer', label: 'Select' },
 ];
 
+// Hoisted out of the component body — the toolbar sits one branch under its
+// ESLint complexity cap (backlog 2026-11-01 BB mount-condition widening).
+const hasActiveOverlays = (overlays) => overlays?.length > 0;
+
 const MapToolbar = ({
     mapName,
     displayName,
@@ -39,6 +43,11 @@ const MapToolbar = ({
         removeOverlay,
         clearOverlays,
     } = spellOverlayState || {};
+
+    // Management surfacing (backlog 2026-11-01 BB): overlays on the board are
+    // enough to mount the controls panel — a GM can remove/clear a stale
+    // overlay WITHOUT ever arming placement mode.
+    const hasOverlays = hasActiveOverlays(overlays);
 
     const toggleSpellMode = () => {
         // Defensive-only: the sole production producer (Map.jsx) always passes a
@@ -162,8 +171,11 @@ const MapToolbar = ({
             {/* Truthy gate unifies the falsy arms: '' and null render identically
                 (no controls, inactive button) — spellMode is only ever null or a
                 non-empty OverlayShape from its producers, and every downstream
-                consumer tests truthiness, so '' means inactive (#928b). */}
-            {!!spellMode && (
+                consumer tests truthiness, so '' means inactive (#928b). Overlays
+                on the board mount the panel in manage-only mode (isActive=false
+                hides Cancel + the placement hint); placement itself still
+                requires the armed toolbar toggle (Map.jsx pointer gate). */}
+            {(spellMode || hasOverlays) && (
                 <SpellOverlayControls
                     selectedShape={selectedShape}
                     setSelectedShape={onSelectShape}

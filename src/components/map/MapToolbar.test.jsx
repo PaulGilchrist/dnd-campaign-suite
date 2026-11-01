@@ -388,6 +388,48 @@ describe('MapToolbar', () => {
             expect(setSelectedShape).toHaveBeenCalledWith(OverlayShape.CONE);
             expect(setSpellMode).toHaveBeenCalledWith(OverlayShape.CONE);
         });
+
+        // Mount condition (backlog 2026-11-01 BB): overlays on the board surface
+        // the management panel WITHOUT ever arming the toolbar Spell toggle.
+        it('mounts manage-only controls when overlays exist with spellMode null', () => {
+            const removeOverlay = vi.fn();
+            const clearOverlays = vi.fn();
+            const setSpellMode = vi.fn();
+            const { container } = renderMapToolbar({
+                spellOverlayState: createMockSpellOverlayState({
+                    spellMode: null,
+                    setSpellMode,
+                    overlays: [{ id: 'o1', shape: OverlayShape.SPHERE }, { id: 'o2', shape: OverlayShape.CONE }],
+                    removeOverlay,
+                    clearOverlays,
+                }),
+            });
+            // Panel present with the full management face.
+            expect(container.querySelector('.spell-overlay-controls')).toBeInTheDocument();
+            expect(screen.getByText('Active (2)')).toBeInTheDocument();
+            expect(container.querySelectorAll('.spell-overlay-item')).toHaveLength(2);
+            // Manage-only: placement chrome stays hidden, toggle stays disarmed.
+            expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+            expect(screen.queryByText(/Click map to place/)).not.toBeInTheDocument();
+            const spellBtn = screen.getByRole('button', { name: 'Spell' });
+            expect(spellBtn).toHaveAttribute('aria-pressed', 'false');
+            expect(spellBtn).not.toHaveClass('active');
+            // Remove/Clear route straight to the hook without arming.
+            fireEvent.click(container.querySelector('.spell-overlay-item button'));
+            expect(removeOverlay).toHaveBeenCalledWith('o1');
+            expect(setSpellMode).not.toHaveBeenCalled();
+            fireEvent.click(container.querySelector('.spell-overlay-clear-btn'));
+            expect(clearOverlays).toHaveBeenCalledTimes(1);
+            expect(setSpellMode).not.toHaveBeenCalled();
+        });
+
+        it('mounts nothing when overlays are empty and placement mode is not armed', () => {
+            const { container } = renderMapToolbar({
+                spellOverlayState: createMockSpellOverlayState({ spellMode: null, overlays: [] }),
+            });
+            expect(container.querySelector('.spell-overlay-controls')).not.toBeInTheDocument();
+            expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
+        });
     });
 
     describe('grid size input', () => {
