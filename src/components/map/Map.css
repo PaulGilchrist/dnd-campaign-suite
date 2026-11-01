@@ -373,6 +373,27 @@
     pointer-events: all;
 }
 
+/* Indoor POI lane (bug-ai-dress-poi-invisible-on-indoor-maps) — the marker
+   group is inert so a click never lands on the icon/label glyphs; only the
+   GM hit area answers (mirrors .placed-item + .item-hit-area above). The
+   label halo mirrors .npc-name so POI text reads on dark floors. */
+.map .poi-item use,
+.map .poi-item text {
+    pointer-events: none;
+}
+
+.map .poi-hit-area {
+    fill: transparent;
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.map .poi-label {
+    fill: #fff;
+    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+    user-select: none;
+}
+
 /* Reposition mode highlight */
 .map .reposition-highlight {
     fill: none;

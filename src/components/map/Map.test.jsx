@@ -356,7 +356,7 @@ describe('Map container — availability & composition', () => {
             'barrel', 'table', 'bed', 'firepit', 'door', 'secretDoor', 'trap',
             'pillar', 'stairs', 'altar', 'arrowSlitWall', 'bookshelf', 'chair',
             'chest', 'crate', 'fountain', 'skeleton', 'statue', 'torch', 'web',
-            'tree', 'boulder', 'bush',
+            'tree', 'boulder', 'bush', 'poi-landmark',
         ]);
     });
 

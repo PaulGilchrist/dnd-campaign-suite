@@ -32,6 +32,9 @@ import TreeSVG from './TreeSVG.jsx';
 import BoulderSVG from './BoulderSVG.jsx';
 import BushSVG from './BushSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
+import IndoorPoiLayer from './IndoorPoiLayer.jsx';
+import IndoorPoiContextMenu from './IndoorPoiContextMenu.jsx';
+import LandmarkSVG from '../hex-map/svg/LandmarkSVG.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
 import Players from './Players.jsx';
 import FogOverlay from './FogOverlay.jsx';
@@ -44,6 +47,7 @@ import usePlayerDragging from './hooks/usePlayerDragging';
 import useItemDragging from './hooks/useItemDragging';
 import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
+import useIndoorPois from './hooks/useIndoorPois';
 import useFogOfWar from './hooks/useFogOfWar';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
@@ -178,6 +182,16 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         handleWheel,
         clientToSVG,
     } = useZoomPan(svgRef);
+
+    // Indoor POI lane (marker render + right-click hide/delete) — see
+    // hooks/useIndoorPois.js; document edits ride setMapData's autosave.
+    const {
+        selectedPoi,
+        closePoiMenu,
+        handlePoiContextMenu,
+        handleTogglePoiVisibility,
+        handleDeletePoi,
+    } = useIndoorPois({ setMapData });
 
     const {
         painting,
@@ -354,8 +368,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         setSelectedItem(null);
         setSelectedPlayer(null);
         setRenamePopover(null);
+        closePoiMenu();
         itemPressRef.current = null;
-    }, [setSelectedItem, setSelectedPlayer, setRenamePopover]);
+    }, [setSelectedItem, setSelectedPlayer, setRenamePopover, closePoiMenu]);
 
     // Left-click / tap on a placed item selects it (backlog 2026-10-25:
     // delete was contextmenu-only). The captured pointer's click lands on the
@@ -370,11 +385,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         const press = itemPressRef.current;
         itemPressRef.current = null;
         const clicked = resolveItemClick(press, e, placedItems);
-        if (clicked) {
-            setSelectedItem({ ...clicked, via: 'click' });
-            return;
-        }
-        handleCloseMenu();
+        if (clicked) setSelectedItem({ ...clicked, via: 'click' });
+        else handleCloseMenu();
     }, [placedItems, setSelectedItem, handleCloseMenu]);
 
     const handleRenameClicked = (event, item, defaultName) => {
@@ -498,7 +510,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         );
     }
 
-    const { players } = mapData;
     const effectiveWalls = computeEffectiveWalls(mapData.walls, placedItems);
 
     // Click-select details dock / contextmenu menu split — see selectionChromeFor.
@@ -603,6 +614,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     <TreeSVG id="tree" />
                     <BoulderSVG id="boulder" />
                     <BushSVG id="bush" />
+                    {/* Shared POI marker (hex-map/svg) — the indoor pois lane
+                        (AI Dress writes landmark rows) renders through this id,
+                        same href as the outdoor POILayer. */}
+                    <LandmarkSVG id="poi-landmark" />
                 </defs>
 
                 <GridAndWalls
@@ -614,7 +629,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                 />
 
                 <Players
-                    players={players}
+                    players={mapData.players}
                     characters={characters}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
@@ -637,6 +652,20 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     npcImages={npcImages}
                     itemDragging={itemDragging}
                     handleItemPointerDown={handleItemPointerDownTracked}
+                />
+
+                {/* Indoor POIs (labelled points of interest, same lane the
+                    hex maps draw via POILayer): GM sees hidden ones dimmed
+                    with a right-click menu; LAN players see hidden/fogged
+                    ones not at all. */}
+                <IndoorPoiLayer
+                    pois={mapData.pois}
+                    isLocalhost={isLocalhost}
+                    fog={fog}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    selectedPoi={selectedPoi}
+                    handlePoiContextMenu={handlePoiContextMenu}
                 />
 
                 <SelectionPreviewRect visible={selectStart.current} rect={selectionRect} className="selection-preview" />
@@ -690,6 +719,18 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     setSelectedPlayer={setSelectedPlayer}
                 />
 
+                {/* POI right-click menu (Hide/Show + named-confirm Delete) —
+                    the only authoring lane for indoor pois. */}
+                <IndoorPoiContextMenu
+                    selectedPoi={selectedPoi}
+                    pois={mapData.pois}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    handleTogglePoiVisibility={handleTogglePoiVisibility}
+                    handleDeletePoi={handleDeletePoi}
+                    onClose={closePoiMenu}
+                />
+
                 <SpellOverlayRenderer
                     overlays={overlays}
                     pendingOverlay={buildPendingOverlay(spellDraft, spellMode, shapeParams)}
@@ -737,7 +778,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     onToggleItemVisibility={handleToggleItemVisibility}
                     onClose={() => setItemsPanelOpen(false)}
                     characters={characters}
-                    players={players}
+                    players={mapData.players}
                     mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
                     campaignName={campaignName}
                 />
