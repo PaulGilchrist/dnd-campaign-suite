@@ -72,7 +72,7 @@ export const KIND_FIELD_RULES = {
     quest: 'quest{name,status active|completed|failed,description,rewards,notes}',
     encounter: 'encounter{name,description,selectedMonsters:[{index,name,qty}]}',
     session: 'session{name,date,summary,notes,contingencies[],links{maps[],encounters[],npcs[],quests[],settlements[],notes[]}}',
-    mapPlan: 'mapPlan{name kebab-case,displayName,generator hex|dungeon,params{gridSize,density,seed},dressing{pois[],placedItemOps[],tokens[]}}',
+    mapPlan: 'mapPlan{name kebab-case,displayName,generator hex|dungeon,params{gridSize,density,seed},dressing{pois[],placedItemOps[],tokens[]}} — placedItemOps and tokens are dungeon-only (hex maps carry terrain + POIs only)',
 };
 
 function blueprintRules({ scope, allow }) {

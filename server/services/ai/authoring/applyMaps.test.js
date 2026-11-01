@@ -64,8 +64,15 @@ describe('applyMapPlans — dungeon', () => {
         const chest = doc.placedItems.find(i => i.type === 'chest' && i.gridX === 3 && i.gridY === 3);
         expect(chest).toMatchObject({ visible: true, rotation: 0 });
         expect(chest.id).toMatch(/^ai-chest-/);
-        // Monster token rides the items[] lane the map editors already render.
-        expect(doc.items).toEqual([expect.objectContaining({ name: 'Goblin', type: 'monster', gridX: 5, gridY: 5, fromEncounter: 'Ferry Ambush' })]);
+        // Monster tokens ride the RENDERED placedItems creature lane (shaped
+        // like dressMap.js addToken / palette NPC rows) — the legacy items[]
+        // lane has zero renderers (bug-ai-generate-tokens-invisible-lane).
+        expect(doc.items).toEqual([]); // write-vestigial lane stays dead
+        const goblin = doc.placedItems.find(p => p.id === 'ai-token-sunken-temple-0');
+        expect(goblin).toMatchObject({
+            id: 'ai-token-sunken-temple-0', name: 'Goblin', type: 'monster',
+            gridX: 5, gridY: 5, fromEncounter: 'Ferry Ambush', visible: true,
+        });
         expect(doc.pois[0]).toMatchObject({ label: 'Ruin Mouth', gridX: 1, gridY: 1 });
         expect(publish).toHaveBeenCalledWith('maps-list-unit',
             { action: 'created', map: { name: 'Sunken Temple', fileName: 'sunken-temple.json', slug: 'sunken-temple' } }, 'unit');
@@ -116,5 +123,23 @@ describe('applyMapPlans — hex', () => {
         const plan = { name: 'wrong', displayName: 'Wrong', generator: 'hex', params: { gridSize: 6, seed: 1 }, dressing: { placedItemOps: [{ op: 'add', item: { type: 'chest', gridX: 1, gridY: 1 } }] } };
         expect(() => applyMapPlans('unit', [plan])).toThrow(/dungeon-only/);
         expect(MOCK_FS.size).toBe(0);
+    });
+
+    // Regression (bug-ai-generate-tokens-invisible-lane): tokens on a hex plan
+    // used to hit doc.items.push on a document the hex builder never seeds an
+    // `items` key for — a mid-batch TypeError AFTER the caller's snapshot,
+    // not an honest all-or-nothing validation error.
+    it('rejects hex tokens with a validation error, not a TypeError', () => {
+        const plan = {
+            name: 'hex-tokens', displayName: 'Hex Tokens', generator: 'hex', params: { gridSize: 5, seed: 1 },
+            dressing: { tokens: [{ encounterName: 'Ferry Ambush', creatureName: 'Goblin', gridX: 0, gridY: 0 }] },
+        };
+        let err = null;
+        try { applyMapPlans('unit', [plan]); } catch (e) { err = e; }
+        expect(err).toBeInstanceOf(Error);
+        expect(err.message).not.toMatch(/Cannot read properties/);
+        expect(err.message).toMatch(/tokens\[0\]|tokens are dungeon-only/);
+        expect(err.message).toMatch(/dungeon-only/);
+        expect(MOCK_FS.size).toBe(0); // pre-write: nothing landed
     });
 });

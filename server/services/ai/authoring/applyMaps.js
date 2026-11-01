@@ -142,14 +142,23 @@ function dressPlacedItems(doc, within, extent, ops, errors) {
     });
 }
 
-/** Encounter monsters as map tokens — the items[] lane ({id,name,type,grid}). */
+/**
+ * Encounter monsters as map tokens. Creature rows live in the ONE placement
+ * lane every face renders (PlacedItems.jsx draws npc/monster rows, GM
+ * right-click menus and the 3D scene ride them) — shaped exactly like the
+ * dress-face addToken (dressMap.js) so the digest, previews and later AI
+ * dress ops agree. The legacy doc.items lane has ZERO renderers app-wide:
+ * writing tokens there produced permanently invisible markers
+ * (bug-ai-generate-tokens-invisible-lane, twin of 33b3d0326's dress fix).
+ * Dungeon-only — callers gate hex plans with a validation error.
+ */
 function dressTokens(doc, within, extent, tokens, errors) {
     (tokens || []).forEach((tok, i) => {
         if (!within(tok.gridX, tok.gridY)) {
             errors.push(`${doc.name}: tokens[${i}] "${tok.creatureName}" at (${tok.gridX},${tok.gridY}) is outside the map (${extent})`);
             return;
         }
-        doc.items.push({
+        doc.placedItems.push({
             id: aiId('token', doc.name, i),
             name: tok.creatureName,
             type: 'monster',
@@ -174,9 +183,15 @@ export function applyMapPlans(campaign, mapPlans) {
         const { doc, within, extent } = generateDocument(plan);
         const d = plan.dressing || {};
         dressPois(doc, within, extent, d.pois, errors);
-        if (doc.type === 'indoor') dressPlacedItems(doc, within, extent, d.placedItemOps, errors);
-        else if (d.placedItemOps?.length) errors.push(`${plan.name}: placedItemOps are dungeon-only (hex maps carry terrain + POIs)`);
-        dressTokens(doc, within, extent, d.tokens, errors);
+        if (doc.type === 'indoor') {
+            dressPlacedItems(doc, within, extent, d.placedItemOps, errors);
+            dressTokens(doc, within, extent, d.tokens, errors);
+        } else {
+            // Honest pre-write validation (all-or-nothing) instead of a
+            // mid-apply TypeError: the hex document has no placement lanes.
+            if (d.placedItemOps?.length) errors.push(`${plan.name}: placedItemOps are dungeon-only (hex maps carry terrain + POIs)`);
+            if (d.tokens?.length) errors.push(`${plan.name}: tokens are dungeon-only (hex maps carry terrain + POIs)`);
+        }
         return doc;
     });
     if (errors.length) throw new Error(errors.join(' — '));
