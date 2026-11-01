@@ -1,5 +1,12 @@
 
 import { CELL_SIZE } from '../../config/mapConfig';
+// One label, one source of truth (ItemDetailsDock.jsx uses the same fn):
+// renamed/AI-Dressed items title as their plain `name`; unnamed props as
+// `type (x,y)` so two same-type markers are distinguishable by a pure DOM
+// `[title]` probe — no hover/click discovery (backlog 2026-11-01 AW).
+// Parity note: the outdoor prop lane (tree/boulder/bush on parentHex grids)
+// had the same gap, so the title rides every marker in both lanes.
+import { placedItemLabel } from './hooks/usePlacedItems.js';
 const RADIUS = 20;
 
 function PlacedItems({
@@ -46,7 +53,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#barrel" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -71,7 +78,7 @@ function PlacedItems({
         const tableW = isRotated ? 36 : 72;
         const tableH = isRotated ? 72 : 36;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#table" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -94,7 +101,7 @@ function PlacedItems({
         const bedW = isVertical ? 36 : 72;
         const bedH = isVertical ? 72 : 36;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#bed" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -114,7 +121,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#firepit" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -134,7 +141,7 @@ function PlacedItems({
         if (!isVisible(item)) return null;
         const isOpen = !!item.open;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 {!isOpen ? (
                     <use href="#door" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                         transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
@@ -170,7 +177,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#secretDoor" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -190,7 +197,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#trap" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -209,7 +216,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#pillar" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -228,7 +235,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#stairs" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -251,7 +258,7 @@ function PlacedItems({
         const altarW = isRotated ? 36 : 72;
         const altarH = isRotated ? 72 : 36;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#altar" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -275,7 +282,7 @@ function PlacedItems({
         const w = isVertical ? 36 : 72;
         const h = isVertical ? 72 : 36;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#bookshelf" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
                     transform={rotation ? `rotate(${rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -295,7 +302,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#chair" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -315,7 +322,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#chest" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -334,7 +341,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#crate" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -353,7 +360,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#fountain" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -372,7 +379,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#skeleton" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -391,7 +398,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#statue" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -410,7 +417,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#torch" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -430,7 +437,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#web" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -452,7 +459,7 @@ function PlacedItems({
         const npcImage = npcImages[item.name] || item.imageUrl;
 
         return (
-            <g key={item.id} className="npc-group">
+            <g key={item.id} className="npc-group" title={placedItemLabel(item)}>
                 <defs>
                     <clipPath id={`npc-clip-${item.id}`}>
                         <circle cx={cx} cy={cy} r={20} />
@@ -524,7 +531,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#arrowSlitWall" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
                     transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
@@ -544,7 +551,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#tree" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -563,7 +570,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#boulder" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
@@ -582,7 +589,7 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         return (
-            <g key={item.id} className="placed-item">
+            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 <use href="#bush" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>

@@ -61,7 +61,6 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 AW: indoor placedItems render icon-only with NO name label/tooltip surface found via DOM text probes — GM can't distinguish two same-type props without hover/click discovery; consider a label-on-select or title attr (`src/components/map/PlacedItems.jsx`).
 - 2026-11-01 AW: Music "Edit tracks for this mood" button exposes its accessible name via `title` only (no aria-label) while the sibling mood `<select>` got `aria-label="Tracks mood"` — cheap a11y parity in `MusicPlayer.jsx`.
 - 2026-11-01 AW: Dress toolbar button remains reachable during preview (dialog overlays the toolbar); clicking it mid-preview behavior unverified — cheap follow for the dressModal owner.
 
