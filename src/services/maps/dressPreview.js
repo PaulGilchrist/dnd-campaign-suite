@@ -41,8 +41,11 @@ const addLabel = (op) => (op.target === 'poi' && op.poi?.targetMap
     ? `portal POI ${op.poi.name} → ${op.poi.targetMap}`
     : op.item?.type || op.token?.name || op.poi?.name || op.target);
 
+// item props and creature tokens share the rendered placedItems lane (server
+// laneOf parity — the legacy items[] lane has no renderer); only POIs live
+// in their own lane.
 function laneRows(doc, target) {
-    const lane = target === 'item' ? doc?.placedItems : target === 'token' ? doc?.items : doc?.pois;
+    const lane = target === 'poi' ? doc?.pois : doc?.placedItems;
     return Array.isArray(lane) ? lane : [];
 }
 

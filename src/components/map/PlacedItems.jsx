@@ -451,7 +451,12 @@ function PlacedItems({
         );
     };
 
-    const renderNpc = (item) => {
+    // Creature-token marker — ONE visual for both creature types so AI-Dress
+    // monster tokens ride the exact machinery NPC tokens proved (title label,
+    // fog dim, image slot, drag + right-click hit areas). Monsters read
+    // distinct: purple ring (.monster-circle) + skull glyph instead of the
+    // name initial.
+    const renderCreature = (item, isMonster) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
@@ -465,7 +470,7 @@ function PlacedItems({
                         <circle cx={cx} cy={cy} r={20} />
                     </clipPath>
                 </defs>
-                <circle cx={cx} cy={cy} r={20} className="npc-circle" style={{ opacity: npcOpacity }} />
+                <circle cx={cx} cy={cy} r={20} className={isMonster ? 'npc-circle monster-circle' : 'npc-circle'} style={{ opacity: npcOpacity }} />
                 {npcImage ? (
                     <image
                         xlinkHref={npcImage}
@@ -490,7 +495,7 @@ function PlacedItems({
                         className="npc-initial"
                         style={{ opacity: npcOpacity }}
                     >
-                        {item.name.charAt(0).toUpperCase()}
+                        {isMonster ? '☠' : item.name.charAt(0).toUpperCase()}
                     </text>
                 )}
                 <text
@@ -525,6 +530,10 @@ function PlacedItems({
             </g>
         );
     };
+
+    const renderNpc = (item) => renderCreature(item, false);
+
+    const renderMonster = (item) => renderCreature(item, true);
 
     const renderArrowSlitWall = (item) => {
         const cx = gridCenterX(item.gridX);
@@ -620,6 +629,7 @@ function PlacedItems({
             {renderItems('door', renderDoor)}
             {renderItems('firepit', renderFirepit)}
             {renderItems('fountain', renderFountain)}
+            {renderItems('monster', renderMonster)}
             {renderItems('npc', renderNpc)}
             {renderItems('pillar', renderPillar)}
             {renderItems('secretDoor', renderSecretDoor)}

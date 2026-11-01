@@ -50,8 +50,12 @@ function indoorFixture() {
     const g = generateDungeon({ gridSize: 25, density: 0.5, seed: 7 });
     return {
         name: 'sunken-temple', displayName: 'Sunken Temple', type: 'indoor', draft: true,
-        gridSize: g.gridSize, walls: g.walls, placedItems: g.placedItems,
-        paintCells: [], items: [{ id: 'tok-goblin-1', name: 'Goblin', type: 'monster', gridX: 4, gridY: 4, visible: true }],
+        gridSize: g.gridSize, walls: g.walls,
+        // The rendered creature-token lane is placedItems (npc/monster rows);
+        // the legacy items[] lane has no renderer (bug-ai-dress-tokens-
+        // invisible-write-only-lane).
+        placedItems: [...g.placedItems, { id: 'tok-goblin-1', name: 'Goblin', type: 'monster', gridX: 4, gridY: 4, visible: true }],
+        paintCells: [], items: [],
         players: [{ id: 'feyranger', name: 'FeyRanger', gridX: 9, gridY: 8 }],
         fog: ['0,0'], revealed: ['1,1'], terrain: {}, pois: [], description: g.description, seed: g.seed,
     };
@@ -106,7 +110,10 @@ describe('dressMapProposal — indoor happy lane', () => {
         const chest = res.updated.placedItems.find(i => i.type === 'chest' && i.gridX === 2 && i.gridY === 2);
         expect(chest.id).toMatch(/^ai-dress-item-chest-2-2-/);
         expect(res.updated.placedItems.some(i => i.id === torch.id)).toBe(false);
-        expect(res.updated.items[0]).toMatchObject({ id: 'tok-goblin-1', gridX: 9, gridY: 6 });
+        const moved = res.updated.placedItems.find(i => i.id === 'tok-goblin-1');
+        expect(moved).toMatchObject({ gridX: 9, gridY: 6, type: 'monster', name: 'Goblin' });
+        // the invisible legacy lane stays untouched
+        expect(res.updated.items).toEqual([]);
         // Untouchable layers are byte-identical; the draft flag survives.
         expect(JSON.stringify(res.updated.walls)).toBe(JSON.stringify(doc.walls));
         expect(JSON.stringify(res.updated.revealed)).toBe(JSON.stringify(doc.revealed));
@@ -173,8 +180,10 @@ describe('applyDressOps — remove previews read as plain English, never raw ids
 
     it('types the removed row with its own fields using the add ops\' `at x,y` idiom', () => {
         const res = applyDressOps(doc({
-            placedItems: [{ id: UUID, type: 'chest', gridX: 4, gridY: 5, visible: true }],
-            items: [{ id: 'tok-1', name: 'Goblin', gridX: 1, gridY: 2 }],
+            placedItems: [
+                { id: UUID, type: 'chest', gridX: 4, gridY: 5, visible: true },
+                { id: 'tok-1', name: 'Goblin', type: 'monster', gridX: 1, gridY: 2, visible: true },
+            ],
             pois: [{ id: 'poi-1', label: 'Temple Door', gridX: 3, gridY: 7 }],
         }), [
             { op: 'remove', target: 'item', id: UUID },
@@ -208,7 +217,7 @@ describe('applyDressOps — remove previews read as plain English, never raw ids
     });
 
     it('an unplaceable row still names itself without a phantom coordinate', () => {
-        const res = applyDressOps(doc({ items: [{ id: 'tok-x', name: 'Ogre' }] }),
+        const res = applyDressOps(doc({ placedItems: [{ id: 'tok-x', name: 'Ogre', type: 'monster' }] }),
             [{ op: 'remove', target: 'token', id: 'tok-x' }]);
         expect(res.preview).toEqual(['remove Ogre']);
     });

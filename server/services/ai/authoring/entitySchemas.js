@@ -334,7 +334,9 @@ export const liveDressPlanSchema = {
                     op: { type: 'string', enum: ['add', 'move', 'remove'] },
                     // item = placed prop (indoor placedItems lane)
                     // poi  = labelled point of interest (both map kinds)
-                    // token = monster/npc marker (indoor items[] lane)
+                    // token = monster/npc marker (indoor placedItems lane —
+                    // the ONE lane every face renders; the legacy items[]
+                    // lane has no renderer)
                     target: { type: 'string', enum: ['item', 'poi', 'token'] },
                     id: DOC_ID,
                     gridX: CELL,

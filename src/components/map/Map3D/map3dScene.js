@@ -16,7 +16,7 @@ const FOG_GM = { color: 0x000000, opacity: 0.45, transparent: true };
 // Player fog is an opaque grey covering (not black, so it reads as "covered"
 // rather than blending into the dark floor), mirroring the 2D player fog.
 const FOG_PLAYER = { color: 0x3a3a42, opacity: 1, transparent: false };
-const COLORS = { wall: 0x696969, player: 0x4a90d9, playerStroke: 0x2c5f8a, npc: 0xc0392b, npcStroke: 0xe74c3c };
+const COLORS = { wall: 0x696969, player: 0x4a90d9, playerStroke: 0x2c5f8a, npc: 0xc0392b, npcStroke: 0xe74c3c, monster: 0x6c3483, monsterStroke: 0xa569bd };
 const MATERIAL_TEXTURE_KEYS = ['map', 'normalMap', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'alphaMap'];
 
 // Mirrors src/components/map/PlacedItems.jsx visibility rules:
@@ -25,6 +25,11 @@ const MATERIAL_TEXTURE_KEYS = ['map', 'normalMap', 'emissiveMap', 'roughnessMap'
 export function isItemVisible(item, fog, isLocalhost) {
     return isLocalhost || (item.visible && !fog.has(`${item.gridX},${item.gridY}`));
 }
+
+// Creature markers share the token render lane (2D PlacedItems parity):
+// palette/AI-Dress npc rows and AI-Dress monster rows become token meshes,
+// everything else is a placed prop model.
+const isCreatureToken = (item) => item.type === 'npc' || item.type === 'monster';
 
 // Mirrors src/components/map/Players.jsx: the GM sees every player; a player
 // cannot see a player token standing in a fogged cell.
@@ -483,7 +488,7 @@ export class Map3DScene {
 
     async _buildPlacedItems(items, fog, isLocalhost) {
         for (const item of items || []) {
-            if (item.type === 'npc') continue; // NPCs are rendered as tokens
+            if (isCreatureToken(item)) continue; // creatures are rendered as tokens
             // Players never see a secret-door model: hidden it is a wall, discovered
             // it is an empty cell. The GM always sees the actual model.
             if (item.type === 'secretDoor' && !isLocalhost) continue;
@@ -558,9 +563,14 @@ export class Map3DScene {
 
     _buildNpcs(items, fog, isLocalhost, npcImages, gen) {
         for (const item of items || []) {
-            if (item.type !== 'npc') continue;
+            if (!isCreatureToken(item)) continue;
             if (!isItemVisible(item, fog, isLocalhost)) continue;
-            const token = this._makeToken(item.name || 'NPC', COLORS.npc, COLORS.npcStroke);
+            const isMonster = item.type === 'monster';
+            // Monster tokens ride the same cylinder+ring machinery, purple
+            // (parity with the 2D .monster-circle ring) — 2D/3D read alike.
+            const token = this._makeToken(item.name || 'NPC',
+                isMonster ? COLORS.monster : COLORS.npc,
+                isMonster ? COLORS.monsterStroke : COLORS.npcStroke);
             token.position.set(this.cellX(item.gridX), 0, this.cellZ(item.gridY));
             if (isLocalhost && item.visible === false) this._setDimmed(token);
             this.mapGroup.add(token);

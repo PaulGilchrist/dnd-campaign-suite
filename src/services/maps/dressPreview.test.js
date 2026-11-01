@@ -14,8 +14,12 @@ import { CELL_SIZE } from '../../config/mapConfig.js';
 import { HEX_SIZE } from '../../config/outdoorConfig.js';
 
 const DOC = {
-    placedItems: [{ id: 'torch-0-2-4', type: 'torch', gridX: 2, gridY: 4 }],
-    items: [{ id: 'npc-1', name: 'Goblin', type: 'monster', gridX: 3, gridY: 4 }],
+    // creature tokens share the rendered placedItems lane (dressMap.js laneOf
+    // parity — the legacy items[] lane renders nothing); only POIs are separate.
+    placedItems: [
+        { id: 'torch-0-2-4', type: 'torch', gridX: 2, gridY: 4 },
+        { id: 'npc-1', name: 'Goblin', type: 'monster', gridX: 3, gridY: 4 },
+    ],
     pois: [{ id: 'poi-0', label: 'Arch', q: 5, r: 6 }],
 };
 

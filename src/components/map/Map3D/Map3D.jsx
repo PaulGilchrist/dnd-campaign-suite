@@ -102,8 +102,11 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
 
     const counts = useMemo(() => {
         const wallCount = walls ? computeEffectiveWalls(walls, placedItems).size : 0;
-        const items = (placedItems || []).filter((i) => i.type !== 'npc').length;
-        const npcs = (placedItems || []).filter((i) => i.type === 'npc').length;
+        // Creature tokens (npc + dress monsters) share the token render lane —
+        // mirror map3dScene's _buildNpcs/_buildPlacedItems dispatch in the counts.
+        const isToken = (i) => i.type === 'npc' || i.type === 'monster';
+        const items = (placedItems || []).filter((i) => !isToken(i)).length;
+        const npcs = (placedItems || []).filter(isToken).length;
         const playerCount = (players || []).length;
         return `${wallCount} walls · ${items} items · ${playerCount} players · ${npcs} npcs`;
     }, [walls, placedItems, players]);

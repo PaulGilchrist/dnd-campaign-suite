@@ -68,8 +68,12 @@ export function buildMapDigest(doc) {
         for (const t of Object.values(doc.terrain || {})) counts[t] = (counts[t] || 0) + 1;
         digest.terrainCellCounts = counts;
     } else {
-        digest.items = compactRows(doc.placedItems, it => ({ id: it.id, type: it.type, at: at(it) }));
-        digest.tokens = compactRows(doc.items, t => ({ id: t.id, name: t.name, type: t.type, at: at(t) }));
+        // The renderer and the digest must split the placement lane the same
+        // way: creature rows (npc/monster) are the TOKENS the 2D board, GM
+        // menus and 3D scene draw; every other placedItems row is a prop.
+        const rows = doc.placedItems || [];
+        digest.items = compactRows(rows.filter(it => !isTokenRow(it)), it => ({ id: it.id, type: it.type, at: at(it) }));
+        digest.tokens = compactRows(rows.filter(isTokenRow), t => ({ id: t.id, name: t.name, type: t.type, at: at(t) }));
     }
     digest.pois = compactRows(doc.pois, p => ({
         id: p.id, label: p.label, at: at(p), ...(p.linkedMap ? { linkedMap: p.linkedMap } : {}),
@@ -81,6 +85,14 @@ export function buildMapDigest(doc) {
 
 const INDOOR_ONLY = new Set(['item', 'token']);
 
+// Creature markers live in the ONE placement lane every face renders
+// (PlacedItems.jsx draws them, ItemContextMenu gives Hide/Delete, the 3D
+// scene builds tokens). The legacy doc.items lane has no renderer anywhere —
+// dress tokens must never be written there (bug-ai-dress-tokens-invisible-
+// write-only-lane).
+const TOKEN_TYPES = new Set(['npc', 'monster']);
+const isTokenRow = (row) => Boolean(row) && TOKEN_TYPES.has(row.type);
+
 // Portal POIs (poi.targetMap → linkedMap) are the hex travel machine's entry
 // lane: every consumer of linkedMap lives under src/components/hex-map/
 // (POILayer's Enter badge, HexMap's invalid-target audit). An indoor
@@ -91,8 +103,9 @@ function portalOnIndoor(doc, op) {
 }
 
 function laneOf(doc, target) {
-    if (target === 'item') return doc.placedItems;
-    if (target === 'token') return doc.items;
+    // item props and token creatures share the rendered placedItems lane;
+    // the digest pre-splits them by type so ids can never be ambiguous.
+    if (target === 'item' || target === 'token') return doc.placedItems;
     return doc.pois;
 }
 
@@ -136,7 +149,10 @@ function addPlacedItem(rows, op, at, ctx) {
 
 function addToken(rows, op, at, ctx) {
     if (!op.token?.name) { ctx.errors.push(`${at} needs token.name`); return; }
-    const kind = op.token.kind || 'monster';
+    const kind = op.token.kind === 'npc' ? 'npc' : 'monster';
+    // Shaped like the palette-dropped NPC tokens the app already renders
+    // (PlacedItems NPC/monster markers, GM right-click menus, fog dim, 3D
+    // token meshes) — a name always rides so every label surface works.
     rows.push({
         id: freshId(rows, `ai-dress-token-${op.gridX}-${op.gridY}`),
         name: op.token.name,
@@ -208,8 +224,10 @@ function applyOne(doc, op, i, ctx) {
         const [gone] = rows.splice(idx, 1);
         // GMs approve previews in plain English: describe the removed row with
         // its own fields (never an opaque id), reusing the add ops' ` at x,y`
-        // idiom so adds and removes read consistently.
-        const label = gone.type || gone.name || gone.label || 'row';
+        // idiom so adds and removes read consistently. A NAMED row (token,
+        // renamed prop) reads by name — the client preview overlay labels it
+        // the same way, so both surfaces agree.
+        const label = gone.name || gone.type || gone.label || 'row';
         const x = Number.isInteger(gone.q) ? gone.q : gone.gridX;
         const y = Number.isInteger(gone.q) ? gone.r : gone.gridY;
         ctx.preview.push(Number.isInteger(x) && Number.isInteger(y)

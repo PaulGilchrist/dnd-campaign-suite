@@ -41,7 +41,9 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
             players: mergedField(data.players, prev?.players).map(({ ...rest }) => rest),
             walls: new Set(mergedField(data.walls, prev?.walls)),
             revealed: mergedField(data.revealed, prev?.revealed),
-            // items (creature-token lane) and pois are full-array document
+            // items (legacy creature-token lane — AI-Dress tokens now land in
+            // the rendered placedItems lane instead, but generator-era docs
+            // still carry rows here) and pois are full-array document
             // lanes the dress/add/remove flows author: an AI Dress applied
             // while this editor is open arrives as a snapshot, and leaving
             // these out let the debounced autosave re-PUT the stale rows

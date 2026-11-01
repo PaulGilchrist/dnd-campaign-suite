@@ -566,6 +566,13 @@
     stroke-width: 4;
 }
 
+/* Monster creature-tokens (AI-Dress monster lane + palette) reuse the NPC
+   marker with a distinct purple ring; the skull glyph is stamped in JSX. */
+.map .monster-circle {
+    fill: #6c3483;
+    stroke: #a569bd;
+}
+
 /* NPC initial (no image) */
 .map .npc-initial {
     pointer-events: none;
