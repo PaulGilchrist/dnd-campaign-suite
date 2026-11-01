@@ -36,8 +36,8 @@ describe('usePlacedItems', () => {
       placedItems = fn(placedItems);
       return placedItems;
     });
-    // Delete rides a named native confirm (house pattern). Accept by default;
-    // cancel-leg tests override to false.
+    // Backlog 2026-11-01 AZ2: delete rides the in-app named modal (pendingDelete
+    // descriptor), NEVER window.confirm — this spy proves that absence.
     confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -47,13 +47,18 @@ describe('usePlacedItems', () => {
 
   const getHook = () => renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem, placedItems)).result;
 
-  it('returns exactly the four mutation handlers', () => {
+  it('returns the four mutation handlers plus the named-confirm dialog seam', () => {
     expect(Object.keys(getHook().current)).toEqual([
       'handleToggleItemVisibility',
       'handleDeleteItem',
       'handleToggleDoor',
       'handleRotate',
+      'requestDelete',
+      'pendingDelete',
+      'cancelDelete',
+      'confirmDelete',
     ]);
+    expect(getHook().current.pendingDelete).toBeNull();
   });
 
   it('toggles visibility both directions with one write per call and other items byte-identical', () => {
@@ -80,16 +85,22 @@ describe('usePlacedItems', () => {
   it('deletes exact survivors, always clears selection, and empties to an exact empty array', () => {
     const result = getHook();
     act(() => result.current.handleDeleteItem('item1'));
+    expect(result.current.pendingDelete).not.toBeNull();
+    act(() => result.current.confirmDelete());
     expect(placedItems).toEqual([
       { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
       { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
       { id: 'item4', visible: true, gridX: 4, gridY: 4 },
     ]);
     expect(setSelectedItem).toHaveBeenCalledWith(null);
+    expect(confirmSpy).not.toHaveBeenCalled();
     act(() => {
       result.current.handleDeleteItem('item2');
+      result.current.confirmDelete();
       result.current.handleDeleteItem('item3');
+      result.current.confirmDelete();
       result.current.handleDeleteItem('item4');
+      result.current.confirmDelete();
     });
     expect(placedItems).toEqual([]);
     expect(setPlacedItems).toHaveBeenCalledTimes(4);
@@ -138,50 +149,64 @@ describe('usePlacedItems', () => {
       result.current.handleToggleItemVisibility('nonexistent');
       result.current.handleRotate('nonexistent');
       result.current.handleDeleteItem('nonexistent');
+      result.current.confirmDelete(); // accept the armed named confirm
       result.current.handleToggleDoor('nonexistent');
       result.current.handleToggleDoor('item1'); // id matches but type is not door
     });
     // Every survivor keeps reference identity — nothing was rewritten, only re-mapped.
     placedItems.forEach((item, i) => expect(item).toBe(refs[i]));
     expect(placedItems[0].open).toBeUndefined();
-    // Honest behavior: the unconditional setSelectedItem(null) in delete/toggleDoor fires
-    // even when nothing was found or toggled — 3 calls total (delete + both door attempts),
-    // never from visibility/rotate.
+    // Honest behavior: the unconditional setSelectedItem(null) in the delete
+    // confirm + both door attempts fires even when nothing was found or toggled —
+    // 3 calls total, never from visibility/rotate (and never from the mere
+    // arm — the dialog decision is what writes).
     expect(setSelectedItem).toHaveBeenCalledTimes(3);
     expect(setSelectedItem).toHaveBeenCalledWith(null);
     expect(setPlacedItems).toHaveBeenCalledTimes(5);
   });
 
-  it('delete confirm NAMES the token: npc label is its name, furniture falls back to type', () => {
+  it('delete ARMS a named descriptor — NPC label is its name, furniture falls back to type', () => {
     placedItems = [
       { id: 'npc1', type: 'npc', name: 'Marta Copperkettle', gridX: 5, gridY: 5 },
       { id: 'barrel1', type: 'barrel', gridX: 6, gridY: 6 },
     ];
     const result = getHook();
     act(() => result.current.handleDeleteItem('npc1'));
-    expect(confirmSpy).toHaveBeenCalledWith('Delete "Marta Copperkettle" from the map?');
+    expect(result.current.pendingDelete.label).toBe('Marta Copperkettle');
     act(() => result.current.handleDeleteItem('barrel1'));
     // Unnamed furniture is anchored by its cell too (same ambiguity family
     // as the 'NPC' palette default).
-    expect(confirmSpy).toHaveBeenLastCalledWith('Delete "barrel (6,6)" from the map?');
-    // Unknown id still asks honestly with the generic fallback and writes an
-    // inert filter (selection clears — unchanged seam semantics).
+    expect(result.current.pendingDelete.label).toBe('barrel (6,6)');
+    // Unknown id still arms honestly with the generic fallback; confirming
+    // writes an inert filter and clears selection (unchanged seam semantics).
+    // One dialog at a time: the earlier arms (npc1/barrel1) were SUPERSEDED by
+    // this re-arm — nothing was written for them, both items survive.
     act(() => result.current.handleDeleteItem('ghost'));
-    expect(confirmSpy).toHaveBeenLastCalledWith('Delete "placed item" from the map?');
-    expect(placedItems).toEqual([]);
+    expect(result.current.pendingDelete.label).toBe('placed item');
+    act(() => result.current.confirmDelete());
+    expect(placedItems).toEqual([
+      { id: 'npc1', type: 'npc', name: 'Marta Copperkettle', gridX: 5, gridY: 5 },
+      { id: 'barrel1', type: 'barrel', gridX: 6, gridY: 6 },
+    ]);
+    expect(setPlacedItems).toHaveBeenCalledTimes(1);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
+    // The delete seam NEVER touches the native window.confirm (backlog AZ2).
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('canceling the delete confirm is fully inert: no write, no selection clear, token intact', () => {
-    confirmSpy.mockReturnValue(false);
+  it('canceling the named confirm is fully inert: no write, no selection clear, token intact', () => {
     placedItems = [{ id: 'npc1', type: 'npc', name: 'Marta', gridX: 5, gridY: 5 }];
     const result = getHook();
     const before = [...placedItems];
     act(() => result.current.handleDeleteItem('npc1'));
-    expect(confirmSpy).toHaveBeenCalledWith('Delete "Marta" from the map?');
+    expect(result.current.pendingDelete.label).toBe('Marta');
+    act(() => result.current.cancelDelete());
+    expect(result.current.pendingDelete).toBeNull();
     expect(setPlacedItems).not.toHaveBeenCalled();
     expect(setSelectedItem).not.toHaveBeenCalled();
     expect(placedItems).toEqual(before);
     expect(placedItems[0]).toBe(before[0]);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });
 

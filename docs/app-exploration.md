@@ -68,7 +68,6 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 AZ2: **Two delete-confirm idioms for maps** — deleting a MAP opens the polished `role=dialog` "Delete Map" modal (681199249) but deleting a placed TOKEN uses a native `window.confirm` (`Delete "X" from the map?`). Same "named confirm" spirit, different chrome/a11y tier. Consider routing token/prop/item deletes through the same named-modal component. `src/components/map/hooks/usePlacedItemsContextMenu`/`PlacedItems.jsx` confirm sites.
 - 2026-11-01 AZ2: **3D-mode exit affordances lack aria-labels** — inside the 3D view the exit is a bare text `2D` toggle and `Top-down` has no accessible name, while entering 3D has `View map in 3D`. a11y parity fix (same family as 8b8897db3). `src/components/map/Map3D/Map3D.jsx` toolbar buttons.
 - 2026-11-01 AZ2: **Hidden-marker dim values diverge** — hidden POI dims `use` opacity 0.4 (AY) while hidden creature tokens dim `.npc-circle` opacity 0.5 (AZ2), both GM-only. Harmless today; a shared constant would keep GM-readable dimming consistent across lanes. `IndoorPoiLayer.jsx` / `PlacedItems.jsx`.
 

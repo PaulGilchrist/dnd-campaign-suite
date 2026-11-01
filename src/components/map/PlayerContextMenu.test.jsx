@@ -1,4 +1,7 @@
-// @maintained-by-ai: 2026-10-26
+// @maintained-by-ai: 2026-11-01 (AZ2 improve: the native window.confirm here
+// became the in-app named modal — the menu now only hands off + closes; the
+// `Remove "<name>" from the map?` dialog is owned by the parent lane, see
+// Map-handlers.test.jsx and DeleteFromMapModal.test.jsx.)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PlayerContextMenu from './PlayerContextMenu';
@@ -17,9 +20,10 @@ const defaultProps = (overrides = {}) => ({
 });
 
 describe('PlayerContextMenu', () => {
-    // "Remove from Map" rides a named native confirm (house pattern, mirrors the
-    // placed-item lane in usePlacedItems.js). Accept by default; the cancel-leg
-    // test overrides to false.
+    // The removal confirm is no longer asked HERE (nor natively): clicking
+    // hands the id to handleRemovePlayer, which arms the shared named-modal at
+    // the Map level. This spy proves the menu seam never falls back to a
+    // native dialog.
     let confirmSpy;
     beforeEach(() => {
         confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -45,15 +49,17 @@ describe('PlayerContextMenu', () => {
         expect(rect.getAttribute('y')).toBe(String(gridCenterY(defaultPlayer.gridY) + 10));
     });
 
-    it('asks a named confirm and calls handleRemovePlayer with the player id when accepted', () => {
+    it('hands the id to handleRemovePlayer and closes the menu — no native confirm', () => {
         const handleRemovePlayer = vi.fn();
-        render(<PlayerContextMenu {...defaultProps({ handleRemovePlayer })} />);
+        const setSelectedPlayer = vi.fn();
+        render(<PlayerContextMenu {...defaultProps({ handleRemovePlayer, setSelectedPlayer })} />);
         fireEvent.click(screen.getByText('Remove from Map'));
-        expect(confirmSpy).toHaveBeenCalledWith('Remove "FeyRanger" from the map?');
         expect(handleRemovePlayer).toHaveBeenCalledWith('player-1');
+        expect(setSelectedPlayer).toHaveBeenCalledWith(null);
+        expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it('labels the confirm with the id when the player has no name', () => {
+    it('hands off the raw id even when the player has no name (dialog copy resolves it)', () => {
         const handleRemovePlayer = vi.fn();
         render(
             <PlayerContextMenu
@@ -64,19 +70,8 @@ describe('PlayerContextMenu', () => {
             />
         );
         fireEvent.click(screen.getByText('Remove from Map'));
-        expect(confirmSpy).toHaveBeenCalledWith('Remove "player-9" from the map?');
         expect(handleRemovePlayer).toHaveBeenCalledWith('player-9');
-    });
-
-    it('is fully inert on cancel: no removal call, but the menu still closes', () => {
-        confirmSpy.mockReturnValue(false);
-        const handleRemovePlayer = vi.fn();
-        const setSelectedPlayer = vi.fn();
-        render(<PlayerContextMenu {...defaultProps({ handleRemovePlayer, setSelectedPlayer })} />);
-        fireEvent.click(screen.getByText('Remove from Map'));
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
-        expect(handleRemovePlayer).not.toHaveBeenCalled();
-        expect(setSelectedPlayer).toHaveBeenCalledWith(null);
+        expect(confirmSpy).not.toHaveBeenCalled();
     });
 
     it('calls setSelectedPlayer with null when close (✕) is clicked', () => {

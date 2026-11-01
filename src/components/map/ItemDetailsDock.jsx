@@ -5,8 +5,9 @@
 // delete affordance no longer hides behind a right-click.
 //
 // Single source of truth: the Delete button invokes the SAME handleDeleteItem
-// the context-menu row uses (named window.confirm + placedItems filter +
-// useMapLoader autosave persist) — no duplicated confirm/persist logic here.
+// the context-menu row uses (staged named confirm via the shared
+// DeleteFromMapModal + placedItems filter + useMapLoader autosave persist) —
+// no duplicated confirm/persist logic here.
 // Renders ONLY while `item` is one of the still-placed items (Map.jsx passes
 // the resolved item, null on select-none/delete), so no stale control is ever
 // left on screen. The ✕ row dismisses the popover by deselecting.

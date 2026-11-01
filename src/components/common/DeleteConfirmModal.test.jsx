@@ -1,0 +1,73 @@
+// @maintained-by-ai
+// Lane: DeleteConfirmModal — the shared in-app named-delete dialog extracted
+// VERBATIM from MapsManager's Delete-map modal (backlog 2026-11-01 AZ2 improve
+// "two delete-confirm idioms"). OWNED here: the a11y tier every named-delete
+// lane inherits — role="dialog" + aria-modal + labelled heading, initial focus
+// inside (Cancel), the two-way Tab trap, and the Cancel/confirm callbacks.
+// MapsManager-side behavior through this dialog stays pinned by
+// MapsManager.delete-a11y.test.jsx; map-lane copy + write semantics are pinned
+// by DeleteFromMapModal.test.jsx and PlacedItems.delete.test.jsx.
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import DeleteConfirmModal from './DeleteConfirmModal.jsx';
+
+const renderModal = (overrides = {}) => render(
+    <DeleteConfirmModal
+        titleId="titled-dialog"
+        title="Delete Thing"
+        confirmLabel="Yes, Delete"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        {...overrides}
+    >
+        Delete &quot;<strong>Widget</strong>&quot; for good?
+    </DeleteConfirmModal>
+);
+
+describe('DeleteConfirmModal', () => {
+    it('exposes a labelled modal dialog with the named copy and both actions', () => {
+        renderModal();
+        const dialog = screen.getByRole('dialog', { name: 'Delete Thing' });
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+        expect(dialog.getAttribute('aria-labelledby')).toBe('titled-dialog');
+        expect(document.getElementById('titled-dialog')).toHaveTextContent('Delete Thing');
+        expect(dialog).toHaveTextContent('Delete "Widget" for good?');
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Yes, Delete' })).toBeInTheDocument();
+    });
+
+    it('moves focus into the dialog on open and traps Tab at both ends', () => {
+        const { container } = renderModal();
+        const dialog = screen.getByRole('dialog');
+        const cancel = screen.getByRole('button', { name: 'Cancel' });
+        const confirm = screen.getByRole('button', { name: 'Yes, Delete' });
+
+        expect(cancel).toHaveFocus();
+        expect(dialog.contains(document.activeElement)).toBe(true);
+
+        confirm.focus();
+        fireEvent.keyDown(confirm, { key: 'Tab' });
+        expect(cancel).toHaveFocus();
+
+        fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true });
+        expect(confirm).toHaveFocus();
+
+        expect(container.querySelector('.maps-manager-modal-overlay')).toBeInTheDocument();
+    });
+
+    it('routes Cancel and Confirm to their callbacks without invoking window.confirm', () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const onCancel = vi.fn();
+        const onConfirm = vi.fn();
+        renderModal({ onCancel, onConfirm });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        expect(onConfirm).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Yes, Delete' }));
+        expect(onConfirm).toHaveBeenCalledTimes(1);
+        expect(confirmSpy).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
+    });
+});

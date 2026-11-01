@@ -40,6 +40,7 @@ import Players from './Players.jsx';
 import FogOverlay from './FogOverlay.jsx';
 import ItemContextMenu from './ItemContextMenu.jsx';
 import ItemDetailsDock from './ItemDetailsDock.jsx';
+import DeleteFromMapModal from './DeleteFromMapModal.jsx';
 import MapDescriptionPanel from '../common/MapDescriptionPanel.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
@@ -354,15 +355,30 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         handleDeleteItem,
         handleToggleDoor,
         handleRotate,
+        requestDelete,
+        pendingDelete,
+        cancelDelete,
+        confirmDelete,
     } = usePlacedItems(setPlacedItems, setSelectedItem, placedItems);
 
+    // Player-token removal rides the SAME in-app named-confirm modal as the
+    // placed-item lane (backlog 2026-11-01 AZ2): stage `Remove "<name>" from
+    // the map?` via requestDelete (verb on the descriptor); the setMapData
+    // edit only fires on confirm — cancel writes nothing to the autosave PUT
+    // lane. The menu still closes at the request (the dialog owns the
+    // decision now; same net UX as the retired native confirm).
     const handleRemovePlayer = useCallback((playerId) => {
-        setMapData(prev => ({
-            ...prev,
-            players: (prev.players || []).filter(p => p.id !== playerId),
-        }));
+        const player = (mapData?.players || []).find(p => p.id === playerId);
+        requestDelete({
+            action: 'Remove',
+            label: (player && (player.name || player.id)) || 'player',
+            confirm: () => setMapData(prev => ({
+                ...prev,
+                players: (prev.players || []).filter(p => p.id !== playerId),
+            })),
+        });
         setSelectedPlayer(null);
-    }, [setMapData]);
+    }, [mapData, setMapData, requestDelete, setSelectedPlayer]);
 
     const handleCloseMenu = useCallback(() => {
         setSelectedItem(null);
@@ -760,6 +776,17 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                 item={dockItem}
                 handleDeleteItem={handleDeleteItem}
                 onDismiss={handleCloseMenu}
+            />
+
+            {/* In-app named-delete confirm for BOTH removal lanes (backlog
+                2026-11-01 AZ2) — token/prop/item deletes staged by
+                usePlacedItems and the player-token "Remove from Map" ride the
+                MapsManager Delete-map dialog's role=dialog tier; null when
+                nothing is armed. Replaces the native window.confirm. */}
+            <DeleteFromMapModal
+                pending={pendingDelete}
+                onCancel={cancelDelete}
+                onConfirm={confirmDelete}
             />
 
             {viewMode === '2d' && renamePopover && (

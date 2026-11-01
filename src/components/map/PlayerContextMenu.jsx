@@ -15,15 +15,15 @@ function PlayerContextMenu({ selectedPlayer, gridCenterX, gridCenterY, handleRem
                     fontSize="11"
                     className="menu-option"
                     onClick={() => {
-                        // Named-confirm before removal — mirrors the placed-item lane
-                        // (usePlacedItems.js handleDeleteItem, house pattern `Delete
-                        // "<name>" from the map?`). Cancel is fully inert: no
-                        // handleRemovePlayer call → no setMapData write → the map's
-                        // autosave PUT lane never fires; the menu still closes.
-                        const name = selectedPlayer.name || selectedPlayer.id;
-                        if (window.confirm(`Remove "${name}" from the map?`)) {
-                            handleRemovePlayer(selectedPlayer.id);
-                        }
+                        // Removal no longer asks a native window.confirm: clicking
+                        // hands off to handleRemovePlayer (Map.jsx), which stages the
+                        // in-app named-confirm modal — `Remove "<name>" from the map?`
+                        // through the shared DeleteConfirmModal (same role="dialog"
+                        // tier as the MapsManager "Delete Map" dialog; backlog
+                        // 2026-11-01 AZ2). Cancel there is fully inert — no
+                        // setMapData write, the map's autosave PUT lane never
+                        // fires. The menu closes here, as before.
+                        handleRemovePlayer(selectedPlayer.id);
                         setSelectedPlayer(null);
                     }}
                 >

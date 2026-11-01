@@ -2,22 +2,26 @@
 // ─── Lane: placed-token DELETE via the item context menu ──────────────────────
 // OWNED here — the end-to-end removal affordance for a placedItems token:
 //   - GM (localhost): right-click token → menu offers Delete → clicking Delete
-//     asks a NATIVE window.confirm that NAMES the token → accepting removes it
-//     from the board immediately AND persists: the app's own PUT lane
-//     (useMapLoader autosave → mapsService.saveMapData → PUT /maps/:name)
-//     receives the filtered placedItems. The real useMapLoader is mounted
-//     here (only mapsService is mocked) so the persistence claim is pinned
-//     through the same code the running app uses — not a mocked setter.
-//   - cancel is inert: confirm false → token stays on the board and every
-//     PUT payload the lane emits still carries the token.
+//     opens the IN-APP named modal (backlog 2026-11-01 AZ2: replaces the native
+//     window.confirm) — role="dialog" + aria-modal, heading "Delete from Map",
+//     copy naming the token verbatim (`Delete "QA Marta" from the map?`).
+//     Confirming removes it from the board immediately AND persists: the app's
+//     own PUT lane (useMapLoader autosave → mapsService.saveMapData →
+//     PUT /maps/:name) receives the filtered placedItems. The real useMapLoader
+//     is mounted here (only mapsService is mocked) so the persistence claim is
+//     pinned through the same code the running app uses — not a mocked setter.
+//   - Cancel/× is inert: the token stays on the board, every PUT payload the
+//     lane emits still carries the token, and no native confirm ever fires.
 //   - LAN player (non-localhost): NO delete affordance renders at all —
 //     tokens carry no context hit-area, right-click opens no menu.
 //
 // NOT OWNED — cited to owner lanes:
-//   confirm wording bytes at the hook seam + label fallback → hooks/usePlacedItems.test.js (#909)
-//   menu label census + per-entry dispatch             → ItemContextMenu.test.jsx (#918)
-//   right-click select payload + defaultPrevented      → PlacedItems-event-handlers.test.jsx
-//   container anchor/swap/close wiring                 → Map-context-menus.test.jsx
+//   dialog a11y tier (focus-in/Tab-trap)             → common/DeleteConfirmModal.test.jsx
+//   descriptor→copy mapping + Remove verb           → DeleteFromMapModal.test.jsx
+//   label descriptor bytes at the hook seam         → hooks/usePlacedItems.test.js
+//   menu label census + per-entry dispatch          → ItemContextMenu.test.jsx
+//   right-click select payload + defaultPrevented   → PlacedItems-event-handlers.test.jsx
+//   container anchor/swap/close wiring              → Map-context-menus.test.jsx
 //   autosave debounce mechanics (walls, load, clobber) → hooks/useMapLoader.test.js
 import { render, fireEvent, act, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -206,6 +210,12 @@ const npcHitAreas = (container) => container.querySelectorAll('g.npc-group rect[
 
 let confirmSpy;
 
+const openDeleteDialog = async (container) => {
+    await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[0]); });
+    await act(async () => { fireEvent.click(screen.getByText('Delete')); });
+    return screen.getByRole('dialog', { name: 'Delete from Map' });
+};
+
 describe('placed-token delete via context menu', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -220,6 +230,9 @@ describe('placed-token delete via context menu', () => {
             placedItems: [npcToken],
         });
         mapsService.saveMapData.mockResolvedValue({});
+        // The seam must NEVER ask a native confirm (backlog 2026-11-01 AZ2):
+        // spy true so an accidental confirm would silently proceed — the
+        // not.toHaveBeenCalled assertions are the real pin.
         confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     });
 
@@ -227,26 +240,34 @@ describe('placed-token delete via context menu', () => {
         confirmSpy.mockRestore();
     });
 
-    it('GM: Delete menu option asks a native confirm that NAMES the token', async () => {
+    it('GM: Delete menu option opens the named in-app dialog — no native confirm', async () => {
         const { container } = await act(async () => renderMap());
         await settleAutosave();
 
-        await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[0]); });
-        const deleteOption = screen.getByText('Delete');
-        await act(async () => { fireEvent.click(deleteOption); });
+        const dialog = await openDeleteDialog(container);
 
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "QA Marta" from the map?');
-        // Accept: token gone from the board immediately, menu closed.
-        expect(container.querySelectorAll('g.npc-group')).toHaveLength(0);
-        expect(container.querySelectorAll('.item-context-menu')).toHaveLength(0);
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+        expect(dialog).toHaveTextContent('Delete "QA Marta" from the map?');
+        expect(confirmSpy).not.toHaveBeenCalled();
+        // Nothing written yet — the token is still on the board while the
+        // dialog is open, and focus started inside the dialog on Cancel.
+        expect(container.querySelectorAll('g.npc-group')).toHaveLength(1);
+        expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
     });
 
-    it('GM: accepting Delete filters placedItems and persists through the autosave PUT lane', async () => {
+    it('GM: confirming the dialog filters placedItems exactly once and persists through the autosave PUT lane', async () => {
         const { container } = await act(async () => renderMap());
         await settleAutosave();
 
-        await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[0]); });
-        await act(async () => { fireEvent.click(screen.getByText('Delete')); });
+        await openDeleteDialog(container);
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Yes, Delete' }));
+        });
+
+        // Token gone from the board, dialog dismissed, menu closed.
+        expect(container.querySelectorAll('g.npc-group')).toHaveLength(0);
+        expect(screen.queryByRole('dialog', { name: 'Delete from Map' })).not.toBeInTheDocument();
+        expect(container.querySelectorAll('.item-context-menu')).toHaveLength(0);
 
         // The lane already has an autosave schedule (mount save carries the token);
         // the delete write must produce a LATER save with placedItems filtered.
@@ -258,16 +279,18 @@ describe('placed-token delete via context menu', () => {
         expect(lastPayload.map).toBeUndefined();
     });
 
-    it('GM: canceling the confirm is inert — token stays on board and in every persisted payload', async () => {
-        confirmSpy.mockReturnValue(false);
+    it('GM: canceling the dialog is inert — token stays on board and in every persisted payload', async () => {
         const { container } = await act(async () => renderMap());
         await settleAutosave();
 
-        await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[0]); });
-        await act(async () => { fireEvent.click(screen.getByText('Delete')); });
+        await openDeleteDialog(container);
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        });
 
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "QA Marta" from the map?');
+        expect(screen.queryByRole('dialog', { name: 'Delete from Map' })).not.toBeInTheDocument();
         expect(container.querySelectorAll('g.npc-group')).toHaveLength(1);
+        expect(confirmSpy).not.toHaveBeenCalled();
         await settleAutosave();
         // No save ever drops the token (mount autosave keeps it — disk intact).
         mapsService.saveMapData.mock.calls.forEach(([, , payload]) =>

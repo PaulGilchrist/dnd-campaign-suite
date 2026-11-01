@@ -289,7 +289,7 @@ describe('Map container - player context menu', () => {
         expect(screen.queryByText('Remove from Map')).not.toBeInTheDocument();
     });
 
-    it('Remove from Map removes exactly that player and closes the menu', async () => {
+    it('Remove from Map asks the named in-app dialog; confirming removes exactly that player and closes the menu', async () => {
         mockState.mapData = {
             players: [
                 player('player1', 'Thorin', 5, 5),
@@ -298,8 +298,9 @@ describe('Map container - player context menu', () => {
             ],
             walls: new Set(),
         };
-        // Removal rides a named native confirm (backlog 2026-10-26 parity with
-        // the placed-item lane) — accept it to reach the removal path.
+        // Removal rides the shared in-app named-confirm modal (backlog
+        // 2026-11-01 AZ2, replaces the native confirm) — the spy pins its
+        // ABSENCE; the dialog copy names the player.
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = await act(async () => renderMap());
 
@@ -307,13 +308,39 @@ describe('Map container - player context menu', () => {
         expect(screen.getByText('Remove from Map')).toBeInTheDocument();
 
         await act(async () => { fireEvent.click(screen.getByText('Remove from Map')); });
-        expect(confirmSpy).toHaveBeenCalledWith('Remove "Thorin" from the map?');
+        const dialog = screen.getByRole('dialog', { name: 'Remove from Map' });
+        expect(dialog).toHaveTextContent('Remove "Thorin" from the map?');
+        expect(confirmSpy).not.toHaveBeenCalled();
+        // Arming alone is inert — every player still on the board.
+        expect(playerCircles(container)).toHaveLength(3);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Yes, Remove' }));
+        });
 
         // Exact remaining players — only the right-clicked one is gone
         expect(mockState.mapData.players.map(p => p.id)).toEqual(['player2', 'player3']);
         expect(menus(container)).toHaveLength(0);
         expect(playerCircles(container)).toHaveLength(2);
         confirmSpy.mockRestore();
+    });
+
+    it('canceling the Remove dialog keeps every player (inert)', async () => {
+        mockState.mapData = {
+            players: [player('player1', 'Thorin', 5, 5), player('player2', 'Legolas', 6, 6)],
+            walls: new Set(),
+        };
+        const { container } = await act(async () => renderMap());
+        await act(async () => { fireEvent.contextMenu(playerCircles(container)[0]); });
+        await act(async () => { fireEvent.click(screen.getByText('Remove from Map')); });
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        });
+
+        expect(screen.queryByRole('dialog', { name: 'Remove from Map' })).not.toBeInTheDocument();
+        expect(mockState.mapData.players.map(p => p.id)).toEqual(['player1', 'player2']);
+        expect(playerCircles(container)).toHaveLength(2);
     });
 
     it('renders the editor without throwing when the map document has no players (backlog 2026-10-27-M)', async () => {

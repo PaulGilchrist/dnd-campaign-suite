@@ -7,7 +7,8 @@
 //     root) selects the item and surfaces ItemDetailsDock: a NORMAL DOM button
 //     whose accessible name is `Delete "<item name>"`. The SVG context menu
 //     does NOT open on this lane.
-//   - the dock's Delete fires the SAME named-confirm + persistence seam as the
+//   - the dock's Delete fires the SAME named-confirm seam as the context menu
+//     (in-app role=dialog modal since backlog 2026-11-01 AZ2) + persistence
 //     contextmenu lane (accept → item gone from placedItems AND the autosave
 //     PUT payload; cancel → inert: item stays, no payload drops it).
 //   - the dock is derived: click on empty canvas deselects and the dock
@@ -267,14 +268,20 @@ describe('placed-item click-select → visible delete dock', () => {
         expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it('GM: dock Delete asks the SAME named confirm; accept removes the item and persists the filtered array', async () => {
+    it('GM: dock Delete opens the SAME named in-app dialog; accept removes the item and persists the filtered array', async () => {
         const { container } = await act(async () => renderMap());
         await settleAutosave();
         await clickToken(container);
 
         await act(async () => { fireEvent.click(deleteDockButton()); });
 
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "QA Marta" from the map?');
+        const dialog = screen.getByRole('dialog', { name: 'Delete from Map' });
+        expect(dialog).toHaveTextContent('Delete "QA Marta" from the map?');
+        expect(confirmSpy).not.toHaveBeenCalled();
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Yes, Delete' }));
+        });
+
         expect(container.querySelectorAll('g.npc-group')).toHaveLength(0);
         // Dock is derived from the selection — deleting the item unmounts it.
         expect(container.querySelector('.item-details-dock')).not.toBeInTheDocument();
@@ -287,14 +294,19 @@ describe('placed-item click-select → visible delete dock', () => {
     });
 
     it('GM: canceling the dock Delete is inert — item and dock stay, every persisted payload keeps the token', async () => {
-        confirmSpy.mockReturnValue(false);
         const { container } = await act(async () => renderMap());
         await settleAutosave();
         await clickToken(container);
 
         await act(async () => { fireEvent.click(deleteDockButton()); });
+        expect(screen.getByRole('dialog', { name: 'Delete from Map' }))
+            .toHaveTextContent('Delete "QA Marta" from the map?');
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        });
 
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "QA Marta" from the map?');
+        expect(screen.queryByRole('dialog', { name: 'Delete from Map' })).not.toBeInTheDocument();
+        expect(confirmSpy).not.toHaveBeenCalled();
         expect(container.querySelectorAll('g.npc-group')).toHaveLength(1);
         expect(container.querySelector('.item-details-dock')).toBeInTheDocument();
         await settleAutosave();
@@ -303,10 +315,10 @@ describe('placed-item click-select → visible delete dock', () => {
         );
     });
 
-    it('GM: palette-default NPC (name "NPC") is cell-anchored in dock text, both aria-labels, and the confirm', async () => {
+    it('GM: palette-default NPC (name "NPC") is cell-anchored in dock text, both aria-labels, and the dialog', async () => {
         // Backlog 2026-10-25 pm: every unnamed palette token read "NPC" —
         // ambiguous with several on one map. Unnamed + numeric cell ⇒ `NPC (x,y)`
-        // through the ONE placedItemLabel source (dock name, both arias, confirm).
+        // through the ONE placedItemLabel source (dock name, both arias, dialog).
         mapsService.loadMapData.mockResolvedValue({
             players: [],
             walls: [],
@@ -326,7 +338,8 @@ describe('placed-item click-select → visible delete dock', () => {
         expect(btn).toBeInTheDocument();
 
         await act(async () => { fireEvent.click(btn); });
-        expect(confirmSpy).toHaveBeenCalledWith('Delete "NPC (5,5)" from the map?');
+        expect(screen.getByRole('dialog', { name: 'Delete from Map' }))
+            .toHaveTextContent('Delete "NPC (5,5)" from the map?');
     });
 
     it('GM: click on empty canvas deselects — the dock unmounts, no stale control', async () => {
