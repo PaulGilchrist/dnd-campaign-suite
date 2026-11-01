@@ -27,3 +27,18 @@ Cheapest honest fix (mirrors the existing INDOOR_ONLY idiom): in `dressMap.js` `
 
 ### Severity
 Broken feature — an explicitly offered, previewed-and-confirmed capability is inert by map kind with no validation, no copy, and no runtime feedback; players learn doors mean "enter" on hexes and get a dead icon indoors.
+
+## Resolution
+FIXED 2026-11-01 — chose the gate direction (mirrors the existing INDOOR_ONLY idiom), not an indoor entry lane. Root cause matched the diagnosis: `applyOne` only gated `item`/`token` on outdoor maps, `addPoi` spread `linkedMap` regardless of `doc.type`, and the prompt advertised `poi.targetMap` with no map-kind caveat. (No dual-ruleset sibling — this is server AI-authoring code, not a 5e/2024 rules module.)
+
+Changes:
+- `server/services/ai/authoring/dressMap.js` — new `portalOnIndoor(doc, op)` guard beside `INDOOR_ONLY`, checked in `applyOne` right after it: `poi.targetMap` on a non-outdoor doc rejects the whole plan with `ops[i] "add poi": poi portals are outdoor-only (party travel is hex-based)`, so the ≤2 repair loop feeds the error back and the model re-proposes without the link. System prompt now says portals are OUTDOOR hex maps only. `addPoi` preview copy for the valid hex case names the destination: `add portal POI X → map at q,r`.
+- `src/services/maps/dressPreview.js` — `addLabel` mirrors the server copy for grid-overlay markers (`add portal POI X → battle-arena at 7,2`); plain POIs keep the generic name ladder.
+- `server/services/ai/authoring/dressMap.poi-portal.test.js` (new) — locks: indoor portal add rejects with the exact error; all-or-nothing (plain poi sibling in the same plan writes nothing); plain indoor poi still applies with generic copy and no `linkedMap`; valid hex portal applies with destination-named preview; poi move/remove unaffected; prompt advertises outdoor-only; persistent portal proposal fails closed after 2 attempts with the error quoted in the repair turn.
+- `src/services/maps/dressPreview.test.js` — added portal-label case (modal + overlay copy parity).
+
+Verification:
+- Repro re-run live first (bug confirmed exactly as filed: preview "add POI QA AY Gate at 7,2", `linkedMap:"battle-arena"` persisted on test-map, click = zero delta).
+- Post-fix live re-verify in test-campaign (fake rig :8123, POIPORTAL marker): indoor map → modal inline alert `ops[0] "add poi": poi portals are outdoor-only (party travel is hex-based)`, NO Apply button, modal stays open (same error surface as the outdoor INDOOR_ONLY negative). POITEST control → plain indoor poi+chest still apply and render in `g.indoor-poi-layer`. Throwaway hex map "QA AZ Hex" → portal op VALID: modal list AND grid overlay both read `add portal POI QA AY Gate → battle-arena at 7,2`, Apply persisted `linkedMap:"battle-arena"` at q,r.
+- Tests: `npx vitest run` on the two touched files (20 passed), then `server/services/ai/authoring` + `src/services/maps` (25 files / 360 passed), then full `npm run test:run` (2988 files / 32841 passed, 3 expected fails), `npm run lint` clean.
+- Cleanup: test-map restored to baseline (`pois: []`, QA chest removed, players 11 intact), QA AZ Hex deleted, change-data `{}` + log `[]` cleared via Admin lane, fake rig killed.

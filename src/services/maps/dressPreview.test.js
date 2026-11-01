@@ -67,6 +67,20 @@ describe('buildDressMarkers', () => {
         const [m] = buildDressMarkers([{ op: 'add', target: 'poi', poi: { name: 'Arch' } }], DOC);
         expect(m).toMatchObject({ kind: 'add', x: null, y: null, valid: false, label: 'add Arch (no cell)' });
     });
+
+    it('names a portal POI\'s destination (server-parity copy; the door is visible on the grid)', () => {
+        const [portal] = buildDressMarkers(
+            [{ op: 'add', target: 'poi', poi: { name: 'Gate', targetMap: 'battle-arena' }, gridX: 7, gridY: 2 }],
+            DOC,
+        );
+        expect(portal).toMatchObject({ kind: 'add', x: 7, y: 2, label: 'add portal POI Gate → battle-arena at 7,2' });
+        // a plain POI keeps the generic landmark copy
+        const [plain] = buildDressMarkers(
+            [{ op: 'add', target: 'poi', poi: { name: 'Shrine' }, gridX: 6, gridY: 3 }],
+            DOC,
+        );
+        expect(plain.label).toBe('add Shrine at 6,3');
+    });
 });
 
 describe('dress geometry', () => {

@@ -35,7 +35,11 @@ const rowLabel = (row, target) => (target === 'token'
     ? row?.name || row?.type || 'row'
     : row?.type || row?.name || row?.label || 'row');
 
-const addLabel = (op) => op.item?.type || op.token?.name || op.poi?.name || op.target;
+// Portal POIs name their destination (server-parity `portal POI X → map`
+// copy) so the GM sees the door, not just the landmark.
+const addLabel = (op) => (op.target === 'poi' && op.poi?.targetMap
+    ? `portal POI ${op.poi.name} → ${op.poi.targetMap}`
+    : op.item?.type || op.token?.name || op.poi?.name || op.target);
 
 function laneRows(doc, target) {
     const lane = target === 'item' ? doc?.placedItems : target === 'token' ? doc?.items : doc?.pois;

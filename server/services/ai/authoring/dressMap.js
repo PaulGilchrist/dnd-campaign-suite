@@ -81,6 +81,15 @@ export function buildMapDigest(doc) {
 
 const INDOOR_ONLY = new Set(['item', 'token']);
 
+// Portal POIs (poi.targetMap → linkedMap) are the hex travel machine's entry
+// lane: every consumer of linkedMap lives under src/components/hex-map/
+// (POILayer's Enter badge, HexMap's invalid-target audit). An indoor
+// linkedMap renders as a plain landmark with no click lane — a fake door —
+// so the applier refuses it exactly like the INDOOR_ONLY pair above.
+function portalOnIndoor(doc, op) {
+    return doc.type !== 'outdoor' && op.target === 'poi' && Boolean(op.poi?.targetMap);
+}
+
 function laneOf(doc, target) {
     if (target === 'item') return doc.placedItems;
     if (target === 'token') return doc.items;
@@ -151,7 +160,11 @@ function addPoi(rows, op, at, ctx) {
         ...(op.poi.targetMap ? { linkedMap: op.poi.targetMap } : {}),
         ...(ctx.place.outdoor ? { q: op.gridX, r: op.gridY } : { gridX: op.gridX, gridY: op.gridY }),
     });
-    ctx.preview.push(`add POI ${op.poi.name} at ${op.gridX},${op.gridY}`);
+    // GMs approve previews in plain English: a portal op must NAME its
+    // destination on the card, never hide behind the generic landmark copy.
+    ctx.preview.push(op.poi.targetMap
+        ? `add portal POI ${op.poi.name} → ${op.poi.targetMap} at ${op.gridX},${op.gridY}`
+        : `add POI ${op.poi.name} at ${op.gridX},${op.gridY}`);
 }
 
 function addRow(op, rows, at, ctx) {
@@ -178,6 +191,10 @@ function applyOne(doc, op, i, ctx) {
     const at = `ops[${i}] "${op.op} ${op.target}"`;
     if (ctx.place.outdoor && INDOOR_ONLY.has(op.target)) {
         ctx.errors.push(`${at}: item/token ops are indoor-only (hex maps carry terrain + POIs)`);
+        return;
+    }
+    if (portalOnIndoor(doc, op)) {
+        ctx.errors.push(`${at}: poi portals are outdoor-only (party travel is hex-based)`);
         return;
     }
     const rows = laneOf(doc, op.target);
@@ -229,7 +246,7 @@ function buildDressMessages({ digest, instruction }) {
 Output ONLY a single JSON object: {"ops":[…]}, nothing else. Each op:
 { "op": "add"|"move"|"remove", "target": "item"|"poi"|"token", "gridX": n, "gridY": n, … }
 - item  = placed prop (chest, trap, torch, door, furniture…) — INDOOR maps only; add carries item{type,name?}
-- poi   = labelled point of interest, optionally a portal via poi.targetMap (kebab file name of another map); add carries poi{name,description?,targetMap?}
+- poi   = labelled point of interest; add carries poi{name,description?,targetMap?}. poi.targetMap (kebab file name of another map) opens a portal — portals are OUTDOOR hex maps only (party travel is hex-based); never put targetMap on an indoor map's poi.
 - token = monster/NPC marker on the token lane — INDOOR maps only; add carries token{name,kind monster|npc,fromEncounter?}
 - add needs gridX/gridY on open ground inside the grid (hex: a cell that exists in the terrain — check the counts and pick sensible central land).
 - move needs the entity's EXACT id from the digest + the new gridX/gridY. remove needs that EXACT id. NEVER invent ids or addresses.
