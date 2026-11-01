@@ -285,6 +285,41 @@ describe('HexMap', () => {
         expect(onBack).toHaveBeenCalledTimes(1);
     });
 
+    // ── POI delete dialog tier (backlog 2026-11-01 BA) ──
+    // The menu no longer rides a native confirm: usePoiManagement stages a
+    // pendingDelete descriptor and the container mounts the shared
+    // DeleteFromMapModal (role=dialog tier, same as the indoor removal lanes).
+    it('mounts no delete dialog while nothing is staged, and never touches window.confirm', () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        renderMap();
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(confirmSpy).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
+    });
+
+    it('renders the shared Delete-from-Map dialog for a staged POI delete and routes Yes, Delete to the hook', () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const cancelDelete = vi.fn();
+        const confirmDelete = vi.fn();
+        usePoiManagement.mockReturnValue(makePoiManagement({
+            pendingDelete: { label: 'City A', confirm: vi.fn() },
+            cancelDelete,
+            confirmDelete,
+        }));
+        renderMap();
+        expect(confirmSpy).not.toHaveBeenCalled();
+        const dialog = screen.getByRole('dialog', { name: 'Delete from Map' });
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+        expect(dialog).toHaveTextContent('Delete "City A" from the map?');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Yes, Delete' }));
+        expect(confirmDelete).toHaveBeenCalledTimes(1);
+        expect(cancelDelete).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(cancelDelete).toHaveBeenCalledTimes(1);
+        confirmSpy.mockRestore();
+    });
+
     it('formats and passes the map name to the toolbar', () => {
         mapsService.formatMapName.mockReturnValue('My Map');
         renderMap();

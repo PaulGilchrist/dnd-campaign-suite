@@ -56,7 +56,6 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 BA: **POI delete lanes still ride native `window.confirm`** — 37112c75b unified token/prop/player removal into the shared `DeleteConfirmModal` role=dialog tier, but indoor `IndoorPoiContextMenu.jsx:49` and hex `POIContextMenu.jsx:205` still fire `Delete POI "X"?` native confirms (BA live spy-captured the indoor one), and `useSpellOverlay.js:103/112` (overlay remove + Clear-All) are native too. Same delete-idiom split AZ2 filed, now on the remaining lanes. Suggest: route POI + overlay deletes through `DeleteFromMapModal`/`DeleteConfirmModal` (the descriptor is already the seam — `requestDelete({label, confirm})`); watch the §244 dispatch/read flush split when re-pointing the ctx-menu handlers.
 - 2026-11-01 BA: **Rotate menu on creature tokens is a silent persisted knob** — ctx-menu offers Rotate for Hide/Delete/Rename(±) and it writes `rotation:90` to the placedItems row + map doc, but the creature lane (`.npc-circle` + label) has zero transform consumer; the value silently accumulates (rotation survives hide/show, invisible forever). Either hide Rotate for rotation-invariant types (compute from type like `showRenameOption` does) or render a label/arrow orientation hint. `src/components/map/PlacedItems.jsx` creature branch + `ItemContextMenu.jsx:37` entries builder.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

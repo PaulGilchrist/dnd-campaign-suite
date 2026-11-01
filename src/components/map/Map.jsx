@@ -41,6 +41,7 @@ import FogOverlay from './FogOverlay.jsx';
 import ItemContextMenu from './ItemContextMenu.jsx';
 import ItemDetailsDock from './ItemDetailsDock.jsx';
 import DeleteFromMapModal from './DeleteFromMapModal.jsx';
+import SpellOverlayConfirmModal from './SpellOverlayConfirmModal.jsx';
 import MapDescriptionPanel from '../common/MapDescriptionPanel.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
@@ -184,15 +185,34 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         clientToSVG,
     } = useZoomPan(svgRef);
 
+    // Item/token removal staging (backlog 2026-11-01 AZ2): the named confirm
+    // is the in-app DeleteFromMapModal tier — a delete request STAGES as a
+    // pendingDelete descriptor (usePlacedItems), cancel is fully inert,
+    // confirm runs the writer exactly once. Mounted once below, so BOTH the
+    // SVG context menus and the ItemDetailsDock ride it. Declared BEFORE the
+    // indoor POI lane so its requestDelete seam can arm the SAME dialog.
+    const {
+        handleToggleItemVisibility,
+        handleDeleteItem,
+        handleToggleDoor,
+        handleRotate,
+        requestDelete,
+        pendingDelete,
+        cancelDelete,
+        confirmDelete,
+    } = usePlacedItems(setPlacedItems, setSelectedItem, placedItems);
+
     // Indoor POI lane (marker render + right-click hide/delete) — see
     // hooks/useIndoorPois.js; document edits ride setMapData's autosave.
+    // Delete arms the SAME requestDelete dialog tier as the token/prop/
+    // player lanes (backlog 2026-11-01 BA).
     const {
         selectedPoi,
         closePoiMenu,
         handlePoiContextMenu,
         handleTogglePoiVisibility,
         handleDeletePoi,
-    } = useIndoorPois({ setMapData });
+    } = useIndoorPois({ setMapData, mapData, requestDelete });
 
     const {
         painting,
@@ -223,6 +243,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         updateOverlayImmediate,
         removeOverlay,
         clearOverlays,
+        pendingOverlayAction,
+        cancelOverlayAction,
+        confirmOverlayAction,
         handleSSEEvent: handleSpellOverlayEvent,
     } = useSpellOverlay(campaignName, mapName);
 
@@ -349,17 +372,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         setSelectedItem(null);
         setNpcImages(prev => ({ ...prev, [newName.trim()]: null }));
     }, [setNpcImages, setPlacedItems, setRenamePopover, setSelectedItem]);
-
-    const {
-        handleToggleItemVisibility,
-        handleDeleteItem,
-        handleToggleDoor,
-        handleRotate,
-        requestDelete,
-        pendingDelete,
-        cancelDelete,
-        confirmDelete,
-    } = usePlacedItems(setPlacedItems, setSelectedItem, placedItems);
 
     // Player-token removal rides the SAME in-app named-confirm modal as the
     // placed-item lane (backlog 2026-11-01 AZ2): stage `Remove "<name>" from
@@ -735,8 +747,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     setSelectedPlayer={setSelectedPlayer}
                 />
 
-                {/* POI right-click menu (Hide/Show + named-confirm Delete) —
-                    the only authoring lane for indoor pois. */}
+                {/* POI right-click menu (Hide/Show + Delete → in-app named
+                    confirm via requestDelete/DeleteFromMapModal) — the only
+                    authoring lane for indoor pois. */}
                 <IndoorPoiContextMenu
                     selectedPoi={selectedPoi}
                     pois={mapData.pois}
@@ -787,6 +800,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                 pending={pendingDelete}
                 onCancel={cancelDelete}
                 onConfirm={confirmDelete}
+            />
+
+            {/* Spell-overlay destructive lanes (Remove / Clear All) ride the
+                same role=dialog tier via their own copy layer (backlog
+                2026-11-01 BA) — armed by useSpellOverlay, null when idle. */}
+            <SpellOverlayConfirmModal
+                pending={pendingOverlayAction}
+                onCancel={cancelOverlayAction}
+                onConfirm={confirmOverlayAction}
             />
 
             {viewMode === '2d' && renamePopover && (

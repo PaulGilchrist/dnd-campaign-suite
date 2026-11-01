@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import useDeleteRequest from '../../common/useDeleteRequest.js';
 
 // Human label for a placed token's named-confirm: NPCs carry `name`,
 // furniture does not — its type key is the honest identifier there.
@@ -40,28 +40,10 @@ export function placedItemLabel(item) {
 // token lane ("Remove from Map", mapData.players) rides the SAME dialog — the
 // action verb is the only thing that differs.
 function usePlacedItems(setPlacedItems, setSelectedItem, placedItems) {
-    const [pendingDelete, setPendingDelete] = useState(null);
-    // Ref mirror: the dialog renders from state, but confirm/cancel must act on
-    // the EXACTLY-armed descriptor even when invoked in the same tick as the
-    // arm (before React commits the state re-render).
-    const pendingRef = useRef(null);
-
-    const requestDelete = (descriptor) => {
-        pendingRef.current = descriptor;
-        setPendingDelete(descriptor);
-    };
-
-    const cancelDelete = () => {
-        pendingRef.current = null;
-        setPendingDelete(null);
-    };
-
-    const confirmDelete = () => {
-        const pending = pendingRef.current;
-        pendingRef.current = null;
-        setPendingDelete(null);
-        if (pending) pending.confirm();
-    };
+    // Staging mechanics unified into common/useDeleteRequest (backlog
+    // 2026-11-01 BA): the hex-POI and spell-overlay lanes share the exact
+    // arm/cancel-inert/confirm-once semantics this hook pioneered.
+    const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
 
     const handleToggleItemVisibility = (itemId) => {
         setPlacedItems(prev =>

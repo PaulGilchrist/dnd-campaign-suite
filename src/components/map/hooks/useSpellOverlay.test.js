@@ -50,8 +50,9 @@ describe('useSpellOverlay', () => {
     vi.useFakeTimers();
     fetchSpellOverlays.mockResolvedValue([]);
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
-    // Destructive lanes ride named native confirms (shared-board ruling
-    // 2026-10-30). Accept by default; cancel-leg tests override to false.
+    // Destructive lanes no longer ride a native confirm (backlog 2026-11-01
+    // BA): the spy proves zero native tolls while the pendingDelete dialog
+    // tier owns the decision.
     confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -85,7 +86,7 @@ describe('useSpellOverlay', () => {
     expect(fetchSpellOverlays).not.toHaveBeenCalled();
   });
 
-  it('applies local mutations to state immediately, ignoring unknown ids', () => {
+  it('applies local mutations to state immediately; remove/clear fire only via the staged dialog confirm', () => {
     const { result } = getHook();
     act(() => {
       result.current.addOverlay(o1);
@@ -101,17 +102,33 @@ describe('useSpellOverlay', () => {
       o2,
     ]);
 
+    // Remove/Clear arm a descriptor; nothing is written until confirm.
     act(() => {
       result.current.removeOverlay('o2');
-      // Unknown ids are silent no-ops:
+    });
+    expect(result.current.pendingOverlayAction).toMatchObject({ kind: 'remove', label: 'spell' });
+    expect(result.current.overlays).toEqual([{ id: 'o1', name: 'Fireball', radius: 30 }, o2]);
+    act(() => {
+      result.current.confirmOverlayAction();
+    });
+    expect(result.current.pendingOverlayAction).toBeNull();
+    expect(result.current.overlays).toEqual([{ id: 'o1', name: 'Fireball', radius: 30 }]);
+
+    // Unknown ids are silent no-ops on the confirm leg (still arm honestly).
+    act(() => {
       result.current.removeOverlay('ghost');
+      result.current.confirmOverlayAction();
       result.current.updateOverlay({ id: 'ghost', name: 'Phantom' });
     });
     expect(result.current.overlays).toEqual([{ id: 'o1', name: 'Fireball', radius: 30 }]);
 
     act(() => {
       result.current.clearOverlays();
-      result.current.clearOverlays();
+      result.current.clearOverlays(); // re-arms (last wins), never double-fires
+    });
+    expect(result.current.pendingOverlayAction).toMatchObject({ kind: 'clear', count: 1 });
+    act(() => {
+      result.current.confirmOverlayAction();
     });
     expect(result.current.overlays).toEqual([]);
   });
@@ -121,7 +138,9 @@ describe('useSpellOverlay', () => {
     act(() => {
       result.current.addOverlay(o1);
       result.current.removeOverlay('o1');
+      result.current.confirmOverlayAction();
       result.current.clearOverlays();
+      result.current.confirmOverlayAction();
     });
     expect(
       fetchSpy.mock.calls.map(([url, opts]) => [url, opts.method, JSON.parse(opts.body)])
@@ -130,12 +149,15 @@ describe('useSpellOverlay', () => {
       [URL, 'POST', { action: 'remove', overlayId: 'o1' }],
       [URL, 'POST', { action: 'clear' }],
     ]);
+    // Every leg stayed native-confirm-free.
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  // Shared-collab board ruling (2026-10-30): players keep add/remove/clear,
-  // but every destructive lane pays a named confirm — cancel is fully inert
+  // Shared-collab board ruling (2026-10-30) on the NEW dialog tier
+  // (backlog 2026-11-01 BA): players keep add/remove/clear, but every
+  // destructive lane arms a shape-named descriptor — cancel is fully inert
   // (zero POST, board byte-unchanged), accept fires exactly one action POST.
-  it('per-item remove confirm names the shape; cancel is inert, accept POSTs remove exactly once', () => {
+  it('per-item remove arms a shape-named descriptor; cancel is inert, accept POSTs remove exactly once', () => {
     const sphere = { id: 'sp1', shape: 'sphere', radiusFt: 20 };
     const cube = { id: 'cb1', shape: 'cube', sizeFt: 15 };
     const { result } = getHook();
@@ -145,20 +167,29 @@ describe('useSpellOverlay', () => {
     });
     fetchSpy.mockClear();
 
-    confirmSpy.mockReturnValue(false);
     act(() => { result.current.removeOverlay('sp1'); });
-    expect(confirmSpy).toHaveBeenCalledWith('Remove this Sphere overlay?');
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(result.current.pendingOverlayAction).toEqual({
+      kind: 'remove',
+      label: 'Sphere',
+      confirm: expect.any(Function),
+    });
+    // Cancel: zero POST, board byte-unchanged, disarmed.
+    act(() => { result.current.cancelOverlayAction(); });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(result.current.overlays).toEqual([sphere, cube]);
+    expect(result.current.pendingOverlayAction).toBeNull();
 
-    // Unknown id still asks honestly with the generic fallback (house pattern:
-    // usePlacedItems' 'placed item' fallback for miss-named tokens).
+    // Unknown id still arms honestly with the generic fallback (house pattern:
+    // usePlacedItems' 'placed item' label for miss-named tokens).
     act(() => { result.current.removeOverlay('ghost'); });
-    expect(confirmSpy).toHaveBeenLastCalledWith('Remove this spell overlay?');
+    expect(result.current.pendingOverlayAction.label).toBe('spell');
+    act(() => { result.current.cancelOverlayAction(); });
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    confirmSpy.mockReturnValue(true);
+    // Accept fires exactly one remove POST.
     act(() => { result.current.removeOverlay('sp1'); });
+    act(() => { result.current.confirmOverlayAction(); });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy).toHaveBeenCalledWith(
       URL,
@@ -167,7 +198,7 @@ describe('useSpellOverlay', () => {
     expect(result.current.overlays).toEqual([cube]);
   });
 
-  it('Clear All confirm names the count and EVERYONE (full-board wipe, not mine-only); cancel is inert, accept POSTs clear exactly once', () => {
+  it('Clear All arms the count + EVERYONE scope (full-board wipe, not mine-only); cancel is inert, accept POSTs clear exactly once', () => {
     const sphere = { id: 'sp1', shape: 'sphere', radiusFt: 20 };
     const cone = { id: 'cn1', shape: 'cone', distanceFt: 60, coneAngle: 53 };
     const { result } = getHook();
@@ -177,16 +208,17 @@ describe('useSpellOverlay', () => {
     });
     fetchSpy.mockClear();
 
-    confirmSpy.mockReturnValue(false);
     act(() => { result.current.clearOverlays(); });
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Clear all 2 spell overlays? This removes overlays placed by everyone.',
-    );
+    expect(confirmSpy).not.toHaveBeenCalled();
+    // Count frozen at arm time; the modal copy carries the everyone-scope line.
+    expect(result.current.pendingOverlayAction).toMatchObject({ kind: 'clear', count: 2 });
+    act(() => { result.current.cancelOverlayAction(); });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(result.current.overlays).toEqual([sphere, cone]);
+    expect(result.current.pendingOverlayAction).toBeNull();
 
-    confirmSpy.mockReturnValue(true);
     act(() => { result.current.clearOverlays(); });
+    act(() => { result.current.confirmOverlayAction(); });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy).toHaveBeenCalledWith(
       URL,
@@ -195,9 +227,9 @@ describe('useSpellOverlay', () => {
     expect(result.current.overlays).toEqual([]);
   });
 
-  // Count-noun gate (cosmetic backlog 2026-10-30): exactly 1 overlay reads
-  // singular; the 2+ plural face above stays byte-identical.
-  it('Clear All confirm is singular with exactly one overlay, plural with two', () => {
+  // Count gate (cosmetic backlog 2026-10-30, now on the descriptor): the copy
+  // layer SpellOverlayConfirmModal renders singular/plural from this count.
+  it('Clear All arms count 1 with exactly one overlay, count 2 with two', () => {
     const sphere = { id: 'sp1', shape: 'sphere', radiusFt: 20 };
     const cone = { id: 'cn1', shape: 'cone', distanceFt: 60, coneAngle: 53 };
     const { result } = getHook();
@@ -205,20 +237,19 @@ describe('useSpellOverlay', () => {
     fetchSpy.mockClear();
 
     act(() => { result.current.clearOverlays(); });
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Clear all 1 spell overlay? This removes overlays placed by everyone.',
-    );
+    expect(result.current.pendingOverlayAction).toMatchObject({ kind: 'clear', count: 1 });
+    act(() => { result.current.cancelOverlayAction(); });
 
-    // Restore the board, add a second overlay → plural face verbatim.
+    // Add a second overlay in its OWN act (the hook's overlaysRef mirror only
+    // refreshes on the commit — the §244-style flush split) → plural count face.
     act(() => {
-      result.current.addOverlay(sphere);
-      result.current.addOverlay(cone);
+        result.current.addOverlay(cone);
     });
-    confirmSpy.mockClear();
-    act(() => { result.current.clearOverlays(); });
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Clear all 2 spell overlays? This removes overlays placed by everyone.',
-    );
+    act(() => {
+        result.current.clearOverlays();
+    });
+    expect(result.current.pendingOverlayAction).toMatchObject({ kind: 'clear', count: 2 });
+
   });
 
   it('logs and keeps optimistic state when the transport fails', async () => {

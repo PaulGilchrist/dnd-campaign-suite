@@ -76,16 +76,17 @@ describe('usePoiManagement', () => {
         expect(result.current.selectedPoiMenu).toBeNull();
     });
 
-    it('deletes the poi and every road touching it, and closes the menu', () => {
+    it('stages the delete as a dialog descriptor — confirm deletes poi + touching roads once, cancel is inert', () => {
         const roads = [
             { id: 'road-1', fromPoiId: 'poi-1', toPoiId: 'poi-2', hexes: ['1,0', '2,0'] },
             { id: 'road-2', fromPoiId: 'poi-2', toPoiId: 'poi-3', hexes: ['3,0', '4,0'] },
             { id: 'road-3', fromPoiId: 'poi-1', toPoiId: 'poi-3', hexes: ['1,0', '2,0', '3,0'] },
         ];
         const { result, setPois, setRoads } = setup({ roads });
-        // The named confirm lives in POIContextMenu.jsx (menu layer, mirroring the
-        // indoor token-removal lane) — the handler stays confirm-free so the menu
-        // gates exactly once (no double-confirm on the accept leg).
+        // Backlog 2026-11-01 BA: the native confirm is dead — the delete
+        // STAGES as a pendingDelete descriptor (HexMap.jsx renders it through
+        // the shared DeleteConfirmModal role=dialog tier). Handler never
+        // touches window.confirm (menu layer doesn't either — spy-zero).
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         act(() => {
             result.current.handlePoiContextMenu('poi-1');
@@ -94,10 +95,47 @@ describe('usePoiManagement', () => {
             result.current.handleDeletePoi('poi-2');
         });
         expect(confirmSpy).not.toHaveBeenCalled();
-        confirmSpy.mockRestore();
+        // Armed descriptor names the label (unknown ids fall back honestly).
+        expect(result.current.pendingDelete.label).toBe('Settlement B');
+        expect(typeof result.current.pendingDelete.confirm).toBe('function');
+        // Nothing written while pending — the arm alone is inert.
+        expect(setPois).not.toHaveBeenCalled();
+        expect(setRoads).not.toHaveBeenCalled();
+
+        // Cancel: fully inert — no writes, menu state untouched, disarmed.
+        act(() => {
+            result.current.cancelDelete();
+        });
+        expect(setPois).not.toHaveBeenCalled();
+        expect(setRoads).not.toHaveBeenCalled();
+        expect(result.current.pendingDelete).toBeNull();
+
+        // Re-arm + confirm: fires the writes exactly once and closes the menu.
+        act(() => {
+            result.current.handleDeletePoi('poi-2');
+        });
+        act(() => {
+            result.current.confirmDelete();
+        });
+        expect(result.current.pendingDelete).toBeNull();
         expect(applyUpdater(setPois, 0, basePois)).toEqual([basePois[0], basePois[2]]);
         expect(applyUpdater(setRoads, 0, roads).map(r => r.id)).toEqual(['road-3']);
         expect(result.current.selectedPoiMenu).toBeNull();
+        confirmSpy.mockRestore();
+    });
+
+    it('arms an id-labelled descriptor for unknown poi ids', () => {
+        const { result, setPois } = setup();
+        act(() => {
+            result.current.handleDeletePoi('missing-poi');
+        });
+        expect(result.current.pendingDelete.label).toBe('POI');
+        act(() => {
+            result.current.confirmDelete();
+        });
+        // Inert filter: unknown id removes nothing, but the write still lands
+        // once (unchanged seam semantics — the row filter is a no-op).
+        expect(applyUpdater(setPois, 0, basePois)).toEqual(basePois);
     });
 
     it('renames the target poi only and clears rename plus menu state', () => {

@@ -195,16 +195,19 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
                     fontSize="11"
                     className="menu-option"
                     onClick={() => {
-                        // Named-confirm before removal — mirrors the indoor token-removal
-                        // lane (PlayerContextMenu.jsx, `Remove "<name>" from the map?`).
-                        // This Delete is the ONLY placed-POI delete lane (HexMap.jsx wires
-                        // handleDeletePoi here and nowhere else), so the menu gates it once.
-                        // Cancel is fully inert: no onDelete call → no setPois/setRoads write
-                        // → the map's autosave PUT lane never fires; the menu still closes.
-                        const label = selectedItem.label || selectedPoi.id;
-                        if (window.confirm(`Delete POI "${label}"?`)) {
-                            onDelete(selectedPoi.id);
-                        }
+                        // Delete stages through the shared requestDelete seam:
+                        // usePoiManagement arms the descriptor and HexMap.jsx
+                        // renders it through DeleteFromMapModal — the same
+                        // role=dialog tier as the indoor token/prop/player/POI
+                        // lanes (backlog 2026-11-01 BA, replaces the native
+                        // native confirm replaced by the dialog tier). Cancel is fully inert: the staged
+                        // closure never runs → no setPois/setRoads write → the
+                        // map's autosave PUT lane never fires. This Delete is
+                        // the ONLY placed-POI delete lane (HexMap.jsx wires
+                        // handleDeletePoi here and nowhere else), so the menu
+                        // gates it once. The menu closes at the request — the
+                        // dialog owns the decision now.
+                        onDelete(selectedPoi.id);
                         onClose();
                     }}
                 >

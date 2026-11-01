@@ -12,7 +12,7 @@
 // Component internals (menu chrome, hit geometry) mirror sibling lanes:
 // hex-map/POILayer.jsx + POIContextMenu.jsx (their own tests own hex bytes).
 
-import { render, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Map from './Map.jsx';
 import { clearRuntimeState } from '../../hooks/runtime/useRuntimeState.js';
@@ -120,7 +120,10 @@ describe('indoor map POI lane', () => {
         lan.unmount();
     });
 
-    it('right-click opens the menu; confirmed Delete removes the row from board and PUT', async () => {
+    it('right-click opens the menu; Delete arms the role=dialog tier (no native confirm); Yes, Delete removes the row from board and PUT', async () => {
+        // Backlog 2026-11-01 BA: native confirm DEAD — the Delete stages a
+        // pendingDelete descriptor rendered by DeleteFromMapModal over the
+        // shared DeleteConfirmModal (same tier as the token/prop/player lanes).
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = await renderGmWithPoi([POI]);
 
@@ -130,8 +133,16 @@ describe('indoor map POI lane', () => {
         expect(menu.textContent).toContain('Delete');
 
         fireEvent.click([...menu.querySelectorAll('text')].find(t => t.textContent === 'Delete'));
-        // Named-confirm ran, then the row is gone from the board...
-        expect(confirmSpy).toHaveBeenCalledWith('Delete POI "QA Fix Shrine"?');
+        expect(confirmSpy).not.toHaveBeenCalled();
+        // The menu closed at the request; the dialog owns the decision now.
+        expect(container.querySelector('.poi-context-menu')).toBeNull();
+        const dialog = screen.getByRole('dialog', { name: 'Delete from Map' });
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+        expect(dialog).toHaveTextContent('Delete "QA Fix Shrine" from the map?');
+
+        // Confirm: the row is gone from the board...
+        fireEvent.click(screen.getByRole('button', { name: 'Yes, Delete' }));
+        expect(screen.queryByRole('dialog')).toBeNull();
         expect(container.querySelector('.indoor-poi-layer .poi-item')).toBeNull();
         // ...and the debounced autosave persists the removal (pre-fix, no
         // indoor UI could ever produce this PUT).
@@ -140,14 +151,17 @@ describe('indoor map POI lane', () => {
         expect(saved.pois).toEqual([]);
     });
 
-    it('cancelling the Delete confirm keeps the row and writes nothing', async () => {
-        vi.spyOn(window, 'confirm').mockReturnValue(false);
+    it('Cancel on the delete dialog is fully inert: row survives, menu and dialog close, nothing PUT', async () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { container } = await renderGmWithPoi([POI]);
 
         fireEvent.contextMenu(container.querySelector('.poi-hit-area'));
         const menu = container.querySelector('.poi-context-menu');
         fireEvent.click([...menu.querySelectorAll('text')].find(t => t.textContent === 'Delete'));
+        expect(confirmSpy).not.toHaveBeenCalled();
 
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).toBeNull();
         expect(container.querySelector('.poi-label')?.textContent).toBe('QA Fix Shrine');
         expect(container.querySelector('.poi-context-menu')).toBeNull();
         expect(mapsService.saveMapData).not.toHaveBeenCalled();

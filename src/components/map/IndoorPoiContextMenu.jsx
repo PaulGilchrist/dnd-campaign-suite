@@ -3,8 +3,10 @@
  * the removal/visibility escape hatch the indoor board never had. Anchors and
  * chrome mirror the sibling indoor menus (ItemContextMenu.jsx,
  * PlayerContextMenu.jsx: gridCenter + 10, `.item-context-menu` styles); the
- * named-confirm on Delete mirrors the outdoor lane (POIContextMenu.jsx) so a
- * mis-click cannot silently orphan a POI row. Hex-only rename/link/road rows
+ * Delete arms the shared requestDelete descriptor seam so the named confirm
+ * renders through the in-app DeleteFromMapModal (role=dialog tier, backlog
+ * 2026-11-01 BA — never a native confirm), so a mis-click cannot
+ * silently orphan a POI row. Hex-only rename/link/road rows
  * are deliberately absent: the indoor dress producer authors plain labelled
  * landmark POIs (server dressMap.js addPoi).
  */
@@ -46,9 +48,13 @@ function IndoorPoiContextMenu({
                     fontSize="11"
                     className="menu-option"
                     onClick={() => {
-                        if (window.confirm(`Delete POI "${poi.label || poi.id}"?`)) {
-                            handleDeletePoi(poi.id);
-                        }
+                        // Delete stages through the shared requestDelete seam
+                        // (useIndoorPois arms the descriptor): the named
+                        // confirm is the DeleteFromMapModal role=dialog tier,
+                        // never a native confirm (backlog 2026-11-01 BA). The
+                        // menu closes at the request — the dialog owns the
+                        // decision; cancel is fully inert.
+                        handleDeletePoi(poi.id);
                         onClose();
                     }}
                 >

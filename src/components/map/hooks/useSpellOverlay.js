@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard.js';
+import useDeleteRequest from '../../common/useDeleteRequest.js';
 import { fetchSpellOverlays } from '../../../services/maps/spellOverlayService.js';
 import { SHAPE_LABELS } from '../../../models/SpellOverlay.js';
 
@@ -96,23 +97,46 @@ function useSpellOverlay(campaignName, _mapName) {
 
     // The board is a party-collab space (owner ruling 2026-10-30): every tab
     // may remove/clear, but both lanes are destructive to EVERYONE's overlays,
-    // so each pays a named native confirm (house pattern: usePlacedItems).
-    // Cancel is fully inert — no local state write, no POST, SSE stays quiet.
+    // so each pays a named confirm (backlog 2026-11-01 BA: no longer a NATIVE
+    // confirm — the request STAGES as a pendingDelete descriptor
+    // { kind, label|count, confirm } and Map.jsx renders it through
+    // SpellOverlayConfirmModal over the shared DeleteConfirmModal role=dialog
+    // tier). Cancel is fully inert — the staged closure never runs, so no
+    // local state write, no POST, SSE stays quiet. Accept fires it exactly once.
+    const {
+        pendingDelete: pendingOverlayAction,
+        requestDelete,
+        cancelDelete: cancelOverlayAction,
+        confirmDelete: confirmOverlayAction,
+    } = useDeleteRequest();
+
     const removeOverlay = useCallback((overlayId) => {
         const overlay = overlaysRef.current.find(o => o.id === overlayId);
-        if (!window.confirm(`Remove this ${overlayConfirmLabel(overlay)} overlay?`)) return;
-        setOverlays(prev => prev.filter(o => o.id !== overlayId));
-        sendAction('remove', { overlayId });
-    }, [sendAction]);
+        // Unknown ids still arm honestly with the generic fallback (house
+        // pattern: usePlacedItems' 'placed item' label for miss-named tokens).
+        requestDelete({
+            kind: 'remove',
+            label: overlayConfirmLabel(overlay),
+            confirm: () => {
+                setOverlays(prev => prev.filter(o => o.id !== overlayId));
+                sendAction('remove', { overlayId });
+            },
+        });
+    }, [requestDelete, sendAction]);
 
     const clearOverlays = useCallback(() => {
-        const count = overlaysRef.current.length;
-        // Count-noun gate (cosmetic, backlog 2026-10-30): 1 overlay reads
-        // "1 spell overlay", never "1 spell overlays".
-        if (!window.confirm(`Clear all ${count} spell overlay${count === 1 ? '' : 's'}? This removes overlays placed by everyone.`)) return;
-        setOverlays([]);
-        sendAction('clear');
-    }, [sendAction]);
+        // Count read at arm time; the count-noun gate (cosmetic, backlog
+        // 2026-10-30) lives in the modal copy: 1 overlay reads "1 spell
+        // overlay", never "1 spell overlays".
+        requestDelete({
+            kind: 'clear',
+            count: overlaysRef.current.length,
+            confirm: () => {
+                setOverlays([]);
+                sendAction('clear');
+            },
+        });
+    }, [requestDelete, sendAction]);
 
     const handleSSEEvent = useCallback((event) => {
         if (!event || !event.key || !event.key.startsWith(SSE_EVENT_KEY_PREFIX)) return;
@@ -159,6 +183,9 @@ function useSpellOverlay(campaignName, _mapName) {
         updateOverlayImmediate,
         removeOverlay,
         clearOverlays,
+        pendingOverlayAction,
+        cancelOverlayAction,
+        confirmOverlayAction,
         handleSSEEvent,
     };
 }

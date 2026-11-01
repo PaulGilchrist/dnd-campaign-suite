@@ -9,14 +9,21 @@ import { useCallback, useState } from 'react';
  * removed them, so applied POI ops were silently invisible. This hook owns the
  * right-click selection + the two document edits, mirroring the outdoor lane
  * (hex-map/hooks/usePoiManagement.js: selectedPoiMenu, toggle visibility,
- * named-confirm delete) on the indoor square-grid geometry.
+ * staged named-confirm delete) on the indoor square-grid geometry.
  *
  * Writes go through setMapData (useMapLoader), the same chokepoint every
  * indoor document lane uses: spread-new-array (never in-place splice), the
  * debounced autosave PUTs the whole document, and the SSE echo is adopted by
  * useSSESync for other tabs.
+ *
+ * Delete-confirm staging (backlog 2026-11-01 BA): the removal no longer pays
+ * a native confirm. The request arms the SHARED requestDelete descriptor seam
+ * (Map.jsx's usePlacedItems instance → DeleteFromMapModal, the same
+ * role=dialog tier as the token/prop/player lanes):
+ * `Delete "<label>" from the map?`. Cancel is fully inert — the staged
+ * setMapData closure never runs, so the autosave PUT lane never fires.
  */
-function useIndoorPois({ setMapData }) {
+function useIndoorPois({ setMapData, mapData, requestDelete }) {
     const [selectedPoi, setSelectedPoi] = useState(null);
 
     const closePoiMenu = useCallback(() => {
@@ -38,12 +45,20 @@ function useIndoorPois({ setMapData }) {
         }));
     }, [setMapData]);
 
+    // Named-confirm before removal (house pattern `Delete "<label>" from the
+    // map?`): the label mirrors the retired native copy's source — the POI
+    // label, falling back to the row id — with an honest generic for unknown
+    // ids; the filter then fires exactly once on dialog confirm.
     const handleDeletePoi = useCallback((id) => {
-        setMapData(prev => ({
-            ...prev,
-            pois: (prev.pois || []).filter(p => p.id !== id),
-        }));
-    }, [setMapData]);
+        const poi = (mapData?.pois || []).find(p => p.id === id);
+        requestDelete({
+            label: (poi && (poi.label || poi.id)) || 'POI',
+            confirm: () => setMapData(prev => ({
+                ...prev,
+                pois: (prev.pois || []).filter(p => p.id !== id),
+            })),
+        });
+    }, [mapData, requestDelete, setMapData]);
 
     return {
         selectedPoi,

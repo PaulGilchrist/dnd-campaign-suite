@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import useDeleteRequest from '../../common/useDeleteRequest.js';
 import { isRoadConnectable, findHexPath } from '../../../services/maps/hexMapUtils.js';
 import { TOOL_ROAD } from '../../../config/outdoorConfig.js';
 
@@ -7,6 +8,11 @@ function usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, he
     const [showRename, setShowRename] = useState(null);
     const [poiDragging, setPoiDragging] = useState(null);
     const [roadStartPoiId, setRoadStartPoiId] = useState(null);
+    // Delete-confirm staging (backlog 2026-11-01 BA): the menu arms a
+    // pendingDelete descriptor here; HexMap.jsx renders it through
+    // DeleteFromMapModal (shared DeleteConfirmModal role=dialog tier — same
+    // seam as the indoor token/prop/player/POI lanes), never a native
+    // window.confirm.
 
     const handlePoiPointerDown = useCallback((poiId, e) => {
         e.preventDefault();
@@ -110,11 +116,29 @@ function usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, he
         setSelectedPoiMenu(null);
     }, [setPois]);
 
+    // Named-confirm before removal (house pattern `Delete "<label>" from the
+    // map?`): the request STAGES here; the setPois/setRoads edits only run on
+    // dialog confirm — cancel is fully inert (no write, no autosave PUT).
+    // Label mirrors the retired native copy's source: the POI label, falling
+    // back to the row id, with an honest generic for unknown ids.
+    const {
+        pendingDelete,
+        requestDelete,
+        cancelDelete,
+        confirmDelete,
+    } = useDeleteRequest();
+
     const handleDeletePoi = useCallback((poiId) => {
-        setPois(prev => prev.filter(p => p.id !== poiId));
-        setRoads(prev => prev.filter(r => r.fromPoiId !== poiId && r.toPoiId !== poiId));
-        setSelectedPoiMenu(null);
-    }, [setPois, setRoads]);
+        const poi = (pois || []).find(p => p.id === poiId);
+        requestDelete({
+            label: (poi && (poi.label || poi.id)) || 'POI',
+            confirm: () => {
+                setPois(prev => prev.filter(p => p.id !== poiId));
+                setRoads(prev => prev.filter(r => r.fromPoiId !== poiId && r.toPoiId !== poiId));
+                setSelectedPoiMenu(null);
+            },
+        });
+    }, [pois, requestDelete, setPois, setRoads]);
 
     const handleRenamePoi = useCallback((poiId, newLabel) => {
         // Trim before committing; a whitespace-only (or empty) label keeps the
@@ -155,6 +179,7 @@ function usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, he
         handlePoiPointerDown, handlePoiPointerMove, handlePoiPointerUp,
         handlePoiContextMenu, handleTogglePoiVisibility, handleDeletePoi,
         handleRenamePoi, handleLinkMap, handleUnlinkMap, handleRemoveRoads,
+        pendingDelete, cancelDelete, confirmDelete,
     };
 }
 

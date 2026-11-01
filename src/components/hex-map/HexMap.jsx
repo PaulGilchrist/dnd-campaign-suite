@@ -30,6 +30,7 @@ import HazardSVG from './svg/HazardSVG.jsx';
 import NaturalWonderSVG from './svg/NaturalWonderSVG.jsx';
 import LandmarkSVG from './svg/LandmarkSVG.jsx';
 import Subscriber from '../common/Subscriber.jsx';
+import DeleteFromMapModal from '../map/DeleteFromMapModal.jsx';
 import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
@@ -208,6 +209,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         handlePoiPointerDown, handlePoiPointerMove, handlePoiPointerUp,
         handlePoiContextMenu, handleTogglePoiVisibility, handleDeletePoi,
         handleRenamePoi, handleLinkMap, handleUnlinkMap, handleRemoveRoads,
+        pendingDelete, cancelDelete, confirmDelete,
     } = poiMgmt;
 
     // ── Encounter generation ──
@@ -722,6 +724,18 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             roads={roads}
                         />
                     </svg>
+
+                    {/* POI Delete rides the SAME in-app named-confirm modal as
+                        the indoor removal lanes (backlog 2026-11-01 BA): the
+                        descriptor staged by usePoiManagement renders through
+                        DeleteFromMapModal over the shared DeleteConfirmModal
+                        role=dialog tier — never a native window.confirm;
+                        null when nothing is armed. */}
+                    <DeleteFromMapModal
+                        pending={pendingDelete}
+                        onCancel={cancelDelete}
+                        onConfirm={confirmDelete}
+                    />
 
                     <div className="hex-map-compass no-print">
                         <svg viewBox="0 0 48 48" width="44" height="44">
