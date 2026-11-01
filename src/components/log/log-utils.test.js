@@ -202,6 +202,18 @@ describe('log-utils filter helpers', () => {
       expect(filterLogEntries([refineEntry], { text: 'proposed a replacement' }).map(e => e.id)).toEqual(['aud1']);
     });
 
+    // Backlog echo-no-op-audit: server-side noOp rows must render (and stay
+    // searchable) with honest no-change wording, never "proposed a replacement".
+    it('renders and searches the echo no-op outcome', () => {
+      const echo = { ...refineEntry, id: 'aud5', noOp: true };
+      const line = formatAiAuditLine(echo);
+      expect(line).toContain('no change proposed — the model echoed the input (no-op)');
+      expect(line).not.toContain('proposed a replacement');
+      expect(getEntrySearchText(echo)).toContain('no change proposed');
+      expect(filterLogEntries([refineEntry, echo], { text: 'no change proposed' }).map(e => e.id)).toEqual(['aud5']);
+      expect(filterLogEntries([refineEntry, echo], { text: 'echoed' }).map(e => e.id)).toEqual(['aud5']);
+    });
+
     it('makes the retry give-up phrase searchable too', () => {
       const givenUp = { ...refineEntry, id: 'aud2', attempts: 0 };
       expect(formatAiAuditLine(givenUp)).toContain('refused — the proposed JSON failed validation');

@@ -108,4 +108,31 @@ describe('refineEntity — proposal only, validation-gated', () => {
         await refineEntity({ campaign: 'c', kind: 'quest', entity: { name: 'The Lost Artifact', status: 'active' }, instruction: 'x', aiConfig: AI, chatFn: questChat });
         expect(questChat.mock.calls[0][0].messages[0].content).toMatch(/NEVER "quest"/);
     });
+
+    // Backlog 2026-10-31 echo-no-op-audit: the server runs the client's echo
+    // predicate itself, so an honest row lands even for LAN clients whose tab
+    // suppressed the apply. Both audit shapes are locked here.
+    describe('ai_refine audit honesty (echo no-op vs real change)', () => {
+        it('a verbatim echo still returns ok (client UX unchanged) but audits a noOp row', async () => {
+            const chatFn = vi.fn(async () => JSON.stringify({ name: 'Oldhem', personality: 'Gruff', attitude: 'neutral' }));
+            const log = vi.fn();
+            const res = await refineEntity({ campaign: 'c', kind: 'npc', entity: npc, instruction: 'make it better', aiConfig: { ...AI, jsonSchema: true }, chatFn, log });
+            expect(res.ok).toBe(true); // suppression stays the client's job
+            expect(log).toHaveBeenCalledWith('c', {
+                type: 'ai_refine', name: 'AI refine', kind: 'npc',
+                instruction: 'make it better', attempts: 1, noOp: true,
+            });
+        });
+
+        it('a real change audits the pre-existing row shape — no noOp key', async () => {
+            const chatFn = vi.fn(async () => JSON.stringify({ name: 'Oldhem', personality: 'Gruff but secretly grieving', attitude: 'neutral' }));
+            const log = vi.fn();
+            const res = await refineEntity({ campaign: 'c', kind: 'npc', entity: npc, instruction: 'give him a secret', aiConfig: AI, chatFn, log });
+            expect(res.ok).toBe(true);
+            expect(log).toHaveBeenCalledWith('c', {
+                type: 'ai_refine', name: 'AI refine', kind: 'npc',
+                instruction: 'give him a secret', attempts: 1,
+            });
+        });
+    });
 });

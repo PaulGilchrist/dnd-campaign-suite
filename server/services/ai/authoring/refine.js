@@ -18,6 +18,7 @@ import { validateEntity, resolveSchemaRefs, ENTITY_SCHEMAS } from './entitySchem
 import { buildCampaignContext, validateBlueprintReferences } from './referential.js';
 import { buildStoryBible } from './storyBible.js';
 import { KIND_FIELD_RULES, namingRule } from './designerPrompts.js';
+import { proposedNoChange } from '../../../../src/services/ai/proposedNoChange.js';
 
 const lower = (v) => String(v || '').trim().toLowerCase();
 
@@ -103,10 +104,14 @@ export async function refineEntity({ campaign, kind, entity, instruction, aiConf
         const refs = checkOutwardRefs(campaign, kind, entity, replacement);
         if (refs.length) { lastErrors = refs; repairOf = replacement; continue; }
 
-        audit(log, campaign, kind, ask, attempt);
+        // Backlog echo-no-op-audit: run the client's echo predicate HERE too,
+        // so a verbatim echo audits an honest no-op row instead of overstating
+        // "proposed a replacement". The response is unchanged — the client's
+        // own detection keeps its notice UX (criterion: untouched).
+        audit(log, { campaign, kind, instruction: ask, attempts: attempt, noOp: proposedNoChange(entity, replacement) });
         return { ok: true, replacement };
     }
-    audit(log, campaign, kind, ask, 0);
+    audit(log, { campaign, kind, instruction: ask, attempts: 0 });
     return { ok: false, errors: lastErrors };
 }
 
@@ -121,7 +126,9 @@ function checkOutwardRefs(campaign, kind, current, replacement) {
     return res.errors.filter(e => !(own && lower(replacement.name) === own && e.includes('collides with an existing')));
 }
 
-function audit(log, campaign, kind, instruction, attempts) {
+// dressMap.js's info-object shape; noOp success rows carry the honest echo
+// marker, every other row keeps the exact pre-existing (byte-identical) shape.
+function audit(log, info) {
     if (typeof log !== 'function') return;
-    log(campaign, { type: 'ai_refine', name: 'AI refine', kind, instruction: instruction.slice(0, 200), attempts });
+    log(info.campaign, { type: 'ai_refine', name: 'AI refine', kind: info.kind, instruction: String(info.instruction).slice(0, 200), attempts: info.attempts, ...(info.noOp ? { noOp: true } : {}) });
 }

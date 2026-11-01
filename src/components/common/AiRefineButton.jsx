@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { isEqual } from 'lodash';
 import { refineEntity } from '../../services/ai/aiClient.js';
+import { proposedNoChange } from '../../services/ai/proposedNoChange.js';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import AiInstructionModal from './AiInstructionModal.jsx';
 import './AiRefineButton.css';
-
-// Server-owned stamps never round-trip in a proposal — the same strip the
-// server refine preflight applies to the input before validating it.
-const SERVER_OWNED_KEYS = ['id', 'updatedAt', 'savedAt', 'draft'];
 
 const NO_CHANGE_NOTICE = 'The model proposed no changes — the form is unchanged.';
 
@@ -23,24 +19,6 @@ const GRAMMAR_ECHO_HINT = ' If Decoding is set to "on" (a forced JSON grammar),'
   + ' this backend family commonly makes the model echo the input verbatim —'
   + ' try setting Decoding to "off" in the campaign admin’s AI'
   + ' config row and retry ("probe" re-forces the grammar here, too).';
-
-/**
- * Backlog refine-no-op-silent: a success whose replacement echoes the input
- * must not close the prompt looking like an applied change. No-change holds
- * when every field the proposal offers back matches the current input AND
- * the proposal doesn't drop a field the GM actually filled in (that WOULD
- * alter the form via setFormData). Server-owned keys and empty inputs are
- * exempt.
- */
-function proposedNoChange(entity, replacement) {
-  if (!replacement || typeof replacement !== 'object') return false;
-  const current = Object.fromEntries(Object.entries(entity || {})
-    .filter(([key]) => !SERVER_OWNED_KEYS.includes(key)));
-  const keys = Object.keys(replacement);
-  return keys.every((key) => isEqual(replacement[key], current[key]))
-    && Object.keys(current).every((key) => keys.includes(key)
-      || current[key] === '' || current[key] === null || current[key] === undefined);
-}
 
 /**
  * AI Campaign Authoring (plan Phase 6) — the "AI button" on one object.

@@ -199,9 +199,13 @@ function describeDesigner(entry) {
 function describeRefine(entry) {
   const kind = asText(entry.kind) || 'entity';
   const instruction = entry.instruction ? `“${truncateLine(entry.instruction, 140)}”` : '';
-  const outcome = Number(entry.attempts) > 0
-    ? `proposed a replacement ${attemptsPhrase(entry.attempts)}`
-    : 'refused — the proposed JSON failed validation';
+  // Echo no-op (server-side proposedNoChange, backlog echo-no-op-audit):
+  // honest wording, mirroring how describeDress branches on its applied row.
+  const outcome = entry.noOp
+    ? 'no change proposed — the model echoed the input (no-op)'
+    : Number(entry.attempts) > 0
+      ? `proposed a replacement ${attemptsPhrase(entry.attempts)}`
+      : 'refused — the proposed JSON failed validation';
   return `Refine ${kind}${instruction ? ` ${instruction} — ` : ' — '}${outcome}`;
 }
 

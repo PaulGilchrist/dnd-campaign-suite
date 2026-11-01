@@ -103,6 +103,17 @@ describe('AI audit rows render labeled one-line summaries', () => {
     expect(line).toContain('refused — the proposed JSON failed validation');
   });
 
+  // Backlog echo-no-op-audit: server marks echoed successes noOp — the row
+  // must NOT overstate model productivity with "proposed a replacement".
+  it('refine echo (noOp): honest no-change outcome, never "proposed a replacement"', () => {
+    setup(Log, [refine({ noOp: true })]);
+    const line = firstLine();
+    expect(line).toContain('Refine npc');
+    expect(line).toContain('make Marta grumpier');
+    expect(line).toContain('no change proposed — the model echoed the input (no-op)');
+    expect(line).not.toContain('proposed a replacement');
+  });
+
   it('refine survives missing kind/instruction without undefined text', () => {
     setup(Log, [refine({ kind: undefined, instruction: undefined })]);
     const line = firstLine();
