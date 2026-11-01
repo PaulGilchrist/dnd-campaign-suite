@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import useSSEEqualityGuard from '../../hooks/runtime/useSSEEqualityGuard.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
@@ -22,12 +22,61 @@ const GENERATE_BUTTONS = {
     },
 };
 
+// Focusable-element probe for the Delete-map dialog's focus trap (mirrors the
+// semantics AiInstructionModal established for role="dialog" overlays; a shared
+// trap hook does not exist app-wide yet, so it lives beside its only consumer).
+const MODAL_FOCUSABLE_SELECTOR =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+function getModalFocusable(modalEl) {
+    return Array.from(modalEl.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)).filter(el => !el.disabled);
+}
+
 function DeleteMapModal({ maps, fileName, onCancel, onConfirm }) {
     const mapName = maps.find(m => m.fileName === fileName)?.name || fileName;
+    const modalRef = useRef(null);
+
+    // Move focus into the dialog when it opens so keyboard and screen-reader
+    // users land on the confirm instead of behind the backdrop.
+    useEffect(() => {
+        const focusable = getModalFocusable(modalRef.current);
+        if (focusable.length > 0) {
+            focusable[0].focus();
+        }
+    }, []);
+
+    // Focus trap: while focus is inside the dialog, Tab from the LAST element
+    // wraps to the FIRST and Shift+Tab from the FIRST wraps to the LAST.
+    const handleKeyDown = (e) => {
+        if (e.key !== 'Tab') return;
+        const focusable = getModalFocusable(modalRef.current);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement;
+        if (!modalRef.current.contains(active)) {
+            e.preventDefault();
+            (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && active === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && active === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    };
+
     return (
         <div className="maps-manager-modal-overlay">
-            <div className="maps-manager-modal">
-                <h3>Delete Map</h3>
+            <div
+                className="maps-manager-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="maps-manager-delete-title"
+                ref={modalRef}
+                onKeyDown={handleKeyDown}
+            >
+                <h3 id="maps-manager-delete-title">Delete Map</h3>
                 <p>
                     This will permanently delete the map &apos;<strong>{mapName}</strong>&apos; and all its
                     contents (walls, items, creature positions). This <strong>cannot be undone</strong>.

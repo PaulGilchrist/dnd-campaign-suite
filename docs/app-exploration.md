@@ -60,10 +60,7 @@
 
 ## Improvement Backlog
 
-- (2026-11-01 AY) Dress server-preview remove copy drops names: `dressMap.js:195` labels removals `gone.type || gone.name || gone.label` — a token remove reads "remove npc at 5,5" on the proposal card while the same op's on-grid marker says "✕remove QA Marta at 5,5"; prefer name/label for labelled rows so both surfaces agree.
-- (2026-11-01 AY) MapsManager Delete-map confirm (`.maps-manager-modal-overlay`) lacks `role="dialog"`/`aria-modal` (+ no focus trap proof) — invisible to assistive tech and standard `[role=dialog]` probes, unlike the sibling AiInstructionModal.
 - (2026-11-01 AY) Map-view toolbar back-button tooltip differs by kind: indoor "Back" vs hex "Back to maps" — unify the a11y label (MapToolbar.jsx vs hex toolbar).
-- (2026-11-01 AY) Dress modal reopens with the last map's context instantly but the toolbar trigger unmounts while the dialog is open (invariant pinned by 6503338e3) — consider keeping the trigger visible-but-disabled so keyboard focus doesn't bounce to page start.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
