@@ -111,6 +111,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   listeners: new Map(),
   getRuntimeValue: vi.fn(() => 0),
   setRuntimeValue: vi.fn(),
+  useRuntimeValue: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
