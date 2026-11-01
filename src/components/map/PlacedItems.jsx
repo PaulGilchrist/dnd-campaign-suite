@@ -42,7 +42,7 @@ function PlacedItems({
 
     const rectHitArea = (item, x, y, w, h) => (
         <rect x={x} y={y} width={w} height={h} fill="transparent"
-            className="item-hit-area"
+            className="item-hit-area placed-hit-area"
             onPointerDown={onDown(item)}
             onContextMenu={onContext(item)}
             style={{ cursor: 'grab' }} />
@@ -57,7 +57,7 @@ function PlacedItems({
                 <use href="#barrel" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
-                        <circle cx={cx} cy={cy} r={RADIUS} fill="transparent" className="item-hit-area"
+                        <circle cx={cx} cy={cy} r={RADIUS} fill="transparent" className="item-hit-area placed-hit-area"
                             onPointerDown={onDown(item)}
                             onContextMenu={onContext(item)}
                             style={{ cursor: 'grab' }} />
@@ -518,6 +518,7 @@ function PlacedItems({
                             width={RADIUS * 2}
                             height={RADIUS * 2}
                             fill="transparent"
+                            className="placed-hit-area"
                             onPointerDown={onDown(item)}
                             onContextMenu={onContext(item)}
                             style={{ cursor: 'grab' }}

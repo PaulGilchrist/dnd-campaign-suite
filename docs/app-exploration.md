@@ -68,7 +68,6 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 BB: **Marker hit-area classes are inconsistent across the three placed-marker lanes** — creature tokens: class-less transparent `<rect>`; furniture: `circle.item-hit-area`; indoor POI: `rect.poi-hit-area`; hex POI: bare `<rect>`. Every automation/harness must hardcode per-lane anchors (this run burned time here). Suggest one shared `placed-hit-area` class (or data-testid) on every GM hit shape in `PlacedItems.jsx` / `IndoorPoiLayer.jsx` / `POILayer.jsx`.
 - 2026-11-01 BB: **Managing placed overlays is hidden behind spell-placement mode** — the Active(N)/Clear-All/per-item Remove panel (`SpellOverlayControls`) mounts only when the toolbar Spell toggle arms placement mode; a GM who wants to just clean up a stale sphere must arm wand-mode first (and a stray canvas click while armed PLACES a new overlay). Suggest surfacing the Active list whenever overlays exist, or gating placement clicks until a drag begins. Files: `MapToolbar.jsx`, `Map.jsx` `spellOverlayState` wiring.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

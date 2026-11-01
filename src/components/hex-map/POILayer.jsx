@@ -122,6 +122,7 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                                 width={36}
                                 height={56}
                                 fill="transparent"
+                                className="placed-hit-area"
                                 style={{ cursor: 'pointer' }}
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); onPoiEnter(poi); }}
@@ -134,6 +135,7 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                                 width={36}
                                 height={36}
                                 fill="transparent"
+                                className="placed-hit-area"
                                 onPointerDown={(e) => onPoiPointerDown(poi.id, e)}
                                 onClick={(e) => e.stopPropagation()}
                                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPoiContextMenu(poi.id, e); }}

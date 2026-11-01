@@ -56,7 +56,7 @@ function IndoorPoiLayer({ pois, isLocalhost, fog, gridCenterX, gridCenterY, hand
                                     y={cy - 18}
                                     width={36}
                                     height={44}
-                                    className="poi-hit-area"
+                                    className="poi-hit-area placed-hit-area"
                                     onContextMenu={(e) => handlePoiContextMenu(poi, e)}
                                 />
                                 {isSelected(poi) && (
