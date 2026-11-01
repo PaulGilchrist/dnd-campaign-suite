@@ -57,8 +57,6 @@
 
 ## Improvement Backlog
 
-- **2026-11-01 AV — world quest_draft accept-scrutiny:** card applies fabricated NPC/settlement names ("Nobody McFakeface", "Nowhere-on-Sea") with zero hint, while rumor/npc_dialogue are fail-closed allow-listed — inconsistent validation between sibling kinds. Non-blocking advisory chip ("names not in the ledger — check spelling") client-side against loaded npcs/settlements would match the referee's review workflow. `AiWorldConsole.jsx` (server validator intentionally stays prose-agnostic).
-- **2026-11-01 AV — music editor mood select:** `#music-editor-mood` has no aria-label (label `for=` only) and the editor opens on `MOODS[0]` regardless of active mood (core defect filed as bug-music-editor-wrong-mood-default); even after that fix, label the select for a11y/testability.
 - **2026-11-01 AV — world card lingers after apply:** "Add quest to ledger" succeeds (log pair + disk row) but the proposal card stays mounted unchanged; an applied-state copy or auto-dismiss would close the loop (same pattern AU noted referee card clears on apply).
 
 ## Blocked / Deepen Targets (fold-gate ledger)

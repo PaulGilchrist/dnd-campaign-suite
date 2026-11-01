@@ -9,9 +9,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 
 // Boundary stubs at the transport seam only — the component's own routing,
-// card rendering, and confirm-gate logic run for real.
+// card rendering, and confirm-gate logic run for real. (npcs/settlements are
+// the quest_draft scrutiny lane's ledger fetches — empty ledgers here keep
+// that advisory silent; behaviour pinned in .name-scrutiny.test.jsx.)
 vi.mock('../../services/ai/aiClient.js', () => ({ askWorldKeeper: vi.fn() }));
 vi.mock('../../services/ai/applyWorldProposal.js', () => ({ applyWorldProposal: vi.fn() }));
+vi.mock('../../services/npcs/npcsService.js', () => ({ loadNPCs: vi.fn() }));
+vi.mock('../../services/campaign/settlementsService.js', () => ({ loadSettlements: vi.fn() }));
 
 import { askWorldKeeper } from '../../services/ai/aiClient.js';
 import { applyWorldProposal } from '../../services/ai/applyWorldProposal.js';

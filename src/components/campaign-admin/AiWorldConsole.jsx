@@ -9,6 +9,9 @@
 import React from 'react'
 import { askWorldKeeper } from '../../services/ai/aiClient.js'
 import { applyWorldProposal } from '../../services/ai/applyWorldProposal.js'
+import { findUnknownLedgerNames, ledgerNameList } from '../../services/ai/proposalNameAudit.js'
+import { loadNPCs } from '../../services/npcs/npcsService.js'
+import { loadSettlements } from '../../services/campaign/settlementsService.js'
 import './AiWorldConsole.css'
 
 const KINDS = [
@@ -25,6 +28,24 @@ export default function AiWorldConsole({ campaignName }) {
     const [proposal, setProposal] = React.useState(null)
     const [result, setResult] = React.useState(null)
     const [asking, setAsking] = React.useState(false)
+    // Backlog 2026-11-01 — client-side quest_draft accept-scrutiny: the
+    // ledgers are fetched when a quest card surfaces so the referee gets a
+    // non-blocking "check spelling" advisory BEFORE applying. Failure to
+    // load simply leaves the card un-adorned (nothing here blocks anything).
+    const [ledgerNames, setLedgerNames] = React.useState(null)
+
+    React.useEffect(() => {
+        if (!proposal || proposal.kind !== 'quest_draft') return undefined
+        let cancelled = false
+        Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName)]).then(([npcs, settlements]) => {
+            if (cancelled) return
+            setLedgerNames({
+                npcNames: npcs.status === 'fulfilled' ? ledgerNameList(npcs.value, 'npcs') : [],
+                settlementNames: settlements.status === 'fulfilled' ? ledgerNameList(settlements.value, 'settlements') : [],
+            })
+        })
+        return () => { cancelled = true }
+    }, [proposal, campaignName])
 
     const ask = async () => {
         setAsking(true); setResult(null); setProposal(null)
@@ -58,7 +79,7 @@ export default function AiWorldConsole({ campaignName }) {
                     <i className={`fas ${asking ? 'fa-spinner' : 'fa-feather'}`}></i> {asking ? 'Writing…' : 'Generate'}
                 </button>
             </div>
-            {proposal && <WorldProposalCard proposal={proposal} onAct={act} onDismiss={() => setProposal(null)} />}
+            {proposal && <WorldProposalCard proposal={proposal} ledgerNames={ledgerNames} onAct={act} onDismiss={() => setProposal(null)} />}
             {result && (
                 <div className={`ai-notice ${result.applied ? 'ai-notice--ok' : 'ai-notice--refused'}`} role="status">
                     {result.applied ? 'Applied: ' : 'Not applied: '}{result.detail}
@@ -68,10 +89,11 @@ export default function AiWorldConsole({ campaignName }) {
     )
 }
 
-function WorldProposalCard({ proposal, onAct, onDismiss }) {
+function WorldProposalCard({ proposal, ledgerNames, onAct, onDismiss }) {
     const body = proposal.kind === 'quest_draft'
         ? `${proposal.name} — ${proposal.description}${proposal.rewards ? ` (rewards: ${proposal.rewards})` : ''}`
         : `${proposal.kind === 'npc_dialogue' ? `${proposal.npcName}: ` : ''}${proposal.text}`
+    const unknownNames = findUnknownLedgerNames(proposal, ledgerNames)
     return (
         <div className="ai-world-card">
             <div className="ai-world-head">
@@ -79,6 +101,12 @@ function WorldProposalCard({ proposal, onAct, onDismiss }) {
                 {typeof proposal.confidence === 'number' && <em className="ai-confidence">confidence {(proposal.confidence * 100).toFixed(0)}%</em>}
             </div>
             <p className="ai-world-body">{body}</p>
+            {unknownNames.length > 0 && (
+                <div className="ai-world-advisory" role="status">
+                    <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                    names not in the ledger — check spelling: {unknownNames.join(', ')}
+                </div>
+            )}
             <div className="ai-world-actions">
                 {proposal.kind !== 'needs_human' && (
                     <button className="ct-btn ct-btn-primary" onClick={onAct}>

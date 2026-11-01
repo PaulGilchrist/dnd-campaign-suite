@@ -28,3 +28,18 @@
 .ai-world-console .ai-confidence { color: #8b949e; font-size: 0.75rem; }
 .ai-world-console .ai-world-body { margin: 0.35rem 0 0; white-space: pre-wrap; }
 .ai-world-console .ai-world-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+/* Backlog 2026-11-01 — quest_draft accept-scrutiny advisory chip: reuses the
+   .ai-badge pill shape (AiRefereeSection.css) and the .ai-notice--refused
+   amber family — a hint for the referee, never a refusal or blocker. */
+.ai-world-console .ai-world-advisory {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin-top: 0.5rem;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    background: rgba(210, 153, 34, 0.16);
+    color: #d29922;
+}
