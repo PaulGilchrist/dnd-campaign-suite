@@ -56,7 +56,7 @@
 
 ## Improvement Backlog
 
-- **2026-10-31 AS — referee dice rulings are stat-blind.** Model proposed +5 then raw "1d20 — Arcana check; no proficiency modifier available" — the referee ask context carries no actor ability stats, so dice rulings roll bare. Consider projecting the chosen character's relevant modifier into the ask payload (proposal stays GM-confirmed).
+(empty — all 2026-10-31 AS bullets consumed by the improve run; see git history for dispositions)
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

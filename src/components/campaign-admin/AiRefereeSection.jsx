@@ -14,6 +14,7 @@ import React from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js'
 import { getAiStatus, askAiReferee } from '../../services/ai/aiClient.js'
+import { projectActorStats } from '../../services/ai/actorStats.js'
 import { applyRuling, isAtomicRuling } from '../../services/ai/applyRuling.js'
 import { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } from '../../services/combat/conditions/targetEffectDefinitions.js'
 import AiConfigRow, { AiStatusBadge } from './AiConfigRow.jsx'
@@ -123,7 +124,11 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
 
     const ask = async () => {
         setAsking(true); setResult(null)
-        const res = await askAiReferee({ campaignName, action, characterName })
+        // Stat projection so dice rulings bake in the actor's real modifiers
+        // (backlog 2026-10-31); null when the roster row carries no stats —
+        // the ask then sends the exact pre-projection payload.
+        const actorStats = projectActorStats(characters.find(c => c.name === characterName) || null)
+        const res = await askAiReferee({ campaignName, action, characterName, actorStats })
         setAsking(false)
         if (!res.ok && res.code !== 'AI_NEEDS_HUMAN') { setResult({ applied: false, detail: res.error || res.code || 'AI unavailable' }); return }
         setProposal(res.ruling)

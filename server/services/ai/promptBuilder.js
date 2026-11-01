@@ -78,14 +78,59 @@ Keep "explanation" short (one sentence). "confidence" is 0..1.
 For type "hp_change", "expression" is REQUIRED and the "amount" must come from those dice — state the dice that produce the delta, never a bare number (rule 2).
 For type "target_effect", the "effect" MUST be one of the VALID_EFFECT_KEYS listed below — conditions like "poisoned" are NOT effect keys.${EFFECT_KEY_LINE}`;
 
+const REFEREE_DICE_STATS_LINE = 'Use these REAL modifiers when composing dice — never claim a modifier is unavailable: '
+    + 'ability check = 1d20+mod; a skill listed in skillProficiencies adds +proficiencyBonus (again if also in expertSkills); '
+    + 'e.g. Arcana check with int +5, Arcana proficient, PB +3 → "1d20+8".';
+
+/**
+ * Sanitize the client-sent actor projection into the compact prompt block.
+ * Defensively re-built from whitelisted fields (the body is untrusted input):
+ * integer mods clamped to legal D&D range, capped string lists. Returns null
+ * when nothing usable is present so the prompt stays byte-identical to the
+ * pre-projection era for stats-less asks.
+ */
+export function compactActorStats(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const int = (v, lo, hi) => {
+        const n = Math.round(Number(v));
+        return Number.isFinite(n) ? Math.min(Math.max(n, lo), hi) : null;
+    };
+    const list = (v) => (Array.isArray(v)
+        ? v.filter(s => typeof s === 'string' && s.trim()).map(s => s.trim().slice(0, 40)).slice(0, 25)
+        : []);
+    const abilityMods = {};
+    for (const key of ['str', 'dex', 'con', 'int', 'wis', 'cha']) {
+        const mod = int(raw.abilityMods?.[key], -5, 15);
+        if (mod !== null) abilityMods[key] = mod;
+    }
+    if (!Object.keys(abilityMods).length) return null;
+    const stats = {
+        name: typeof raw.name === 'string' ? raw.name.trim().slice(0, 120) : '',
+        abilityMods,
+        proficiencyBonus: int(raw.proficiencyBonus, 0, 8),
+    };
+    const skills = list(raw.skillProficiencies);
+    const experts = list(raw.expertSkills);
+    if (skills.length) stats.skillProficiencies = skills;
+    if (experts.length) stats.expertSkills = experts;
+    return stats;
+}
+
+function actorStatsBlock(raw) {
+    const stats = compactActorStats(raw);
+    if (!stats) return null;
+    return `ACTOR STATS (the acting character's actual stats):\n${JSON.stringify(stats)}\n${REFEREE_DICE_STATS_LINE}`;
+}
+
 /**
  * Build the chat messages for a referee ruling request.
- * @param {{ action: string, characterName: string, state: object }} args
+ * @param {{ action: string, characterName: string, state: object, actorStats?: object|null }} args
  */
-export function buildRefereeMessages({ action, characterName, state }) {
+export function buildRefereeMessages({ action, characterName, state, actorStats }) {
     const user = [
         `CAMPAIGN STATE (compact JSON):\n${JSON.stringify(compactContext(state))}`,
         characterName ? `ACTING CHARACTER: ${characterName}` : null,
+        actorStatsBlock(actorStats),
         `PLAYER'S ACTION (freeform): ${String(action || '').slice(0, 2000)}`,
     ].filter(Boolean).join('\n\n');
     return [

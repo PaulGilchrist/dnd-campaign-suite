@@ -1,6 +1,6 @@
 // L5 Phase 3 — prompt builder + answer parsing tests.
 import { describe, it, expect, vi } from 'vitest';
-import { buildRefereeMessages, compactContext, parseRulingAnswer } from './promptBuilder.js';
+import { buildRefereeMessages, compactContext, compactActorStats, parseRulingAnswer } from './promptBuilder.js';
 
 // Drift pin: REFEREE_SYSTEM must enumerate the REAL registry keys. The
 // registry imports client runtime hooks — stub that boundary so the server
@@ -59,8 +59,47 @@ describe('buildRefereeMessages', () => {
     });
 });
 
-describe('parseRulingAnswer — hp_change provenance gate', () => {
-    it('bare-amount hp_change is rejected; amount + dice expression parses', () => {
+// Backlog 2026-10-31 — referee dice rulings were stat-blind: the ask prompt
+// must bake the actor's REAL modifiers in so checks aren't bare rolls.
+describe('buildRefereeMessages — ACTOR STATS projection', () => {
+    const STATS = {
+        name: 'DivinationWizard',
+        abilityMods: { str: -1, dex: -1, con: 0, int: 5, wis: 0, cha: -1 },
+        proficiencyBonus: 6,
+        skillProficiencies: ['Arcana', 'History'],
+        expertSkills: ['Arcana'],
+    };
+
+    it('carries the modifiers and the check-composition instruction', () => {
+        const u = buildRefereeMessages({ action: 'I study the rune', characterName: 'DivinationWizard', state: {}, actorStats: STATS })[1].content;
+        expect(u).toContain('ACTOR STATS');
+        expect(u).toContain('"int":5');
+        expect(u).toContain('"proficiencyBonus":6');
+        expect(u).toContain('Arcana');
+        expect(u).toMatch(/never claim a modifier is unavailable/i);
+        expect(u).toMatch(/1d20\+mod/);
+    });
+
+    it('stats-less asks keep the pre-projection prompt byte-identical', () => {
+        const withNull = buildRefereeMessages({ action: 'x', characterName: 'Rakan', state: {}, actorStats: null })[1].content;
+        const legacy = buildRefereeMessages({ action: 'x', characterName: 'Rakan', state: {} })[1].content;
+        expect(withNull).toBe(legacy);
+        expect(withNull).not.toContain('ACTOR STATS');
+    });
+
+    it('compactActorStats sanitizes untrusted payloads — clamps, drops junk, null when unusable', () => {
+        expect(compactActorStats({ abilityMods: { int: 999, dex: -50 }, proficiencyBonus: 42 }))
+            .toMatchObject({ abilityMods: { int: 15, dex: -5 }, proficiencyBonus: 8 });
+        expect(compactActorStats({ name: 'n'.repeat(500), abilityMods: { int: '5', bogus: 1 } }).abilityMods).toEqual({ int: 5 });
+        expect(compactActorStats(null)).toBeNull();
+        expect(compactActorStats('stats')).toBeNull();
+        expect(compactActorStats({ name: 'no mods here' })).toBeNull();
+        const u = buildRefereeMessages({ action: 'x', characterName: null, state: {}, actorStats: { junk: true } })[1].content;
+        expect(u).not.toContain('ACTOR STATS');
+    });
+});
+
+describe('parseRulingAnswer — hp_change provenance gate', () => {    it('bare-amount hp_change is rejected; amount + dice expression parses', () => {
         expect(parseRulingAnswer('{"type":"hp_change","targetName":"X","amount":-6,"explanation":"claws"}').ok).toBe(false);
         expect(parseRulingAnswer('{"type":"hp_change","targetName":"X","expression":"2d6","amount":-6,"explanation":"claws"}'))
             .toMatchObject({ ok: true, ruling: { type: 'hp_change', expression: '2d6', amount: -6 } });

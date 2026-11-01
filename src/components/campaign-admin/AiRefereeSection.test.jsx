@@ -298,6 +298,55 @@ describe('AiRefereeSection — suggest mode: AI proposes, human disposes', () =>
     });
 });
 
+// Backlog 2026-10-31 — stat-blind dice rulings fix: the ask must project the
+// selected character's REAL modifiers (read from the raw character-file
+// shape, mirroring public/campaigns/test-campaign/DivinationWizard.json).
+describe('AiRefereeSection — actor stats projection in the ask payload', () => {
+    const WIZARD = {
+        name: 'DivinationWizard',
+        level: 20,
+        rules: '2024',
+        class: { name: 'Wizard', subclass: { name: 'Evoker' } },
+        abilities: [
+            { name: 'Strength', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+            { name: 'Dexterity', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+            { name: 'Constitution', baseScore: 10, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
+            { name: 'Intelligence', baseScore: 16, featIncrease: 4, backgroundIncrease: 1, miscIncrease: 0 },
+            { name: 'Wisdom', baseScore: 10, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
+            { name: 'Charisma', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
+        ],
+        skillProficiencies: ['Arcana', 'History', 'Sleight of Hand'],
+        expertSkills: ['Arcana'],
+    };
+
+    it('ask body carries the compact actorStats projection for the selected character', async () => {
+        synced.aiConfig = CONFIGURED;
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={[WIZARD]} />);
+        askAbout('I check the arcana of the rune');
+        await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
+        const [post] = refereePosts(fetchMock);
+        expect(post.body.characterName).toBe('DivinationWizard');
+        // INT 16+4+1 = 21 → clamp 20 → +5; level 20 → PB +6
+        expect(post.body.actorStats).toEqual({
+            name: 'DivinationWizard',
+            abilityMods: { str: -1, dex: -1, con: 0, int: 5, wis: 0, cha: -1 },
+            proficiencyBonus: 6,
+            skillProficiencies: ['Arcana', 'History', 'Sleight of Hand'],
+            expertSkills: ['Arcana'],
+        });
+    });
+
+    it('stats-less roster row ⇒ the body is exactly the pre-projection shape (regression)', async () => {
+        synced.aiConfig = CONFIGURED;
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('wave at the goblin');
+        await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
+        expect(refereePosts(fetchMock)[0].body).toEqual({ action: 'wave at the goblin', characterName: 'Rakan' });
+    });
+});
+
 describe('AiRefereeSection — autopilot scope', () => {
     it('atomic dice rulings auto-apply at once, through the engine (never the AI)', async () => {
         synced.aiConfig = { ...CONFIGURED, mode: 'autopilot' };

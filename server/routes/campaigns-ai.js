@@ -79,8 +79,11 @@ router.post('/api/campaigns/:campaign/ai/referee', async (req, res) => {
             return res.status(400).json({ error: 'action (what the character does) is required' });
         }
         const characterName = typeof req.body?.characterName === 'string' ? req.body.characterName.trim().slice(0, 120) : null;
+        // Client-projected actor stats (backlog 2026-10-31: stat-blind dice
+        // rulings). Passed through untrusted — promptBuilder re-sanitizes.
+        const actorStats = req.body?.actorStats && typeof req.body.actorStats === 'object' ? req.body.actorStats : null;
 
-        const result = await askReferee({ campaign, action, characterName, aiConfig: cfg, state: cd, log: addEntry });
+        const result = await askReferee({ campaign, action, characterName, actorStats, aiConfig: cfg, state: cd, log: addEntry });
         res.status(200).json({ ...result, mode: cfg.mode });
     } catch (e) {
         console.error('[campaigns-ai:referee]', e);

@@ -98,6 +98,37 @@ describe('POST /ai/referee', () => {
         expect(res.body.ruling.type).toBe('needs_human');
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_ruling' }));
     });
+
+    // Backlog 2026-10-31 — the client-projected actor stats must reach the
+    // model prompt (stat-blind dice fix).
+    it('forwards body actorStats into the model prompt as an ACTOR STATS block', async () => {
+        setStore(CFG);
+        const fetchFn = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ message: { content: VALID } }) }));
+        vi.stubGlobal('fetch', fetchFn);
+        const res = await request(createTestApp())
+            .post('/api/campaigns/test-campaign/ai/referee')
+            .send({
+                action: 'I study the rune',
+                characterName: 'DivinationWizard',
+                actorStats: { name: 'DivinationWizard', abilityMods: { int: 5 }, proficiencyBonus: 6, skillProficiencies: ['Arcana'] },
+            });
+        expect(res.status).toBe(200);
+        const sentToModel = JSON.stringify(fetchFn.mock.calls.map(c => c[1]));
+        expect(sentToModel).toContain('ACTOR STATS');
+        expect(sentToModel).toContain('1d20+mod');
+    });
+
+    it('asks without actorStats never mention ACTOR STATS to the model', async () => {
+        setStore(CFG);
+        const fetchFn = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ message: { content: VALID } }) }));
+        vi.stubGlobal('fetch', fetchFn);
+        const res = await request(createTestApp())
+            .post('/api/campaigns/test-campaign/ai/referee')
+            .send({ action: 'I shout a warning', characterName: 'Rakan' });
+        expect(res.status).toBe(200);
+        const sentToModel = JSON.stringify(fetchFn.mock.calls.map(c => c[1]));
+        expect(sentToModel).not.toContain('ACTOR STATS');
+    });
 });
 
 describe('GM (localhost) authority (§12)', () => {

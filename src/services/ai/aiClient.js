@@ -14,13 +14,18 @@ export async function getAiStatus(campaignName) {
 }
 
 /**
+ * Ask the referee for a ruling. actorStats is the compact projection from
+ * actorStats.js (backlog 2026-10-31: stat-blind dice rulings) — omitted from
+ * the body when absent, so non-projection asks stay byte-identical.
  * @returns {Promise<{ok:boolean, ruling?:object, code?:string, mode?:string}>}
  */
-export async function askAiReferee({ campaignName, action, characterName }) {
+export async function askAiReferee({ campaignName, action, characterName, actorStats = null }) {
+    const payload = { action, characterName }
+    if (actorStats) payload.actorStats = actorStats
     const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/referee`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, characterName }),
+        body: JSON.stringify(payload),
     })
     const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
     if (!res.ok) return { ok: false, code: res.status === 403 ? 'AI_OFF' : 'AI_ERROR', error: data.error }

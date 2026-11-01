@@ -40,11 +40,11 @@ function chatOpts(cfg) {
  *  - ok:false — AI off / unreachable / twice-invalid; ruling is the
  *               needs_human fallback so the table never stalls on the model.
  */
-export async function askReferee({ campaign, action, characterName, aiConfig, state, log }) {
+export async function askReferee({ campaign, action, characterName, aiConfig, state, log, actorStats }) {
     if (!aiConfigLive(aiConfig)) {
         return { ok: false, code: 'AI_OFF', ruling: null };
     }
-    const messages = buildRefereeMessages({ action, characterName, state });
+    const messages = buildRefereeMessages({ action, characterName, state, actorStats });
 
     let lastError = 'no attempt made';
     for (let attempt = 1; attempt <= 2; attempt++) { // one retry, then human (§9.1)
