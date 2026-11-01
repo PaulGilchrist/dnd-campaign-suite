@@ -1,163 +1,19 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addEntry } from '../../../ui/logService.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
-import { resolveMapPositions } from '../../common/targetResolver.js';
+// Hypnotic Pattern "Shake Out Stupor" lane (#1926) — thin config wrapper over
+// the shared wake-on-damage shake factory. Public exports (handle,
+// handleConfirm) and file path are unchanged for automation/index.js
+// (hypnotic_pattern_shake + hypnotic_pattern_shake_confirm registrations);
+// every per-spell literal the twin split required now lives in this config.
+import { createWakeOnDamageShake } from './wakeOnDamageShake.js';
 
+const { handle, handleConfirm } = createWakeOnDamageShake({
+    defaultFeatureName: 'Shake Out Stupor',
+    modalName: 'hypnoticPatternShake',
+    awakenConditions: ['charmed', 'incapacitated'],
+    removalConditions: ['charmed', 'incapacitated', 'speed_zero'],
+    conditionReason: 'Shake Out Stupor (Hypnotic Pattern)',
+    logTag: '[hypnoticPatternShake]',
+    slumberPhrase: 'hypnotic stupor',
+    spellName: 'Hypnotic Pattern',
+});
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
-    const featureName = action.name || 'Shake Out Stupor';
-
-    const rangeFt = auto.range ? parseInt(auto.range.match(/(\d+)/)?.[1] || '5', 10) : 5;
-
-    const positions = _mapName ? await resolveMapPositions(campaignName, _mapName, playerName) : null;
-
-    const combatSummary = await getCombatContext(campaignName);
-    if (!combatSummary?.creatures) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: 'No combat context found.',
-                automation: auto,
-            },
-        };
-    }
-
-    const eligibleTargets = [];
-    for (const c of combatSummary.creatures) {
-        if (c.name === playerName) continue;
-        if (rangeFt > 0 && positions) {
-            const inRange = await isWithinRange(playerName, c.name, rangeFt);
-            if (!inRange) continue;
-        }
-        eligibleTargets.push(c);
-    }
-
-    const hypnoTargets = combatSummary.creatures.filter(c => {
-        if (c.name === playerName) return false;
-        if (c.type === 'player') {
-            const conditions = getRuntimeValue(c.name, 'activeConditions', campaignName) || [];
-            const condArray = Array.isArray(conditions) ? conditions : [];
-            return condArray.some(cond => {
-                const cl = String(cond).toLowerCase();
-                return cl === 'charmed' || cl === 'incapacitated';
-            });
-        }
-        return (c.conditions || []).some(cond => {
-            const cl = String(cond.key).toLowerCase();
-            return cl === 'charmed' || cl === 'incapacitated';
-        });
-    });
-
-    const targets = hypnoTargets.length > 0 ? hypnoTargets : eligibleTargets;
-
-    if (targets.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: 'No eligible targets within range.',
-                automation: auto,
-            },
-        };
-    }
-
-    return {
-        type: 'modal',
-        modalName: 'hypnoticPatternShake',
-        payload: {
-            attackerName: playerName,
-            campaignName,
-            targets: targets.map(t => t.name),
-            rangeFeet: rangeFt,
-            featureName,
-            automation: auto,
-        },
-    };
-}
-
-function shakeOutConditionEntry(campaignName, targetName, condition) {
-    addEntry(campaignName, {
-        type: 'condition',
-        action: 'removed',
-        characterName: targetName,
-        condition,
-        reason: 'Shake Out Stupor (Hypnotic Pattern)',
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
-}
-
-async function shakeOutPlayer(targetName, campaignName) {
-    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-    const condArray = Array.isArray(conditions) ? conditions : [];
-    const filtered = condArray.filter(c => {
-        const cl = String(c).toLowerCase();
-        return cl !== 'charmed' && cl !== 'incapacitated' && cl !== 'speed_zero';
-    });
-    if (filtered.length !== condArray.length) {
-        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-        for (const cond of ['charmed', 'incapacitated', 'speed_zero']) {
-            if (!filtered.some(f => String(f).toLowerCase() === cond)) {
-                shakeOutConditionEntry(campaignName, targetName, cond.charAt(0).toUpperCase() + cond.slice(1));
-            }
-        }
-    }
-}
-
-function shakeOutCreature(targetName, campaignName) {
-    const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-    const condArray = Array.isArray(conditions) ? conditions : [];
-    const hadCharmed = condArray.some(c => String(c).toLowerCase() === 'charmed');
-    const hadIncapacitated = condArray.some(c => String(c).toLowerCase() === 'incapacitated');
-    const filtered = condArray.filter(c => {
-        const cl = String(c).toLowerCase();
-        return cl !== 'charmed' && cl !== 'incapacitated' && cl !== 'speed_zero';
-    });
-    if (filtered.length !== condArray.length) {
-        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
-    }
-    if (hadCharmed) {
-        shakeOutConditionEntry(campaignName, targetName, 'Charmed');
-    }
-    if (hadIncapacitated) {
-        shakeOutConditionEntry(campaignName, targetName, 'Incapacitated');
-    }
-}
-
-export async function handleConfirm(action, playerStats, campaignName, _mapName, targetName) {
-    if (!targetName) return null;
-
-    const playerName = playerStats.name;
-
-    const combatSummary = await getCombatContext(campaignName);
-    const creature = combatSummary?.creatures?.find(c => c.name === targetName);
-
-    if (creature?.type === 'player') {
-        await shakeOutPlayer(targetName, campaignName);
-    } else if (creature) {
-        shakeOutCreature(targetName, campaignName);
-    }
-
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: 'Shake Out Stupor',
-        description: `${playerName} used an action to shake ${targetName} out of its hypnotic stupor.`,
-        targetName,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[hypnoticPatternShake] Error:", e); });
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: 'Shake Out Stupor',
-            description: `${targetName} is no longer affected by Hypnotic Pattern.`,
-        },
-    };
-}
+export { handle, handleConfirm };
