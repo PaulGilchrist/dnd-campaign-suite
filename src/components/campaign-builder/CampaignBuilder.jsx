@@ -71,10 +71,18 @@ function CampaignBuilder({ campaignName }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const reload = useCallback(async () => {
+  // `keepError: true` marks SSE-triggered reloads (backlog 2026-11-01 AT:
+  // approve-race banner self-erase). An action failure that 409s "was
+  // modified in another tab — it was NOT saved" sets the banner right after
+  // its own reload settles, but the other tab's `<kind>-list` broadcast lands
+  // ~200ms later: a plain reload() started with setError(null) and erased the
+  // message before the GM could read it. Row-sync reloads therefore leave the
+  // banner untouched; it clears only on a user-initiated Refresh, the next
+  // action, or a successful action (all of which reload without the flag).
+  const reload = useCallback(async (options) => {
     if (!campaignName) return;
     setBusy(true);
-    setError(null);
+    if (options?.keepError !== true) setError(null);
     try {
       setGroups(await loadDrafts(campaignName));
     } catch (err) {
@@ -127,7 +135,8 @@ function CampaignBuilder({ campaignName }) {
   const handleSSEEvent = useCallback((event) => {
     if (!event || !draftListKeys(campaignName).has(event.key)) return;
     if (busy) return;
-    reload();
+    // keepError: syncing rows must never erase an unread action-error banner.
+    reload({ keepError: true });
   }, [campaignName, busy, reload]);
 
   const subscriber = <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />;
@@ -139,7 +148,7 @@ function CampaignBuilder({ campaignName }) {
         {error && <div className="campaign-builder-error" role="alert">{error}</div>}
         <p>{busy ? 'Loading drafts…' : 'No AI drafts to review.'}</p>
         {!busy && !error && (
-          <button type="button" className="ct-btn" onClick={reload}>
+          <button type="button" className="ct-btn" onClick={() => reload()}>
             <i className="fa-solid fa-rotate" /> Refresh
           </button>
         )}
@@ -162,7 +171,7 @@ function CampaignBuilder({ campaignName }) {
           AI-drafted content — invisible to players until you approve it.
         </p>
         <div className="campaign-builder-header-actions">
-          <button type="button" className="ct-btn" onClick={reload} disabled={busy}>
+          <button type="button" className="ct-btn" onClick={() => reload()} disabled={busy}>
             <i className="fa-solid fa-rotate" /> Refresh
           </button>
           {total > 0 && (

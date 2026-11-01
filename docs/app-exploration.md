@@ -60,7 +60,6 @@
 
 ## Improvement Backlog
 
-- **2026-11-01 AT — approve-race error banner self-erases before it can be read:** `runAction`'s catch now reloads then sets the banner (good), but the other tab's `<kind>-list` SSE broadcast lands ~200ms later in a now-non-busy tab → `reload()` starts with `setError(null)` and the "was modified in another tab — it was NOT saved" message vanishes unreadable (observed live: reject-side banner survived ≥2.5s, approve-side gone at 2.5s; console keeps it). Suggest: keep the last action-error across SSE-triggered reloads (clear only on user-initiated Refresh or next successful action). File: `src/components/campaign-builder/CampaignBuilder.jsx` (`reload`/`handleSSEEvent`).
 - **2026-11-01 AT — referee actor select has no "no actor" option:** every ask force-projects a roster PC (or defaults to the first); the stats-less/legacy ask body (byte-identical pre-projection prompt) is reachable only via direct API. For rules the GM wants judged context-free there is no UI affordance. Suggest: a blank first option (or a "no actor" checkbox) in the AiRefereeSection combobox. File: `src/components/campaign-admin/AiRefereeSection.jsx`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
