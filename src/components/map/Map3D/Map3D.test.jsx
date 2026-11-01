@@ -118,6 +118,28 @@ describe('Map3D', () => {
         expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs')).toBeInTheDocument();
     });
 
+    it('exit and top-down buttons are discoverable by accessible name (aria-label parity)', () => {
+        // a11y parity (backlog 2026-11-01 AZ2, 8b8897db3 MusicPlayer pattern):
+        // the visible text ("2D", "Top-down") is a poor accessible name, so the
+        // buttons expose their title via aria-label.
+        renderMap3D();
+        const exit = screen.getByRole('button', { name: 'Back to 2D map' });
+        expect(exit).toHaveAttribute('aria-label', 'Back to 2D map');
+        // Title kept for the hover tooltip and existing getByTitle locators.
+        expect(exit).toHaveAttribute('title', 'Back to 2D map');
+        expect(screen.getByTitle('Back to 2D map')).toBe(exit);
+
+        const topDown = screen.getByRole('button', { name: 'Top-down view' });
+        expect(topDown).toHaveAttribute('aria-label', 'Top-down view');
+        expect(topDown).toHaveAttribute('title', 'Top-down view');
+        expect(screen.getByTitle('Top-down view')).toBe(topDown);
+
+        // Whole-.map3d-toolbar audit (criterion 3): the only other controls are
+        // the label-wrapped Labels/Torch checkboxes — visible text names them.
+        expect(screen.getByRole('checkbox', { name: 'Labels' })).toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: 'Torch light' })).toBeInTheDocument();
+    });
+
     it('holds the viewport loading state until init resolves, then builds the exact scene payload', async () => {
         const { container } = renderMap3D();
         expect(screen.getByText('Loading 3D map…')).toBeInTheDocument();

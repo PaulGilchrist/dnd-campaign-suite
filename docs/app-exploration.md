@@ -68,7 +68,6 @@
 
 ## Improvement Backlog
 
-- 2026-11-01 AZ2: **3D-mode exit affordances lack aria-labels** — inside the 3D view the exit is a bare text `2D` toggle and `Top-down` has no accessible name, while entering 3D has `View map in 3D`. a11y parity fix (same family as 8b8897db3). `src/components/map/Map3D/Map3D.jsx` toolbar buttons.
 - 2026-11-01 AZ2: **Hidden-marker dim values diverge** — hidden POI dims `use` opacity 0.4 (AY) while hidden creature tokens dim `.npc-circle` opacity 0.5 (AZ2), both GM-only. Harmless today; a shared constant would keep GM-readable dimming consistent across lanes. `IndoorPoiLayer.jsx` / `PlacedItems.jsx`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

@@ -117,10 +117,15 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
                 <h4>{displayName || '3D Map'}</h4>
                 <span className="map3d-counts">{counts}</span>
                 <div className="toolbar no-print">
-                    <button onClick={onExit} title="Back to 2D map">
+                    {/* aria-labels (backlog 2026-11-01 AZ2, a11y parity with the
+                        8b8897db3 MusicPlayer pattern): the visible text ("2D",
+                        "Top-down") is a poor accessible name, so mirror the
+                        title; titles stay for hover tooltips and the legacy
+                        getByTitle locators. */}
+                    <button onClick={onExit} title="Back to 2D map" aria-label="Back to 2D map">
                         <i className="fa-solid fa-map"></i> 2D
                     </button>
-                    <button onClick={handleTopDown} title="Top-down view">
+                    <button onClick={handleTopDown} title="Top-down view" aria-label="Top-down view">
                         <i className="fa-solid fa-arrow-down"></i> Top-down
                     </button>
                     <label className="map3d-toggle">
