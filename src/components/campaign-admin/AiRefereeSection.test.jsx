@@ -258,11 +258,33 @@ describe('AiRefereeSection — suggest mode: AI proposes, human disposes', () =>
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         askAbout('do a thing');
         await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
+        expect(confirmButton()).toBeInTheDocument(); // dice/effect/automation rulings keep the full action button
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
         await waitFor(() => expect(screen.queryByText(/AI proposes: dice/)).toBeNull());
         expect(screen.queryByText(/Applied:/)).toBeNull();
         expect(rollExpression).not.toHaveBeenCalled();
         expect(auditEntries()).toHaveLength(0);
+    });
+
+    // Backlog 2026-10-31 — needs_human card is dismiss-only: the applier can
+    // only refuse (applyRuling.js APPLIERS.needs_human), so rendering Confirm
+    // was a dead end. Gate mirrors the world console (AiWorldConsole.jsx).
+    it('needs_human proposal renders its content but NO Confirm & Apply — dismiss writes nothing', async () => {
+        synced.aiConfig = CONFIGURED;
+        stubFetch({ referee: { ok: false, code: 'AI_NEEDS_HUMAN', ruling: { type: 'needs_human', text: 'AI referee unavailable — the referee adjudicates this turn. (invalid ruling: text required and non-empty)' } } });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('hmm?');
+
+        await waitFor(() => expect(screen.getByText(/AI proposes: needs_human/)).toBeInTheDocument());
+        expect(screen.getByText(/invalid ruling: text required/)).toBeInTheDocument(); // content stays visible
+        expect(screen.queryByRole('button', { name: /Confirm & Apply/ })).toBeNull(); // the gate
+        expect(screen.queryByText(/Applied:|Not applied:/)).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        await waitFor(() => expect(screen.queryByText(/AI proposes: needs_human/)).toBeNull());
+        expect(auditEntries()).toHaveLength(0); // no ai_ruling_applied audit row
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled(); // no targetEffect/roll side effects
     });
 
     it('referee transport failure says so honestly — no proposal, no apply', async () => {
@@ -307,6 +329,8 @@ describe('AiRefereeSection — autopilot scope', () => {
         askAbout('hmm?');
         await waitFor(() => expect(screen.getByText(/AI proposes: needs_human/)).toBeInTheDocument());
         expect(screen.getByText(/the referee adjudicates/)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Confirm & Apply/ })).toBeNull(); // dismiss-only, even in autopilot
+        expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
         expect(screen.queryByText(/Applied:/)).toBeNull();
         expect(auditEntries()).toHaveLength(0);
     });

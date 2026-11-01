@@ -232,14 +232,20 @@ function AiProposalCard({ ruling, onConfirm, onDismiss }) {
                 </div>
             )}
             <div className="ai-proposal-actions">
-                <button
-                    className="ct-btn ct-btn-primary"
-                    disabled={effectInvalid && !effectRepaired}
-                    title={effectInvalid && !effectRepaired ? 'Pick a valid effect key first' : undefined}
-                    onClick={confirmClick}
-                >
-                    <i className="fas fa-check"></i> Confirm &amp; Apply
-                </button>
+                {/* needs_human has no apply route — the applier can only refuse
+                    (applyRuling.js APPLIERS.needs_human), so hide the action
+                    button rather than offer a dead-end Confirm. Mirrors the
+                    world console's gate (AiWorldConsole.jsx). */}
+                {ruling.type !== 'needs_human' && (
+                    <button
+                        className="ct-btn ct-btn-primary"
+                        disabled={effectInvalid && !effectRepaired}
+                        title={effectInvalid && !effectRepaired ? 'Pick a valid effect key first' : undefined}
+                        onClick={confirmClick}
+                    >
+                        <i className="fas fa-check"></i> Confirm &amp; Apply
+                    </button>
+                )}
                 <button className="ct-btn" onClick={onDismiss}>Dismiss</button>
             </div>
         </div>
