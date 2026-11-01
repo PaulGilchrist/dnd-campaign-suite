@@ -1,3 +1,6 @@
+// NOTE: near-duplicate of ./sanctuarySave.js (attack path) — diverged signatures;
+// merging is a behavioral change, tracked in .opencode/plans/analysis_report.md (Duplication #1).
+// This file is the damage path, imported by ../useLoggedDiceRollDamage.js.
 import { addEntry } from '../../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';

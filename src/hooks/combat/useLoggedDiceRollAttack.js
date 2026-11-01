@@ -24,7 +24,7 @@ export { getKnownManeuvers, getSuperiorityDice } from './battleMaster.js';
 
 // Import extracted modules
 import { checkAttackBlockers } from './attackBlockers.js';
-import { handleSanctuarySave } from './sanctuarySave.js';
+import { handleSanctuarySave } from './handlers/sanctuarySave.js';
 import { computeD20Roll } from './d20RollComputation.js';
 import { resolveTarget } from './targetResolution.js';
 import { resolveHit } from './hitResolution.js';

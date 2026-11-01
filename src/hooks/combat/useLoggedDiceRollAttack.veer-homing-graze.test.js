@@ -102,7 +102,7 @@ vi.mock('./attackBlockers.js', () => ({
     checkAttackBlockers: vi.fn(() => false),
 }));
 
-vi.mock('./sanctuarySave.js', () => ({
+vi.mock('./handlers/sanctuarySave.js', () => ({
     handleSanctuarySave: vi.fn(async () => true),
 }));
 
@@ -141,7 +141,7 @@ import { resolveTarget } from './targetResolution.js';
 import { resolveHit } from './hitResolution.js';
 import { processAttackAfterResult } from './attackPostProcessing.js';
 import { checkAttackBlockers } from './attackBlockers.js';
-import { handleSanctuarySave } from './sanctuarySave.js';
+import { handleSanctuarySave } from './handlers/sanctuarySave.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 
 const deps = {

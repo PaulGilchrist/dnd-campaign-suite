@@ -101,7 +101,7 @@ vi.mock('./attackBlockers.js', () => ({
     checkAttackBlockers: vi.fn(() => false),
 }));
 
-vi.mock('./sanctuarySave.js', () => ({
+vi.mock('./handlers/sanctuarySave.js', () => ({
     handleSanctuarySave: vi.fn(() => true),
 }));
 

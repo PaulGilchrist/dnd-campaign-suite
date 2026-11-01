@@ -4,7 +4,7 @@
 // Compelled Duel expiry, Resilient Sphere auto-miss, and the starryDragon.js
 // re-exports. cannotAct / isWithinRange gates do NOT live in this lane —
 // they are owned by canTakeAction.js / rangeCheck.js and their own suites.
-// Sibling lane files neuter ./attackBlockers.js and ./sanctuarySave.js in
+// Sibling lane files neuter ./attackBlockers.js and ./handlers/sanctuarySave.js in
 // their mocks, so nothing else exercises these paths for real.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
