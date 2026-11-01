@@ -383,7 +383,10 @@ function MusicPlayer({ campaignName, isLocalhost }) {
           onChange={handleVolume}
           title="Volume"
         />
-        <button className="music-btn" onClick={openEditor} title="Edit tracks for this mood">
+        {/* aria-label (backlog 2026-11-01, a11y parity with the 7c547abdc mood
+            select): icon-only button, so expose its name explicitly; title is
+            kept for the hover tooltip and existing getByTitle test locators. */}
+        <button className="music-btn" onClick={openEditor} title="Edit tracks for this mood" aria-label="Edit tracks for this mood">
           <i className="fa-solid fa-pen"></i>
         </button>
       </div>

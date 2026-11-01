@@ -171,4 +171,17 @@ describe('MusicPlayer editor opens on the active mood', () => {
     expect(moodSelect()).toBeInTheDocument();
     expect(moodSelect()).toHaveAttribute('aria-label', 'Tracks mood');
   });
+
+  it('Edit-tracks button is discoverable by accessible name (aria-label parity)', () => {
+    stubMusicServer();
+    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+
+    // a11y parity with the 7c547abdc select: icon-only button must expose its
+    // name via aria-label, not just the title tooltip.
+    const button = screen.getByRole('button', { name: 'Edit tracks for this mood' });
+    expect(button).toHaveAttribute('aria-label', 'Edit tracks for this mood');
+    // Title kept for the hover tooltip and the legacy getByTitle locators.
+    expect(button).toHaveAttribute('title', 'Edit tracks for this mood');
+    expect(screen.getByTitle('Edit tracks for this mood')).toBe(button);
+  });
 });
