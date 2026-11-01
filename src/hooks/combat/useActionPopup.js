@@ -41,14 +41,6 @@ export async function showWeaponMasteryPopup(masteryName, setPopupHtml) {
       }
 }
 
-let backgroundsCache = null;
-export async function loadBackgrounds() {
-    if (backgroundsCache === null) {
-        backgroundsCache = await (await fetch('/data/2024/backgrounds.json')).json();
-      }
-    return backgroundsCache;
-}
-
 export async function showBackgroundPopup(backgroundName, setPopupHtml, rulesVersion = '2024') {
     try {
         const backgrounds = await loadBackgroundData(rulesVersion);

@@ -78,20 +78,3 @@ export async function confirmIllusoryReality(action, playerStats, campaignName, 
         },
     };
 }
-
-export async function getActiveObject(playerName, campaignName) {
-    const objectName = getRuntimeValue(playerName, OBJECT_KEY, campaignName);
-
-    if (!objectName) return null;
-
-    return {
-        name: objectName,
-    };
-}
-
-export async function clearObject(playerName, campaignName) {
-    await setRuntimeValue(playerName, OBJECT_KEY, null, campaignName);
-    await setRuntimeValue(playerName, USED_ROUND_KEY, null, campaignName);
-}
-
-export { OBJECT_KEY as handlerModal };
