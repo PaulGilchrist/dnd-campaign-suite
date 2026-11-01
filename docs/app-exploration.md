@@ -60,7 +60,7 @@
 
 ## Improvement Backlog
 
-- **2026-11-01 AT — referee actor select has no "no actor" option:** every ask force-projects a roster PC (or defaults to the first); the stats-less/legacy ask body (byte-identical pre-projection prompt) is reachable only via direct API. For rules the GM wants judged context-free there is no UI affordance. Suggest: a blank first option (or a "no actor" checkbox) in the AiRefereeSection combobox. File: `src/components/campaign-admin/AiRefereeSection.jsx`.
+(no open items)
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

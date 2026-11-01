@@ -125,8 +125,9 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
     const ask = async () => {
         setAsking(true); setResult(null)
         // Stat projection so dice rulings bake in the actor's real modifiers
-        // (backlog 2026-10-31); null when the roster row carries no stats —
-        // the ask then sends the exact pre-projection payload.
+        // (backlog 2026-10-31); null when no actor is selected or the roster
+        // row carries no stats — the ask then sends the exact pre-projection
+        // payload (askAiReferee omits the actorStats key entirely).
         const actorStats = projectActorStats(characters.find(c => c.name === characterName) || null)
         const res = await askAiReferee({ campaignName, action, characterName, actorStats })
         setAsking(false)
@@ -147,7 +148,16 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
                 onChange={(e) => setAction(e.target.value)}
             />
             <div className="ai-console-row">
-                <select value={characterName} onChange={(e) => setCharacterName(e.target.value)}>
+                <select
+                    value={characterName}
+                    onChange={(e) => setCharacterName(e.target.value)}
+                    aria-label="Acting character"
+                >
+                    {/* Backlog 2026-11-01: rules the GM wants judged context-free
+                        get an explicit no-actor lane — with value '' the lookup
+                        below finds no roster row, so the ask sends the exact
+                        pre-projection body (no actorStats key). */}
+                    <option value="">(No actor)</option>
                     {characters.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                 </select>
                 <button className="ct-btn ct-btn-primary" disabled={!action.trim() || asking} onClick={ask}>
