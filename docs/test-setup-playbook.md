@@ -2315,3 +2315,18 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - FACT — outdoor negative gate surfaces honestly: token op on hex map → modal inline error `ops[0] "add token": item/token ops are indoor-only (hex maps carry terrain + POIs)`, NO Apply button, modal stays open (repair loop burns 2 model calls first). Throwaway outdoor rig one-liner: `POST /maps {name,type:'outdoor',terrain:{"0,0":"grass",…}}`.
 - PITFALL — MapsManager Delete-map opens a CUSTOM React modal `.maps-manager-modal-overlay` — NOT role=dialog (invisible to [role=dialog] probes) and NOT native confirm (window.confirm spy stays empty); the overlay intercepts further row clicks until Cancel/"Yes, Delete Permanently".
 - PITFALL — aiConfig `mode` enum is off|suggest|autopilot — "chat" 400s the whole POST ("aiConfig.mode must be…"), don't confuse with /v1 chat lanes. Indoor map-view back button title is "Back"; the hex view's is "Back to maps".
+
+## Fix run 2026-11-01 (bug-ai-dress-poi-portal-inert-on-indoor-maps, commit 0fe7d441b) — recipes + pitfalls
+
+- FACT — indoor portal gate (post-fix): dress ops with `poi.targetMap` on non-outdoor docs now fail validation inline `ops[0] "add poi": poi portals are outdoor-only (party travel is hex-based)` — same modal inline-error surface as the outdoor INDOOR_ONLY negative (no Apply button, modal stays, repair loop gets the error text); valid hex poi+targetMap preview copy (modal AND grid overlay) reads `add portal POI <name> → <map> at <x>,<y>`.
+- RECIPE — dress modal inline errors are `role=alert` nodes with no test-id — find via `browser_wait_for({ text: 'outdoor-only' })` or an `[role=alert]` query.
+- RECIPE — quick throwaway hex for dress tests: `POST /maps {name,type:'outdoor',terrain:{"7,2":"grass",…}}` sparse cells are dressable; the applier validates POI placement against the ACTUAL cell set, not a computed bounding box.
+- PITFALL — `pkill -f "node server.js"` does NOT kill the fake-model rig (`qa-fake-model-server-ay.mjs`); kill it with its own pattern.
+
+## Fix run 2026-11-01 (bug-ai-dress-tokens-invisible-write-only-lane, commit 33b3d0326) — recipes + facts + pitfalls
+
+- FACT — dress token lane canonical storage (post-fix): token ops write `placedItems` creature rows (`type:'monster'|'npc'`, id `ai-dress-token-<x>-<y>-<placedItems.length>`); digest `tokens.rows` sources from `placedItems` (palette NPCs listed BEFORE dress-added rows); monsters render npc-circle + purple ring + ☠ in 2D and as purple token meshes in 3D; GM right-click Hide(dim 0.5)/Show/Delete (named confirm) rides shared machinery. Legacy `doc.items` is now write-vestigial for dress — wipe `ai-dress-token-*` orphans there when restoring baselines.
+- FACT — remove copy parity: dress remove ops label rows by NAME when a label exists (modal + grid agree).
+- RESIDUAL (owner call): `server/services/ai/authoring/applyMaps.js` `dressTokens` (AI map GENERATOR face) still writes encounter tokens into the invisible `doc.items` lane — same defect class, not covered by the dress fix.
+- PITFALL — `browser_take_screenshot` writes to the repo root by default and root `*.png` is NOT gitignored — move evidence into `.playwright-mcp/` after capture.
+- PITFALL — dev API is plain `node server.js`: server-layer fixes need a full dev trio restart; kill by PIDs (`pkill -f "node.*server"` also matches fake-model rigs).
