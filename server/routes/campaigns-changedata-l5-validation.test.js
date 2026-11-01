@@ -346,6 +346,27 @@ describe('L5-001 change-data validation chokepoint', () => {
             }
         });
 
+        // Strict-keys refusal (backlog 2026-10-31 AR): unknown top-level keys
+        // are refused by name; known-field writes keep merging/saving as before.
+        it('unknown top-level key ⇒ 400 naming it, stored config untouched', async () => {
+            characterChangeData.get('test-campaign').aiConfig = LOCAL;
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/aiConfig')
+                .send({ value: { ...LOCAL, futureTuning: 42 } });
+            expect(res.status).toBe(400);
+            expect(res.body.error).toMatch(/futureTuning/);
+            expect(characterChangeData.get('test-campaign').aiConfig).toEqual(LOCAL);
+        });
+
+        it('known-field write still saves (temperature override round-trips)', async () => {
+            characterChangeData.get('test-campaign').aiConfig = LOCAL;
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/aiConfig')
+                .send({ value: { ...LOCAL, temperature: 0.5 } });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').aiConfig.temperature).toBe(0.5);
+        });
+
         it('ENGAGING the AI from a non-localhost anonymous client ⇒ 400 (a write that turns AI on is an act of authority)', async () => {
             const res = await request(proxyApp())
                 .post('/api/campaigns/test-campaign/aiConfig')

@@ -1,10 +1,10 @@
 // @maintained-by-ai
-// aiConfig override shapes (backlog ai-config-ui-clobbers-api-overrides):
-// every shape the config-row UI writes must pass the server chokepoint —
-// boolean jsonSchema (on/off), numeric temperature (0..2), removal when
-// blanked (key absent), plus preservation-safe unknown keys. No 400s, and
-// the classic refusals (string jsonSchema, out-of-range temperature) stay
-// refused.
+// aiConfig override shapes (backlog ai-config-ui-clobbers-api-overrides) +
+// strict-keys refusal (backlog 2026-10-31 AR): every shape the config-row UI
+// writes must pass the server chokepoint — boolean jsonSchema (on/off),
+// numeric temperature (0..2), removal when blanked (key absent). Unknown
+// TOP-LEVEL keys are refused by name (the config surface stays honest as
+// fields grow); malformed known fields stay refused.
 import { validateRuntimeWrite } from './keyValidators.js';
 
 // localhost ⇒ authority guard satisfied for engaged (mode !== 'off') writes.
@@ -21,7 +21,21 @@ describe('keyValidators — aiConfig override shapes', () => {
         expect(write({ ...BASE, temperature: 0.7 })).toMatchObject({ ok: true });
         expect(write({ ...BASE, temperature: 2 })).toMatchObject({ ok: true }); // …and so is 2
         expect(write({ ...BASE, jsonSchema: true, temperature: 0.3 })).toMatchObject({ ok: true });
-        expect(write({ ...BASE, futureKey: 'x' })).toMatchObject({ ok: true }); // merge-preserved unknowns pass
+        expect(write({ ...BASE, provider: 'openai', timeoutMs: 30000 })).toMatchObject({ ok: true }); // every known field round-trips
+    });
+
+    it('refuses unknown top-level keys, naming them (strict-keys, 2026-10-31 AR)', () => {
+        const single = write({ ...BASE, futureTuning: 42 });
+        expect(single.ok).toBe(false);
+        expect(single.reason).toMatch(/futureTuning/); // names the rejected key
+        expect(single.reason).toMatch(/known keys/i); // self-documenting: lists the surface
+        const multi = write({ ...BASE, futureTuning: 42, anotherJunk: 'x' });
+        expect(multi.ok).toBe(false);
+        expect(multi.reason).toMatch(/futureTuning.*anotherJunk|anotherJunk.*futureTuning/); // both named
+        // Checked BEFORE the mode guard so a junk-only body still names its key.
+        const junkOnly = write({ futureTuning: 42 });
+        expect(junkOnly.ok).toBe(false);
+        expect(junkOnly.reason).toMatch(/futureTuning/);
     });
 
     it('still refuses malformed overrides (no silent acceptance)', () => {

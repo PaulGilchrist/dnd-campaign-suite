@@ -169,6 +169,18 @@ function enforcementBlobChanged(value, current) {
     return JSON.stringify(canonicalizeEnforcement(value)) !== JSON.stringify(canonicalizeEnforcement(current));
 }
 
+// Strict-keys whitelist (backlog 2026-10-31 AR): the FULL known surface of the
+// aiConfig blob — every key the client config row writes (AiConfigRow.jsx
+// buildConfigPayload) or any server AI service reads back off the stored blob
+// (designer.js/index.js/localProvider.js: timeoutMs). The API key deliberately
+// is NOT here — it lives server-side via /api/ai/key, never in aiConfig.
+// Unknown top-level keys are refused so the config surface stays honest and
+// self-documenting as fields grow; nested keys inside known object fields are
+// not scanned (no known field is an object today).
+const AI_CONFIG_KEYS = new Set([
+    'mode', 'endpoint', 'model', 'provider', 'temperature', 'jsonSchema', 'timeoutMs',
+]);
+
 /**
  * L5 Phase 3 (plan §5.3/§9.1, D3): aiConfig governs the local model. The
  * LOCALHOST-ENDPOINT guard is the privacy contract — campaign/world context
@@ -178,6 +190,10 @@ function enforcementBlobChanged(value, current) {
 function validateAiConfig(value) {
     if (value === null) return { ok: true }; // unset ⇒ AI off (today's behavior)
     if (!isPlainObject(value)) return { ok: false, reason: 'aiConfig must be null or an object' };
+    const unknown = Object.keys(value).filter(key => !AI_CONFIG_KEYS.has(key));
+    if (unknown.length) {
+        return { ok: false, reason: `aiConfig has unknown key(s): ${unknown.join(', ')} — known keys are: ${[...AI_CONFIG_KEYS].join(', ')}` };
+    }
     if (!AI_MODES.includes(value.mode)) return { ok: false, reason: "aiConfig.mode must be 'off'|'suggest'|'autopilot'" };
     if (value.mode !== 'off') {
         // Single source of truth for the local-endpoint contract (D3).
