@@ -253,14 +253,22 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     setMusic({ ...music, volume: next });
   }, [music, setMusic]);
 
+  // "Edit tracks for this mood" must mean the mood IN PLAY (bug-music-editor-
+  // wrong-mood-default): with an active mood the editor seeds, names, and
+  // saves THAT mood — previously it always opened on MOODS[0] ('town'), so a
+  // GM adding Tavern tracks while tavern played silently misfiled them into
+  // overrides.town. With no mood active there is no "this mood", so fall back
+  // to the last mood selected in the editor's select (starts at MOODS[0]).
   const openEditor = useCallback(() => {
-    const tracks = getTracksForMood(editMood, music.overrides);
+    const moodKey = music.mood || editMood;
+    setEditMood(moodKey);
+    const tracks = getTracksForMood(moodKey, music.overrides);
     const text = tracks.map(t => t.videoId).join('\n');
     setTrackText(text);
     seedDraft({ trackText: text });
     setEditorError(null);
     setEditing(true);
-  }, [editMood, music.overrides, seedDraft]);
+  }, [music.mood, music.overrides, editMood, seedDraft]);
 
   const changeEditMood = useCallback((event) => {
     const moodKey = event.target.value;
@@ -395,7 +403,10 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       {editing && (
         <div className="music-editor">
           <label htmlFor="music-editor-mood">Mood</label>
-          <select id="music-editor-mood" value={editMood} onChange={changeEditMood}>
+          {/* aria-label (backlog 2026-11-01 AV): the visible label is the bare
+              word "Mood"; the explicit name makes the chooser discoverable to
+              screen readers and tests. */}
+          <select id="music-editor-mood" aria-label="Tracks mood" value={editMood} onChange={changeEditMood}>
             {MOODS_ALPHABETICAL.map((mood) => (
               <option key={mood.key} value={mood.key}>{mood.label}</option>
             ))}

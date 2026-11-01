@@ -30,3 +30,15 @@ In `openEditor`, seed from the active mood when one exists:
 
 ## Severity
 Minor UX issue (with misfiled-input risk): nothing is corrupted and recovery is possible via the select, but the control's own label misdescribes its target and a GM can save tracks into the wrong mood's bucket without any warning.
+
+## Resolution
+FIXED 2026-11-01 (fix subagent run). Diagnosis confirmed exactly as filed: `editMood` was `useState(MOODS[0].key)` and `openEditor` seeded from `editMood`, ignoring `music.mood`.
+
+**Change** (`src/components/music/MusicPlayer.jsx`):
+- `openEditor` now resolves `const moodKey = music.mood || editMood` — with an active mood the editor selects it, seeds its tracks (override-aware), and the discard confirm/toast copy (`moodLabel(editMood)`, re-rendered from the new state) names it; Save/Reset write its override bucket. With no mood active, the old catalogue-first fallback stands.
+- Mood `<select>` gained `aria-label="Tracks mood"` (AV backlog ask; label `for=` kept — `getByLabelText('Mood')` in the sibling test still matches via the associated label).
+- No 2024/5e twin concern (UI component, single implementation). No server change.
+
+**Live re-verification (test-campaign, dev:locked, :5173):** pre-fix repro captured first (Tavern active → select `town`, Town seed, save wrote `overrides.town`, toast "Town tracks saved", confirm named Town). Post-fix, same steps: Tavern active + playing → editor opens on `tavern` seeded `vyg5jJrZ42s/2P8J7Cx1plA` ("2 valid tracks"); Save `dQw4w9WgXcQ` → toast **"Tavern tracks saved"**, GET /music shows `overrides.tavern` only (town absent); reopen seeds the tavern override; dirty Cancel confirm reads **"Discard changes to the Tavern track list?"**; select switch tavern→town re-seeds Town starters and saves into `overrides.town` (chooser intact); clean Cancel silent. Cleanup: Stop → Admin clear-change-data + clear-log from closed-tab quiet → `change-data {}`, `log []`, zero campaign-lock denials; test track gone with the music key.
+
+**Tests:** new `src/components/music/MusicPlayer.active-mood-editor.test.jsx` (7 tests: seed/override-seed/save-bucket+toast+playTracks-on-playing-mood/named-confirm/no-mood-fallback/manual-switch/aria-label). `npx vitest run src/components/music/` → 9 files, 63 tests green (twice); `npm run lint` zero warnings. Note: a harness pitfall surfaced while writing the lock — the per-test fetch stub must seed `mood/playing` server-side too, else the save echo (`saved.mood === editMood && playing` restart lane) never fires.

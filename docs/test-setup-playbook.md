@@ -2269,3 +2269,10 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - FACT — EB search matches TYPE/SUBTYPE: query "Goblin" honestly returns Bugbears (Goblinoid type) — not a filter defect. `input[aria-label="Select Goblin"]` + `input[aria-label="Search monsters"]` reliable; qty-1 join lands unsuffixed 'Goblin' beside the 13-PC skeleton (total 14).
 - PITFALL — the write TOOL refuses paths under the approved tmp dir (permission.external_directory) — stage rig files in workspace `.playwright-mcp/` (gitignored) instead; node can still write tmp logs itself.
 - PITFALL — closing tabs: browser_close on the last app tab can leave an auto-created about:blank; a follow-up browser_tabs select by old index throws "Tab 0 not found" — list first, close the blank, state "No open tabs" is the quiet-before-clear signal.
+
+## Fix run music-editor-wrong-mood-default 2026-11-01 (bug-mood sync fix in MusicPlayer)
+
+- PITFALL — MusicPlayer test stubs: the fetch server-stub's initial `mood/playing` is independent of the runtime store — seeding only `getStore('campaign')` leaves the save echo `{mood:null}`, so `saveTracks`' `saved.mood === editMood && playing` restart lane (playTracks) silently never fires. Seed BOTH sides to mirror live.
+- FACT — a11y: adding `aria-label` alongside a `<label for=>` keeps `getByLabelText('<label text>')` matching in testing-library (both label sources are collected) — sibling tests using `getByLabelText('Mood')` still pass after adding `aria-label="Tracks mood"`.
+- PITFALL — same-tick DOM reads after `fireEvent.click(Cancel)` see stale `.music-editor` (React hasn't flushed) — probe in a second evaluate.
+- FIXED — editor now seeds from active mood (`music.mood || editMood`) on open; saves/toasts/confirms name the active mood; `#music-editor-mood` select has `aria-label="Tracks mood"` (supersedes AV § "no aria-label" note).
