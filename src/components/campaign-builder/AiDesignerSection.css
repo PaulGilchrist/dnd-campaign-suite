@@ -89,6 +89,21 @@
   overflow-wrap: anywhere;
 }
 
+/* Backlog 2026-11-01 AZ2: a whole-JSON designer reply pretty-prints as an
+   indented block instead of a raw one-line blob. Mirrors the shared code
+   treatment (Notes.css / PreviewToggle.css pre idiom: --code-bg, radius 4px,
+   overflow-x). pre-wrap + overflow-wrap come from .ai-designer-msg-text. */
+.ai-designer-msg-json {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  background: var(--code-bg, #f4f4f4);
+  padding: 8px 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.82rem;
+}
+
 .ai-designer-composer {
   display: flex;
   gap: 0.5rem;

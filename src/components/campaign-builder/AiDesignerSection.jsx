@@ -61,6 +61,33 @@ function PlanEditor({ plan, setPlan, busy, onGenerate, onCancel }) {
   );
 }
 
+// Backlog 2026-11-01 AZ2: the chat lane sends no response_format (by design), so
+// a misbehaving model can answer with a raw JSON blob. Detect a WHOLE-message
+// JSON document (object/array only — prose like "42" stays plain) and return the
+// parsed value for pretty-printing. Anything else — prose, malformed lookalikes
+// (`{"a": `, `[1,2`), or JSON embedded mid-prose — returns null and renders
+// verbatim. Silent by design: a failed parse here is an expected branch, not an error.
+function parseWholeMessageJson(content) {
+  const text = typeof content === 'string' ? content.trim() : '';
+  if (text[0] !== '{' && text[0] !== '[') return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed !== null && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// One thread row's body: a whole-JSON designer reply becomes an indented,
+// readable block; everything else renders exactly as before.
+function MessageBody({ role, content }) {
+  const json = role === 'ai' ? parseWholeMessageJson(content) : null;
+  if (json) {
+    return <pre className="ai-designer-msg-text ai-designer-msg-json">{JSON.stringify(json, null, 2)}</pre>;
+  }
+  return <span className="ai-designer-msg-text">{content}</span>;
+}
+
 // Post-generate status banner. Full success keeps the classic copy; a
 // mid-resume stop reports "n of m planned entities drafted" honestly
 // alongside the failure strip above it (backlog partial-draft lane).
@@ -239,7 +266,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
             {messages.map((m, i) => (
               <div key={`${m.at ?? i}-${m.role}-${i}`} className={`ai-designer-msg ai-designer-msg-${m.role === 'gm' ? 'gm' : 'ai'}`}>
                 <span className="ai-designer-msg-who">{m.role === 'gm' ? 'GM' : 'Designer'}</span>
-                <span className="ai-designer-msg-text">{m.content}</span>
+                <MessageBody role={m.role} content={m.content} />
               </div>
             ))}
             <div ref={threadEnd} />
