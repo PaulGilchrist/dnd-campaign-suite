@@ -75,8 +75,6 @@ export const BASE_STATS = {
     ],
 }
 
-export const BASE_FEATURE = { name: 'Test Feature' }
-
 export function makeFeature(automation, name = 'Test Feature') {
     return { name, automation }
 }

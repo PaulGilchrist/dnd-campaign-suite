@@ -197,7 +197,4 @@ export const mockPlayerStats2024Wizard = {
         },
 };
 
-export const mockHandleTogglePreparedSpells = vi.fn();
 export const mockGateMetamagic = vi.fn();
-export const mockGateUpcast = vi.fn(() => false);
-export const mockGetCantripAutoLevel = vi.fn(() => null);

@@ -75,10 +75,3 @@ export function makeCombatSummary(creatures = [], players = []) {
   return { creatures, players, placedItems: [] };
 }
 
-export function makeDamageSpell(spellName, damageType) {
-  return { name: spellName, damage: { damage_type: damageType } };
-}
-
-export function makeHealSpell(overrides = {}) {
-  return { name: 'Power Word Heal', ...overrides };
-}
