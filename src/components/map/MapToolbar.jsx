@@ -67,7 +67,7 @@ const MapToolbar = ({
         <>
             <div className="toolbar-row">
                 {onBack && (
-                    <button onClick={onBack} title="Back" aria-label="Back" className="toolbar-back-btn no-print">
+                    <button onClick={onBack} title="Back to maps" aria-label="Back to maps" className="toolbar-back-btn no-print">
                         <i className="fa-solid fa-arrow-left"></i>
                     </button>
                 )}

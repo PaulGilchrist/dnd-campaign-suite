@@ -102,11 +102,11 @@ describe('MapToolbar', () => {
         it('renders the back button only when onBack is provided and invokes it once', () => {
             const onBack = vi.fn();
             const { unmount } = renderMapToolbar({ onBack });
-            fireEvent.click(screen.getByTitle('Back'));
+            fireEvent.click(screen.getByTitle('Back to maps'));
             expect(onBack).toHaveBeenCalledTimes(1);
             unmount();
             renderMapToolbar({ onBack: undefined });
-            expect(screen.queryByTitle('Back')).not.toBeInTheDocument();
+            expect(screen.queryByTitle('Back to maps')).not.toBeInTheDocument();
         });
 
         it('renders the 3D button only when onEnter3D is provided and invokes it once', () => {
@@ -129,7 +129,7 @@ describe('MapToolbar', () => {
             const { container } = renderMapToolbar({ onEnter3D: vi.fn() });
             // Acceptance query: zero unlabelled buttons in the toolbar.
             expect(container.querySelectorAll('.toolbar button:not([aria-label])')).toHaveLength(0);
-            expect(container.querySelector('.toolbar-back-btn')).toHaveAttribute('aria-label', 'Back');
+            expect(container.querySelector('.toolbar-back-btn')).toHaveAttribute('aria-label', 'Back to maps');
             // Texted buttons mirror their visible label; icon-only/3D carry functional ones.
             for (const label of ['Paint', 'Erase', 'Select', 'Spell', 'Ruler', 'Items', 'Reset Fog']) {
                 expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-label', label);

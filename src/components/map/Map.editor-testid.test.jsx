@@ -143,7 +143,7 @@ describe('map editor mount-proof testid (list → Open navigation)', () => {
         await waitFor(() => expect(editorTestids()).toHaveLength(1));
 
         // Editor toolbar Back → manager list: testid gone, list rows return.
-        fireEvent.click(screen.getByTitle('Back'));
+        fireEvent.click(screen.getByTitle('Back to maps'));
         await waitFor(() => expect(editorTestids()).toHaveLength(0));
         expect(openButton()).toBeInTheDocument();
 

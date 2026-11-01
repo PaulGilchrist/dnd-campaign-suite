@@ -60,8 +60,6 @@
 
 ## Improvement Backlog
 
-- (2026-11-01 AY) Map-view toolbar back-button tooltip differs by kind: indoor "Back" vs hex "Back to maps" — unify the a11y label (MapToolbar.jsx vs hex toolbar).
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - OPEN (owner call): director needs_human Confirm asymmetry — live-proven AW, unchanged code since; adjudicate, don't re-prove.
