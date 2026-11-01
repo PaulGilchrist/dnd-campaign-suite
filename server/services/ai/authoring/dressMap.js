@@ -116,6 +116,11 @@ function placementChecker(doc) {
             outdoor: true,
             within: (x, y) => Number.isInteger(x) && Number.isInteger(y) && cells.has(`${x},${y}`),
             extent: `${cells.size} hex cells`,
+            // A hex map created via the API without terrain has ZERO valid
+            // landing cells; every placement refusal is then about the missing
+            // terrain, never about the model's coordinates (backlog 2026-11-01
+            // BB: "outside the map (0 hex cells)" reads like a coordinate bug).
+            empty: cells.size === 0,
         };
     }
     const n = doc.gridSize;
@@ -203,16 +208,30 @@ function moveRow(row, op, at, ctx) {
     ctx.preview.push(`move ${row.name || row.label || row.id} → ${op.gridX},${op.gridY}`);
 }
 
-function applyOne(doc, op, i, ctx) {
-    const at = `ops[${i}] "${op.op} ${op.target}"`;
+// The three document-shape refusals that outrank everything else, hoisted so
+// applyOne stays under the complexity cap (each branch counts).
+function gateRefusal(doc, op, at, ctx) {
+    // Zero-cell terrain is a map-creation gap, not a bad coordinate: name the
+    // fix (Generate Terrain) instead of the misleading extent refusal. Id-
+    // addressed removes need no ground and stay unaffected.
+    if (ctx.place.empty && op.op !== 'remove') {
+        ctx.errors.push(`${at}: this hex map has no terrain — generate terrain first (placement needs real hex cells)`);
+        return true;
+    }
     if (ctx.place.outdoor && INDOOR_ONLY.has(op.target)) {
         ctx.errors.push(`${at}: item/token ops are indoor-only (hex maps carry terrain + POIs)`);
-        return;
+        return true;
     }
     if (portalOnIndoor(doc, op)) {
         ctx.errors.push(`${at}: poi portals are outdoor-only (party travel is hex-based)`);
-        return;
+        return true;
     }
+    return false;
+}
+
+function applyOne(doc, op, i, ctx) {
+    const at = `ops[${i}] "${op.op} ${op.target}"`;
+    if (gateRefusal(doc, op, at, ctx)) return;
     const rows = laneOf(doc, op.target);
     if (op.op === 'add') { addRow(op, rows, at, ctx); return; }
     const idx = rows.findIndex(r => String(r?.id) === String(op.id));
