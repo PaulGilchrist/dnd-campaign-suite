@@ -567,6 +567,48 @@ describe('App - Runtime Events & State Management', () => {
       expect(writesFor('targetEffects')).toHaveLength(0);
     });
 
+    // bug-victory-stamp-not-sse-adopted-missing-campaign-key: the victory
+    // banner's stamp is an OBJECT written and read at the campaign tier
+    // (characterKey='campaign'). Unregistered in CAMPAIGN_KEYS, this exact
+    // echo fell through to setRuntimeObject('lastCombatResult', …) — a ghost
+    // character store — so already-mounted clients silently never showed the
+    // banner (only a reload hydrated it). The banner's whole contract is
+    // "shown by every client at the combat-clear seam".
+    it('mirrors the victory-stamp object echo into the campaign store, never a ghost character store', async () => {
+      const stores = new Map();
+      getStore.mockImplementation((name) => {
+        if (!stores.has(name)) stores.set(name, new Map());
+        return stores.get(name);
+      });
+
+      const stamp = {
+        stamp: 1793657677511, rounds: 1, foes: 1, defeated: 1,
+        survivors: 13, partySize: 13, wipe: false,
+      };
+      await dispatch({ key: 'change-test-campaign-lastCombatResult', data: stamp });
+
+      // Reader side: useRuntimeValue('campaign','lastCombatResult') now sees it.
+      expect(stores.get('campaign').get('lastCombatResult')).toEqual(stamp);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      // Ghost-store side: zero writes to a store named after the key.
+      expect(writesFor('lastCombatResult')).toHaveLength(0);
+      expect(stores.has('lastCombatResult')).toBe(false);
+    });
+
+    // The stamp is cleared/null-POSTed nowhere today, but the mirror law must
+    // hold if a clear lane is ever added: a null echo removes the key (declared
+    // default null ⇒ banner hidden), it never stores a raw null.
+    it('removes the victory stamp from the campaign store on a null cleared-key echo', async () => {
+      const campaignStore = new Map([['lastCombatResult', { stamp: 1, rounds: 1 }]]);
+      getStore.mockImplementation(() => campaignStore);
+
+      await dispatch({ key: 'change-test-campaign-lastCombatResult', data: null });
+
+      expect(campaignStore.has('lastCombatResult')).toBe(false);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      expect(writesFor('lastCombatResult')).toHaveLength(0);
+    });
+
     // Cross-tab staleness bug: cleared keys publish null and scalars are plain
     // value updates — dropping them kept resolved prompts (travel EventDialog)
     // open and actionable on every other client. A cleared-key echo mirrors as

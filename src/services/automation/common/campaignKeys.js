@@ -59,6 +59,15 @@ export const CAMPAIGN_KEYS = new Set([
     // mode:'off'|'suggest'|'autopilot', provider } — LOCAL endpoint only,
     // server-validated; null/off ⇒ zero AI traffic (L1–4 parity).
     'aiConfig',
+    // Victory/TV banner stamp (Phase 1): handleClear stamps it at the
+    // combat-clear seam with characterKey='campaign' and useTvPresentation
+    // reads it campaign-level. Unregistered, its OBJECT echo failed
+    // isCampaignKey in applyStoreUpdate and was dispatched to a ghost
+    // CHARACTER store named "lastCombatResult" — every already-mounted client
+    // silently never showed the banner (only a reload hydrated it, since
+    // seedCampaignRuntimeData copies all top-level keys unfiltered).
+    // bug-victory-stamp-not-sse-adopted-missing-campaign-key.
+    'lastCombatResult',
 ]);
 
 /**
