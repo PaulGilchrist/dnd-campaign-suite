@@ -1,9 +1,12 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import lodash from 'lodash';
 import { publish, activeMaps, characterChangeData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignMapsDir, normalizeMapFile } from '../utils/campaignPaths.js';
+
+const { isEqual } = lodash;
 
 const router = express.Router();
 
@@ -41,9 +44,12 @@ function resolveMapFileName(mapsDir, mapname) {
 // (bug-player-clients-clobber-fog-reset). The client gates the same rule
 // (Map.jsx / useMapLoader isLocalhost) so honest read-only tabs never attempt
 // these writes; this route guard is the server seam that makes it structural.
-// Outdoor hex documents stay writable from any tab: their whole-document PUT
-// is the existing party-travel persistence lane (hex useMapLoader), which this
-// bug does not touch — the disk document's type decides, deny-safe on unknown.
+// Outdoor hex documents keep a NARROW all-tab write lane: their whole-document
+// PUT is the party-travel persistence lane (hex useMapLoader writes the party
+// marker / travel state / marching order / per-client view pan-zoom, and the
+// travel lane rolls weather as it runs). Editor-scope deltas (terrain, rivers,
+// roads, pois, gridSize, draft) are GM-only even on outdoor docs — see
+// outdoorEditorDelta below and bug-lan-player-terrain-paint-persists.
 const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 
 function refuseUnlessGm(req, res) {
@@ -51,6 +57,30 @@ function refuseUnlessGm(req, res) {
   console.log(`[maps] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
   res.status(403).json({ error: 'Access denied: GM-only feature' });
   return false;
+}
+
+// Editor-scope outdoor fields: content authored by the GM. A non-localhost
+// PUT may change any OTHER field (partyPosition/travelState/marchingOrder/
+// zoom/panX/panY/weather) but these must deep-match the stored document —
+// an honest read-only tab always echoes them unchanged, so legitimate lanes
+// pass untouched while a paint/POI/road/grid edit gets the canonical GM-only
+// 403. Missing stored doc = deny-safe: creation is a GM act (POST is gated).
+const outdoorEditorDelta = (storedData, body) => {
+  if (!storedData) return true;
+  const editorView = (doc) => ({
+    terrain: doc.terrain ?? {},
+    rivers: doc.rivers ?? [],
+    roads: doc.roads ?? [],
+    pois: doc.pois ?? [],
+    gridSize: doc.gridSize,
+    draft: doc.draft === true,
+  });
+  return !isEqual(editorView(storedData), editorView(body ?? {}));
+};
+
+function refuseOutdoorEditorWriteUnlessGm(req, res) {
+  console.log(`[maps] BLOCKED non-localhost PUT ${req.originalUrl} — outdoor editor fields (terrain/rivers/roads/pois/gridSize) are GM-only`);
+  res.status(403).json({ error: 'Access denied: GM-only feature' });
 }
 
 // Mirror the authoritative active map into the '__map__' runtime key so range
@@ -329,7 +359,11 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   // unreadable file falls back to the claimed body type (deny-safe on unknown).
   const storedData = readStoredMapDocument(filePath);
   const isOutdoor = storedData ? storedData.type === 'outdoor' : req.body?.type === 'outdoor';
-  if (!isOutdoor && !refuseUnlessGm(req, res)) return;
+  if (!isOutdoor) {
+    if (!refuseUnlessGm(req, res)) return;
+  } else if (!isLocalhost(req) && outdoorEditorDelta(storedData, req.body)) {
+    return refuseOutdoorEditorWriteUnlessGm(req, res);
+  }
 
   if (!isOutdoor && erasesStoredPlayers(storedData, req.body)) {
     console.log(`[maps] BLOCKED PUT ${campaign}/${fileName} — body without a players array would erase stored player tokens`);

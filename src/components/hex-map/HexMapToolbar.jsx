@@ -4,6 +4,65 @@ import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_TRAVEL, TOOL_ROAD }
 // icon-only buttons mirror their title into the accessible name).
 const toggleLabel = (open, openLabel, closeLabel) => (open ? closeLabel : openLabel);
 
+// GM-only editor-tools cluster (terrain paint/erase + selector, rivers,
+// roads). Split out of HexMapToolbar (ESLint complexity ceiling) — the host
+// renders it only when isLocalhost; see the toolbar gate for the why.
+function EditorTools({ tool, setTool, selectedTerrain, setSelectedTerrain, terrainTypes }) {
+    return (<>
+        {/* Terrain tools */}
+        <button
+            className={tool === TOOL_PAINT ? 'active no-print' : 'no-print'}
+            onClick={() => setTool(tool === TOOL_PAINT ? TOOL_NONE : TOOL_PAINT)}
+            title="Paint terrain"
+            aria-label="Paint terrain"
+        >
+            <i className="fa-solid fa-paint-brush"></i>
+        </button>
+        <button
+            className={tool === TOOL_ERASE ? 'active no-print' : 'no-print'}
+            onClick={() => setTool(tool === TOOL_ERASE ? TOOL_NONE : TOOL_ERASE)}
+            title="Erase terrain paint (re-click Paint rivers tool to remove river hexes)"
+            aria-label="Erase terrain"
+        >
+            <i className="fa-solid fa-eraser"></i>
+        </button>
+
+        {/* Terrain selector — visible when paint or erase is active */}
+        {(tool === TOOL_PAINT || tool === TOOL_ERASE) && (
+            <div className="terrain-selector no-print">
+                {terrainTypes.map(t => (
+                    <div
+                        key={t.id}
+                        className={`terrain-swatch ${selectedTerrain === t.id ? 'active' : ''}`}
+                        style={{ backgroundColor: t.fill }}
+                        onClick={() => { setSelectedTerrain(t.id); setTool(TOOL_PAINT); }}
+                        title={t.name}
+                    />
+                ))}
+            </div>
+        )}
+
+        {/* River tool */}
+        <button
+            className={tool === TOOL_RIVER ? 'active no-print' : 'no-print'}
+            onClick={() => setTool(tool === TOOL_RIVER ? TOOL_NONE : TOOL_RIVER)}
+            title="Paint rivers"
+            aria-label="Paint rivers"
+        >
+            <i className="fa-solid fa-water"></i>
+        </button>
+        {/* Road tool */}
+        <button
+            className={tool === TOOL_ROAD ? 'active no-print' : 'no-print'}
+            onClick={() => setTool(tool === TOOL_ROAD ? TOOL_NONE : TOOL_ROAD)}
+            title="Connect cities and settlements with roads"
+            aria-label="Connect cities and settlements with roads"
+        >
+            <i className="fa-solid fa-road"></i>
+        </button>
+    </>);
+}
+
 function HexMapToolbar({
     onBack,
     mapName,
@@ -24,6 +83,7 @@ function HexMapToolbar({
     marchingOrder,
     dressButton,
     onEnter3D,
+    isLocalhost = false,
 }) {
     const poiLabel = toggleLabel(poiPanelOpen, 'Open POI panel', 'Close POI panel');
     const marchingLabel = toggleLabel(marchingOrderOpen, 'Manage marching order', 'Close marching order');
@@ -34,57 +94,21 @@ function HexMapToolbar({
             </button>
             <span className="hex-map-title">{displayName || mapName}</span>
 
-            {/* Terrain tools */}
-            <button
-                className={tool === TOOL_PAINT ? 'active no-print' : 'no-print'}
-                onClick={() => setTool(tool === TOOL_PAINT ? TOOL_NONE : TOOL_PAINT)}
-                title="Paint terrain"
-                aria-label="Paint terrain"
-            >
-                <i className="fa-solid fa-paint-brush"></i>
-            </button>
-            <button
-                className={tool === TOOL_ERASE ? 'active no-print' : 'no-print'}
-                onClick={() => setTool(tool === TOOL_ERASE ? TOOL_NONE : TOOL_ERASE)}
-                title="Erase terrain paint (re-click Paint rivers tool to remove river hexes)"
-                aria-label="Erase terrain"
-            >
-                <i className="fa-solid fa-eraser"></i>
-            </button>
-
-            {/* Terrain selector — visible when paint or erase is active */}
-            {(tool === TOOL_PAINT || tool === TOOL_ERASE) && (
-                <div className="terrain-selector no-print">
-                    {terrainTypes.map(t => (
-                        <div
-                            key={t.id}
-                            className={`terrain-swatch ${selectedTerrain === t.id ? 'active' : ''}`}
-                            style={{ backgroundColor: t.fill }}
-                            onClick={() => { setSelectedTerrain(t.id); setTool(TOOL_PAINT); }}
-                            title={t.name}
-                        />
-                    ))}
-                </div>
+            {/* Editor tools (terrain/erase/rivers/roads) + grid sizing — GM
+                (localhost) only, mirroring the dressButton host gate above
+                (bug-lan-player-terrain-paint-persists): a network client gets
+                the read-only view, so these never arm and never queue a PUT
+                the server would 403 (outdoorEditorDelta in maps.js). Travel,
+                POI panel, marching order and the 3D view stay shared lanes. */}
+            {isLocalhost && (
+                <EditorTools
+                    tool={tool}
+                    setTool={setTool}
+                    selectedTerrain={selectedTerrain}
+                    setSelectedTerrain={setSelectedTerrain}
+                    terrainTypes={terrainTypes}
+                />
             )}
-
-            {/* River tool */}
-            <button
-                className={tool === TOOL_RIVER ? 'active no-print' : 'no-print'}
-                onClick={() => setTool(tool === TOOL_RIVER ? TOOL_NONE : TOOL_RIVER)}
-                title="Paint rivers"
-                aria-label="Paint rivers"
-            >
-                <i className="fa-solid fa-water"></i>
-            </button>
-            {/* Road tool */}
-            <button
-                className={tool === TOOL_ROAD ? 'active no-print' : 'no-print'}
-                onClick={() => setTool(tool === TOOL_ROAD ? TOOL_NONE : TOOL_ROAD)}
-                title="Connect cities and settlements with roads"
-                aria-label="Connect cities and settlements with roads"
-            >
-                <i className="fa-solid fa-road"></i>
-            </button>
 
             {/* Travel tool — binary toggle: aria-pressed mirrors the .active
                 class (SessionSection.jsx pattern) so SRs announce on/off. */}
@@ -155,20 +179,23 @@ function HexMapToolbar({
                 </button>
             </div>
 
-            {/* Grid size */}
-            <div className="hex-map-grid-size no-print">
-                <label>
-                    Grid:
-                    <input
-                        type="number"
-                        min="30"
-                        max="100"
-                        value={gridSize}
-                        onChange={(e) => setGridSize(Number(e.target.value))}
-                    />
-                    <span className="hex-map-grid-hint">{gridSize * 2}×{gridSize}</span>
-                </label>
-            </div>
+            {/* Grid size — editor scope (gridSize PUTs the document; the
+                server 403s the delta from LAN), so GM-only like the tools. */}
+            {isLocalhost && (
+                <div className="hex-map-grid-size no-print">
+                    <label>
+                        Grid:
+                        <input
+                            type="number"
+                            min="30"
+                            max="100"
+                            value={gridSize}
+                            onChange={(e) => setGridSize(Number(e.target.value))}
+                        />
+                        <span className="hex-map-grid-hint">{gridSize * 2}×{gridSize}</span>
+                    </label>
+                </div>
+            )}
         </div>
     );
 }

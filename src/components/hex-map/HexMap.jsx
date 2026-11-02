@@ -637,6 +637,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 marchingOrderOpen={marchingOpen} setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
                 onEnter3D={() => setViewMode('3d')}
+                isLocalhost={isLocalhost}
                 // AI Dress in the hex toolbar (GM-only, POI/q,r lane) — the
                 // same component as the list-row shortcut, docked variant;
                 // its ops drive the canvas overlay preview (hook nulls both

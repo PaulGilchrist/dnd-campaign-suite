@@ -63,6 +63,9 @@ describe('HexMapToolbar', () => {
             marchingOrderOpen: false,
             setMarchingOrderOpen: vi.fn(),
             marchingOrder: [],
+            // GM (localhost) view is the byte-order contract below; the LAN
+            // differential lives in the 'host gating' describe.
+            isLocalhost: true,
         };
     });
 
@@ -328,5 +331,55 @@ describe('HexMapToolbar', () => {
         const titles = [...container.querySelectorAll('button[title]')].map(b => b.getAttribute('title'));
         // Slot: after the marching toggle (and dress mount), before Print.
         expect(titles).toEqual([...BUTTON_TITLE_ORDER.slice(0, -4), 'View map in 3D', ...BUTTON_TITLE_ORDER.slice(-4)]);
+    });
+
+    // bug-lan-player-terrain-paint-persists: the Paint terrain / Erase /
+    // Paint rivers / Roads buttons and the Grid-size editor are GM-authored
+    // map content — a network client (isLocalhost=false, the HexMap.jsx
+    // default) must not even see them, mirroring the dressButton host gate.
+    // The shared lanes (travel, POI panel, marching order, zoom, print) and
+    // the read-only 3D entry stay available.
+    describe('host gating (non-localhost read-only view)', () => {
+        const GM_ONLY_TITLES = [
+            TOOL_TITLES[TOOL_PAINT],
+            'Erase terrain',
+            TOOL_TITLES[TOOL_RIVER],
+            TOOL_TITLES[TOOL_ROAD],
+        ];
+
+        it('hides the editor tools and the grid input but keeps the shared lanes', () => {
+            renderToolbar({ isLocalhost: false, onEnter3D: vi.fn() });
+            for (const title of GM_ONLY_TITLES) {
+                expect(screen.queryByTitle(title)).not.toBeInTheDocument();
+            }
+            expect(container.querySelector('.hex-map-grid-size')).toBeNull();
+            expect(container.querySelector('.terrain-selector')).toBeNull();
+            // Shared lanes present, in order.
+            const titles = [...container.querySelectorAll('button[title]')].map(b => b.getAttribute('title'));
+            expect(titles).toEqual([
+                'Back to maps',
+                TOOL_TITLES[TOOL_TRAVEL],
+                'Open POI panel',
+                'Manage marching order',
+                'View map in 3D',
+                'Print map',
+                'Zoom in',
+                'Zoom out',
+                'Reset view',
+            ]);
+        });
+
+        it('still arms travel for a LAN client (shared party lane)', () => {
+            renderToolbar({ isLocalhost: false, tool: TOOL_NONE });
+            fireEvent.click(screen.getByTitle(TOOL_TITLES[TOOL_TRAVEL]));
+            expect(props.setTool).toHaveBeenCalledWith(TOOL_TRAVEL);
+        });
+
+        it('defaults a host-less render to the hidden (read-only) state', () => {
+            const noHost = { ...props };
+            delete noHost.isLocalhost;
+            render(<HexMapToolbar {...noHost} />, { container });
+            expect(screen.queryByTitle(TOOL_TITLES[TOOL_PAINT])).not.toBeInTheDocument();
+        });
     });
 });
