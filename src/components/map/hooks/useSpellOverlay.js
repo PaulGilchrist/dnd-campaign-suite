@@ -19,6 +19,29 @@ const UPDATE_DEBOUNCE_MS = 150;
 const overlayConfirmLabel = (overlay) =>
     (overlay && (SHAPE_LABELS[overlay.shape] || overlay.shape)) || 'spell';
 
+// Legacy pre-guard disk docs can carry null/undefined rows. They deref `.id`
+// inside every merge lane below — BEFORE SpellOverlayRenderer's isValidOverlay
+// skip can fire — and the render-phase throw takes the whole map view to the
+// ErrorBoundary (bug-overlay-viewer-null-row-crashes-map-view). Drop them here
+// with an honest skip log; non-null junk rows/strings stay verbatim in state —
+// the renderer and Controls own their fail-soft skip (pinned by the verbatim-
+// adoption test in useSpellOverlay.test.js).
+const skipNullRows = (rows, lane) => {
+    const safe = rows.filter(row => row != null);
+    if (safe.length !== rows.length) {
+        console.error(`useSpellOverlay: skipping ${rows.length - safe.length} null overlay row(s) (${lane})`);
+    }
+    return safe;
+};
+
+// Unpack an SSE payload once, null-guarding shared rows before any lane
+// derefs .id. Non-array payloads pass through — the lanes' own
+// `newOverlays?.length` gates own them.
+const parseOverlayEvent = (data) => {
+    const { action, overlays, overlayId } = data || {};
+    return { action, overlayId, newOverlays: Array.isArray(overlays) ? skipNullRows(overlays, 'SSE') : overlays };
+};
+
 function useSpellOverlay(campaignName, _mapName) {
     const [overlays, setOverlays] = useState([]);
     const setOverlaysG = useSSEEqualityGuard(setOverlays);
@@ -36,7 +59,7 @@ function useSpellOverlay(campaignName, _mapName) {
         if (!campaignName) return;
         let cancelled = false;
         (async () => {
-            const loaded = await fetchSpellOverlays(campaignName);
+            const loaded = skipNullRows(await fetchSpellOverlays(campaignName), 'load');
             if (loaded.length && !cancelled) {
                 setOverlays(prev => {
                     const existingIds = new Set(prev.map(o => o.id));
@@ -142,7 +165,7 @@ function useSpellOverlay(campaignName, _mapName) {
         if (!event || !event.key || !event.key.startsWith(SSE_EVENT_KEY_PREFIX)) return;
         if (event.key !== `${SSE_EVENT_KEY_PREFIX}${campaignName}`) return;
 
-        const { action, overlays: newOverlays, overlayId } = event.data || {};
+        const { action, newOverlays, overlayId } = parseOverlayEvent(event.data);
         switch (action) {
             case 'add':
                 if (newOverlays?.length) {
