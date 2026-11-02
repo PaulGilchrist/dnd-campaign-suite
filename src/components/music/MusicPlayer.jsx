@@ -27,7 +27,8 @@ function parseTrackList(text) {
     .map(videoId => ({ videoId, title: videoId }));
 }
 
-function MusicPlayer({ campaignName, isLocalhost }) {
+// Ambience duty is delegable: the view is open to players, not GM-only.
+function MusicPlayer({ campaignName }) {
   const [rawMusic, setMusic] = useSyncedState('campaign', 'music', DEFAULT_MUSIC, campaignName);
   const music = useMemo(
     () => (rawMusic && typeof rawMusic === 'object' ? { ...DEFAULT_MUSIC, ...rawMusic } : DEFAULT_MUSIC),
@@ -141,10 +142,10 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   }, []);
 
   useEffect(() => {
-    if (!isLocalhost || !playerMounted) return;
+    if (!playerMounted) return;
     youtubePlayer.ensurePlayer(YT_FRAME_ID);
     return () => youtubePlayer.dispose();
-  }, [isLocalhost, playerMounted]);
+  }, [playerMounted]);
 
   // The panel now lives in the main content area (it used to be pinned to the
   // sidebar footer, always mounted): navigating to another view unmounts it,
@@ -157,7 +158,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     if (!state || !state.playerMounted || !state.music.playing) return;
     youtubePlayer.stop();
     commitMusic({ ...state.music, mood: null, playing: false });
-    addEntry({ type: 'music', action: 'stop', message: 'GM stopped ambience (left Music view)' });
+    addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience (left Music view)' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -179,7 +180,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       type: 'music',
       action: 'set_ambience',
       mood: moodKey,
-      message: `GM set ambience: ${mood ? mood.label : moodKey} — ${tracks[0].title}`
+      message: `Set ambience: ${mood ? mood.label : moodKey} — ${tracks[0].title}`
     });
   }, [music, commitMusic, addEntry]);
 
@@ -192,7 +193,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
         type: 'music',
         action: 'pause',
         mood: music.mood,
-        message: `GM paused ${moodLabel(music.mood)} ambience`
+        message: `Paused ${moodLabel(music.mood)} ambience`
       });
     } else {
       if (!playerMounted) {
@@ -211,7 +212,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
         type: 'music',
         action: 'resume',
         mood: music.mood,
-        message: `GM resumed ${moodLabel(music.mood)} ambience`
+        message: `Resumed ${moodLabel(music.mood)} ambience`
       });
     }
   }, [music, commitMusic, playerMounted, addEntry]);
@@ -219,11 +220,11 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   const stopMusic = useCallback(() => {
     youtubePlayer.stop();
     commitMusic({ ...music, mood: null, playing: false });
-    addEntry({ type: 'music', action: 'stop', message: 'GM stopped ambience' });
+    addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience' });
   }, [music, commitMusic, addEntry]);
 
   // Queue exhaustion (youtubePlayer.js handleError): every track failed
-  // back-to-back — un-arm the mood and tell the GM honestly instead of the
+  // back-to-back — un-arm the mood and tell the listener honestly instead of the
   // transport claiming it is playing dead videos. Toast lane mirrors the
   // editor-save errors; the log row follows the set_ambience/stop pattern.
   useEffect(() => {
@@ -236,7 +237,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
         type: 'music',
         action: 'no_playable_tracks',
         mood: music.mood,
-        message: `GM ambience stopped — no playable tracks for ${label}${failedIds.length > 0 ? ` (${failedIds.join(', ')})` : ''}`
+        message: `Ambience stopped — no playable tracks for ${label}${failedIds.length > 0 ? ` (${failedIds.join(', ')})` : ''}`
       });
     };
     window.addEventListener('music-queue-exhausted', handleQueueExhausted);
@@ -256,7 +257,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
   // "Edit tracks for this mood" must mean the mood IN PLAY (bug-music-editor-
   // wrong-mood-default): with an active mood the editor seeds, names, and
   // saves THAT mood — previously it always opened on MOODS[0] ('town'), so a
-  // GM adding Tavern tracks while tavern played silently misfiled them into
+  // player adding Tavern tracks while tavern played silently misfiled them into
   // overrides.town. With no mood active there is no "this mood", so fall back
   // to the last mood selected in the editor's select (starts at MOODS[0]).
   const openEditor = useCallback(() => {
@@ -342,8 +343,6 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     setEditorError(null);
     showToast(`${moodLabel(editMood)} overrides reset to defaults`);
   }, [editMood, music, campaignName, showToast, seedDraft]);
-
-  if (!isLocalhost) return null;
 
   const playing = music.playing;
 

@@ -91,7 +91,7 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
       type: 'music',
       action: 'no_playable_tracks',
       mood: 'town',
-      message: 'GM ambience stopped — no playable tracks for Town (Me9VLOSaJkg)'
+      message: 'Ambience stopped — no playable tracks for Town (Me9VLOSaJkg)'
     }));
   });
 
@@ -123,7 +123,7 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
     expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'music',
       action: 'stop',
-      message: 'GM stopped ambience (left Music view)'
+      message: 'Stopped ambience (left Music view)'
     }));
 
     // The exhaustion listener itself is gone — a late event adds nothing.

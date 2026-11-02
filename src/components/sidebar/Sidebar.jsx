@@ -37,9 +37,9 @@ const NAV_ITEMS = [
     { view: 'partyInventory', onClick: 'onInventoryClick' },
     { view: 'campaignLog', onClick: 'onLogClick' },
     { view: 'mapsManager', onClick: 'onMapsClick', playerLabel: 'Map' },
-    // GM-only: the music panel moved out of the sidebar footer into the
-    // main content area (activeView 'music').
-    { view: 'music', onClick: 'onMusicClick', localhostOnly: true },
+    // Ambience duty is delegable, so the music panel is open to players too
+    // (main content area, activeView 'music').
+    { view: 'music', onClick: 'onMusicClick' },
     { view: 'notes', onClick: 'onNotesClick' },
     { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
     { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true },

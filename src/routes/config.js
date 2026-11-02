@@ -108,7 +108,7 @@ export const VIEWS = {
     stateVar: 'activeView',
     type: 'string',
     component: 'MusicPlayer',
-    description: 'GM ambience player — mood playback, transport, volume, and track editor'
+    description: 'Ambience player — mood playback, transport, volume, and track editor (delegable to players)'
   },
   CAMPAIGN_BUILDER: {
     name: 'campaignBuilder',

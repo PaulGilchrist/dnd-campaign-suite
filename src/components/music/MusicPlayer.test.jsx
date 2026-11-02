@@ -40,9 +40,9 @@ beforeEach(() => {
 });
 
 describe('MusicPlayer', () => {
-  it('renders nothing for non-localhost clients', () => {
+  it('renders the full player for non-localhost clients (ambience duty is delegable to players)', () => {
     const { container } = renderPlayer({ isLocalhost: false });
-    expect(container.querySelector('.music-player')).toBeNull();
+    expect(container.querySelector('.music-player')).not.toBeNull();
   });
 
   it('renders mood buttons and transport controls on localhost', () => {
@@ -133,7 +133,7 @@ describe('MusicPlayer', () => {
     expect(musicState().volume).toBeCloseTo(0.4);
   });
 
-  it('lets the GM override a mood with pasted YouTube URLs', async () => {
+  it('lets a player override a mood with pasted YouTube URLs', async () => {
     // Editor save PATCHes { overrides } only; stub mirrors the server music route merge.
     let serverMusic = { mood: null, playing: false, volume: 0.6, overrides: {} };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts = {}) => {

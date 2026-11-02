@@ -153,12 +153,12 @@ describe('MusicPlayer remote-state adoption', () => {
     fireEvent.click(townButton());
     fireEvent.click(screen.getByTitle('Pause'));
     expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'music', action: 'pause', mood: 'town', message: 'GM paused Town ambience'
+      type: 'music', action: 'pause', mood: 'town', message: 'Paused Town ambience'
     }));
 
     fireEvent.click(screen.getByTitle('Play'));
     expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'music', action: 'resume', mood: 'town', message: 'GM resumed Town ambience'
+      type: 'music', action: 'resume', mood: 'town', message: 'Resumed Town ambience'
     }));
   });
 });

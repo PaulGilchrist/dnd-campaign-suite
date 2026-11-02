@@ -78,7 +78,8 @@ router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     res.json({ [key]: data[key] });
 }));
 
-// POST /api/campaigns/:campaign/music - GM ambience state, intent-split merge.
+// POST /api/campaigns/:campaign/music - Shared ambience state (GM or delegated
+// player), intent-split merge.
 // Transport writes (play/pause/stop/mood/volume via useSyncedState) POST the full
 // music object and overwrite every field, exactly as the generic wildcard did before.
 // The track EDITOR save/reset PATCH sends { overrides } only: playing/mood/volume are

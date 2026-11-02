@@ -278,7 +278,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     campaignBuilder: <CampaignBuilder campaignName={campaignName} />,
     partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
-    music: <MusicPlayer campaignName={campaignName} isLocalhost={isLocalhost} />,
+    music: <MusicPlayer campaignName={campaignName} />,
     campaignRepair: (
       <CampaignAdmin
         campaignName={campaignName}

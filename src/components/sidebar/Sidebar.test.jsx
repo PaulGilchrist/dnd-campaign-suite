@@ -12,7 +12,7 @@ const NAV_BUTTONS = [
   { label: 'Inventory', view: 'partyInventory', handler: 'onInventoryClick' },
   { label: 'Log', view: 'campaignLog', handler: 'onLogClick' },
   { label: 'Maps', view: 'mapsManager', handler: 'onMapsClick', playerLabel: 'Map' },
-  { label: 'Music', view: 'music', handler: 'onMusicClick', localhostOnly: true },
+  { label: 'Music', view: 'music', handler: 'onMusicClick' },
   { label: 'Notes', view: 'notes', handler: 'onNotesClick' },
   { label: 'NPCs', view: 'npcs', handler: 'onNPCsClick', localhostOnly: true },
   { label: 'Quests', view: 'quests', handler: 'onQuestsClick', localhostOnly: true },

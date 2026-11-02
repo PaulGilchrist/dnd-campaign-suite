@@ -1,9 +1,9 @@
 /**
- * GM background music — mood catalogue.
+ * Shared background music — mood catalogue (ambience duty is delegable to players).
  *
  * Each mood maps to one or more YouTube videos (verified public & embeddable
- * at time of writing). The GM can replace any track by pasting a YouTube
- * URL in the sidebar music editor; overrides persist per-campaign in the
+ * at time of writing). Any DJ (GM or player) can replace a track by pasting a
+ * YouTube URL in the Music view editor; overrides persist per-campaign in the
  * runtime store key 'music'.
  */
 
@@ -79,7 +79,7 @@ export function getMood(moodKey) {
 }
 
 /**
- * Tracks for a mood — GM overrides (keyed by mood) take precedence over the
+ * Tracks for a mood — saved overrides (keyed by mood) take precedence over the
  * starter catalogue.
  */
 export function getTracksForMood(moodKey, overrides) {
