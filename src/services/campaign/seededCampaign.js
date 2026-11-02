@@ -250,9 +250,9 @@ const ARENA_PRESET = {
     // Join lane resolves real stats (plan §2.2). No quests/factions/
     // settlements/NPCs: the arena stays lean (D5 disposable folder).
     const pools = [
-      { name: 'Sparing — Goblin Pack', picks: [['Goblin', 3], ['Kobold', 2]] },
-      { name: 'Sparing — Skeleton Watch', picks: [['Skeleton', 3], ['Zombie', 2]] },
-      { name: 'Sparing — Pack Hunt', picks: [['Wolf', 3], ['Bandit', 2]] },
+      { name: 'Sparring — Goblin Pack', picks: [['Goblin', 3], ['Kobold', 2]] },
+      { name: 'Sparring — Skeleton Watch', picks: [['Skeleton', 3], ['Zombie', 2]] },
+      { name: 'Sparring — Pack Hunt', picks: [['Wolf', 3], ['Bandit', 2]] },
     ];
     for (const pool of pools) {
       const monsters = await findBestiaryRows(pool.picks.map(p => p[0]));

@@ -207,7 +207,7 @@ describe('arena preset', () => {
     expect(saveEncounter).toHaveBeenCalledTimes(3);
     const [campaign, name, data] = saveEncounter.mock.calls[0];
     expect(campaign).toBe('qa-arena');
-    expect(name).toBe('Sparing — Goblin Pack');
+    expect(name).toBe('Sparring — Goblin Pack');
     expect(data.selectedMonsters.map(m => m.name)).toEqual(['Goblin', 'Kobold']);
     const goblin = data.creatures.find(c => c.name === 'Goblin 1');
     expect(goblin).toMatchObject({ type: 'monster', ac: 15, hp: 7, maxHp: 7, speed: 30, initBonus: 2 });
