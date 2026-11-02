@@ -1,4 +1,4 @@
-import { OverlayShape, toGrid, svgOrigin, OVERLAY_STROKE_ALPHA } from '../../models/SpellOverlay.js';
+import { OverlayShape, isValidOverlay, toGrid, svgOrigin, OVERLAY_STROKE_ALPHA } from '../../models/SpellOverlay.js';
 import { CELL_SIZE } from '../../config/mapConfig';
 
 const HANDLE_RADIUS = 6;
@@ -117,6 +117,14 @@ const renderLine = (overlay) => {
 
 const SpellOverlayRenderer = ({ overlays = [], pendingOverlay = null }) => {
     const renderOverlay = (overlay) => {
+        // Legacy-corrupt rows (junk coord keys, unknown shapes) render NaN
+        // geometry or crash color.replace — skip with one console.error so a
+        // bad board doc can never spam the console or lock the view
+        // (backlog 2026-11-02 BD; the server now 400s these writes).
+        if (!isValidOverlay(overlay)) {
+            console.error(`SpellOverlayRenderer: skipping malformed overlay ${JSON.stringify(overlay?.id ?? overlay) ?? String(overlay)}`);
+            return null;
+        }
         switch (overlay.shape) {
             case OverlayShape.SPHERE:
                 return renderSphere(overlay);

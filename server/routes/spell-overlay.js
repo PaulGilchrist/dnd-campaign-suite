@@ -42,14 +42,67 @@ function refuseLockedOffTargetWrite(req, res, campaign) {
     return true;
 }
 
-// Refuses unrecognized actions (missing/non-string included) and removes of
-// ids absent from the campaign's list. Returns an error message, or null when
-// accepted. Runs AFTER the campaign 400 and the lock 403 (ordering is pinned
-// by tests); a rejected request must never touch spellOverlayData, markDirty,
-// or publish(), so it mutates nothing in memory or on disk.
-function overlayValidationError(campaign, action, overlayId) {
+// Transport shape for renderable overlays (client producer: createOverlay in
+// src/models/SpellOverlay.js). Each shape sizes itself from these ft keys —
+// a row missing one renders cx/r = NaN (React/SVG error spam + a phantom
+// "Active (N)" panel row while the board shows nothing) or crashes
+// overlayStroke on a missing color. Same key set the client guard
+// isValidOverlay uses; keep both sides in step.
+const SHAPE_SIZE_KEYS = {
+    sphere: ['radiusFt'],
+    cylinder: ['radiusFt'],
+    cube: ['sizeFt'],
+    cone: ['distanceFt', 'coneAngle'],
+    line: ['distanceFt', 'widthFt'],
+};
+
+const isPositiveNumber = (value) => Number.isFinite(value) && value > 0;
+
+// Names the first thing a renderable overlay is missing, or null when the
+// item matches the canonical transport shape.
+function overlayShapeProblem(overlay) {
+    if (!overlay || typeof overlay !== 'object' || Array.isArray(overlay)) {
+        return `entry was ${overlay === null ? 'null' : Array.isArray(overlay) ? 'an array' : typeof overlay}, expected an object`;
+    }
+    const sizeKeys = SHAPE_SIZE_KEYS[overlay.shape];
+    if (!sizeKeys) {
+        return `shape ${JSON.stringify(overlay.shape) ?? String(overlay.shape)} is not a known overlay shape (sphere, cylinder, cube, cone, line)`;
+    }
+    if (!Number.isFinite(overlay.startGridX) || !Number.isFinite(overlay.startGridY)) {
+        return 'startGridX/startGridY must be finite numbers';
+    }
+    const badSize = sizeKeys.find((key) => !isPositiveNumber(overlay[key]));
+    if (badSize) {
+        return `${badSize} must be a positive number for a ${overlay.shape}`;
+    }
+    if (typeof overlay.color !== 'string' || overlay.color.trim() === '') {
+        return 'color must be a color string';
+    }
+    return null;
+}
+
+// Refuses unrecognized actions (missing/non-string included), removes of
+// ids absent from the campaign's list, and add/update payloads carrying a
+// malformed overlay row (backlog 2026-11-02 BD: arbitrary coord keys like
+// x/y/radius used to 200 and NaN-poison every tab's board). Returns an error
+// message, or null when accepted. Runs AFTER the campaign 400 and the lock
+// 403 (ordering is pinned by tests); a rejected request must never touch
+// spellOverlayData, markDirty, or publish(), so it mutates nothing in memory
+// or on disk. Absent/null/empty overlays arrays keep their current no-op 200.
+function overlayValidationError(campaign, action, overlayId, overlays) {
     if (typeof action !== 'string' || !VALID_ACTIONS.has(action)) {
         return `Unknown spell-overlay action: ${JSON.stringify(action) ?? String(action)}`;
+    }
+    if ((action === 'add' || action === 'update') && overlays !== undefined && overlays !== null) {
+        if (!Array.isArray(overlays)) {
+            return `Spell overlay rejected: overlays must be an array of overlay objects — got ${typeof overlays}. Expected { id, shape, startGridX, startGridY, … } with finite coordinates and a positive size for the shape (e.g. radiusFt for a sphere).`;
+        }
+        for (const overlay of overlays) {
+            const problem = overlayShapeProblem(overlay);
+            if (problem) {
+                return `Spell overlay rejected: every overlay needs a known shape, finite startGridX/startGridY numbers, a positive size for its shape (e.g. radiusFt for a sphere) and a color string — ${problem}.`;
+            }
+        }
     }
     if (action === 'remove' && overlayId) {
         const existing = spellOverlayData.get(campaign) || [];
@@ -106,7 +159,7 @@ router.post('/spell-overlay', asyncHandler((req, res) => {
     }
     const { action, overlays, overlayId } = req.body || {};
 
-    const validationError = overlayValidationError(campaign, action, overlayId);
+    const validationError = overlayValidationError(campaign, action, overlayId, overlays);
     if (validationError) {
         return res.status(400).json({ error: validationError });
     }

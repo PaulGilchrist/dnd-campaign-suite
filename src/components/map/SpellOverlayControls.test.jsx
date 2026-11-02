@@ -107,21 +107,54 @@ describe('SpellOverlayControls', () => {
     expect(screen.queryByText(/Active/)).not.toBeInTheDocument();
   });
 
-  it('lists active overlays with count, shape labels, and unknown-shape fallback', () => {
+  // Panel fixtures must be renderable overlays — malformed rows are skipped
+  // by design now (no phantom "Active (N)" rows, backlog 2026-11-02 BD).
+  const validOverlay = (item) => ({
+    startGridX: 1,
+    startGridY: 1,
+    radiusFt: 20,
+    sizeFt: 15,
+    distanceFt: 60,
+    coneAngle: 53,
+    widthFt: 5,
+    color: 'rgba(255,80,60,0.07)',
+    ...item,
+  });
+
+  it('lists active overlays with an honest count and shape labels', () => {
     const overlays = [
-      { id: 'o1', shape: OverlayShape.CUBE },
-      { id: 'o2', shape: 'unknown-shape' },
+      validOverlay({ id: 'o1', shape: OverlayShape.CUBE }),
+      validOverlay({ id: 'o2', shape: OverlayShape.CONE }),
     ];
     const { container } = renderComponent({ overlays });
     expect(screen.getByText('Active (2)')).toBeInTheDocument();
     const labels = Array.from(container.querySelectorAll('.spell-overlay-item span')).map((s) => s.textContent);
-    expect(labels).toEqual(['Cube', 'unknown-shape']);
+    expect(labels).toEqual(['Cube', 'Cone']);
+  });
+
+  it('skips malformed rows: no phantom panel row, count reflects only renderable overlays', () => {
+    const overlays = [
+      validOverlay({ id: 'good', shape: OverlayShape.SPHERE }),
+      { id: 'junk-1', shape: 'sphere', x: 5, y: 5, radius: 20 },
+      { id: 'junk-2', name: 'Fireball', level: 3 },
+      { id: 'junk-3', shape: 'unknown-shape', startGridX: 0, startGridY: 0 },
+    ];
+    const { container } = renderComponent({ overlays });
+    expect(screen.getByText('Active (1)')).toBeInTheDocument();
+    const items = container.querySelectorAll('.spell-overlay-item');
+    expect(items).toHaveLength(1);
+    expect(items[0].querySelector('span').textContent).toBe('Sphere');
+  });
+
+  it('hides the active section entirely when every row is junk', () => {
+    renderComponent({ overlays: [{ id: 'junk', shape: 'sphere', x: 1, y: 1, radius: 5 }] });
+    expect(screen.queryByText(/Active/)).not.toBeInTheDocument();
   });
 
   it('calls onRemoveOverlay and onClearAll from the active list', () => {
     const overlays = [
-      { id: 'o1', shape: OverlayShape.CUBE },
-      { id: 'o2', shape: OverlayShape.CONE },
+      validOverlay({ id: 'o1', shape: OverlayShape.CUBE }),
+      validOverlay({ id: 'o2', shape: OverlayShape.CONE }),
     ];
     const { container } = renderComponent({ overlays });
     fireEvent.click(container.querySelector('.spell-overlay-item button'));

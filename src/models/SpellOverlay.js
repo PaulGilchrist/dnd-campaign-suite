@@ -66,6 +66,36 @@ export const DEFAULTS = {
 
 export const toGrid = (ft) => ft / 5;
 
+// Which ft dimensions each shape renders from (mirrors the server guard in
+// server/routes/spell-overlay.js — keep both sides in step). A stored item
+// missing any of these renders NaN geometry or crashes overlayStroke, so
+// every display lane pre-screens with isValidOverlay (backlog 2026-11-02 BD:
+// junk coord keys produced phantom "Active (N)" panel rows + error spam).
+const SHAPE_SIZE_KEYS = {
+  [OverlayShape.SPHERE]: ['radiusFt'],
+  [OverlayShape.CYLINDER]: ['radiusFt'],
+  [OverlayShape.CUBE]: ['sizeFt'],
+  [OverlayShape.CONE]: ['distanceFt', 'coneAngle'],
+  [OverlayShape.LINE]: ['distanceFt', 'widthFt'],
+};
+
+/**
+ * True when an overlay row carries everything the renderer reads: a known
+ * shape, finite startGridX/startGridY, a positive size for its shape and a
+ * color string. Anything else must be skipped by the board renderer AND the
+ * panel (no phantom rows).
+ * @param {unknown} overlay
+ * @returns {boolean}
+ */
+export const isValidOverlay = (overlay) => {
+  if (!overlay || typeof overlay !== 'object' || Array.isArray(overlay)) return false;
+  const sizeKeys = SHAPE_SIZE_KEYS[overlay.shape];
+  if (!sizeKeys) return false;
+  if (!Number.isFinite(overlay.startGridX) || !Number.isFinite(overlay.startGridY)) return false;
+  if (!sizeKeys.every((key) => Number.isFinite(overlay[key]) && overlay[key] > 0)) return false;
+  return typeof overlay.color === 'string' && overlay.color.trim() !== '';
+};
+
 export const createOverlay = (shape, gridX, gridY, angle = 0, params = {}) => ({
   id: utils.safeUuid(),
   shape,

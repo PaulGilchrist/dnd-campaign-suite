@@ -113,4 +113,39 @@ describe('RiverLayer', () => {
         expect(getFills(container)).toHaveLength(2);
         expect(fillAt(container, 0, 0)).toHaveAttribute('fill', 'rgba(60, 130, 210, 0.45)');
     });
+
+    // Legacy/corrupt docs (the exact BD probe stored an object row via the
+    // pre-fix API). Malformed rows must skip themselves with a console.error
+    // — never throw and hard-lock the editor behind the ErrorBoundary.
+    describe('malformed rows (backlog 2026-11-02 BD)', () => {
+        const junkCases = [
+            { name: 'an object row', rivers: ['0,0', { q: 1, r: 0 }, '1,0'] },
+            { name: 'a null row', rivers: ['0,0', null, '1,0'] },
+            { name: 'a comma-less string', rivers: ['0,0', 'junk', '1,0'] },
+            { name: 'every row malformed', rivers: [{ q: 0, r: 0 }, 42] },
+        ];
+
+        it.each(junkCases)('skips $name without throwing and renders the valid rows unchanged', ({ rivers }) => {
+            const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const { container } = renderLayer({ rivers });
+            errSpy.mockRestore();
+
+            const valid = rivers.filter(k => typeof k === 'string' && /^\d+,\d+$/.test(k));
+            if (valid.length === 2) {
+                // '0,0' + '1,0' survive the filter → one chain, two soft fills
+                expect(getPaths(container)).toHaveLength(1);
+                expect(getFills(container)).toHaveLength(2);
+            } else {
+                expect(container.querySelector('g.river-layer')).not.toBeInTheDocument();
+            }
+        });
+
+        it('logs one console.error per skipped row (fail-soft, never silent)', () => {
+            const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            renderLayer({ rivers: ['0,0', { q: 1, r: 0 }, 'bad'] });
+            expect(errSpy).toHaveBeenCalledTimes(2);
+            expect(errSpy.mock.calls[0][0]).toMatch(/malformed river entry/);
+            errSpy.mockRestore();
+        });
+    });
 });

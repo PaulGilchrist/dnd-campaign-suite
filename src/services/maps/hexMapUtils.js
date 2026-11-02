@@ -14,11 +14,31 @@ export function hexKey(q, r) {
 }
 
 /**
- * Parses "q,r" back to { q, r } (numbers).
- * @param {string} key
- * @returns {{ q: number, r: number }}
+ * True when `key` is a usable "q,r" hex-key string (integer parts, optional
+ * surrounding spaces, optional negatives). Rows loaded from disk can drift
+ * (legacy docs carried object rows — see backlog 2026-11-02 BD), so every
+ * read lane that parses stored keys should pre-screen with this.
+ * @param {unknown} key
+ * @returns {boolean}
+ */
+export function isValidHexKey(key) {
+  return typeof key === 'string' && /^\s*-?\d+\s*,\s*-?\d+\s*$/.test(key);
+}
+
+/**
+ * Parses "q,r" back to { q, r } (numbers). Fail-soft: a malformed row
+ * (non-string, missing comma, junk parts) logs and returns null instead of
+ * throwing — one corrupt stored row must skip its layer, not hard-lock the
+ * whole map editor in the ErrorBoundary. Callers filter with isValidHexKey
+ * or null-check the result.
+ * @param {unknown} key
+ * @returns {{ q: number, r: number } | null}
  */
 export function parseHexKey(key) {
+  if (!isValidHexKey(key)) {
+    console.error(`parseHexKey: skipping malformed hex key ${JSON.stringify(key) ?? String(key)} (expected a "q,r" string like "7,2")`);
+    return null;
+  }
   const [q, r] = key.split(',');
   return { q: Number(q), r: Number(r) };
 }

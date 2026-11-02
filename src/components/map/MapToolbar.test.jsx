@@ -399,7 +399,12 @@ describe('MapToolbar', () => {
                 spellOverlayState: createMockSpellOverlayState({
                     spellMode: null,
                     setSpellMode,
-                    overlays: [{ id: 'o1', shape: OverlayShape.SPHERE }, { id: 'o2', shape: OverlayShape.CONE }],
+                    // Renderable rows only (transport shape guard, 2026-11-02):
+                    // malformed items would now be skipped by the panel.
+                    overlays: [
+                        { id: 'o1', shape: OverlayShape.SPHERE, startGridX: 1, startGridY: 2, radiusFt: 20, color: 'rgba(255,80,60,0.07)' },
+                        { id: 'o2', shape: OverlayShape.CONE, startGridX: 3, startGridY: 4, distanceFt: 60, coneAngle: 53, color: 'rgba(255,80,60,0.07)' },
+                    ],
                     removeOverlay,
                     clearOverlays,
                 }),

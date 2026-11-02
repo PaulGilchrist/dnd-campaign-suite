@@ -232,6 +232,63 @@ export function erasesStoredPlayers(storedData, incomingData) {
     && !Array.isArray(incomingData?.players);
 }
 
+// Row-shape guard for the outdoor editor lanes (backlog 2026-11-02 BD): the
+// whole-document PUT happily accepted object rows in `rivers` before, and one
+// malformed row hard-locked the hex editor on EVERY later open — RiverLayer's
+// parseHexKey threw `key.split is not a function` and the ErrorBoundary
+// "Reload the view" loop could only be healed by API surgery. Reject at the
+// write seam with the canonical shape spelled out; nothing on disk is touched.
+// Canonical shapes (see docs/app-exploration.md fixture recipes):
+//   rivers: ["q,r", …]                     — plain hex-key STRINGS
+//   roads:  [{id?, hexes: ["q,r", …]}, …]  — objects carrying hex-key arrays
+const HEX_KEY_ROW = /^\s*-?\d+\s*,\s*-?\d+\s*$/;
+const isHexKeyRow = (row) => typeof row === 'string' && HEX_KEY_ROW.test(row);
+const rowKind = (row) => (row === null ? 'null' : Array.isArray(row) ? 'an array' : typeof row);
+
+function riversShapeError(rivers) {
+  if (rivers === undefined || rivers === null) return null;
+  if (!Array.isArray(rivers)) {
+    return 'Map save rejected: "rivers" must be a list of hex keys, each a "q,r" string like "7,2" — got ' + rowKind(rivers) + '.';
+  }
+  for (let i = 0; i < rivers.length; i++) {
+    if (!isHexKeyRow(rivers[i])) {
+      return `Map save rejected: every river must be a "q,r" hex-key string like "7,2" — entry ${i} was ${rowKind(rivers[i])}.`;
+    }
+  }
+  return null;
+}
+
+function roadsShapeError(roads) {
+  if (roads === undefined || roads === null) return null;
+  if (!Array.isArray(roads)) {
+    return 'Map save rejected: "roads" must be a list of objects shaped { id, hexes: ["7,2", …] } — got ' + rowKind(roads) + '.';
+  }
+  for (let i = 0; i < roads.length; i++) {
+    const road = roads[i];
+    if (!road || typeof road !== 'object' || Array.isArray(road)) {
+      return `Map save rejected: every road must be an object shaped { id, hexes: ["7,2", …] } — entry ${i} was ${rowKind(road)}.`;
+    }
+    if (!Array.isArray(road.hexes)) {
+      return `Map save rejected: road entry ${i} must carry "hexes" — a list of "q,r" hex-key strings like "7,2".`;
+    }
+    for (let j = 0; j < road.hexes.length; j++) {
+      if (!isHexKeyRow(road.hexes[j])) {
+        return `Map save rejected: every road hex must be a "q,r" hex-key string like "7,2" — road entry ${i} hex ${j} was ${rowKind(road.hexes[j])}.`;
+      }
+    }
+  }
+  return null;
+}
+
+// Returns a plain-English 400 message for the first malformed outdoor row, or
+// null when the body's rivers/roads (if present) match the canonical shapes.
+// Absent/null fields pass — this never over-validates the indoor or
+// party-lane echoes that carry neither key (or carry them unchanged, as the
+// honest outdoor travel lane always does).
+export function outdoorRowsShapeError(body) {
+  return riversShapeError(body?.rivers) || roadsShapeError(body?.roads);
+}
+
 const buildOutdoorMapData = (name, body) => ({
   displayName: name.trim(),
   name: toKebabCase(name.trim()),
@@ -311,6 +368,16 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     return res.status(400).json({ error: 'A map with this name already exists' });
   }
 
+  // Same row-shape guard as the PUT (backlog 2026-11-02 BD): the builder
+  // drops rivers/roads from create bodies today, but "silently accepts
+  // anything" hides authoring bugs — refuse malformed rows with the
+  // canonical shape instead of shrugging. No file is written on refusal.
+  const createRowsError = outdoorRowsShapeError(body);
+  if (createRowsError) {
+    console.log(`[maps] BLOCKED POST ${campaign} (create "${name}") — ${createRowsError}`);
+    return res.status(400).json({ error: createRowsError });
+  }
+
   const defaultMapData = (body.type ?? 'indoor') === 'outdoor'
     ? buildOutdoorMapData(name, body)
     : buildIndoorMapData(name, body);
@@ -368,6 +435,12 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
   if (!isOutdoor && erasesStoredPlayers(storedData, req.body)) {
     console.log(`[maps] BLOCKED PUT ${campaign}/${fileName} — body without a players array would erase stored player tokens`);
     return res.status(400).json({ error: 'Map save rejected: a whole-map save must include the players array — without it every player token would be erased from the map.' });
+  }
+
+  const rowsError = outdoorRowsShapeError(req.body);
+  if (rowsError) {
+    console.log(`[maps] BLOCKED PUT ${campaign}/${fileName} — ${rowsError}`);
+    return res.status(400).json({ error: rowsError });
   }
 
   const mapData = preserveAuthoredNames(

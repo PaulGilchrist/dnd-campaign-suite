@@ -25,6 +25,7 @@ import { describe, it, expect } from 'vitest';
 import {
   hexKey,
   parseHexKey,
+  isValidHexKey,
   hexToPixel,
   pixelToHex,
   hexRound,
@@ -53,6 +54,35 @@ describe('hexMapUtils', () => {
   ])('hexKey/parseHexKey roundtrip on "%s" <-> (%i,%i)', (key, q, r) => {
     expect(hexKey(q, r)).toBe(key);
     expect(parseHexKey(key)).toEqual({ q, r });
+  });
+
+  // T1b — stored docs can drift (object rows, junk strings); the validator
+  // screens and parseHexKey fails SOFT (null + console.error) instead of
+  // throwing a TypeError that hard-locks the map editor behind the
+  // ErrorBoundary (backlog 2026-11-02 BD).
+  it.each([
+    ['an object row', { q: 1, r: 2 }],
+    ['a null row', null],
+    ['undefined', undefined],
+    ['a number', 7],
+    ['a comma-less string', 'abc'],
+    ['a missing part', '1'],
+    ['a trailing comma', '1,'],
+    ['non-numeric parts', 'a,b'],
+    ['fractional parts', '1.5,2'],
+    ['an array row', ['1', '2']],
+  ])('isValidHexKey rejects %s and parseHexKey returns null without throwing', (_label, key) => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(isValidHexKey(key)).toBe(false);
+    expect(parseHexKey(key)).toBeNull();
+    expect(errSpy).toHaveBeenCalledTimes(1); // logged fail-soft, never silent
+    errSpy.mockRestore();
+  });
+
+  it('isValidHexKey accepts the exact integer-key space the writers produce', () => {
+    for (const key of ['0,0', '7,2', '-1,-2', '999,-42', ' 3,4 ']) {
+      expect(isValidHexKey(key)).toBe(true);
+    }
   });
 
   // T2 — pointy-top axial->pixel bytes. (q,r) chosen so an axis swap or a

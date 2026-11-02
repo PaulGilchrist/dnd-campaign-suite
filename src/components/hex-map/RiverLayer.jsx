@@ -1,23 +1,31 @@
 import { useMemo } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig.js';
-import { hexToPixel, hexNeighbors, orderHexPath, buildWindingPathDescriptor } from '../../services/maps/hexMapUtils.js';
-
-function parseHexKey(key) {
-    const [q, r] = key.split(',');
-    return { q: Number(q), r: Number(r) };
-}
+import { hexToPixel, hexNeighbors, isValidHexKey, parseHexKey, orderHexPath, buildWindingPathDescriptor } from '../../services/maps/hexMapUtils.js';
 
 function inBounds(n, hexCols, hexRows) {
     return n.q >= 0 && n.q < hexCols && n.r >= 0 && n.r < hexRows;
 }
 
+// Legacy/corrupt docs can carry junk rows (objects, stray strings) in
+// rivers — pre-screen with the shared validator so one bad row skips itself
+// instead of throwing and hard-locking the editor behind the ErrorBoundary
+// (backlog 2026-11-02 BD).
+function toRiverKeys(rivers) {
+    return rivers.filter((key) => {
+        if (isValidHexKey(key)) return true;
+        console.error(`RiverLayer: skipping malformed river entry ${JSON.stringify(key) ?? String(key)} (expected a "q,r" hex-key string)`);
+        return false;
+    });
+}
+
 function buildRiverChains(rivers, hexCols, hexRows) {
-    const riverSet = new Set(rivers);
+    const keys = toRiverKeys(rivers);
+    const riverSet = new Set(keys);
     const visited = new Set();
     const chains = [];
 
     // Group into connected chains
-    for (const key of rivers) {
+    for (const key of keys) {
         if (visited.has(key)) continue;
         const chain = [];
         const stack = [key];
@@ -88,7 +96,10 @@ function buildRiverGraphics(chains) {
 function RiverLayer({ rivers, hexCols, hexRows }) {
     const elements = useMemo(() => {
         if (!rivers || rivers.length === 0) return null;
-        return buildRiverGraphics(buildRiverChains(rivers, hexCols, hexRows));
+        const built = buildRiverGraphics(buildRiverChains(rivers, hexCols, hexRows));
+        // Every row malformed → nothing left to draw; skip the empty layer
+        // entirely, mirroring the empty-array no-op.
+        return built.paths.length || built.fills.length ? built : null;
     }, [rivers, hexCols, hexRows]);
 
     if (!elements) return null;

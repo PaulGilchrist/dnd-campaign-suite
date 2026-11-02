@@ -1,6 +1,6 @@
 // @maintained-by-ai: 2026-10-14
 import { render } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
 import {
     OverlayShape,
@@ -171,5 +171,42 @@ describe('SpellOverlayRenderer', () => {
         // end handle rotates with the angle: straight down at 90 degrees
         expect(Number(handles[1].getAttribute('cx'))).toBeCloseTo(x);
         expect(Number(handles[1].getAttribute('cy'))).toBeCloseTo(y + dist);
+    });
+
+    // Legacy-corrupt board rows (the BD probe stored junk coord keys via the
+    // pre-fix POST). The renderer must skip them with one console.error each:
+    // no circle cx="NaN" bytes, no color.replace crash, valid siblings intact.
+    describe('malformed rows (backlog 2026-11-02 BD)', () => {
+        const junkCases = [
+            ['the x/y/radius junk sphere', { id: 'junk-1', shape: 'sphere', x: 5, y: 5, radius: 20, color: 'rgba(255,80,60,0.07)' }],
+            ['a gridX-keyed row', { id: 'junk-2', shape: 'sphere', gridX: 2, gridY: 2, radiusFt: 20, color: 'rgba(255,80,60,0.07)' }],
+            ['a color-less sphere (overlayStroke crash)', { id: 'junk-3', shape: 'sphere', startGridX: 1, startGridY: 1, radiusFt: 20 }],
+            ['a zero-radius sphere', { id: 'junk-4', shape: 'sphere', startGridX: 1, startGridY: 1, radiusFt: 0, color: 'rgba(255,80,60,0.07)' }],
+            ['a legacy name/level row', { id: 'junk-5', name: 'Fireball', level: 3 }],
+            ['a null entry', null],
+        ];
+
+        it.each(junkCases)('skips %s with one console.error and renders nothing for it', (_label, junk) => {
+            const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const { container } = renderComponent([makeSphere(), junk]);
+            expect(getGroups(container).length).toBe(1); // only the valid sphere
+            expect(container.innerHTML).not.toContain('NaN');
+            expect(errSpy).toHaveBeenCalledTimes(1);
+            expect(errSpy.mock.calls[0][0]).toMatch(/malformed overlay/);
+            errSpy.mockRestore();
+        });
+
+        it('keeps the whole layer clean when every row is junk (committed + pending)', () => {
+            const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const { container } = renderComponent(
+                [{ id: 'j1', shape: 'sphere', x: 1, y: 1, radius: 5 }],
+                { id: 'j2', shape: 'cube', x: 1, y: 1, size: 5 },
+            );
+            expect(container.querySelector('g.spell-overlay-layer')).toBeInTheDocument();
+            expect(getGroups(container).length).toBe(0);
+            expect(container.innerHTML).not.toContain('NaN');
+            expect(errSpy).toHaveBeenCalledTimes(2);
+            errSpy.mockRestore();
+        });
     });
 });

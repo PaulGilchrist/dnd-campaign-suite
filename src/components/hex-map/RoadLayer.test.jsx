@@ -95,4 +95,35 @@ describe('RoadLayer', () => {
             );
         });
     });
+
+    // Corrupt-doc lane (backlog 2026-11-02 BD): junk road rows and junk hex
+    // entries skip themselves instead of throwing a TypeError that hard-locks
+    // the whole hex editor. A road keeps rendering when its SURVIVING hexes
+    // still form a chain; bad hexes log fail-soft (never silent).
+    it('skips malformed road rows and hex entries without throwing, valid roads render byte-identical', () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const mixed = [
+            'not-a-road',
+            null,
+            { id: 'road-junk-hexes', hexes: [{ q: 0, r: 0 }, 'junk', 42] },
+            { id: 'road-partial', hexes: ['0,0', { q: 1, r: 0 }, '1,0'] },
+            ...roads,
+        ];
+        const { container } = renderLayer({ roads: mixed });
+        const groups = getRoadGroups(container);
+        // road-partial survives as the 0,0→1,0 chain, then both canonical roads.
+        expect(groups).toHaveLength(3);
+        expect(groups[0].querySelector('path').getAttribute('d')).toBe(
+            windingOracle({ q: 0, r: 0 }, { q: 1, r: 0 })
+        );
+        roadPoints.forEach((points, i) => {
+            expect(groups[i + 1].querySelector('path').getAttribute('d')).toBe(
+                windingOracle(...points)
+            );
+        });
+        // three junk hexes in road-junk-hexes + one in road-partial, logged.
+        expect(errSpy).toHaveBeenCalledTimes(4);
+        expect(errSpy.mock.calls[0][0]).toMatch(/malformed hex key/);
+        errSpy.mockRestore();
+    });
 });

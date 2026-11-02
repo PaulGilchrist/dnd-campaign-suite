@@ -7,7 +7,7 @@ import { DEFAULT_TERRAIN, HEX_SIZE, TERRAIN_TYPES } from '../../../config/outdoo
 import { HIDDEN_MARKER_OPACITY } from '../../../config/mapConfig.js';
 import {
     hexToPixel, hexKey, hexNeighbors, hexCornerOffset, getAllHexes, orderHexPath,
-    getHexGridPixelDimensions,
+    getHexGridPixelDimensions, isValidHexKey,
 } from '../../../services/maps/hexMapUtils.js';
 import { tintedTerrainRgb } from '../../../services/maps/hexColors.js';
 
@@ -196,10 +196,13 @@ export function poiShapeSpec(typeId) {
 // builder, re-expressed for the 3D lane — same BFS semantics, output ordered
 // through orderHexPath so the tube follows the water).
 export function chainRiverHexes(rivers, hexCols, hexRows) {
-    const riverSet = new Set(rivers || []);
+    // Malformed rows skip themselves (RiverLayer logs the same doc in 2D —
+    // no double console noise here), so one junk key never throws mid-build.
+    const keys = (rivers || []).filter(isValidHexKey);
+    const riverSet = new Set(keys);
     const visited = new Set();
     const chains = [];
-    for (const start of rivers || []) {
+    for (const start of keys) {
         if (visited.has(start)) continue;
         const chain = [];
         const stack = [start];
@@ -705,8 +708,8 @@ export class Hex3DScene {
     _buildRoads(roads) {
         const THREE = this.THREE;
         for (const road of roads || []) {
-            if (!road.hexes || road.hexes.length < 2) continue;
-            const hexes = road.hexes.map((k) => {
+            if (!road || !road.hexes || road.hexes.length < 2) continue;
+            const hexes = road.hexes.filter(isValidHexKey).map((k) => {
                 const [q, r] = k.split(',').map(Number);
                 return { q, r };
             });

@@ -29,6 +29,20 @@ function createTestApp() {
     return app;
 }
 
+// The route now 400s add/update items that are not renderable overlays
+// (improvement 2026-11-02 BD — junk coord keys used to poison every board).
+// POSTed fixtures ride a real createOverlay-style sphere under their probe
+// fields; in-memory spellOverlayData.set seeding intentionally stays bare
+// because that lane bypasses validation by design.
+const overlay = (item) => ({
+    shape: 'sphere',
+    startGridX: 0,
+    startGridY: 0,
+    radiusFt: 20,
+    color: 'rgba(255,80,60,0.07)',
+    ...item,
+});
+
 // Clean up the in-memory store between tests
 function clearOverlayStore() {
     spellOverlayData.clear();
@@ -173,7 +187,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'add',
-                    overlays: [{ id: 'overlay-1', name: 'Fireball', level: 3 }],
+                    overlays: [overlay({ id: 'overlay-1', name: 'Fireball', level: 3 })],
                 });
 
             expect(res.status).toBe(200);
@@ -192,9 +206,9 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'add',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball', level: 3 },
-                        { id: 'overlay-2', name: 'Shield', level: 1 },
-                        { id: 'overlay-3', name: 'Mage Armor', level: 1 },
+                        overlay({ id: 'overlay-1', name: 'Fireball', level: 3 }),
+                        overlay({ id: 'overlay-2', name: 'Shield', level: 1 }),
+                        overlay({ id: 'overlay-3', name: 'Mage Armor', level: 1 }),
                     ],
                 });
 
@@ -215,7 +229,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'add',
                     overlays: [
-                        { id: 'overlay-2', name: 'Shield', level: 1 },
+                        overlay({ id: 'overlay-2', name: 'Shield', level: 1 }),
                     ],
                 });
 
@@ -237,8 +251,8 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'add',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball Updated', level: 4 },
-                        { id: 'overlay-2', name: 'Shield', level: 1 },
+                        overlay({ id: 'overlay-1', name: 'Fireball Updated', level: 4 }),
+                        overlay({ id: 'overlay-2', name: 'Shield', level: 1 }),
                     ],
                 });
 
@@ -264,8 +278,8 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'add',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball Updated', level: 4 },
-                        { id: 'overlay-2', name: 'Shield Updated', level: 2 },
+                        overlay({ id: 'overlay-1', name: 'Fireball Updated', level: 4 }),
+                        overlay({ id: 'overlay-2', name: 'Shield Updated', level: 2 }),
                     ],
                 });
 
@@ -342,7 +356,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'add',
-                    overlays: [{ id: 'overlay-1', name: 'First Overlay' }],
+                    overlays: [overlay({ id: 'overlay-1', name: 'First Overlay' })],
                 });
 
             expect(res.status).toBe(200);
@@ -364,7 +378,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball Updated', level: 4 },
+                        overlay({ id: 'overlay-1', name: 'Fireball Updated', level: 4 }),
                     ],
                 });
 
@@ -391,8 +405,8 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball V2', level: 5 },
-                        { id: 'overlay-2', name: 'Shield V2', level: 2 },
+                        overlay({ id: 'overlay-1', name: 'Fireball V2', level: 5 }),
+                        overlay({ id: 'overlay-2', name: 'Shield V2', level: 2 }),
                     ],
                 });
 
@@ -416,7 +430,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball Updated', level: 4 },
+                        overlay({ id: 'overlay-1', name: 'Fireball Updated', level: 4 }),
                     ],
                 });
 
@@ -442,8 +456,8 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball Updated', level: 4 },
-                        { id: 'overlay-3', name: 'New Overlay', level: 5 },
+                        overlay({ id: 'overlay-1', name: 'Fireball Updated', level: 4 }),
+                        overlay({ id: 'overlay-3', name: 'New Overlay', level: 5 }),
                     ],
                 });
 
@@ -682,12 +696,12 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'add',
-                    overlays: [{ id: 'overlay-1', name: 'Fireball' }],
+                    overlays: [overlay({ id: 'overlay-1', name: 'Fireball' })],
                 });
 
             expect(publishSpy).toHaveBeenCalledWith(
                 'spell-overlay-test-campaign',
-                { action: 'add', overlays: [{ id: 'overlay-1', name: 'Fireball' }], overlayId: undefined },
+                { action: 'add', overlays: [overlay({ id: 'overlay-1', name: 'Fireball' })], overlayId: undefined },
                 'test-campaign'
             );
             expect(markDirtySpy).toHaveBeenCalledWith('test-campaign');
@@ -736,12 +750,12 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'update',
-                    overlays: [{ id: 'overlay-1', name: 'Updated' }],
+                    overlays: [overlay({ id: 'overlay-1', name: 'Updated' })],
                 });
 
             expect(publishSpy).toHaveBeenCalledWith(
                 'spell-overlay-test-campaign',
-                { action: 'update', overlays: [{ id: 'overlay-1', name: 'Updated' }], overlayId: undefined },
+                { action: 'update', overlays: [overlay({ id: 'overlay-1', name: 'Updated' })], overlayId: undefined },
                 'test-campaign'
             );
             expect(markDirtySpy).toHaveBeenCalledWith('test-campaign');
@@ -785,7 +799,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .post('/spell-overlay?campaign=campaign-a')
                 .send({
                     action: 'add',
-                    overlays: [{ id: 'a-2', name: 'Mage Armor' }],
+                    overlays: [overlay({ id: 'a-2', name: 'Mage Armor' })],
                 });
 
             const storedA = spellOverlayData.get('campaign-a');
@@ -934,9 +948,9 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'add',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball', level: 3 },
-                        { id: 'overlay-1', name: 'Fireball Duplicate', level: 5 },
-                        { id: 'overlay-2', name: 'Shield', level: 1 },
+                        overlay({ id: 'overlay-1', name: 'Fireball', level: 3 }),
+                        overlay({ id: 'overlay-1', name: 'Fireball Duplicate', level: 5 }),
+                        overlay({ id: 'overlay-2', name: 'Shield', level: 1 }),
                     ],
                 });
 
@@ -955,9 +969,9 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'add',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball', level: 3 },
-                        { id: 'overlay-2', name: 'Shield', level: 1 },
-                        { id: 'overlay-3', name: 'Mage Armor', level: 1 },
+                        overlay({ id: 'overlay-1', name: 'Fireball', level: 3 }),
+                        overlay({ id: 'overlay-2', name: 'Shield', level: 1 }),
+                        overlay({ id: 'overlay-3', name: 'Mage Armor', level: 1 }),
                     ],
                 });
 
@@ -985,8 +999,8 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball Updated', level: 4 },
-                        { id: 'overlay-1', name: 'Fireball V3', level: 6 },
+                        overlay({ id: 'overlay-1', name: 'Fireball Updated', level: 4 }),
+                        overlay({ id: 'overlay-1', name: 'Fireball V3', level: 6 }),
                     ],
                 });
 
@@ -1015,7 +1029,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball Updated', level: 4 },
+                        overlay({ id: 'overlay-1', name: 'Fireball Updated', level: 4 }),
                     ],
                 });
 
@@ -1034,7 +1048,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'nonexistent', name: 'Ghost', level: 9 },
+                        overlay({ id: 'nonexistent', name: 'Ghost', level: 9 }),
                     ],
                 });
 
@@ -1108,9 +1122,9 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'add',
                     overlays: [
-                        { id: 'overlay-1', name: 'Fireball', level: 3 },
-                        { id: 'overlay-2', name: 'Shield', level: 1 },
-                        { id: 'overlay-3', name: 'Mage Armor', level: 1 },
+                        overlay({ id: 'overlay-1', name: 'Fireball', level: 3 }),
+                        overlay({ id: 'overlay-2', name: 'Shield', level: 1 }),
+                        overlay({ id: 'overlay-3', name: 'Mage Armor', level: 1 }),
                     ],
                 });
 
@@ -1123,7 +1137,7 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .send({
                     action: 'update',
                     overlays: [
-                        { id: 'overlay-2', name: 'Shield Updated', level: 2 },
+                        overlay({ id: 'overlay-2', name: 'Shield Updated', level: 2 }),
                     ],
                 });
 
@@ -1161,21 +1175,21 @@ describe('spell-overlay - POST /spell-overlay', () => {
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'add',
-                    overlays: [{ id: 'overlay-1', name: 'Fireball', level: 3 }],
+                    overlays: [overlay({ id: 'overlay-1', name: 'Fireball', level: 3 })],
                 });
 
             await request(app)
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'add',
-                    overlays: [{ id: 'overlay-1', name: 'Fireball Duplicate', level: 5 }],
+                    overlays: [overlay({ id: 'overlay-1', name: 'Fireball Duplicate', level: 5 })],
                 });
 
             await request(app)
                 .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'add',
-                    overlays: [{ id: 'overlay-1', name: 'Fireball Another Duplicate', level: 7 }],
+                    overlays: [overlay({ id: 'overlay-1', name: 'Fireball Another Duplicate', level: 7 })],
                 });
 
             const stored = spellOverlayData.get('test-campaign');

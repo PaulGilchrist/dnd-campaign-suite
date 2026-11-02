@@ -1,4 +1,4 @@
-import { OverlayShape, SHAPE_LABELS, DEFAULTS } from '../../models/SpellOverlay.js';
+import { OverlayShape, SHAPE_LABELS, DEFAULTS, isValidOverlay } from '../../models/SpellOverlay.js';
 
 const PARAM_FIELDS = {
     [OverlayShape.SPHERE]: [
@@ -101,6 +101,12 @@ const SpellOverlayControls = ({
         setShapeParams(DEFAULTS[shape]);
     };
 
+    // Malformed board rows (junk coord keys — the server now 400s these
+    // writes, but legacy docs persist) get no panel row and no vote in the
+    // Active count; SpellOverlayRenderer skips them with a console.error
+    // (backlog 2026-11-02 BD — phantom "Active (1)" over an empty board).
+    const visibleOverlays = overlays.filter(isValidOverlay);
+
     return (
         <div className="spell-overlay-controls">
             <div className="spell-overlay-header">
@@ -135,9 +141,9 @@ const SpellOverlayControls = ({
                 </div>
             )}
 
-            {overlays.length > 0 && (
+            {visibleOverlays.length > 0 && (
                 <ActiveOverlays
-                    overlays={overlays}
+                    overlays={visibleOverlays}
                     onClearAll={onClearAll}
                     onRemoveOverlay={onRemoveOverlay}
                 />

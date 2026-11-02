@@ -31,6 +31,19 @@ function createTestApp() {
     return app;
 }
 
+// The write route 400s non-renderable overlay rows (improvement 2026-11-02
+// BD), so accepted-write fixtures here carry the canonical transport keys.
+// Lock/refusal legs keep bare ids — the 403/400 lanes never reach the shape
+// check with a mutation anyway.
+const validOverlay = (item) => ({
+    shape: 'sphere',
+    startGridX: 0,
+    startGridY: 0,
+    radiusFt: 20,
+    color: 'rgba(255,80,60,0.07)',
+    ...item,
+});
+
 describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
     let store;
     let publish;
@@ -106,16 +119,16 @@ describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
         it('allows on-target (locked campaign) POST unchanged', async () => {
             const res = await request(createTestApp())
                 .post('/spell-overlay?campaign=test-campaign')
-                .send({ action: 'add', overlays: [{ id: 'ok-1', name: 'Fireball' }] });
+                .send({ action: 'add', overlays: [validOverlay({ id: 'ok-1', name: 'Fireball' })] });
 
             expect(res.status).toBe(200);
             expect(res.body).toEqual({ ok: true });
-            expect(store.get('test-campaign')).toEqual([{ id: 'ok-1', name: 'Fireball' }]);
+            expect(store.get('test-campaign')).toEqual([validOverlay({ id: 'ok-1', name: 'Fireball' })]);
             // On-target writes ride the shared debounced cache→disk lane
             expect(markDirty).toHaveBeenCalledWith('test-campaign');
             expect(publish).toHaveBeenCalledWith(
                 'spell-overlay-test-campaign',
-                { action: 'add', overlays: [{ id: 'ok-1', name: 'Fireball' }], overlayId: undefined },
+                { action: 'add', overlays: [validOverlay({ id: 'ok-1', name: 'Fireball' })], overlayId: undefined },
                 'test-campaign'
             );
         });
@@ -191,14 +204,14 @@ describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
             const app = createTestApp();
             const res = await request(app)
                 .post('/spell-overlay?campaign=any-lan-campaign')
-                .send({ action: 'add', overlays: [{ id: 'a-1', name: 'Shield' }] });
+                .send({ action: 'add', overlays: [validOverlay({ id: 'a-1', name: 'Shield' })] });
 
             expect(res.status).toBe(200);
             expect(res.body).toEqual({ ok: true });
-            expect(store.get('any-lan-campaign')).toEqual([{ id: 'a-1', name: 'Shield' }]);
+            expect(store.get('any-lan-campaign')).toEqual([validOverlay({ id: 'a-1', name: 'Shield' })]);
             expect(publish).toHaveBeenCalledWith(
                 'spell-overlay-any-lan-campaign',
-                { action: 'add', overlays: [{ id: 'a-1', name: 'Shield' }], overlayId: undefined },
+                { action: 'add', overlays: [validOverlay({ id: 'a-1', name: 'Shield' })], overlayId: undefined },
                 'any-lan-campaign'
             );
         });
