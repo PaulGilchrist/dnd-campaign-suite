@@ -65,7 +65,7 @@
 
 ## Improvement Backlog
 
-- (2026-11-02 BD) — HexMap3D counts row prints `1 POIs` at count 1 (and counts hidden POIs without qualification); singular/plural + a visible-aware count would read honest.
+_(empty — all 2026-11-02 items resolved by improve-run BD2, see git log `improve(...)` commits)_
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

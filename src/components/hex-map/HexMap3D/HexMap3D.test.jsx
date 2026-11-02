@@ -1,5 +1,5 @@
 // @maintained-by-ai
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import HexMap3D from './HexMap3D.jsx';
 
@@ -90,12 +90,106 @@ describe('HexMap3D', () => {
     it('renders toolbar name, exact counts, and fires onExit from the 2D button, falling back to "3D Map"', () => {
         const { props } = renderHex3D();
         expect(screen.getByText('North Reach')).toBeInTheDocument();
-        expect(screen.getByText('1800 hexes · 1 POIs · 1 roads · 2 river hexes')).toBeInTheDocument();
+        expect(screen.getByText('1800 hexes · 1 POI · 1 road · 2 river hexes')).toBeInTheDocument();
         fireEvent.click(screen.getByTitle('Back to 2D map'));
         expect(props.onExit).toHaveBeenCalledTimes(1);
 
         renderHex3D({ displayName: undefined });
         expect(screen.getByText('3D Map')).toBeInTheDocument();
+    });
+
+    // Backlog 2026-11-02 BD: the counts line pluralizes each slot honestly
+    // (1 → singular, 0/≥2 → plural, byte-matching the old rendering for 0/≥2)
+    // and the POI slot is visibility-aware — LAN counts only visible POIs
+    // (mesh lane skips hidden), GM counts all and qualifies the hidden ones.
+    describe('counts line singular/plural + hidden-POI table', () => {
+        const renderCounts = (overrides = {}) => {
+            cleanup();
+            render(<HexMap3D {...hex3dProps(overrides)} />);
+            return screen.getByText(/hex(es)? ·/).textContent;
+        };
+
+        const hiddenPoi = { id: 'p0', type: 'town', q: 0, r: 0, visible: false, label: 'Secret' };
+
+        it('renders every slot singular at exactly 1', () => {
+            expect(renderCounts({
+                hexCols: 1,
+                hexRows: 1,
+                pois: [pois[0]],
+                roads: [roads[0]],
+                rivers: ['5,5'],
+            })).toBe('1 hex · 1 POI · 1 road · 1 river hex');
+        });
+
+        it('renders every slot plural at 0, matching the legacy bytes', () => {
+            expect(renderCounts({
+                hexCols: 0,
+                hexRows: 30,
+                pois: [],
+                roads: [],
+                rivers: [],
+            })).toBe('0 hexes · 0 POIs · 0 roads · 0 river hexes');
+        });
+
+        it('renders every slot plural at ≥2, matching the legacy bytes', () => {
+            expect(renderCounts({
+                hexCols: 2,
+                hexRows: 3,
+                pois: [pois[0], { ...pois[0], id: 'p2' }],
+                roads: [roads[0], { id: 'r2', hexes: [] }],
+                rivers: ['5,5', '6,5', '7,5'],
+            })).toBe('6 hexes · 2 POIs · 2 roads · 3 river hexes');
+        });
+
+        it('GM face includes hidden POIs in the total and qualifies them', () => {
+            expect(renderCounts({
+                hexCols: 1,
+                hexRows: 2,
+                pois: [pois[0], hiddenPoi],
+                isLocalhost: true,
+            })).toBe('2 hexes · 2 POIs (1 hidden) · 1 road · 2 river hexes');
+
+            expect(renderCounts({
+                hexCols: 1,
+                hexRows: 1,
+                pois: [hiddenPoi],
+                roads: [],
+                rivers: [],
+                isLocalhost: true,
+            })).toBe('1 hex · 1 POI (1 hidden) · 0 roads · 0 river hexes');
+        });
+
+        it('GM face with no hidden POIs carries no qualifier (legacy bytes)', () => {
+            expect(renderCounts({ isLocalhost: true })).not.toMatch(/hidden/);
+        });
+
+        it('LAN face counts only visible POIs and never leaks the hidden qualifier', () => {
+            expect(renderCounts({
+                hexCols: 1,
+                hexRows: 2,
+                pois: [pois[0], hiddenPoi],
+                isLocalhost: false,
+            })).toBe('2 hexes · 1 POI · 1 road · 2 river hexes');
+
+            expect(renderCounts({
+                hexCols: 1,
+                hexRows: 1,
+                pois: [hiddenPoi],
+                roads: [],
+                rivers: [],
+                isLocalhost: false,
+            })).toBe('1 hex · 0 POIs · 0 roads · 0 river hexes');
+        });
+
+        it('treats pois with visible undefined as visible on both faces (POILayer parity)', () => {
+            const unpinned = { id: 'p3', type: 'town', q: 1, r: 1, label: 'Old' };
+            expect(renderCounts({ pois: [unpinned], isLocalhost: true })).toBe(
+                '1800 hexes · 1 POI · 1 road · 2 river hexes'
+            );
+            expect(renderCounts({ pois: [unpinned], isLocalhost: false })).toBe(
+                '1800 hexes · 1 POI · 1 road · 2 river hexes'
+            );
+        });
     });
 
     it('renders the camera-control hint in the toolbar chrome with the exact copy, alongside the intact controls', () => {

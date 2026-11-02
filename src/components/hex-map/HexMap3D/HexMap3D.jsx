@@ -97,10 +97,24 @@ function HexMap3D({
         sceneRef.current?.topDown();
     }, []);
 
-    const counts = useMemo(() => (
-        `${hexCols * hexRows} hexes · ${(pois || []).length} POIs · `
-        + `${(roads || []).length} roads · ${(rivers || []).length} river hexes`
-    ), [hexCols, hexRows, pois, roads, rivers]);
+    // Honest counts line (backlog 2026-11-02 BD): singular/plural per slot,
+    // and the POI count mirrors the mesh lane — LAN players never see hidden
+    // POIs so the line does not count them; the GM sees them dimmed, so the
+    // total includes them with a "(N hidden)" qualifier.
+    const counts = useMemo(() => {
+        const plural = (n, singular, pluralForm = `${singular}s`) =>
+            `${n} ${n === 1 ? singular : pluralForm}`;
+        const poiList = pois || [];
+        const hiddenPois = poiList.filter(p => p.visible === false).length;
+        const poiCount = isLocalhost ? poiList.length : poiList.length - hiddenPois;
+        const hiddenQualifier = isLocalhost && hiddenPois ? ` (${hiddenPois} hidden)` : '';
+        return (
+            `${plural(hexCols * hexRows, 'hex', 'hexes')} · `
+            + `${plural(poiCount, 'POI')}${hiddenQualifier} · `
+            + `${plural((roads || []).length, 'road')} · `
+            + `${plural((rivers || []).length, 'river hex', 'river hexes')}`
+        );
+    }, [hexCols, hexRows, pois, roads, rivers, isLocalhost]);
 
     return (
         <div className="hex3d">
