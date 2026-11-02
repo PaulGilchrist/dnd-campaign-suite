@@ -3,7 +3,9 @@
 // GET answers { seed: null } when no document exists (regular campaigns never
 // render the first-session checklist, and the client never sees error noise);
 // PUT is GM-only (localhost) — network clients 403 and stay disk-inert; the
-// payload guard refuses non-object seeds.
+// payload guard refuses non-object seeds; a successful PUT broadcasts the
+// updated document on `starter-seed-<campaign>` so every tab's checklist
+// refreshes without reload (mirrors settlements-list broadcasts).
 import express from 'express';
 import fs from 'fs';
 import { request } from '../test-utils/localhostSupertest.js';
@@ -28,6 +30,11 @@ vi.mock('fs', () => {
 vi.mock('../utils/campaignPaths.js', () => ({
     campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
     ensureDataDir: vi.fn(() => '/mock/campaigns/test-campaign/data'),
+}));
+
+const publishSpy = vi.hoisted(() => vi.fn());
+vi.mock('../utils/changeData.js', () => ({
+    publish: publishSpy,
 }));
 
 const FOREIGN_HOST = '100.92.171.80';
@@ -96,5 +103,37 @@ describe('starter-seed PUT', () => {
         const array = await request(createTestApp()).put('/api/campaigns/test-campaign/starter-seed').send({ seed: [] });
         expect(array.status).toBe(400);
         expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+});
+
+describe('starter-seed PUT live-sync broadcast', () => {
+    it('publishes the updated document on starter-seed-<campaign>', async () => {
+        const seed = { version: 1, seed: 7, entities: { settlement: 'QA Hollow', dungeonTitle: 'Crypt of Q' } };
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/starter-seed')
+            .send({ seed });
+        expect(res.status).toBe(200);
+        expect(publishSpy).toHaveBeenCalledWith(
+            'starter-seed-test-campaign',
+            { action: 'updated', seed },
+            'test-campaign'
+        );
+    });
+
+    it('stays silent when the PUT is rejected (403 network client)', async () => {
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/starter-seed')
+            .set('Host', FOREIGN_HOST)
+            .send({ seed: { version: 1 } });
+        expect(res.status).toBe(403);
+        expect(publishSpy).not.toHaveBeenCalled();
+    });
+
+    it('stays silent when the payload is refused (400)', async () => {
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/starter-seed')
+            .send({ seed: 'nope' });
+        expect(res.status).toBe(400);
+        expect(publishSpy).not.toHaveBeenCalled();
     });
 });

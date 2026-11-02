@@ -11,6 +11,12 @@ vi.mock('../../services/campaign/starterSeedService.js', () => ({
   loadStarterSeed: vi.fn(),
 }));
 
+// Shared SSE client is exercised in FirstSessionChecklist.sse-sync.test.jsx;
+// here it just needs to be inert (no EventSource in jsdom).
+vi.mock('../../services/ui/sseClient.js', () => ({
+  subscribeToSSE: vi.fn(() => () => {}),
+}));
+
 const SEED = {
   version: 1,
   seed: 42,
@@ -86,28 +92,7 @@ describe('FirstSessionChecklist', () => {
   });
 });
 
-// Regenerate live-refresh (arena-starter §5B.2): the Admin regenerate lane
-// dispatches starter-seed-changed; the checklist re-reads and names the NEW
-// layer without a reload — and stays dismissed if the user dismissed it.
-describe('starter-seed-changed live refresh', () => {
-  it('re-reads the seed and shows the new layer names', async () => {
-    loadStarterSeed.mockResolvedValue(SEED);
-    render(<FirstSessionChecklist campaignName="qa-starter" />);
-    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
-
-    loadStarterSeed.mockResolvedValue({ ...SEED, entities: { ...SEED.entities, settlement: 'BRIDGEHAM', dungeonTitle: 'New Tomb' } });
-    window.dispatchEvent(new CustomEvent('starter-seed-changed', { detail: { campaignName: 'qa-starter' } }));
-
-    await waitFor(() => expect(screen.getByText(/Meet the folk of BRIDGEHAM/)).toBeInTheDocument());
-    expect(screen.getByText(/portal of New Tomb/)).toBeInTheDocument();
-  });
-
-  it('ignores events from other campaigns', async () => {
-    loadStarterSeed.mockResolvedValue(SEED);
-    render(<FirstSessionChecklist campaignName="qa-starter" />);
-    await waitFor(() => expect(loadStarterSeed).toHaveBeenCalledTimes(1));
-    window.dispatchEvent(new CustomEvent('starter-seed-changed', { detail: { campaignName: 'other' } }));
-    await new Promise(r => setTimeout(r, 20));
-    expect(loadStarterSeed).toHaveBeenCalledTimes(1);
-  });
-});
+// Regenerate live-refresh moved to FirstSessionChecklist.sse-sync.test.jsx
+// (2026-11-02): the same-tab starter-seed-changed window event was replaced
+// by the server's starter-seed-<campaign> SSE broadcast so ALL open tabs
+// refresh, not just the one that issued the PUT.

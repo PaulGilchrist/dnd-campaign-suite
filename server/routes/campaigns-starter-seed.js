@@ -2,6 +2,7 @@ import fs from 'fs';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { isLocalHost } from '../utils/jsonEntityCrud.js';
+import { publish } from '../utils/changeData.js';
 import { Router } from 'express';
 
 // ---------------------------------------------------------------------------
@@ -60,6 +61,11 @@ router.put('/api/campaigns/:campaign/starter-seed', asyncHandler((req, res) => {
     }
     ensureDataDir(campaign);
     fs.writeFileSync(seedPath(campaign), JSON.stringify(seed, null, 2));
+    // Live-sync (mirrors broadcastSettlementsList, routes/settlements.js):
+    // every open tab's first-session checklist refreshes without reload.
+    // Explicit campaign arg — publish's key-parsing regex does not know the
+    // `starter-seed-` prefix, and campaign names contain hyphens.
+    publish(`starter-seed-${campaign}`, { action: 'updated', seed }, campaign);
     res.json({ message: 'Starter seed saved successfully' });
 }));
 

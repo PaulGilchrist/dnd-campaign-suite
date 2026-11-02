@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadStarterSeed } from '../../services/campaign/starterSeedService.js';
+import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import './FirstSessionChecklist.css';
 
 /**
@@ -19,23 +20,26 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
 
   useEffect(() => {
     let cancelled = false;
-    const refetch = () => loadStarterSeed(campaignName)
+    setSeed(null);
+    loadStarterSeed(campaignName)
       .then(value => { if (!cancelled) setSeed(value); })
       .catch(() => { if (!cancelled) setSeed(null); });
-    setSeed(null);
-    refetch();
-    // Regenerate adventure (Campaign Admin) re-rolls the layer and rewrites
-    // the seed in place; refresh the named entities without a page reload.
-    // Pure UI-local event (client-only, no game state, no timer).
-    const onSeedChanged = (e) => {
-      if (e.detail?.campaignName === campaignName) refetch();
-    };
-    window.addEventListener('starter-seed-changed', onSeedChanged);
     return () => {
       cancelled = true;
-      window.removeEventListener('starter-seed-changed', onSeedChanged);
     };
   }, [campaignName]);
+
+  // Regenerate adventure (Campaign Admin) and the create-time seed write
+  // re-publish the whole document on `starter-seed-<campaign>` (see
+  // server/routes/campaigns-starter-seed.js), so EVERY open tab — including
+  // the one that issued the PUT — refreshes its named entities without a
+  // reload. The payload is applied directly (never re-GET/re-POST the echo,
+  // skipSync doctrine); subscription rides the ONE shared SSE client.
+  useEffect(() => subscribeToSSE(campaignName, (event) => {
+    if (!event || event.key !== `starter-seed-${campaignName}`) return;
+    const updated = event.data?.seed;
+    if (updated && typeof updated === 'object') setSeed(updated);
+  }), [campaignName]);
 
   if (dismissed || !seed?.entities) return null;
 
