@@ -68,6 +68,18 @@ export const CAMPAIGN_KEYS = new Set([
     // seedCampaignRuntimeData copies all top-level keys unfiltered).
     // bug-victory-stamp-not-sse-adopted-missing-campaign-key.
     'lastCombatResult',
+    // Starry Chalice post-cast ally-heal handoff (sibling-key audit 2026-11-02,
+    // same misroute family as the victory stamp): producer
+    // (postCastHealService.triggerPostCastAllyHeals) stamps it campaign-level
+    // and both readers (postCastHealService.applyStarryChaliceHeal,
+    // spellCastService runGenericHealPath) read it campaign-level. Today's
+    // lane runs producer+consumer on the SAME client, but unregistered, its
+    // OBJECT echo failed isCampaignKey in applyStoreUpdate and was dispatched
+    // to a ghost CHARACTER store named "pendingStarryChaliceHeal" on every
+    // mounted client, with the null-clear echo dropped and stale nulls
+    // lingering.
+    // bug-victory-stamp-not-sse-adopted-missing-campaign-key (sibling verdict).
+    'pendingStarryChaliceHeal',
 ]);
 
 /**
