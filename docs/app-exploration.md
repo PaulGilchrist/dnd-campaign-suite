@@ -71,8 +71,7 @@ All BF claims entered/derived THIS run unless tagged carried.
 
 ## Improvement Backlog
 
-- (2026-11-02 improve) `sseHandlers.js:160` calls `handleOverlayEvent(event)` without the `setOverlays` setter arg `createOverlayHandler` (`sseHandlers.js:11`) requires — overlay `clear` echo to a loaded Initiative tab throws `TypeError: setOverlays is not a function` (found live during admin-clear, pre-existing, kin to CAMPAIGN_KEYS family). Wire the setter through at the dispatcher.
-- (2026-11-02 BF) Sibling campaign-key audit: `pendingStarryChaliceHeal` + `gameMode` written campaign-level but absent from `CAMPAIGN_KEYS` (same misroute family as the filed victory bug) — register or retire with a grep-backed consumer verdict. `src/services/automation/common/campaignKeys.js`.
+- (2026-11-02 improve) `sseHandlers.js:160` calls `handleOverlayEvent(event)` without the `setOverlays` setter arg `createOverlayHandler` (`sseHandlers.js:11`) requires — overlay `clear` echo to a loaded Initiative tab throws `TypeError: setOverlays is not a function` (found live during admin-clear, pre-existing, kin to CAMPAIGN_KEYS family). Wire the setter through at the dispatcher. RE-VERIFIED still live at 6d2368e92 (caller passes 1 arg to the 2-arity return fn; the map-view lane uses `useSpellOverlay` instead, so only an Initiative-mounted tab crashes — likely why the c698caf4f live pass missed it).
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
