@@ -19,11 +19,11 @@ If a bounded attempt times out, treat it as missing information, not a failure t
 
 ## Scope — read this before doing anything
 
-- You may ONLY create, edit, or delete data inside the campaign named "test-campaign". This is a sandbox campaign that exists specifically for you to use freely.
-- Every other campaign in the app is real production data belonging to actual players. You must NOT create, edit, or delete anything inside any campaign other than "test-campaign" — no NPCs, maps, encounters, quests, party members, initiative state, nothing.
+- You may ONLY create, edit, or delete data inside the campaign named "test-campaign", plus the two owner-sanctioned throwaway campaigns **`qa-arena`** and **`qa-starter`** (owner ruling 2026-11-01, recorded in `.opencode/plans/levels-1-4-strengthening.md`) which you may CREATE, exercise, and DELETE via the campaign-selection quick-create buttons. Every other campaign in the app is real production data belonging to actual players. You must NOT create, edit, or delete anything inside any campaign other than those three — no NPCs, maps, encounters, quests, party members, initiative state, nothing.
+- **The throwaways exist to cover the seeded-campaign lanes** (`New Arena Campaign` / `New Starter Campaign` on campaign selection → seeded maps/encounters/quests/settlement, the `FirstSessionChecklist` panel + deep-links, `Admin → Regenerate adventure`, Admin typed-name delete). Exercise those flows there, never inside test-campaign, and DELETE both throwaway folders before finishing. If neither the throwaways nor test-campaign can be reached, stop and check rather than guessing.
 - If "test-campaign" doesn't exist yet, create it first and do all your exploration inside it.
-- Before performing any create/edit/delete action, confirm from the page context (URL, breadcrumb, campaign selector, page heading, etc.) that you are currently inside "test-campaign". If you can't confirm this with confidence, stop and check rather than guessing.
-- Read-only actions (viewing, navigating, opening other campaigns to see how they render) are fine anywhere. Any action that mutates state is restricted to "test-campaign" only.
+- Before performing any create/edit/delete action, confirm from the page context (URL, breadcrumb, campaign selector, page heading, etc.) that you are currently inside "test-campaign" (or the throwaway you deliberately created). If you can't confirm this with confidence, stop and check rather than guessing.
+- Read-only actions (viewing, navigating, opening other campaigns to see how they render) are fine anywhere. Any action that mutates state is restricted to "test-campaign" and the `qa-arena`/`qa-starter` throwaways only.
 
 ## Before you start
 
@@ -41,7 +41,7 @@ yet (unusual input combinations, concurrent SSE updates, boundary conditions) ra
 ## What to do
 
 1. Start at the app's home/dashboard and map out the primary navigation and features.
-2. Inside "test-campaign", exercise each major feature end-to-end: create/edit/delete NPCs, quests, encounters, maps, party members, initiative tracking, fog of war, and anything using the real-time SSE party sync — try it from a couple of angles (e.g. rapid edits, empty/invalid inputs, refreshing mid-action) since sync and stateful features are the most likely to break.
+2. Inside "test-campaign", exercise each major feature end-to-end: create/edit/delete NPCs, quests, encounters, maps, party members, initiative tracking, fog of war, and anything using the real-time SSE party sync — try it from a couple of angles (e.g. rapid edits, empty/invalid inputs, refreshing mid-action) since sync and stateful features are the most likely to break. Beyond those classics, the Levels 1–4 lanes must appear in your coverage map too: **TV presentation mode** (spotlight/up-next/floaters/bloodied + per-screen persistence), **Victory banner** (kills-only honest copy + dismiss), **🎮 control delegation** (GM picker + a LAN-tab (`isolatedContext:'lan'`) visitor opening and rolling a controlled monster's card), **🤝 Allies editor** (Clear All → self-only confirm → store `selectedAllies` + audit row → the betrayal flip: aura/hostility/friendly-fire confirm behavior), and **friendly-fire confirm** when arming a listed ally as target. In the `qa-arena`/`qa-starter` throwaways: **New Arena/Starter quick-create** (button → modal default name → seeded maps/encounters/POIs/settlement/quests render), the **first-session checklist** (names generated entities, each step deep-links a real view), **Admin → Regenerate adventure** (confirm → new dungeon file, POI/quests/rumours re-pointed, layer bumped, settlement+log kept), and **Admin typed-name delete**.
 3. Pay attention to: console errors, failed network requests, broken navigation, UI states that don't match what you did (stale data, elements that don't update), and anything that silently fails instead of showing feedback.
 4. Note anything confusing or inconsistent from a UX standpoint too, not just outright breakage.
 5. Record improvement opportunities — things that could be better or more complete (missing affordances, inconsistent validation between similar screens, chatty network/save patterns, UX friction) — in an `## Improvement backlog` section of `docs/app-exploration.md`, dated per entry. These are NOT bug files; only write a `bug-*.md` file for confirmed breakage. An improvement may still name likely files and suggested approaches, but keep it non-blocking — never spend session time turning an improvement into a deep investigation.
@@ -55,6 +55,8 @@ yet (unusual input combinations, concurrent SSE updates, boundary conditions) ra
 5. **Cache debounce, not cache breakage** — edits persist through the in-memory cache with ~10s debounce (`changeData.js`). If a change seems not to take, wait 15+ seconds / reload / clear cache via Admin panel — never blame caching as a reason to stop.
 6. **Caster-merged summons verify via the CAST path** — summoned/merged creatures (Animate Objects, Summon Beast kin, Wild Shape) get the caster's stats merged at cast time; a flat EB-direct-joined copy is honestly inert by design (MA-0286) — that is NOT a bug.
 7. **Close-but-not-exact counts as a bug, not a pass** — right feature, wrong number/condition/timing is still a bug.
+8. **Stale server locks block quick-create** — if `New Arena/Starter Campaign` 403s ("Campaign creation is locked…"), a previous session's `api:locked` server owns :80. Restart with the throwaway allowlist: `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node server.js` (or no lock at all for a plain `npm run dev`), then retry.
+9. **Zero-character campaigns auto-open the character wizard** on entry/selection — Cancel it before driving any further clicks, or the overlay intercepts pointer events.
 
 ## When you find a bug
 
@@ -97,7 +99,7 @@ Do not attempt to fix the bug yourself during this session — just document it.
 - A "Blocked / not verified" section: anything you could not test or confirm, with the concrete blocker named (replaced each run).
 - The `## Improvement backlog` section in `docs/app-exploration.md` updated with this session's improvement opportunities (create the section if missing; append dated entries — `e2e-implement-improvements` removes bullets once resolved, so this section stays a live open-items list only).
 
-Then clean up: clear the change-data cache and campaign log for "test-campaign" via the Admin panel, append any new setup recipes or pitfalls you hit to `docs/test-setup-playbook.md`, and record any characters/NPCs/monsters you left in the campaign in the two registry files.
+Then clean up: clear the change-data cache and campaign log for "test-campaign" via the Admin panel (closed-tab two-pass: clear → reload/re-enter to surface select-rehydrated keys → close tab → clear again → verify `{}`/`[]`), DELETE any `qa-arena`/`qa-starter` throwaways you created (Admin typed-name delete or localhost `DELETE /api/campaigns/<name>`; note the exit-hook scaffold re-materialization pitfall), append any new setup recipes or pitfalls you hit to `docs/test-setup-playbook.md`, and record any characters/NPCs/monsters you left in the campaign in the two registry files.
 
 ## What to report back
 

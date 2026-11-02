@@ -14,6 +14,8 @@
 
 **qa-temp exception (owner ruling, 2026-10-29):** exactly ONE throwaway campaign named `qa-temp` may be created/exercised/deleted for cross-campaign seams. All other campaigns PRODUCTION. `POST /api/campaigns` 403s while `CAMPAIGN_LOCK` is set. BA: LOCK IS ROUTE-METHOD-SCOPED (GETs open, writes 403 verbatim).
 
+**qa-arena / qa-starter exception (owner ruling, 2026-11-01, codified into `.opencode/commands/e2e-explore.md` scope 2026-11-02):** exactly TWO additional throwaways `qa-arena` and `qa-starter` may be created (via the campaign-selection New Arena/New Starter quick-create buttons or `POST /api/campaigns` under `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter'`), exercised and deleted — they cover the seeded-campaign lanes (Arena preset, Starter preset/Regenerate/checklist). Delete both before finishing; same doctrine as qa-temp.
+
 ## Priority Targets (next descent)
 
 1. ~~Director needs_human Confirm asymmetry~~ — **ADJUDICATED + FIXED 2026-11-01 improve run (owner Option A: dismiss-only card)** — row closed, nothing owed.
@@ -48,6 +50,9 @@
 | AI-Dress UI lane (panel, instruction, errors, Apply to map) | deep-ish (live 2026-11-01 BB) | `src/components/map/*Dress* server/routes/ai-designer.js` — both gate faces through the real panel; generator-preview overlay not re-probed (AZ2 row stands) |
 | MapsManager row ops (Open/Activate/Delete) | deep (live BA rows; Open used ×4 BB; delete dialog AZ2) | `src/components/maps-manager/MapsManager.jsx` |
 | LAN player map-follow | deep-ish (live 2026-11-01 BA) | `src/components/map/hooks/useSSESync.js useFogOfWar.js` — token lane walked; NEW POI/overlay lanes not LAN-diffed |
+| Campaign quick-create (Arena/Starter) + typed-name delete | deep (live 2026-11-02 arena/starter run) | `src/components/campaign-selection/ src/services/campaign/seededCampaign.js server/routes/campaigns-basic.js campaigns-admin.js server/utils/campaignLock.js` — one-click qa-arena/qa-starter create under CAMPAIGN_LOCK allowlist; seeded maps/POIs/encounters/settlement/quests/seed-doc persisted (real bestiary names → stats+art resolve); Join→fight; Admin typed-name delete (empty≠delete fail-safe) purges folder; zero-char wizard auto-open + exit-hook scaffold re-materialization pinned in playbook |
+| Starter seed doc + Regenerate adventure + first-session checklist | deep (live 2026-11-02) | `src/services/campaign/seededCampaign.js src/services/campaign/starterSeedService.js server/routes/campaigns-starter-seed.js src/components/campaign-starter/ src/components/campaign-admin/CampaignAdmin.jsx` — layer-1 roll verified on disk (party marker at village hex, dungeon-POI linkedMap, chest loot); regenerated ×2: new map md5, retired file deleted, POI+ALL quests+rumors re-pointed via pastTitles (zero stale titles), layer bump, settlement/party/log kept; checklist deep-links every view + live refresh (window event; NO SSE — cross-tab regenerate refresh is reload-only, backlog); fresh-quest rows un-tamped (409 guard) + `{settlement}` envelope pinned by tests |
+| Tracker TV/victory/🎮 delegation/🤝 allies-betrayal/friendly-fire | deep (live 2026-11-02, two-tab) | `src/components/initiative/ src/services/encounters/creatureControl.js src/hooks/useAllySelection.js src/services/combat/auras/ src/services/combat/opportunityTrigger.js src/services/automation/contextBuilder-sync.js src/services/rules/effects/auraDamageService.js` — LAN visitor opened + rolled a CONTROLLED monster (d20 popup + `attack` row, GM-only pickers absent); ally Clear-All→self flip persists + audits; friendly-fire confirm verbatim on arming a listed ally (logged, engine resolves); board renders joined monsters with ZERO players (gate fix); zero-char `handleClear` crash fixed; betrayal flips (wolf/lion/sneak/OA) unit-pinned — full two-tab aura-coverage screenshot not re-walked (test-campaign run covered store+audit only) |
 | Map 3D view (toolbar a11y, enter/exit) | live 2026-11-01 BA (a11y face closed) | `src/components/map/Map3D/Map3D.jsx` — mesh geometry still not asserted (Target 4) |
 | AI designer chat lane | deep (live 2026-11-01 BA) | `src/components/campaign-builder/AiDesignerSection.jsx server/services/ai/designNotes*` |
 | Generator AI funnel (plan→generate→approve) | deep (live 2026-11-01 AZ2) event-clear | `server/services/ai/authoring/applyMaps.js designerPrompts.js` |
@@ -67,6 +72,9 @@
 - Rig: reused `.playwright-mcp/qa-fake-model-server-az2.mjs` on :8123 (killed at exit via `kill $(lsof -ti :8123)`; jsonl log refreshed); dev:locked trio LEFT RUNNING on :80/:5173 for immediate reuse. No evidence screenshots kept (all verdicts text/machine-proof).
 
 ## Improvement Backlog
+
+- (2026-11-02, arena/starter run) — `PUT /starter-seed` publishes no SSE event, so a Regenerate in one tab refreshes only that tab's checklist (same-tab window event); other open tabs show stale generated names until reload. Fix shape: `publish('starter-seed-<campaign>', …)` in `campaigns-starter-seed.js` + subscribe in `FirstSessionChecklist` via the shared SSE client. Carried (non-blocking) in `.opencode/plans/levels-1-4-complete.md` §4.2.
+- (2026-11-02) — campaign-selection buttons read `New Arena Campaign`/`New Starter Campaign` with modal explainer copy; a first-time user may not realize the plain `Add` is unchanged. If tables stumble, consider grouping the three under a subtle "Create" cluster — UX note only, current labels verified clear enough this run.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
