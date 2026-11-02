@@ -97,6 +97,16 @@ describe('GM control picker (ControlRow)', () => {
         expect(options).toEqual(['', 'Alice', 'Bob']);
     });
 
+    it('control picker carries a stable aria-label and title (a11y + test anchors)', () => {
+        renderCard();
+        const byLabel = screen.getByLabelText('Assign who controls Zombie');
+        expect(byLabel).toBe(screen.getByTestId('control-select'));
+        expect(byLabel).toHaveAttribute(
+            'title',
+            'Assign who controls Zombie (their device can roll from its card)'
+        );
+    });
+
     it('assigning dispatches (name, player); choosing GM dispatches null (release)', () => {
         const { onControllerChange } = renderCard();
         const select = screen.getByTestId('control-select');
@@ -155,6 +165,14 @@ describe('LAN card opening via controller resolution', () => {
     it('the controlling device sees a turn cue when its creature is active', () => {
         renderCard({ isLocalhost: false, isActive: true, creature: { ...uncontrolledZombie, controller: 'Alice' } });
         expect(screen.getByText('Your turn!')).toBeInTheDocument();
+    });
+
+    it('LAN controlled-monster card keeps the target picker with sibling testid + accessible name', () => {
+        renderCard({ isLocalhost: false, creature: { ...uncontrolledZombie, controller: 'Alice' } });
+        const select = screen.getByLabelText('Zombie target');
+        expect(select).toBe(screen.getByTestId('target-select'));
+        // isPlayerSummoned exception keeps the controlled monster's picker live for the visitor.
+        expect(select).toBeEnabled();
     });
 
     it('no turn cue for the GM view, inactive cards, or uncontrolled creatures', () => {

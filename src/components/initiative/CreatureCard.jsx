@@ -182,6 +182,7 @@ function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, o
     return (
         <div className='creature-target'>Target&nbsp;
             <select
+                aria-label={`${creature.name} target`}
                 data-testid="target-select"
                 value={creature.targetName || ''}
                 onChange={(e) => onTargetChange(creature.name, e.target.value)}
@@ -311,6 +312,7 @@ function ControlRow({ creature, allCreatures, isLocalhost, controllerName, onCon
         <div className='creature-control'>
             <i className='fa-solid fa-gamepad'></i>&nbsp;
             <select
+                aria-label={`Assign who controls ${creature.name}`}
                 data-testid="control-select"
                 value={explicit}
                 onChange={(e) => onControllerChange(creature.name, e.target.value || null)}

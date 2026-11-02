@@ -71,8 +71,8 @@ All BF claims entered/derived THIS run unless tagged carried.
 
 ## Improvement Backlog
 
-- (2026-11-02 BF) GM control picker + LAN controlled-card target picker carry only `title` (no aria-label/testid) — add stable labels (a11y + test anchors; siblings already use `data-testid="target-select"`). `CreatureCard.jsx ControlRow/TargetSelect`.
 - (2026-11-02 BF) Seeded arena flavor: "The Colosseum Pit" description is generic dungeon-decay prose ("…traps and guardians still protect the dungeon's secrets") — theme-mismatch for a sparring pit. `seededCampaign.js` ARENA map flavor pool.
+- (2026-11-02 improve) `sseHandlers.js:160` calls `handleOverlayEvent(event)` without the `setOverlays` setter arg `createOverlayHandler` (`sseHandlers.js:11`) requires — overlay `clear` echo to a loaded Initiative tab throws `TypeError: setOverlays is not a function` (found live during admin-clear, pre-existing, kin to CAMPAIGN_KEYS family). Wire the setter through at the dispatcher.
 - (2026-11-02 BF) Sibling campaign-key audit: `pendingStarryChaliceHeal` + `gameMode` written campaign-level but absent from `CAMPAIGN_KEYS` (same misroute family as the filed victory bug) — register or retire with a grep-backed consumer verdict. `src/services/automation/common/campaignKeys.js`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

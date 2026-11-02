@@ -157,6 +157,9 @@ describe('CreatureCard - rendering', () => {
         expect(screen.getByTestId('creature-hp-Alice')).toBeInTheDocument();
         expect(screen.getByTestId('initiative-input')).toBeInTheDocument();
         expect(screen.getByTestId('target-select')).toBeInTheDocument();
+        // Stable a11y name on every card lane (visitor + GM), mirroring the
+        // "<Name> current HP" input convention.
+        expect(screen.getByLabelText('Alice target')).toBe(screen.getByTestId('target-select'));
         expect(container.querySelector('.creature-conditions')).toBeInTheDocument();
     });
 
