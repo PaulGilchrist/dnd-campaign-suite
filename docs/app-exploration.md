@@ -73,7 +73,6 @@ All BD-era claims below were entered or re-derived THIS run (BE) unless tagged c
 
 ## Improvement Backlog
 
-- 2026-11-02 BE — Admin typed-name delete refuses a WRONG name silently: prompt closes, campaign stays, zero feedback (observed live; users may think Delete did nothing by accident). An inline mismatch message or prompt-retry would make the guard legible (`CampaignAdmin.jsx` delete lane).
 - 2026-11-02 BE — `/api/campaigns/:c/spell-overlay` (generic change-data wildcard) still accepts raw junk under the `spell-overlay` key (BE stored `{campaign,overlays:[x/y/radius junk]}` 200); guarded seam is `/spell-overlay {action:add,overlays}` only. Consider rejecting/wrapping malformed docs for the reserved key at the wildcard, or documenting the dual-write duality — client `isValidOverlay` fail-soft covers rendering but the key stays in a non-transport shape.
 - 2026-11-02 BE — campaign-selection rows never refresh while the screen is open (tab sitting on selection showed a stale folder list after another tab created two campaigns; manual reload required). A campaign-created SSE event (or short poll while mounted) would match the starter-seed refresh doctrine just shipped in 71f617299.
 - 2026-11-02 BE — music playback pollutes console with YouTube ad-tracker CORS errors (`googleads…doubleclick` ERR_FAILED ×2 per mood start); harmless third-party, but a documented filter in the e2e console-clean checks keeps future runs from counting them as app errors (playbook § noted).
