@@ -24,6 +24,7 @@
  * feat extended reach on the map is §16.
  */
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getAllyList, hasExplicitAllyList } from '../../hooks/useAllySelection.js';
 import { chargeSlot } from './chargeEconomy.js';
 import { addEntry } from '../ui/logService.js';
 import { MELEE_REACH_FEET } from './baseCombatActions.js';
@@ -38,15 +39,24 @@ function hasPosition(t) {
 
 /** Pure: defenders that the mover just left. Players come from the map's
  *  players[] array (token JSON carries no type field), NPC-like things from
- *  placedItems[]. */
+ *  placedItems[]. Hostility follows the ONE allegiance model (Phase 3.2): a
+ *  mover with an EDITED ally list provokes anyone off it (PvP included) and
+ *  never provokes from creatures on it; an unedited mover keeps the legacy
+ *  players-vs-NPC-token split (see header note). */
 export function findOpportunityDefenders({ mapData, moverName, moverIsPlayer, fromCell, toCell, reachFeet = MELEE_REACH_FEET }) {
+    const alliesEdited = hasExplicitAllyList(moverName);
+    const allies = alliesEdited ? getAllyList(moverName) : null;
     const candidates = [
         ...(mapData?.players || []).map((t) => ({ t, isPlayer: true })),
         ...(mapData?.placedItems || []).map((t) => ({ t, isPlayer: t.type === 'player' })),
     ].filter(({ t }) => t.name !== moverName && hasPosition(t));
     return candidates.filter(({ t, isPlayer }) => {
-        // players vs npc tokens only (see hostility note in header)
-        if (isPlayer === moverIsPlayer) return false;
+        if (allies) {
+            if (allies.includes(t.name)) return false;
+        } else if (isPlayer === moverIsPlayer) {
+            // players vs npc tokens only (see hostility note in header)
+            return false;
+        }
         const wasInReach = distCells(t.gridX, t.gridY, fromCell.gridX, fromCell.gridY) * 5 <= reachFeet;
         const nowOutside = distCells(t.gridX, t.gridY, toCell.gridX, toCell.gridY) * 5 > reachFeet;
         return wasInReach && nowOutside;

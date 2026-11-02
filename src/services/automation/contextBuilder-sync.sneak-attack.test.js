@@ -128,10 +128,11 @@ function combatSummary(allyConds) {
   };
 }
 
-function setupRuntime({ latch = null, activeConditions = [] } = {}) {
+function setupRuntime({ latch = null, activeConditions = [], attackerAllies } = {}) {
   getRuntimeValue.mockImplementation((name, key) => {
     if (name === 'campaign' && key === 'targetEffects') return [];
     if (name === 'AasimarTest' && key === '_SneakAttack_usedRound') return latch;
+    if (name === 'AasimarTest' && key === 'selectedAllies') return attackerAllies;
     if (name === 'ElderPaladin' && key === 'activeConditions') return activeConditions;
     return undefined;
   });
@@ -244,6 +245,24 @@ describe('CLA-317: sneak attack ally-5ft gate', () => {
     isWithinRange.mockResolvedValue(true);
     setupRuntime({ latch: 1 });
     getCurrentCombatRound.mockReturnValue(2);
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
+    expect(result.sneakAttackDice).toBe(9);
+  });
+
+  // Phase 3.2 betrayal validation (arena-starter §4): an EDITED ally list on
+  // the attacker is the allegiance model — a defector (self-only) loses the
+  // flanking benefit of former allies; an edited list naming them keeps it.
+  it('betrayal: defector rogue (self-only edited list) loses a former ally\'s flanking', async () => {
+    isWithinRange.mockResolvedValue(true);
+    setupRuntime({ attackerAllies: ['AasimarTest'] });
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
+    expect(result.sneakAttackDice).toBe(0);
+    expect(isWithinRange).not.toHaveBeenCalledWith('Thug 1', 'ElderPaladin', 5);
+  });
+
+  it('edited ally list naming the flanker keeps the sneak benefit', async () => {
+    isWithinRange.mockResolvedValue(true);
+    setupRuntime({ attackerAllies: ['AasimarTest', 'ElderPaladin'] });
     const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(9);
   });

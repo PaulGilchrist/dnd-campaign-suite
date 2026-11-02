@@ -3,6 +3,8 @@ import './CampaignAdmin.css';
 import EnforcementSection from './EnforcementSection.jsx';
 import AiRefereeSection from './AiRefereeSection.jsx';
 import SessionSection from './SessionSection.jsx';
+import { loadStarterSeed } from '../../services/campaign/starterSeedService.js';
+import { regenerateAdventure } from '../../services/campaign/seededCampaign.js';
 
 // Keep in sync with UPLOAD_SIZE_LIMIT in server/routes/campaigns-admin.js —
 // the server remains authoritative; this only fronts the rejection.
@@ -17,7 +19,8 @@ const BUSY_STATUS_TEXT = {
     'uploading': 'Uploading and extracting...',
     'clearing-change-data': 'Clearing change data...',
     'clearing-log': 'Clearing log...',
-    'resetting': 'Performing full reset...'
+    'resetting': 'Performing full reset...',
+    'regenerating-adventure': 'Re-rolling the adventure...'
 };
 
 function formatBytes(bytes) {
@@ -308,7 +311,7 @@ function SnapshotList({ snapshots, onRestore, disabled }) {
     );
 }
 
-function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [] }) {
+function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [], isLocalhost = false }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
     const [newName, setNewName] = useState('');
@@ -328,6 +331,9 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     // targets the renamed folder and 403s opaquely mid-flow, so we disable
     // the affordance up front instead.
     const [campaignLocked, setCampaignLocked] = useState(false);
+    // Starter adventure lane: non-null after load iff this campaign carries a
+    // starter-seed document (seeded quick-create). Drives the Regenerate card.
+    const [starterSeed, setStarterSeed] = useState(null);
     // The upload file input, so a dismissed (cancelled) Upload confirm can
     // reset it — otherwise the cancelled file stays selected and re-choosing
     // the SAME file fires no change event (silent no-op).
@@ -351,6 +357,16 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         return () => { cancelled = true; };
     }, []);
 
+    // Starter seed probe — a missing document (regular campaign) answers
+    // { seed: null }, so the Regenerate card stays hidden without error noise.
+    useEffect(() => {
+        let cancelled = false;
+        loadStarterSeed(campaignName)
+            .then(seed => { if (!cancelled) setStarterSeed(seed); })
+            .catch(() => { if (!cancelled) setStarterSeed(null); });
+        return () => { cancelled = true; };
+    }, [campaignName]);
+
     const loadSnapshots = useCallback(async () => {
         setSnapshotsState('loading');
         try {
@@ -372,6 +388,23 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     useEffect(() => {
         loadSnapshots();
     }, [loadSnapshots]);
+
+    // Starter adventure regenerate (arena-starter §3.2): named-confirm before
+    // the durable mutation (house canon). Re-rolls dungeon/monsters/treasure
+    // through the shared orchestrator; settlement, party, and log untouched.
+    const handleRegenerateAdventure = async () => {
+        if (!window.confirm(`Regenerate the adventure in "${campaignName}"? A brand-new dungeon with fresh monsters and treasure replaces the current one, and the portal and main quest are re-pointed at it. The settlement, party, and log stay. Continue?`)) {
+            return;
+        }
+        setStatus('regenerating-adventure');
+        try {
+            const result = await regenerateAdventure(campaignName);
+            setStarterSeed(await loadStarterSeed(campaignName));
+            setStatus({ success: `New adventure rolled: ${result.dungeonTitle} — waves re-rolled, portal and main quest re-pointed.` });
+        } catch (err) {
+            setStatus({ error: err.message });
+        }
+    };
 
     const handleClearChangeData = async () => {
         if (!window.confirm(`This will clear all runtime state for "${campaignName}" including HP, conditions, spell slots, death saves, and target effects. You will need to re-establish combat state. Continue?`)) {
@@ -700,6 +733,29 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                     </div>
                 </div>
             </div>
+
+            {starterSeed && (
+                <div className="admin-section">
+                    <h3>Starter Adventure</h3>
+                    <div className="admin-actions-grid">
+                        <div className="admin-action">
+                            <h3>Regenerate adventure</h3>
+                            <p>
+                                Re-rolls the dungeon (<strong>{starterSeed.entities?.dungeonTitle}</strong>),
+                                the Wave monster line-ups, and the treasure, then re-points the portal and
+                                main quest. The village, party, and campaign log stay exactly as they are.
+                            </p>
+                            {isLocalhost ? (
+                                <button className="ct-btn ct-btn-primary" onClick={handleRegenerateAdventure} disabled={isBusy}>
+                                    <i className="fas fa-dice"></i> Regenerate Adventure
+                                </button>
+                            ) : (
+                                <p className="admin-lock-note">GM-only (localhost)</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="admin-section">
                 <h3>Data Management</h3>

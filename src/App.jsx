@@ -46,6 +46,7 @@ import ConcentrationPromptModal from './components/common/ConcentrationPromptMod
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import BardicInspirationReactionModal from './components/common/BardicInspirationReactionModal.jsx';
 import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
+import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
 
 function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
   if (event.key.startsWith('character-delete-')) {
@@ -287,6 +288,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
         onRenameCampaign={onRenameCampaign}
         onDeleteCampaign={onDeleteCampaign}
         restoredSnapshot={restoredSnapshot}
+        isLocalhost={isLocalhost}
       />
     ),
   };
@@ -718,6 +720,7 @@ function App() {
           activeView={activeView}
            />
         <ErrorBoundary resetKey={`${campaignName}|${activeView}`}>
+        <FirstSessionChecklist campaignName={campaignName} onNavigate={setActiveView} isLocalhost={isLocalhost} />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
              allAbilityScores={abilityScores}

@@ -2,6 +2,10 @@ import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
+// Phase 3.2 audit (arena-starter §4): NOT an allegiance assumption — the pool
+// filter only gathers candidate bearers; the benefit itself is gated on the
+// bearer's explicit per-use `invokeDuplicityAdvantageTargets` grant, so
+// "all players are allies" is never assumed.
 function collectMapCreatures(mapData) {
     const players = mapData.players?.length ? mapData.players : [];
     const allCreatures = [...players];

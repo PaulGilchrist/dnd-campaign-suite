@@ -14,7 +14,7 @@
 // isolation and never verify its real behavior, so this file is the only
 // direct coverage of the helper behaviour every production consumer relies on.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getAllyList, setAllyList } from './useAllySelection.js';
+import { getAllyList, setAllyList, hasExplicitAllyList } from './useAllySelection.js';
 import {
   clearRuntimeState,
   getAllStoreKeys,
@@ -79,6 +79,28 @@ describe('getAllyList defaults', () => {
     setAllyList('Cleric', ['Mia'], CAMPAIGN);
 
     expect(getRuntimeValue('Cleric', 'selectedAllies')).toEqual(['Mia']);
+  });
+});
+
+
+describe('hasExplicitAllyList (Phase 3.2 override lanes)', () => {
+  it('is false until any selection has been saved (legacy party-by-type default)', () => {
+    expect(hasExplicitAllyList('Goblin')).toBe(false);
+  });
+
+  it('is true for the self-only DEFECTION list — the shape the tracker ally editor confirms', () => {
+    setAllyList('Hero', ['Hero'], CAMPAIGN);
+    expect(hasExplicitAllyList('Hero')).toBe(true);
+  });
+
+  it('is true for a normal multi-name selection', () => {
+    setAllyList('Hero', ['Mia', 'Bran'], CAMPAIGN);
+    expect(hasExplicitAllyList('Hero')).toBe(true);
+  });
+
+  it('is false for non-array stored values (server-hydrated junk never overrides)', () => {
+    getStore('Odd').set('selectedAllies', {});
+    expect(hasExplicitAllyList('Odd')).toBe(false);
   });
 });
 

@@ -18,3 +18,15 @@ export function getAllyList(creatureName) {
 export function setAllyList(creatureName, allies, campaignName) {
     setRuntimeValue(creatureName, 'selectedAllies', allies, campaignName);
 }
+
+/**
+ * True when the creature has an EDITED (explicit) ally list on record.
+ * Distinguishes "trusts no one" (a defector confirmed [self] in the editor)
+ * from never-configured (getAllyList's [self] fallback) — the allegiance
+ * override lanes (aura bearers, sneak flanking, opportunity reach) keep the
+ * pre-editor type-based defaults until an explicit list exists.
+ */
+export function hasExplicitAllyList(creatureName) {
+    const storedAllies = getRuntimeValue(creatureName, 'selectedAllies');
+    return Array.isArray(storedAllies) && storedAllies.length > 0;
+}

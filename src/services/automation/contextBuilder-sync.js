@@ -3,6 +3,7 @@ import { getCombatContext } from '../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../encounters/combatData.js';
 import { isWithinRange } from '../rules/combat/rangeCheck.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getAllyList, hasExplicitAllyList } from '../../hooks/useAllySelection.js';
 import { getInnateSorceryBonus } from '../combat/buffs/buffService.js';
 import { getWolfAdvantageAgainst } from '../combat/auras/wolfAuraUtils.js';
 import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils.js';
@@ -491,9 +492,17 @@ async function computeSneakAttackDice(playerStats, attack, targetName, forcedMod
 }
 
 async function hasFlankingAlly(combatSummary, playerStats, targetName) {
+    // Phase 3.2 betrayal gate: once the attacker has an EDITED ally list, only
+    // creatures on it count as flankers (a defector's former party no longer
+    // covers them, and excluded companions stop covering the attacker).
+    // Unedited attackers keep the legacy party-by-type default.
+    const listEdited = hasExplicitAllyList(playerStats.name);
+    const allies = listEdited ? getAllyList(playerStats.name) : null;
     for (const c of combatSummary.creatures) {
         if (c.name === playerStats.name || c.name === targetName) continue;
-        const friendly = c.type === 'player' || (c.type === 'npc' && c.attitude !== 'hostile');
+        const friendly = allies
+            ? allies.includes(c.name)
+            : (c.type === 'player' || (c.type === 'npc' && c.attitude !== 'hostile'));
         if (!friendly) continue;
         if (allyIsIncapacitated(c)) continue;
         if (await isWithinRange(targetName, c.name, 5)) return true;

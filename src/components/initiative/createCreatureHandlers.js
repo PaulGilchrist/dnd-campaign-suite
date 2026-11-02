@@ -1,5 +1,6 @@
 import { cloneDeep } from 'lodash'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { getAllyList } from '../../hooks/useAllySelection.js'
 import storage from '../../services/ui/storage.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { clearDeathSavePrompt, sendDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
@@ -274,6 +275,24 @@ export function createCreatureHandlers({
 
     const handleTargetChange = function handleTargetChange(creatureName, targetName) {
         if (!combatSummary) return
+        // Friendly-fire confirm (Phase 3.2 betrayal): arming a target that is
+        // on the attacker's OWN ally list requires a UI-local confirm — the
+        // engine still resolves the attack normally once confirmed (allegiance
+        // is an intent signal, not a hard block). Overlay (AoE) arming rides
+        // its own per-save careful-spell flow, so it is exempt here. Every
+        // confirmed friendly arm logs an audit row (repo log rule).
+        if (targetName && !targetName.startsWith('overlay-') && targetName !== creatureName
+            && getAllyList(creatureName).includes(targetName)) {
+            if (!window.confirm(`Friendly fire: ${targetName} is on ${creatureName}'s ally list. Arm them as the target anyway?`)) return
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: creatureName,
+                abilityName: 'Target Selection',
+                description: `${creatureName} armed ${targetName} as a target — ${targetName} is on ${creatureName}'s ally list (friendly fire confirmed).`,
+                friendlyFire: true,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[initiative] friendly-fire arming log failed:', e) })
+        }
         if (targetName && targetName.startsWith('overlay-')) {
             const overlayId = targetName.slice('overlay-'.length)
             const overlay = overlays.find(o => o.id === overlayId)

@@ -22,6 +22,7 @@ import aiDesignerRoutes from './server/routes/ai-designer.js';
 import aiKeyRoutes from './server/routes/ai-key.js';
 import aiModelRoutes from './server/routes/ai-models.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
+import campaignsStarterSeed from './server/routes/campaigns-starter-seed.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
@@ -202,6 +203,11 @@ app.use(aiDesignerRoutes);
 app.use(aiKeyRoutes);
 // AI model discovery for the admin config dropdown (localhost-only)
 app.use(aiModelRoutes);
+
+// Starter-campaign seed document (data/starter-seed.json) — BEFORE
+// campaignsChangedata so the generic :campaign/:key wildcard can never
+// capture /starter-seed.
+app.use(campaignsStarterSeed);
 
 // Change data routes (after character file route so .json files aren't captured by :key)
 app.use(campaignsChangedata);

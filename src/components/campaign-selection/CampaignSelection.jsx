@@ -1,6 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
+import { createSeededCampaign } from '../../services/campaign/seededCampaign.js';
+import SeededCampaignModal from './SeededCampaignModal.jsx';
 import './CampaignSelection.css';
+
+// Quick-create presets (arena-starter plan §2.3/§3.4): localhost-only buttons
+// next to the plain "Add" that seed a finished campaign via the shared
+// orchestrator. The plain "Add" flow above stays untouched.
+const SEEDED_PRESETS = {
+  arena: {
+    button: 'New Arena Campaign',
+    icon: 'fa-solid fa-shield-halved',
+    prefix: 'Arena',
+    note: 'Creates a disposable arena campaign: two carved sparring halls plus a saved low-CR encounter pool, ready for pickup play.',
+  },
+  starter: {
+    button: 'New Starter Campaign',
+    icon: 'fa-solid fa-seedling',
+    prefix: 'Starter',
+    note: 'Creates a seeded starter campaign: a generated village, wilds hex map with portal, dungeon, quests, and Dungeon Wave 1-3 encounters — every roll is fresh.',
+  },
+};
+
+function seededDefaultName(prefix) {
+  return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+}
 
 function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost = true }) {
   const [campaigns, setCampaigns] = useState([]);
@@ -9,6 +33,9 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  // null | 'arena' | 'starter' — which preset the name-entry modal is for.
+  const [seedPreset, setSeedPreset] = useState(null);
+  const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     const fetchCampaigns = async () => {
@@ -105,6 +132,42 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
     setNewCampaignName('');
   };
 
+  const openSeedModal = (presetKey) => {
+    setSeedPreset(presetKey);
+    setNewCampaignName(seededDefaultName(SEEDED_PRESETS[presetKey].prefix));
+    setError(null);
+  };
+
+  const closeSeedModal = () => {
+    setSeedPreset(null);
+    setNewCampaignName('');
+    setError(null);
+  };
+
+  // Seeded quick-create (arena/starter): create folder + run the preset's
+  // generators through the shared orchestrator, then jump straight into the
+  // new campaign (the "reload to it" step of plan §2.3 without losing state).
+  const handleCreateSeededCampaign = async () => {
+    const name = newCampaignName.trim();
+    if (!name) {
+      setError('Please enter a campaign name');
+      return;
+    }
+    setSeeding(true);
+    try {
+      const result = await createSeededCampaign(seedPreset, { name });
+      setSeedPreset(null);
+      setNewCampaignName('');
+      await handleCampaignSelect(result.name);
+      // If the parent kept us mounted, surface the fresh row.
+      setCampaigns(await getCharacterFolders());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   if (loading && campaigns.length === 0) {
     return (
         <div className="campaign-selection loading">
@@ -142,6 +205,16 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
          {isLocalhost && (
            <button className="new-campaign-button" onClick={openNewCampaignModal}><i className="fas fa-plus"></i> Add</button>
          )}
+         {isLocalhost && Object.entries(SEEDED_PRESETS).map(([presetKey, cfg]) => (
+           <button
+             key={presetKey}
+             className="new-campaign-button new-campaign-button--seeded"
+             onClick={() => openSeedModal(presetKey)}
+             disabled={seeding}
+           >
+             <i className={cfg.icon}></i> {cfg.button}
+           </button>
+         ))}
          {campaigns.length === 0 ? (
            <p className="no-campaigns">
            No campaigns found. Please create folders under ./public/campaigns to get started.
@@ -183,6 +256,17 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
                </div>
              </div>
            </div>
+         )}
+
+         {isLocalhost && seedPreset && (
+           <SeededCampaignModal
+             preset={SEEDED_PRESETS[seedPreset]}
+             name={newCampaignName}
+             onNameChange={setNewCampaignName}
+             seeding={seeding}
+             onCreate={handleCreateSeededCampaign}
+             onCancel={closeSeedModal}
+           />
          )}
        </div>
      );

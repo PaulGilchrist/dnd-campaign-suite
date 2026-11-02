@@ -41,8 +41,14 @@ function resetMocks() {
 }
 
 // Seeds runtime per player name; inRange may be a bool or per-source predicate.
-function seed({ buffs = {}, inRange = true } = {}) {
-  getRuntimeValue.mockImplementation((name) => (name in buffs ? buffs[name] : []));
+// allies carries per-player EDITED selectedAllies lists (Phase 3.2 betrayal);
+// any other key reads null (unedited → legacy party-by-type default).
+function seed({ buffs = {}, allies = {}, inRange = true } = {}) {
+  getRuntimeValue.mockImplementation((name, key) => {
+    if (key === 'activeBuffs') return name in buffs ? buffs[name] : [];
+    if (key === 'selectedAllies') return allies[name] ?? null;
+    return null;
+  });
   isWithinRange.mockImplementation(async source =>
     typeof inRange === 'function' ? inRange(source) : inRange);
 }
@@ -138,5 +144,25 @@ describe('getWolfAdvantageAgainst — gridless combat-context lane (always skipp
     expect(await getWolfAdvantageAgainst({ attackerName: 'HexWarlock', campaignName: CAMPAIGN, skipRangeCheck: true }))
       .toEqual({ advantage: false });
     expect(isWithinRange).not.toHaveBeenCalled();
+  });
+});
+
+// Phase 3.2 betrayal validation (arena-starter §4): an EDITED ally list on the
+// bearer flips the pack benefit immediately — self-only defection drops former
+// allies, an edited list naming the attacker keeps them covered. Unedited
+// bearers (above) stay legacy party-by-type.
+describe('getWolfAdvantageAgainst — betrayal ally-list flip', () => {
+  beforeEach(resetMocks);
+
+  it('a defector bearer (self-only edited list) no longer grants the attacker advantage', async () => {
+    seed({ buffs: { Barbarian: [wolf()] }, allies: { Barbarian: ['Barbarian'] } });
+    expect(await getWolfAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
+      .toEqual({ advantage: false });
+  });
+
+  it('an edited list that still names the attacker keeps the pack benefit', async () => {
+    seed({ buffs: { Barbarian: [wolf()] }, allies: { Barbarian: ['Barbarian', 'Attacker'] } });
+    expect(await getWolfAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
+      .toEqual({ advantage: true, source: 'Barbarian' });
   });
 });

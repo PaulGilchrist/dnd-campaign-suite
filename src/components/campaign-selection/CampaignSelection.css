@@ -198,3 +198,15 @@
   text-align: center;
   font-weight: bold;
 }
+
+/* Seeded quick-create buttons (Arena/Starter) — same button tier as "Add",
+   separated by an accent icon; note text under the modal heading. */
+.campaign-selection .new-campaign-button--seeded {
+  margin-left: 0.5rem;
+}
+
+.campaign-selection .seeded-campaign-note {
+  color: var(--color-text-secondary, inherit);
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0.75rem;
+}

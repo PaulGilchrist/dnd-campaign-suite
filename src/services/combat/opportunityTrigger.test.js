@@ -243,3 +243,57 @@ describe('onTokenMoveLanded', () => {
         ]);
     });
 });
+
+// Phase 3.2 betrayal validation (arena-starter §4): an EDITED ally list on the
+// mover re-draws hostility immediately — former allies provoke (PvP flips on)
+// and listed allies never do, overriding the legacy players-vs-NPC split.
+describe('findOpportunityDefenders — betrayal ally-list flip', () => {
+    const pvpMap = {
+        players: [
+            { name: 'Hero', gridX: 4, gridY: 4 },
+            { name: 'Mia', gridX: 5, gridY: 4 },
+        ],
+        placedItems: [{ name: 'Goblin 1', gridX: 6, gridY: 4, type: 'npc' }],
+    };
+
+    function editedAllies(list) {
+        getRuntimeValue.mockImplementation((store, key) =>
+            (key === 'selectedAllies' && store === 'Hero') ? list : null);
+    }
+
+    it('defector (self-only list) retreating past a former ally PC ⇒ that PC provokes', () => {
+        editedAllies(['Hero']);
+        const defenders = findOpportunityDefenders({
+            mapData: pvpMap,
+            moverName: 'Hero',
+            moverIsPlayer: true,
+            fromCell: { gridX: 4, gridY: 4 },
+            toCell: { gridX: 8, gridY: 4 },
+        });
+        expect(defenders.map(d => d.name)).toContain('Mia');
+    });
+
+    it('edited party list keeps the ally covered but the excluded NPC subset provokes', () => {
+        editedAllies(['Hero', 'Mia']);
+        const defenders = findOpportunityDefenders({
+            mapData: pvpMap,
+            moverName: 'Hero',
+            moverIsPlayer: true,
+            fromCell: { gridX: 4, gridY: 4 }, // Mia adjacent; Goblin 1 is 2 cells (out of reach at start)
+            toCell: { gridX: 1, gridY: 4 },
+        });
+        expect(defenders.map(d => d.name)).toEqual([]); // no one was in reach at the START except Mia (ally)
+    });
+
+    it('unedited mover keeps the legacy split (former ally PC never provokes)', () => {
+        getRuntimeValue.mockReturnValue(null);
+        const defenders = findOpportunityDefenders({
+            mapData: pvpMap,
+            moverName: 'Hero',
+            moverIsPlayer: true,
+            fromCell: { gridX: 4, gridY: 4 },
+            toCell: { gridX: 8, gridY: 4 },
+        });
+        expect(defenders.map(d => d.name)).toEqual([]);
+    });
+});

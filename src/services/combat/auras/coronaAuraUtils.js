@@ -2,6 +2,10 @@ import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getCombatContext, getCombatSummary } from '../../encounters/combatData.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
+// Phase 3.2 audit (arena-starter §4): NOT an allegiance assumption — the
+// pool filter only gathers aura BEARERS; per-target hostility is the bearer's
+// explicit `coronaOfLightEnemies` designation (isInCoronaEnemiesList), so a
+// betrayal edit needs no type-gate here.
 function isInCoronaEnemiesList(sourceName, targetName) {
     const storedEnemies = getRuntimeValue(sourceName, 'coronaOfLightEnemies') || [];
     if (!Array.isArray(storedEnemies)) return true;
