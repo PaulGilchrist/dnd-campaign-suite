@@ -234,6 +234,10 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     // registered for this key ⇒ the write passes through exactly as today.
     const validation = validateRuntimeWrite(key, propertyValue, { req, campaign, current: characterChangeData.get(campaign) });
     if (!validation.ok) {
+        // Mirror the [maps] BLOCKED write-seam pattern (d3e1658c9): every
+        // wildcard refusal leaves a named server-log line beside its
+        // enforcement_denied audit entry.
+        console.log(`[${key}] BLOCKED POST ${campaign} — ${validation.reason}`);
         // Broadcast the rejection so every client can surface the denied write.
         publish(`denied-${campaign}-${key}`, { key, reason: validation.reason }, campaign);
         // §10.4: denials are PERSISTENT audit — the audit ledger must show
@@ -260,6 +264,26 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     publish(`change-${campaign}-${key}`, storedValue, campaign);
 
     res.json({ message: 'Data saved successfully' });
+}));
+
+// PUT /api/campaigns/:campaign/:key — reserved-key guard only.
+// No key has a PUT write lane here (change-data writes ride POST; ".json"
+// PUTs are consumed by campaigns-character before this router mounts), so a
+// PUT to an unreserved key keeps today's honest 404 byte-identically. The
+// reserved spell-overlay key, though, must never shrug at malformed docs with
+// an HTML 404 — it gets the same "Overlay save rejected: …" 400 + BLOCKED
+// log the POST lane pays (backlog 2026-11-02 BE). A well-formed PUT still
+// 404s: nothing persists through this verb, so nothing dishonest is written.
+router.put('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
+    const { campaign, key } = req.params;
+    if (key !== 'spell-overlay') return next();
+    const value = 'value' in req.body ? req.body.value : req.body;
+    const validation = validateRuntimeWrite(key, value, { req, campaign, current: characterChangeData.get(campaign) });
+    if (!validation.ok) {
+        console.log(`[${key}] BLOCKED PUT ${campaign} — ${validation.reason}`);
+        return res.status(400).json({ error: validation.reason });
+    }
+    return next();
 }));
 
 // DELETE /api/campaigns/:campaign/:key - Remove a key from the change data store

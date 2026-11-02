@@ -20,6 +20,11 @@ const AI_MODES = ['off', 'suggest', 'autopilot']; // mirrors server/services/ai 
 // would obey it; the validator enforces the same rule, not a copy of it.
 import { isLocalEndpoint, PROVIDERS } from '../services/ai/providers/localProvider.js';
 
+// Shared overlay model — the client board, the /spell-overlay transport guard
+// and this wildcard guard all screen rows through the SAME validator so a doc
+// that renders somewhere is a doc the server admits everywhere.
+import { isValidOverlay } from '../../src/models/SpellOverlay.js';
+
 // Mirrors client ENFORCEMENT_DEFAULTS (src/services/combat/canTakeAction.js).
 // Keeping the list explicit here is the point: the server defines the contract.
 const ENFORCEMENT_FLAGS = new Set([
@@ -280,6 +285,49 @@ function validateMapContext(value) {
 }
 
 /**
+ * Reserved `spell-overlay` change-data key (backlog 2026-11-02 BE): the
+ * generic wildcard used to store ANY junk under it ({campaign, overlays:
+ * [x/y/radius rows]}, scalars, …), leaving the key in a shape no board could
+ * ever render. The live writes ride the /spell-overlay transport (a separate
+ * spellOverlayData store); the wildcard lane is legacy/operational, so it may
+ * only carry what an overlay board could actually hold: null / [] (clear), an
+ * array of rows passing the shared isValidOverlay, or the legacy dual-write
+ * wrapper { campaign, overlays: […] } whose rows pass. Accepted payloads
+ * persist byte-as-sent (no canonicalization) so every established writer's
+ * exact shape keeps round-tripping.
+ */
+function describeOverlayValue(value) {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'an array';
+    if (typeof value === 'object') return `an object with keys: ${Object.keys(value).join(', ') || 'none'}`;
+    return `${typeof value} ${JSON.stringify(value)}`;
+}
+
+function overlayRowsProblem(rows) {
+    const badRow = rows.findIndex((row) => !isValidOverlay(row));
+    if (badRow === -1) return null;
+    return 'every overlay needs a known shape, finite startGridX/startGridY numbers, a positive size for its shape (e.g. radiusFt for a sphere) and a color string — '
+        + `row ${badRow} does not match (${describeOverlayValue(rows[badRow])})`;
+}
+
+function validateSpellOverlayKey(value) {
+    if (value === null) return { ok: true }; // honest clear (key unset)
+    const rows = Array.isArray(value)
+        ? value
+        : (isPlainObject(value) && Array.isArray(value.overlays) ? value.overlays : null);
+    if (rows === null) {
+        return {
+            ok: false,
+            reason: 'Overlay save rejected: the spell-overlay key is reserved for board geometry — '
+                + `expected an array of overlay objects (or [] / null to clear), got ${describeOverlayValue(value)}.`,
+        };
+    }
+    const problem = overlayRowsProblem(rows);
+    if (problem) return { ok: false, reason: `Overlay save rejected: ${problem}` };
+    return { ok: true };
+}
+
+/**
  * H1 hardening (§17): monster-side economy shape validation inside creature
  * store writes (POST /:campaign/:storeName posts the full store). The MA
  * engines (monsterLegendaryUses/monsterRecharge) enforce the rules client-side
@@ -360,6 +408,11 @@ export const keyValidators = {
     // turnover is refused with the standard 400 + enforcement_denied audit log.
     'activeCreatureName': (v, ctx) => validateAuthority('activeCreatureName', ctx, true),
     'lastAppliedTurnStartCreature': (v, ctx) => validateAuthority('lastAppliedTurnStartCreature', ctx, true),
+    // Reserved overlay key (backlog 2026-11-02 BE): shape-only guard — the
+    // board is a party-collab space the client already opens to every tab, so
+    // this closes the DATA-INTEGRITY hole (junk rows poison the shared key),
+    // not an authority lane.
+    'spell-overlay': validateSpellOverlayKey,
 };
 
 /**
