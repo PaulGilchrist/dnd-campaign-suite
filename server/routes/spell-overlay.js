@@ -25,7 +25,9 @@ router.get('/spell-overlay', asyncHandler((req, res) => {
     if (!campaign) {
         return res.status(400).json({ error: 'campaign query param required' });
     }
-    const overlays = spellOverlayData.has(campaign) ? spellOverlayData.get(campaign) : [];
+    // Read-path hygiene (backlog 2026-11-02 BF): never echo a malformed disk
+    // row to a viewer — see filterRenderableOverlays below.
+    const overlays = filterRenderableOverlays(campaign, spellOverlayData.get(campaign));
     res.json({ overlays });
 }));
 
@@ -79,6 +81,28 @@ function overlayShapeProblem(overlay) {
         return 'color must be a color string';
     }
     return null;
+}
+
+// Read-path twin of the POST write guard (backlog 2026-11-02 BF): rows
+// persisted to disk BEFORE the guards existed (null / bare strings /
+// x-y-radius junk) still boot straight into the transport Map, and GET used
+// to echo them verbatim to every viewer (defense-in-depth beside the viewer
+// fail-soft filters). Screens the snapshot through the SAME overlayShapeProblem
+// the add/update write lane rejects with, so no second divergent validator
+// exists. Dropped rows are NEVER removed from the stored array or from disk —
+// this filters the response copy only (read-path hygiene) — and each drop
+// logs one line, mirroring the `[spell-overlay] BLOCKED …` convention.
+// Exported so tests can pin the helper directly.
+export function filterRenderableOverlays(campaign, stored) {
+    if (!Array.isArray(stored)) {
+        return [];
+    }
+    const valid = stored.filter(overlay => overlayShapeProblem(overlay) === null);
+    const dropped = stored.length - valid.length;
+    if (dropped > 0) {
+        console.log(`[spell-overlay] dropped ${dropped} malformed row(s) GET ${campaign} — disk left untouched`);
+    }
+    return valid;
 }
 
 // Refuses unrecognized actions (missing/non-string included), removes of

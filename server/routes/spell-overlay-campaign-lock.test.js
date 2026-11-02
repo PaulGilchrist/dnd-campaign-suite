@@ -180,7 +180,17 @@ describe('spell-overlay - campaign lock (out-of-namespace write guard)', () => {
         });
 
         it('still serves reads while locked (GET pass-through doctrine, incl. on-target)', async () => {
-            store.set('test-campaign', [{ id: 'ok-1', name: 'Fireball' }]);
+            // Renderable-shape row: GET now screens its snapshot through the
+            // transport shape guard (backlog 2026-11-02 BF), so the fixture
+            // must be one the read-path filter keeps.
+            store.set('test-campaign', [{
+                id: 'ok-1',
+                shape: 'sphere',
+                startGridX: 1,
+                startGridY: 1,
+                radiusFt: 20,
+                color: 'rgba(255,80,60,0.07)',
+            }]);
             const onTarget = await request(createTestApp())
                 .get('/spell-overlay?campaign=test-campaign');
             expect(onTarget.status).toBe(200);

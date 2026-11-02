@@ -32,8 +32,10 @@ function createTestApp() {
 // The route now 400s add/update items that are not renderable overlays
 // (improvement 2026-11-02 BD — junk coord keys used to poison every board).
 // POSTed fixtures ride a real createOverlay-style sphere under their probe
-// fields; in-memory spellOverlayData.set seeding intentionally stays bare
-// because that lane bypasses validation by design.
+// fields. In-memory spellOverlayData.set seeding ALSO uses renderable rows:
+// since improvement 2026-11-02 BF, GET screens its snapshot through the same
+// shape guard (read-path filter), so bare name/level rows would be dropped
+// from the response (the drop itself is pinned in spell-overlay-get-filter.test.js).
 const overlay = (item) => ({
     shape: 'sphere',
     startGridX: 0,
@@ -74,8 +76,8 @@ describe('spell-overlay - GET /spell-overlay', () => {
 
     it('should return stored overlays for a campaign', async () => {
         spellOverlayData.set('test-campaign', [
-            { id: 'overlay-1', name: 'Fireball', level: 3 },
-            { id: 'overlay-2', name: 'Shield', level: 1 },
+            overlay({ id: 'overlay-1', name: 'Fireball', level: 3 }),
+            overlay({ id: 'overlay-2', name: 'Shield', level: 1 }),
         ]);
 
         const app = createTestApp();
@@ -96,7 +98,7 @@ describe('spell-overlay - GET /spell-overlay', () => {
     });
 
     it('should handle overlays with complex data', async () => {
-        const complexOverlay = {
+        const complexOverlay = overlay({
             id: 'overlay-complex',
             name: 'Concentration Spell',
             level: 4,
@@ -104,7 +106,7 @@ describe('spell-overlay - GET /spell-overlay', () => {
             duration: 'Concentration, up to 1 minute',
             affectedCreatures: ['creature-1', 'creature-2'],
             modifiers: { acBonus: 2, saveDC: 15 },
-        };
+        });
         spellOverlayData.set('complex-campaign', [complexOverlay]);
 
         const app = createTestApp();
@@ -769,10 +771,10 @@ describe('spell-overlay - POST /spell-overlay', () => {
 
         it('should keep overlays separate between campaigns', async () => {
             spellOverlayData.set('campaign-a', [
-                { id: 'a-1', name: 'Fireball', level: 3 },
+                overlay({ id: 'a-1', name: 'Fireball', level: 3 }),
             ]);
             spellOverlayData.set('campaign-b', [
-                { id: 'b-1', name: 'Shield', level: 1 },
+                overlay({ id: 'b-1', name: 'Shield', level: 1 }),
             ]);
 
             const app = createTestApp();
