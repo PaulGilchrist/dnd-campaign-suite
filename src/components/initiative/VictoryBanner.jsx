@@ -3,27 +3,11 @@
 // dismisses (per-client stamp persists — see useTvPresentation.js). The guard
 // lives here so the container stays a single unconditional render.
 
+import { buildVictoryLines } from './victoryLines.js'
+
 const THEMES = {
     win: { icon: 'fa-trophy', label: 'Victory!', titleClass: '', cardClass: '' },
     defeat: { icon: 'fa-skull', label: 'The Party Falls', titleClass: ' defeat', cardClass: ' victory-card-defeat' },
-}
-
-function buildVictoryLines(result) {
-    const rounds = result.rounds ?? 1
-    const roundWord = rounds === 1 ? 'round' : 'rounds'
-    const lines = []
-    if (result.wipe) lines.push(`The party fell after ${rounds} ${roundWord}.`)
-    else lines.push(`The party survived ${rounds} ${roundWord}!`)
-    if (result.foes > 0) {
-        const fled = Math.max(0, (result.foes ?? 0) - (result.defeated ?? 0))
-        lines.push(fled > 0
-            ? `${result.defeated} foes defeated · ${fled} drove off`
-            : `All ${result.foes} foes defeated`)
-    }
-    if (result.partySize > 0) {
-        lines.push(`${result.survivors} of ${result.partySize} heroes standing`)
-    }
-    return lines
 }
 
 export default function VictoryBanner({ visible, result, onDismiss }) {
