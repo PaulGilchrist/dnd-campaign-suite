@@ -14,11 +14,14 @@ const FLESH_TO_STONE_PREFIX = '_fleshToStone_';
 const PRISMATIC_SPRAY_INDIGO_PREFIX = '_prismaticSprayIndigo_';
 const PRISMATIC_SPRAY_VIOLET_PREFIX = '_prismaticSprayViolet_';
 import CreatureBadge from '../common/CreatureBadge.jsx'
+import HpFeedback from './HpFeedback.jsx'
+import AlliesButton from './AlliesButton.jsx'
 import { isBuffActive } from '../../services/automation/common/buffToggle.js';
 import { CONDITION_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
 import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakableMajesty } from '../../services/combat/auras/unbreakableMajesty.js'
 import { sendFleshToStoneResult, sendPrismaticSprayIndigoResult, sendPrismaticSprayVioletResult } from '../../services/combat/conditions/savePromptService.js'
 import { isResilientSphereActive, getResilientSphereSource } from '../../services/combat/automation/automationPassives.js'
+import { getCreatureController } from '../../services/encounters/creatureControl.js'
 import { cleanupWildShape } from '../../services/automation/handlers/class-druid/wildShapeCreatureBuilder.js'
 import { revertPolymorph } from '../../services/automation/handlers/spells/polymorphService.js'
 import { revertAnimalShapes } from '../../services/automation/handlers/spells/animalShapesService.js'
@@ -42,14 +45,9 @@ function hasFormSource(creature) {
     return creature.wildShapeSource || creature.polymorphSource || creature.animalShapesSource || creature.shapechangeSource
 }
 
-function computePlayerSummoned(creature, allCreatures, myTargetEffects) {
-    const isPlayerNamed = name => allCreatures.some(c => c.type === 'player' && c.name === name)
-    const summonedByPlayer = myTargetEffects.some(te => te.effect === 'summoned' && isPlayerNamed(te.source))
-    if ((creature.type !== 'player' || creature.wildShapeSource || creature.shapechangeSource) && summonedByPlayer) return true
-    if (creature.wildShapeSource && isPlayerNamed(creature.wildShapeSource)) return true
-    if (creature.shapechangeSource && isPlayerNamed(creature.shapechangeSource)) return true
-    return false
-}
+// Control resolution (Phase 2) lives in services/encounters/creatureControl.js —
+// explicit GM assignment wins, then the historical summon/form-source lanes.
+// (Former computePlayerSummoned removed per code-simplicity: single source.)
 
 function findSanctuaryInfo(allCreatures, creatureName, campaignName) {
     for (const other of allCreatures) {
@@ -296,6 +294,57 @@ function MajestyBadge({ creature, isLocalhost, campaignName }) {
             removable={isLocalhost}
             onRemove={() => clearUnbreakableMajesty(creature.name, campaignName)}
         />
+    )
+}
+
+// GM-only control assignment (Phase 2). Handing an NPC/monster to a player
+// stamps `controller` on the roster row; the owning device's card opens and
+// rolls through the exact same monster-action lanes the GM uses. Release
+// falls back to the derived lane (summons stay with their caster).
+function ControlRow({ creature, allCreatures, isLocalhost, controllerName, onControllerChange }) {
+    if (!isLocalhost || creature.type !== 'npc' || !onControllerChange) return null
+    const players = allCreatures.filter(c => c.type === 'player')
+    if (!players.length) return null
+    const explicit = creature.controller || ''
+    const autoNote = !explicit && controllerName ? `auto: ${controllerName}` : ''
+    return (
+        <div className='creature-control'>
+            <i className='fa-solid fa-gamepad'></i>&nbsp;
+            <select
+                data-testid="control-select"
+                value={explicit}
+                onChange={(e) => onControllerChange(creature.name, e.target.value || null)}
+                title={`Assign who controls ${creature.name} (their device can roll from its card)`}
+            >
+                <option value=''>— GM —</option>
+                {players.map(p => (
+                    <option key={p.name} value={p.name}>{p.name}</option>
+                ))}
+            </select>
+            {autoNote && <span className='creature-control-auto'>{autoNote}</span>}
+        </div>
+    )
+}
+
+// Device-side turn cue: shown on a viewer's screen when a creature THEY
+// control becomes the active combatant (the GM view already spotlights it).
+function YourTurnCue({ isActive, isLocalhost, controlled }) {
+    if (!isActive || isLocalhost || !controlled) return null
+    return (
+        <div className='your-turn-cue' role='status'>
+            <i className='fa-solid fa-clock'></i> Your turn!
+        </div>
+    )
+}
+
+// TV-mode target readout replacing the (CSS-hidden) TargetSelect dropdown —
+// overlay targets keep their picker, so plain names only.
+function TvTargetChip({ tvMode, targetName }) {
+    if (!tvMode || !targetName || String(targetName).startsWith('overlay-')) return null
+    return (
+        <div className='tv-target-chip'>
+            <i className='fa-solid fa-crosshairs'></i> → {targetName}
+        </div>
     )
 }
 
@@ -615,6 +664,11 @@ function CreatureCard({
     characters,
     mapName,
     onViewCharacter,
+    tvMode = false,
+    hpEvent = null,
+    onHpFeedbackDone,
+    onControllerChange,
+    onEditAllies,
 }) {
     const isUnconscious = creature.currentHp <= 0
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? [];
@@ -628,11 +682,13 @@ function CreatureCard({
     const prismaticIndigoData = useRuntimeValue('campaign', prismaticIndigoKey, campaignName);
     const prismaticVioletKey = PRISMATIC_SPRAY_VIOLET_PREFIX + creature.name.replace(/\s+/g, '_');
     const prismaticVioletData = useRuntimeValue('campaign', prismaticVioletKey, campaignName);
-    const isPlayerSummoned = computePlayerSummoned(creature, allCreatures, myTargetEffects);
+    const controllerName = getCreatureController(creature, allCreatures, myTargetEffects);
+    const isPlayerSummoned = controllerName !== null;
     const sanctuaryInfo = findSanctuaryInfo(allCreatures, creature.name, campaignName);
 
     return (
         <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
+            <HpFeedback creatureName={creature.name} hpEvent={hpEvent} onDone={onHpFeedbackDone} />
             <NpcRemoveButton creature={creature} isLocalhost={isLocalhost} onRemoveNpc={onRemoveNpc} />
             <CardAvatar creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} npcImage={npcImage} campaignName={campaignName} characters={characters} onViewCharacter={onViewCharacter} onNpcClick={onNpcClick} />
             <CardName creature={creature} campaignNpcs={campaignNpcs} onNameChange={onNameChange} isLocalhost={isLocalhost} />
@@ -646,10 +702,15 @@ function CreatureCard({
                 isLocalhost={isLocalhost}
                 onChange={onHpChange}
                 isPlayerSummoned={isPlayerSummoned}
+                tvMode={tvMode}
             />
             <TempHpDisplay creature={creature} campaignName={campaignName} />
             <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} isLocalhost={isLocalhost} />
             <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} allCreatures={allCreatures} overlays={overlays} onTargetChange={onTargetChange} />
+            <ControlRow creature={creature} allCreatures={allCreatures} isLocalhost={isLocalhost} controllerName={controllerName} onControllerChange={onControllerChange} />
+            <AlliesButton creature={creature} isLocalhost={isLocalhost} onEditAllies={onEditAllies} />
+            <TvTargetChip tvMode={tvMode} targetName={creature.targetName} />
+            <YourTurnCue isActive={isActive} isLocalhost={isLocalhost} controlled={isPlayerSummoned} />
             <ConditionsSection
                 creature={creature}
                 fleshToStoneData={fleshToStoneData}

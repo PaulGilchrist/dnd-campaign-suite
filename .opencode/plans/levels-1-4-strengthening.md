@@ -4,6 +4,34 @@
 > parked until 1–4 are strengthened; several items here deliberately build its rails
 > (controller field, seeded-sandbox campaign, feedback juice).
 
+## Status
+
+> **qa-arena / qa-starter exception (owner ruling, 2026-11-01):** exactly TWO throwaway
+> campaigns named `qa-arena` and `qa-starter` may be created/exercised/deleted for
+> Phase 3/4 Arena & Starter verification. All other campaigns remain PRODUCTION —
+> never touch. Same doctrine as the `qa-temp` ruling in docs/app-exploration.md.
+
+| Phase | State | Notes |
+|---|---|---|
+| 1 — TV mode + juice | ✅ **DONE + LIVE-VERIFIED 2026-11-01** | `useTvPresentation.js`, `TvToggleButton`, `TvNextUpStrip`, `HpFeedback`, `VictoryBanner` (extracted for the complexity ratchet); `handleClear` stamps `campaign.lastCombatResult` (kills-only). Unit: `Initiative.tv.test.jsx` (6) + `handleClear` assertions; full suite 32,956 green, lint 0, no-timers guard OK (floaters are timer-free via animationend). Playwright live pass on test-campaign: toggle/fullscreen/persist, spotlight order+pulse (incl. re-center fix on mode entry), up-next reactivity, −11/−103/+5 floaters + flash + retire/re-arm, bloodied badge, target chip, victory banner honest copy ("0 foes defeated · 1 drove off", 13/13), dismiss persists across reload, zero console errors; baseline restored (change-data `{}`, log `[]`, tab closed). |
+| 2 — Control delegation | ✅ **DONE + LIVE-VERIFIED 2026-11-01** | `services/encounters/creatureControl.js` (precedence: explicit `controller` > summoned te > wild-shape/shapechange source > `summonedBy`-player); GM 🎮 picker on NPC cards (`ControlRow`, localhost-only, auto-note for derived lane), `handleControllerChange` (write + `control_assigned`/`control_released` automation log), LAN "Your turn!" cue; CreatureCard/Initiative wired; `computePlayerSummoned` removed (single source). Unit: creatureControl.test.js (10) + createCreatureHandlers.control.test.js (6) + CreatureCard.control.test.jsx (10); full suite 32,982 green, lint 0, timer guard OK. Two-tab Playwright live pass: picker options + assign → combatSummary `controller:"FeyRanger"` + verbatim audit row; LAN visitor opens the Skeleton's full interactive card, NO picker on LAN, real Shortsword roll (d20 9+5=14 vs AC 18, honest MISS, retro adv/dis); zero console errors both tabs; baseline restored two-pass closed-tab. |
+| 3.1 — Arena campaign preset | ⬜ next (see `.opencode/plans/arena-starter-build-and-verify.md`) | |
+| 3.2 — In-campaign betrayal / ally editing | ✅ **DONE + LIVE-VERIFIED 2026-11-02** | Engine allegiance already shared one model (`selectedAllies` read by auras/Redirect/AoE). Surfaced a **GM-only 🤝 Allies editor on every tracker card** (players included → defectors work), reusing the existing `AllySelectionModal` + key (D4: edit at any time, no restore switch). Files: `useAllyEditor.js`, `AlliesButton.jsx` (self-gating), `AllyEditorModal.jsx`, wired into `Initiative`/`CreatureCard`; logged `ability_use / Ally Selection`. Unit: `useAllyEditor.test.js` (5) + `Initiative.allyEditor.test.jsx` (3). Playwright live: 13 buttons on test-campaign, opened AasimarTest → Clear All (0 → confirm disabled) → tick self (1) → Confirm ⇒ store `selectedAllies:["AasimarTest"]` + verbatim audit row, modal closed, 0 console errors; baseline restored `{}`/`[]`. |
+| 4 — Starter campaign | ⬜ next (see `.opencode/plans/arena-starter-build-and-verify.md`) | |
+
+> **Campaign-lock infra (enables 3.1/4 live verification):** `campaignLock.js`
+> extended to a **comma-separated allowlist** (single name = byte-identical prior
+> behavior; production never an element stays denied). Added body-aware
+> `createCampaignCreateGuard` (POST /api/campaigns creates only a set member) +
+> primary-protection in the rename guard (first lock entry never renamable;
+> throwaway↔throwaway renames allowed). spell-overlay lane uses set membership.
+> Tests: `campaignLock.test.js` extended (allowlist create/rename/production-deny).
+> **Restart the QA-locked API** with:
+> `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node server.js`
+> (vite `npm run dev:react` on :5173 unchanged). Verified 2026-11-02: qa-arena/
+> qa-starter → 201, Frostfall → 403, then both probes deleted (DELETE also
+> allowlist-gated). Full suite 33,001 green, lint 0, timer guard OK.
+
 ## Guiding decisions (from owner)
 
 | # | Decision | Consequence |

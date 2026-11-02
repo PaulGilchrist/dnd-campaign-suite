@@ -252,8 +252,7 @@
     cursor: not-allowed;
 }
 
-/* Condition badges on creature cards */
-.initiative .creature-conditions {
+/* Condition badges on creature cards */.initiative .creature-conditions {
     display: flex;
     flex-wrap: wrap;
     gap: 3px;
@@ -1242,4 +1241,405 @@
     background: rgba(244, 67, 54, 0.15);
     border-color: var(--color-error-border);
     color: var(--color-error-light);
+}
+
+/* ============ TV presentation mode (Phase 1) ============ */
+/* Big, glanceable tracker for the living-room screen. Root class toggles the
+   layout; all rules are display-only (no game state). Colors reuse the
+   tracker's existing palette (gold active, green player, red NPC). */
+
+.initiative .tv-toggle-button {
+    padding: 8px 14px;
+    font-size: 0.9em;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--color-text);
+    background-color: var(--background-color-button-secondary);
+    border: 1px solid var(--border-color, #444);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.initiative .tv-toggle-button:hover {
+    background-color: var(--background-color-button-secondary-hover);
+}
+
+.initiative .tv-toggle-button.tv-toggle-on {
+    color: #ffcc00;
+    border-color: #ffcc00;
+    box-shadow: 0 0 8px rgba(255, 204, 0, 0.35);
+}
+
+.initiative .tv-toggle-button .fa-display {
+    margin-right: 6px;
+}
+
+/* Up-next strip — "who comes after" at a glance */
+.initiative .tv-next-up {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 2px 0 8px;
+}
+
+.initiative .tv-next-up-label {
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.65;
+}
+
+.initiative .tv-next-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.8em;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid rgba(231, 76, 60, 0.5);
+    background-color: rgba(231, 76, 60, 0.12);
+}
+
+.initiative .tv-next-chip.player {
+    border-color: rgba(46, 204, 113, 0.5);
+    background-color: rgba(46, 204, 113, 0.12);
+}
+
+/* Target readout (TV mode replaces the hidden TargetSelect dropdown) */
+.initiative .tv-target-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #ffcc00;
+    border: 1px solid rgba(255, 204, 0, 0.5);
+    background-color: rgba(255, 204, 0, 0.1);
+}
+
+/* ---- Damage / heal floaters + hit flash (all modes) ---- */
+/* Timer-free: elements animate to opacity 0 with fill-mode forwards; the
+   floater's animationend retires the event (HpFeedback.jsx). */
+
+.initiative .hp-floater {
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    z-index: 30;
+    pointer-events: none;
+    font-weight: 900;
+    font-size: 1.5em;
+    line-height: 1;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    animation: hp-float 1.5s ease-out forwards;
+}
+
+.initiative .hp-floater-damage { color: #ff6b5e; }
+.initiative .hp-floater-heal { color: #4ade80; }
+.initiative .hp-floater-big { font-size: 2.1em; }
+
+@keyframes hp-float {
+    0% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); }
+    15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+    30% { transform: translate(-50%, -2px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -36px) scale(1); }
+}
+
+.initiative .hp-hit-flash {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    z-index: 25;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.initiative .hp-hit-flash-damage { animation: hp-flash-damage 0.6s ease-out forwards; }
+.initiative .hp-hit-flash-heal { animation: hp-flash-heal 0.6s ease-out forwards; }
+
+@keyframes hp-flash-damage {
+    0% { opacity: 1; background: rgba(231, 76, 60, 0.28); }
+    100% { opacity: 0; background: rgba(231, 76, 60, 0); }
+}
+
+@keyframes hp-flash-heal {
+    0% { opacity: 1; background: rgba(46, 204, 113, 0.25); }
+    100% { opacity: 0; background: rgba(46, 204, 113, 0); }
+}
+
+/* ---- Victory / defeat celebration overlay ---- */
+.initiative .victory-banner {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    animation: victory-fade 0.4s ease-out;
+}
+
+.initiative .victory-card {
+    background: var(--background-color-card, #1e2138);
+    border: 2px solid #ffcc00;
+    border-radius: 16px;
+    padding: 36px 56px;
+    text-align: center;
+    box-shadow: 0 0 48px rgba(255, 204, 0, 0.35);
+    max-width: 90vw;
+    animation: victory-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.initiative .victory-card-defeat {
+    border-color: #e74c3c;
+    box-shadow: 0 0 48px rgba(231, 76, 60, 0.35);
+}
+
+.initiative .victory-title {
+    font-size: 3em;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #ffcc00;
+}
+
+.initiative .victory-title.defeat { color: #e74c3c; }
+
+.initiative .victory-title .fa-solid { margin-right: 12px; }
+
+.initiative .victory-line {
+    margin-top: 12px;
+    font-size: 1.25em;
+    opacity: 0.9;
+}
+
+.initiative .victory-sub {
+    margin-top: 6px;
+    font-size: 1em;
+    opacity: 0.7;
+}
+
+.initiative .victory-dismiss {
+    margin-top: 22px;
+    padding: 10px 28px;
+    font-size: 1em;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--color-text);
+    background-color: var(--background-color-button-secondary);
+    border: 1px solid var(--border-color, #444);
+}
+
+.initiative .victory-dismiss:hover {
+    background-color: var(--background-color-button-secondary-hover);
+}
+
+@keyframes victory-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes victory-pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ---- TV mode layout ---- */
+.initiative--tv {
+    padding: 28px 36px;
+}
+
+.initiative--tv .combat-header {
+    justify-content: center;
+    gap: 24px;
+}
+
+.initiative--tv .combat-header h4 {
+    font-size: 2em;
+}
+
+.initiative--tv .tv-next-up {
+    font-size: 1.25em;
+    margin-bottom: 12px;
+}
+
+.initiative--tv .carousel-container {
+    gap: 18px;
+    /* Tall vertical padding: overflow-x:auto forces vertical clipping, and the
+       scaled-up spotlight card needs the room to glow without being cut. */
+    padding: 180px 12px;
+}
+
+.initiative--tv .creature-card {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+    order: 2;
+}
+
+/* Spotlight: the active creature jumps to the head of the row and breathes. */
+.initiative--tv .creature-card.active {
+    order: 1;
+    transform: scale(1.4);
+    animation: tv-active-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes tv-active-pulse {
+    0%, 100% { box-shadow: 0 0 18px rgba(255, 204, 0, 0.55), 0 0 40px rgba(255, 204, 0, 0.28); }
+    50% { box-shadow: 0 0 30px rgba(255, 204, 0, 0.9), 0 0 64px rgba(255, 204, 0, 0.45); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .initiative--tv .creature-card.active { animation: none; }
+    .initiative .hp-floater { animation-duration: 0.8s; }
+    .initiative .victory-card { animation: none; }
+}
+
+.initiative--tv .creature-name {
+    font-size: 1.7em;
+}
+
+.initiative--tv .hp-bar-row {
+    width: 92%;
+}
+
+.initiative--tv .hp-bar-container {
+    height: 12px;
+    border-radius: 6px;
+}
+
+.initiative--tv .hp-bar-fill {
+    border-radius: 6px;
+}
+
+.initiative--tv .hp-label,
+.initiative--tv .hp-max-val {
+    font-size: 1.15em;
+}
+
+.initiative--tv .status-badge {
+    font-size: 0.85em;
+    padding: 2px 8px;
+}
+
+.initiative--tv .creature-conditions {
+    gap: 5px;
+}
+
+.initiative--tv .condition-effect-badge,
+.initiative--tv .initiative-condition-badge,
+.initiative--tv .initiative-concentration-badge {
+    font-size: 0.8em;
+    padding: 2px 7px;
+}
+
+.initiative--tv .hp-floater { font-size: 1.9em; }
+.initiative--tv .hp-floater-big { font-size: 2.6em; }
+
+/* Declutter: edit chrome is for the GM's control device, not the display. */
+.initiative--tv .creature-initiative,
+.initiative--tv .creature-target,
+.initiative--tv .creature-control,
+.initiative--tv .allies-edit-btn,
+.initiative--tv .npc-remove-btn,
+.initiative--tv .effect-add-btn {
+    display: none;
+}
+
+/* ============ Control delegation (Phase 2) ============ */
+
+/* GM-only "who controls this creature" picker on NPC cards */
+.initiative .creature-control {
+    margin-top: 6px;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 0.8em;
+    opacity: 0.85;
+}
+
+.initiative .creature-control select {
+    width: 100%;
+    max-width: 130px;
+    padding: 2px 4px;
+    font-size: 0.95em;
+    border-radius: 4px;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    background-color: rgba(0, 0, 0, 0.2);
+    color: inherit;
+    cursor: pointer;
+}
+
+.initiative .creature-control .fa-gamepad {
+    color: #3b82f6;
+    font-size: 0.9em;
+}
+
+.initiative .creature-control-auto {
+    font-size: 0.75em;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+/* Device-side turn cue for creatures the viewer controls */
+.initiative .your-turn-cue {
+    margin-top: 6px;
+    padding: 3px 12px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 0.85em;
+    letter-spacing: 0.5px;
+    color: #ffcc00;
+    border: 1px solid rgba(255, 204, 0, 0.6);
+    background-color: rgba(255, 204, 0, 0.12);
+    animation: your-turn-pulse 1.6s ease-in-out infinite;
+}
+
+.initiative .your-turn-cue .fa-clock {
+    margin-right: 5px;
+}
+
+/* GM-only "Allies…" trigger — sibling styling to .effect-add-btn */
+.initiative .allies-edit-btn {
+    margin-top: 4px;
+    padding: 2px 8px;
+    border: 1px dashed rgba(59, 130, 246, 0.5);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    font-size: 0.7em;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.initiative .allies-edit-btn:hover {
+    opacity: 1;
+    border-color: rgba(59, 130, 246, 0.8);
+}
+
+.initiative .allies-edit-btn .fa-handshake {
+    margin-right: 2px;
+    font-size: 0.85em;
+}
+
+@keyframes your-turn-pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(255, 204, 0, 0.35); }
+    50% { box-shadow: 0 0 14px rgba(255, 204, 0, 0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .initiative .your-turn-cue { animation: none; }
 }

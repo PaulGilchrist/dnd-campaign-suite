@@ -33,6 +33,12 @@ import { useLootHandlers } from './useLootHandlers.js'
 import { createNextCreatureHandler, createPreviousCreatureHandler } from './navigationHandlers.js'
 import TurnEconomyStrip from './TurnEconomyStrip.jsx'
 import AiDirectorPanel from './AiDirectorPanel.jsx'
+import { useTvPresentation } from './useTvPresentation.js'
+import { useAllyEditor } from './useAllyEditor.js'
+import AllyEditorModal from './AllyEditorModal.jsx'
+import TvToggleButton from './TvToggleButton.jsx'
+import TvNextUpStrip from './TvNextUpStrip.jsx'
+import VictoryBanner from './VictoryBanner.jsx'
 import { createCreatureHandlers } from './createCreatureHandlers.js'
 import { createRollConditionSaveHandler } from './createRollConditionSaveHandler.js'
 import { createConcentrationHandlers } from './createConcentrationHandlers.js'
@@ -271,6 +277,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [combatSummary, characters, runtimeStateTick])
 
+    // Phase 1 TV presentation bundle (toggle + fullscreen sync, HP floater
+    // events, up-next strip, victory banner) — extracted to keep the container
+    // within the complexity ratchet. See useTvPresentation.js.
+    const {
+        tvMode, toggleTvMode, hpEvents, clearHpFeedback,
+        nextUpCreatures, lastCombatResult, victoryVisible, dismissVictory,
+    } = useTvPresentation({ campaignName, displayCreatures, activeCreatureName, showToast })
+    // Phase 3.2 — tracker-level ally editor (betrayal / split party / teams).
+    const { allyEditorOpen, modalProps, openAllyEditor, closeAllyEditor, confirmAllyEditor } = useAllyEditor({ campaignName, isLocalhost })
+
     React.useEffect(() => {
         if (!campaignName) return
         loadNPCs(campaignName).then(response => {
@@ -366,6 +382,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         handleInitiativeChange,
         handleNameChange,
         handleTargetChange,
+        handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,
     } = React.useMemo(() => createCreatureHandlers({
@@ -590,7 +607,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (activeCard) {
             activeCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
         }
-    }, [activeCreatureName])
+        // tvMode re-centers too: entering TV/fullscreen reflows the row and the
+        // spotlight creature can otherwise sit off-screen.
+    }, [activeCreatureName, tvMode])
 
     // GM (localhost) only — mirrors the fog-write gate in Map.jsx:234. A
     // read-only (network) client must never AUTHOR the tracker: the mount
@@ -644,16 +663,21 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }, [campaignName, isLocalhost]) // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-        <div className='initiative'>
+        <div className={`initiative${tvMode ? ' initiative--tv' : ''}`}>
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
             {toast && (
                 <div className={`initiative-toast${toast.isError ? ' initiative-toast-error' : ''}`} role='status'>
                     {toast.message}
                 </div>
             )}
+            <VictoryBanner visible={victoryVisible} onDismiss={dismissVictory} result={lastCombatResult} />
             {combatSummary && combatSummary.creatures && characters.length > 0 ? (
              <>
-             <h4>Initiative (round {combatSummary.round})</h4>
+             <div className='combat-header'>
+                 <h4>Initiative (round {combatSummary.round})</h4>
+                 <TvToggleButton tvMode={tvMode} onToggle={toggleTvMode} />
+             </div>
+             <TvNextUpStrip creatures={nextUpCreatures} />
              <TurnEconomyStrip
                  creatureName={activeCreatureName}
                  speedFeet={(() => {
@@ -719,6 +743,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             characters={characters}
                             mapName={mapName}
                             onViewCharacter={onViewCharacter}
+                            tvMode={tvMode}
+                            hpEvent={hpEvents[creature.name]}
+                            onHpFeedbackDone={clearHpFeedback}
+                            onControllerChange={handleControllerChange}
+                            onEditAllies={openAllyEditor}
                         />
                     )
                 })}
@@ -787,6 +816,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     creatures={creaturesOrEmpty(combatSummary)}
                 />
             )}
+            <AllyEditorModal open={allyEditorOpen} modalProps={modalProps} onConfirm={confirmAllyEditor} onCancel={closeAllyEditor} />
             {conditionPopup && (
                 <ConditionSavePopup
                     popup={conditionPopup}

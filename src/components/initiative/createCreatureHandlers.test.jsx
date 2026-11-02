@@ -517,7 +517,17 @@ describe('handleClear', () => {
         // CLA-100: Dread Ambush latch resets for players only.
         expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'dreadAmbushSpeedActive', null, campaignName);
         expect(setRuntimeValue).toHaveBeenCalledWith('Bob', 'dreadAmbushSpeedActive', null, campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        // TV-mode victory banner: the closing roster's outcome is stamped BEFORE
+        // the wipe (UI key; kills-only defeat count — Goblin at 5 HP fled, not fell).
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastCombatResult', expect.objectContaining({
+            rounds: expect.any(Number),
+            foes: 1,
+            defeated: 0,
+            survivors: expect.any(Number),
+            partySize: expect.any(Number),
+            wipe: false,
+        }), campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledTimes(3);
         expect(sweepNewCombatClocks).toHaveBeenCalledWith(campaignName);
         // L5 §10.3: rewards are computed from the CLOSING roster (Goblin included), not the cleared one.
         expect(autoAwardCombatRewards).toHaveBeenCalledWith(expect.objectContaining({

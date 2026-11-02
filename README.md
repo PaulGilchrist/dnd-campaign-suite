@@ -68,7 +68,10 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 | 📊 **Digital Character Sheet** | Live-updating, click-to-roll, condition & exhaustion tracking, resource management |
 | 🖨️ **Print-Ready Sheets** | Single-page, clean layout, critical stats front and center |
 | ⚔️ **Initiative Tracker** | Turn order, round counter, NPC management, keyboard shortcuts, battle notes |
+| 📺 **TV Presentation Mode** | One click turns the tracker into an across-the-room display: golden turn spotlight, up-next strip, big HP bars with bloodied/dead badges, damage & heal floaters, target chips — on any device, read-only by design |
+| 🏆 **Victory Banner** | Clearing combat celebrates the seam on every screen: rounds survived, foes defeated vs driven off (kills only), heroes standing |
 | 👾 **Encounter Builder** | Monster selection, XP budgets, difficulty ratings, save/load, auto-generation by environment, loot tables |
+| 🎮 **Control Delegation** | GM hands any NPC/monster to a player's device (🎮 picker on the card) — visitors run monsters, players multi-control, summons follow their caster; all rolls use the real engine lanes, every hand-off logged |
 | 🐲 **Interactive Monster Stat Blocks** | Fully clickable monster actions — 1,800+ verified action rows across 600+ monsters: attacks, spellcasting, AoE save pickers, recharge gates, legendary action pools, lair actions with persistent hazard zones, reactions, summons into initiative |
 | 🗺️ **Indoor Maps** | Grid-based, fog of war, 25+ furniture types, spell overlays, ruler tool, door toggling, bulk selection |
 | 🧊 **3D Map View** | One-click WebGL view of any indoor map — extruded textured walls, 3D furniture models, portrait tokens, torch point lights, fog-of-war volumes, 3D spell-effect volumes, orbit/pan/zoom camera, live SSE sync |
@@ -325,6 +328,12 @@ When battle erupts, the app becomes your **tactical command center**:
 ### Battle Notes
 
 - Add notes to any creature (track conditions, remember tactics, etc.)
+
+### TV Mode & Combat Juice
+
+- **TV button** on the tracker header switches any browser into presentation mode — spotlight on the active creature (with pulse), an "Up next" strip, big HP bars with OK/BLOODIED/DEAD badges, and target chips; edit chrome hides automatically (fullscreen where the browser allows, per-screen preference)
+- **Damage & heal floaters** with crit-big numbers and hit flashes animate on every card as HP changes — on all devices
+- **Victory banner** at the combat-clear seam on every screen: rounds, kills vs foes that drove off, and heroes standing
 
 <img src="public/initiative.png" alt="Combat Tracking" width="800" />
 

@@ -27,7 +27,7 @@ import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
 import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 import createServerConfigRouter from './server/routes/server-config.js';
-import { createCampaignLockMiddleware, createCampaignRenameGuard, setCampaignLock } from './server/utils/campaignLock.js';
+import { createCampaignLockMiddleware, createCampaignCreateGuard, createCampaignRenameGuard, setCampaignLock } from './server/utils/campaignLock.js';
 import { noStoreCampaignGets } from './server/utils/noStoreApi.js';
 
 const PORT = process.env.PORT || 80;
@@ -56,6 +56,18 @@ app.use(express.json({ limit: '5mb' }));
 // req.body.newName — an identity the phase-1 path check cannot see. Mounted
 // right after the JSON parser so it can read req.body; only exact-shape
 // rename PUTs into the locked campaign pay the check.
+// Lock phase 2 (body-aware gates, mounted AFTER the JSON parser):
+//   • createCampaignCreateGuard — POST /api/campaigns reads the new campaign
+//     name from req.body.campaignName (invisible to phase 1's path check) and
+//     permits it only when it is an explicit member of the lock set, so the
+//     throwaway campaigns (qa-arena/qa-starter) can be created while
+//     production names and arbitrary names stay refused;
+//   • createCampaignRenameGuard — PUT /api/campaigns/:campaign renames the
+//     folder to req.body.newName (also a body-only identity). A real rename is
+//     allowed only between two throwaway members, so the harness's own
+//     campaign is never renamed out from under it (live incident 2026-10-28:
+//     test-campaign to zz slipped past phase 1, which saw only the source).
+app.use(createCampaignCreateGuard(CAMPAIGN_LOCK));
 app.use(createCampaignRenameGuard(CAMPAIGN_LOCK));
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

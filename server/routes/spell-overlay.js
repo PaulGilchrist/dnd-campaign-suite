@@ -1,7 +1,7 @@
 import express from 'express';
 import { publish, spellOverlayData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { getCampaignLock, blockRequest } from '../utils/campaignLock.js';
+import { getCampaignLock, activeCampaignLockAllows, blockRequest } from '../utils/campaignLock.js';
 
 const router = express.Router();
 
@@ -29,11 +29,13 @@ router.get('/spell-overlay', asyncHandler((req, res) => {
     res.json({ overlays });
 }));
 
-// While locked, refuse any write whose campaign is not the locked one.
-// Returns true when the request was answered with the block response.
+// While locked, refuse any write whose campaign is not a permitted member of
+// the active lock (single name = that one campaign; set form permits the
+// throwaway campaigns too). Returns true when the request was answered with
+// the block response.
 function refuseLockedOffTargetWrite(req, res, campaign) {
     const campaignLock = getCampaignLock();
-    if (!campaignLock || campaign === campaignLock) {
+    if (!campaignLock || activeCampaignLockAllows(campaign)) {
         return false;
     }
     blockRequest(req, res, campaignLock);

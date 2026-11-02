@@ -11,6 +11,7 @@ import { autoAwardCombatRewards } from '../../services/items/autoRewardService.j
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
 import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCreatureService.js'
 import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js'
+import { getCreatureController } from '../../services/encounters/creatureControl.js'
 import { sweepNewCombatClocks } from '../../services/rules/effects/zoneDurationClock.js'
 
 /**
@@ -186,6 +187,27 @@ export function createCreatureHandlers({
             // auto-rewards (flag-gated, off ⇒ zero writes) need the NPCs
             // that were on the tracker to compute loot + XP.
             const closingSummary = cloneDeep(combatSummary)
+            // TV-mode victory banner: stamp the outcome into the runtime store
+            // BEFORE the roster is wiped (combat UI state, AGENTS server-first
+            // allowlist). Every client — including the TV tab — celebrates the
+            // seam until dismissed; "defeated" is kills only (hp ≤ 0), anything
+            // else fled and pays nothing. UI presentation only — no game rule
+            // reads this key.
+            const foeRows = closingSummary.creatures.filter(c => c.type === 'npc')
+            const defeatedFoes = foeRows.filter(c => (c.currentHp ?? 0) <= 0).length
+            const playerRows = closingSummary.creatures.filter(c => c.type === 'player')
+            const survivors = playerRows.filter(c =>
+                (getRuntimeValue(c.name, 'currentHitPoints') ?? c.currentHp ?? 1) > 0
+            ).length
+            setRuntimeValue('campaign', 'lastCombatResult', {
+                stamp: Date.now(),
+                rounds: closingSummary.round ?? 1,
+                foes: foeRows.length,
+                defeated: defeatedFoes,
+                survivors,
+                partySize: playerRows.length,
+                wipe: playerRows.length > 0 && survivors === 0,
+            }, campaignName)
             const newSummary = clearCombat(characters, numOfNpc, (name) => name)
             storage.set('combatSummary', newSummary, campaignName)
             setCombatSummary(newSummary)
@@ -263,6 +285,40 @@ export function createCreatureHandlers({
         }
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
+    }
+
+    // Phase 2 — control delegation. GM hands an NPC/monster to a player (their
+    // device opens and rolls its card through the same monster-action lanes)
+    // or releases it back (derived lanes — summon/wild-shape — re-assert).
+    // Tracker authorship is GM-only (bug-player-clients-can-hijack-initiative
+    // family), and every assignment logs to the campaign log (repo rule).
+    const handleControllerChange = function handleControllerChange(creatureName, controllerName) {
+        if (!isLocalhost || !combatSummary) return
+        const creature = combatSummary.creatures.find(c => c.name === creatureName)
+        if (!creature || creature.type === 'player') return
+        if (controllerName) {
+            const isValidPlayer = combatSummary.creatures.some(c => c.type === 'player' && c.name === controllerName)
+            if (!isValidPlayer) {
+                console.error(`[handleControllerChange] ${controllerName} is not a player on the tracker — control not assigned`)
+                return
+            }
+            creature.controller = controllerName
+        } else {
+            delete creature.controller
+        }
+        storage.set('combatSummary', combatSummary, campaignName)
+        setCombatSummary(cloneDeep(combatSummary))
+        const fallback = controllerName ? null : getCreatureController(creature, combatSummary.creatures, [])
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: creature.name,
+            automationType: controllerName ? 'control_assigned' : 'control_released',
+            name: 'Control',
+            description: controllerName
+                ? `${creature.name} handed to ${controllerName} — their device can run its card (roll, target, saves) until released.`
+                : `${creature.name} returned to the GM${fallback ? ` (auto-controlled by ${fallback})` : ''}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[handleControllerChange] control log failed:', e) })
     }
 
     const handleRemoveNpc = function handleRemoveNpc(creatureName) {
@@ -352,6 +408,7 @@ export function createCreatureHandlers({
         handleInitiativeChange,
         handleNameChange,
         handleTargetChange,
+        handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,
     }

@@ -22,6 +22,36 @@
 const CAMPAIGNS_PREFIX = '/api/campaigns';
 const READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
+// Parse the decoded lock string into the set of allowed campaign names.
+// Backwards compatible: a single name yields ["name"] and every membership
+// test collapses to the original `target === campaignLock` behavior. A
+// comma-separated list (e.g. "test-campaign,qa-arena,qa-starter") additionally
+// permits writes to the extra throwaway campaigns — used for Arena/Starter
+// verification — while still denying every production campaign and any other
+// name. Blank entries are dropped; an all-blank/empty lock is treated as
+// unlocked (null). Exported so the spell-overlay lane and tests share one parse.
+export function parseCampaignLock(campaignLock) {
+    if (!campaignLock) return null;
+    const names = String(campaignLock)
+        .split(',')
+        .map((n) => n.trim())
+        .filter(Boolean);
+    return names.length ? names : null;
+}
+
+// Is `target` one of the permitted campaign names for this lock string?
+function isAllowed(campaignLock, target) {
+    const names = parseCampaignLock(campaignLock);
+    return !!names && names.includes(target);
+}
+
+// Public membership check for out-of-namespace enforcement (the /spell-overlay
+// transport takes its campaign as a query param and cannot see the path). A
+// null/empty lock returns false — callers must guard on "is locked" themselves.
+export function campaignLockAllows(campaignLock, target) {
+    return isAllowed(campaignLock, target);
+}
+
 // The decoded lock name, kept here as the runtime single source of truth so
 // routes OUTSIDE the /api/campaigns path namespace (e.g. the /spell-overlay
 // transport, which takes its campaign as a query param the path-based phase-1
@@ -35,6 +65,13 @@ export function setCampaignLock(campaignLock) {
 
 export function getCampaignLock() {
     return activeCampaignLock;
+}
+
+// Membership test against the ACTIVE lock (the runtime single source of
+// truth). Lets out-of-namespace routes enforce the same rule without threading
+// the lock string through. Not-locked (null active lock) → false.
+export function activeCampaignLockAllows(campaign) {
+    return isAllowed(activeCampaignLock, campaign);
 }
 
 // Canonical refusal shared by every lock enforcement point: one stderr
@@ -70,7 +107,32 @@ export function createCampaignLockMiddleware(campaignLock) {
         if (READ_METHODS.includes(req.method)) return next();
         const scoped = describeCampaignPath(req);
         if (!scoped) return next();
-        if (scoped.target === campaignLock) return next();
+        // A named target that is a permitted campaign of this lock writes freely.
+        if (isAllowed(campaignLock, scoped.target)) return next();
+        // The bare collection route (POST /api/campaigns, no name segment) carries
+        // the new campaign name in the body — invisible to this pre-parse phase —
+        // so defer it to createCampaignCreateGuard (mounted after express.json).
+        if (scoped.target === '') return next();
+        return blockRequest(req, res, campaignLock);
+    };
+}
+
+// Body-aware creation gate (mounted AFTER express.json). While locked, a new
+// campaign may be created ONLY when its name is an explicit member of the lock
+// set (e.g. the qa-arena / qa-starter throwaways) — production names and any
+// other name are refused with the shared [campaign-lock] audit line. A single-
+// name lock therefore can never create (its only member already exists); the
+// set form is what makes throwaway creation possible without loosening safety.
+export function createCampaignCreateGuard(campaignLock) {
+    return (req, res, next) => {
+        if (!campaignLock) return next();
+        if (req.method !== 'POST') return next();
+        if (req.path !== CAMPAIGNS_PREFIX && req.path !== `${CAMPAIGNS_PREFIX}/`) return next();
+        const names = parseCampaignLock(campaignLock);
+        const campaignName = req.body && typeof req.body.campaignName === 'string'
+            ? req.body.campaignName.trim()
+            : null;
+        if (campaignName && names.includes(campaignName)) return next();
         return blockRequest(req, res, campaignLock);
     };
 }
@@ -80,15 +142,19 @@ export function createCampaignRenameGuard(campaignLock) {
         if (!campaignLock) return next();
         if (req.method !== 'PUT') return next();
         const scoped = describeCampaignPath(req);
-        // Only the exact campaign-level PUT onto the locked campaign can
-        // rename its folder; off-target PUTs were already 403'd by phase 1,
-        // and nested data writes never move the folder.
-        if (!scoped || !scoped.exact || scoped.target !== campaignLock) return next();
-        const newName = req.body && typeof req.body.newName === 'string' ? req.body.newName : null;
-        if (newName !== null && newName.trim() !== campaignLock) {
-            return blockRequest(req, res, campaignLock);
-        }
-        // No-op rename (newName === lock) and non-rename PUTs reach the route.
-        return next();
+        const names = parseCampaignLock(campaignLock);
+        // Only the exact campaign-level PUT onto a permitted campaign can rename
+        // its folder; off-target PUTs were already 403'd by phase 1, and nested
+        // data writes never move the folder.
+        if (!scoped || !scoped.exact || !names.includes(scoped.target)) return next();
+        const newName = req.body && typeof req.body.newName === 'string' ? req.body.newName.trim() : null;
+        // No-op rename (newName === source) and non-rename PUTs reach the route.
+        if (newName === null || newName === scoped.target) return next();
+        // A real rename is permitted only between two THROWAWAY members (the
+        // primary/first lock entry — the harness's own campaign — is never
+        // renamable, closing the 2026-10-28 test-campaign → zz incident, and
+        // a throwaway can never be renamed out to a production or new name).
+        if (scoped.target !== names[0] && names.includes(newName)) return next();
+        return blockRequest(req, res, campaignLock);
     };
 }

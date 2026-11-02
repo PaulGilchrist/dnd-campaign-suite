@@ -1,6 +1,6 @@
 import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
-import { createCampaignLockMiddleware, createCampaignRenameGuard } from './campaignLock.js';
+import { createCampaignLockMiddleware, createCampaignCreateGuard, createCampaignRenameGuard, parseCampaignLock, campaignLockAllows } from './campaignLock.js';
 
 // Regression for bug-campaign-lock-ignores-rename-target: the lock
 // middleware only validated the :campaign SOURCE segment, so while locked
@@ -19,7 +19,11 @@ function createTestApp(campaignLock = LOCK) {
     const app = express();
     app.use(createCampaignLockMiddleware(campaignLock));
     app.use(express.json({ limit: '5mb' }));
+    app.use(createCampaignCreateGuard(campaignLock));
     app.use(createCampaignRenameGuard(campaignLock));
+    app.post('/api/campaigns', (req, res) => {
+        res.json({ reached: true, created: req.body?.campaignName });
+    });
     app.put('/api/campaigns/:campaign', (req, res) => {
         res.json({ reached: true, campaign: req.params.campaign, newName: req.body?.newName });
     });
@@ -150,5 +154,116 @@ describe('campaignLock - unlocked passthrough', () => {
         expect(res.status).toBe(200);
         expect(res.body).toEqual({ reached: true, campaign: 'test-campaign', newName: 'renamed-freely' });
         expect(errorSpy).not.toHaveBeenCalled();
+    });
+});
+
+describe('parseCampaignLock / campaignLockAllows', () => {
+    it('single name parses to one-element list; membership equals old equality', () => {
+        expect(parseCampaignLock('test-campaign')).toEqual(['test-campaign']);
+        expect(campaignLockAllows('test-campaign', 'test-campaign')).toBe(true);
+        expect(campaignLockAllows('test-campaign', 'qa-arena')).toBe(false);
+    });
+
+    it('comma list trims and drops blanks; membership covers every member', () => {
+        expect(parseCampaignLock(' test-campaign , qa-arena ,, qa-starter ')).toEqual(['test-campaign', 'qa-arena', 'qa-starter']);
+        expect(campaignLockAllows('test-campaign,qa-arena,qa-starter', 'qa-arena')).toBe(true);
+        expect(campaignLockAllows('test-campaign,qa-arena,qa-starter', 'Frostfall')).toBe(false);
+    });
+
+    it('empty/all-blank lock parses to null (unlocked)', () => {
+        expect(parseCampaignLock('')).toBeNull();
+        expect(parseCampaignLock('  ,  ')).toBeNull();
+        expect(parseCampaignLock(null)).toBeNull();
+    });
+});
+
+describe('campaignLock - allowlist set (qa throwaways)', () => {
+    const LIST = 'test-campaign,qa-arena,qa-starter';
+
+    it('permits nested writes to every member campaign', async () => {
+        for (const name of ['test-campaign', 'qa-arena', 'qa-starter']) {
+            const res = await request(createTestApp(LIST))
+                .post(`/api/campaigns/${name}/change`)
+                .set('Content-Type', 'application/json')
+                .send({ value: 1 });
+            expect(res.status).toBe(200);
+            expect(res.body.reached).toBe(true);
+        }
+    });
+
+    it('still denies production campaigns', async () => {
+        const res = await request(createTestApp(LIST))
+            .post('/api/campaigns/Frostfall/change')
+            .set('Content-Type', 'application/json')
+            .send({ value: 1 });
+        expect(res.status).toBe(403);
+    });
+
+    it('create route accepts a member name and refuses non-members', async () => {
+        const ok = await request(createTestApp(LIST))
+            .post('/api/campaigns')
+            .set('Content-Type', 'application/json')
+            .send({ campaignName: 'qa-arena' });
+        expect(ok.status).toBe(200);
+        expect(ok.body).toEqual({ reached: true, created: 'qa-arena' });
+
+        for (const bad of ['Frostfall', 'my-new-campaign', '']) {
+            const locked = await request(createTestApp(LIST))
+                .post('/api/campaigns')
+                .set('Content-Type', 'application/json')
+                .send({ campaignName: bad });
+            expect(locked.status).toBe(403);
+        }
+    });
+
+    it('a single-name lock cannot create anything (its only member already exists)', async () => {
+        const res = await request(createTestApp(LOCK))
+            .post('/api/campaigns')
+            .set('Content-Type', 'application/json')
+            .send({ campaignName: 'test-campaign' });
+        // Even naming the existing campaign: creation of the already-set member
+        // is allowed by the guard (route then errors on dup), but a NEW name is
+        // hard-refused before the route:
+        expect(res.status).toBe(200);
+        const fresh = await request(createTestApp(LOCK))
+            .post('/api/campaigns')
+            .set('Content-Type', 'application/json')
+            .send({ campaignName: 'qa-arena' });
+        expect(fresh.status).toBe(403);
+    });
+
+    it('rename between two throwaways is allowed', async () => {
+        const res = await request(createTestApp(LIST))
+            .put('/api/campaigns/qa-arena')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'qa-starter' });
+        expect(res.status).toBe(200);
+        expect(res.body.reached).toBe(true);
+    });
+
+    it('renaming the PRIMARY (first) lock entry away is still blocked', async () => {
+        const res = await request(createTestApp(LIST))
+            .put('/api/campaigns/test-campaign')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'qa-arena' });
+        expect(res.status).toBe(403);
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('BLOCKED PUT /api/campaigns/test-campaign'));
+    });
+
+    it('a throwaway renamed to a NON-member name is blocked', async () => {
+        const res = await request(createTestApp(LIST))
+            .put('/api/campaigns/qa-arena')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'Frostfall' });
+        expect(res.status).toBe(403);
+    });
+
+    it('unlocked still creates any name', async () => {
+        const res = await request(createTestApp(null))
+            .post('/api/campaigns')
+            .set('Content-Type', 'application/json')
+            .send({ campaignName: 'literally-anything' });
+        expect(res.status).toBe(200);
+        expect(res.body.created).toBe('literally-anything');
     });
 });

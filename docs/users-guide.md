@@ -65,7 +65,7 @@ Every level builds on the one below it, and every level stays available forever.
 | Level | Name | What you get | Typical table |
 |---|---|---|---|
 | **1** | **Pre-game only** | Build campaigns, maps, encounters, quests, NPCs, settlements; create and level up characters; print everything. | Paper + real dice on game night. The app is your prep bench. |
-| **2** | **Minimal game use** | The Initiative tracker on a TV or monitor: whose turn it is, who's hurt, who's buffed, round counter. | Paper play with a live turn order on screen. |
+| **2** | **Minimal game use** | The Initiative tracker on a TV or monitor: whose turn it is, who's hurt, who's buffed, round counter — with a dedicated **TV presentation mode** (spotlight, up-next strip, damage floaters, victory banner). | Paper play with a live turn order on screen. |
 | **3** | **Maps** | Tactical grid maps: token movement, fog of war, walls and doors, spell area-of-effect overlays, rulers, item drops. | Theater of the mind replaced by a shared battle map. |
 | **4** | **Combat** | The rules run with you: to-hit vs target AC, damage auto-rolls with criticals, resistances/immunity notices, conditions with action-blocking, saves, spell automation, loot and XP, full PvE **and** PvP / NPC-vs-NPC / ally / arena matchups. | Fully digital play; the GM adjudicates anything unusual. |
 | **5** | **GM-optional** | Optional enforcement (turn lock, action economy, movement budgets, line of sight, cover, zones, opportunity attacks, auto-encounters, auto-rewards) plus a **local AI** that can propose NPC decisions, adjudicate rules questions, and maintain world continuity — always through the same engine lanes a human click uses. | The app referees the rules and can run NPCs; a human referee is optional, and can take over at any moment with one button. |
@@ -114,6 +114,7 @@ Open the network link the GM shares — nothing to install, no account. Pick you
 
 - **Your sheet:** abilities, savings throws, skills, attacks, spells (click to cast), bonus actions, reactions, features, inventory. Click an ability/skill/save name to roll it (with retroactive advantage/disadvantage — see §18).
 - **During combat:** click an attack to roll to-hit against your selected target; damage and criticals resolve automatically. Conditions applied to you show up as badges and genuinely block what they should — incapacitated means the buttons say so.
+- **Running a creature:** when the GM hands you a monster (or you summon one), it appears as *your* card on the tracker — click its avatar for the full stat block and roll its actions yourself; a **Your turn!** cue tells you when to act.
 - **Your turn on the map:** drag your own token; the fog lifts as you explore; you can see spell overlays and everyone's HP bars.
 - **Rests:** **Short Rest** / **Long Rest** on your sheet track hit dice and class resources.
 - **Inventory:** pick up, equip, and move items between your pack and the party stash.
@@ -131,7 +132,17 @@ Combat runs the same at every level; enforcement switches (§8) only decide *who
 2. **Players act:** select a target (the Target dropdown on the tracker card, or click a token), then click the attack/spell on your sheet. The engine rolls to-hit, compares to AC, rolls damage on a hit (doubling dice on a natural 20), applies resistances/immunity notes, and pushes the result everywhere.
 3. **Monsters act:** click the monster's **avatar** → its full stat block opens → click a **dice chip** (+6 🎲) to roll that attack, save, or skill; damage chips apply to the current target. The card stays open so a monster can be run in seconds.
 4. **Conditions and automation:** 5e conditions block the actions they should (paralyzed can't act; restrained halves speed and gives attackers advantage, and the app tells you). Spell and monster automations (concentration saves on damage, lair actions, legendary uses, recharge dice…) are built in, with clear prompts where a human decides.
-5. **End of combat:** **Clear** wipes the tracker back to camp (players keep their sheet state; monsters respawn if re-added). Loot and XP are handled per §12.
+5. **Hand a monster to a player (visitors & multi-character play):** every NPC card has a GM-only 🎮 **control picker** — choose a player and that monster becomes *theirs*: their device opens its full stat card and rolls its attacks, saves, and targets through the exact same engine lanes the GM uses, with a pulsing **Your turn!** cue when it acts. Summons and wild-shapes already auto-follow their caster; an explicit assignment overrides and can be released back to the GM (both legs are logged to the campaign log). One person can run several characters plus their creatures — control travels with the character, not the device.
+6. **End of combat:** **Clear** wipes the tracker back to camp (players keep their sheet state; monsters respawn if re-added). Every screen celebrates the seam — a **Victory banner** reports the rounds survived, foes defeated vs driven off (kills only — the app never fabricates a result), and how many heroes are standing; click it to dismiss. Loot and XP are handled per §12.
+
+### TV mode (presentation, on any device)
+
+The tracker's **TV** button (top-right of the header) turns it into an across-the-room display — this is the same tracker, just dressed for the living-room screen:
+
+- Click **TV** on any browser (GM, player, or a tablet dedicated to the TV) — the layout grows big: the active creature spotlights to the head of the row with a golden pulse, an **Up next** strip previews the turn order, HP bars thicken, and **OK / BLOODIED / DEAD** badges show for every creature.
+- **Damage and healing floaters** (−11, +5, crit-big numbers) and a hit-flash animate on every card as the fight swings — on all devices, TV or not.
+- Token editing chrome (initiative inputs, target dropdowns, add/remove buttons) hides on the TV; set a creature's target and the TV shows a **→ target** chip instead.
+- TV mode is a per-screen preference (it asks the browser to go fullscreen; on networks where the browser blocks fullscreen it says so — press F11). Press **Esc** or click **TV** again to exit. Nothing you see on the TV can be changed from it — it's pure presentation.
 
 > Nothing resolves on a timer. Death saves, concentration prompts, contested decisions — they wait until someone answers.
 
