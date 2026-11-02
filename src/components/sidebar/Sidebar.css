@@ -140,6 +140,30 @@
   white-space: nowrap;
 }
 
+/* Campaign-type chip (Arena Battle / Starter Adventure) — the header names
+   what kind of campaign is open; standard shows no chip. Colors match the
+   campaign-selection row badges (CampaignSelection.css). */
+.sidebar-header .sidebar-campaign-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-inverse);
+}
+
+.sidebar-header .sidebar-campaign-badge--arena {
+  background-color: #b0413e;
+}
+
+.sidebar-header .sidebar-campaign-badge--starter {
+  background-color: #3d8b5f;
+}
+
 .sidebar-active-indicator {
   display: flex;
   align-items: center;

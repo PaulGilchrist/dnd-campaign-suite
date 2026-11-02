@@ -17,6 +17,7 @@ import storage from './services/ui/storage.js';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/maps/mapsService.js';
 import { characterFileName } from './services/campaign/characterFileName.js';
+import useCampaignType from './hooks/management/useCampaignType.js';
 import useAppData from './hooks/runtime/useAppData.js';
 import useCharacterManagement from './hooks/management/useCharacterManagement.js';
 import useCampaignManagement from './hooks/management/useCampaignManagement.js';
@@ -486,6 +487,10 @@ function App() {
     setMapsView({ type: 'none' });
   }, [campaignName]);
 
+  // Campaign type (standard | arena | starter) drives the sidebar chip and
+  // arena nav gating (see useCampaignType).
+  const campaignType = useCampaignType(campaignName);
+
   useEffect(() => {
     setActiveMapName(null);
     if (!campaignName) return;
@@ -718,6 +723,7 @@ function App() {
           onLogClick={handleLogClick}
           onRepairClick={() => setActiveView('campaignRepair')}
           activeView={activeView}
+          campaignType={campaignType}
            />
         <ErrorBoundary resetKey={`${campaignName}|${activeView}`}>
         <FirstSessionChecklist campaignName={campaignName} onNavigate={setActiveView} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />

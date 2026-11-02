@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
+import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
 import { createSeededCampaign } from '../../services/campaign/seededCampaign.js';
 import SeededCampaignModal from './SeededCampaignModal.jsx';
 import './CampaignSelection.css';
 
 // Quick-create presets (arena-starter plan §2.3/§3.4): localhost-only buttons
-// next to the plain "Add" that seed a finished campaign via the shared
-// orchestrator. The plain "Add" flow above stays untouched.
+// next to the standard create that seed a finished campaign via the shared
+// orchestrator. Labels name what you actually get: a full campaign, a
+// one-off arena battle, or a short guided starter adventure.
 const SEEDED_PRESETS = {
   arena: {
-    button: 'New Arena Campaign',
+    button: 'New Arena Battle',
     icon: 'fa-solid fa-shield-halved',
     prefix: 'Arena',
-    note: 'Creates a disposable arena campaign: two carved sparring halls plus a saved low-CR encounter pool, ready for pickup play.',
+    note: 'Creates a one-off arena battle: two carved sparring halls plus a saved low-CR encounter pool, ready for pickup play. Campaign-only views (quests, factions, settlements, …) are hidden while an arena is open.',
   },
   starter: {
-    button: 'New Starter Campaign',
+    button: 'New Starter Adventure',
     icon: 'fa-solid fa-seedling',
     prefix: 'Starter',
-    note: 'Creates a seeded starter campaign: a generated village, wilds hex map with portal, dungeon, quests, and Dungeon Wave 1-3 encounters — every roll is fresh.',
+    note: 'Creates a short guided adventure: a generated village, wilds hex map with portal, dungeon, quests, and Dungeon Wave 1-3 encounters — every roll is fresh.',
   },
 };
 
@@ -28,6 +30,7 @@ function seededDefaultName(prefix) {
 
 function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost = true }) {
   const [campaigns, setCampaigns] = useState([]);
+  const [campaignTypes, setCampaignTypes] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
@@ -42,7 +45,9 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
       try {
         setLoading(true);
         const folders = await getCharacterFolders();
+        const types = await getCampaignTypes();
         setCampaigns(folders);
+        setCampaignTypes(types);
         setLoading(false);
       } catch (_err) {
         setError('Failed to load campaigns. Please ensure campaign folders exist under ./public/campaigns');
@@ -159,8 +164,9 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
       setSeedPreset(null);
       setNewCampaignName('');
       await handleCampaignSelect(result.name);
-      // If the parent kept us mounted, surface the fresh row.
+      // If the parent kept us mounted, surface the fresh row (and its badge).
       setCampaigns(await getCharacterFolders());
+      setCampaignTypes(await getCampaignTypes());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -203,7 +209,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
            </div>
          )}
          {isLocalhost && (
-           <button className="new-campaign-button" onClick={openNewCampaignModal}><i className="fas fa-plus"></i> Add</button>
+           <button className="new-campaign-button" onClick={openNewCampaignModal}><i className="fas fa-plus"></i> New Campaign</button>
          )}
          {isLocalhost && Object.entries(SEEDED_PRESETS).map(([presetKey, cfg]) => (
            <button
@@ -220,24 +226,32 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
            No campaigns found. Please create folders under ./public/campaigns to get started.
            </p>
          ) : (
-           <div className="campaign-list">
-             {campaigns.map((campaign) => (
-               <button
-               key={campaign}
-               className="campaign-button"
-               onClick={() => handleCampaignSelect(campaign)}
-               disabled={loading}
-               >
-                 {campaign}
-               </button>
-             ))}
-           </div>
+            <div className="campaign-list">
+              {campaigns.map((campaign) => {
+                const badge = CAMPAIGN_TYPE_BADGES[campaignTypes[campaign]];
+                return (
+                  <button
+                    key={campaign}
+                    className={`campaign-button${badge ? ` campaign-button--${badge.cls}` : ''}`}
+                    onClick={() => handleCampaignSelect(campaign)}
+                    disabled={loading}
+                  >
+                    {campaign}
+                    {badge && (
+                      <span className={`campaign-type-badge campaign-type-badge--${badge.cls}`}>
+                        <i className={badge.icon}></i> {badge.label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
          )}
        
          {isLocalhost && showNewCampaignModal && (
            <div className="modal-overlay">
              <div className="modal-content">
-               <h2>Create New Campaign</h2>
+               <h2>New Campaign</h2>
                <input
                type="text"
                value={newCampaignName}

@@ -5,10 +5,16 @@ import CampaignSelection from './CampaignSelection.jsx';
 
 // Mock the campaign service — the component under test talks to the API
 // only through these three functions (plus a direct fetch for creation).
+// The meta lane is mocked too so the load-time getCampaignTypes never
+// pollutes the fetch spies below (it defaults to an empty type map).
 vi.mock('../../services/campaign/campaignService.js', () => ({
   getCharacterFolders: vi.fn(),
   getCharacterFiles: vi.fn(),
   loadCharacters: vi.fn(),
+}));
+vi.mock('../../services/campaign/campaignMetaService.js', () => ({
+  getCampaignTypes: vi.fn(async () => ({})),
+  CAMPAIGN_TYPE_BADGES: {},
 }));
 
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
@@ -60,7 +66,7 @@ async function renderCampaigns({ folders = ['Campaign1'], ...props } = {}) {
 
 const campaignButton = (name) => screen.getByRole('button', { name });
 
-const openCreateModal = () => fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+const openCreateModal = () => fireEvent.click(screen.getByRole('button', { name: 'New Campaign' }));
 // NOTE: getByRole('textbox', { name }) cannot resolve placeholder-derived
 // names in this vitest/jsdom setup, so the placeholder query is used here.
 const nameInput = () => screen.getByPlaceholderText('Enter campaign name');
@@ -105,31 +111,31 @@ describe('CampaignSelection', () => {
   });
 
   describe('campaign list', () => {
-    it('renders the heading, an Add button, and one enabled button per campaign', async () => {
+    it('renders the heading, a New Campaign button, and one enabled button per campaign', async () => {
       await renderCampaigns({ folders: ['Alpha', 'Beta', 'Gamma'] });
 
       expect(screen.getByRole('heading', { level: 1, name: 'Select a Campaign' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'New Campaign' })).toBeInTheDocument();
       ['Alpha', 'Beta', 'Gamma'].forEach((name) => {
         expect(campaignButton(name)).toBeEnabled();
       });
     });
 
-    it('shows guidance and keeps Add available when no campaigns exist', async () => {
+    it('shows guidance and keeps New Campaign available when no campaigns exist', async () => {
       await renderCampaigns({ folders: [] });
 
       expect(screen.getByText(/No campaigns found/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'New Campaign' })).toBeInTheDocument();
       expect(screen.queryByText('Campaign1')).not.toBeInTheDocument();
     });
   });
 
   describe('create campaign modal', () => {
-    it('opens from Add, discards the typed name on Cancel, and reopens blank', async () => {
+    it('opens from the New Campaign button, discards the typed name on Cancel, and reopens blank', async () => {
       await renderCampaigns();
 
       openCreateModal();
-      expect(screen.getByRole('heading', { level: 2, name: 'Create New Campaign' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'New Campaign' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 
@@ -137,7 +143,7 @@ describe('CampaignSelection', () => {
       expect(nameInput()).toHaveValue('My Campaign');
 
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(screen.queryByRole('heading', { name: 'Create New Campaign' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'New Campaign' })).not.toBeInTheDocument();
       expect(screen.queryByPlaceholderText('Enter campaign name')).not.toBeInTheDocument();
 
       // Re-opening starts from a clean slate.

@@ -14,6 +14,7 @@ function setupReaddir(path, entries) {
 
 function clearMockFs() {
     MOCK_REaddir.clear();
+    MOCK_FILES.clear();
 }
 
 vi.mock('fs', () => ({
@@ -25,12 +26,21 @@ vi.mock('fs', () => ({
             }
             return entries;
         }),
+        existsSync: vi.fn((p) => MOCK_FILES.has(p)),
+        readFileSync: vi.fn((p) => {
+            if (MOCK_FILES.has(p)) return MOCK_FILES.get(p);
+            throw new Error('ENOENT');
+        }),
     },
 }));
+
+// Campaign-type resolution (campaigns-meta.js) reads per-campaign data files.
+const MOCK_FILES = new Map();
 
 vi.mock('../utils/campaignPaths.js', () => ({
     campaignsRoot: vi.fn(() => '/mock/campaigns/root'),
     campaignDir: vi.fn((campaign) => `/mock/campaigns/root/${campaign}`),
+    campaignDataFile: vi.fn((campaign, fileName) => `/mock/campaigns/root/${campaign}/data/${fileName}`),
 }));
 
 
@@ -138,6 +148,26 @@ describe('campaignsBasic - GET /api/campaigns', () => {
         expect(res.body.folders).toContain('test-campaign-a');
         expect(res.body.folders).toContain('test-campaign-b');
         expect(res.body.folders).not.toContain('.hidden-campaign');
+    });
+
+    it('maps every folder to its type (meta file, starter-seed inference, else standard)', async () => {
+        setupReaddir('/mock/campaigns/root', [
+            dirEntry('Arena One', true),
+            dirEntry('Starter One', true),
+            dirEntry('Plain One', true),
+        ]);
+        MOCK_FILES.set('/mock/campaigns/root/Arena One/data/campaign-meta.json', JSON.stringify({ type: 'arena' }));
+        MOCK_FILES.set('/mock/campaigns/root/Starter One/data/starter-seed.json', JSON.stringify({ version: 1 }));
+
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns');
+
+        expect(res.status).toBe(200);
+        expect(res.body.types).toEqual({
+            'Arena One': 'arena',
+            'Starter One': 'starter',
+            'Plain One': 'standard',
+        });
     });
 
     it('should return 404 for non-existent routes', async () => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
 import { addEntry } from '../../services/ui/logService.js';
+import { CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
 import './Sidebar.css';
 
 const VIEW_LABELS = {
@@ -30,22 +31,24 @@ const DICE_POPUP_AUTO_HIDE_MS = 4000;
 const NAV_ITEMS = [
     // NAV_ITEMS render verbatim — the nav-order test pins alphabetical-by-label,
     // so a new view slots by its label, not by insertion time.
-    { view: 'campaignBuilder', onClick: 'onCampaignBuilderClick', localhostOnly: true },
+    // arenaHidden: an arena battle is a one-off fight sandbox, so campaign-only
+    // planning views drop out of the nav while one is open (campaignType gate).
+    { view: 'campaignBuilder', onClick: 'onCampaignBuilderClick', localhostOnly: true, arenaHidden: true },
     { view: 'encounter', onClick: 'onEncounterClick', localhostOnly: true },
-    { view: 'factions', onClick: 'onFactionsClick', localhostOnly: true },
+    { view: 'factions', onClick: 'onFactionsClick', localhostOnly: true, arenaHidden: true },
     { view: 'initiative', onClick: 'onInitiativeClick' },
-    { view: 'partyInventory', onClick: 'onInventoryClick' },
+    { view: 'partyInventory', onClick: 'onInventoryClick', arenaHidden: true },
     { view: 'campaignLog', onClick: 'onLogClick' },
     { view: 'mapsManager', onClick: 'onMapsClick', playerLabel: 'Map' },
     // Ambience duty is delegable, so the music panel is open to players too
     // (main content area, activeView 'music').
     { view: 'music', onClick: 'onMusicClick' },
-    { view: 'notes', onClick: 'onNotesClick' },
+    { view: 'notes', onClick: 'onNotesClick', arenaHidden: true },
     { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
-    { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true },
+    { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true, arenaHidden: true },
     { external: true, icon: 'fa-book', label: 'Rules' },
-    { view: 'sessions', onClick: 'onSessionsClick', localhostOnly: true },
-    { view: 'settlements', onClick: 'onSettlementsClick', localhostOnly: true },
+    { view: 'sessions', onClick: 'onSessionsClick', localhostOnly: true, arenaHidden: true },
+    { view: 'settlements', onClick: 'onSettlementsClick', localhostOnly: true, arenaHidden: true },
 ];
 
 function openRules() {
@@ -132,7 +135,7 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
     const [diceResult, setDiceResult] = useState(null);
 
     // Auto-hide timer (display only, no game state). A re-roll replaces
@@ -159,12 +162,21 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
     const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
+    const typeBadge = CAMPAIGN_TYPE_BADGES[campaignType];
+    const navItems = campaignType === 'arena'
+        ? NAV_ITEMS.filter(item => !item.arenaHidden)
+        : NAV_ITEMS;
 
     return (
         <>
             <nav className="sidebar no-print">
                 <div className="sidebar-header">
                     <div className="campaign-name">{campaignName}</div>
+                    {typeBadge && (
+                        <div className={`sidebar-campaign-badge sidebar-campaign-badge--${typeBadge.cls}`}>
+                            <i className={typeBadge.icon}></i> {typeBadge.label}
+                        </div>
+                    )}
                 </div>
                 {activeView && (
                     <div className="sidebar-active-indicator">
@@ -188,7 +200,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     onDismissDeleteError={onDismissDeleteError}
                 />
 
-                {NAV_ITEMS.map((item) => (
+                {navItems.map((item) => (
                     <NavButton
                         key={item.view || 'rules'}
                         item={item}

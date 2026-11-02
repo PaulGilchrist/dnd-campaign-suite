@@ -1,8 +1,8 @@
 // @maintained-by-ai
 // Campaign creation is a GM (localhost-only) affordance. App.jsx threads the
 // isLocalhost flag computed by useCampaignManagement into CampaignSelection;
-// these tests lock both branches: network (LAN) players never see "+ Add"
-// or the "Create New Campaign" modal, localhost behavior is unchanged.
+// these tests lock both branches: network (LAN) players never see "New
+// Campaign" or its create modal, localhost behavior is unchanged.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignSelection from './CampaignSelection.jsx';
@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe('CampaignSelection localhost gating', () => {
-  it('hides the Add button and the create modal for non-localhost (LAN) clients', async () => {
+  it('hides the New Campaign button and the create modal for non-localhost (LAN) clients', async () => {
     await renderCampaigns({ isLocalhost: false });
 
     // Campaign list still renders for players.
@@ -41,32 +41,32 @@ describe('CampaignSelection localhost gating', () => {
 
     // The GM-only creation affordance is absent from the DOM entirely.
     expect(document.querySelector('.new-campaign-button')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New Campaign' })).not.toBeInTheDocument();
     expect(document.querySelector('.modal-overlay')).toBeNull();
-    expect(screen.queryByText('Create New Campaign')).not.toBeInTheDocument();
+    expect(screen.queryByText('New Campaign')).not.toBeInTheDocument();
   });
 
-  it('renders Add, opens the Create New Campaign modal, and closes it on Cancel for localhost', async () => {
+  it('renders New Campaign, opens its create modal, and closes it on Cancel for localhost', async () => {
     await renderCampaigns({ isLocalhost: true });
 
-    const addButton = screen.getByRole('button', { name: 'Add' });
+    const addButton = screen.getByRole('button', { name: 'New Campaign' });
     expect(addButton).toBeInTheDocument();
     expect(document.querySelector('.new-campaign-button')).toBe(addButton);
 
     fireEvent.click(addButton);
-    expect(screen.getByRole('heading', { level: 2, name: 'Create New Campaign' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'New Campaign' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter campaign name')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('heading', { name: 'Create New Campaign' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'New Campaign' })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Enter campaign name')).not.toBeInTheDocument();
   });
 
   it('defaults to localhost visibility when the prop is omitted (existing callers unchanged)', async () => {
     await renderCampaigns();
 
-    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New Campaign' })).toBeInTheDocument();
   });
 });

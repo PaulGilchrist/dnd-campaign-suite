@@ -23,6 +23,7 @@ import aiKeyRoutes from './server/routes/ai-key.js';
 import aiModelRoutes from './server/routes/ai-models.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsStarterSeed from './server/routes/campaigns-starter-seed.js';
+import campaignsMeta from './server/routes/campaigns-meta.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
@@ -208,6 +209,11 @@ app.use(aiModelRoutes);
 // campaignsChangedata so the generic :campaign/:key wildcard can never
 // capture /starter-seed.
 app.use(campaignsStarterSeed);
+
+// Campaign-type metadata (data/campaign-meta.json) — BEFORE
+// campaignsChangedata so the generic :campaign/:key wildcard can never
+// capture /meta (same trap as starter-seed).
+app.use(campaignsMeta);
 
 // Change data routes (after character file route so .json files aren't captured by :key)
 app.use(campaignsChangedata);

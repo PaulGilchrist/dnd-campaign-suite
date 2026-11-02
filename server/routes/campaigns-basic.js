@@ -2,10 +2,14 @@ import express from 'express';
 import fs from 'fs';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDir, campaignsRoot } from '../utils/campaignPaths.js';
+import { resolveCampaignType } from './campaigns-meta.js';
 
 const router = express.Router();
 
-// API endpoint to list character folders
+// API endpoint to list character folders. `types` maps each campaign name to
+// its quick-create type ('standard' | 'arena' | 'starter') so the selection
+// screen can badge rows BEFORE opening; resolveCampaignType never throws, so
+// a campaign with no meta file just reads as standard.
 router.get('/api/campaigns', asyncHandler((req, res) => {
     const items = fs.readdirSync(campaignsRoot(), { withFileTypes: true });
     const folders = items
@@ -13,7 +17,10 @@ router.get('/api/campaigns', asyncHandler((req, res) => {
         .map(item => item.name)
         .sort();
 
-    res.json({ folders });
+    const types = {};
+    for (const name of folders) types[name] = resolveCampaignType(name);
+
+    res.json({ folders, types });
 }));
 
 // API endpoint to list character files in a specific campaign
