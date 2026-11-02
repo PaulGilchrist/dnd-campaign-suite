@@ -23,6 +23,7 @@ function HexMapToolbar({
     setMarchingOrderOpen,
     marchingOrder,
     dressButton,
+    onEnter3D,
 }) {
     const poiLabel = toggleLabel(poiPanelOpen, 'Open POI panel', 'Close POI panel');
     const marchingLabel = toggleLabel(marchingOrderOpen, 'Manage marching order', 'Close marching order');
@@ -125,6 +126,15 @@ function HexMapToolbar({
                 POIs via q,r addressing) so the GM instructs with the grid in
                 view. Players/hosts without the prop pass nothing → no button. */}
             {dressButton}
+
+            {/* 3D diorama entry — the indoor MapToolbar.jsx twin (title AND
+                aria-label mirror; button renders only when the host provides
+                the handler). Read-only view, players included. */}
+            {onEnter3D && (
+                <button onClick={onEnter3D} title="View map in 3D" aria-label="View map in 3D">
+                    <i className="fa-solid fa-cube"></i> 3D
+                </button>
+            )}
 
             {/* Print */}
             <button onClick={() => window.print()} title="Print map" aria-label="Print map" className="no-print">

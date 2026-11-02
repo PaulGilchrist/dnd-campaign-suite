@@ -308,4 +308,25 @@ describe('HexMapToolbar', () => {
         renderToolbar({ marchingOrder: [{ id: 1 }, { id: 2 }] });
         expect(screen.getByText('2')).toBeInTheDocument();
     });
+
+    // 3D diorama entry (indoor MapToolbar.jsx twin): renders ONLY when the
+    // host supplies the handler, fires once, and mirrors title into the
+    // accessible name. With it supplied, it slots between the dress mount
+    // and Print in the byte-order census.
+    it('renders the 3D button only when onEnter3D is provided and invokes it once', () => {
+        renderToolbar();
+        expect(screen.queryByTitle('View map in 3D')).not.toBeInTheDocument();
+
+        const onEnter3D = vi.fn();
+        renderToolbar({ onEnter3D });
+        const button = screen.getByRole('button', { name: 'View map in 3D' });
+        expect(button).toHaveAttribute('title', 'View map in 3D');
+        expect(button).toHaveAttribute('aria-label', 'View map in 3D');
+        fireEvent.click(button);
+        expect(onEnter3D).toHaveBeenCalledTimes(1);
+
+        const titles = [...container.querySelectorAll('button[title]')].map(b => b.getAttribute('title'));
+        // Slot: after the marching toggle (and dress mount), before Print.
+        expect(titles).toEqual([...BUTTON_TITLE_ORDER.slice(0, -4), 'View map in 3D', ...BUTTON_TITLE_ORDER.slice(-4)]);
+    });
 });

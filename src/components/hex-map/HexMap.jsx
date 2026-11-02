@@ -18,6 +18,7 @@ import POIPanel from './POIPanel.jsx';
 import POIContextMenu from './POIContextMenu.jsx';
 import MarchingOrderPanel from './MarchingOrderPanel.jsx';
 import PartyMarkerLayer from './PartyMarkerLayer.jsx';
+import HexMap3D from './HexMap3D/HexMap3D.jsx';
 import RiverLayer from './RiverLayer.jsx';
 import RoadLayer from './RoadLayer.jsx';
 import SettlementSVG from './svg/SettlementSVG.jsx';
@@ -79,6 +80,37 @@ function HexHoverPreview({ hoveredHex, tool, rivers }) {
 // branch stays outside HexMap's render complexity.
 function rejectedNoticeName(mapDisplayName, parentDisplayName) {
     return mapDisplayName || parentDisplayName;
+}
+
+// 2D console ↔ read-only 3D diorama stage (indoor Map.jsx viewMode twin).
+// The branch lives HERE — a hoisted component — so the swap never inflates
+// HexMap's own render complexity (rejectedNoticeName precedent). In 3D the
+// toolbar/canvas/panels subtree is replaced wholesale; every hook above
+// (travel, SSE sync, painting) keeps running, so a trip in flight continues
+// and its SSE ticks patch the diorama live via HexMap3D's patch lanes.
+function HexMapStage({
+    viewMode, mapData, hexCols, hexRows, terrain, rivers, roads, pois,
+    partyPosition, travelPath, travelPathIndex, weather, isLocalhost,
+    onExit, children,
+}) {
+    if (viewMode !== '3d') return children;
+    return (
+        <HexMap3D
+            displayName={mapData?.displayName}
+            hexCols={hexCols}
+            hexRows={hexRows}
+            terrain={terrain}
+            rivers={rivers}
+            roads={roads}
+            pois={pois}
+            partyPosition={partyPosition}
+            travelPath={travelPath}
+            travelPathIndex={travelPathIndex}
+            weather={weather}
+            isLocalhost={isLocalhost}
+            onExit={onExit}
+        />
+    );
 }
 
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName, mapDisplayName }) {
@@ -151,6 +183,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [poiPanelOpen, setPoiPanelOpen] = useState(false);
     const [marchingOpen, setMarchingOpen] = useState(false);
     const [partyContextMenu, setPartyContextMenu] = useState(null);
+    // 2D editor ↔ read-only 3D diorama swap (indoor Map.jsx viewMode twin).
+    // Pure per-client display state — never persisted, never game state.
+    const [viewMode, setViewMode] = useState('2d');
 
     // ── Terrain painting ──
     const terrainPainting = useTerrainPainting({ hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers });
@@ -572,6 +607,22 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         // map editor, indoor or outdoor.
         <div className="hex-map" data-testid="map-editor">
             <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+            <HexMapStage
+                viewMode={viewMode}
+                mapData={mapLoader.mapData}
+                hexCols={hexCols}
+                hexRows={hexRows}
+                terrain={terrain}
+                rivers={rivers}
+                roads={roads}
+                pois={pois}
+                partyPosition={partyPosition}
+                travelPath={travelMgmt.path}
+                travelPathIndex={travelMgmt.pathIndex}
+                weather={weather}
+                isLocalhost={isLocalhost}
+                onExit={() => setViewMode('2d')}
+            >
             <HexMapToolbar
                 onBack={onBack}
                 mapName={mapsService.formatMapName(mapName)}
@@ -585,6 +636,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 gridSize={gridSize} setGridSize={setGridSize}
                 marchingOrderOpen={marchingOpen} setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
+                onEnter3D={() => setViewMode('3d')}
                 // AI Dress in the hex toolbar (GM-only, POI/q,r lane) — the
                 // same component as the list-row shortcut, docked variant;
                 // its ops drive the canvas overlay preview (hook nulls both
@@ -818,7 +870,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     onSkip={handleEventSkip}
                     onReroll={handleEventReroll}
                 />
-
+            </div>
+            </HexMapStage>
+            {/* Arrival/refusal toasts ride the always-mounted lane (outside the
+                2D/3D swap) so a trip completing while the GM watches the
+                diorama still lands. */}
+            <div className="no-print">
                 <TravelToast message={mapToast} />
             </div>
         </div>

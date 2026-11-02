@@ -1,0 +1,187 @@
+/* Read-only 3D outdoor hex view (HexMap3D) — mirrors the indoor Map3D.css
+   idiom under hex3d-* class names so the two views never share mutable
+   chrome. */
+
+.hex3d {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Toolbar chrome — the indoor bytes from Map.css (.map/.toolbar rules)
+   mirrored under .hex3d: the diorama mounts inside .hex-map, so the
+   .map-scoped rules never reach it and the bare global button fell back
+   to dark-on-dark (unreachable 2D/Top-down labels, owner report
+   2026-11-01). */
+.hex3d .toolbar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.hex3d .toolbar {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.hex3d .toolbar button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.hex3d .toolbar button:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.hex3d .toolbar button.active {
+    background: #4a90d9;
+    border-color: #2c5f8a;
+    color: #fff;
+}
+
+.hex3d .toolbar button i {
+    font-size: 14px;
+}
+
+[data-theme="light"] .hex3d .toolbar button {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .hex3d .toolbar button:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .hex3d .toolbar button.active {
+    background: #4a90d9;
+    border-color: #2c5f8a;
+    color: #fff;
+}
+
+[data-theme="light"] .hex3d-toggle {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .hex3d-toggle:hover {
+    background: #d8d8d8;
+}
+
+@media (prefers-color-scheme: light) {
+    body:not([data-theme="dark"]) .hex3d .toolbar button {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    body:not([data-theme="dark"]) .hex3d .toolbar button:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    body:not([data-theme="dark"]) .hex3d .toolbar button.active {
+        background: #4a90d9;
+        border-color: #2c5f8a;
+        color: #fff;
+    }
+
+    body:not([data-theme="dark"]) .hex3d-toggle {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    body:not([data-theme="dark"]) .hex3d-toggle:hover {
+        background: #d8d8d8;
+    }
+}
+
+.hex3d-counts {
+    color: #99a;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+/* Camera-control hint — .travel-panel-hint idiom: small, muted, italic
+   one-liner with info icon, ABOVE the viewport so it can never intercept
+   canvas drags. */
+.hex3d-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #99a;
+    font-size: 11px;
+    font-style: italic;
+    padding: 0 0 4px;
+}
+
+.hex3d-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.hex3d-toggle:hover {
+    background: #3a3a3a;
+}
+
+.hex3d-viewport {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #111;
+}
+
+.hex3d-viewport canvas {
+    display: block;
+}
+
+.hex3d-error,
+.hex3d-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    background: rgba(40, 20, 20, 0.9);
+    border: 1px solid #6b2b2b;
+    color: #ffb4ad;
+}
+
+.hex3d-loading {
+    background: rgba(20, 20, 30, 0.9);
+    border-color: #334;
+    color: #bcd;
+}
