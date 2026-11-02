@@ -18,6 +18,8 @@
  *  - "Maps" never shows the manager — it resolves the active map via
  *    loadMaps and opens it directly; re-clicking it while a map is open
  *    triggers no reload.
+ *  - Leaving to another view (Log) and back re-mounts the map view and
+ *    re-resolves the active map (a GM activation while away is honored).
  *  - Back from a map lands on the waiting placeholder, never the manager.
  *  - With no active map, re-clicking "Maps" re-runs the load (campaign-
  *    scoped) and opens the map once the GM has activated one.
@@ -456,6 +458,49 @@ describe('App - Map Navigation & View Management', () => {
       expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
       expect(loadMaps.mock.calls.length).toBe(loadCallsBefore);
+    });
+
+    // Regression (bug-lan-map-nav-noop-mid-session): leaving the map view for
+    // another sidebar view unmounts MapsAreaView while mapsView still carries
+    // type 'map' — the old "already on their only view" branch swallowed every
+    // later Map click, stranding the player on the previous view for the rest
+    // of the session (silent no-op, zero errors, reload-only recovery). One
+    // re-entry click must re-arm the view AND re-resolve the active map, so a
+    // GM activation made while the player was away is honored instead of
+    // re-opening the stale name left in mapsView.
+    it('re-clicking Map after leaving to another view re-mounts the map and follows the current active map', async () => {
+      loadMaps.mockResolvedValue({
+        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
+      });
+      await renderInCampaign('example.com');
+      clickMaps();
+      await expectMapShowing('dungeon-1');
+
+      // Player leaves the map view for the campaign log.
+      fireEvent.click(screen.getByTestId('log-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+
+      // GM activates a different map while the player is away.
+      loadMaps.mockResolvedValue({
+        maps: [
+          { fileName: 'dungeon-1.json', isActive: false },
+          { fileName: 'crypt-2.json', isActive: true },
+        ],
+      });
+
+      // One Map click re-mounts the view on the CURRENT active map —
+      // not a silent fall-back to the log, not the stale mapsView name.
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('map-view')).toBeInTheDocument();
+        expect(screen.getByTestId('map-name').textContent).toBe('crypt-2');
+      });
+      expect(screen.queryByTestId('campaign-log-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
+      expect(window.alert).not.toHaveBeenCalled();
     });
 
     it('back from a map lands on the waiting placeholder, never the manager', async () => {

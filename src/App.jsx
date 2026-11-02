@@ -517,8 +517,18 @@ function App() {
       if (isLocalhost) {
         setMapsView({ type: 'manager' });
         mapHistoryRef.current = []; // clear history when going back to manager
+      } else if (activeView !== 'mapsManager') {
+        // Regression (bug-lan-map-nav-noop-mid-session): a player who navigated
+        // to another view (Log, sheet…) unmounts MapsAreaView while mapsView
+        // still says 'map' — the old "already on their only view" assumption
+        // held only while mapsManager was active, so the re-entry click was a
+        // silent no-op stuck on the previous view. Re-arm the view and
+        // re-resolve the active map, so a GM activation made while the player
+        // was away opens the CURRENT active map, not the stale mapsView name.
+        setActiveView('mapsManager');
+        loadActiveMapAndOpen();
       }
-      // Players: already on their only view, do nothing
+      // Player already on the map view — do nothing
     } else if (activeView === 'mapsManager') {
       if (isLocalhost) {
         // Self-heal the blank sub-state: a Back click or a campaign switch
