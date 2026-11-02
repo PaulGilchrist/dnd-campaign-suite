@@ -10,9 +10,10 @@ import { HEX_SIZE, TERRAIN_TYPES, DEFAULT_TERRAIN } from '../../config/outdoorCo
 // catches wrong args and non-verbatim passthrough. Converter internals are owned by
 // hexMapUtils tests, grid geometry by HexGridLayer (#791), terrain paint STATE by the
 // terrain hook (#805), and prop forwarding by the container (#793). This file owns
-// TerrainLayer's rendered output only: one path per grid hex, verbatim `d` bytes, and
+// TerrainLayer's rendered output only: one path per grid hex, verbatim `d` bytes,
 // fills = terrain-id→colour-map lookup held within the layer's deterministic ±5%
-// per-position variation band of its base colour (exact golden byte pinned once).
+// per-position variation band of its base colour (exact golden byte pinned once),
+// and the additive ⚠ drift-badge over unknown-id cells (none on valid/unpainted).
 
 const TERRAIN_FILLS = Object.fromEntries(TERRAIN_TYPES.map(t => [t.id, t.fill]));
 const DEFAULT_FILL = TERRAIN_FILLS[DEFAULT_TERRAIN];
@@ -78,6 +79,55 @@ describe('TerrainLayer', () => {
         TERRAIN_TYPES.forEach((t, i) => expectFillWithinBand(fills[i], t.fill));
         expectFillWithinBand(fills[cols - 2], DEFAULT_FILL); // no terrain key → default
         expectFillWithinBand(fills[cols - 1], DEFAULT_FILL); // 'lava' unknown id → default
+    });
+
+    it('renders no warning markers on unpainted or valid-id hexes', () => {
+        const { container } = renderLayer({
+            hexCols: 3,
+            hexRows: 1,
+            terrain: { '0,0': 'plains', '1,0': 'forest' }, // (2,0) unpainted
+        });
+        expect(container.querySelectorAll('text.terrain-unknown-warning')).toHaveLength(0);
+    });
+
+    it('badges every unknown-id cell with one ⚠ marker and keeps fallback fills untouched', () => {
+        const unknown = ['mountain', 'coast', 'city'];
+        const { container } = renderLayer({
+            hexCols: 6,
+            hexRows: 1,
+            terrain: {
+                '0,0': 'forest',           // valid → no marker
+                '1,0': unknown[0],
+                '2,0': unknown[1],
+                '3,0': unknown[2],
+                // 4,0 unpainted → no marker; 5,0 stays unpainted
+            },
+        });
+
+        const markers = container.querySelectorAll('text.terrain-unknown-warning');
+        expect(markers).toHaveLength(unknown.length);
+        markers.forEach(marker => {
+            expect(marker.textContent.trim()).toBe('⚠');
+        });
+        // marker keys mirror the unknown cells (one per cell, no duplicates)
+        const markerXs = [...markers].map(m => Number(m.getAttribute('x')));
+        expect(new Set(markerXs).size).toBe(unknown.length);
+
+        // Additive only: path count and unknown-cell fills identical to default band.
+        const paths = container.querySelectorAll('g.terrain-layer path');
+        expect(paths).toHaveLength(6);
+        unknown.forEach((_, i) => expectFillWithinBand(fillsOf(container)[i + 1], DEFAULT_FILL));
+    });
+
+    it('drops warning markers when an unknown id is repainted with a valid one', () => {
+        const { container, rerender } = renderLayer({ hexCols: 3, hexRows: 1, terrain: { '1,0': 'mountain' } });
+        expect(container.querySelectorAll('text.terrain-unknown-warning')).toHaveLength(1);
+
+        rerender(<TerrainLayer hexCols={3} hexRows={1} terrain={{ '1,0': 'mountains' }} />);
+        expect(container.querySelectorAll('text.terrain-unknown-warning')).toHaveLength(0);
+
+        rerender(<TerrainLayer hexCols={3} hexRows={1} terrain={{}} />);
+        expect(container.querySelectorAll('text.terrain-unknown-warning')).toHaveLength(0);
     });
 
     it('is deterministic per position and repaints when the terrain reference changes', () => {

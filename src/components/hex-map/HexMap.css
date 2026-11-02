@@ -170,6 +170,20 @@
     pointer-events: none;
 }
 
+/* Unknown terrain-id drift badge (editor): ⚠ glyph over the plains fallback
+   fill for cells whose stored id is not in TERRAIN_TYPES. Purely additive
+   decoration — pointer-events:none keeps painting and context menus intact. */
+.terrain-unknown-warning {
+    pointer-events: none;
+    font-size: 14px;
+    font-weight: 700;
+    fill: #d9531e;
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 0.6px;
+    paint-order: stroke;
+    user-select: none;
+}
+
 /* Loading state */
 .hex-map-loading {
     display: flex;

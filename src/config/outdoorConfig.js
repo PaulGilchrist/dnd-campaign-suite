@@ -19,6 +19,15 @@ export const TERRAIN_TYPES = [
 // Default terrain (used when a hex has no assigned terrain)
 export const DEFAULT_TERRAIN = 'plains';
 
+// Single source of truth for terrain-id validity. Paint UI only offers
+// TERRAIN_TYPES ids, so an id stored outside that set means API/legacy data
+// drift — the editor badges such cells instead of silently plains-filling.
+const KNOWN_TERRAIN_IDS = new Set(TERRAIN_TYPES.map(t => t.id));
+
+export function isKnownTerrain(id) {
+  return KNOWN_TERRAIN_IDS.has(id);
+}
+
 // POI types
 export const POI_TYPES = [
   { id: 'camp',          name: 'Camp',          label: 'Camp',          svgId: 'poi-camp',          description: 'Campsite, waystation' },

@@ -65,7 +65,6 @@
 
 ## Improvement Backlog
 
-- (2026-11-02 BD) — unknown terrain ids (`'mountain'`, `'coast'`, `'city'`) silently paint as default plains in BOTH 2D and 3D with zero signal; paint UI only offers valid ids, so API/legacy docs drift undetected — a server warning or a ⚠ badge on unknown-id cells in the editor would surface legacy rot.
 - (2026-11-02 BD) — HexMap3D counts row prints `1 POIs` at count 1 (and counts hidden POIs without qualification); singular/plural + a visible-aware count would read honest.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
