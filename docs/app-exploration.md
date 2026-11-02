@@ -16,7 +16,7 @@
 
 ## Priority Targets (next descent)
 
-1. **Director needs_human Confirm asymmetry** — UNCHANGED since AW; owner-adjudication-owed before filing — don't re-prove, adjudicate.
+1. ~~Director needs_human Confirm asymmetry~~ — **ADJUDICATED + FIXED 2026-11-01 improve run (owner Option A: dismiss-only card)** — row closed, nothing owed.
 2. **`jsonSchema:true` vs a refusing backend** — STILL owed (unchanged since AQ): no llama.cpp-style refusing backend on this machine.
 3. **Fog-of-war deep face** — rows event-clear since AO/AS; 25e3a15e3/65babe2f5 touch NO fog lane (Map.jsx hunks are modal wiring only). Descend if a fog commit lands.
 4. **3D mesh geometry inspection** — color-pixel proof closed at AZ2; per-mesh placement/height never pixel-asserted. Only worth it if a 3D bug is suspected. (3D hidden-mesh dim 0.4 via `map3dScene._setDimmed`, unit-pinned.)
@@ -52,7 +52,7 @@
 | AI designer chat lane | deep (live 2026-11-01 BA) | `src/components/campaign-builder/AiDesignerSection.jsx server/services/ai/designNotes*` |
 | Generator AI funnel (plan→generate→approve) | deep (live 2026-11-01 AZ2) event-clear | `server/services/ai/authoring/applyMaps.js designerPrompts.js` |
 | Music view | deep (live AW; 8b8897db3 pinned) event-clear | |
-| World keeper / Referee ask-console / Drafts panel / NPC director | deep (live AW) event-clear | director needs_human Confirm → Target 1 (owner call) |
+| World keeper / Referee ask-console / Drafts panel / NPC director | deep (live AW) event-clear | director needs_human Confirm CLOSED (owner Option A, improve run — dismiss-only card) |
 | Factions CRUD + conflict lanes / Quests CRUD | deep (live AW) event-clear | |
 | aiConfig API lane | deep (live BB: POST {value} / {value:null} / status probe / rig handshake) | `server/routes/campaigns-ai.js server/validation/keyValidators.js` |
 | Log view / Encounters+EB / Dice tray / Campaign admin / NPCs+ct-lanes / fog paint / Initiative board / SSE-general / wizard / player view / inventory / rules | carried — event-clear | BB wrote via admin API clears only (no dialogs on API lane); campaign-lock reads-open/writes-403 unchanged |
@@ -70,7 +70,7 @@
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
-- OPEN (owner call): director needs_human Confirm asymmetry — live-proven AW, unchanged code since; adjudicate, don't re-prove.
+- CLOSED this run (owner call executed): director needs_human Confirm asymmetry — Option A implemented + live-proven (needs_human director card dismiss-only, mirrors referee 069a7099a; siblings byte-kept; commit see git log `improve(director-needs-human-dismiss-only)`).
 - OPEN (infra): llama.cpp-style refusing-backend face for constrained decoding fallback — no such backend on this machine (unchanged since AQ).
 - OPEN (infra, refreshed AS): oMLX + Qwen-mtp grammar-echo degeneration family — BB sidestepped entirely with the fake rig.
 - DEFERRED (low value): 3D per-mesh geometry assertions (Target 4); 3D hidden-mesh dim pixel proof (0.4 unit-pinned).

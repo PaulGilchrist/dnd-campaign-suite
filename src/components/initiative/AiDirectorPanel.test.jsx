@@ -18,6 +18,7 @@ vi.mock('../../hooks/runtime/useSyncedState.js', () => ({
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(async () => ({})) }));
 
 import AiDirectorPanel from './AiDirectorPanel.jsx';
+import { addEntry } from '../../services/ui/logService.js';
 
 const CN = 'test-campaign';
 const NPC = { name: 'Goblin 1', type: 'npc', currentHp: 7 };
@@ -153,8 +154,39 @@ describe('AiDirectorPanel', () => {
         vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: false, code: 'AI_NEEDS_HUMAN', intent: { intent: 'needs_human', creatureName: 'Orc 2', text: 'AI director: no living targets' } }) })));
         view.rerender(<AiDirectorPanel campaignName={CN} activeCreature={OTHER_NPC} isLocalhost onStampTarget={stamp} round={10} />);
         await waitFor(() => expect(screen.getByText('AI director: no living targets')).toBeInTheDocument());
-        // the card waits indefinitely for a person — no auto-apply, no stamp
-        expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
+        // the card waits indefinitely for a person — dismiss-only, no auto-apply, no stamp
+        expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull();
         expect(stamp).not.toHaveBeenCalled();
+    });
+
+    // Backlog 2026-11-01 — needs_human card is dismiss-only: applyDirectorIntent
+    // early-returns for it (nothing applies, no audit row), so rendering Confirm
+    // was a dead-end affordance. Gate mirrors the referee (069a7099a) and
+    // world-console lanes.
+    it('needs_human card renders its content with NO Confirm; sibling intents keep both buttons; dismiss writes nothing', async () => {
+        synced.aiConfig = CONFIGURED;
+        stubFetch({ ok: false, code: 'AI_NEEDS_HUMAN', intent: { intent: 'needs_human', creatureName: 'Goblin 1', text: 'QA stub: GM decides', explanation: 'unclear intent' } });
+        const stamp = vi.fn();
+        render(<AiDirectorPanel campaignName={CN} activeCreature={NPC} isLocalhost onStampTarget={stamp} />);
+
+        fireEvent.click(askButton('Goblin 1'));
+        await waitFor(() => expect(screen.getByText('QA stub: GM decides')).toBeInTheDocument());
+        expect(screen.getByText('needs_human')).toBeInTheDocument(); // label stays visible
+        expect(screen.getByText('unclear intent')).toBeInTheDocument(); // explanation stays visible
+        expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull(); // the gate
+        expect(screen.queryByText(/AI director: decide Goblin 1's turn/)).toBeNull(); // card replaced the ask button
+
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        await waitFor(() => expect(screen.queryByText('QA stub: GM decides')).toBeNull());
+        expect(stamp).not.toHaveBeenCalled(); // zero game-state writes
+        expect(addEntry).not.toHaveBeenCalled(); // no ai_director_applied audit row
+        expect(askButton('Goblin 1')).toBeInTheDocument();
+
+        // sibling intent: Confirm + Dismiss both render, byte-unchanged
+        stubFetch(ATTACK);
+        fireEvent.click(askButton('Goblin 1'));
+        await waitFor(() => expect(screen.getByText(/Scimitar → Rakan/)).toBeInTheDocument());
+        expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
     });
 });

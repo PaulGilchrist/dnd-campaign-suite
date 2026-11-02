@@ -5,7 +5,8 @@
  * stat block. suggest ⇒ card waits for Confirm indefinitely (no clock);
  * autopilot auto-applies safe intents (target stamp / log / advisory — the
  * attack itself still resolves on the monster's own card lane: the engine
- * rolls, never the model). needs_human always waits for a person.
+ * rolls, never the model). needs_human always waits for a person — and since
+ * it has no apply route, its card is dismiss-only (no Confirm).
  * aiConfig off or unset ⇒ renders nothing, zero traffic.
  */
 import React from 'react'
@@ -108,7 +109,13 @@ function AiIntentCard({ intent, onConfirm, onDismiss }) {
             {intent.explanation && <span className='ai-director-why'>{intent.explanation}</span>}
             {intent.text && <span className='ai-director-why'>{intent.text}</span>}
             <span className='ai-director-actions'>
-                <button className='ct-btn ct-btn-primary' onClick={onConfirm}><i className='fas fa-check'></i> Confirm</button>
+                {/* needs_human has no apply route — applyDirectorIntent early-
+                    returns for it (no stamp, no audit row), so rendering
+                    Confirm was a dead-end affordance. Gate mirrors the
+                    referee (AiRefereeSection.jsx) and world-console lanes. */}
+                {intent.intent !== 'needs_human' && (
+                    <button className='ct-btn ct-btn-primary' onClick={onConfirm}><i className='fas fa-check'></i> Confirm</button>
+                )}
                 <button className='ct-btn' onClick={onDismiss}>Dismiss</button>
             </span>
         </div>
