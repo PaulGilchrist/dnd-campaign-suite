@@ -86,6 +86,41 @@ Every level builds on the one below it, and every level stays available forever.
 
 That's it — nothing to enable, nothing to configure. This is levels 2–4 working out of the box.
 
+### Arena play in one click (disposable campaigns)
+
+On the campaign-selection screen (GM link) two quick-create buttons sit beside **Add**:
+
+- **New Arena Campaign** builds a throwaway pickup-arena folder in seconds: two carved
+  sparring halls (one activated) plus a saved **sparring encounter pool** of classic low-CR
+  monsters (goblins, skeletons, kobolds, wolves…). Everything resolves through the normal
+  generator services — the names are real bestiary names, so joined monsters pull their
+  official stats and art. Players build throwaway arena characters there with **Add
+  Character**, join a saved encounter, and fight. Loot/XP stay opt-in (they're off by
+  default). When the night ends, delete the campaign like any other (Admin → Delete,
+  type-the-name confirm) — nothing leaks anywhere else.
+- Teams are the ally model: each combatant's **🤝 Allies** editor (see §7) is the whole
+  assignment story — tick your teammates, and auras, redirection and friendly-fire prompts
+  follow immediately. No separate team system to learn.
+
+### The Starter campaign (seeded, replayable sandbox)
+
+**New Starter Campaign** seeds a ready-to-play teaching sandbox from the existing
+generators — a different world every roll, the same learnable shape:
+
+- A generated **village** (services, named folk, rumours that reference the current
+  adventure), an overland **hex map** with a settlement POI, the party marker at the
+  village, and a **dungeon POI linked to a freshly generated dungeon** (the portal lane),
+- three **starter quests** (hook / side / payoff) naming the generated places,
+- saved **Dungeon Wave 1–3** encounters, and treasure chests placed in the dungeon,
+- a **first-session checklist** panel that walks the table (build heroes → visit the
+  village → reach the portal → join Wave 1 → TV mode → short rest → log) using the
+  *generated* names, one click per step.
+
+Want a fresh adventure in the same world? **Admin → Regenerate adventure** (GM, confirm)
+re-rolls the dungeon, monsters and treasure and re-points the portal, quests and village
+rumours — the settlement, party, and log stay. Every roll is recorded in a rolling seed
+document, so replaying is one button.
+
 ---
 
 ## 5. Quick start — building a full campaign
@@ -143,6 +178,23 @@ The tracker's **TV** button (top-right of the header) turns it into an across-th
 - **Damage and healing floaters** (−11, +5, crit-big numbers) and a hit-flash animate on every card as the fight swings — on all devices, TV or not.
 - Token editing chrome (initiative inputs, target dropdowns, add/remove buttons) hides on the TV; set a creature's target and the TV shows a **→ target** chip instead.
 - TV mode is a per-screen preference (it asks the browser to go fullscreen; on networks where the browser blocks fullscreen it says so — press F11). Press **Esc** or click **TV** again to exit. Nothing you see on the TV can be changed from it — it's pure presentation.
+
+### Teams, alliances and betrayal (PvP in one model)
+
+Every tracker card has a GM-only **🤝 Allies** button. It opens one editor: tick exactly
+who this creature considers an ally. That single list *is* the allegiance model the whole
+engine reads — auras cover only your listed allies, redirection and flanking consult it,
+and a creature can only be handed friendly-fire leniency if you put it on the list.
+
+- **Co-op by default:** tick the party, confirm, done — logged to the campaign log.
+- **Arena teams:** each captain's list = themselves + teammates; nothing else to configure.
+- **The betrayal moment** is a two-click edit: open the defector's Allies, tick only
+  themselves, confirm — former allies immediately see them as hostile (auras drop off,
+  leaving their reach provokes opportunity attacks, they appear in enemy targeting), no
+  special switch, restorable just as fast.
+- **Friendly-fire prompt:** arming a target that's on the attacker's own ally list asks
+  once (*"X is on Y's ally list — arm them anyway?"*) and logs the confirmed choice.
+  It's a prompt, not a wall — the engine resolves the roll either way.
 
 > Nothing resolves on a timer. Death saves, concentration prompts, contested decisions — they wait until someone answers.
 

@@ -1,5 +1,11 @@
 # Arena & Starter Campaigns — Build + Verify (continues `levels-1-4-strengthening.md`)
 
+> ✅ **SUPERSEDED 2026-11-02 — FULLY COMPLETE.** Both build slices (Arena preset,
+> Starter campaign), the 3.2 betrayal validation pass, and Playwright 5A/5B/5C shipped
+> with zero console errors and baselines restored. Open work (the deferred Level 5
+> re-analysis + optional polish) carried forward to
+> **`.opencode/plans/levels-1-4-complete.md`**. Historical detail below.
+
 > Session-ready follow-up for **Phase 3.1 (Arena preset)** and **Phase 4 (Starter
 > campaign)**, plus the **Phase 3.2 betrayal validation pass**. Phases 1, 2, and 3.2
 > (the tracker ally editor) are DONE + live-verified — see the Status table in

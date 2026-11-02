@@ -720,7 +720,7 @@ function App() {
           activeView={activeView}
            />
         <ErrorBoundary resetKey={`${campaignName}|${activeView}`}>
-        <FirstSessionChecklist campaignName={campaignName} onNavigate={setActiveView} isLocalhost={isLocalhost} />
+        <FirstSessionChecklist campaignName={campaignName} onNavigate={setActiveView} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
              allAbilityScores={abilityScores}

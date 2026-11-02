@@ -26,7 +26,7 @@ import { generateHexTerrain } from '../maps/hexTerrainGenerator.js';
 import { toKebabCase, createMap, saveMapData, loadMapData, activateMap, deleteMap } from '../maps/mapsService.js';
 import { saveEncounter, updateEncounter } from '../encounters/encountersService.js';
 import { generateSettlement } from './settlementGenerator.js';
-import { saveSettlement } from './settlementsService.js';
+import { saveSettlement, loadSettlement } from './settlementsService.js';
 import { saveQuests, loadQuests } from './questsService.js';
 import { loadStarterSeed, saveStarterSeed } from './starterSeedService.js';
 import { loadMonsters } from '../ui/dataLoader.js';
@@ -271,13 +271,20 @@ const STARTER_PRESET = {
     const seeded = { maps: [], encounters: [], quests: [], settlement: null };
 
     // 1. Settlement — fixed teachable size, fresh name/content each roll.
+    //    Plus layer rumors referencing the current adventure hook (§4.1-2).
     const settlement = await generateSettlement([], { size: 'village' });
+    const dungeon = generateDungeon({ gridSize: 30, density: 0.5, seed });
+    settlement.rumors = [
+        `Folk in ${settlement.name} whisper about ${dungeon.name} — ${WAVE_MONSTER_POOLS[0][0]}s seen on the road at dusk.`,
+        `The ${settlement.services?.[0]?.name || 'general store'} hasn't had a caravan through since ${WAVE_MONSTER_POOLS[2][0]}s took the old ruin.`,
+        ...(settlement.rumors || []),
+    ].slice(0, 4);
     await saveSettlement(campaignName, settlement);
     seeded.settlement = settlement.name;
 
     // 2. Dungeon — BSP generator; chests it places ARE the loot cache
-    //    (plan §3.1: "placed-item chest on the map" needs no new code).
-    const dungeon = generateDungeon({ gridSize: 30, density: 0.5, seed });
+    //    (plan §3.1: "placed-item chest on the map" needs no new code),
+    //    alongside the generator's prop/furniture clusters.
     const dungeonMap = await persistDungeonMap(campaignName, dungeon, dungeon.name);
 
     // 3. Small hex wilds with settlement + dungeon POIs; the dungeon POI's
@@ -287,22 +294,39 @@ const STARTER_PRESET = {
     const { terrain, rivers } = generateHexTerrain({ gridSize: hexGridSize, seed });
     const pois = pickPoiHexes(terrain);
     const hexMapName = `${settlement.name} Countryside`;
+    // The hex doc (POIs + party marker AT the settlement hex, §4.1-3) rides
+    // the full-document save lane — the create route builds a bare doc and
+    // would drop partyPosition.
+    const starterPois = [
+      {
+        id: 'poi-settlement', type: 'settlement', label: settlement.name,
+        q: pois.settlement.q, r: pois.settlement.r, visible: true,
+      },
+      {
+        id: 'poi-dungeon', type: 'dungeon', label: dungeon.name,
+        q: pois.dungeon.q, r: pois.dungeon.r, visible: true,
+        linkedMap: dungeonMap.slug,
+      },
+    ];
     await createMap(campaignName, hexMapName, {
       type: 'outdoor',
       gridSize: hexGridSize,
       terrain,
       rivers,
-      pois: [
-        {
-          id: 'poi-settlement', type: 'settlement', label: settlement.name,
-          q: pois.settlement.q, r: pois.settlement.r, visible: true,
-        },
-        {
-          id: 'poi-dungeon', type: 'dungeon', label: dungeon.name,
-          q: pois.dungeon.q, r: pois.dungeon.r, visible: true,
-          linkedMap: dungeonMap.slug,
-        },
-      ],
+      pois: starterPois,
+    });
+    await saveMapData(campaignName, hexMapName, {
+      name: toKebabCase(hexMapName),
+      displayName: hexMapName,
+      type: 'outdoor',
+      gridSize: hexGridSize,
+      terrain,
+      rivers,
+      partyPosition: { q: pois.settlement.q, r: pois.settlement.r },
+      pois: starterPois,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
     });
     await activateMap(campaignName, hexMapName);
     seeded.maps = [
@@ -313,6 +337,8 @@ const STARTER_PRESET = {
     // 4. Quests — hook / side / payoff, referencing the generated names.
     //    Row NAMES stay stable across regenerations (stable lookup keys);
     //    the generated settlement/dungeon titles live in description+notes.
+    const missingNpc = settlement.notableNPCs?.[0]?.name || 'a village trader';
+    const wave3Boss = WAVE_MONSTER_POOLS[2][0];
     const quests = [
       {
         name: 'Starter — Into the Ruins',
@@ -322,21 +348,24 @@ const STARTER_PRESET = {
         notes: `Starter main quest — dungeon: ${dungeon.name}`,
       },
       {
-        name: 'Starter — Trouble in Town',
+        name: 'Starter — The Missing Trader',
         status: 'active',
-        description: `Folk in ${settlement.name} want the road quiet again — the last caravan never reached ${dungeon.name}.`,
-        rewards: 'Goodwill of the village',
-        notes: 'Starter side quest',
+        description: `${missingNpc} left for ${dungeon.name} and never returned to ${settlement.name}. ${WAVE_MONSTER_POOLS[1][0]}s hold the upper halls — find what happened.`,
+        rewards: 'A village debt of gratitude',
+        notes: `Starter side quest — missing: ${missingNpc}`,
       },
       {
         name: 'Starter — The Spoils',
         status: 'active',
-        description: `Bring back whatever the chests in ${dungeon.name} hold and ${settlement.name} will pay well for it.`,
-        rewards: 'Coin per chest',
-        notes: 'Starter payoff quest',
+        description: `Drive the ${wave3Boss} that rules ${dungeon.name} from its lair and bring back the chests it guards; ${settlement.name} will pay well.`,
+        rewards: 'Seeded treasure: chests placed in the dungeon',
+        notes: `Starter payoff quest — boss-tier: ${wave3Boss}`,
       },
     ];
-    await saveQuests(campaignName, quests.map(q => ({ id: crypto.randomUUID(), ...q, updatedAt: Date.now() })));
+    // Rows arrive UNS-tamped on purpose: the concurrent-save guard reads an
+    // echoed updatedAt on a row disk doesn't know as a resurrection attempt
+    // (409). Fresh creates never stamp; the server stamps them on write.
+    await saveQuests(campaignName, quests.map(q => ({ id: crypto.randomUUID(), ...q })));
     seeded.quests = quests.map(q => q.name);
 
     // 5. Dungeon Wave 1-3 saved encounters from the classics.
@@ -346,6 +375,7 @@ const STARTER_PRESET = {
     const seedDoc = {
       version: 1,
       seed,
+      layer: 1, // regenerateAdventure bumps (§4.1 "bumps layer number")
       createdAt: Date.now(),
       regeneratedAt: null,
       entities: {
@@ -431,6 +461,15 @@ export async function regenerateAdventure(campaignName) {
   const newSeed = Math.floor(rng() * 2147483647);
   const oldDungeon = seedDoc.entities.dungeonMap;
   const oldTitle = seedDoc.entities.dungeonTitle;
+  // Every title the campaign's flavor text may still name (each layer ever
+  // rolled) — re-point them ALL, so two regenerations ago can't haunt the
+  // village rumors. Longest-first so a shared-word title can't half-swap.
+  const retiredTitles = [...new Set([oldTitle, ...(seedDoc.entities.pastTitles || [])])]
+    .filter(t => typeof t === 'string' && t)
+    .sort((a, b) => b.length - a.length);
+  const swapTitles = (s) => (typeof s === 'string'
+    ? retiredTitles.reduce((acc, t) => acc.split(t).join(dungeon.name), s)
+    : s);
 
   // 1. Fresh dungeon map file (name + walls + chest props).
   const dungeon = generateDungeon({ gridSize: 30, density: 0.5, seed: newSeed });
@@ -450,26 +489,44 @@ export async function regenerateAdventure(campaignName) {
   // 3. Re-roll the wave monster line-ups (row names stable).
   const encounters = await rerollWaves(campaignName, rng);
 
-  // 4. Re-point the main quest's dungeon reference.
-  const mainQuest = seedDoc.entities.quests[0];
+  // 4. Re-point every quest row's dungeon reference (the hook names it in
+  //    description; side/payoff rows may too). Row names stay stable.
   const quests = await loadQuests(campaignName);
-  const updated = quests.map(q => (q.name === mainQuest ? {
-    ...q,
-    description: q.description.replace(oldTitle, dungeon.name),
-    rewards: (q.rewards || '').replace(oldTitle, dungeon.name),
-    notes: `Starter main quest — dungeon: ${dungeon.name}`,
-  } : q));
-  await saveQuests(campaignName, updated);
+  const rerolledQuest = (q) => {
+    const next = { ...q, description: swapTitles(q.description), rewards: swapTitles(q.rewards), notes: swapTitles(q.notes) };
+    if (q.name === seedDoc.entities.quests[0]) {
+      next.notes = `Starter main quest — dungeon: ${dungeon.name}`;
+    }
+    return next;
+  };
+  await saveQuests(campaignName, quests.map(rerolledQuest));
 
-  // 5. Rewrite the seed document with the new roll + names.
+  // 4b. Re-point the settlement's layer rumors at the new dungeon (the
+  //     settlement itself — name, services, NPCs — stays, §3.2 "settlement
+  //     kept"). The GET-single lane answers the { settlement } envelope.
+  try {
+    const row = await loadSettlement(campaignName, seedDoc.entities.settlement);
+    const settlementRow = row?.settlement || row;
+    if (settlementRow && settlementRow.name) {
+      const rerolved = (settlementRow.rumors || []).map(swapTitles);
+      await saveSettlement(campaignName, { ...settlementRow, rumors: rerolved });
+    }
+  } catch (err) {
+    console.error('[regenerateAdventure] settlement rumor re-point failed:', err);
+  }
+
+  // 5. Rewrite the seed document with the new roll + names, and bump the
+  //    adventure layer number (§4.1: layer 1 → 2 → …).
   const nextDoc = {
     ...seedDoc,
     seed: newSeed,
+    layer: (seedDoc.layer || 1) + 1,
     regeneratedAt: Date.now(),
     entities: {
       ...seedDoc.entities,
       dungeonMap,
       dungeonTitle: dungeon.name,
+      pastTitles: retiredTitles,
       encounters,
     },
   };

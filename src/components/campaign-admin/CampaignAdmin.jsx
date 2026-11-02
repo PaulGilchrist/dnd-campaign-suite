@@ -400,6 +400,9 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         try {
             const result = await regenerateAdventure(campaignName);
             setStarterSeed(await loadStarterSeed(campaignName));
+            // Tell the first-session checklist (separate component) to re-read
+            // the seed so its named entities reflect the new layer live.
+            window.dispatchEvent(new CustomEvent('starter-seed-changed', { detail: { campaignName } }));
             setStatus({ success: `New adventure rolled: ${result.dungeonTitle} — waves re-rolled, portal and main quest re-pointed.` });
         } catch (err) {
             setStatus({ error: err.message });

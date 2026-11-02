@@ -175,6 +175,15 @@ function creaturesOrEmpty(combatSummary) {
     return combatSummary?.creatures || []
 }
 
+// Board-visibility gate (Level 5 SSE-timing guard, Arena-tuned): the legacy
+// rule hides the board until players have arrived; an Arena/Starter quick-join
+// additionally opens it the moment any creature is on the board with zero
+// players yet (empty creatures[] skeleton keeps the guard byte-identical for
+// every other campaign).
+function boardHasSubjects(combatSummary, characters) {
+    return characters.length > 0 || creaturesOrEmpty(combatSummary).length > 0
+}
+
 function ConditionSavePopup({ popup, onClose }) {
     return (
         <Popup onClickOrKeyDown={onClose}>
@@ -671,7 +680,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 </div>
             )}
             <VictoryBanner visible={victoryVisible} onDismiss={dismissVictory} result={lastCombatResult} />
-            {combatSummary && combatSummary.creatures && characters.length > 0 ? (
+            {combatSummary && combatSummary.creatures && boardHasSubjects(combatSummary, characters) ? (
              <>
              <div className='combat-header'>
                  <h4>Initiative (round {combatSummary.round})</h4>

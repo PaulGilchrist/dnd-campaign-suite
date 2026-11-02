@@ -76,6 +76,18 @@ function seedAllies(list) {
         (name === 'Alice' && key === 'selectedAllies') ? list : null);
 }
 
+describe('handleClear', () => {
+    it('zero-character roster clears without crashing (Arena/Starter quick play)', async () => {
+        const { handlers, setCombatSummary } = makeHandlers()
+        // Simulate the join→clear flow in a fresh arena/starter campaign: the
+        // clear's newSummary (players-only skeleton) is EMPTY with 0 characters.
+        const initiativeService = await import('../../services/encounters/initiativeService.js')
+        initiativeService.clearCombat.mockReturnValue({ round: 1, creatures: [] })
+        expect(() => handlers.handleClear()).not.toThrow()
+        expect(setCombatSummary).toHaveBeenCalledWith({ round: 1, creatures: [] })
+    })
+})
+
 describe('handleTargetChange — friendly-fire confirm', () => {
     it('ally target: confirm asked; on OK the target arms AND the row is log-flagged', () => {
         seedAllies(['Alice', 'Bob']);

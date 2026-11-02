@@ -44,27 +44,32 @@ describe('FirstSessionChecklist', () => {
   it('names the generated entities and deep-links each step into a real view', async () => {
     loadStarterSeed.mockResolvedValue(SEED);
     const onNavigate = vi.fn();
-    await renderChecklist({ onNavigate, isLocalhost: true });
+    const onBuildHeroes = vi.fn();
+    await renderChecklist({ onNavigate, onBuildHeroes, isLocalhost: true });
 
     await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
-    expect(screen.getByText(/Thornhollow Countryside — the portal to Crypt of X waits/)).toBeInTheDocument();
+    expect(screen.getByText(/the portal of Crypt of X through the fog/)).toBeInTheDocument();
     expect(screen.getByText(/Join Dungeon Wave 1/)).toBeInTheDocument();
 
+    fireEvent.click(screen.getByText('Build your heroes (+ Character)'));
+    expect(onBuildHeroes).toHaveBeenCalled();
     fireEvent.click(screen.getByText('Meet the folk of Thornhollow'));
     expect(onNavigate).toHaveBeenCalledWith('settlements');
-    fireEvent.click(screen.getByText(/Thornhollow Countryside — the portal to Crypt of X waits/));
+    fireEvent.click(screen.getByText(/the portal of Crypt of X through the fog/));
     expect(onNavigate).toHaveBeenCalledWith('mapsManager');
+    fireEvent.click(screen.getByText(/campaign log/));
+    expect(onNavigate).toHaveBeenCalledWith('campaignLog');
   });
 
-  it('shows the GM-only regenerate + teams rows only on localhost', async () => {
+  it('shows the GM-only betrayal + regenerate rows only on localhost', async () => {
     loadStarterSeed.mockResolvedValue(SEED);
     render(<FirstSessionChecklist campaignName="qa-starter" isLocalhost={false} />);
     await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
-    expect(screen.queryByText(/Regenerate adventure/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Regenerate/)).not.toBeInTheDocument();
     expect(screen.queryByText(/🤝 Allies/)).not.toBeInTheDocument();
 
     render(<FirstSessionChecklist campaignName="qa-starter" isLocalhost />);
-    await waitFor(() => expect(screen.getAllByText(/Regenerate adventure/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText(/Admin → Regenerate/).length).toBeGreaterThan(0));
     expect(screen.getAllByText(/🤝 Allies/).length).toBeGreaterThan(0);
   });
 
@@ -78,5 +83,31 @@ describe('FirstSessionChecklist', () => {
     // Pure onboarding: the ONLY server traffic is the seed GET itself.
     expect(loadStarterSeed).toHaveBeenCalledTimes(1);
     expect(vi.mocked(loadStarterSeed).mock.calls.every(c => c[0] === 'qa-starter')).toBe(true);
+  });
+});
+
+// Regenerate live-refresh (arena-starter §5B.2): the Admin regenerate lane
+// dispatches starter-seed-changed; the checklist re-reads and names the NEW
+// layer without a reload — and stays dismissed if the user dismissed it.
+describe('starter-seed-changed live refresh', () => {
+  it('re-reads the seed and shows the new layer names', async () => {
+    loadStarterSeed.mockResolvedValue(SEED);
+    render(<FirstSessionChecklist campaignName="qa-starter" />);
+    await waitFor(() => expect(screen.getByText(/Meet the folk of Thornhollow/)).toBeInTheDocument());
+
+    loadStarterSeed.mockResolvedValue({ ...SEED, entities: { ...SEED.entities, settlement: 'BRIDGEHAM', dungeonTitle: 'New Tomb' } });
+    window.dispatchEvent(new CustomEvent('starter-seed-changed', { detail: { campaignName: 'qa-starter' } }));
+
+    await waitFor(() => expect(screen.getByText(/Meet the folk of BRIDGEHAM/)).toBeInTheDocument());
+    expect(screen.getByText(/portal of New Tomb/)).toBeInTheDocument();
+  });
+
+  it('ignores events from other campaigns', async () => {
+    loadStarterSeed.mockResolvedValue(SEED);
+    render(<FirstSessionChecklist campaignName="qa-starter" />);
+    await waitFor(() => expect(loadStarterSeed).toHaveBeenCalledTimes(1));
+    window.dispatchEvent(new CustomEvent('starter-seed-changed', { detail: { campaignName: 'other' } }));
+    await new Promise(r => setTimeout(r, 20));
+    expect(loadStarterSeed).toHaveBeenCalledTimes(1);
   });
 });

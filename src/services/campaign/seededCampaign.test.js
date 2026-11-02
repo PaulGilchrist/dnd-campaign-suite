@@ -16,7 +16,7 @@ import {
 import * as mapsService from '../maps/mapsService.js';
 import { saveEncounter, updateEncounter } from '../encounters/encountersService.js';
 import { generateSettlement } from './settlementGenerator.js';
-import { saveSettlement } from './settlementsService.js';
+import { saveSettlement, loadSettlement } from './settlementsService.js';
 import { saveQuests, loadQuests } from './questsService.js';
 import { loadStarterSeed, saveStarterSeed } from './starterSeedService.js';
 
@@ -42,7 +42,10 @@ vi.mock('./settlementGenerator.js', () => ({
   })),
 }));
 
-vi.mock('./settlementsService.js', () => ({ saveSettlement: vi.fn(async () => ({})) }));
+vi.mock('./settlementsService.js', () => ({
+  saveSettlement: vi.fn(async () => ({})),
+  loadSettlement: vi.fn(async () => null),
+}));
 vi.mock('./questsService.js', () => ({
   saveQuests: vi.fn(async () => {}),
   loadQuests: vi.fn(async () => []),
@@ -208,9 +211,12 @@ describe('starter preset', () => {
     result = await createSeededCampaign('starter', { name: 'qa-starter', seed: 5 });
   });
 
-  it('seeds a village settlement through the settlements lane', () => {
+  it('seeds a village settlement whose rumors reference the current adventure layer', async () => {
+    const roll = await createSeededCampaign('starter', { name: 'qa-starter', seed: 5 });
     expect(generateSettlement).toHaveBeenCalledWith([], expect.objectContaining({ size: 'village' }));
-    expect(saveSettlement).toHaveBeenCalledWith('qa-starter', expect.objectContaining({ name: 'Thornhollow' }));
+    const saved = saveSettlement.mock.calls[0][1];
+    expect(saved.name).toBe('Thornhollow');
+    expect(saved.rumors.join(' ')).toContain(roll.seeded.seed.entities.dungeonTitle);
   });
 
   it('creates the dungeon map and an outdoor hex map with settlement + dungeon POIs', () => {
@@ -229,6 +235,10 @@ describe('starter preset', () => {
       expect(['water', 'beach']).not.toContain(opts.terrain[`${poi.q},${poi.r}`]);
     }
     expect(mapsService.activateMap).toHaveBeenCalledWith('qa-starter', hexName);
+
+    // Party marker sits ON the settlement hex (§4.1-3), stamped via the doc save.
+    const hexSave = mapsService.saveMapData.mock.calls.find(c => c[1] === hexName);
+    expect(hexSave[2].partyPosition).toEqual({ q: poiByName['poi-settlement'].q, r: poiByName['poi-settlement'].r });
   });
 
   it('seeds three quests naming the generated settlement + dungeon', () => {
@@ -239,6 +249,9 @@ describe('starter preset', () => {
     expect(joined).toContain('Thornhollow');
     expect(joined).toContain(result.seeded.seed.entities.dungeonTitle);
     expect(quests.every(q => q.id && q.status === 'active')).toBe(true);
+    // Fresh-create rows must NOT carry updatedAt echoes (live 409 pin): the
+    // jsonEntityCrud guard reads a stamped row disk lacks as a resurrection.
+    expect(quests.every(q => q.updatedAt === undefined)).toBe(true);
   });
 
   it('seeds Dungeon Wave 1-3 from the classics and persists the rolling seed', () => {
@@ -254,6 +267,7 @@ describe('starter preset', () => {
     }));
     const doc = saveStarterSeed.mock.calls[0][1];
     expect(doc.entities.settlement).toBe('Thornhollow');
+    expect(doc.layer).toBe(1);
     expect(doc.entities.encounters).toEqual(['Dungeon Wave 1', 'Dungeon Wave 2', 'Dungeon Wave 3']);
     expect(result.seeded.settlement).toBe('Thornhollow');
   });
@@ -266,6 +280,7 @@ describe('regenerateAdventure', () => {
   const seedDoc = {
     version: 1,
     seed: 99,
+    layer: 2,
     createdAt: 1,
     regeneratedAt: null,
     entities: {
@@ -273,6 +288,9 @@ describe('regenerateAdventure', () => {
       hexMap: { name: 'Thornhollow Countryside', slug: 'thornhollow-countryside' },
       dungeonMap: { name: 'Old Keep', slug: 'old-keep' },
       dungeonTitle: 'Old Keep',
+      // A title retired by an earlier regeneration must ALSO be swapped out of
+      // every flavor row (rumors/quests) — history lives on the seed doc.
+      pastTitles: ['Elder Tomb'],
       quests: ['Starter — Into the Ruins', 'Starter — Trouble in Town', 'Starter — The Spoils'],
       encounters: ['Dungeon Wave 1', 'Dungeon Wave 2', 'Dungeon Wave 3'],
     },
@@ -282,7 +300,7 @@ describe('regenerateAdventure', () => {
     loadStarterSeed.mockResolvedValue(seedDoc);
     loadQuests.mockResolvedValue([
       { name: 'Starter — Into the Ruins', status: 'active', description: 'Raid Old Keep.', rewards: 'Gold in Old Keep', notes: 'Starter main quest — dungeon: Old Keep' },
-      { name: 'Starter — Trouble in Town', status: 'active', description: 'Folk of Thornhollow.', rewards: '', notes: 'side' },
+      { name: 'Starter — Trouble in Town', status: 'active', description: 'Tales of Elder Tomb linger in town.', rewards: '', notes: 'side' },
     ]);
     mapsService.loadMapData.mockResolvedValue({
       name: 'thornhollow-countryside', type: 'outdoor', pois: [
@@ -290,6 +308,7 @@ describe('regenerateAdventure', () => {
         { id: 'poi-dungeon', label: 'Old Keep', q: 2, r: 8, visible: true, linkedMap: 'old-keep' },
       ],
     });
+    loadSettlement.mockResolvedValue({ settlement: { name: 'Thornhollow', rumors: ['Raiders from Old Keep prowl the road.', 'Good ale at the inn.'] } });
   });
 
   it('refuses a campaign without a starter seed', async () => {
@@ -328,14 +347,24 @@ describe('regenerateAdventure', () => {
     expect(main.description).not.toContain('Old Keep');
     expect(main.rewards).toContain(result.dungeonTitle);
     expect(main.notes).toBe(`Starter main quest — dungeon: ${result.dungeonTitle}`);
-    expect(side.description).toBe('Folk of Thornhollow.');
+    // Layer-1 title (Elder Tomb) is swapped out of the side quest too.
+    expect(side.description).toContain(result.dungeonTitle);
+    expect(side.description).not.toContain('Elder Tomb');
 
     // Seed rewritten: new roll + title, settlement preserved, log lane never touched.
     const doc = saveStarterSeed.mock.calls[0][1];
     expect(doc.seed).not.toBe(99);
+    expect(doc.layer).toBe(3); // 2 → 3 (§4.1 layer bump)
+    expect(doc.entities.pastTitles).toEqual(expect.arrayContaining(['Old Keep', 'Elder Tomb']));
     expect(doc.entities.dungeonTitle).toBe(result.dungeonTitle);
     expect(doc.entities.settlement).toBe('Thornhollow');
     expect(doc.regeneratedAt).toBeGreaterThan(0);
     expect(result.preserved.settlement).toBe('Thornhollow');
+
+    // Layer rumor re-pointed at the new dungeon; unrelated rumors byte-kept.
+    const savedSettlement = saveSettlement.mock.calls.find(c => c[1]?.rumors)?.[1];
+    expect(savedSettlement.rumors[0]).toContain(result.dungeonTitle);
+    expect(savedSettlement.rumors[0]).not.toContain('Old Keep');
+    expect(savedSettlement.rumors[1]).toBe('Good ale at the inn.');
   });
 });

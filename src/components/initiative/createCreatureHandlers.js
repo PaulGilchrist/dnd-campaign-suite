@@ -215,9 +215,14 @@ export function createCreatureHandlers({
             // L5 §10.1: clearing combat returns the table to exploration.
             setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'initiative tracker', reason: 'combat cleared' })
                 .catch((e) => { console.error('[createCreatureHandlers] session phase exploration failed:', e) })
-            const firstCreatureName = newSummary.creatures[0].name
-            storage.set('activeCreatureName', firstCreatureName, campaignName)
-            setActiveCreatureName(firstCreatureName)
+            // Zero-character campaigns (Arena/Starter quick-create — the table
+            // cleared before any hero joined) leave an empty roster: re-arm no
+            // active creature instead of crashing on creatures[0].
+            const firstCreatureName = newSummary.creatures[0]?.name ?? null
+            if (firstCreatureName) {
+                storage.set('activeCreatureName', firstCreatureName, campaignName)
+                setActiveCreatureName(firstCreatureName)
+            }
             // CLA-100: Clear restarts combat (round back to 1) but preserves per-creature
             // runtime stores and dispatches no initiative-rolled event — reset the Dread
             // Ambush Ambusher's Leap once-per-combat latch so round-1 of the new

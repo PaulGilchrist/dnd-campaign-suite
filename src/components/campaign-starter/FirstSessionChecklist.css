@@ -32,8 +32,16 @@
 }
 
 .campaign-starter-checklist-steps {
+  columns: 2;
+  column-gap: 1.5rem;
   margin: 0.5rem 0 0;
-  padding-left: 1.25rem;
+  padding-left: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .campaign-starter-checklist-steps {
+    columns: 1;
+  }
 }
 
 .campaign-starter-checklist-steps li {
@@ -53,10 +61,4 @@
 .campaign-starter-step:hover {
   color: var(--color-primary-hover);
   text-decoration: underline;
-}
-
-.campaign-starter-checklist-note {
-  color: var(--color-text-secondary);
-  font-size: 0.85rem;
-  margin: 0.5rem 0 0;
 }
