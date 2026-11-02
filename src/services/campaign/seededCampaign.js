@@ -45,6 +45,16 @@ export const CLASSIC_MONSTERS = [
 
 const ARENA_MAP_NAMES = ['The Sparring Hall', 'The Colosseum Pit'];
 
+// Sparring-pit flavor assigned by index to ARENA_MAP_NAMES. generateDungeon
+// draws dungeon-decay prose ("Traps and guardians still protect the dungeon's
+// secrets") from the shared namegen pool — wrong theme for arena halls, so the
+// arena preset overwrites the description (text only: names, grid sizes and
+// RNG draw order stay byte-stable).
+const ARENA_MAP_DESCRIPTIONS = [
+  'A roofed drill hall with sand raked smooth across the floor. Weapon racks and padded posts stand ready along the walls for the next bout.',
+  'An open-air fighting pit ringed by weathered stone benches. Sun-bleached sand at the center is scored with the scrapes of a hundred duels.',
+];
+
 const WAVE_MONSTER_POOLS = [
   ['Goblin', 'Kobold', 'Bandit', 'Skeleton'],          // Wave 1 — CR ≤ .25
   ['Skeleton', 'Zombie', 'Wolf', 'Orc', 'Goblin'],     // Wave 2 — CR ≤ .5
@@ -241,7 +251,8 @@ const ARENA_PRESET = {
         density: 0.55,
         seed: Math.floor(rng() * 2147483647),
       }));
-      const map = await persistDungeonMap(campaignName, dungeon, ARENA_MAP_NAMES[i]);
+      const map = await persistDungeonMap(campaignName,
+        { ...dungeon, description: ARENA_MAP_DESCRIPTIONS[i] }, ARENA_MAP_NAMES[i]);
       seeded.maps.push(map);
     }
     await activateMap(campaignName, ARENA_MAP_NAMES[0]);

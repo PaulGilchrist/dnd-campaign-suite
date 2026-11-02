@@ -203,6 +203,13 @@ describe('arena preset', () => {
     expect(doc.players).toEqual([]);
   });
 
+  it('pins sparring-pit flavor on both arena maps — never dungeon-decay prose', () => {
+    for (const call of mapsService.saveMapData.mock.calls) {
+      expect(call[2].description.toLowerCase()).not.toMatch(/dungeon|traps and guardians|ancient evil/);
+    }
+    expect(mapsService.saveMapData.mock.calls[1][2].description).toContain('fighting pit');
+  });
+
   it('seeds three sparring encounters with bestiary-resolved creature rows', () => {
     expect(saveEncounter).toHaveBeenCalledTimes(3);
     const [campaign, name, data] = saveEncounter.mock.calls[0];
