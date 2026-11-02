@@ -2466,3 +2466,5 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - FACT: `POST /api/campaigns/:c/lastCombatResult {value:{stamp,…}}` is live-adopted by mounted tabs within ~1–2s (CAMPAIGN_KEYS shipped) — victory-banner copy faces can be proven plural/singular without reload.
 - FACT: the live stamp reads back at change-data TOP level (`j.lastCombatResult`), not nested under a `campaign` bucket; the key-route GET wraps `{value:…}` — probe both shapes.
 - RECIPE: Clear-rig native confirm chain — `clear.click({noWaitAfter:true})` inside `browser_run_code_unsafe` (catch the rejection), then `browser_handle_dialog` accept in the immediate next call.
+- FACT: this session's Playwright MCP `browser_click` takes `target` (not `ref`) as the element param.
+- FACT: EncounterModal now closes on Escape + backdrop (2026-11-02 improve run); the old "z-1000 swallows nav until x" map fact is superseded. House dismiss pattern: isOpen-gated document keydown + overlay onClick with closest(panelClass) inert-inside guard (DiceTray.jsx).

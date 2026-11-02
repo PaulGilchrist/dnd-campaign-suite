@@ -29,6 +29,20 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
     }
   }, [mode, renameTargetProp]);
 
+  // QA backlog 2026-11-02: Escape closes, mirroring the house overlay-dismiss
+  // pattern (DiceTray.jsx:42-48, FontOfMagicModal.jsx:75) — Escape is ×-parity.
+  // The only nested confirmation this modal owns is the native window.confirm
+  // on the delete leg, which blocks all keydown/click while shown, so there is
+  // no custom nested dialog to guard against here.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSave = async () => {
@@ -93,7 +107,19 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
   };
 
   return (
-    <div className="encounter-modal-overlay">
+    <div
+      className="encounter-modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        // Backdrop dismiss mirrors the DiceTray popup-overlay convention
+        // (DiceTray.jsx:73-80): clicks bubbling from inside the panel are
+        // inert; a pure backdrop click is onClose only — no dispatch, no
+        // state write — while the open (2026-11-02 BF: the z-1000 overlay
+        // used to swallow every click, incl. sidebar nav, until ×).
+        if (e.target.closest('.encounter-modal')) return;
+        onClose();
+      }}
+    >
       <div className="encounter-modal">
         <div className="encounter-modal-header">
           <h3>

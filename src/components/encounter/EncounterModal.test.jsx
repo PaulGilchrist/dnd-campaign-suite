@@ -24,8 +24,9 @@
  *      Prod-path pins below; full-stack campaign-exact bytes in
  *      EncounterModal.rename-flow.test.jsx; rename stays no-confirm (fix#36 sibling
  *      parity, builder handleRenameEncounter is a straight dispatcher).
- * The overlay (:61) has no onClick, so backdrop/content clicks structurally cannot
- * close — no vacuous "does not close" pins for them.
+ * The overlay closes on Escape/backdrop since the 2026-11-02 QA backlog fix —
+ * those lanes are pinned in EncounterModal.escape-backdrop-close.test.jsx;
+ * this file stays focused on internals and never fires stray Escapes.
  * Owned elsewhere: builder Save-commit #399, load-hydrate #403, action seam #410. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';

@@ -71,7 +71,6 @@ All BF claims entered/derived THIS run unless tagged carried.
 
 ## Improvement Backlog
 
-- (2026-11-02 BF) Load-Encounter modal ignores Escape (only ×; while open its z-1000 overlay silently swallows every sidebar nav click — a first-time user may think nav is dead). Consider Escape + backdrop-close like other modals. `src/components/encounter/`.
 - (2026-11-02 BF) `GET /spell-overlay` serves malformed disk rows through to every viewer unchanged — filter at the transport source (server) as defense-in-depth beside the viewer filters (complements the filed null-row bug). `server/routes/spell-overlay.js`.
 - (2026-11-02 BF) GM control picker + LAN controlled-card target picker carry only `title` (no aria-label/testid) — add stable labels (a11y + test anchors; siblings already use `data-testid="target-select"`). `CreatureCard.jsx ControlRow/TargetSelect`.
 - (2026-11-02 BF) Seeded arena flavor: "The Colosseum Pit" description is generic dungeon-decay prose ("…traps and guardians still protect the dungeon's secrets") — theme-mismatch for a sparring pit. `seededCampaign.js` ARENA map flavor pool.
