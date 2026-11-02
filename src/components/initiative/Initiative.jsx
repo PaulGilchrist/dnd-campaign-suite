@@ -657,7 +657,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 if (cancelled) return
                 const creatures = setupCreatures(characters, 0, utils.getName)
                 const newSummary = { round: 1, creatures }
-                const firstName = creatures[0]?.name
+                // Zero-character campaigns (Arena/Starter quick-create — first board
+                // mount before any hero joined) leave an empty roster: store the null
+                // "no active creature" sentinel, never undefined — undefined collapses
+                // the {value} body to a bare {} POST that persists as a malformed
+                // key and crashes the SSE echo (bug-zero-creature-initiative-null-name;
+                // mirrors the createCreatureHandlers CLEAR-path guard from 2036625ff).
+                const firstName = creatures[0]?.name ?? null
                 if (isLocalhost) {
                     storage.set('combatSummary', newSummary, campaignName)
                     storage.set('activeCreatureName', firstName, campaignName)

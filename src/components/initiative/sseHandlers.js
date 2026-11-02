@@ -104,6 +104,16 @@ export function createSseEventHandler({
     }
 
     async function handleActiveCreatureNameChange(newActive) {
+        // bug-zero-creature-initiative-null-name: a malformed object echo (e.g. a
+        // legacy {} stored under this key) must never poison the round gate with
+        // "[object Object]" or crash expireStaleEffects' toLowerCase. null/
+        // undefined are legitimate "no active creature" sentinels — the dispatch
+        // above already drops them (event.data == null) — so only truthy
+        // non-strings are rejected here.
+        if (newActive && typeof newActive !== 'string') {
+            console.error('[sseHandlers] Ignoring malformed activeCreatureName echo:', newActive)
+            return
+        }
         const prevActive = activeCreatureNameRef.current
         activeCreatureNameRef.current = newActive
         const cs = combatSummaryRef.current || getCombatSummary(campaignName)
