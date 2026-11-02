@@ -12,6 +12,12 @@ vi.mock('../../services/campaign/campaignService.js', () => ({
   getCharacterFiles: vi.fn(),
   loadCharacters: vi.fn(),
 }));
+// The component lives-refreshes via the ONE shared SSE client (app-level
+// channel); stub it so these tests never touch EventSource — afterEach's
+// unstubAllGlobals removes the inert one setup.js installs.
+vi.mock('../../services/ui/sseClient.js', () => ({
+  subscribeToSSE: vi.fn(() => () => {}),
+}));
 
 import { getCharacterFolders } from '../../services/campaign/campaignService.js';
 

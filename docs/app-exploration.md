@@ -73,8 +73,6 @@ All BD-era claims below were entered or re-derived THIS run (BE) unless tagged c
 
 ## Improvement Backlog
 
-- 2026-11-02 BE — campaign-selection rows never refresh while the screen is open (tab sitting on selection showed a stale folder list after another tab created two campaigns; manual reload required). A campaign-created SSE event (or short poll while mounted) would match the starter-seed refresh doctrine just shipped in 71f617299.
-- 2026-11-02 BE — music playback pollutes console with YouTube ad-tracker CORS errors (`googleads…doubleclick` ERR_FAILED ×2 per mood start); harmless third-party, but a documented filter in the e2e console-clean checks keeps future runs from counting them as app errors (playbook § noted).
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

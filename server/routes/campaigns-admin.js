@@ -79,6 +79,14 @@ router.post('/api/campaigns', asyncHandler((req, res) => {
     // Create data subdirectory for character change data
     fs.mkdirSync(campaignDataDir(campaignName.trim()), { recursive: true });
 
+    // Live-sync (starter-seed doctrine, 71f617299): app-level `campaigns-list`
+    // event so open campaign-selection tabs refresh their folder rows without
+    // a reload. Routed with an explicit campaign target (the key carries no
+    // parseable prefix): publish() always fans targeted events to the shared
+    // SSE client's app-level subscribers (empty campaignName — the selection
+    // screen) as well as same-campaign tabs.
+    publish('campaigns-list', { action: 'created', campaign: campaignName.trim() }, campaignName.trim());
+
     res.status(201).json({ message: 'Campaign created successfully', campaignName: campaignName.trim() });
 }));
 
@@ -184,6 +192,9 @@ router.put('/api/campaigns/:campaign', asyncHandler((req, res) => {
     saveFile();
     markDirty(trimmedName);
 
+    // Live-sync the selection list (see campaigns-list note on POST above).
+    publish('campaigns-list', { action: 'renamed', campaign: trimmedName, from: campaign }, trimmedName);
+
     res.json({ message: 'Campaign renamed successfully', campaignName: trimmedName });
 }));
 
@@ -211,6 +222,8 @@ router.delete('/api/campaigns/:campaign', asyncHandler((req, res) => {
     // Mounted map tabs must retire overlay geometry the server just wiped
     // (same live-retire the in-editor Clear All gets from spell-overlay.js).
     publish(`spell-overlay-${campaign}`, { action: 'clear' }, campaign);
+    // Live-sync: open selection tabs drop the deleted row without a reload.
+    publish('campaigns-list', { action: 'deleted', campaign }, campaign);
 
     res.json({ message: 'Campaign deleted successfully' });
 }));

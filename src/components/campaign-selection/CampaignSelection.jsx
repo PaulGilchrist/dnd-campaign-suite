@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
 import { createSeededCampaign } from '../../services/campaign/seededCampaign.js';
+import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import SeededCampaignModal from './SeededCampaignModal.jsx';
 import './CampaignSelection.css';
 
@@ -57,6 +58,35 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
 
     fetchCampaigns();
   }, []);
+
+  // Live refresh (starter-seed SSE doctrine, 71f617299): the server publishes
+  // app-level `campaigns-list` events on campaign create/rename/delete/meta
+  // writes (server/routes/campaigns-admin.js + campaigns-meta.js). Selection
+  // happens BEFORE any campaign is joined, so this rides the shared SSE
+  // client's app-level channel (empty campaign key → `/subscribe` with no
+  // `campaign` param) — still ONE shared EventSource, closed automatically
+  // when this screen unmounts. The refetch is non-destructive: only the
+  // folder/type lists are set-if-changed (stable refs when equal, so no
+  // re-render churn) and no modal/loading/error state is touched.
+  const refreshCampaigns = useCallback(async () => {
+    try {
+      const [folders, types] = await Promise.all([
+        getCharacterFolders(),
+        getCampaignTypes(),
+      ]);
+      setCampaigns(prev => (JSON.stringify(prev) === JSON.stringify(folders) ? prev : folders));
+      setCampaignTypes(prev => (JSON.stringify(prev) === JSON.stringify(types) ? prev : types));
+    } catch (err) {
+      // Transient failure: keep the visible rows rather than wiping the
+      // screen; the next event (or a manual reload) recovers.
+      console.error('Campaign list refresh failed:', err);
+    }
+  }, []);
+
+  useEffect(() => subscribeToSSE(null, (event) => {
+    if (!event || event.key !== 'campaigns-list') return;
+    refreshCampaigns();
+  }), [refreshCampaigns]);
 
   const handleCampaignSelect = async (campaign) => {
         try {
@@ -165,8 +195,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
       setNewCampaignName('');
       await handleCampaignSelect(result.name);
       // If the parent kept us mounted, surface the fresh row (and its badge).
-      setCampaigns(await getCharacterFolders());
-      setCampaignTypes(await getCampaignTypes());
+      await refreshCampaigns();
     } catch (err) {
       setError(err.message);
     } finally {

@@ -2,6 +2,7 @@ import fs from 'fs';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { isLocalHost } from '../utils/jsonEntityCrud.js';
+import { publish } from '../utils/changeData.js';
 import { Router } from 'express';
 
 // ---------------------------------------------------------------------------
@@ -69,6 +70,11 @@ router.put('/api/campaigns/:campaign/meta', asyncHandler((req, res) => {
     }
     ensureDataDir(campaign);
     fs.writeFileSync(metaPath(campaign), JSON.stringify({ type }, null, 2));
+    // Live-sync the selection list (starter-seed doctrine, 71f617299): quick-
+    // create writes the folder first and this meta last, so the second
+    // campaigns-list event is what lands the Arena/Starter badge on the row
+    // another tab just saw appear unbadged.
+    publish('campaigns-list', { action: 'updated', campaign }, campaign);
     res.json({ message: 'Campaign meta saved successfully', type });
 }));
 

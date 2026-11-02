@@ -16,6 +16,12 @@ vi.mock('../../services/campaign/campaignMetaService.js', () => ({
   getCampaignTypes: vi.fn(async () => ({})),
   CAMPAIGN_TYPE_BADGES: {},
 }));
+// The component lives-refreshes via the ONE shared SSE client (app-level
+// channel); stub it so these fetch-spying tests never touch EventSource —
+// afterEach's unstubAllGlobals removes the inert one setup.js installs.
+vi.mock('../../services/ui/sseClient.js', () => ({
+  subscribeToSSE: vi.fn(() => () => {}),
+}));
 
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 

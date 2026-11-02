@@ -30,6 +30,11 @@ vi.mock('../utils/campaignPaths.js', () => ({
     ensureDataDir: vi.fn(() => '/mock/campaigns/test-campaign/data'),
 }));
 
+const publishSpy = vi.hoisted(() => vi.fn());
+vi.mock('../utils/changeData.js', () => ({
+    publish: publishSpy,
+}));
+
 const FOREIGN_HOST = '100.92.171.80';
 const META_FILE = '/mock/campaigns/test-campaign/data/campaign-meta.json';
 const SEED_FILE = '/mock/campaigns/test-campaign/data/starter-seed.json';
@@ -110,4 +115,38 @@ describe('campaign meta PUT', () => {
             expect(fs.writeFileSync).not.toHaveBeenCalled();
         },
     );
+});
+
+describe('campaign meta PUT live-sync broadcast', () => {
+    // Quick-create writes the folder first and this meta last, so this event
+    // is what lands the Arena/Starter badge on rows open selection tabs just
+    // saw appear (campaigns-list doctrine, starter-seed 71f617299 twin).
+    it('publishes campaigns-list (updated) on a successful type write', async () => {
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .send({ type: 'arena' });
+        expect(res.status).toBe(200);
+        expect(publishSpy).toHaveBeenCalledWith(
+            'campaigns-list',
+            { action: 'updated', campaign: 'test-campaign' },
+            'test-campaign'
+        );
+    });
+
+    it('stays silent when the PUT is rejected (403 network client)', async () => {
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .set('Host', FOREIGN_HOST)
+            .send({ type: 'starter' });
+        expect(res.status).toBe(403);
+        expect(publishSpy).not.toHaveBeenCalled();
+    });
+
+    it('stays silent when the payload is refused (400)', async () => {
+        const res = await request(createTestApp())
+            .put('/api/campaigns/test-campaign/meta')
+            .send({ type: 'chess-match' });
+        expect(res.status).toBe(400);
+        expect(publishSpy).not.toHaveBeenCalled();
+    });
 });

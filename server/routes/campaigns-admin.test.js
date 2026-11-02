@@ -130,6 +130,27 @@ describe('campaignsAdmin - POST /api/campaigns', () => {
         expect(mockFsState.exists.has('/mock/campaigns/test-campaign/data')).toBe(true);
     });
 
+    it('publishes campaigns-list (created) so open selection tabs gain the row without reload', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        vi.clearAllMocks();
+        const res = await request(createTestApp()).post('/api/campaigns').send({ campaignName: 'test-campaign' });
+        expect(res.status).toBe(201);
+        expect(publish).toHaveBeenCalledWith(
+            'campaigns-list',
+            { action: 'created', campaign: 'test-campaign' },
+            'test-campaign'
+        );
+    });
+
+    it('stays silent on campaigns-list when creation is refused (duplicate name)', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        vi.clearAllMocks();
+        ensureCampaign('test-campaign-existing');
+        const res = await request(createTestApp()).post('/api/campaigns').send({ campaignName: 'test-campaign-existing' });
+        expect(res.status).toBe(400);
+        expect(publish).not.toHaveBeenCalled();
+    });
+
     it('should trim whitespace from campaign name', async () => {
         const app = createTestApp();
         const res = await request(app).post('/api/campaigns').send({ campaignName: '  trimmed  ' });
@@ -214,6 +235,19 @@ describe('campaignsAdmin - PUT /api/campaigns/:campaign', () => {
         expect(res.body.campaignName).toBe('new-campaign');
         expect(mockFsState.exists.has('/mock/campaigns/old-campaign')).toBe(false);
         expect(mockFsState.exists.has('/mock/campaigns/new-campaign')).toBe(true);
+    });
+
+    it('publishes campaigns-list (renamed) so open selection tabs swap the row', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        vi.clearAllMocks();
+        ensureCampaign('old-campaign');
+        const res = await request(createTestApp()).put('/api/campaigns/old-campaign').send({ newName: 'new-campaign' });
+        expect(res.status).toBe(200);
+        expect(publish).toHaveBeenCalledWith(
+            'campaigns-list',
+            { action: 'renamed', campaign: 'new-campaign', from: 'old-campaign' },
+            'new-campaign'
+        );
     });
 
     it('should trim whitespace from new name', async () => {
@@ -320,6 +354,27 @@ describe('campaignsAdmin - DELETE /api/campaigns/:campaign', () => {
         const res = await request(app).delete('/api/campaigns/nonexistent');
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Campaign not found');
+    });
+
+    it('publishes campaigns-list (deleted) so open selection tabs drop the row', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        const app = createTestApp();
+        ensureCampaign('delete-test');
+        const res = await request(app).delete('/api/campaigns/delete-test');
+        expect(res.status).toBe(200);
+        expect(publish).toHaveBeenCalledWith(
+            'campaigns-list',
+            { action: 'deleted', campaign: 'delete-test' },
+            'delete-test'
+        );
+    });
+
+    it('stays silent on campaigns-list when the delete 404s', async () => {
+        const { publish } = await import('../utils/changeData.js');
+        vi.clearAllMocks();
+        const res = await request(createTestApp()).delete('/api/campaigns/nonexistent');
+        expect(res.status).toBe(404);
+        expect(publish).not.toHaveBeenCalled();
     });
 
     it('should delete the campaign directory and all contents', async () => {
