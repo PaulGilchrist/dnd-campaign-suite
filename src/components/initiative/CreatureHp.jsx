@@ -75,6 +75,30 @@ function MaxHpInput({ creature, effectiveMaxHp, aidIncrease, heroesFeastIncrease
     )
 }
 
+// TV presentation lane: big bar + plain numbers + status badge — across-the-
+// room readable, zero input chrome. Exception: on non-localhost clients,
+// monster HP NUMBERS stay hidden (bar + status badge only), mirroring the
+// remote lane — a TV is shared with players, so the big-type mode must not
+// leak what the normal lane hides.
+function TvHpRow({ currentHp, effectiveMaxHp, isDead, isBloodied, hideNumbers }) {
+    return (
+        <div className="creature-hp">
+            <div className="hp-bar-row">
+                <HpBar current={currentHp} max={effectiveMaxHp} />
+            </div>
+            <div className="hp-inline-row">
+                {!hideNumbers && (
+                    <>
+                        <span className="hp-label">HP</span>
+                        <span className="hp-max-val">{currentHp}/{effectiveMaxHp}</span>
+                    </>
+                )}
+                <HpStatusBadges isDead={isDead} isBloodied={isBloodied} />
+            </div>
+        </div>
+    )
+}
+
 function CreatureHp({ creature, isLocalhost, onChange, isPlayerSummoned, tvMode = false }) {
     const { currentHp: rawCurrentHp, maxHp: rawMaxHp, type, name } = creature
     const currentHp = rawCurrentHp ?? 0
@@ -85,20 +109,17 @@ function CreatureHp({ creature, isLocalhost, onChange, isPlayerSummoned, tvMode 
     const isDead = currentHp <= 0
     const isBloodied = currentHp > 0 && currentHp <= Math.floor(effectiveMaxHp / 2)
 
-    // TV presentation mode: big bar + plain numbers + status badge for EVERY
-    // creature (players included) — across-the-room readable, zero input chrome.
+    // TV presentation mode renders its own row; players/summoned/GM keep the
+    // numeric bytes, remote monster cards fall back to badge-only.
     if (tvMode) {
         return (
-            <div className="creature-hp">
-                <div className="hp-bar-row">
-                    <HpBar current={currentHp} max={effectiveMaxHp} />
-                </div>
-                <div className="hp-inline-row">
-                    <span className="hp-label">HP</span>
-                    <span className="hp-max-val">{currentHp}/{effectiveMaxHp}</span>
-                    <HpStatusBadges isDead={isDead} isBloodied={isBloodied} />
-                </div>
-            </div>
+            <TvHpRow
+                currentHp={currentHp}
+                effectiveMaxHp={effectiveMaxHp}
+                isDead={isDead}
+                isBloodied={isBloodied}
+                hideNumbers={type !== 'player' && !isLocalhost && !isPlayerSummoned}
+            />
         )
     }
 

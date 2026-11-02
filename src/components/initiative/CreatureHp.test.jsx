@@ -3,6 +3,7 @@
 // Owned here (input lane):
 //   status badge thresholds DEAD/BLOODIED/OK vs effective max (jsx:66-67, 89)
 //   lane census: NPC remote badge / summoned numeric / localhost editable / player static (jsx:69-129)
+//   tvMode lane: numeric for players/summoned/localhost, badge-only for remote monsters
 //   current HP commit (NPC lane): onChange(name, clamped 0..effectiveMax) — bug-initiative-hp-input-no-range-clamp
 //     (high clamps to effective max, negative clamps to 0, input echoes the stored number) (jsx:24-38)
 //   current HP commit (player lane): ceiling pass-through — temp-HP overshoot above max is
@@ -216,5 +217,27 @@ describe('CreatureHp', () => {
         useRuntimeValue.mockImplementation((_, prop) => (prop === 'aidHpMaxIncrease' ? 10 : null));
         render(<CreatureHp {...props} creature={{ ...npc, currentHp: 8, maxHp: 7 }} isLocalhost={false} />);
         expect(screen.getByText('BLOODIED')).toBeInTheDocument();
+    });
+
+    it('tvMode hides monster HP numbers from non-localhost players (badge + bar only)', () => {
+        render(<CreatureHp {...props} creature={npc} isLocalhost={false} tvMode />);
+        expect(screen.queryByText('7/7')).not.toBeInTheDocument();
+        expect(screen.queryByText('HP')).not.toBeInTheDocument();
+        expect(screen.getByTestId('hp-bar')).toBeInTheDocument();
+        expect(screen.getByText('OK')).toBeInTheDocument();
+    });
+
+    it('tvMode keeps numeric HP on localhost and for players/summoned on remote clients', () => {
+        const { unmount } = render(<CreatureHp {...props} creature={npc} tvMode />);
+        expect(screen.getByText('7/7')).toBeInTheDocument();
+        expect(screen.getByText('OK')).toBeInTheDocument();
+        unmount();
+
+        const { unmount: unmount2 } = render(<CreatureHp {...props} creature={player} isLocalhost={false} tvMode />);
+        expect(screen.getByText('15/20')).toBeInTheDocument();
+        unmount2();
+
+        render(<CreatureHp {...props} creature={{ ...npc, currentHp: 3 }} isLocalhost={false} isPlayerSummoned tvMode />);
+        expect(screen.getByText('3/7')).toBeInTheDocument();
     });
 });
