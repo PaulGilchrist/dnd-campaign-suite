@@ -195,6 +195,7 @@ vi.mock('../../services/rules/core/spellDamageUtils.js', async (importOriginal) 
 
 vi.mock('../../services/ui/formatUtils.js', () => ({
   formatRange: vi.fn((range) => range || ''),
+  formatWeaponRange: vi.fn((a) => (a?.range ? String(a.range) : '')),
   signFormatter: new Intl.NumberFormat('en-US', { signDisplay: 'always' }),
   getAttackSpellLevel: vi.fn((spellAbilities, attackName) => {
     if (!spellAbilities?.spells) return null;

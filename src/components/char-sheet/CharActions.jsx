@@ -4,7 +4,7 @@ import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames, applyPotentSpellcasting } from '../../services/ui/spellSectionUtils.js'
-import { formatRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
+import { formatRange, formatWeaponRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
 import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from '../../services/rules/core/spellDamageUtils.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
@@ -547,7 +547,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                         return <React.Fragment key={attack.name}>
                             <div className='left clickable' onClick={() => handleAttackClick(attackItem)}>{attack.name}</div>
                             <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : ''}</div>
-                            <div>{formatRange(attack.range)}</div>
+                            <div>{formatWeaponRange(attack)}</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
                                 : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={hitTitle} onClick={() => handleAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}

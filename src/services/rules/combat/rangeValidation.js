@@ -1,7 +1,8 @@
 import { isDistanceInRange } from './rangeCheck.js';
 
 const FEET_PER_CELL = 5
-const MELEE_RANGE_FT = 8 // 8 vs 5 to handle attacking a diagonal square
+// Exported: shared melee-vs-ranged discriminator (see formatWeaponRange in ui/formatUtils.js)
+export const MELEE_RANGE_FT = 8 // 8 vs 5 to handle attacking a diagonal square
 
 function toFeet(gridDistance) {
   return gridDistance * FEET_PER_CELL

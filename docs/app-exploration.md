@@ -66,7 +66,6 @@ Event-check: commits since CI = exactly the five above (+ fold "Explore" commits
 
 ## Improvement Backlog
 
-- 2026-11-03 CJ: sheet Actions Range column prints bare "5 ft." for melee reach weapons — reads like a firing range and misleads distance math (auto-miss face discovered via this); consider "Reach 5 ft." label. `src/components/char-sheet/`
 - 2026-11-03 CJ: save-prompt pre-roll panel never displays the live save bonus/aura breakdown (only the post-Roll result line) — players can't see an Aura-of-Protection pad before committing (the CJ AoP bug hid even better with a pre-roll "+5 (Aura of Protection)" chip). `src/components/common/SavePromptModal.jsx`
 
 ## Blocked / Deepen Targets (fold-gate ledger)

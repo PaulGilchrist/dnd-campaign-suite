@@ -48,6 +48,7 @@ vi.mock('../../services/ui/spellSectionUtils.js', () => ({
 
 vi.mock('../../services/ui/formatUtils.js', () => ({
   formatRange: vi.fn((r) => r || '0'),
+  formatWeaponRange: vi.fn((a) => (a?.range ? String(a.range) : '0')),
   signFormatter: new Intl.NumberFormat('en-US', { sign: 'always' }),
   getAttackSpellLevel: vi.fn(() => null),
 }));

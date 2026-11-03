@@ -233,7 +233,7 @@ describe('CharActions rendering and attack click', () => {
 
     expect(screen.getByText('Longsword')).toHaveClass('clickable');
     expect(screen.getByText('Shortbow')).toHaveClass('clickable');
-    expect(screen.getByText('5 ft.')).toBeInTheDocument();
+    expect(screen.getByText('Reach 5 ft.')).toBeInTheDocument();
     expect(screen.getByText('80 ft.')).toBeInTheDocument();
     expect(screen.getAllByText('+5')).toHaveLength(2);
     expect(screen.getByText('1d8+3')).toBeInTheDocument();
