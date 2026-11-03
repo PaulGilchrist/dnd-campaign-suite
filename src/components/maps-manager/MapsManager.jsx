@@ -96,7 +96,7 @@ function DescriptionEditModal({ map, description, onDescriptionChange, loading, 
     );
 }
 
-function MapsManager({ campaignName, onOpenMap }) {
+function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     const [maps, setMaps] = useState([]);
     const setMapsGuarded = useSSEEqualityGuard(setMaps);
     const [loading, setLoading] = useState(true);
@@ -253,6 +253,10 @@ function MapsManager({ campaignName, onOpenMap }) {
         try {
             setError(null);
             await mapsService.deleteMap(campaignName, fileName);
+            // Tell the app the slug (the naming convention activeMapName and
+            // the server '__map__' key both use) so it can drop a stale active
+            // map from its roller-lane context after an ACTIVE-map deletion.
+            onMapDeleted?.(fileName.replace(/\.json$/, ''));
             setDeletingMap(null);
             await loadMapsList();
         } catch (err) {

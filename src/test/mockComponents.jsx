@@ -11,10 +11,11 @@ export const MockCharSheet = vi.fn((props) => (
   </div>
 ));
 
-export const MockInitiative = vi.fn(({ characters, campaignName }) => (
+export const MockInitiative = vi.fn(({ characters, campaignName, mapName }) => (
   <div data-testid="initiative">
     <span data-testid="init-char-count">{characters?.length || 0}</span>
     <span data-testid="init-campaign">{campaignName}</span>
+    <span data-testid="init-map-name">{mapName || ''}</span>
   </div>
 ));
 
@@ -120,10 +121,11 @@ export const MockSidebar = vi.fn(({
   );
 });
 
-export const MockMapsManager = vi.fn(({ campaignName, onOpenMap }) => (
+export const MockMapsManager = vi.fn(({ campaignName, onOpenMap, onMapDeleted }) => (
   <div data-testid="maps-manager">
     <span data-testid="mm-campaign">{campaignName}</span>
     <button data-testid="open-map-btn" onClick={() => onOpenMap('dungeon-1', 'Dungeon 1')}>Open Map</button>
+    <button data-testid="delete-map-btn" onClick={() => onMapDeleted?.('dungeon-1')}>Delete Active Map</button>
   </div>
 ));
 

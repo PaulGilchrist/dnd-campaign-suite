@@ -10,7 +10,11 @@
  *  - Activation never hijacks a player off the character sheet or off a map
  *    they are already viewing.
  *  - The GM (localhost) never auto-navigates — they manage maps via the
- *    manager listing.
+ *    manager listing — but the event MUST still arm the GM tab's own map
+ *    context (the roller lanes consume activeMapName via Initiative →
+ *    MonsterCardModal mapData; bug-gm-activate-without-open-gridless-roller-lane).
+ *  - Deleting the ACTIVE map from the manager clears the GM tab's armed map
+ *    context; deleting a non-active map leaves it armed.
  *  - Events scoped to another campaign, and malformed payloads (null data,
  *    empty activeMap), are ignored without navigating, alerting, or
  *    crashing.
@@ -340,6 +344,103 @@ describe('App - map-activate SSE auto-open', () => {
     // GM manages maps manually — activation pushes do not navigate them.
     expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
     expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+  });
+
+  // Regression (bug-gm-activate-without-open-gridless-roller-lane): the
+  // localhost early-return used to skip setActiveMapName entirely, so a GM
+  // who ACTIVATEs a map (without Open/re-select) keeps a null local context —
+  // every MonsterCardModal lane fed by Initiative's mapName prop then runs
+  // with mapData:null and measured range/aura gating silently degrades to
+  // tokenless leniency on the GM's own tab.
+  describe('GM (localhost) map-context arming without navigation', () => {
+    async function renderGmOnManager(maps) {
+      const { loadMaps } = await import('./services/maps/mapsService.js');
+      loadMaps.mockResolvedValue({ maps });
+      mockState.characters = [{ name: 'Aragorn', level: 1 }];
+      setHostname('localhost');
+      render(<App />);
+      await selectCampaign();
+      fireEvent.click(screen.getByTestId('maps-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+    }
+
+    it('arms the GM tab map context on activate — no navigation, later activations re-arm', async () => {
+      await renderGmOnManager([{ fileName: 'battle-arena.json', isActive: false }]);
+
+      await dispatch({
+        key: 'map-activate-test-campaign',
+        data: { activeMap: 'battle-arena' },
+      });
+
+      // No hijack: the manager listing stays put (the intent of the original
+      // localhost early-return is preserved).
+      expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+
+      // The GM tab's own roller context (Initiative → MonsterCardModal
+      // mapName/mapData chain) adopted the activated map.
+      fireEvent.click(screen.getByTestId('initiative-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('initiative')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('init-map-name').textContent).toBe('battle-arena');
+
+      // A subsequent activation swaps the armed context without any Open.
+      await dispatch({
+        key: 'map-activate-test-campaign',
+        data: { activeMap: 'test-map' },
+      });
+      expect(screen.getByTestId('init-map-name').textContent).toBe('test-map');
+    });
+
+    it('clears the GM map context when the manager deletes the ACTIVE map', async () => {
+      await renderGmOnManager([{ fileName: 'dungeon-1.json', isActive: false }]);
+
+      await dispatch({
+        key: 'map-activate-test-campaign',
+        data: { activeMap: 'dungeon-1' },
+      });
+      // Mock manager's Delete button calls onMapDeleted('dungeon-1') —
+      // deleting the map this tab has armed must clear the stale context.
+      fireEvent.click(screen.getByTestId('delete-map-btn'));
+      await flushEffects();
+
+      fireEvent.click(screen.getByTestId('initiative-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('initiative')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('init-map-name').textContent).toBe('');
+    });
+
+    it('leaves the armed context in place when the deleted map is not the active one', async () => {
+      await renderGmOnManager([
+        { fileName: 'battle-arena.json', isActive: true },
+        { fileName: 'dungeon-1.json', isActive: false },
+      ]);
+
+      // Select-time load arms battle-arena (isActive listing); deleting a
+      // DIFFERENT map must not blank it.
+      await waitFor(async () => {
+        fireEvent.click(screen.getByTestId('initiative-btn'));
+        await flushEffects();
+        expect(screen.getByTestId('init-map-name').textContent).toBe('battle-arena');
+      });
+      fireEvent.click(screen.getByTestId('maps-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('delete-map-btn'));
+      await flushEffects();
+
+      fireEvent.click(screen.getByTestId('initiative-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('initiative')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('init-map-name').textContent).toBe('battle-arena');
+    });
   });
 
   it.each([

@@ -72,6 +72,7 @@ describe('MapsManager', () => {
         props = {
             campaignName: 'test-campaign',
             onOpenMap: vi.fn(),
+            onMapDeleted: vi.fn(),
         };
     });
 
@@ -481,6 +482,32 @@ describe('MapsManager', () => {
                 expect(mapsService.deleteMap).toHaveBeenCalledWith('test-campaign', 'dungeon-level-1.json');
                 expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
             });
+        });
+
+        // Regression (bug-gm-activate-without-open-gridless-roller-lane,
+        // delete face): the App mirrors deletion into its activeMapName
+        // roller-lane context, so a successful delete must report the deleted
+        // map by SLUG (the naming convention activeMapName/'__map__' use).
+        it('reports the deleted map slug to onMapDeleted after a successful delete', async () => {
+            await renderWithMaps(makeMap({ name: 'Dungeon Level 1', fileName: 'dungeon-level-1.json' }));
+            openDeleteModal();
+            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
+
+            await waitFor(() => {
+                expect(props.onMapDeleted).toHaveBeenCalledWith('dungeon-level-1');
+            });
+        });
+
+        it('does not report a deletion when the delete request fails', async () => {
+            mapsService.deleteMap.mockRejectedValue(new Error('gone wrong'));
+            await renderWithMaps(makeMap({ name: 'Dungeon Level 1', fileName: 'dungeon-level-1.json' }));
+            openDeleteModal();
+            fireEvent.click(screen.getByRole('button', { name: /Yes, Delete Permanently/i }));
+
+            await waitFor(() => {
+                expect(screen.getByText('gone wrong')).toBeInTheDocument();
+            });
+            expect(props.onMapDeleted).not.toHaveBeenCalled();
         });
 
         it('shows the default delete error and closes the modal', async () => {

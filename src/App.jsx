@@ -165,10 +165,20 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
 }
 
 function handleMapActivateEvent(event, { isLocalhost, activeView, mapsView, setMapsView, setActiveMapName }) {
-  // GM (localhost) manages maps through the manager listing — behavior unchanged there.
-  if (isLocalhost) return;
   const { activeMap } = event.data || {};
   if (!activeMap) return;
+  // GM (localhost) manages the view through the manager listing — an activation
+  // never navigates them. But it MUST still arm their own tab's map context:
+  // every roller lane consumes the activeMapName prop chain (Initiative →
+  // MonsterCardModal mapData), and a GM who only activated a map (never Opened
+  // or re-selected) would otherwise silently roll gridless — measured range
+  // gates and rage-aura distance checks degrade to tokenless leniency on the
+  // GM tab while every player tab measures through the activated map
+  // (bug-gm-activate-without-open-gridless-roller-lane).
+  if (isLocalhost) {
+    setActiveMapName(activeMap);
+    return;
+  }
   // Player stranded on the blank maps view (no active map when they clicked
   // "Map") — open the map the GM just activated with zero further clicks.
   if (activeView === 'mapsManager' && mapsView.type !== 'map') {
@@ -241,6 +251,11 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
       <MapsManager
         campaignName={campaignName}
         onOpenMap={(mapName, mapDisplayName) => { setMapsView({ type: 'map', mapName, mapDisplayName }); setActiveMapName(mapName); }}
+        // Deleting the active map clears the server key (stampActiveMapContext
+        // null) — mirror that into this tab's roller-lane context so the stale
+        // name can't keep arming modal mapData for a deleted file
+        // (bug-gm-activate-without-open-gridless-roller-lane, delete face).
+        onMapDeleted={(fileName) => setActiveMapName(prev => (prev === fileName ? null : prev))}
       />
     );
   }
