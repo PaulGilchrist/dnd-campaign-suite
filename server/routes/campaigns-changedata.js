@@ -3,14 +3,18 @@ import { publish, characterChangeData, markDirty } from '../utils/changeData.js'
 import asyncHandler from '../utils/asyncHandler.js';
 import { resolveOverrideTitles } from '../utils/resolveTrackTitles.js';
 import { validateRuntimeWrite } from '../validation/keyValidators.js';
+import { isInvalidCampaignName } from '../utils/campaignReadGuard.js';
 import { addEntry as addLogEntry } from './log.js';
 
 const router = express.Router();
 
-// Reject requests with invalid campaign names before any route handler
+// Reject requests with invalid campaign names before any route handler.
+// (On the full server the app-level missing-folder guard answers these
+// FIRST with the identical 400 — this middleware keeps the face intact for
+// this router in isolation, e.g. under its co-located supertest suites.)
 router.use('/api/campaigns/:campaign', (req, res, next) => {
     const { campaign } = req.params;
-    if (campaign === 'undefined' || campaign === 'null') {
+    if (isInvalidCampaignName(campaign)) {
         console.error('Rejecting request for invalid campaign name', { campaign, url: req.originalUrl, ip: req.ip });
         return res.status(400).json({ error: 'Invalid campaign name' });
     }

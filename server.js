@@ -31,6 +31,7 @@ import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 import createServerConfigRouter from './server/routes/server-config.js';
 import { createCampaignLockMiddleware, createCampaignCreateGuard, createCampaignRenameGuard, setCampaignLock } from './server/utils/campaignLock.js';
 import { noStoreCampaignGets } from './server/utils/noStoreApi.js';
+import { createMissingCampaignFolderGuard } from './server/utils/campaignReadGuard.js';
 
 const PORT = process.env.PORT || 80;
 
@@ -84,6 +85,14 @@ app.use((req, res, next) => {
 // GETs, campaign/file lists, change-data, log, etc.) inherits it. GET-only;
 // SSE (/subscribe) is outside this prefix and keeps its own no-cache.
 app.use('/api/campaigns', noStoreCampaignGets);
+
+// Deleted-campaign ghost reads (backlog 2026-11-03 CL): campaign-scoped
+// GET/HEAD for a folder that no longer exists 404 { error: 'Campaign not
+// found' } instead of synthesizing defaults — and never re-materialize the
+// folder through an entity-lane read. GET/HEAD only; writes and SSE are
+// untouched. Mounted before every campaign router (see
+// server/utils/campaignReadGuard.js).
+app.use(createMissingCampaignFolderGuard());
 
 // Serve static files from the public directory FIRST so live rule data
 // (/data/*) and campaign files (/campaigns/*) are never shadowed by the
