@@ -13,6 +13,9 @@
 //   non-finite grid coords REFUSED loud (numeric law fix#121 — no NaN cells persisted), nameless
 //   'character:' REFUSED (same-class). Unknown non-empty types stay lawful ("treat unknown types
 //   as furniture" contract, ItemsPanel has no exported manifest to validate against).
+// Bounds law (backlog 2026-11-03 CK): out-of-grid drops CLAMP to the nearest edge cell (matching
+//   the usePlayerDragging/useItemDragging relocation pattern) and log loudly; broken gridSize
+//   cannot define bounds so coords pass through unclamped rather than poisoned to NaN.
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useMapDrops from './useMapDrops.js';
@@ -228,5 +231,61 @@ describe('useMapDrops', () => {
     dropAt(result, 'npc');
     dropAt(result, 'chair');
     expect(placedItems.map((i) => i.id)).toEqual(['guid-a', 'guid-b']);
+  });
+
+  // Grid-bounds law (backlog 2026-11-03 CK): out-of-grid drops CLAMP to the
+  // nearest edge cell — the relocation pattern the pointer-drag seams already
+  // use (usePlayerDragging.js clampToGrid, useItemDragging.js:93-94) — and the
+  // clamp is loud (console.error, fix#121 family). Never persist negative or
+  // ≥gridSize cells. In-grid drop math is byte-unchanged above.
+  it('clamps an out-of-grid character drop to the nearest edge cell, loud, both negative and oversized axes', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = getHook();
+    dropAt(result, 'character:ElderPaladin', { gridX: -3.4, gridY: 10.9 });   // left of canvas (the CK repro)
+    dropAt(result, 'character:Aria', { gridX: 42, gridY: -1 });
+    expect(errSpy).toHaveBeenCalledTimes(2);
+    expect(errSpy.mock.calls[0][0]).toContain('clamped out-of-grid drop (-4, 10) to (0, 10)');
+    expect(errSpy.mock.calls[1][0]).toContain('clamped out-of-grid drop (42, -1) to (29, 0)');
+    expect(mapData.players).toEqual([
+      { id: 'elderpaladin', name: 'ElderPaladin', gridX: 0, gridY: 10 },
+      { id: 'aria', name: 'Aria', gridX: 29, gridY: 0 },
+    ]);
+    errSpy.mockRestore();
+  });
+
+  it('clamps out-of-grid npc and furniture drops to edge cells too', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = getHook();
+    dropAt(result, 'npc', { gridX: -1, gridY: 29.5 });
+    dropAt(result, 'table', { gridX: 30, gridY: 100.9 });
+    expect(errSpy).toHaveBeenCalledTimes(2);
+    expect(placedItems.map((i) => [i.gridX, i.gridY])).toEqual([
+      [0, 29],
+      [29, 29],
+    ]);
+    errSpy.mockRestore();
+  });
+
+  it('keeps edge-cell and in-grid drops byte-unchanged: cells 0 and gridSize-1 never log', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = getHook();
+    dropAt(result, 'character:Zero', { gridX: 0.5, gridY: 0.5 });
+    dropAt(result, 'character:Max', { gridX: 29.9, gridY: 29 });
+    expect(errSpy).not.toHaveBeenCalled();
+    expect(mapData.players).toEqual([
+      { id: 'zero', name: 'Zero', gridX: 0, gridY: 0 },
+      { id: 'max', name: 'Max', gridX: 29, gridY: 29 },
+    ]);
+    errSpy.mockRestore();
+  });
+
+  it('quirk pin: a broken (non-finite/<1) gridSize cannot define bounds — coords pass through unclamped, never poisoned to NaN', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = getHook({ gridSize: undefined });
+    dropAt(result, 'table', { gridX: -3.2, gridY: 41 });
+    expect(errSpy).not.toHaveBeenCalled();
+    expect(placedItems).toHaveLength(1);
+    expect([placedItems[0].gridX, placedItems[0].gridY]).toEqual([-4, 41]);
+    errSpy.mockRestore();
   });
 });
