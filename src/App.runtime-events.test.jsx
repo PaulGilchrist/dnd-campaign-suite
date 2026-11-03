@@ -20,12 +20,13 @@
  *     - `pipeline-<campaign>-<key>` mirrors into the runtime store with
  *       skipSync=true (the SSE echo must never re-POST to the server).
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
- *       the campaign store and everything else to the character store,
- *       also skipSync=true; bardic-inspiration prompts gate other writes
- *       until cleared. Null (cleared-key) echoes REMOVE the key from the
- *       campaign store (declared defaults win — never a raw null in the
- *       mirror); scalar echoes mirror into the campaign store; for
- *       character keys both stay dropped (snapshot lane).
+ *       the campaign store; character-scoped keys adopt via
+ *       replaceRuntimeObject (full-bucket REPLACE — ghost keys absent from the
+ *       payload are evicted; memory-only, never re-POSTed); bardic-inspiration
+ *       prompts gate other writes until cleared. Null (cleared-key) echoes
+ *       REMOVE the key from the campaign store (declared defaults win — never
+ *       a raw null in the mirror); scalar echoes mirror into the campaign
+ *       store; for character keys both stay dropped (snapshot lane).
  *     - Malformed events (null key, foreign campaigns, null/scalar data on
  *       character keys) are ignored.
  *  2. Character CRUD through the App shell: landing after campaign
@@ -48,7 +49,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
 
 import { mockState } from './test/appTestState.js';
-import { setRuntimeObject, getStore, notify } from './hooks/runtime/useRuntimeState.js';
+import { setRuntimeObject, replaceRuntimeObject, getStore, notify } from './hooks/runtime/useRuntimeState.js';
 import * as campaignService from './services/campaign/campaignService.js';
 import { loadMaps } from './services/maps/mapsService.js';
 
@@ -90,6 +91,7 @@ vi.mock('./services/encounters/combatData.js', async () => ({
 
 vi.mock('./hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeObject: vi.fn(),
+  replaceRuntimeObject: vi.fn(),
   seedTrackedResources: vi.fn(),
   getStore: vi.fn(() => new Map()),
   notify: vi.fn(),
@@ -547,12 +549,19 @@ describe('App - Runtime Events & State Management', () => {
       expect(setRuntimeObject).toHaveBeenCalledWith('damage:rolled', data, 'test-campaign', true);
     });
 
-    it('applies character-scoped change events to the character store with skipSync', async () => {
+    // bug-changedata-key-removal-stale-on-mounted-tab: the server wildcard POST
+    // stores every write as a REPLACE of the whole character bucket, so the echo
+    // is complete server truth. Adoption must go through replaceRuntimeObject
+    // (evicts keys absent from the payload, memory-only) — NOT the merging
+    // setRuntimeObject, which let a deleted key (e.g. selectedAllies) keep
+    // enforcing allegiance gates on a mounted tab until reload.
+    it('adopts character-scoped change events via replace-object semantics, never a merge', async () => {
       const data = { hp: { current: 7, max: 12 } };
 
       await dispatch({ key: 'change-test-campaign-Aragorn', data });
 
-      expect(writesFor('Aragorn')).toEqual([['Aragorn', data, 'test-campaign', true]]);
+      expect(replaceRuntimeObject).toHaveBeenCalledWith('Aragorn', data);
+      expect(writesFor('Aragorn')).toHaveLength(0);
     });
 
     it('routes campaign-scoped change events into the campaign store and wakes its listeners', async () => {
@@ -678,6 +687,7 @@ describe('App - Runtime Events & State Management', () => {
         key: 'change-test-campaign-Aragorn',
         data: { biPrompt: { promptId: 'bi-1' } },
       });
+      expect(replaceRuntimeObject).not.toHaveBeenCalled();
       expect(writesFor('Aragorn')).toHaveLength(0);
 
       // The cleared signal itself is swallowed too — only the gate moves.
@@ -685,11 +695,13 @@ describe('App - Runtime Events & State Management', () => {
         key: 'change-test-campaign-Aragorn',
         data: { biPromptCleared: true },
       });
+      expect(replaceRuntimeObject).not.toHaveBeenCalled();
       expect(writesFor('Aragorn')).toHaveLength(0);
 
       // Normal traffic resumes after the prompt window.
       await dispatch({ key: 'change-test-campaign-Aragorn', data: { hp: 12 } });
-      expect(writesFor('Aragorn')).toEqual([['Aragorn', { hp: 12 }, 'test-campaign', true]]);
+      expect(replaceRuntimeObject).toHaveBeenCalledWith('Aragorn', { hp: 12 });
+      expect(writesFor('Aragorn')).toHaveLength(0);
     });
 
     it.each([
@@ -704,6 +716,7 @@ describe('App - Runtime Events & State Management', () => {
       await dispatch(event);
 
       expect(writesFor('Aragorn')).toHaveLength(0);
+      expect(replaceRuntimeObject).not.toHaveBeenCalled();
       expect(writesFor('damage:rolled')).toHaveLength(0);
       expect(campaignStore.size).toBe(0);
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();

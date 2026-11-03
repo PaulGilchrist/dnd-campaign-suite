@@ -26,7 +26,7 @@ import rulesFactory from './services/rules/rulesFactory.js';
 import Subscriber from './components/common/Subscriber.jsx';
 import CampaignReloadNotice from './components/common/CampaignReloadNotice/CampaignReloadNotice.jsx';
 import MapContextSync from './components/common/MapContextSync.jsx';
-import { setRuntimeObject, seedTrackedResources, getStore, notify } from './hooks/runtime/useRuntimeState.js';
+import { setRuntimeObject, replaceRuntimeObject, seedTrackedResources, getStore, notify } from './hooks/runtime/useRuntimeState.js';
 import { applyServerOverride, trackedResourcesToStoreEntries } from './services/rules/trackedResources.js';
 import { usePostRestoreNotice } from './hooks/ui/usePostRestoreNotice.js';
 import { useBattleMasterSelectionVersion, battleMasterSelectionSerial } from './hooks/combat/battleMaster.js';
@@ -106,9 +106,10 @@ function redispatchSaveResult(promptId, data, campaignName) {
   }
 }
 
-function applyStoreUpdate(storeKey, data, campaignName) {
+function applyStoreUpdate(storeKey, data) {
   // Campaign-level keys: SSE key is "change-{campaign}-{key}" -> store in campaign store
-  // Character keys: SSE key is "change-{campaign}-{characterName}" -> apply full object to character store
+  // Character keys: SSE key is "change-{campaign}-{characterName}" -> replace that
+  // character store's bucket with the snapshot (server writes are full replaces)
   if (isCampaignKey(storeKey)) {
     const campaignStore = getStore('campaign');
     if (data === null) {
@@ -124,7 +125,10 @@ function applyStoreUpdate(storeKey, data, campaignName) {
     }
     notify('campaign');
   } else {
-    setRuntimeObject(storeKey, data, campaignName, true);
+    // Full-bucket echo: adopt as REPLACE (evict keys absent from the payload —
+    // the server route replaced the whole bucket with this snapshot).
+    // Memory-only, so this never re-POSTs the echo back (skipSync law).
+    replaceRuntimeObject(storeKey, data);
   }
 }
 
@@ -142,7 +146,7 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
     // there is corrupt noise and stays dropped; prompt lanes below need object
     // data, so they are never reached by null/scalar echoes.
     if (isCampaignKey(storeKey)) {
-      applyStoreUpdate(storeKey, event.data, campaignName);
+      applyStoreUpdate(storeKey, event.data);
     }
     return;
   }
@@ -157,7 +161,7 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
     return;
   }
   pendingPromptIdRef.current = null;
-  applyStoreUpdate(storeKey, event.data, campaignName);
+  applyStoreUpdate(storeKey, event.data);
 }
 
 function handleMapActivateEvent(event, { isLocalhost, activeView, mapsView, setMapsView, setActiveMapName }) {

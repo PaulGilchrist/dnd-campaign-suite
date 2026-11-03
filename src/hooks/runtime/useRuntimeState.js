@@ -198,6 +198,45 @@ export function useRuntimeValue(characterKey, propertyName, campaignName) {
     return value;
 }
 
+/**
+ * SSE-echo adoption for full-bucket stores (character / combatSummary lanes).
+ * The server's wildcard POST route (server/routes/campaigns-changedata.js)
+ * stores each write as a REPLACE of the whole bucket, so a `change-<campaign>-<key>`
+ * echo carries complete server truth: keys absent from the payload no longer
+ * exist server-side and MUST be evicted locally too. A merge-only adoption kept
+ * mounted tabs enforcing ghost keys after another client dropped them
+ * (bug-changedata-key-removal-stale-on-mounted-tab: a removed selectedAllies
+ * list silently gated allegiance checks until reload, and the tab's next
+ * full-store POST resurrected the ghost server-side).
+ * Memory-only — never POSTs (the server already owns this data), mirroring the
+ * skipSync=true guarantee of the setRuntimeObject call it replaces in the
+ * echo path.
+ */
+export function replaceRuntimeObject(characterKey, fullObject) {
+    if (Array.isArray(fullObject)) {
+        console.error('[replaceRuntimeObject] Bucket echo must be an object, got an array — dropped', { characterKey });
+        return;
+    }
+    if (!fullObject || typeof fullObject !== 'object') return;
+    const store = getStore(characterKey);
+    let changed = false;
+    for (const key of Array.from(store.keys())) {
+        if (!(key in fullObject)) {
+            store.delete(key);
+            changed = true;
+        }
+    }
+    for (const [key, value] of Object.entries(fullObject)) {
+        if (!valuesEqual(store.get(key), value)) {
+            store.set(key, value);
+            changed = true;
+        }
+    }
+    if (changed) {
+        notify(characterKey);
+    }
+}
+
 export function setRuntimeBatch(characterKey, properties, campaignName) {
     if (!properties || typeof properties !== 'object') return;
     const store = getStore(characterKey);
