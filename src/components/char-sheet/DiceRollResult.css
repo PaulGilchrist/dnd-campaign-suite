@@ -2,6 +2,9 @@
     display: flex;
     gap: 10px;
     justify-content: center;
+    /* stacked forced-mode reason chips (multi-source disadvantage) wrap onto
+       their own centered lines instead of overflowing the popup width */
+    flex-wrap: wrap;
     margin: 10px 0;
 }
 

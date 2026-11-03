@@ -9,9 +9,9 @@
 // (2024 Power of the Wilds — Lion) was structurally unaffected.
 // Sibling setup mirrors MonsterCardModal.logic.test.jsx.
 
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage } from './MonsterCardModal.jsx';
+import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage, buildLionAuraReason, buildDisadvantageReasons } from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -130,6 +130,8 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
+import * as rangeValidation from '../../services/rules/combat/rangeValidation.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getLionDisadvantageAgainst } from '../../services/combat/auras/lionAuraUtils.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -172,6 +174,11 @@ beforeEach(() => {
   conditionEffects.__setCombineReturn('normal');
   getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: false });
   addEntry.mockResolvedValue({});
+  // vi.clearAllMocks keeps implementations — re-stub the range/map seams per
+  // test so the stacked multi-source face cannot leak into siblings.
+  rangeValidation.computeRangeEffect.mockReturnValue({ mode: 'normal', reason: '' });
+  rangeValidation.getDistanceFeet.mockReturnValue(null);
+  mapsService.loadMapData.mockResolvedValue(null);
   getCombatSummary.mockImplementation(() => ({
     creatures: [
       { name: 'Goblin', type: 'npc' },
@@ -207,6 +214,62 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
     expect(entry.characterName).toBe('Goblin');
     expect(entry.abilityName).toBe('Scimitar');
     expect(entry.description).toContain('ElderPaladin');
+  });
+
+  // 2026-11-03 QA backlog (multi-source disadvantage attribution): the aura
+  // must ride the roll options as a REASON (not just a mode), so the popup can
+  // name it alongside the range-band reason instead of silently dropping it.
+  it('threads the single aura reason into the roll options (no range source)', async () => {
+    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
+
+    render(<MonsterCardModal {...goblinProps()} />);
+    clickScimitarChip();
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    expect(rollAttack.mock.calls[0][2].disadvantageReasons).toEqual([
+      'Lion rage aura — within 5 ft of raging ElderPaladin',
+    ]);
+    // Exactly ONE aura log row per press (acceptance: machine log unchanged).
+    expect(lionAuraLogCalls()).toHaveLength(1);
+  });
+
+  it('stacks BOTH the range-band and aura reasons when two sources apply', async () => {
+    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
+    // Positioned-map lane: goblin token placed, target 25 ft away → melee
+    // range-band auto-miss reason, on top of the aura disadvantage.
+    rangeValidation.getDistanceFeet.mockReturnValue(25);
+    rangeValidation.computeRangeEffect.mockReturnValue({
+      mode: 'miss',
+      reason: 'Target out of melee range (25 ft > 8 ft)',
+    });
+    mapsService.loadMapData.mockResolvedValue({
+      players: [{ name: 'ElderPaladin', gridX: 2, gridY: 8 }, { name: 'Player A', gridX: 8, gridY: 8 }],
+      placedItems: [{ name: 'Goblin', type: 'npc', gridX: 3, gridY: 8 }],
+    });
+
+    render(<MonsterCardModal {...goblinProps({ mapName: 'battle-arena' })} />);
+    // Flush the async map-load effect so mapData is live before the press —
+    // gridless (null mapData) would skip the measured range band.
+    await act(async () => {});
+    clickScimitarChip();
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    const [, , options] = rollAttack.mock.calls[0];
+    expect(options.forcedMode).toBe('disadvantage');
+    expect(options.rangeReason).toBe('Target out of melee range (25 ft > 8 ft)');
+    expect(options.disadvantageReasons).toEqual([
+      'Target out of melee range (25 ft > 8 ft)',
+      'Lion rage aura — within 5 ft of raging ElderPaladin',
+    ]);
+    expect(lionAuraLogCalls()).toHaveLength(1);
+  });
+
+  it('carries no reason list when no disadvantage source applies', async () => {
+    render(<MonsterCardModal {...goblinProps()} />);
+    clickScimitarChip();
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    expect(rollAttack.mock.calls[0][2].disadvantageReasons).toEqual([]);
   });
 
   it('cancels advantage forward to normal when the aura applies (getNetAttackMode convention)', async () => {
@@ -312,5 +375,48 @@ describe('foldAuraDisadvantage — merge precedence', () => {
     expect(foldAuraDisadvantage('advantage', aura)).toBe('normal');
     expect(foldAuraDisadvantage('normal', aura)).toBe('disadvantage');
     expect(foldAuraDisadvantage('disadvantage', aura)).toBe('disadvantage');
+  });
+});
+
+describe('buildLionAuraReason / buildDisadvantageReasons — multi-source attribution', () => {
+  const aura = { disadvantage: true, source: 'ElderPaladin' };
+  const auraReason = 'Lion rage aura — within 5 ft of raging ElderPaladin';
+  const bandReason = 'Target out of melee range (25 ft > 8 ft)';
+
+  it('names the bearer in the aura reason; null aura stays null', () => {
+    expect(buildLionAuraReason(aura)).toBe(auraReason);
+    expect(buildLionAuraReason(null)).toBeNull();
+  });
+
+  it('stacks the range band FIRST, then the aura, when both apply (miss face)', () => {
+    expect(buildDisadvantageReasons({
+      foldedMode: 'disadvantage', rangeReason: bandReason, isAutoMiss: true, rangeForcedMode: null, lionAura: aura,
+    })).toEqual([bandReason, auraReason]);
+  });
+
+  it('stacks both when the range band itself forces disadvantage', () => {
+    expect(buildDisadvantageReasons({
+      foldedMode: 'disadvantage', rangeReason: 'Beyond normal range (15 ft > 8 ft)', isAutoMiss: false, rangeForcedMode: 'disadvantage', lionAura: aura,
+    })).toEqual(['Beyond normal range (15 ft > 8 ft)', auraReason]);
+  });
+
+  it('single-source faces carry exactly one reason (no phantom second)', () => {
+    expect(buildDisadvantageReasons({
+      foldedMode: 'normal', rangeReason: bandReason, isAutoMiss: true, rangeForcedMode: null, lionAura: null,
+    })).toEqual([bandReason]);
+    expect(buildDisadvantageReasons({
+      foldedMode: 'disadvantage', rangeReason: null, isAutoMiss: false, rangeForcedMode: null, lionAura: aura,
+    })).toEqual([auraReason]);
+  });
+
+  it('carries nothing when no disadvantage source applied (or the aura cancelled out)', () => {
+    expect(buildDisadvantageReasons({
+      foldedMode: 'normal', rangeReason: null, isAutoMiss: false, rangeForcedMode: null, lionAura: null,
+    })).toEqual([]);
+    // adv + aura cancel to normal (foldAuraDisadvantage) → the aura is not a
+    // reason for this press; a lingering gridless advisory never stacks.
+    expect(buildDisadvantageReasons({
+      foldedMode: 'normal', rangeReason: 'Range band advisory (GM-enforced)', isAutoMiss: false, rangeForcedMode: null, lionAura: aura,
+    })).toEqual([]);
   });
 });

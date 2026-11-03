@@ -66,6 +66,55 @@ describe('DiceRollResult rendering', () => {
             const badge = screen.getByText(badgeText);
             expect(badge).toHaveAttribute('title', title);
         });
+
+        // 2026-11-03 QA backlog (multi-source disadvantage attribution): when
+        // the roll seam carries 2+ reasons (range band + Lion rage aura), the
+        // popup stacks one chip per source; ≤1 reason keeps the legacy single
+        // chip copy byte-identical (no phantom second chip).
+        it('stacks one chip per reason when multiple disadvantage sources apply', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                rangeReason: 'Target out of melee range (25 ft > 8 ft)',
+                disadvantageReasons: ['Target out of melee range (25 ft > 8 ft)', 'Lion rage aura — within 5 ft of raging ElderPaladin'],
+            });
+            const badges = document.querySelectorAll('.forced-mode-badge');
+            expect(badges).toHaveLength(2);
+            expect(badges[0]).toHaveTextContent('Disadv (Target out of melee range (25 ft > 8 ft))');
+            expect(badges[0]).toHaveAttribute('title', 'Target out of melee range (25 ft > 8 ft)');
+            expect(badges[1]).toHaveTextContent('Disadv (Lion rage aura — within 5 ft of raging ElderPaladin)');
+            expect(badges[1]).toHaveAttribute('title', 'Lion rage aura — within 5 ft of raging ElderPaladin');
+            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
+        });
+
+        it('single-reason list keeps the legacy single chip (no second chip)', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                rangeReason: 'Beyond normal range (15 ft > 8 ft)',
+                disadvantageReasons: ['Beyond normal range (15 ft > 8 ft)'],
+            });
+            expect(document.querySelectorAll('.forced-mode-badge')).toHaveLength(1);
+            expect(screen.getByText('Disadv (Beyond normal range (15 ft > 8 ft))')).toBeInTheDocument();
+        });
+
+        it('empty/null reason list falls back to the conditions copy', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                disadvantageReasons: [],
+            });
+            expect(document.querySelectorAll('.forced-mode-badge')).toHaveLength(1);
+            expect(screen.getByText('Disadv (conditions)')).toHaveAttribute('title', 'Automatically set by active conditions');
+        });
+
+        it('advantage mode never stacks the disadvantage reason list', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage',
+                advantageReason: 'Precise Hunter (Hunter\'s Mark)',
+                disadvantageReasons: ['Target out of melee range (25 ft > 8 ft)', 'Lion rage aura — within 5 ft of raging ElderPaladin'],
+            });
+            const badges = document.querySelectorAll('.forced-mode-badge');
+            expect(badges).toHaveLength(1);
+            expect(badges[0]).toHaveTextContent('Adv (Precise Hunter (Hunter\'s Mark))');
+        });
     });
 
     describe('crit / Natural 20 / crit-miss notices', () => {

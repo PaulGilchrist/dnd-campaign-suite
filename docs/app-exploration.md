@@ -57,7 +57,6 @@ Event-check: commits since CL = 31cc31b9a + c675dbe18 (docs) + 90e0b0d08 + d23e1
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- (2026-11-03 CM) Multi-source disadvantage attribution: when the Lion aura AND a range-band disadvantage both apply, the HIT/MISS popup chip shows only ONE reason ("Disadv (Target out of melee range (25 ft > 8 ft))") and silently drops the aura reason — the per-press `lion_aura_disadvantage` log row is the only surface telling the GM why. Consider stacking reason chips or joining reasons in the label. Likely `MonsterCardModal.jsx` popup builder / `AttackResultPopup.jsx`.
 - (2026-11-03 CM) `lion_aura_disadvantage` log copy asserts "within 5 feet of raging <bearer>" even on the tokenless/`skipRangeCheck` lenient face where proximity was never measured (MonsterCardModal `logLionAuraApplied` static template). Honest variant: "proximity unmeasured (no token) — GM-enforced" tail, mirroring house-law advisory phrasing.
 - (2026-11-03 CM) Seed quick-create buttons (`New Arena Battle` / `New Starter Adventure`) stay clickable while a sibling seed modal is open; the stacked `.modal-overlay` then intercepts every click until Cancel (recovery cost two tool passes). Disable the other seeded buttons while one modal is up, or replace the overlay instead of stacking. `CampaignSelection` + modal component.
 

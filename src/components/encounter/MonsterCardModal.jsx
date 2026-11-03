@@ -1190,6 +1190,30 @@ function logLionAuraApplied({ monsterName, actionName, bearerName, campaignName 
   }).catch((e) => { console.error('[MonsterCardModal] Error logging Lion aura disadvantage:', e); });
 }
 
+// 2026-11-03 QA backlog (multi-source disadvantage attribution): the aura folds
+// the MODE (foldAuraDisadvantage) but until now never reached the popup's
+// forced-mode chip as a REASON — when the range band also applied, the chip's
+// single-string slot (advantageReason || rangeReason || 'conditions') printed
+// only "Target out of melee range (…)" and silently dropped the aura "why"
+// (the per-press log row was the only attribution surface). These builders
+// produce a REASONS LIST — one entry per disadvantage source actually applied
+// to THIS press, range band first (mirrors resolveForcedMode precedence) —
+// which the popup renders as stacked reason chips (DiceRollResult).
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildLionAuraReason(aura) {
+  return aura ? `Lion rage aura — within 5 ft of raging ${aura.source}` : null;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura }) {
+  const rangeBandApplies = Boolean(rangeReason) && (isAutoMiss || rangeForcedMode === 'disadvantage');
+  const auraApplies = Boolean(lionAura) && foldedMode === 'disadvantage';
+  return [
+    rangeBandApplies ? rangeReason : null,
+    auraApplies ? buildLionAuraReason(lionAura) : null,
+  ].filter(Boolean);
+}
+
 // CLA-036: Bestial Fury rider transport fields — Fury-stamped Beast's Strike
 // rows arm the hit-confirmed Hunter's Mark extra-Force leg; unstamped rows
 // emit {} (byte-inert). Hoisted to keep buildAutoDamageOptions under the cap.
@@ -1458,6 +1482,11 @@ function buildAttackRollOptions(v) {
     isAutoCrit: v.isAutoCrit,
     isAutoMiss: v.isAutoMiss,
     rangeReason: v.rangeReason ?? buildRangedBandAdvisory(v.action),
+    // 2026-11-03 QA backlog (multi-source disadvantage attribution): per-press
+    // REASONS LIST riding alongside the single rangeReason (AUTO-MISS line and
+    // machine log copy unchanged) — DiceRollResult stacks one chip per reason
+    // when 2+ sources applied, legacy single chip otherwise.
+    disadvantageReasons: v.disadvantageReasons ?? null,
     coverAcBonus: v.coverAcBonus,
     coverLevel: v.coverLevel,
     coverReason: v.coverReason,
@@ -2478,6 +2507,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         .catch((e) => { console.error('[MonsterCardModal] Error resolving Lion rage aura:', e); return null; })
       : null;
 
+    const foldedMode = foldAuraDisadvantage(forcedMode, lionAura);
+
     rollAttack(name, effectiveBonus, buildAttackRollOptions({
       action,
       name,
@@ -2486,12 +2517,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       ...enlargedFields,
       primaryDamageType,
       resistanceNotice,
-      forcedMode: foldAuraDisadvantage(forcedMode, lionAura),
+      forcedMode: foldedMode,
       rangeForcedMode,
       isMelee,
       isAutoCrit,
       isAutoMiss,
       rangeReason,
+      disadvantageReasons: buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura }),
       coverAcBonus,
       coverLevel,
       coverReason,

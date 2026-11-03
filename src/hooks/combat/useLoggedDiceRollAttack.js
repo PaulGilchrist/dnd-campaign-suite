@@ -185,6 +185,14 @@ function secondaryConditionTransportField(context) {
     return { secondaryCondition: context?.secondaryCondition ?? null };
 }
 
+// 2026-11-03 multi-source disadvantage attribution: the per-press reasons list
+// (range band + Lion rage aura) rides the popup data so DiceRollResult can
+// stack one forced-mode chip per source. Hoisted spread helper (buildPopupData
+// sits at the complexity cap).
+function disadvantageReasonsField(context) {
+    return { disadvantageReasons: context?.disadvantageReasons ?? null };
+}
+
 // FT-103: reaction-lane marker rides the popup auto-damage transport so the
 // standalone damage pipeline skips own-turn-only riders (Charger, Shield Bash).
 function opportunityAttackTransportField(context) {
@@ -348,6 +356,7 @@ function buildPopupData({ ctx, context, name, rollType, targetAc, targetName, ch
         coverReason: context?.coverReason,
         forcedMode: ctx.forcedMode,
         advantageReason: context?.advantageReason,
+        ...disadvantageReasonsField(context),
         isAutoCrit: context?.isAutoCrit,
         isCrit: ctx.isCrit,
         isNatural20: ctx.effectiveD20Roll === 20,

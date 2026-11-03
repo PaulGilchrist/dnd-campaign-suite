@@ -2626,3 +2626,8 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - RECIPE (EB checkbox locator): first `<td>` is the empty checkbox cell, so exact-td-text row matching fails; `input.monster-checkbox[aria-label="Select <Name>"]` is the reliable anchor.
 - TRICK (own-card select census): when the attacker is cs idx 0, `[data-testid="target-select"]` nth(0) is its own (self-absent option list identifies it); `.mc-overlay` itself never has one (re-confirms §153).
 - PITFALL (delete-face observability): deleting the active map is live-indistinguishable (stale name 404s to `mapData:null`, cleared name is null anyway) — pin such lanes with unit tests (App-wiring via mock-manager callback button + MapsManager success/failure slug reporting).
+
+### Improve run 2026-11-03 (item 1: multi-source disadvantage chips)
+- RECIPE (measured-token rig without drags): PUT `/api/campaigns/test-campaign/maps/battle-arena` with `players[]`+`placedItems[]` positions gives MEASURED monster-lane faces on an Activate-armed GM tab (post-64721eead); honour the ~10s changeData debounce (poll before reopen) and close/reopen the monster card to refresh its `mapData`.
+- PITFALL (popup replay vs chips): re-press after Done can replay the cached popup (same d20, reason chips re-render) with ZERO new log rows — audit chips visually, count presses by log.
+- FACT (MCP): `browser_take_screenshot` requires the `scale` key ('css'|'device') in this playwright-mcp build.

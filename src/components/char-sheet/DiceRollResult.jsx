@@ -243,8 +243,28 @@ function RollAdjustmentNotices({ props, state }) {
     );
 }
 
+// Forced-mode chip copy. Multi-source disadvantage attribution (2026-11-03 QA
+// backlog): when the roll seam carries 2+ reasons (range band + Lion rage
+// aura), stack one chip per source so neither "why" is silently dropped.
+// 0/1 reasons keep the legacy single-chip chain byte-identical (advantageReason
+// || rangeReason || 'conditions') — no phantom second chip.
+function buildForcedModeChips({ forcedMode, advantageReason, rangeReason, disadvantageReasons }) {
+    const prefix = forcedMode === 'advantage' ? 'Adv' : 'Disadv';
+    const reasons = forcedMode === 'disadvantage' && Array.isArray(disadvantageReasons)
+        ? disadvantageReasons.filter(Boolean)
+        : [];
+    if (reasons.length >= 2) {
+        return reasons.map(reason => ({ label: `${prefix} (${reason})`, title: reason }));
+    }
+    const single = advantageReason || rangeReason;
+    return [{
+        label: `${prefix} (${single || 'conditions'})`,
+        title: single || 'Automatically set by active conditions',
+    }];
+}
+
 function RollModeToggles({ props, state }) {
-    const { forcedMode, advantageReason, rangeReason } = props;
+    const { forcedMode, advantageReason, rangeReason, disadvantageReasons } = props;
     const { isD20, mode, setMode } = state;
     if (!isD20) return null;
     return (
@@ -268,9 +288,11 @@ function RollModeToggles({ props, state }) {
                 Disadvantage
             </label>
             {forcedMode && forcedMode !== 'normal' && (
-               <span className="badge-toggle forced-mode-badge" title={advantageReason || rangeReason || "Automatically set by active conditions"}>
-                 <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} ({advantageReason || rangeReason || 'conditions'})
-               </span>
+               buildForcedModeChips({ forcedMode, advantageReason, rangeReason, disadvantageReasons }).map(chip => (
+                 <span key={chip.label} className="badge-toggle forced-mode-badge" title={chip.title}>
+                   <i className="fa-solid fa-asterisk"></i> {chip.label}
+                 </span>
+               ))
              )}
         </div>
     );
