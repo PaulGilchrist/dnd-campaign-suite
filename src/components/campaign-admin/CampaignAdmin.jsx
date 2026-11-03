@@ -774,7 +774,7 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                     <h3>Starter Adventure</h3>
                     <div className="admin-actions-grid">
                         <div className="admin-action">
-                            <h3>Regenerate adventure</h3>
+                            <h3>Regenerate Adventure</h3>
                             <p>
                                 Re-rolls the dungeon (<strong>{starterSeed.entities?.dungeonTitle}</strong>),
                                 the Wave monster line-ups, and the treasure, then re-points the portal and

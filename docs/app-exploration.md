@@ -67,7 +67,6 @@ Event-check: commits since CJ = the five above + fold/docs commits. Every file t
 
 ## Improvement Backlog
 
-- 2026-11-03 (CK): Admin heading says "Regenerate adventure" but the button says "Regenerate Adventure" — trivial casing parity fix (`CampaignAdmin.jsx` starter section).
 - 2026-11-03 (CK): from the character-sheet view, the FIRST click on the sidebar `Maps` section-header was a no-op (view stayed on the sheet); second click navigated — possibly expand-vs-navigate duality or re-render miss; worth one probe before writing anything (`sidebar-section-header` handler).
 
 ## Blocked / Deepen Targets (fold-gate ledger)

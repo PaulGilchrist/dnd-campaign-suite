@@ -22,6 +22,14 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
+import { loadStarterSeed } from '../../services/campaign/starterSeedService.js';
+
+// The starter-seed probe resolves null (regular campaign) by default, keeping
+// every existing test's render identical to the inert-fetch path; the
+// casing-parity test below overrides it for one render.
+vi.mock('../../services/campaign/starterSeedService.js', () => ({
+    loadStarterSeed: vi.fn(async () => null),
+}));
 
 const CAMPAIGN = 'test-campaign';
 
@@ -166,5 +174,17 @@ describe('CampaignAdmin - Rendering', () => {
         BUSY_TEXTS.forEach((busyText) => {
             expect(screen.queryByText(busyText)).not.toBeInTheDocument();
         });
+    });
+
+    it('starter Regenerate card: heading and button share one Title Case label', async () => {
+        // App convention: every other action card pairs a Title Case h3 with a
+        // button of the SAME visible text (e.g. 'Clear Change Data'). This pins
+        // that parity for the starter card (fixes the 'Regenerate adventure'
+        // heading vs 'Regenerate Adventure' button casing drift).
+        vi.mocked(loadStarterSeed).mockResolvedValueOnce({ entities: { dungeonTitle: 'Test Dungeon' } });
+        renderAdmin({ isLocalhost: true });
+        const heading = await screen.findByRole('heading', { level: 3, name: 'Regenerate Adventure' });
+        const button = screen.getByRole('button', { name: 'Regenerate Adventure' });
+        expect(button.closest('.admin-action')).toBe(heading.closest('.admin-action'));
     });
 });
