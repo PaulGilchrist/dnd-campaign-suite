@@ -103,6 +103,24 @@
   opacity: 0.7;
 }
 
+.sp-preroll-bonus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+  font-weight: bold;
+}
+
+.sp-preroll-base {
+  color: var(--color-header-inner);
+}
+
+.sp-preroll-total {
+  color: var(--color-link);
+}
+
 .sp-actions {
   display: flex;
   gap: 12px;

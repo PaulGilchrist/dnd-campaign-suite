@@ -4,6 +4,7 @@ import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { dropPendingSavePrompt } from '../../services/automation/common/savePrompt.js';
 import Subscriber from './Subscriber.jsx';
+import CreatureBadge from './CreatureBadge.jsx';
 import { getSaveDisadvantage, getHolyAuraSaveAdvantage, getHolyNimbusSaveAdvantage } from './savePromptUtils.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
@@ -352,6 +353,64 @@ function computePromptDisplayState(current, campaignName) {
   };
 }
 
+function signedBonus(n) {
+  return n >= 0 ? `+${n}` : `${n}`;
+}
+
+// Pre-roll save-bonus breakdown for the prompt panel (display-only — the Roll
+// seam recomputes everything at commit time). Same computeAuraBonus call the
+// resolve lane uses (auraOfProtection.js), so base + aura here agrees with the
+// post-roll bonus line whenever no roll-time dice bonuses (Bane/Bless) apply.
+function buildPreRollBreakdown(abilityLabel, saveBonus, aura) {
+  const auraBonus = aura?.bonus > 0 ? aura.bonus : 0;
+  return {
+    promptId: null,
+    baseLabel: `${abilityLabel} ${signedBonus(saveBonus)}`,
+    auraLabel: auraBonus > 0 ? `${signedBonus(auraBonus)} (Aura of Protection)` : null,
+    auraTooltip: auraBonus > 0 && aura.sourceName
+      ? `Aura of Protection from ${aura.sourceName}`
+      : 'Aura of Protection',
+    totalLabel: `= ${signedBonus(saveBonus + auraBonus)}`,
+  };
+}
+
+// Live per-prompt aura/base read: re-derived whenever the front prompt
+// changes (promptId is the staleness key — an aura resolved for a previous
+// prompt is discarded via the active-flag guard, never shown on a new one).
+function usePreRollSaveBreakdown(current, abilityLabel, characters, campaignName, activeMapName) {
+  const [preRoll, setPreRoll] = useState(null);
+  const latestRef = useRef(null);
+  latestRef.current = { current, abilityLabel, characters, activeMapName };
+  const promptId = current?.promptId || null;
+
+  useEffect(() => {
+    setPreRoll(null);
+    if (!promptId) return undefined;
+    let active = true;
+    (async () => {
+      const snapshot = latestRef.current;
+      const prompt = snapshot.current;
+      if (!prompt || prompt.promptId !== promptId) return;
+      const { saveBonus } = resolveTargetSaveBonus(prompt, snapshot.characters, campaignName);
+      const aura = await computeAuraBonus({
+        targetName: prompt.targetName,
+        characters: snapshot.characters,
+        campaignName,
+        activeMapName: snapshot.activeMapName,
+        allCreatures: getCombatSummary(campaignName)?.creatures,
+      });
+      if (active) {
+        setPreRoll({ ...buildPreRollBreakdown(snapshot.abilityLabel, saveBonus, aura), promptId });
+      }
+    })().catch((e) => { console.error('[SavePromptModal] Pre-roll save breakdown failed:', e); });
+    return () => { active = false; };
+    // promptId is the intended refresh key; the other inputs are read from
+    // latestRef at effect time so unstable prop identities never re-loop.
+  }, [promptId, campaignName]);
+
+  return preRoll;
+}
+
 function findTargetCharacter(current, characters) {
   if (!current) return null;
   return (characters || []).find(c => {
@@ -685,7 +744,7 @@ function DualDamageNotice({ current }) {
 }
 
 function SavePromptDialog({
-  current, prompts, dimmed, characters, campaignName, display, hasResult,
+  current, prompts, dimmed, characters, campaignName, display, hasResult, preRoll,
   rerollUsedForSave, rerollAvailability, handlers,
 }) {
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = display;
@@ -702,6 +761,15 @@ function SavePromptDialog({
         <div className="sp-body">
           <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.{promptHasAdvantage ? <span className="sp-advantage-badge"> (Advantage)</span> : ''}{promptHasDisadvantage ? <span className="sp-disadvantage-badge"> (Disadvantage)</span> : ''}</p>
           <p className="sp-dc">DC {current.saveDc}</p>
+          {preRoll && preRoll.promptId === current.promptId && (
+            <div className="sp-preroll-bonus" data-testid="sp-preroll-bonus">
+              <span className="sp-preroll-base">{preRoll.baseLabel}</span>
+              {preRoll.auraLabel && (
+                <CreatureBadge icon="fa-shield-heart" label={preRoll.auraLabel} cls="effect-buff" tooltip={preRoll.auraTooltip} />
+              )}
+              <span className="sp-preroll-total">{preRoll.totalLabel}</span>
+            </div>
+          )}
           {current.dcSuccess === 'half' && (
             <EvasionNote current={current} characters={characters} campaignName={campaignName} />
           )}
@@ -922,6 +990,8 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = computePromptDisplayState(current, campaignName);
   const hasResult = current?.result != null;
 
+  const preRoll = usePreRollSaveBreakdown(current, abilityLabel, characters, campaignName, activeMapName);
+
   useEffect(() => {
     setRerollUsedForSave(false);
   }, [current?.promptId]);
@@ -983,6 +1053,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
           campaignName={campaignName}
           display={{ abilityLabel, promptHasDisadvantage, promptHasAdvantage }}
           hasResult={hasResult}
+          preRoll={preRoll}
           rerollUsedForSave={rerollUsedForSave}
           rerollAvailability={rerollAvailability}
           handlers={{
