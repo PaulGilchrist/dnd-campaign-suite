@@ -25,3 +25,21 @@ Mirror the wolf split on the ATTACKER axis in `lionAuraUtils.js`: add `attackerI
 
 ## Severity
 Broken feature — a live rules engine applies the wrong advantage mode on every attack made adjacent to a raging lv14 Wild Heart barbarian by their own allies; wrong dice directly corrupt combat outcomes. Reachable in ordinary play (melee party clustering is the default formation).
+
+## Resolution
+**FIXED 2026-11-03 (fix subagent). Diagnosis in this file was correct** — the sole defect was the missing attacker-hostility gate in `getLionDisadvantageAgainst`; no other divergence found between the black-box guess and the real code.
+
+**What changed**
+- `src/services/combat/auras/lionAuraUtils.js` — replaced the grantor-side `bearerSupports` (which, unedited, returned true for EVERY attacker — the bug) with `attackerIsEnemyOfBearer(bearerName, attackerName, partyNames)`, mirroring the 2026-11-03 wolf prose-axis doctrine (`wolfAuraUtils.targetIsEnemyOfBearer`) symmetrically on the ATTACKER axis: unedited bearer → legacy party-by-type split (`!partyNames.has(attacker)`; on the map lane `partyNames` = `mapData.players[]` names so placedItems monster/NPC tokens stay hostile, on the gridless lane the candidate list is already `type==='player'` combat-summary creatures); EDITED ally-list bearer → everyone OFF its list is an enemy (betrayal direction per wolf precedent — the aura debuffs the bearer's enemies, so hostility rules, not grantor support). `partyNames` census built once before the loop, same shape as the wolf util.
+- `src/services/combat/auras/lionAuraUtils.test.js` — full doctrine rewrite: new `attacker hostility gate` block pins the exact broken face (ally attacker + unedited bearer → NO disadvantage, grid AND gridless lanes; off-list monster attacker → penalty stands); the `betrayal ally-list flip` block was INVERTED to the wolf direction (off-list former ally → penalized; attacker named on the edited list → exempted); all pre-fix grant-expected tests now use off-list enemy attackers (monster-token doctrine); gridless-lane coverage preserved.
+
+**Not changed (deliberate)**
+- Secondary RAW axis "…or another Barbarian who has this option active" (target exemption): stays deferred per this file's own note and the exploration map's DEFERRED-low-value list — implementing it would also flip the existing pinned "second in-range bearer still penalizes when the target is the first bearer" face, so it needs its own ticket, not a mixed pass. Code comment at the skip site documents it.
+- Dual-ruleset: `lionAuraUtils.js` is a single module consulted by both 5e and 2024 context builders — no sibling twin to mirror the fix onto. Call sites (`contextBuilder-map.js`, `contextBuilder-sync.js`) already thread `targetName`/`mapData`; unchanged.
+
+**Verification**
+- Live repro (pre-fix, test-campaign, :5173 dev): battle-arena activated, DD token dragged to (2,8) via Items-panel char chip (letterbox math), Wild Heart swapped via wizard step 6, Rage + PowW→Lion stamped via the real producer UI (log `Selected Lion wild form`), cs POST armed EF→FeyRanger, EF sheet Shortbow +7 rolled → **`mode:'disadvantage'`, popup "d20 6, 9 → 6" + "Disadv (conditions)" chip** — bug confirmed exactly as written.
+- Live re-verify (post-fix, same rig): ally EF → party FR logs **`mode:'normal'`**, popup "d20 7 +7", single die, NO Disadv chip ✓. Self-target control (target = bearer DD) → still `mode:'normal'` (exclusion axis intact) ✓. Edited defector bearer (`selectedAllies=['DraconicDragon']` bucket POST) → ally attacker penalized again **`mode:'disadvantage'`** ("d20 10, 7 → 7") — wolf-mirrored betrayal direction confirmed live ✓.
+- Tests: `lionAuraUtils.test.js` 32/32; `src/services/combat/auras/` 12 files 220/220 (wolf faces untouched); `src/services/automation/` 519 files 7050/7050; `npm run lint` zero warnings; `no-timers-guard` OK.
+- Cleanup: change-data `{}` + log `[]` (two-pass admin clear, tabs closed), DD subclass restored to Path of the Berserker (disk-verified), battle-arena.json byte-restored to baseline md5 `94fcd0bfe9e4cf6e1118f736b920e7a2`.
+
