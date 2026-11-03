@@ -11,6 +11,7 @@ import { isProtectionFromEvilAndGoodActive, isCreatureWarded } from '../../servi
 import { resolveCreatureType } from '../../services/combat/creatureTypeResolver.js';
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import { isDistanceInRange, isWithinRange } from '../../services/rules/combat/rangeCheck.js';
+import { getLionDisadvantageAgainst } from '../../services/combat/auras/lionAuraUtils.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 import AttackResultPopup from '../common/AttackResultPopup.jsx';
@@ -1131,6 +1132,62 @@ function computeCoverState(isAutoMiss, target, characters, mapData, campaignName
 function resolveForcedMode(forcedMode, rangeForcedMode) {
   if (rangeForcedMode) return rangeForcedMode;
   return forcedMode !== 'normal' ? forcedMode : undefined;
+}
+
+// bug-monster-attack-lane-never-consults-rage-auras: monster-card attack rolls
+// must consult the Lion rage aura (2024 Power of the Wilds — Lion: "any of
+// your enemies within 5 feet of you have Disadvantage on attack rolls against
+// targets other than you"). The aura's principal RAW audience is adjacent
+// hostile monsters, but previously ONLY the PC sheet-roller lanes
+// (contextBuilder-map/sync) fed the aura utils. Lane census mirrors the PC
+// builders byte-for-byte: mapData present → players[] party census (monster
+// tokens live in placedItems[], so a monster attacker is always off the
+// party set and hostile to an unedited bearer); monster token placed →
+// measured bearer↔attacker distance via isWithinRange inside the util;
+// tokenless attacker or no map → skipRangeCheck (cannot-gate leniency,
+// house law §44 — same lane choice as contextBuilder-sync.resolveLionAura).
+
+// Cheap synchronous fast-path gate: returns true when the party census holds
+// any creature with a Lion-option buff stamp. Deliberately broader than the
+// RAW gate — hostility, self-target exclusion and range stay owned by
+// lionAuraUtils.getLionDisadvantageAgainst (single source of truth); this
+// only keeps the awaited util call (and its map fetch) off every monster
+// attack roll in campaigns that have no raging Wild Heart bearer at all.
+function hasLionBearerInScene({ mapData, campaignName }) {
+  const census = mapData?.players?.length
+    ? mapData.players
+    : (getCombatSummary(campaignName)?.creatures || []).filter(c => c.type === 'player');
+  return census.some(p => (getRuntimeValue(p.name, 'activeBuffs', campaignName) || [])
+    .some(b => b.optionName === 'Lion'));
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export async function resolveMonsterLionAura({ mapData, monsterName, target, campaignName }) {
+  const opts = { attackerName: monsterName, targetName: target?.name ?? null, campaignName };
+  if (mapData) opts.mapData = mapData;
+  const attackerPlaced = mapData ? (mapData.placedItems || []).some(i => i.name === monsterName) : false;
+  if (!attackerPlaced) opts.skipRangeCheck = true;
+  const lion = await getLionDisadvantageAgainst(opts);
+  return lion.disadvantage ? lion : null;
+}
+
+// Net-mode fold mirroring getNetAttackMode (conditionEffects.js) — advantage
+// and disadvantage cancel to normal, disadvantage is sticky.
+// eslint-disable-next-line react-refresh/only-export-components
+export function foldAuraDisadvantage(forcedMode, aura) {
+  if (!aura) return forcedMode;
+  return forcedMode === 'advantage' ? 'normal' : 'disadvantage';
+}
+
+function logLionAuraApplied({ monsterName, actionName, bearerName, campaignName }) {
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'lion_aura_disadvantage',
+    characterName: monsterName,
+    abilityName: actionName,
+    description: `${monsterName} has Disadvantage on ${actionName}: within 5 feet of raging ${bearerName} (Power of the Wilds — Lion).`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[MonsterCardModal] Error logging Lion aura disadvantage:', e); });
 }
 
 // CLA-036: Bestial Fury rider transport fields — Fury-stamped Beast's Strike
@@ -2324,7 +2381,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     return types;
   }, []);
 
-  const handleAttack = (name, bonus, action) => {
+  const handleAttack = async (name, bonus, action) => {
     // MA-0294: recharge gate on ATTACK-roll rows (Ape Rock Recharge 6) —
     // mirrors the block-save seam exactly: a spent row refuses with popup +
     // `<action-slug>_refused (not recharged)` log, zero roll zero spend;
@@ -2407,6 +2464,20 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // log; modifier untouched, crit ×2 still applies downstream as today.
     const enlargedFields = enlargedAttackDamageFields({ monsterTargetEffects, action, name, monsterName, campaignName });
 
+    // bug-monster-attack-lane-never-consults-rage-auras: the Lion rage aura is
+    // consulted AFTER every refusal gate above (refused presses never pay an
+    // aura fetch) and folded into the condition-derived forcedMode. The sync
+    // bearer-census gate keeps the roll's microtask placement byte-identical
+    // when no Wild Heart bearer is raging (sibling click→assert contract).
+    const lionAura = hasLionBearerInScene({ mapData, campaignName })
+      ? await resolveMonsterLionAura({ mapData, monsterName, target, campaignName })
+        .then((aura) => {
+          if (aura) logLionAuraApplied({ monsterName, actionName: name, bearerName: aura.source, campaignName });
+          return aura;
+        })
+        .catch((e) => { console.error('[MonsterCardModal] Error resolving Lion rage aura:', e); return null; })
+      : null;
+
     rollAttack(name, effectiveBonus, buildAttackRollOptions({
       action,
       name,
@@ -2415,7 +2486,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       ...enlargedFields,
       primaryDamageType,
       resistanceNotice,
-      forcedMode,
+      forcedMode: foldAuraDisadvantage(forcedMode, lionAura),
       rangeForcedMode,
       isMelee,
       isAutoCrit,

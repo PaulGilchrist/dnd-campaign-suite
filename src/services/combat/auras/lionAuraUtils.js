@@ -37,7 +37,10 @@ export async function getLionDisadvantageAgainst({ attackerName, targetName, cam
     // never here, so a monster attacker is off the party set and still gets
     // the Disadvantage); on the gridless lane the candidate list is already
     // the combat-summary party filtered to type 'player'. Same census as
-    // wolfAuraUtils.getWolfAdvantageAgainst.
+    // wolfAuraUtils.getWolfAdvantageAgainst. Monster-card attack rolls are
+    // fed here too (MonsterCardModal.resolveMonsterLionAura, bug-monster-
+    // attack-lane-never-consults-rage-auras), so the "monster attacker still
+    // gets the Disadvantage" doctrine is live on both roller lanes.
     const partyNames = new Set(allCreatures.map(c => c.name));
 
     for (const player of allCreatures) {
