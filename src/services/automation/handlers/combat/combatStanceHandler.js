@@ -24,6 +24,17 @@ function isWearingArmor(playerStats) {
     return formula.includes('Armor (');
 }
 
+// Path of the Wild Heart rage-companion stances: lv3 Rage of the Wilds
+// (Bear/Eagle/Wolf) and lv14 Power of the Wilds (Falcon/Lion/Ram) are both
+// chosen "whenever you activate your Rage" — they require an active Rage,
+// consume NO separate rage use, re-open their chooser on re-click, and log
+// the wild-form selection. Keep both rows on this one lane.
+const WILD_HEART_STANCE_NAMES = ['Rage of the Wilds', 'Power of the Wilds'];
+
+function isWildHeartStance(action) {
+    return WILD_HEART_STANCE_NAMES.includes(action.name);
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -32,7 +43,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const activeBuffs = Array.isArray(stored) ? stored : [];
     const wasActive = activeBuffs.some(b => b.name === action.name);
 
-    if (wasActive && action.name !== 'Rage of the Wilds') {
+    if (wasActive && !isWildHeartStance(action)) {
         if (auto.effect === 'create_illusion' && playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing')) {
             return {
                 type: 'modal',
@@ -78,7 +89,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    if (action.name === 'Rage of the Wilds') {
+    if (isWildHeartStance(action)) {
         return {
             type: 'modal',
             modalName: 'combatStance',
@@ -122,11 +133,11 @@ function hasEnhancedDistraction(playerStats) {
     return passives.some(p => p.effect === 'enhanced_distraction_and_healing');
 }
 
-function logWildHeartFormChoice(isWildHeart, chosenOption, playerName, campaignName) {
+function logWildHeartFormChoice(isWildHeart, action, chosenOption, playerName, campaignName) {
     if (!isWildHeart || !chosenOption) return;
     addEntry(campaignName, {
         type: 'automation',
-        automationType: 'Rage of the Wilds',
+        automationType: action.name,
         creatureName: playerName,
         description: `Selected ${chosenOption.name} wild form`,
     }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
@@ -153,7 +164,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     const playerName = playerStats.name;
     const maxUses = auto.uses || 0;
 
-    const isWildHeart = action.name === 'Rage of the Wilds';
+    const isWildHeart = isWildHeartStance(action);
 
     const gate = await consumeStanceResource({ action, auto, playerStats, campaignName, isWildHeart, maxUses });
     if (gate.popup) return gate.popup;
@@ -176,7 +187,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
     }
 
-    logWildHeartFormChoice(isWildHeart, chosenOption, playerName, campaignName);
+    logWildHeartFormChoice(isWildHeart, action, chosenOption, playerName, campaignName);
 
     const specialActions = playerStats.automation?.specialActions || [];
 
@@ -235,7 +246,7 @@ async function consumeStanceResource({ action, auto, playerStats, campaignName, 
         const activeBuffs = Array.isArray(stored) ? stored : [];
         const hasRageActive = activeBuffs.some(b => b.name === 'Rage');
         if (!hasRageActive) {
-            return stanceRefusal(action, auto, 'Rage of the Wilds requires Rage to be active.');
+            return stanceRefusal(action, auto, `${action.name} requires Rage to be active.`);
         }
         return { currentUses: 0 };
     }

@@ -253,6 +253,37 @@ describe('CharSpecialActions - modal open routing', () => {
     },
   );
 
+  // bug-power-of-the-wilds-row-inert-no-producer EMIT pin: the lv14 Power of
+  // the Wilds row lives in this grid (casting_time 'passive'), so its
+  // combat_stance chooser must bridge out via the window event the CharActions
+  // tree listens on. Pre-fix, modalName 'combatStance' matched neither
+  // MODAL_DISPATCH nor CHOICE_MODAL_EVENTS — the result fell through
+  // dispatchModalResult and the click produced zero observable delta.
+  it('bridges a combatStance modal result out as the combat-stance-modal-show window event', async () => {
+    const payload = { action: { name: 'Power of the Wilds' }, playerStats: basePlayerStats, campaignName: 'test' };
+    executeHandler.mockResolvedValue({ type: 'modal', modalName: 'combatStance', payload });
+    const listener = vi.fn();
+    window.addEventListener('combat-stance-modal-show', listener);
+
+    const playerStats = {
+      ...basePlayerStats,
+      specialActions: [{
+        name: 'Power of the Wilds',
+        description: 'Falcon, Lion, or Ram while raging.',
+        automation: { type: 'combat_stance', effect: 'power_of_wilds_option', options: [{ name: 'Falcon' }, { name: 'Lion' }, { name: 'Ram' }] },
+      }],
+    };
+    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+    fireEvent.click(screen.getByText(rowLabel('Power of the Wilds')));
+
+    await waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+    expect(listener.mock.calls[0][0].detail).toBe(payload);
+    // The grid itself mounts no modal — the chooser lives in the CharActions tree.
+    window.removeEventListener('combat-stance-modal-show', listener);
+  });
+
   it.each([
     {
       reason: 'cannotAct is true',

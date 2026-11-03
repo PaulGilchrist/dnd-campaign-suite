@@ -328,6 +328,9 @@ describe('CharActions modal-show events → setModalState passthrough', () => {
     { eventName: 'bait-and-switch-modal-show', detail: { attackName: 'Shortsword', options: ['Attack', 'Disengage'] }, modalKey: 'baitAndSwitchChoiceModal' },
     { eventName: 'commander-strike-modal-show', detail: { attackName: 'Longbow', allyName: 'Rogue' }, modalKey: 'commanderStrikeChoiceModal' },
     { eventName: 'rally-choice-modal-show', detail: { attackName: 'War Cry', rallyAmount: 5 }, modalKey: 'rallyChoiceModal' },
+    // bug-power-of-the-wilds-row-inert: Special-Actions grid bridges its
+    // combat_stance chooser (Power of the Wilds Falcon/Lion/Ram) to this tree.
+    { eventName: 'combat-stance-modal-show', detail: { action: { name: 'Power of the Wilds' }, playerStats: { name: 'TestCharacter' }, campaignName: 'test' }, modalKey: 'combatStanceModal' },
   ])('$eventName sets $modalKey with the event detail', async ({ eventName, detail, modalKey }) => {
     await renderWithWrapper(<CharActions playerStats={createStats()} />, makeWrapper(vi.fn()));
 

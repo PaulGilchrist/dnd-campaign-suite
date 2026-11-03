@@ -178,4 +178,17 @@ export default function useCharActionsEventListeners({
         window.addEventListener('rally-choice-modal-show', handler);
         return () => window.removeEventListener('rally-choice-modal-show', handler);
     }, [setModalState]);
+
+    // combat-stance-modal-show listener: the Special Actions grid bridges its
+    // combat_stance chooser (lv14 Power of the Wilds → Falcon/Lion/Ram) here —
+    // same CHOICE_MODAL_EVENTS lineage as rally-choice-modal-show. Opens the
+    // tree's CombatStanceModal with {action, playerStats, campaignName},
+    // mirroring useCharActionsAutomation's combatStance simpleModal lane.
+    useEffect(() => {
+        const handler = (event) => {
+            setModalState({ combatStanceModal: event.detail });
+        };
+        window.addEventListener('combat-stance-modal-show', handler);
+        return () => window.removeEventListener('combat-stance-modal-show', handler);
+    }, [setModalState]);
 }

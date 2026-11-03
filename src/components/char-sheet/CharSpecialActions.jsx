@@ -75,12 +75,17 @@ const MODAL_DISPATCH = {
 
 // MN-002: single-use choice modals live in the CharActions tree; the grid
 // bridges them via the window events useCharActionsEventListeners listens on
-// (mirror of useCombatSuperiorityModal's CHOICE_MODAL_EVENTS).
+// (mirror of useCombatSuperiorityModal's CHOICE_MODAL_EVENTS). The
+// combatStance entry lets the lv14 Power of the Wilds special-grid row open
+// the same CombatStanceModal its lv3 Rage-of-the-Wilds twin opens (the modal
+// state lives in the CharActions tree, so a bridge event is required —
+// pre-fix the {modalName:'combatStance'} result was silently dropped here).
 const CHOICE_MODAL_EVENTS = {
     baitAndSwitchChoice: 'bait-and-switch-modal-show',
     commanderStrikeChoice: 'commander-strike-modal-show',
     rallyChoice: 'rally-choice-modal-show',
     sweepingAttackTarget: 'sweeping-attack-modal-show',
+    combatStance: 'combat-stance-modal-show',
 };
 
 function dispatchModalResult(modalName, payload, d) {
