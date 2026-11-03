@@ -96,6 +96,7 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
 
     expect(getWolfAdvantageAgainst).toHaveBeenCalledWith({
       attackerName: 'HexWarlock',
+      targetName: 'Thug 1',
       campaignName: 'test-campaign',
       skipRangeCheck: true,
     });

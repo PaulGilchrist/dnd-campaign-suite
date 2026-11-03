@@ -162,7 +162,16 @@ async function accumulateAuraCounts(base, playerStats, campaignName, mapData, ta
     const auraOpts = targetPos
         ? { targetPos, attackerName: playerStats.name, campaignName, mapData }
         : { attackerName: playerStats.name, campaignName, mapData, skipRangeCheck: true };
-    const wolfResult = await getWolfAdvantageAgainst(auraOpts);
+    // Wolf threads its target axis (owner ruling 2026-11-03 — prose parity:
+    // "advantage … against any enemy of yours within 5 feet of you [the
+    // bearer]"; wolfAuraUtils.js measures bearer↔target and gates target
+    // hostility). targetPos still selects measured-vs-skip lane-side; the
+    // util resolves positions by name via isWithinRange. Duplicity keeps the
+    // original auraOpts (source semantics).
+    const wolfOpts = targetPos
+        ? { targetPos, attackerName: playerStats.name, targetName: base.targetName, campaignName, mapData }
+        : { attackerName: playerStats.name, targetName: base.targetName, campaignName, mapData, skipRangeCheck: true };
+    const wolfResult = await getWolfAdvantageAgainst(wolfOpts);
     if (wolfResult.advantage) {
         mapAdv++;
     }
@@ -171,8 +180,9 @@ async function accumulateAuraCounts(base, playerStats, campaignName, mapData, ta
         mapAdv++;
     }
     // targetName threaded for the Lion self-target exclusion ("attacks against
-    // targets other than you" — lionAuraUtils.js); wolf/duplicity keep their
-    // source semantics and take no target axis.
+    // targets other than you" — lionAuraUtils.js); wolf now carries its own
+    // target axis too (bearer↔target prose — wolfAuraUtils.js), leaving
+    // duplicity as the only source-semantics aura here.
     const lionOpts = targetPos
         ? { attackerName: playerStats.name, targetName: base.targetName, campaignName, mapData }
         : { attackerName: playerStats.name, targetName: base.targetName, campaignName, mapData, skipRangeCheck: true };

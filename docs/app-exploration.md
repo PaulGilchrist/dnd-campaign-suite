@@ -62,7 +62,6 @@ Event-check for carried rows: commits since BH = **918c7a4b7 only** (Map.jsx/Map
 
 ## Improvement Backlog
 
-- **2026-11-03 CI: Wolf aura proximity axis diverges from its own prose** — classes.json: "allies have Advantage … against any enemy of yours **within 5 feet of you [the bearer]**" but wolfAuraUtils checks bearer↔ATTACKER distance and ignores the target entirely (unit-pinned as "source semantics"; Lion mirrors it). If the pin was a deliberate arena-starter adjudication, fix the feature copy shown in CombatStanceModal; if not, thread targetPos (already handed to the util call and unused). Owner ruling needed — non-blocking until then.
 - **2026-11-03 CI: Allies control is a bare `div.clickable`** — "Allies (n)" opens a fully keyboard-less picker (no role=button, no aria-label; rows are label-text-toggled). Screen readers/automation reach it only by innerText scan; the modal itself is the one decent part (role-able buttons). Cheap win: make the trigger a real button + label the rows with checkboxes as such.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

@@ -369,9 +369,10 @@ async function resolvePreciseHunter(playerName, targetName, playerStats, campaig
 }
 
 // Aura checks when no map is active — all creatures considered in range
-async function resolveWolfAura(playerName, campaignName) {
+async function resolveWolfAura(playerName, targetName, campaignName) {
     const noMapWolf = await getWolfAdvantageAgainst({
         attackerName: playerName,
+        targetName,
         campaignName,
         skipRangeCheck: true,
     });
@@ -522,7 +523,7 @@ async function resolveAttackModeResolvers({ playerName, playerStats, targetName,
         // Invoke Duplicity: Distract grants Advantage on attack rolls while the illusion is active
         () => (activeBuffs.some(b => b.effect === 'create_illusion') ? { mode: 'advantage' } : undefined),
         () => resolvePreciseHunter(playerName, targetName, playerStats, campaignName),
-        () => resolveWolfAura(playerName, campaignName),
+        () => resolveWolfAura(playerName, targetName, campaignName),
         () => resolveDuplicityAura(playerName, campaignName),
         () => resolveLionAura(playerName, targetName, campaignName),
         // WM-008 one-shot te consumption (attack roll only)

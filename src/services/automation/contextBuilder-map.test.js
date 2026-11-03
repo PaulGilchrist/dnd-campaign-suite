@@ -577,7 +577,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       const result = await buildAttack();
       expect(result.forcedMode).toBe('advantage');
       expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(
-        expect.objectContaining({ targetPos: { gridX: 10, gridY: 10 }, mapData: expect.any(Object) }),
+        expect.objectContaining({ targetPos: { gridX: 10, gridY: 10 }, targetName: 'Orc', mapData: expect.any(Object) }),
       );
     });
 
@@ -622,7 +622,7 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       const result = await buildAttack();
       expect(result.forcedMode).toBe('advantage');
       expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(
-        expect.objectContaining({ skipRangeCheck: true }),
+        expect.objectContaining({ skipRangeCheck: true, targetName: 'Orc' }),
       );
     });
   });
