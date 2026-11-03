@@ -61,6 +61,30 @@ function logRoll(campaignName, name, rollResult) {
      }).catch((e) => { console.error("[encounterToInitiative] Error:", e); });
 }
 
+// EB join fan-out disclosure (party-alive model): joining an encounter seeds
+// EVERY saved PC onto the initiative board as a type:player combatant (the
+// campaign-select seed plus the Initiative mount merge keep the whole party
+// present). The board silently growing by a dozen rows confused GMs — write
+// ONE automation row naming the fan-out and its size. Counted off the
+// accepted board (PC entries matching a saved character), so a failed join
+// logs nothing (same post-ack contract as the initiative-roll rows) and a
+// join with no saved party writes no row at all.
+function logPartyFanOut(campaignName, combatSummary, characters) {
+    const boardPlayers = new Set(
+        combatSummary.creatures.filter(c => c.type === 'player').map(c => c.name));
+    const memberCount = characters.reduce(
+        (count, character) => count + (boardPlayers.has(utils.getName(character.name)) ? 1 : 0),
+        0);
+    if (memberCount === 0) return;
+    addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'party_joined_initiative',
+        characterName: 'Party',
+        description: `Party joined initiative (${memberCount} members) — the saved PC party is seeded onto the tracker with the encounter.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[encounterToInitiative] Error:', e); });
+}
+
 export async function expandMonstersToCreatures(selectedMonsters, characters, _campaignName) {
     const creatureList = [];
     const npcRollResults = [];
@@ -275,6 +299,9 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
     for (const { name, rollResult } of npcRollResults) {
         logRoll(campaignName, name, rollResult);
     }
+
+    // One disclosure row for the silent PC-party fan-out (see helper).
+    logPartyFanOut(campaignName, combatSummary, characters);
 
     const firstName = combatSummary.creatures[0]?.name;
     await storage.set('activeCreatureName', firstName, campaignName);

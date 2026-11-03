@@ -60,7 +60,6 @@ Event-check: commits since CK = the seven above + 2d99760f9 docs + ef11508fc fol
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- 2026-11-03 CL: **EB join PC-party fan-out is undocumented UI-wise** — joining a single monster seeds all 13 saved PCs into the initiative board (type:player, placeholder HP); intentional (party-alive model) but the board silently grows with no log row or hint. One `automation` log line "party joined initiative (N members)" or a footnote in the join toast would explain the rows. `encounterToInitiative.js`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
