@@ -92,6 +92,18 @@ function monsterInitBonus(monster) {
   return 0;
 }
 
+/** Sentence-article assembly helper for flavor copy that prefixes "The" onto a
+ *  generated service/business name (backlog 2026-11-03: shop/guild banks ship
+ *  ~1400 names already leading with "The ", so a blind `The ${name}` produced
+ *  "The The Quality Emporium hasn't had a caravan…"). Collides ONLY a genuine
+ *  sentence-leading article word (case-sensitive, followed by whitespace), so
+ *  mid-string "the" and words merely starting with A/An ("Anthel's Arcana")
+ *  pass through untouched. Exported for unit tests; used at every composer
+ *  seam that interpolates a service name, so it holds across regenerate. */
+export function withLeadingArticle(name) {
+  return /^(The|A|An)\s/.test(name) ? name : `The ${name}`;
+}
+
 async function findBestiaryRows(names) {
   const monsters = await loadMonsters();
   const byName = new Map(monsters.map(m => [m.name.toLowerCase(), m]));
@@ -292,7 +304,7 @@ const STARTER_PRESET = {
     const dungeon = generateDungeon({ gridSize: 30, density: 0.5, seed });
     settlement.rumors = [
         `Folk in ${settlement.name} whisper about ${dungeon.name} — ${WAVE_MONSTER_POOLS[0][0]}s seen on the road at dusk.`,
-        `The ${settlement.services?.[0]?.name || 'general store'} hasn't had a caravan through since ${WAVE_MONSTER_POOLS[2][0]}s took the old ruin.`,
+        `${withLeadingArticle(settlement.services?.[0]?.name || 'general store')} hasn't had a caravan through since ${WAVE_MONSTER_POOLS[2][0]}s took the old ruin.`,
         ...(settlement.rumors || []),
     ].slice(0, 4);
     await saveSettlement(campaignName, settlement);
