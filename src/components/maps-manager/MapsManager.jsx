@@ -381,11 +381,22 @@ function MapsManager({ campaignName, onOpenMap }) {
                                     <span className="maps-manager-item-name">
                                         {map.name}
                                         <DraftFlag row={map} />
-                                        {map.type && (
-                                            <span className={`map-type-badge ${map.type === 'outdoor' ? 'outdoor' : 'indoor'}`}>
-                                                {map.type === 'outdoor' ? 'Outdoor' : 'Indoor'}
-                                            </span>
-                                        )}
+                                    </span>
+                                )}
+                                {' '}
+                                {/* Type badge is a sibling of the name (same flex lane as the
+                                    Active badge) so the row's existing 10px gap separates them
+                                    visually, and the {' '} text node keeps the text layer reading
+                                    "Test Map Indoor" instead of "Test MapIndoor" for innerText
+                                    scans and screen readers (backlog 2026-11-03 CK: badge chrome
+                                    was nested in the name span and ran together). Hidden during
+                                    rename, as the badge used to be while the input replaces it. */}
+                                {map.type && renamingMap !== map.fileName && (
+                                    <span
+                                        className={`map-type-badge ${map.type === 'outdoor' ? 'outdoor' : 'indoor'}`}
+                                        aria-label={`Map type: ${map.type === 'outdoor' ? 'Outdoor' : 'Indoor'}`}
+                                    >
+                                        {map.type === 'outdoor' ? 'Outdoor' : 'Indoor'}
                                     </span>
                                 )}
                                 {map.isActive && <span className="maps-manager-active-badge">Active</span>}

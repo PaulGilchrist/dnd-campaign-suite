@@ -452,15 +452,17 @@
   font-size: 14px;
 }
 
-/* Map type badge in list */
+/* Map type badge in list — sibling flex item of the row name inside
+   .maps-manager-item-info; the container's gap provides the separation,
+   so no margin-left (see 2026-11-03 CK backlog fix). */
 .map-type-badge {
   display: inline-block;
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 8px;
-  margin-left: 6px;
   vertical-align: middle;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .map-type-badge.indoor {

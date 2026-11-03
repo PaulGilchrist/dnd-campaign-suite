@@ -67,7 +67,6 @@ Event-check: commits since CJ = the five above + fold/docs commits. Every file t
 
 ## Improvement Backlog
 
-- 2026-11-03 (CK): MapsManager row labels concatenate name+type badge without separation ("The Colosseum PitIndoor") — screen readers and innerText scans eat the seam (`MapsManager` row template).
 - 2026-11-03 (CK): starter rumor template double-articles service names already starting with "The" — "The The Quality Emporium hasn't had a caravan…" persists across regenerate (`starterSeedService`/rumour composer copy assembly).
 - 2026-11-03 (CK): procedural dungeon naming can echo the word ("The Shadow Temple of Shadows") — prefix/suffix pools overlap on "Shadow"; cheap dedupe pass would read better (`seededCampaign`/dungeon name generator).
 - 2026-11-03 (CK): Admin heading says "Regenerate adventure" but the button says "Regenerate Adventure" — trivial casing parity fix (`CampaignAdmin.jsx` starter section).
