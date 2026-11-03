@@ -85,28 +85,26 @@ describe('campaignService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return empty array on API error', async () => {
+    it('should throw on API error (failure ≠ healthy empty list)', async () => {
       fetchSpy.mockResolvedValue({
         ok: false,
         statusText: 'Not Found'
       });
 
-      const result = await getCharacterFolders();
-
-      expect(result).toEqual([]);
-      // Swallow must stay non-silent (AGENTS.md: console.error, not silence).
+      // Rethrow contract (2026-11-02 BG): callers must distinguish an outage
+      // from a healthy-but-empty folder list to show the retry path.
+      await expect(getCharacterFolders()).rejects.toThrow('Failed to fetch character folders');
+      // Failure stays non-silent (AGENTS.md: console.error, not silence).
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Error fetching character folders:',
         expect.any(Error)
       );
     });
 
-    it('should return empty array on network error', async () => {
+    it('should rethrow network errors', async () => {
       fetchSpy.mockRejectedValue(new Error('Network error'));
 
-      const result = await getCharacterFolders();
-
-      expect(result).toEqual([]);
+      await expect(getCharacterFolders()).rejects.toThrow('Network error');
     });
   });
 

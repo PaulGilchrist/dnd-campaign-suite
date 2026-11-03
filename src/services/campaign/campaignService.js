@@ -8,8 +8,12 @@ export const getCharacterFolders = async () => {
     const data = await response.json();
     return data.folders || [];
   } catch (error) {
+    // Log once and RETHROW (2026-11-02 BG retry-affordance fix): swallowing
+    // to [] made a transient API outage indistinguishable from a genuinely
+    // empty campaigns dir, dead-ending selection at "No campaigns found".
+    // Healthy-but-malformed bodies still resolve to [] via `data.folders || []`.
     console.error('Error fetching character folders:', error);
-    return [];
+    throw error;
   }
 };
 

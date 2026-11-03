@@ -124,8 +124,22 @@ describe('CampaignSelection live campaigns-list sync', () => {
     expect(screen.getByRole('button', { name: 'Frostfall' })).toBeInTheDocument();
   });
 
-  it('refresh is non-destructive: an open quick-create modal keeps its name draft', async () => {
-    await renderSelection(['Frostfall']);
+  it('a refresh that fails mid-session keeps the visible rows — no wipe, no error lane', async () => {
+    // Service rethrows on outage (2026-11-02 BG): a campaigns-list event that
+    // refetches into a dead API must NOT blank the list (old LAN-deselect
+    // symptom — the swallowed [] used to land here as an empty success).
+    await renderSelection(['Frostfall', 'test-campaign']);
+    getCharacterFolders.mockRejectedValue(new Error('Network error'));
+
+    capturedHandler({ key: 'campaigns-list', data: { action: 'deleted', campaign: 'Frostfall' } });
+    await new Promise(r => setTimeout(r, 30));
+
+    expect(screen.getByRole('button', { name: 'Frostfall' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'test-campaign' })).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to load campaigns/)).not.toBeInTheDocument();
+  });
+
+  it('refresh is non-destructive: an open quick-create modal keeps its name draft', async () => {    await renderSelection(['Frostfall']);
     fireEvent.click(screen.getByRole('button', { name: 'New Campaign' }));
     const input = screen.getByPlaceholderText('Enter campaign name');
     fireEvent.change(input, { target: { value: 'Mid-Edit' } });

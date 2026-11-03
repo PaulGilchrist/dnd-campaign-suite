@@ -100,19 +100,53 @@ describe('CampaignSelection', () => {
       expect(screen.queryAllByRole('button')).toHaveLength(0);
     });
 
-    it('shows an error screen when loading folders fails and reloads the page when Reload Page is clicked', async () => {
+    it('shows an inline error with a Retry button when the folder fetch fails, and refetches in place on Retry', async () => {
       const reloadSpy = stubReload();
-      getCharacterFolders.mockRejectedValue(new Error('Network error'));
+      getCharacterFolders.mockRejectedValueOnce(new Error('Network error'));
 
       render(<CampaignSelection />);
 
       await waitFor(() => {
         expect(screen.getByText(/Failed to load campaigns/)).toBeInTheDocument();
       });
+      // In-place recovery (2026-11-02 BG): Retry refetches — no page reload,
+      // and the healthy "No campaigns found" copy must never masquerade here.
+      const retry = screen.getByRole('button', { name: 'Retry' });
+      expect(screen.queryByRole('button', { name: 'Reload Page' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/No campaigns found/)).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Reload Page' }));
+      getCharacterFolders.mockResolvedValue(['Campaign1']);
+      fireEvent.click(retry);
 
-      expect(reloadSpy).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Campaign1' })).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/Failed to load campaigns/)).not.toBeInTheDocument();
+      expect(reloadSpy).not.toHaveBeenCalled();
+    });
+
+    it('keeps the Retry affordance available when the retry itself fails (no auto-polling)', async () => {
+      getCharacterFolders.mockRejectedValue(new Error('Network error'));
+
+      render(<CampaignSelection />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      });
+      const attemptsAfterMount = getCharacterFolders.mock.calls.length;
+
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      await waitFor(() => {
+        expect(getCharacterFolders).toHaveBeenCalledTimes(attemptsAfterMount + 1);
+      });
+      // Still failed: error lane persists, Retry stays clickable, no reload.
+      expect(screen.getByText(/Failed to load campaigns/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+
+      // Failure never becomes a polling loop — fetches only happen on clicks.
+      await new Promise(r => setTimeout(r, 50));
+      expect(getCharacterFolders).toHaveBeenCalledTimes(attemptsAfterMount + 1);
     });
   });
 
@@ -133,6 +167,12 @@ describe('CampaignSelection', () => {
       expect(screen.getByText(/No campaigns found/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'New Campaign' })).toBeInTheDocument();
       expect(screen.queryByText('Campaign1')).not.toBeInTheDocument();
+      // Healthy-but-empty is a FINAL answer, not an error: exactly one fetch,
+      // no Retry lane, no retry loop (2026-11-02 BG).
+      expect(getCharacterFolders).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      await new Promise(r => setTimeout(r, 50));
+      expect(getCharacterFolders).toHaveBeenCalledTimes(1);
     });
   });
 

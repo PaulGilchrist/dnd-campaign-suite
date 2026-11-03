@@ -31,6 +31,15 @@
   margin: 1rem 0;
 }
 
+/* Failed folder-fetch lane (2026-11-02 BG retry affordance): replaces the
+   healthy .no-campaigns copy with an in-place error + Retry refetch.
+   Message styling mirrors the hard-fail error screen; the Retry button
+   reuses .reload-button below. */
+.campaign-selection .campaign-load-error .error-message {
+  color: var(--color-error-light);
+  font-weight: bold;
+}
+
 .campaign-selection .campaign-list {
   display: flex;
   flex-wrap: wrap;

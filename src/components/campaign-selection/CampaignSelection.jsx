@@ -29,6 +29,53 @@ function seededDefaultName(prefix) {
   return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
 }
 
+/**
+ * The list region has three mutually exclusive faces (hoisted out of
+ * CampaignSelection for the complexity ceiling): a FAILED folder fetch — an
+ * outage, NOT the healthy "No campaigns found" empty state — recovers via an
+ * in-place Retry refetch without a manual page reload (2026-11-02 BG); the
+ * healthy-but-empty guidance; and the campaign rows themselves.
+ */
+function CampaignListArea({ foldersError, onRetry, campaigns, campaignTypes, selecting, onSelect }) {
+  if (foldersError) {
+    return (
+      <div className="campaign-load-error" role="alert">
+        <p className="error-message">{foldersError}</p>
+        <button className="reload-button" onClick={onRetry}>Retry</button>
+      </div>
+    );
+  }
+  if (campaigns.length === 0) {
+    return (
+      <p className="no-campaigns">
+        No campaigns found. Please create folders under ./public/campaigns to get started.
+      </p>
+    );
+  }
+  return (
+    <div className="campaign-list">
+      {campaigns.map((campaign) => {
+        const badge = CAMPAIGN_TYPE_BADGES[campaignTypes[campaign]];
+        return (
+          <button
+            key={campaign}
+            className={`campaign-button${badge ? ` campaign-button--${badge.cls}` : ''}`}
+            onClick={() => onSelect(campaign)}
+            disabled={selecting}
+          >
+            {campaign}
+            {badge && (
+              <span className={`campaign-type-badge campaign-type-badge--${badge.cls}`}>
+                <i className={badge.icon}></i> {badge.label}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost = true }) {
   const [campaigns, setCampaigns] = useState([]);
   const [campaignTypes, setCampaignTypes] = useState({});
@@ -40,24 +87,32 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // null | 'arena' | 'starter' — which preset the name-entry modal is for.
   const [seedPreset, setSeedPreset] = useState(null);
   const [seeding, setSeeding] = useState(false);
+  // Transient folder-fetch failure (2026-11-02 BG retry-affordance fix): kept
+  // separate from the hard-fail `error` screen so the header, quick-create
+  // buttons and SSE live-refresh stay mounted while the user recovers the
+  // list in place with Retry (MapUnavailable "Check Again" pattern).
+  const [foldersError, setFoldersError] = useState(null);
+
+  const loadCampaigns = useCallback(async () => {
+    setLoading(true);
+    try {
+      const folders = await getCharacterFolders();
+      const types = await getCampaignTypes();
+      setCampaigns(folders);
+      setCampaignTypes(types);
+      setFoldersError(null);
+    } catch (_err) {
+      // campaignService logs the cause once and rethrows (failure is never
+      // silently downgraded to a healthy empty list).
+      setFoldersError('Failed to load campaigns. Please ensure campaign folders exist under ./public/campaigns');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchCampaigns = async () => {
-      try {
-        setLoading(true);
-        const folders = await getCharacterFolders();
-        const types = await getCampaignTypes();
-        setCampaigns(folders);
-        setCampaignTypes(types);
-        setLoading(false);
-      } catch (_err) {
-        setError('Failed to load campaigns. Please ensure campaign folders exist under ./public/campaigns');
-        setLoading(false);
-       }
-      };
-
-    fetchCampaigns();
-  }, []);
+    loadCampaigns();
+  }, [loadCampaigns]);
 
   // Live refresh (starter-seed SSE doctrine, 71f617299): the server publishes
   // app-level `campaigns-list` events on campaign create/rename/delete/meta
@@ -67,7 +122,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // `campaign` param) — still ONE shared EventSource, closed automatically
   // when this screen unmounts. The refetch is non-destructive: only the
   // folder/type lists are set-if-changed (stable refs when equal, so no
-  // re-render churn) and no modal/loading/error state is touched.
+  // re-render churn) and no modal/loading state is touched.
   const refreshCampaigns = useCallback(async () => {
     try {
       const [folders, types] = await Promise.all([
@@ -76,9 +131,14 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
       ]);
       setCampaigns(prev => (JSON.stringify(prev) === JSON.stringify(folders) ? prev : folders));
       setCampaignTypes(prev => (JSON.stringify(prev) === JSON.stringify(types) ? prev : types));
+      // A successful refresh means the API is answering again — retire any
+      // stale folder-load error/Retry lane.
+      setFoldersError(null);
     } catch (err) {
       // Transient failure: keep the visible rows rather than wiping the
-      // screen; the next event (or a manual reload) recovers.
+      // screen; the next event (or the folder-load Retry button) recovers.
+      // (Service rethrows, so a mid-session outage can no longer blank the
+      // list with a swallowed [] — the old LAN-deselect symptom.)
       console.error('Campaign list refresh failed:', err);
     }
   }, []);
@@ -250,32 +310,14 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
              <i className={cfg.icon}></i> {cfg.button}
            </button>
          ))}
-         {campaigns.length === 0 ? (
-           <p className="no-campaigns">
-           No campaigns found. Please create folders under ./public/campaigns to get started.
-           </p>
-         ) : (
-            <div className="campaign-list">
-              {campaigns.map((campaign) => {
-                const badge = CAMPAIGN_TYPE_BADGES[campaignTypes[campaign]];
-                return (
-                  <button
-                    key={campaign}
-                    className={`campaign-button${badge ? ` campaign-button--${badge.cls}` : ''}`}
-                    onClick={() => handleCampaignSelect(campaign)}
-                    disabled={loading}
-                  >
-                    {campaign}
-                    {badge && (
-                      <span className={`campaign-type-badge campaign-type-badge--${badge.cls}`}>
-                        <i className={badge.icon}></i> {badge.label}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-         )}
+          <CampaignListArea
+            foldersError={foldersError}
+            onRetry={loadCampaigns}
+            campaigns={campaigns}
+            campaignTypes={campaignTypes}
+            selecting={loading}
+            onSelect={handleCampaignSelect}
+          />
        
          {isLocalhost && showNewCampaignModal && (
            <div className="modal-overlay">

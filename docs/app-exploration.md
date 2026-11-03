@@ -71,7 +71,7 @@ All BG claims entered/derived THIS run unless tagged carried.
 
 ## Improvement Backlog
 
-- (2026-11-02 BG) Campaign-selection list fetch has NO retry/backoff after a transient API outage: every mounted tab sticks at "No campaigns found. Please create folders…" until manual reload (GM + LAN both, after deliberate API restarts); LAN additionally fully deselects. A visible retry affordance or 1-shot auto-retry on the folder fetch would remove the dead-end. `src/components/campaign-selection/CampaignSelection.jsx` + folder-fetch lane.
+_(No open items.)_
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 
