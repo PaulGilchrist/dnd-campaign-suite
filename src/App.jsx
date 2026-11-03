@@ -719,7 +719,11 @@ function App() {
 
   return (
     <div className="app">
-      <input key={Date.now()} type="file" accept=".json" multiple ref={inputRef} onChange={handleUploadChange} hidden />
+      {/* Hidden multi-file JSON import lane (CharSummary "Upload" clicks it via
+          inputRef). It mounts as the FIRST `input` in the app DOM, so it needs
+          an accessible name to keep aria-label locators off invisible elements
+          (2026-11-03 QA backlog). */}
+      <input key={Date.now()} type="file" accept=".json" multiple ref={inputRef} onChange={handleUploadChange} hidden aria-label="Import campaign JSON" />
       <div className="app-body">
         <Sidebar
           campaignName={campaignName}
