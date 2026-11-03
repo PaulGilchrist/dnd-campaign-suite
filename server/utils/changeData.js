@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import http from 'http';
 import { normalizeCharacterName } from './characterName.js';
+import { filterRenderableOverlays } from '../routes/spell-overlay.js';
 
 // Tracks the active map key per campaign
 export const activeMaps = new Map();
@@ -65,6 +66,12 @@ function flattenNestedCampaignKeys(data, nestedKey) {
  * clears any in-memory entry, so rollbacks/admin wipes never resurrect
  * stale geometry after a reload. A simply-absent file is silent — fresh
  * campaigns boot with zero overlays and zero console noise.
+ * Pre-guard disk docs (null / bare strings / x-y-radius junk) are screened
+ * through the route's filterRenderableOverlays BEFORE entering the Map
+ * (bug 2026-11-02 BG: raw boot rows dereferenced `.id` in every POST write
+ * traversal and 500-wedged the whole overlay lane). Same doctrine as the
+ * GET filter — boot only reads, the disk file is left byte-untouched, and
+ * each drop logs one census line.
  */
 function loadCampaignOverlays(campaignsDir, campaign) {
     const filePath = path.join(campaignsDir, campaign, 'data', 'spell-overlays.json');
@@ -77,7 +84,7 @@ function loadCampaignOverlays(campaignsDir, campaign) {
         if (!Array.isArray(overlays)) {
             throw new Error('file content is not an array');
         }
-        spellOverlayData.set(campaign, overlays);
+        spellOverlayData.set(campaign, filterRenderableOverlays(campaign, overlays, 'boot'));
     } catch (err) {
         console.error(`Failed to read spell overlays for campaign ${campaign}:`, err.message);
         spellOverlayData.delete(campaign);

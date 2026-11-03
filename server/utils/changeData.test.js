@@ -437,7 +437,21 @@ describe('changeData - spell overlay persistence', () => {
 
     describe('readFile boot load', () => {
         it('should load an existing spell-overlays.json into spellOverlayData', () => {
-            const overlays = [{ id: 'overlay-1', shape: 'sphere', radiusFt: 20 }];
+            // Canonical transport shape — boot load passes valid rows through
+            // byte-identical (screening only removes malformed ones).
+            const overlays = [{
+                id: 'overlay-1',
+                shape: 'sphere',
+                startGridX: 1,
+                startGridY: 2,
+                angle: 0,
+                radiusFt: 20,
+                coneAngle: 0,
+                widthFt: 0,
+                distanceFt: 0,
+                sizeFt: 0,
+                color: 'rgba(255,80,60,0.07)',
+            }];
             vi.spyOn(fs, 'readdirSync').mockReturnValue([
                 { name: 'overlay-campaign', isDirectory: () => true },
             ]);

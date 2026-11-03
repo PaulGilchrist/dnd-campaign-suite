@@ -92,18 +92,28 @@ function overlayShapeProblem(overlay) {
 // exists. Dropped rows are NEVER removed from the stored array or from disk —
 // this filters the response copy only (read-path hygiene) — and each drop
 // logs one line, mirroring the `[spell-overlay] BLOCKED …` convention.
-// Exported so tests can pin the helper directly.
-export function filterRenderableOverlays(campaign, stored) {
+// `source` names the lane in the census line (GET responses vs the boot
+// disk-load in changeData.js, bug 2026-11-02 BG: unfiltered boot rows
+// crash-wedged the whole POST write lane).
+// Exported so tests can pin the helper and changeData's boot load can reuse
+// it (one validator, every lane).
+export function filterRenderableOverlays(campaign, stored, source = 'GET') {
     if (!Array.isArray(stored)) {
         return [];
     }
     const valid = stored.filter(overlay => overlayShapeProblem(overlay) === null);
     const dropped = stored.length - valid.length;
     if (dropped > 0) {
-        console.log(`[spell-overlay] dropped ${dropped} malformed row(s) GET ${campaign} — disk left untouched`);
+        console.log(`[spell-overlay] dropped ${dropped} malformed row(s) ${source} ${campaign} — disk left untouched`);
     }
     return valid;
 }
+
+// Stored rows are screened on every entry path (boot load filters through
+// filterRenderableOverlays, POST payloads through overlayShapeProblem), so
+// traversals below stay structurally safe even for a store seeded by an old
+// in-process rollback. `?.id` never throws on a null/undefined legacy row.
+const storedId = (overlay) => overlay?.id;
 
 // Refuses unrecognized actions (missing/non-string included), removes of
 // ids absent from the campaign's list, and add/update payloads carrying a
@@ -130,7 +140,7 @@ function overlayValidationError(campaign, action, overlayId, overlays) {
     }
     if (action === 'remove' && overlayId) {
         const existing = spellOverlayData.get(campaign) || [];
-        if (!existing.some(o => o.id === overlayId)) {
+        if (!existing.some(o => storedId(o) === overlayId)) {
             return `No overlay with id ${overlayId}`;
         }
     }
@@ -147,7 +157,7 @@ function applyOverlayAction(campaign, action, overlays, overlayId) {
         case 'add':
             if (overlays?.length) {
                 const existing = spellOverlayData.get(campaign);
-                const existingIds = new Set(existing.map(o => o.id));
+                const existingIds = new Set(existing.map(o => storedId(o)));
                 for (const overlay of overlays) {
                     if (!existingIds.has(overlay.id)) {
                         existing.push(overlay);
@@ -159,12 +169,12 @@ function applyOverlayAction(campaign, action, overlays, overlayId) {
             if (overlays?.length) {
                 const existing = spellOverlayData.get(campaign);
                 const updatedIds = new Set(overlays.map(o => o.id));
-                spellOverlayData.set(campaign, existing.map(o => updatedIds.has(o.id) ? overlays.find(n => n.id === o.id) : o));
+                spellOverlayData.set(campaign, existing.map(o => updatedIds.has(storedId(o)) ? overlays.find(n => n.id === storedId(o)) : o));
             }
             break;
         case 'remove':
             if (overlayId) {
-                spellOverlayData.set(campaign, spellOverlayData.get(campaign).filter(o => o.id !== overlayId));
+                spellOverlayData.set(campaign, spellOverlayData.get(campaign).filter(o => storedId(o) !== overlayId));
             }
             break;
         case 'clear':
