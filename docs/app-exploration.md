@@ -50,7 +50,7 @@ Event-check: commits since CL = 31cc31b9a + c675dbe18 (docs) + 90e0b0d08 + d23e1
 - maps [Battle Arena, Test Map] battle-arena md5 **94fcd0bfe9e4cf6e1118f736b920e7a2** byte-identical to dist (PUT-copy restore; EP/EF/goblin rig positions gone; placedItems back to []).
 - campaigns/ = 5 baseline folders (qa-arena created, exercised, DELETED via API — zero re-materialization; qa-starter not needed this run).
 - npcs [Marta Copperkettle]; ZERO character-file writes (git porcelain on public/campaigns empty); 13 char files untouched.
-- Env at exit: dev pair RUNNING (`CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter'` node server.js :80 + vite :5173; logs /tmp/dnd-api-cm.log, /tmp/dnd-vite-cm.log) — kill trio before next run. Browser tabs CLOSED.
+- Env at exit: dev pair STOPPED — both background shells (server :80, vite :5173) were SIGKILLed by the harness after the session ended (post-verification; API log tail clean: ghost-404 read-guard entries + normal SSE connect/close, zero errors/lock denials). Ports free, nothing to kill before next run. Logs remain at /tmp/dnd-api-cm.log, /tmp/dnd-vite-cm.log. Browser tabs CLOSED.
 - Bug files this run: 1 (GM-activate gridless). CL's monster-lane bug RESOLVED + live re-verified dead here (5 faces).
 
 ## Improvement Backlog
