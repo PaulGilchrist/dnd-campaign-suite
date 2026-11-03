@@ -519,6 +519,17 @@ function App() {
     if (mapsView.type === 'map') {
       // Already viewing a map — go back to the manager listing (GM only)
       if (isLocalhost) {
+        // Regression (2026-11-03, GM twin of bug-lan-map-nav-noop-mid-session):
+        // this branch only re-armed the mapsView sub-state, so a GM who had a
+        // map open and then navigated elsewhere (char sheet, Log…) saw NOTHING
+        // on the first Maps click — MapsAreaView renders only when
+        // activeView === 'mapsManager', so the click changed an invisible flag
+        // and the second click fell through to the else branch below to
+        // actually navigate. Re-arm the view in lockstep with the sub-state,
+        // mirroring every sibling header handler (`setActiveView(view)`).
+        // While already on mapsManager this is a state no-op, preserving the
+        // "Maps exits an open map back to the manager listing" contract.
+        setActiveView('mapsManager');
         setMapsView({ type: 'manager' });
         mapHistoryRef.current = []; // clear history when going back to manager
       } else if (activeView !== 'mapsManager') {

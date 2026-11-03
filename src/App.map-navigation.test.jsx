@@ -13,6 +13,9 @@
  *  - Clicking "Maps" while viewing a map exits the stack to the manager and
  *    clears the stack (re-clicking the manager listing is a no-op), so a
  *    fresh open starts on a clean stack.
+ *  - Clicking "Maps" from ANOTHER view while a map is still open (left open
+ *    before navigating away) navigates on the FIRST click — the click must
+ *    re-arm activeView too, not just the mapsView sub-state.
  *
  * Player (non-localhost):
  *  - "Maps" never shows the manager — it resolves the active map via
@@ -394,6 +397,40 @@ describe('App - Map Navigation & View Management', () => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
         expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
       });
+      expect(window.alert).not.toHaveBeenCalled();
+    });
+
+    // Regression (2026-11-03 QA backlog, GM twin of
+    // bug-lan-map-nav-noop-mid-session): opening a map and then navigating to
+    // another view leaves mapsView stuck at type 'map' (MapsAreaView only
+    // mounts under activeView 'mapsManager'). The old localhost branch reset
+    // ONLY that sub-state, so the first Maps click from e.g. the Log changed
+    // an invisible flag — the rendered view stayed put and only the second
+    // click reached the else branch and navigated. One click must navigate.
+    it('clicking Maps from another view while a map is open navigates on the first click', async () => {
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+      openMapFromManager();
+      await expectMapShowing('dungeon-1');
+
+      // Leave the open map for the campaign log (view change only —
+      // handleLogClick never touches mapsView, mirroring the sheet route).
+      fireEvent.click(screen.getByTestId('log-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('campaign-log-view')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+
+      // ONE Maps click: the view must actually change to the manager listing
+      // (log view gone, indicator on Maps) — not just an internal flag.
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('campaign-log-view')).not.toBeInTheDocument();
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
       expect(window.alert).not.toHaveBeenCalled();
     });
 
