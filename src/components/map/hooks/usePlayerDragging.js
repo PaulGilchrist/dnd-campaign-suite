@@ -84,7 +84,7 @@ function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData
  * and the §8.4 opportunity-attack trigger (returns synchronously with
  * zero work while enforcement.opportunityAttacks is off).
  */
-function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData }) {
+function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData, setPopupHtml }) {
     if (!campaignName || !player) return;
     const startGridX = dragging.startX ?? player.gridX;
     const startGridY = dragging.startY ?? player.gridY;
@@ -100,6 +100,7 @@ function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, 
         fromCell: { gridX: startGridX, gridY: startGridY },
         toCell: { gridX: targetX, gridY: targetY },
         mapData,
+        setPopupHtml,
     }).catch((e) => { console.error('[usePlayerDragging:opportunity-trigger]', e); });
 }
 
@@ -148,6 +149,10 @@ export default function usePlayerDragging({
     isLocalhost,
     walls,
     placedItems,
+    // §8.4 advisory sink (Map.jsx's .map-toast channel) — threaded into the
+    // onTokenMoveLanded ctx so opportunity-attack advisories render on the
+    // board, not only in the campaign log.
+    setPopupHtml,
 }) {
     const [dragging, setDragging] = useState(null);
     // Enforcement snap-back visibility (backlog 2026-10-25): the drop-side clamp
@@ -344,8 +349,8 @@ export default function usePlayerDragging({
 
         setDragging(null);
 
-        finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData });
-    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems, showSnapToast]);
+        finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData, setPopupHtml });
+    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems, showSnapToast, setPopupHtml]);
 
     const handlePointerLeave = useCallback((e) => {
         if (!dragging) return;

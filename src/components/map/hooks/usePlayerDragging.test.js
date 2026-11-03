@@ -39,6 +39,9 @@ describe('usePlayerDragging', () => {
 
   const gridSize = 30; // max clamped cell is 29
   const campaignName = 'test-campaign';
+  // §8.4 advisory sink (Map.jsx's .map-toast channel) — the lane must thread
+  // it verbatim into the onTokenMoveLanded ctx (dead-sink BH 2026-11-03).
+  const advisorySink = vi.fn();
   const gridCenterX = (v) => v * CELL_SIZE + CELL_SIZE / 2;
   const gridCenterY = (v) => v * CELL_SIZE + CELL_SIZE / 2;
 
@@ -75,6 +78,7 @@ describe('usePlayerDragging', () => {
         isLocalhost: false,
         walls: new Set(),
         placedItems: [],
+        setPopupHtml: advisorySink,
         ...overrides,
       })
     );
@@ -284,6 +288,7 @@ describe('usePlayerDragging', () => {
         fromCell: { gridX: 1, gridY: 2 }, // press-time cell, not the live ghost cell
         toCell: { gridX: 3, gridY: 4 },
         mapData: mapAtUp,
+        setPopupHtml: advisorySink,
       });
     });
 

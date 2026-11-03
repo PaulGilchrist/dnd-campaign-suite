@@ -81,6 +81,7 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
                 isLocalhost: false,
                 walls: new Set(),
                 placedItems: [],
+                setPopupHtml: () => {},
                 ...overrides,
             })
         );
@@ -183,7 +184,10 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
                 reason: 'Out of movement — snapped to the remaining budget (30 ft this move).',
             }));
             expect(mocks.onTokenMoveLanded).toHaveBeenCalledWith(
-                expect.objectContaining({ toCell: { gridX: 7, gridY: 2 } }));
+                expect.objectContaining({
+                    toCell: { gridX: 7, gridY: 2 },
+                    setPopupHtml: expect.any(Function),
+                }));
             // ...AND the clamp is now visible on the board: a plain-English
             // snap-back toast naming the creature + snapped distance.
             expect(helpers.result.current.snapToast).toMatchObject({

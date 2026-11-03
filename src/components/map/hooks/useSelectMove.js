@@ -87,7 +87,7 @@ function buildMovedWalls(prev, selWalls, dstBounds, offset) {
     return { ...prev, walls: newWalls };
 }
 
-function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName }) {
+function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName, setPopupHtml }) {
     const [selectionRect, setSelectionRect] = useState(null);
     const [selectedWalls, setSelectedWalls] = useState(new Set());
     const [selectedItems, setSelectedItems] = useState(new Set());
@@ -228,9 +228,10 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
                 fromCell: { gridX: it.gridX, gridY: it.gridY },
                 toCell: { gridX: it.gridX + dx, gridY: it.gridY + dy },
                 mapData: mapNow,
+                setPopupHtml,
             }).catch((e) => { console.error('[useSelectMove:opportunity-trigger]', e); });
         }
-    }, [campaignName]);
+    }, [campaignName, setPopupHtml]);
 
     const handleSelectPointerUp = useCallback((e, placedItems, mapData, setMapData, setPlacedItems) => {
         if (!isLocalhost) return;

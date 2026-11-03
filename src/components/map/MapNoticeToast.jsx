@@ -1,12 +1,14 @@
 // @maintained-by-ai
-// Rejected-load notice — display-only "Could not load <map>" toast (backlog
-// map-fresh-fallback-silent). When a named map's load 404s/aborts/corrupts,
-// useMapLoader falls through to a fresh editor; the console.error is loud for
-// developers, this makes the same moment visible to the USER so a dead map
-// never reads as a silently-blank editor. Reuses the .map-toast tokens
-// (Map.css) — same fixed bottom-center amber slot as MapSnapToast.jsx; the
-// auto-hide timer lives in Map.jsx (display only, no game state). Hoisted out
-// of Map.jsx to keep the Map body under the complexity cap.
+// Map notice toast — display-only shared .map-toast slot (Map.css). Fed by
+// Map.jsx's useEphemeralToast channel with (a) the rejected-load notice
+// "Could not load <map>" (backlog map-fresh-fallback-silent) and (b) the
+// §8.4 opportunity-attack advisories surfaced through the three move lanes'
+// `setPopupHtml` sink (backlog 2026-11-03: OA advisory popup was a dead
+// sink — enforcement_triggered/denied text now renders on the board, not
+// only in the campaign log). Reuses the .map-toast tokens — same fixed
+// bottom-center amber slot as MapSnapToast.jsx; the auto-hide timer lives in
+// Map.jsx (display only, no game state). Hoisted out of Map.jsx to keep the
+// Map body under the complexity cap.
 const MapNoticeToast = ({ message }) => {
     if (!message) return null;
     return (

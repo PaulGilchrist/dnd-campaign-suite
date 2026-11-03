@@ -60,7 +60,7 @@ All BH claims entered/derived THIS run unless tagged carried. Event-check for ca
 
 ## Improvement Backlog
 
-- **2026-11-03 BH: OA advisory popup is a dead sink** — `opportunityTrigger.triggerDefender` accepts `setPopupHtml` and the module header promises "surfaces an advisory popup + campaign log entry", but grep-zero of all three move lanes (usePlayerDragging/useItemDragging/useSelectMove) pass it → the defender sees only a campaign-log row while the board is on screen. Starting point: Map.jsx already owns a popup channel used by other move-time advisories; thread it into the onTokenMoveLanded ctx on the pointer-drag lane (select-move lane already has map popup refs nearby). Non-blocking: log + reaction-economy adjudication are honest today.
+_(empty — consumed items are recorded in the run summaries/git history)_
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

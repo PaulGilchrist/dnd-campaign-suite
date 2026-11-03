@@ -33,6 +33,9 @@ describe('useItemDragging', () => {
   const gridSize = 30; // max clamped cell is 29
   const campaignName = 'test-campaign';
   const mapData = { name: 'test-map' };
+  // §8.4 advisory sink (Map.jsx's .map-toast channel) — the lane must thread
+  // it verbatim into the onTokenMoveLanded ctx (dead-sink BH 2026-11-03).
+  const advisorySink = vi.fn();
 
   // Fixed transforms keep every geometry assertion deterministic.
   const svgMock = (overrides = {}) => ({
@@ -73,6 +76,7 @@ describe('useItemDragging', () => {
         spellMode,
         campaignName: campaign,
         mapData,
+        setPopupHtml: advisorySink,
       })
     );
 
@@ -428,6 +432,7 @@ describe('useItemDragging', () => {
         fromCell: { gridX: 1, gridY: 1 },
         toCell: { gridX: 2, gridY: 2 },
         mapData,
+        setPopupHtml: advisorySink,
       });
     });
 

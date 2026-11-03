@@ -163,16 +163,20 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
     const [shapeParams, setShapeParams] = useState(DEFAULTS.sphere);
     const [viewMode, setViewMode] = useState('2d');
 
-    // Rejected-load notice (backlog map-fresh-fallback-silent): a named map
-    // whose load 404s/aborts/corrupts opens a fresh copy — the loader reports
-    // it here so the user sees WHY the editor is blank (the falsy-resolve
-    // "no document yet" create lane stays silent). Display-only ephemeral UI
-    // (never game state); rendered by MapNoticeToast.jsx.
-    const { message: loadNotice, show: handleLoadRejected } = useEphemeralToast(4000);
+    // Shared map-notice channel (display-only ephemeral UI — never game
+    // state; rendered by MapNoticeToast.jsx on the .map-toast slot). Fed by
+    // the rejected-load notice (backlog map-fresh-fallback-silent: a named
+    // map whose load 404s/aborts/corrupts opens a fresh copy — the loader
+    // reports it here so the user sees WHY the editor is blank) AND by the
+    // §8.4 opportunity-attack advisories: `showMapNotice` threads into all
+    // three move lanes (usePlayerDragging/useItemDragging/useSelectMove) as
+    // `setPopupHtml`, so enforcement_triggered/denied text renders visibly
+    // on the board instead of living only in the campaign log.
+    const { message: mapNotice, show: showMapNotice } = useEphemeralToast(4000);
 
     const { mapData, setMapData, placedItems, setPlacedItems, flushSave } = useMapLoader({
         campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost,
-        onLoadRejected: handleLoadRejected,
+        onLoadRejected: showMapNotice,
     });
 
     const {
@@ -227,7 +231,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
         selectedWallsRef, selectedItemsRef, selectStart, moveStartGrid,
         placedItemsRef, mapDataRef,
         handleSelectPointerDown, handleSelectPointerMove, handleSelectPointerUp,
-    } = useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName });
+    } = useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName, setPopupHtml: showMapNotice });
 
     const {
         rulerMode, setRulerMode,
@@ -299,11 +303,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
 
     const { dragging, snapToast, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
         svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
-        isLocalhost, walls: getWalls(mapData), placedItems,
+        isLocalhost, walls: getWalls(mapData), placedItems, setPopupHtml: showMapNotice,
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({
         svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName, mapData,
+        setPopupHtml: showMapNotice,
     });
 
     // Click-select press recorder (see resolveItemClick): the left-button
@@ -843,9 +848,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                 />
             )}
 
-            {/* Rejected-load notice (display-only — see MapNoticeToast.jsx):
-                names the dead/404/corrupt map the fresh editor replaced. */}
-            <MapNoticeToast message={loadNotice} />
+            {/* Map notices (display-only — see MapNoticeToast.jsx): rejected
+                map loads AND §8.4 opportunity-attack advisories from the
+                three move lanes' setPopupHtml sink. */}
+            <MapNoticeToast message={mapNotice} />
         </div>
     );
 }

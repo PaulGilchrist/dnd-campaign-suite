@@ -14,6 +14,10 @@ export default function useItemDragging({
     spellMode,
     campaignName,
     mapData,
+    // §8.4 advisory sink (Map.jsx's .map-toast channel) — threaded into the
+    // onTokenMoveLanded ctx so opportunity-attack advisories render on the
+    // board, not only in the campaign log.
+    setPopupHtml,
 }) {
     const [itemDragging, setItemDragging] = useState(null);
 
@@ -126,11 +130,12 @@ export default function useItemDragging({
                 fromCell: { gridX: itemDragging.startGridX, gridY: itemDragging.startGridY },
                 toCell: { gridX: item.gridX, gridY: item.gridY },
                 mapData,
+                setPopupHtml,
             }).catch((err) => { console.error('[useItemDragging:opportunity-trigger]', err); });
         }
 
         setItemDragging(null);
-    }, [itemDragging, svgRef, campaignName, placedItems, mapData]);
+    }, [itemDragging, svgRef, campaignName, placedItems, mapData, setPopupHtml]);
 
     const handleItemPointerLeave = useCallback((e) => {
         if (!itemDragging) return;

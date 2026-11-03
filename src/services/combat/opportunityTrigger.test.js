@@ -187,8 +187,14 @@ describe('onTokenMoveLanded', () => {
     it('reaction already spent ⇒ charge attempted once, exact denied log, no triggered advisory', async () => {
         mockCampaignStore();
         chargeSlot.mockReturnValue(false);
-        await onTokenMoveLanded(base);
+        const setPopupHtml = vi.fn();
+        await onTokenMoveLanded({ ...base, setPopupHtml });
         expect(chargeSlot).toHaveBeenCalledTimes(1);
+        // Denied face rides the same board channel — verbatim log reason.
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(setPopupHtml).toHaveBeenCalledWith(
+            "Goblin 1's reaction is already used — no opportunity attack on Hero."
+        );
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_denied',
@@ -203,10 +209,14 @@ describe('onTokenMoveLanded', () => {
     it.each([
         ['te carries its own reason', 'Watched by a spell.', 'Watched by a spell.'],
         ['te carries no reason', undefined, 'A condition prevents opportunity attacks.'],
-    ])('defender under no_opportunity_attacks (%s) ⇒ no charge, exact denied log', async (_desc, teReason, blockedNote) => {
+    ])('defender under no_opportunity_attacks (%s) ⇒ no charge, exact denied log + board advisory', async (_desc, teReason, blockedNote) => {
         mockCampaignStore(ON, [{ target: 'Goblin 1', effect: 'no_opportunity_attacks', reason: teReason }]);
-        await onTokenMoveLanded(base);
+        const setPopupHtml = vi.fn();
+        await onTokenMoveLanded({ ...base, setPopupHtml });
         expect(chargeSlot).not.toHaveBeenCalled();
+        // te block (te.reason rides) surfaces on the SAME board channel.
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(setPopupHtml).toHaveBeenCalledWith(`Hero left Goblin 1's reach — ${blockedNote}`);
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_denied',

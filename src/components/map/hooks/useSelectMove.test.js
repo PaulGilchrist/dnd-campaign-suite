@@ -49,6 +49,9 @@ describe('useSelectMove', () => {
   const mockSvgRef = { current: null };
   const mockGetGridFromEvent = vi.fn();
   const campaignName = 'test-campaign';
+  // §8.4 advisory sink (Map.jsx's .map-toast channel) — the lane must thread
+  // it verbatim into the onTokenMoveLanded ctx (dead-sink BH 2026-11-03).
+  const advisorySink = vi.fn();
 
   const createMockEvent = (pointerId = 1) => ({
     preventDefault: vi.fn(),
@@ -86,6 +89,7 @@ describe('useSelectMove', () => {
     getGridFromEvent: mockGetGridFromEvent,
     svgRef: mockSvgRef,
     campaignName,
+    setPopupHtml: advisorySink,
     ...overrides,
   });
 
@@ -502,6 +506,7 @@ describe('useSelectMove', () => {
         moverIsPlayer: true,
         fromCell: { gridX: 2, gridY: 2 },
         toCell: { gridX: 3, gridY: 3 },
+        setPopupHtml: expect.any(Function),
       }));
     });
   });

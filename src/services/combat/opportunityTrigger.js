@@ -70,17 +70,21 @@ function defenderBlockedReason(defenderName, targetEffects) {
 }
 
 /** One defender's trigger leg: blocked ⇒ audit deny; spent reaction ⇒ audit
- *  deny; otherwise charge the reaction + advisory popup/log. */
+ *  deny; otherwise charge the reaction + advisory popup/log. Every face —
+ *  trigger AND both denials — rides the same `setPopupHtml` board channel
+ *  (the log reason is the verbatim popup text, byte-identical). */
 function triggerDefender({ defender, campaignName, moverName, targetEffects, economyLive, setPopupHtml }) {
     const blocked = defenderBlockedReason(defender.name, targetEffects);
     if (blocked) {
+        const reason = `${moverName} left ${defender.name}'s reach — ${blocked}`;
+        if (typeof setPopupHtml === 'function') setPopupHtml(reason);
         addEntry(campaignName, {
             type: 'enforcement_denied',
             creature: defender.name,
             target: moverName,
             bucket: 'opportunityAttack',
             source: 'token-move',
-            reason: `${moverName} left ${defender.name}'s reach — ${blocked}`,
+            reason,
         }).catch((e) => { console.error('[opportunityTrigger] block log failed:', e); });
         return;
     }
@@ -89,13 +93,15 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
     // OFF there is no budget to charge — the trigger stays advisory
     // (chargeSlot gates on that flag by design).
     if (economyLive && !chargeSlot({ creatureName: defender.name, bucket: 'reaction', campaignName })) {
+        const reason = `${defender.name}'s reaction is already used — no opportunity attack on ${moverName}.`;
+        if (typeof setPopupHtml === 'function') setPopupHtml(reason);
         addEntry(campaignName, {
             type: 'enforcement_denied',
             creature: defender.name,
             target: moverName,
             bucket: 'reaction',
             source: 'opportunity-attack-trigger',
-            reason: `${defender.name}'s reaction is already used — no opportunity attack on ${moverName}.`,
+            reason,
         }).catch((e) => { console.error('[opportunityTrigger] spent log failed:', e); });
         return;
     }
