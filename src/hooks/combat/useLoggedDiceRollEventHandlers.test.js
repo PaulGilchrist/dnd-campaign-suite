@@ -16,7 +16,7 @@ vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
 vi.mock('../../services/rules/effects/expirations.js', () => ({ addExpiration: vi.fn() }));
 vi.mock('../../services/dice/diceRoller.js', () => ({ rollExpression: vi.fn(), rollExpressionDoubled: vi.fn() }));
 vi.mock('../../services/encounters/combatData.js', () => ({ getCombatSummary: vi.fn() }));
-vi.mock('../runtime/useRuntimeState.js', () => ({ getRuntimeValue: vi.fn(), setRuntimeValue: vi.fn() }));
+vi.mock('../runtime/useRuntimeState.js', () => ({ getRuntimeValue: vi.fn(), setRuntimeValue: vi.fn(), deleteRuntimeKey: vi.fn() }));
 // byte mirror of the REAL computeDamageAfterEvasion/save semantics.
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterEvasion: vi.fn((raw, success, dcSuccess, evasion) => {
@@ -54,7 +54,7 @@ vi.mock('../../services/combat/auras/pendingSaveRegistry.js', () => ({
 import { registerPendingPopupSetter } from '../../services/combat/auras/pendingPopupRegistry.js';
 import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
-import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../runtime/useRuntimeState.js';
 import { computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
@@ -156,7 +156,10 @@ describe('save-result event', () => {
             return null;
         });
         await fire({ promptId: pid, targetName: 'Goblin' });
-        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'pendingSaveListenerPrompts', [], CAMPAIGN);
+        // Pruning the LAST listener id drains the bucket to eviction (backlog
+        // 2026-11-03 CJ) — the key is DELETEd, never persisted as [].
+        expect(deleteRuntimeKey).toHaveBeenCalledWith('campaign', 'pendingSaveListenerPrompts', CAMPAIGN);
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'pendingSaveListenerPrompts', [], CAMPAIGN);
         expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 

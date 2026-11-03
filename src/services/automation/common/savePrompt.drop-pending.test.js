@@ -23,13 +23,14 @@ vi.mock('../../shared/abilityLookup.js', () => ({
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
+    deleteRuntimeKey: vi.fn(),
 }));
 
 vi.mock('../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import(
+const { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } = await import(
     '../../../hooks/runtime/useRuntimeState.js'
 );
 const { dropPendingSavePrompt } = await import('./savePrompt.js');
@@ -75,7 +76,7 @@ describe('dropPendingSavePrompt', () => {
         expect(setRuntimeValue).toHaveBeenCalledTimes(2);
     });
 
-    it('drains to an empty bucket object (zero rows for dismissed ids = criterion truth)', () => {
+    it('drains to eviction: the last row DELETEs both bucket keys (never persists {} / [] dust)', () => {
         mockBuckets({
             saves: { 'p-1': { promptId: 'p-1', campaignName: CAMPAIGN } },
             listenerIds: ['p-1'],
@@ -83,8 +84,12 @@ describe('dropPendingSavePrompt', () => {
 
         dropPendingSavePrompt(CAMPAIGN, 'p-1');
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'pendingSavePrompts', {}, CAMPAIGN);
-        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'pendingSaveListenerPrompts', [], CAMPAIGN);
+        // Backlog 2026-11-03 CJ: mirrors the concentration lane — the emptied
+        // bucket is fully evicted (deleteRuntimeKey → server DELETE + null
+        // echo), NOT POSTed as an empty object/array.
+        expect(deleteRuntimeKey).toHaveBeenCalledWith('campaign', 'pendingSavePrompts', CAMPAIGN);
+        expect(deleteRuntimeKey).toHaveBeenCalledWith('campaign', 'pendingSaveListenerPrompts', CAMPAIGN);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('writes nothing when the id lives in neither bucket (no pointless churn, e.g. staged prompts)', () => {

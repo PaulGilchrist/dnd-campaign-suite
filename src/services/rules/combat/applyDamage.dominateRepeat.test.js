@@ -61,6 +61,7 @@ const { store } = vi.hoisted(() => ({ store: {} }));
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((name, key) => store[`${name}.${key}`]),
   setRuntimeValue: vi.fn((name, key, value) => { store[`${name}.${key}`] = value; }),
+  deleteRuntimeKey: vi.fn((name, key) => { delete store[`${name}.${key}`]; }),
   getAllStoreKeys: vi.fn(() => []),
   getStore: vi.fn(() => ({ keys: () => [] })),
 }));

@@ -134,6 +134,35 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     notify(characterKey);
 }
 
+/**
+ * Drain-to-evict companion of setRuntimeValue: DELETEs the key server-side
+ * instead of persisting an emptied aggregate bucket as `{}` / `[]` cosmetic
+ * dust (backlog 2026-11-03 CJ drained-save-buckets; mirrors the concentration
+ * lane, where the last answered `concentrationPrompt-<Target>-<promptId>`
+ * key is fully deleted, never written back empty). The wildcard DELETE route
+ * (campaigns-changedata.js) removes the key and publishes a null echo, which
+ * App.jsx applyStoreUpdate already converts into a local store.remove + notify
+ * on every mounted tab (the replace-echo eviction lane, 7cce79493 /
+ * 6b1800fa2) — a campaign-key null echo is a REMOVE, never a stored null, so
+ * nothing resurrects the key. The local delete + notify mirror immediately so
+ * the sender's own consumers see the eviction without waiting for the echo;
+ * the has() guard makes double-sweep lanes (createSaveListener's save-result
+ * handler + its finally) idempotent — no second DELETE, no honest-404 churn.
+ */
+export function deleteRuntimeKey(characterKey, propertyName, campaignName) {
+    const store = getStore(characterKey);
+    if (!store.has(propertyName)) return;
+    store.delete(propertyName);
+    notify(characterKey);
+    if (!campaignName) {
+        console.error('deleteRuntimeKey called with undefined campaignName', { characterKey, propertyName, stack: new Error().stack });
+        return;
+    }
+    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(propertyName)}`, {
+        method: 'DELETE',
+    }).catch((e) => { console.error("[useRuntimeState] Error:", e); });
+}
+
 export function setRuntimeObject(characterKey, fullObject, campaignName, skipSync = false) {
     if (!fullObject || typeof fullObject !== 'object') return;
     if (campaignName && characterKey === campaignName) {

@@ -3,6 +3,7 @@
 // This file is the damage path, imported by ../useLoggedDiceRollDamage.js.
 import { addEntry } from '../../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
+import { setSavePromptBucket } from '../../../services/automation/common/savePrompt.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import utils from '../../../services/ui/utils.js';
 
@@ -52,9 +53,11 @@ export async function handleSanctuarySave(characterName, campaignName, context, 
                 const handler = (event) => {
                     if (event.detail.promptId !== promptId) return;
                     window.removeEventListener('save-result', handler);
-                    const saves = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
+                    const saves = { ...(getRuntimeValue('campaign', 'pendingSavePrompts') || {}) };
                     delete saves[promptId];
-                    setRuntimeValue('campaign', 'pendingSavePrompts', saves, campaignName);
+                    // Drain-to-evict: resolving the LAST row deletes the bucket
+                    // key instead of persisting {} (setSavePromptBucket).
+                    setSavePromptBucket(campaignName, 'pendingSavePrompts', saves);
                     resolve(event.detail);
                 };
                 window.addEventListener('save-result', handler);

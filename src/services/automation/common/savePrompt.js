@@ -1,8 +1,35 @@
 import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
+
+// Bucket write with drain-to-evict (backlog 2026-11-03 CJ: after a full sweep
+// the two aggregate save-prompt keys persisted in change-data as
+// `pendingSavePrompts:{}` / `pendingSaveListenerPrompts:[]` — honest rows
+// until Admin Clear, but cosmetic dust that the concentration lane never
+// leaves: there, the last answered prompt DELETEs its key outright). Every
+// lane that can EMPTY one of these buckets writes through here: the last row
+// evicts the key entirely (deleteRuntimeKey → server DELETE + null echo →
+// applyStoreUpdate removes it on every mounted tab) instead of POSTing
+// `{}` / `[]`. Buckets that still hold rows keep the exact broadcast-POST
+// behaviour (per-promptId object / id array, 38382ce16).
+const SAVE_PROMPT_BUCKETS = new Set(['pendingSavePrompts', 'pendingSaveListenerPrompts']);
+
+export function setSavePromptBucket(campaignName, key, nextValue) {
+    if (!SAVE_PROMPT_BUCKETS.has(key)) {
+        console.error('[savePrompt] setSavePromptBucket called with a non-bucket key', { key });
+        return;
+    }
+    const isEmpty = Array.isArray(nextValue)
+        ? nextValue.length === 0
+        : !nextValue || Object.keys(nextValue).length === 0;
+    if (isEmpty) {
+        deleteRuntimeKey('campaign', key, campaignName);
+        return;
+    }
+    setRuntimeValue('campaign', key, nextValue, campaignName);
+}
 
 export function buildSaveDc(auto, playerStats) {
     if (!playerStats) {
@@ -121,9 +148,12 @@ export function createSaveListener(campaignName, config) {
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handler);
-            const saves = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
+            // Spread before deleting (playbook §41): in-place mutation of the
+            // stored reference made setRuntimeValue's valuesEqual(new===old)
+            // skip the broadcast POST, leaving a stale row server-side.
+            const saves = { ...(getRuntimeValue('campaign', 'pendingSavePrompts') || {}) };
             delete saves[promptId];
-            setRuntimeValue('campaign', 'pendingSavePrompts', saves, campaignName);
+            setSavePromptBucket(campaignName, 'pendingSavePrompts', saves);
             resolve(event.detail);
          };
         window.addEventListener('save-result', handler);
@@ -135,9 +165,9 @@ export function createSaveListener(campaignName, config) {
     });
 
     saveResultPromise.finally(() => {
-        const saves = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
+        const saves = { ...(getRuntimeValue('campaign', 'pendingSavePrompts') || {}) };
         delete saves[promptId];
-        setRuntimeValue('campaign', 'pendingSavePrompts', saves, campaignName);
+        setSavePromptBucket(campaignName, 'pendingSavePrompts', saves);
     });
 
     return { promptId, promise: saveResultPromise };
@@ -149,19 +179,22 @@ export function createSaveListener(campaignName, config) {
 // save-result resolution path — a DISMISSED save never resolves, so nothing
 // else swept them and every ghost prompt leaked an orphan row the Admin
 // clear had to keep absorbing. Dismiss drops the prompt from both buckets
-// itself (setRuntimeValue broadcasts, so peers and server truth match the
-// drained UI). Idempotent: absent ids write nothing (no pointless POSTs).
+// itself — surviving rows write through the broadcast-POST, the FINAL row
+// evicts its bucket key outright (drain-to-evict, setSavePromptBucket) — so
+// peers and server truth match the drained UI and no `{}` / `[]` dust
+// outlives the queue. Idempotent: absent ids write nothing (no pointless
+// POST/DELETE churn).
 export function dropPendingSavePrompt(campaignName, promptId) {
     if (!promptId) return;
     const saves = getRuntimeValue('campaign', 'pendingSavePrompts') || {}; // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198
     if (Object.prototype.hasOwnProperty.call(saves, promptId)) {
         const nextSaves = { ...saves };
         delete nextSaves[promptId];
-        setRuntimeValue('campaign', 'pendingSavePrompts', nextSaves, campaignName);
+        setSavePromptBucket(campaignName, 'pendingSavePrompts', nextSaves);
     }
     const listenerIds = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []; // fix#339 sibling read
     if (Array.isArray(listenerIds) && listenerIds.includes(promptId)) {
-        setRuntimeValue('campaign', 'pendingSaveListenerPrompts', listenerIds.filter(id => id !== promptId), campaignName);
+        setSavePromptBucket(campaignName, 'pendingSaveListenerPrompts', listenerIds.filter(id => id !== promptId));
     }
 }
 

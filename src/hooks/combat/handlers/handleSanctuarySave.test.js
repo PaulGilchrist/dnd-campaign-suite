@@ -8,6 +8,7 @@ vi.mock('../../../services/ui/logService.js', () => ({
 vi.mock('../../runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(() => Promise.resolve()),
+    deleteRuntimeKey: vi.fn(),
 }));
 
 vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({

@@ -2,6 +2,7 @@
 // merging is a behavioral change, tracked in .opencode/plans/analysis_report.md (Duplication #1).
 // This file is the attack path, imported by ../useLoggedDiceRollAttack.js.
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
+import { setSavePromptBucket } from '../../../services/automation/common/savePrompt.js';
 import utils from '../../../services/ui/utils.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { addTargetResult } from '../../../services/automation/common/damageRollback.js';
@@ -54,9 +55,11 @@ export async function handleSanctuarySave(attackerName, targetName, campaignName
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handler);
-            const saves = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
+            const saves = { ...(getRuntimeValue('campaign', 'pendingSavePrompts') || {}) };
             delete saves[promptId];
-            setRuntimeValue('campaign', 'pendingSavePrompts', saves, campaignName);
+            // Drain-to-evict: dismissing/resolving the LAST row deletes the
+            // bucket key instead of persisting {} (setSavePromptBucket).
+            setSavePromptBucket(campaignName, 'pendingSavePrompts', saves);
             resolve(event.detail);
         };
         window.addEventListener('save-result', handler);

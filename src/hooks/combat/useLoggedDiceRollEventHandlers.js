@@ -26,6 +26,7 @@ import { triggerViciousMockeryForGeneric } from '../../services/rules/features/v
 import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, resolveAppliedDamage } from './handlers/damageHandlerUtils.js';
 import { grantSoulTomeTrap } from '../../services/rules/features/soulTomeTrapService.js';
 import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
+import { setSavePromptBucket } from '../../services/automation/common/savePrompt.js';
 
 const SECONDARY_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 
@@ -37,7 +38,10 @@ function syncListenerPromptFilters(detail, pending, campaignName) {
     // createSaveListener prompts are not in the pendingSaveRegistry — read campaignName from the runtime store.
     const pendingSavesStore = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
     const saveCampaignName = pending?.campaignName || pendingSavesStore[detail.promptId]?.campaignName || campaignName;
-    setRuntimeValue('campaign', 'pendingSaveListenerPrompts', filteredPrompts, saveCampaignName);
+    // Drain-to-evict: pruning the LAST listener id deletes the bucket key
+    // instead of persisting [] (setSavePromptBucket mirrors the concentration
+    // lane; rows remaining keep the broadcast-POST as before).
+    setSavePromptBucket(saveCampaignName, 'pendingSaveListenerPrompts', filteredPrompts);
 }
 
 // CLA-211: shared Leading Evasion folds ONLY when the GM ticked the target
