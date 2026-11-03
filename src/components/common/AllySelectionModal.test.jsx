@@ -4,6 +4,7 @@
 // (select via checkbox or row, bulk actions, confirm/cancel payloads), queried
 // through accessible roles rather than CSS class internals.
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AllySelectionModal from './AllySelectionModal.jsx';
 
@@ -231,5 +232,47 @@ describe('AllySelectionModal', () => {
 
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  // ── Checkbox role semantics (CI 2026-11-03 a11y: rows pinned as named
+  // checkboxes, keyboard-toggled, feeding Confirm Allies (n)) ──
+
+  it('exposes every row as a checkbox with an accessible name', () => {
+    renderModal();
+
+    expect(screen.getByRole('checkbox', { name: 'Select Goblin' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select Hero' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select Orc' })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+  });
+
+  it('Space on a focused row toggles what Confirm Allies (n) counts', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    const goblin = screen.getByRole('checkbox', { name: 'Select Goblin' });
+    expect(goblin).toBeEnabled(); // natively focusable — reachable via Tab
+
+    goblin.focus();
+    await user.keyboard(' ');
+    expect(goblin).toBeChecked();
+    expect(screen.getByRole('button', { name: /Confirm Allies \(1\)/ })).toBeEnabled();
+
+    await user.keyboard(' ');
+    expect(goblin).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /Confirm Allies \(0\)/ })).toBeDisabled();
+  });
+
+  it('confirms a keyboard-toggled selection', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    screen.getByRole('checkbox', { name: 'Select Hero' }).focus();
+    await user.keyboard(' ');
+
+    await user.click(screen.getByRole('button', { name: /Confirm Allies \(1\)/ }));
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(['Hero']);
   });
 });

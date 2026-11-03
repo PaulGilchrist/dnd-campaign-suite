@@ -68,8 +68,11 @@ export default function AllySelectionModal({
                                     key={i}
                                     className={`secondary-target-row ${isSelected ? 'secondary-target-selected' : ''}`}
                                 >
+                                    {/* EB canon (EncounterMonsterTable): explicit accessible
+                                        name so rows read as checkboxes, not label-text spans. */}
                                     <input
                                         type="checkbox"
+                                        aria-label={`Select ${name}`}
                                         checked={isSelected}
                                         onChange={() => toggleCreature(name)}
                                     />

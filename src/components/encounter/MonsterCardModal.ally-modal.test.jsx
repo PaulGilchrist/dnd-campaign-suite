@@ -194,8 +194,9 @@ describe('MonsterCardModal - ally modal interactions', () => {
   it('opens ally selection modal when ally badge is clicked', () => {
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
 
-    const allyBadge = screen.getByTitle('Manage allies');
-    expect(allyBadge).toBeInTheDocument();
+    // CI 2026-11-03 a11y sibling parity: badge is a real named button now.
+    const allyBadge = screen.getByRole('button', { name: /Allies \(1\)/ });
+    expect(allyBadge).toHaveAttribute('title', 'Manage allies');
     fireEvent.click(allyBadge);
 
     expect(document.querySelector('.sp-modal')).toBeInTheDocument();

@@ -62,7 +62,6 @@ Event-check for carried rows: commits since BH = **918c7a4b7 only** (Map.jsx/Map
 
 ## Improvement Backlog
 
-- **2026-11-03 CI: Allies control is a bare `div.clickable`** — "Allies (n)" opens a fully keyboard-less picker (no role=button, no aria-label; rows are label-text-toggled). Screen readers/automation reach it only by innerText scan; the modal itself is the one decent part (role-able buttons). Cheap win: make the trigger a real button + label the rows with checkboxes as such.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

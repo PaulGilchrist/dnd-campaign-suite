@@ -94,9 +94,11 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <MonsterCombatStrategy monster={monster} />
         </div>
         <div className="mc-footer no-print">
-          <span className="mc-ally-badge clickable" onClick={(e) => { e.stopPropagation(); handleAllyModalOpen(); }} title="Manage allies">
-            <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
-          </span>
+          {/* CI 2026-11-03 a11y sibling parity: real <button> with the sheet
+              trigger (Tab-focusable, Enter/Space actuates, text accessible name). */}
+          <button type="button" className="mc-ally-badge clickable" onClick={(e) => { e.stopPropagation(); handleAllyModalOpen(); }} title="Manage allies">
+            <i className="fa-solid fa-users" aria-hidden="true"></i> Allies ({currentAllies.length})
+          </button>
         </div>
       </div>
     );

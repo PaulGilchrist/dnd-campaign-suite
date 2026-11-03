@@ -425,6 +425,12 @@
   font-size: 0.85em;
 }
 
+/* Allies trigger is a real <button> (CI 2026-11-03 a11y sibling parity) —
+   neutralize the UA font so the badge matches the card typeface. */
+button.mc-ally-badge {
+  font-family: inherit;
+}
+
 .mc-footer {
   display: flex;
   justify-content: flex-end;

@@ -455,9 +455,12 @@ function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effective
             <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
             {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
             <CharFeats playerStats={playerStats} showPopup={(feat) => showFeatDetailPopup(feat, setPopupHtml)} />
-            <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
-                <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
-            </span>
+            {/* CI 2026-11-03 a11y: real <button> (was a bare clickable span) so the
+                trigger is Tab-focusable and Enter/Space-actuated; accessible name comes
+                from the "Allies (n)" text, icon stays decorative. */}
+            <button type="button" className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
+                <i className="fa-solid fa-users" aria-hidden="true"></i> Allies ({currentAllies.length})
+            </button>
             {mountName ? (
                 <>
                     <span className="mount-badge clickable no-print" onClick={handleDismount} title="Dismount">

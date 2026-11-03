@@ -460,6 +460,12 @@
     background-color: rgba(255, 255, 255, 0.1);
 }
 
+/* The Allies trigger is a real <button> (CI 2026-11-03 a11y) — neutralize the
+   UA font so the badge keeps the sheet's typeface and visual weight. */
+button.ally-badge {
+    font-family: inherit;
+}
+
 .ally-badge .fa-users {
     font-size: 0.85em;
 }
