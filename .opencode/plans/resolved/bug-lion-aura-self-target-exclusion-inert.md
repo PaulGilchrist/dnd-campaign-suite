@@ -34,3 +34,21 @@ Thread `targetName` into `lionOpts` in `accumulateAuraCounts` and skip the disad
 
 ## Severity
 Broken feature (rules engine close-but-not-exact: right trigger, wrong condition). Punishes the exact attack the feature text says is safe, silently biasing every Lion-vs-bearer melee exchange.
+
+## Resolution
+FIXED 2026-11-03 — diagnosis in the bug file confirmed against the real code: the engine had zero consumers of the "other than you" exclusion. The live roll fired on the **gridless sync lane** (`resolveLionAura` → `getLionDisadvantageAgainst` with `skipRangeCheck`, DD present in `combatSummary` as a type-player Lion holder), so both production call sites needed the target axis, not just `accumulateAuraCounts`.
+
+**Changes:**
+- `src/services/combat/auras/lionAuraUtils.js` — `getLionDisadvantageAgainst` now accepts `targetName`; per-bearer skip `if (player.name === targetName) continue;` mirrors the existing attacker skip and the `taunting_step` gate (`conditionEffects.js:869`). Kept as a bare `===` (no truthy `&&`) to stay under the complexity-15 ceiling; null targetName stays lenient (nameless players are refused at the drop seam, fix#39). Comment notes the deferred "another Barbarian who has this option active" clause per the suggested fix.
+- `src/services/automation/contextBuilder-map.js` — `lionOpts` threads `targetName: base.targetName` (both targetPos branches).
+- `src/services/automation/contextBuilder-sync.js` — `resolveLionAura(playerName, targetName, campaignName)` passes `targetName` through; the modeResolvers row supplies it from scope.
+- `src/services/combat/auras/lionAuraUtils.test.js` — new `describe('… self-target exclusion (targets other than you)')`: 7 faces — measured-grid exempt, skipRangeCheck exempt, third-party target still disadvantaged, second in-range bearer still fires when target is the first bearer (per-bearer exclusion), null/undefined targetName lenient (legacy), gridless-context-lane exempt. Header comment documents the target axis.
+- `src/services/automation/contextBuilder-sync.wolf-aura.test.js` — pinned lion call-args expectation extended with `targetName: 'Thug 1'` (intentional contract change).
+
+5e/2024 twin check: lionAuraUtils is a single shared module (no 2024 fork); wolf/duplicity intentionally keep source semantics (wolf's prose divergence is the separate owner-ruling backlog item, untouched).
+
+**Verification:**
+- Live repro (pre-fix): test-campaign GM tab, DD token dragged to (2,8) via Items-panel char-chip drop, cs POST armed `creatures[EvasiveFighter].targetName='DraconicDragon'` (hp 200), DD stamped `activeBuffs:[{optionName:'Lion',range:'5 ft'}]` legacy-unedited. Glaive "+9" popup: `d20 6, 20 → 6 +9 … Disadv (conditions)`; log: `rolls:[6,20] mode:"disadvantage" targetName:"DraconicDragon"` — bug confirmed exactly.
+- Live re-verify (post-fix, after hard reload + re-select): same rig, target = bearer → popup `d20 1 +9` single die, no Disadv chip; log `mode:"normal"` ✔. Adjacency faces (target re-armed to non-bearer FeyRanger): Glaive `mode:"disadvantage"` (range-band auto-miss) and Shortbow `mode:"disadvantage"` with popup chip **"Disadv (conditions)"** — the aura's own channel still fires on non-bearer targets, exclusion did not leak. 4 log roll entries total agree with popups.
+- Tests: `npx vitest run lionAuraUtils.test.js contextBuilder-sync.wolf-aura.test.js` → 31 passed; area run `auras + contextBuilder*` → 12 files / 201 passed; full suite → 3035 files / 33,269 passed, exit 0. `npm run lint` → zero warnings.
+- Cleanup: battle-arena.json restored to 3-token baseline (DD token removed via maps PUT from a map-unmounted tab), change-data `{}` + log `[]` via Admin panel, zero campaign-lock denials.

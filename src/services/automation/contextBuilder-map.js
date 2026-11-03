@@ -170,9 +170,12 @@ async function accumulateAuraCounts(base, playerStats, campaignName, mapData, ta
     if (duplicityResult.advantage) {
         mapAdv++;
     }
+    // targetName threaded for the Lion self-target exclusion ("attacks against
+    // targets other than you" — lionAuraUtils.js); wolf/duplicity keep their
+    // source semantics and take no target axis.
     const lionOpts = targetPos
-        ? { attackerName: playerStats.name, campaignName, mapData }
-        : { attackerName: playerStats.name, campaignName, mapData, skipRangeCheck: true };
+        ? { attackerName: playerStats.name, targetName: base.targetName, campaignName, mapData }
+        : { attackerName: playerStats.name, targetName: base.targetName, campaignName, mapData, skipRangeCheck: true };
     const lionResult = await getLionDisadvantageAgainst(lionOpts);
     if (lionResult.disadvantage) {
         mapDis++;

@@ -387,9 +387,10 @@ async function resolveDuplicityAura(playerName, campaignName) {
     return noMapDuplicity.advantage ? { mode: 'advantage', reason: 'Improved Duplicity' } : undefined;
 }
 
-async function resolveLionAura(playerName, campaignName) {
+async function resolveLionAura(playerName, targetName, campaignName) {
     const noMapLion = await getLionDisadvantageAgainst({
         attackerName: playerName,
+        targetName,
         campaignName,
         skipRangeCheck: true,
     });
@@ -523,7 +524,7 @@ async function resolveAttackModeResolvers({ playerName, playerStats, targetName,
         () => resolvePreciseHunter(playerName, targetName, playerStats, campaignName),
         () => resolveWolfAura(playerName, campaignName),
         () => resolveDuplicityAura(playerName, campaignName),
-        () => resolveLionAura(playerName, campaignName),
+        () => resolveLionAura(playerName, targetName, campaignName),
         // WM-008 one-shot te consumption (attack roll only)
         () => {
             if (!targetName || !consumeAttackTe) return undefined;

@@ -1,4 +1,7 @@
 // @maintained-by-ai
+// regression: bug-lion-aura-self-target-exclusion-inert — the targetName axis
+// (Power of the Wilds "attacks against targets other than you") is pinned in
+// the 'self-target exclusion' block below.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -28,6 +31,9 @@ import { getCombatContext } from '../../rules/combat/damageUtils.js';
 // the awaited combat-summary party filtered to type 'player'; the only production
 // gridless caller, resolveLionAura (contextBuilder-sync.js), ALWAYS passes
 // skipRangeCheck — the gridless measured path is unreachable in prod and untested.
+// targetName axis (RAW "against targets other than you"): a bearer who IS the
+// attack's target is skipped per-bearer — the exclusion never masks a second
+// in-range bearer. A null/omitted targetName stays lenient (no exclusion).
 // Pattern-sibling: duplicityAuraUtils.test.js (same ctx/skip skeleton, trimmed).
 const CAMPAIGN = 'test-campaign';
 
@@ -175,5 +181,60 @@ describe('getLionDisadvantageAgainst — betrayal ally-list flip', () => {
     seed({ buffs: { Barbarian: [lion()] }, allies: { Barbarian: ['Barbarian', 'Attacker'] } });
     expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
       .toEqual({ disadvantage: true, source: 'Barbarian' });
+  });
+});
+
+// Power of the Wilds (Lion) RAW: "enemies within 5 feet of you have Disadvantage
+// on attack rolls against targets other than you" — an attack aimed AT the
+// bearer itself must roll normal (bug-lion-aura-self-target-exclusion-inert:
+// the util never received targetName, so the exclusion was inert).
+describe('getLionDisadvantageAgainst — self-target exclusion (targets other than you)', () => {
+  beforeEach(resetMocks);
+
+  it('exempts a measured grid attack whose target IS the bearer', async () => {
+    seed({ buffs: { Barbarian: [lion()] } });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Barbarian', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
+      .toEqual({ disadvantage: false });
+    expect(isWithinRange).not.toHaveBeenCalled();
+  });
+
+  it('exempts the bearer on the unmeasured skipRangeCheck lane too', async () => {
+    seed({ buffs: { Barbarian: [lion()] } });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Barbarian', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian'), skipRangeCheck: true }))
+      .toEqual({ disadvantage: false });
+  });
+
+  it('keeps disadvantage when the target is a creature other than the bearer', async () => {
+    seed({ buffs: { Barbarian: [lion()] } });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Wizard', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian', 'Wizard') }))
+      .toEqual({ disadvantage: true, source: 'Barbarian' });
+  });
+
+  it('a second in-range bearer still forces disadvantage when the target is the first bearer', async () => {
+    seed({ buffs: { Barbarian: [lion()], Second: [lion()] } });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName: 'Barbarian', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian', 'Second') }))
+      .toEqual({ disadvantage: true, source: 'Second' });
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+  ])('lenient when the caller passes no target (%s) — legacy behavior unchanged', async (_label, targetName) => {
+    seed({ buffs: { Barbarian: [lion()] } });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', targetName, campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
+      .toEqual({ disadvantage: true, source: 'Barbarian' });
+  });
+
+  it('exempts the bearer on the gridless combat-context lane', async () => {
+    getCombatContext.mockResolvedValue({ creatures: [{ name: 'DraconicDragon', type: 'player' }, { name: 'HexWarlock', type: 'player' }] });
+    seed({ buffs: { DraconicDragon: [lion()] } });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'HexWarlock', targetName: 'DraconicDragon', campaignName: CAMPAIGN, skipRangeCheck: true }))
+      .toEqual({ disadvantage: false });
   });
 });

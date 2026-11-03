@@ -15,7 +15,7 @@ function lionBuffFor(player, campaignName) {
     return Array.isArray(buffs) ? buffs.find(b => b.optionName === 'Lion') : null;
 }
 
-export async function getLionDisadvantageAgainst({ attackerName, campaignName, mapData, skipRangeCheck }) {
+export async function getLionDisadvantageAgainst({ attackerName, targetName, campaignName, mapData, skipRangeCheck }) {
     let allCreatures = [];
     if (mapData) {
         allCreatures = mapData.players?.length ? mapData.players : [];
@@ -26,6 +26,16 @@ export async function getLionDisadvantageAgainst({ attackerName, campaignName, m
 
     for (const player of allCreatures) {
         if (player.name === attackerName) continue;
+        // Power of the Wilds (Lion) RAW: enemies have Disadvantage "on attack
+        // rolls against targets other than you" — an attack aimed AT the bearer
+        // itself is exempt. Same per-bearer skip shape as the attacker check
+        // above and the taunting_step gate (conditionEffects.js:869); a null
+        // targetName stays lenient (bearers always carry a name — drop-seam
+        // law fix#39 refuses nameless players).
+        // NOTE: the full clause also exempts "another Barbarian who has this
+        // option active"; that second axis needs a scan for other Lion-buff
+        // holders matching the target and is deferred (see bug file).
+        if (player.name === targetName) continue;
         if (!bearerSupports(player.name, attackerName)) continue;
         const lionBuff = lionBuffFor(player, campaignName);
         if (!lionBuff) continue;
