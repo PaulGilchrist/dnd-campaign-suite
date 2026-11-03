@@ -9,8 +9,8 @@
 // only (e.g. createRollConditionSaveHandler #1004 pins call-args through a
 // mock; buildConditionPopup envelope is @#1004). Endpoint bytes are here.
 // Turn-based canon: the source uses no timers — adjudication prompts wait
-// indefinitely and are removed only by explicit clear* calls; the lone
-// exception-shaped lane is the result keys' self-sweep (concentration
+// indefinitely and are removed only by explicit clear* calls; the exception-
+// shaped lane is the result keys' self-sweep (save 2026-11-03 + concentration
 // 2026-10-29-Z + death-save backlog death-save-result-key-never-deleted),
 // DELETEd event-driven on their own POST response (no timer).
 // Verified.
@@ -20,6 +20,7 @@ import {
   sendSavePrompt,
   sendSaveResult,
   clearSavePrompt,
+  clearSaveResult,
   sendDeathSavePrompt,
   clearDeathSavePrompt,
   sendDeathSaveResult,
@@ -43,6 +44,9 @@ const ENCODED_CAMPAIGN = 'Campaign%20%231';
 /** POST families: prompt sends take (campaign, promptData). */
 const PROMPT_POSTS = [
   { fn: sendSavePrompt, key: 'savePrompt-Goblin', data: { targetName: 'Goblin', dc: 13 } },
+  // Per-promptId key (save-prompt queue orphan fix 2026-11-03): each save
+  // gets its own key so a drained queue never DELETEs the same key twice.
+  { fn: sendSavePrompt, key: 'savePrompt-Goblin-prompt-abc', data: { targetName: 'Goblin', promptId: 'prompt-abc' } },
   { fn: sendDeathSavePrompt, key: 'deathSavePrompt-Fighter', data: { targetName: 'Fighter' } },
   // Per-promptId key (multi-hit collapse fix): each damage event's prompt
   // lives under its own key so answering one never DELETEs another's.
@@ -57,9 +61,10 @@ const RESULT_POSTS = [
   { fn: sendConcentrationResult, key: 'concentrationResult-Wizard', result: { success: true } },
 ];
 
-/** DELETE families: clears take (campaign, targetName). */
+/** DELETE families: clears take (campaign, keySuffix/targetName). */
 const CLEARS = [
   { fn: clearSavePrompt, key: 'savePrompt-Goblin' },
+  { fn: clearSaveResult, key: 'saveResult-Goblin' },
   { fn: clearDeathSavePrompt, key: 'deathSavePrompt-Fighter' },
   { fn: clearConcentrationPrompt, key: 'concentrationPrompt-Wizard' },
   { fn: clearConcentrationResult, key: 'concentrationResult-Goblin' },
@@ -137,6 +142,53 @@ describe('savePromptService', () => {
       expect(init.headers).toBeUndefined();
     }
   );
+
+  it('clears a save prompt by arrival key so a drained queue never re-DELETEs (no 404 orphan call)', () => {
+    clearSavePrompt(CAMPAIGN, 'Goblin-prompt-abc');
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = globalThis.fetch.mock.calls[0];
+    expect(url).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/savePrompt-Goblin-prompt-abc`);
+    expect(init.method).toBe('DELETE');
+  });
+
+  describe('save result hygiene lane (backlog 2026-11-03 save-prompt-queue-dismiss-orphan)', () => {
+    it('posts the result to its own promptId-scoped key and self-sweeps it after the POST ack', async () => {
+      let resolvePost;
+      globalThis.fetch.mockImplementationOnce(() => new Promise((res) => { resolvePost = res; }));
+
+      sendSaveResult(CAMPAIGN, 'Goblin', { promptId: 'prompt-abc', success: true });
+      await Promise.resolve();
+      // No DELETE while the POST is still in flight — the value echo must
+      // lead the null echo on every SSE socket (double-roll guard order).
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+      resolvePost({ ok: true, json: () => Promise.resolve({}) });
+      await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+      const [postUrl] = globalThis.fetch.mock.calls[0];
+      expect(postUrl).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/saveResult-Goblin-prompt-abc`);
+      const [url, init] = globalThis.fetch.mock.calls[1];
+      expect(url).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/saveResult-Goblin-prompt-abc`);
+      expect(init.method).toBe('DELETE');
+    });
+
+    it('falls back to the bare-target key for promptId-less (countercharm/legacy) results', async () => {
+      sendSaveResult(CAMPAIGN, 'Goblin', { success: true });
+      await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+      const [postUrl] = globalThis.fetch.mock.calls[0];
+      expect(postUrl).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/saveResult-Goblin`);
+      const [deleteUrl] = globalThis.fetch.mock.calls[1];
+      expect(deleteUrl).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/saveResult-Goblin`);
+    });
+
+    it('never deletes a result key when the POST fails (nothing was written)', async () => {
+      globalThis.fetch.mockRejectedValueOnce(new Error('network fail'));
+
+      sendSaveResult(CAMPAIGN, 'Goblin', { promptId: 'prompt-abc', success: true });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
 
   it('clears a concentration prompt by promptId so sibling multi-hit prompts survive', () => {
     clearConcentrationPrompt(CAMPAIGN, 'Wizard', 'prompt-abc');
@@ -245,7 +297,7 @@ describe('savePromptService', () => {
     }
   );
 
-  it('never throws to the caller when the network fails (all 15 entry points, fire-and-forget)', async () => {
+  it('never throws to the caller when the network fails (every entry point, fire-and-forget; rejected POSTs skip their chained DELETE)', async () => {
     globalThis.fetch.mockRejectedValue(new Error('network fail'));
 
     ALL_SENDERS.forEach((call) => expect(call()).toBeUndefined());

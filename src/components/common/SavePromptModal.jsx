@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import utils from '../../services/ui/utils.js';
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
+import { dropPendingSavePrompt } from '../../services/automation/common/savePrompt.js';
 import Subscriber from './Subscriber.jsx';
 import { getSaveDisadvantage, getHolyAuraSaveAdvantage, getHolyNimbusSaveAdvantage } from './savePromptUtils.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
@@ -361,15 +362,25 @@ function findTargetCharacter(current, characters) {
 
 function appendSavePrompt(prev, event, prefix) {
   if (prev.some(p => p.promptId === event.data.promptId)) return prev;
-  const { sourceAttackerName, attackerName: eventDataAttackerName, targetName: dataTargetName, ...restData } = event.data;
-  const targetName = dataTargetName || event.key.slice(prefix.length) || null;
-  const newPrompt = { targetName, attackerName: eventDataAttackerName || sourceAttackerName, ...restData };
+  const { sourceAttackerName, attackerName: eventDataAttackerName, targetName: dataTargetName, promptId, ...restData } = event.data;
+  // The arrival key identifies the SERVER key this prompt lives on:
+  // '<Target>-<promptId>' (per-prompt lane) or bare '<Target>' (legacy/
+  // staged producers). Queue it verbatim so Dismiss/Done clear exactly the
+  // key that exists instead of guessing at a sibling shape (drained-queue
+  // 404 class, backlog 2026-11-03).
+  const keySuffix = event.key.slice(prefix.length);
+  const targetName = dataTargetName
+    || (promptId && keySuffix.endsWith(`-${promptId}`)
+      ? keySuffix.slice(0, -(promptId.length + 1))
+      : keySuffix)
+    || null;
+  const newPrompt = { targetName, attackerName: eventDataAttackerName || sourceAttackerName, promptId, ...restData, promptKeySuffix: keySuffix };
 
   return [...prev, newPrompt];
 }
 
 // Shared submit path for Dismiss/Done with a resolved result.
-function submitResultAndClear(campaignName, current, result, { includeBaneRoll, evasionActive, sendExtra, advance }) {
+function submitResultAndClear(campaignName, current, result, { includeBaneRoll, evasionActive, sendExtra, clearPrompt, advance }) {
   const saveBonus = result.saveBonus;
   const rollMode = result.mode || 'normal';
   const rawRolls = result.rawRolls || [result.roll];
@@ -398,7 +409,13 @@ function submitResultAndClear(campaignName, current, result, { includeBaneRoll, 
   // and the prune POST stays ordered behind sendSaveResult for remote lanes.
   clearLeadingEvasionSelection(campaignName, current.promptId);
 
-  clearSavePrompt(campaignName, current.targetName);
+  // The creator tab's save-result listener above already swept the bucket
+  // row (its write makes this one a no-op via valuesEqual); on a tab without
+  // that listener (cross-tab Done, staged lane) this drop is the row's only
+  // sweeper — never absent, never double-POSTed.
+  dropPendingSavePrompt(campaignName, current.promptId);
+
+  clearPrompt();
   advance();
 }
 
@@ -435,8 +452,11 @@ function restoreHpAfterSuccessfulReroll(campaignName, { targetName, rawDamage, d
 }
 
 // Reroll submit path: posts the rerolled result, logs it, updates combat
-// summary, restores HP on success, and clears the prompt.
-function createSubmitSaveResult(campaignName, setPrompts) {
+// summary, restores HP on success, and clears the prompt. The prompt stays
+// queued (result panel refreshes), so the later Done click must NOT re-DELETE
+// the key this already swept — clearPrompt's per-key guard absorbs that
+// second attempt (the reroll→Done double-404 face).
+function createSubmitSaveResult(campaignName, setPrompts, clearPrompt, promptsRef) {
   return (saveData) => {
     const {
       promptId, targetName, success, roll, total, saveBonus, rawRolls, mode, bonusDetail,
@@ -475,7 +495,7 @@ function createSubmitSaveResult(campaignName, setPrompts) {
       }
     }
 
-    clearSavePrompt(campaignName, targetName);
+    clearPrompt(promptsRef.current[0] || { targetName });
   };
 }
 
@@ -752,10 +772,47 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     setPrompts(prev => prev.slice(1));
   }, []);
 
+  // Server keys this client has already DELETEd while their prompts may still
+  // sit in the queue (reroll-submit clears, then Done; or rapid double
+  // Dismisses racing the SSE round-trip). A second clear for the same key
+  // would honest-404 — skip it. A fresh value echo on the key revives it
+  // (a re-POST legitimately recreates the server key).
+  const clearedPromptKeysRef = useRef(new Set());
+
+  const clearPrompt = useCallback((prompt) => {
+    const keySuffix = prompt?.promptKeySuffix || prompt?.targetName;
+    if (!keySuffix) return;
+    if (clearedPromptKeysRef.current.has(keySuffix)) return;
+    clearedPromptKeysRef.current.add(keySuffix);
+    clearSavePrompt(campaignName, keySuffix);
+  }, [campaignName]);
+
   const handleEvent = useCallback((event) => {
-    if (!event.key || event.data == null) return;
+    if (!event.key) return;
     const prefix = `change-${campaignName}-savePrompt-`;
     if (!event.key.startsWith(prefix)) return;
+    const keySuffix = event.key.slice(prefix.length);
+    if (!keySuffix) return;
+
+    if (event.data == null) {
+      // Cleared-key echo (the server broadcasts null on key DELETE, as every
+      // client's Roll-Done/Dismiss does via clearPrompt): the save was
+      // answered or dismissed on another client — drop exactly the
+      // un-adjudicated prompt whose key was cleared (per-prompt key suffix
+      // '<Target>-<promptId>', or arrival-key match), plus the legacy
+      // bare-target clear which is target-wide by construction (the server
+      // only ever held one key for that target). Keeps any check this client
+      // already rolled so its result panel survives until Done — the
+      // ConcentrationPromptModal/DeathSavePromptModal cross-tab doctrine.
+      const isCleared = (p) => !p.result
+        && (p.promptKeySuffix === keySuffix
+          || keySuffix === `${p.targetName}-${p.promptId}`
+          || keySuffix === p.targetName);
+      setPrompts(prev => (prev.some(isCleared) ? prev.filter(p => !isCleared(p)) : prev));
+      return;
+    }
+
+    clearedPromptKeysRef.current.delete(keySuffix);
     setPrompts(prev => appendSavePrompt(prev, event, prefix));
    }, [campaignName]);
 
@@ -772,12 +829,23 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const handleDismiss = useCallback(() => {
     if (!current) return;
     if (current.result) {
-      submitResultAndClear(campaignName, current, current.result, { includeBaneRoll: false, evasionActive: lastEvasionState, advance });
+      submitResultAndClear(campaignName, current, current.result, {
+        includeBaneRoll: false, evasionActive: lastEvasionState,
+        clearPrompt: () => clearPrompt(current), advance,
+      });
       return;
     }
-    clearSavePrompt(campaignName, current.targetName);
+    // Un-rolled dismissal is a client-wide answer (concentration doctrine):
+    // sweep the prompt's memory-registry residue, drop its pendingSavePrompts
+    // /pendingSaveListenerPrompts rows (broadcast — otherwise they orphan in
+    // the campaign bucket forever, backlog 2026-11-03), clear exactly its
+    // arrival key, then advance.
+    getPendingSavePrompt(current.promptId);
+    getPendingPopupSetter(current.promptId);
+    dropPendingSavePrompt(campaignName, current.promptId);
+    clearPrompt(current);
     advance();
-  }, [campaignName, current, lastEvasionState, advance]);
+  }, [campaignName, current, lastEvasionState, clearPrompt, advance]);
 
   const handleRollSave = useCallback(async () => {
     if (!current) return;
@@ -812,9 +880,10 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       includeBaneRoll: true,
       evasionActive: lastEvasionState,
       sendExtra: { baneRoll: result.baneRoll },
+      clearPrompt: () => clearPrompt(current),
       advance,
     });
-  }, [campaignName, current, lastEvasionState, advance]);
+  }, [campaignName, current, lastEvasionState, clearPrompt, advance]);
 
   // CLA-211: persist the GM's per-save share selection to the runtime store
   // (broadcast, skipSync=false) keyed by promptId so every adjudication lane
@@ -866,7 +935,15 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     indomitableUses, indomitableMaxUses, indomitableRerollBonus,
   } = computeRerollAvailability(current, targetCharacter, campaignName);
 
-  const submitSaveResult = useMemo(() => createSubmitSaveResult(campaignName, setPrompts), [campaignName]);
+  const promptsRef = useRef([]);
+  useEffect(() => {
+    promptsRef.current = prompts;
+  }, [prompts]);
+
+  const submitSaveResult = useMemo(
+    () => createSubmitSaveResult(campaignName, setPrompts, clearPrompt, promptsRef),
+    [campaignName, clearPrompt]
+  );
 
   const rerollAvailability = {
     fanaticalFocusAvailable,

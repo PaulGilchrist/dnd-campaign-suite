@@ -143,6 +143,28 @@ export function createSaveListener(campaignName, config) {
     return { promptId, promise: saveResultPromise };
 }
 
+// Dismiss hygiene (backlog 2026-11-03 save-prompt-queue-dismiss-orphan):
+// createSaveListener registers the promptId in the campaign pendingSavePrompts
+// bucket (and pendingSaveListenerPrompts). Those rows are only pruned by the
+// save-result resolution path — a DISMISSED save never resolves, so nothing
+// else swept them and every ghost prompt leaked an orphan row the Admin
+// clear had to keep absorbing. Dismiss drops the prompt from both buckets
+// itself (setRuntimeValue broadcasts, so peers and server truth match the
+// drained UI). Idempotent: absent ids write nothing (no pointless POSTs).
+export function dropPendingSavePrompt(campaignName, promptId) {
+    if (!promptId) return;
+    const saves = getRuntimeValue('campaign', 'pendingSavePrompts') || {}; // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198
+    if (Object.prototype.hasOwnProperty.call(saves, promptId)) {
+        const nextSaves = { ...saves };
+        delete nextSaves[promptId];
+        setRuntimeValue('campaign', 'pendingSavePrompts', nextSaves, campaignName);
+    }
+    const listenerIds = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []; // fix#339 sibling read
+    if (Array.isArray(listenerIds) && listenerIds.includes(promptId)) {
+        setRuntimeValue('campaign', 'pendingSaveListenerPrompts', listenerIds.filter(id => id !== promptId), campaignName);
+    }
+}
+
 function describeSaveRoll({ roll, saveBonus, total, advantage, disadvantage, success, dcSuccess }) {
     let rollDetail = `rolled ${roll}${saveBonus !== 0 ? ' +' + saveBonus : ''} = ${total}`;
     if (advantage && disadvantage) {
