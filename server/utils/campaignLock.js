@@ -9,11 +9,14 @@
 // 2. createCampaignRenameGuard — mounted AFTER body parsing: closes the
 //    one campaign mutation whose identity does NOT live in the path —
 //    PUT /api/campaigns/:campaign renames the folder to req.body.newName.
-//    While locked, a rename of the locked campaign whose trimmed newName
-//    decodes to anything other than the locked name itself (a no-op) gets
-//    the same 403 + `[campaign-lock] BLOCKED …` log line, so the folder is
-//    never renamed out from under the lock (live incident 2026-10-28:
-//    test-campaign → zz slipped past phase 1, which only saw the source).
+//    While locked, only two rename shapes reach the route: a no-op
+//    (newName === source) and a member-to-member hop of a set-form lock —
+//    the source must be a non-primary allowlist entry (never the
+//    harness's own campaign) and the trimmed newName must also be an
+//    allowlist member. Everything else gets the same 403 + `[campaign-lock]
+//    BLOCKED …` log line, so the folder is never renamed out from under the
+//    lock (live incident 2026-10-28: test-campaign → zz slipped past phase 1,
+//    which only saw the source).
 //
 // `campaignLock` is the already-decoded lock name (null when unlocked) —
 // env parsing stays a single source of truth in server.js. Unset = both

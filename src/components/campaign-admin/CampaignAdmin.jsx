@@ -164,6 +164,21 @@ function StatusDisplay({ status }) {
     );
 }
 
+// Client mirror of createCampaignRenameGuard (server/utils/campaignLock.js):
+// under a set-form lock ("primary,throwawayA,throwawayB") only a non-primary
+// member may rename, and only onto another allowlisted name; the primary/
+// harness campaign is never renamable. Lives outside the component to keep
+// CampaignAdmin under the complexity cap.
+function renameLockFlags(campaignLocked, lockNames, campaignName) {
+    const renameWhileLocked = campaignLocked && lockNames.length > 1
+        && campaignName !== lockNames[0] && lockNames.includes(campaignName);
+    return {
+        renameWhileLocked,
+        renameDisabled: campaignLocked && !renameWhileLocked,
+        allowedTargets: lockNames.filter((n) => n !== campaignName).join(', '),
+    };
+}
+
 function RenameModal({ campaignName, newName, onNewNameChange, onClose, onSubmit, error, isBusy }) {
     const trimmed = newName.trim();
     const isUnchanged = trimmed !== '' && trimmed.toLowerCase() === campaignName.toLowerCase();
@@ -327,10 +342,14 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     // Campaign-lock state from GET /api/server-config. Fail-open default:
     // the Rename button stays enabled until the server explicitly reports a
     // lock (mirrors the snapshots pattern — a failed GET never blocks the
-    // normal unlocked flow). Under CAMPAIGN_LOCK the revert PUT of a rename
-    // targets the renamed folder and 403s opaquely mid-flow, so we disable
-    // the affordance up front instead.
+    // normal unlocked flow). A set-form lock ("primary,throwawayA,throwawayB")
+    // additionally lets a THROWAWAY member rename onto another allowlisted
+    // name — the client mirror of createCampaignRenameGuard (see derived
+    // flags below); the primary/harness campaign and single-name locks stay
+    // disabled up front, since the server 403s those mid-flow (live incident
+    // 2026-10-28).
     const [campaignLocked, setCampaignLocked] = useState(false);
+    const [lockNames, setLockNames] = useState([]);
     // Starter adventure lane: non-null after load iff this campaign carries a
     // starter-seed document (seeded quick-create). Drives the Regenerate card.
     const [starterSeed, setStarterSeed] = useState(null);
@@ -340,6 +359,8 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     const uploadInputRef = useRef(null);
 
     const isBusy = status && typeof status === 'string';
+    const { renameWhileLocked, renameDisabled, allowedTargets } =
+        renameLockFlags(campaignLocked, lockNames, campaignName);
 
     useEffect(() => {
         let cancelled = false;
@@ -349,6 +370,9 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                 const data = await res.json();
                 if (!cancelled && res.ok) {
                     setCampaignLocked(data.campaignLocked === true);
+                    setLockNames(typeof data.lockedCampaign === 'string'
+                        ? data.lockedCampaign.split(',').map((n) => n.trim()).filter(Boolean)
+                        : []);
                 }
             } catch (err) {
                 console.error('Failed to load server config:', err.message);
@@ -473,6 +497,10 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     const handleRenameSubmit = async () => {
         const trimmed = newName.trim();
         if (!trimmed || !campaignName || trimmed.toLowerCase() === campaignName.toLowerCase()) return;
+        if (renameWhileLocked && !lockNames.includes(trimmed)) {
+            setRenameError(`While the campaign is locked, you can only rename to an allowlisted name: ${allowedTargets || '(none configured — add a destination to CAMPAIGN_LOCK)'}`);
+            return;
+        }
         setRenameError(null);
         setRenaming(true);
         try {
@@ -720,12 +748,15 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                         <button
                             className="ct-btn ct-btn-primary"
                             onClick={() => { setRenameError(null); setRenameModal(true); }}
-                            disabled={campaignLocked}
+                            disabled={renameDisabled}
                         >
                             <i className="fas fa-pen"></i> Rename Campaign
                         </button>
-                        {campaignLocked && (
+                        {renameDisabled && (
                             <p className="admin-lock-note">Disabled while campaign is locked</p>
+                        )}
+                        {renameWhileLocked && (
+                            <p className="admin-lock-note">Locked: renames allowed only between the allowlisted campaigns ({allowedTargets})</p>
                         )}
                     </div>
                     <div className="admin-action admin-action--danger">

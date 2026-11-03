@@ -30,9 +30,9 @@ function mockServerConfig(config) {
     return fetchMock;
 }
 
-function renderAdmin() {
+function renderAdmin(campaignName = CAMPAIGN) {
     const props = {
-        campaignName: CAMPAIGN,
+        campaignName,
         theme: 'dark',
         toggleTheme: vi.fn(),
         onRenameCampaign: vi.fn(),
@@ -85,5 +85,59 @@ describe('CampaignAdmin - Rename Campaign lock gating', () => {
 
         fireEvent.click(renameButton());
         expect(screen.getByLabelText('New Campaign Name')).toBeInTheDocument();
+    });
+});
+
+// Owner ruling 2026-11-02 (rename-QA unblock): a set-form CAMPAIGN_LOCK lets a
+// THROWAWAY member (any member but the primary/first entry) rename onto
+// another allowlisted name — client mirror of createCampaignRenameGuard. The
+// primary stays disabled and off-allowlist destinations are refused in-modal
+// with honest copy instead of an opaque 403.
+describe('CampaignAdmin - Rename lock gating under a set-form lock', () => {
+    const SET_LOCK = 'test-campaign,qa-arena,qa-starter,qa-renamed';
+
+    it('enables Rename for a throwaway member and names the allowlisted destinations', async () => {
+        mockServerConfig({ campaignLocked: true, lockedCampaign: SET_LOCK });
+        renderAdmin('qa-starter');
+
+        await waitFor(() => expect(renameButton()).toBeEnabled());
+        expect(screen.queryByText('Disabled while campaign is locked')).not.toBeInTheDocument();
+        expect(screen.getByText(/renames allowed only between the allowlisted campaigns/)).toBeInTheDocument();
+
+        fireEvent.click(renameButton());
+        expect(screen.getByLabelText('New Campaign Name')).toBeInTheDocument();
+    });
+
+    it('keeps Rename disabled for the PRIMARY lock entry', async () => {
+        mockServerConfig({ campaignLocked: true, lockedCampaign: SET_LOCK });
+        renderAdmin(CAMPAIGN);
+
+        await waitFor(() => expect(renameButton()).toBeDisabled());
+        expect(screen.getByText('Disabled while campaign is locked')).toBeInTheDocument();
+    });
+
+    it('refuses an off-allowlist destination in-modal without calling the rename handler', async () => {
+        mockServerConfig({ campaignLocked: true, lockedCampaign: SET_LOCK });
+        const props = renderAdmin('qa-starter');
+        await waitFor(() => expect(renameButton()).toBeEnabled());
+        fireEvent.click(renameButton());
+
+        fireEvent.change(screen.getByLabelText('New Campaign Name'), { target: { value: 'Frostfall II' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+
+        expect(await screen.findByText(/you can only rename to an allowlisted name/)).toBeInTheDocument();
+        expect(props.onRenameCampaign).not.toHaveBeenCalled();
+    });
+
+    it('submits an allowlisted destination through to the rename handler', async () => {
+        mockServerConfig({ campaignLocked: true, lockedCampaign: SET_LOCK });
+        const props = renderAdmin('qa-starter');
+        await waitFor(() => expect(renameButton()).toBeEnabled());
+        fireEvent.click(renameButton());
+
+        fireEvent.change(screen.getByLabelText('New Campaign Name'), { target: { value: 'qa-renamed' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+
+        await waitFor(() => expect(props.onRenameCampaign).toHaveBeenCalledWith('qa-renamed'));
     });
 });

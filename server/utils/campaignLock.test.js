@@ -145,6 +145,70 @@ describe('campaignLock - phase 1 behavior preserved', () => {
     });
 });
 
+describe('campaignLock - set-form lock rename lane (throwaway ↔ allowlisted member)', () => {
+    // Owner ruling 2026-11-02 (rename-QA unblock, option B): a set-form lock
+    // ("primary,qa-arena,qa-starter,qa-renamed") permits renaming a
+    // THROWAWAY member (any member except the primary/first entry) onto
+    // another allowlisted name — the only way Arena/Starter verification can
+    // exercise the rename lane without ever touching production or stranding
+    // the harness campaign. Everything else stays 403.
+    const SET_LOCK = 'test-campaign,qa-arena,qa-starter,qa-renamed';
+
+    it('lets a throwaway member rename onto another allowlisted member', async () => {
+        const res = await request(createTestApp(SET_LOCK))
+            .put('/api/campaigns/qa-starter')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'qa-renamed' });
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ reached: true, campaign: 'qa-starter', newName: 'qa-renamed' });
+        expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('passes a padded allowlisted destination through (route trims identically)', async () => {
+        const res = await request(createTestApp(SET_LOCK))
+            .put('/api/campaigns/qa-starter')
+            .set('Content-Type', 'application/json')
+            .send({ newName: '  qa-renamed  ' });
+        expect(res.status).toBe(200);
+    });
+
+    it('passes a no-op rename of a throwaway member through', async () => {
+        const res = await request(createTestApp(SET_LOCK))
+            .put('/api/campaigns/qa-arena')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'qa-arena' });
+        expect(res.status).toBe(200);
+    });
+
+    it('blocks a throwaway rename onto an OFF-allowlist name (no escape hatch)', async () => {
+        const res = await request(createTestApp(SET_LOCK))
+            .put('/api/campaigns/qa-starter')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'Frostfall II' });
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain('denied');
+    });
+
+    it('blocks renaming the PRIMARY/first lock entry even onto a member (harness never renamed)', async () => {
+        const res = await request(createTestApp(SET_LOCK))
+            .put('/api/campaigns/test-campaign')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'qa-renamed' });
+        expect(res.status).toBe(403);
+        expect(errorSpy).toHaveBeenCalledWith(
+            '[campaign-lock] BLOCKED PUT /api/campaigns/test-campaign (locked to "test-campaign,qa-arena,qa-starter,qa-renamed")'
+        );
+    });
+
+    it('blocks a non-member source entirely (phase 1, regardless of destination)', async () => {
+        const res = await request(createTestApp(SET_LOCK))
+            .put('/api/campaigns/Testing G1')
+            .set('Content-Type', 'application/json')
+            .send({ newName: 'qa-renamed' });
+        expect(res.status).toBe(403);
+    });
+});
+
 describe('campaignLock - unlocked passthrough', () => {
     it('renames of any campaign reach the route when the lock is unset', async () => {
         const res = await request(createTestApp(null))
