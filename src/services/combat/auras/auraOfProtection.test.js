@@ -7,13 +7,14 @@
 // App semantics pinned from source, not book:
 // - computeAuraBonus returns { bonus, sourceName } (consumed by savePromptHandlers,
 //   concentrationService, conditionSaveService, CharConditions). Callers pass
-//   campaignName/activeMapName/allCreatures which this pure helper ignores.
+//   campaignName/activeMapName which this pure helper ignores; allCreatures
+//   feeds the unedited-bearer legacy party split (type 'player' entries).
 // - every gate-passing bearer clamps to a MINIMUM bonus of 1; strict '>' keeps the
 //   first-set highest source on ties (duplicate bearers never stack).
-// - getAllyList can never return null (useAllySelection self-falls-back to
-//   [creatureName]), so computeAuraBonus has NO ally-fallback branch — the former
-//   twin "falls back to no ally filtering" tests were vacuous: deleted, unreachable
-//   (#2070 verdict).
+// - ally gate (wolfAuraUtils target-side shape): hasExplicitAllyList bearers pad
+//   only creatures on their EDITED list (defectors narrow the aura); unedited
+//   bearers keep the legacy party-by-type default — party tokens (and the bearer
+//   itself) are covered, NPC/monster tokens are not (pre-editor RAW party aura).
 // - radius is 10ft, expanded 30ft via the 'Aura Expansion' passive; distance math
 //   is isWithinRange's own lane (mocked here). Call-time gating only — no clocks;
 //   aura presence changes at turn seams.
@@ -25,6 +26,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../hooks/useAllySelection.js', () => ({
   getAllyList: vi.fn(),
+  hasExplicitAllyList: vi.fn(),
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
@@ -43,14 +45,16 @@ import {
   computeAuraBonus,
 } from './auraOfProtection.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { getAllyList } from '../../../hooks/useAllySelection.js';
+import { getAllyList, hasExplicitAllyList } from '../../../hooks/useAllySelection.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 
 beforeEach(() => {
   vi.resetAllMocks();
   // Defaults are all pass-gates: a zero-envelope result proves an explicitly
-  // triggered gate, never missing fixture data.
+  // triggered gate, never missing fixture data. An EDITED list naming the
+  // target is the default bearer posture; legacy faces opt out explicitly.
   getRuntimeValue.mockReturnValue([]);
+  hasExplicitAllyList.mockReturnValue(true);
   getAllyList.mockReturnValue(['Cleric']);
   isWithinRange.mockResolvedValue(true);
 });
@@ -62,10 +66,11 @@ function bearer(name, passives, abilities = [{ name: 'Charisma', bonus: 5 }]) {
   return { name, computedStats: { automation: { passives: passives.map(passive) }, abilities } };
 }
 
-// As-invoked payload; campaignName/activeMapName ride along but the source gates
-// only on targetName + characters.
-const compute = (characters, targetName = 'Cleric') =>
-  computeAuraBonus({ targetName, characters, campaignName: 'test-campaign', activeMapName: 'Map' });
+// As-invoked payload; campaignName/activeMapName ride along. The source gates
+// on targetName + characters + the ally split; allCreatures feeds only the
+// legacy (unedited-bearer) party set, so edited-list faces omit it.
+const compute = (characters, targetName = 'Cleric', allCreatures = undefined) =>
+  computeAuraBonus({ targetName, characters, campaignName: 'test-campaign', activeMapName: 'Map', allCreatures });
 
 describe('constants', () => {
   it('pins the cannot-act condition list and the 10/30 ft aura ranges', () => {
@@ -161,7 +166,7 @@ describe('computeAuraBonus', () => {
     ['computedStats is null or undefined', () => [{ name: 'Paladin', computedStats: null }, { name: 'Bard', computedStats: undefined }]],
     ['the source lacks Aura of Protection', () => [bearer('Wizard', ['Spell Sniper'])]],
     ['the bearer has a cannot-act condition', () => [bearer('Paladin', ['Aura of Protection'])], () => getRuntimeValue.mockReturnValue(['stunned'])],
-    ['the bearer\'s ally list excludes the target', () => [bearer('Paladin', ['Aura of Protection'])], () => getAllyList.mockReturnValue(['OtherPlayer'])],
+    ['the EDITED bearer\'s ally list excludes the target', () => [bearer('Paladin', ['Aura of Protection'])], () => getAllyList.mockReturnValue(['OtherPlayer'])],
     ['the bearer is out of range', () => [bearer('Paladin', ['Aura of Protection'])], () => isWithinRange.mockResolvedValue(false)],
   ])('returns { bonus: 0, sourceName: null } when %s', async (_case, characters, setup) => {
     setup?.();
@@ -199,7 +204,7 @@ describe('computeAuraBonus', () => {
     expect(await compute(characters)).toEqual({ bonus: 2, sourceName: 'Aldric' });
   });
 
-  it('skips a higher-bonus bearer whose own ally list excludes the target', async () => {
+  it('skips a higher-bonus bearer whose own EDITED ally list excludes the target', async () => {
     // Per-source ally lists (not one answer for everyone): Paladin1 outscores
     // but does not cover Cleric, so the lower bonus wins.
     getAllyList.mockImplementation(name => (name === 'Paladin1' ? ['Wizard'] : ['Cleric']));
@@ -208,5 +213,66 @@ describe('computeAuraBonus', () => {
       bearer('Paladin2', ['Aura of Protection'], [{ name: 'Charisma', bonus: 3 }]),
     ];
     expect(await compute(characters)).toEqual({ bonus: 3, sourceName: 'Paladin2' });
+  });
+});
+
+// Regression: Aura of Protection silently degraded to SELF-only for every
+// bearer that never touched the 🤝 Allies editor — getAllyList's [self]
+// fallback was the only gate, so the RAW party-wide aura was unreachable for
+// pre-editor campaigns. The fix mirrors the wolf target-side gate
+// (wolfAuraUtils.js): unedited bearers fall back to the legacy party-by-type
+// split from allCreatures (type 'player' = party), edited bearers trust ONLY
+// their named list (editor narrows, never widens). Live face: Gazer Frost Ray
+// DC12 Dex vs FeyRanger, ElderPaladin token 5 ft away — pre-fix saveBonus +8,
+// post-fix +13 (+5 Cha aura) with the bearer UNEDITED.
+describe('computeAuraBonus — ally gate (unedited legacy split vs edited narrowing)', () => {
+  const cs = (...specs) => specs.map(([name, type]) => ({ name, type }));
+
+  it('unedited bearer PADS a party-PC target (legacy default, no editor used)', async () => {
+    hasExplicitAllyList.mockReturnValue(false);
+    const result = await compute(
+      [bearer('Paladin', ['Aura of Protection'])],
+      'Cleric',
+      cs(['Paladin', 'player'], ['Cleric', 'player'], ['Gazer', 'npc'])
+    );
+    expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
+  });
+
+  it('unedited bearer REFUSES an NPC/monster token (legacy enemy side of the split)', async () => {
+    hasExplicitAllyList.mockReturnValue(false);
+    const result = await compute(
+      [bearer('Paladin', ['Aura of Protection'])],
+      'Gazer',
+      cs(['Paladin', 'player'], ['Cleric', 'player'], ['Gazer', 'npc'])
+    );
+    expect(result).toEqual({ bonus: 0, sourceName: null });
+  });
+
+  it('unedited bearer still covers ITSELF, even with no combat summary at all', async () => {
+    hasExplicitAllyList.mockReturnValue(false);
+    expect(await compute([bearer('Paladin', ['Aura of Protection'])], 'Paladin'))
+      .toEqual({ bonus: 5, sourceName: 'Paladin' });
+  });
+
+  it('unedited bearer with no party set (absent combatSummary) covers only itself', async () => {
+    hasExplicitAllyList.mockReturnValue(false);
+    expect(await compute([bearer('Paladin', ['Aura of Protection'])], 'Cleric', undefined))
+      .toEqual({ bonus: 0, sourceName: null });
+  });
+
+  it('edited bearer naming the target PADS (editor widens toward named allies)', async () => {
+    getAllyList.mockReturnValue(['Paladin', 'Cleric']);
+    const result = await compute([bearer('Paladin', ['Aura of Protection'])], 'Cleric');
+    expect(result).toEqual({ bonus: 5, sourceName: 'Paladin' });
+  });
+
+  it('edited defector ([self]) REFUSES its former party allies', async () => {
+    getAllyList.mockReturnValue(['Paladin']);
+    const result = await compute(
+      [bearer('Paladin', ['Aura of Protection'])],
+      'Cleric',
+      cs(['Paladin', 'player'], ['Cleric', 'player'])
+    );
+    expect(result).toEqual({ bonus: 0, sourceName: null });
   });
 });
