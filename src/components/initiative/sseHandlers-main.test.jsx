@@ -7,7 +7,7 @@
 // separate module, the mirror of what is pinned here).
 //
 // Event → owner (this module, sseHandlers.js):
-//   spell-overlay-*                          → handleOverlayEvent (routing byte only)
+//   spell-overlay-*                          → handleOverlayEvent(event, setOverlays) — setter threaded (routing + owner setter byte)
 //   change-{campaign}-combatSummary          → adoption: enrich activeCreatureName, round-regression guard, cache write (:62-81)
 //   change-{campaign}-lastAttack             → noop, zero writes (:142)
 //   change-{campaign}-activeCreatureName     → turn mirror: name state, CLA-307/MN-003 outgoing turn-end (skipSync), round-scoped turn-start gate (:106-135)
@@ -20,7 +20,7 @@
 // no-combatSummary-update-when-equal→T9 · CLA-170→T10 · undefined-computedStats→T12 · CLA-307→T13 ·
 // fallback-read + null-summary + cs-null-still-applies→T14/T15 · tick-unknown + excluded-keys→T3.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSseEventHandler } from './sseHandlers.js';
+import { createSseEventHandler, createOverlayHandler } from './sseHandlers.js';
 import * as combatData from '../../services/encounters/combatData.js';
 import * as expirations from '../../services/rules/effects/expirations.js';
 import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
@@ -79,6 +79,7 @@ describe('createSseEventHandler', () => {
             setCombatSummaryG: vi.fn(),
             setActiveCreatureNameG: vi.fn(),
             setRuntimeStateTick: vi.fn(),
+            setOverlays: vi.fn(),
             handleOverlayEvent: vi.fn(),
         };
         handler = createSseEventHandler({
@@ -91,19 +92,65 @@ describe('createSseEventHandler', () => {
             setCombatSummaryG: mocks.setCombatSummaryG,
             setActiveCreatureNameG: mocks.setActiveCreatureNameG,
             setRuntimeStateTick: mocks.setRuntimeStateTick,
+            setOverlays: mocks.setOverlays,
             handleOverlayEvent: mocks.handleOverlayEvent,
         });
     });
 
     // ---- Routing ----
 
-    it('routes spell-overlay events to handleOverlayEvent and nothing else', async () => {
+    it('routes spell-overlay events to handleOverlayEvent WITH the owner setter and nothing else', async () => {
         const overlayEvent = { key: `spell-overlay-${campaignName}`, data: { action: 'clear' } };
         await handler(overlayEvent);
-        expect(mocks.handleOverlayEvent).toHaveBeenCalledWith(overlayEvent);
+        expect(mocks.handleOverlayEvent).toHaveBeenCalledWith(overlayEvent, mocks.setOverlays);
         expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
         expect(mocks.setActiveCreatureNameG).not.toHaveBeenCalled();
         expect(mocks.setRuntimeStateTick).not.toHaveBeenCalled();
+    });
+
+    // Dispatcher ↔ real overlay-handler wiring (backlog 2026-11-02 improve): the
+    // 1-arg delegate call threw "setOverlays is not a function" on the add (:18)
+    // and clear (:39) branches — sseClient's try/catch hid it as "[SSE] handler
+    // error:" — so Initiative-lane overlays never synced. These legs run the REAL
+    // createOverlayHandler through the dispatcher against a stateful setter fake.
+    describe('spell-overlay dispatcher → real overlay handler (setter threading)', () => {
+        const sphere = { id: 'qa-sphere', shape: 'sphere', startGridX: 2, startGridY: 3, angle: 0, radiusFt: 20, coneAngle: 0, widthFt: 0, distanceFt: 0, sizeFt: 0, color: 'rgba(255,80,60,0.07)' };
+        let wiredHandler;
+        let overlayState;
+        let realSetOverlays;
+
+        beforeEach(() => {
+            overlayState = [];
+            realSetOverlays = vi.fn((update) => {
+                overlayState = typeof update === 'function' ? update(overlayState) : update;
+            });
+            wiredHandler = createSseEventHandler({
+                campaignName,
+                characters: CHARACTERS,
+                combatSummaryRef: refs.combatSummaryRef,
+                activeCreatureNameRef: refs.activeCreatureNameRef,
+                lastAppliedTurnStartCreatureRef: refs.lastAppliedTurnStartCreatureRef,
+                setCombatSummary: mocks.setCombatSummary,
+                setCombatSummaryG: mocks.setCombatSummaryG,
+                setActiveCreatureNameG: mocks.setActiveCreatureNameG,
+                setRuntimeStateTick: mocks.setRuntimeStateTick,
+                setOverlays: realSetOverlays,
+                handleOverlayEvent: createOverlayHandler(campaignName),
+            });
+        });
+
+        it('add event reaches setOverlays and appends the payload rows (no throw)', async () => {
+            await wiredHandler({ key: `spell-overlay-${campaignName}`, data: { action: 'add', overlays: [sphere] } });
+            expect(realSetOverlays).toHaveBeenCalledTimes(1);
+            expect(overlayState).toEqual([sphere]);
+        });
+
+        it('clear event reaches setOverlays with the [] literal (no throw)', async () => {
+            overlayState = [sphere];
+            await wiredHandler({ key: `spell-overlay-${campaignName}`, data: { action: 'clear' } });
+            expect(realSetOverlays).toHaveBeenCalledWith([]);
+            expect(overlayState).toEqual([]);
+        });
     });
 
     it('writes nothing for nullish key/data, foreign campaigns, and the lastAttack echo', async () => {

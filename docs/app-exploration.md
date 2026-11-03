@@ -71,7 +71,6 @@ All BG claims entered/derived THIS run unless tagged carried.
 
 ## Improvement Backlog
 
-- (2026-11-02 improve, RE-VERIFIED + WIDENED BG) `sseHandlers.js:160` calls `handleOverlayEvent(event)` without the `setOverlays` setter — BG proves it throws on BOTH add (`:17`) and clear (`:38`) branches while an Initiative tab is mounted (stacks captured verbatim on a LAN client; wrapped as `[SSE] handler error:` by sseClient's per-handler try/catch, so it fails silently in-app). Initiative-lane overlay state never syncs while the board is open. Wire the setter through at the dispatcher.
 - (2026-11-02 BG) Campaign-selection list fetch has NO retry/backoff after a transient API outage: every mounted tab sticks at "No campaigns found. Please create folders…" until manual reload (GM + LAN both, after deliberate API restarts); LAN additionally fully deselects. A visible retry affordance or 1-shot auto-retry on the folder fetch would remove the dead-end. `src/components/campaign-selection/CampaignSelection.jsx` + folder-fetch lane.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

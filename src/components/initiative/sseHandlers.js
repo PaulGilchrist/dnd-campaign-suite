@@ -57,6 +57,7 @@ export function createSseEventHandler({
     setCombatSummaryG,
     setActiveCreatureNameG,
     setRuntimeStateTick,
+    setOverlays,
     handleOverlayEvent,
 }) {
     async function handleCombatSummaryChange(data) {
@@ -157,7 +158,12 @@ export function createSseEventHandler({
         if (event.key == null || event.data == null) return
 
         if (event.key.startsWith('spell-overlay-')) {
-            handleOverlayEvent(event)
+            // Thread the owner's setter (Initiative.jsx passes setOverlays here) —
+            // calling handleOverlayEvent without it threw "setOverlays is not a
+            // function" on the add/update/remove/clear branches (swallowed by
+            // sseClient's per-handler try/catch as "[SSE] handler error:"), so
+            // Initiative-lane overlay state never synced while the board was open.
+            handleOverlayEvent(event, setOverlays)
             return
         }
 
