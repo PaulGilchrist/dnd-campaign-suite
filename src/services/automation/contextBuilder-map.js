@@ -7,7 +7,6 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getWolfAdvantageAgainst } from '../combat/auras/wolfAuraUtils.js';
 import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils.js';
 import { getLionDisadvantageAgainst } from '../combat/auras/lionAuraUtils.js';
-import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
 import { isWithinRange } from '../rules/combat/rangeCheck.js';
 import { resolveMeleeReachBonus } from '../character/featRangeService.js';
@@ -193,15 +192,12 @@ async function accumulateAuraCounts(base, playerStats, campaignName, mapData, ta
     if (base.targetName && hasProtectionEffectAgainst(base.targetName)) {
         mapDis++;
     }
-    const coronaOpts = { targetName: base.targetName, campaignName, mapData, damageType: base.damageType };
-    if (!targetPos) {
-        coronaOpts.skipRangeCheck = true;
-    }
-    // CLA-063: awaited — the util is async; un-awaited it was always undefined.
-    const coronaResult = await getCoronaSaveDisadvantage(coronaOpts);
-    if (coronaResult.disadvantage) {
-        mapDis++;
-    }
+    // NOTE: Corona of Light is intentionally NOT counted here. RAW: "Disadvantage
+    // on saving throws against spells that deal Fire or Radiant damage" — a
+    // SAVE-lane effect. Its consumers live in handleNpcSaveDamage/handlePlayerSaveDamage/
+    // aoeService/DivineSparkModal; applying it to the ATTACK roll penalized the
+    // bearer's own allies on matching weapon attacks (see
+    // .opencode/plans/resolved/bug-corona-save-disadv-applied-to-attack-roll.md).
     return { mapAdv, mapDis };
 }
 

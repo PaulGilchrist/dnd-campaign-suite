@@ -143,24 +143,6 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     // NOT claim "within 5 ft" — proximity was never measured (3db9da635 tail).
     expect(result.advantageReason).toBe('Lion rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced');
   });
-
-  it('corona gridless face threads its own lenient reason under the Disadv chip', async () => {
-    setup();
-    getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: true, source: 'TestCleric' });
-
-    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
-
-    expect(getCoronaSaveDisadvantage).toHaveBeenCalledWith({
-      targetName: 'Thug 1',
-      campaignName: 'test-campaign',
-      damageType: 'Force',
-      skipRangeCheck: true,
-    });
-    expect(result.forcedMode).toBe('disadvantage');
-    // Sync corona can only fire gridless (the util refuses without mapData on
-    // an active map), so the lenient honest copy is always the sync-lane face.
-    expect(result.advantageReason).toBe('Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced');
-  });
 });
 
 // bug-wolf-aura-unmeasured-on-pc-roller-lane: with an ACTIVE map the sync lane
@@ -235,29 +217,32 @@ describe('contextBuilder-sync - active map MEASURES the aura axes (skipRangeChec
     expect(result.advantageReason).toBe('Lion rage aura — enemy of raging ElderPaladin within 5 ft');
   });
 
-  it('corona twin: active map → util consulted measured; refused measurement leaves mode normal', async () => {
+  it('corona is NEVER consulted on the attack lane (save-only effect — bug file)', async () => {
     setup();
     activeMap();
-    // The util refuses without mapData on an active map (map lane owns the
-    // measured corona verdict there) — no lenient stamp must leak through.
-    getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: false });
+    // Corona of Light is "Disadvantage on saving throws against Fire/Radiant
+    // SPELLS" (2024 classes.json Light Domain lv17) — a SAVE-lane effect. Even
+    // a util that reports disadvantage must not touch the attack roll.
+    getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
 
     const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
-    expect(getCoronaSaveDisadvantage).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
+    expect(getCoronaSaveDisadvantage).not.toHaveBeenCalled();
     expect(result.forcedMode).toBeUndefined();
     expect(result.advantageReason).toBeUndefined();
   });
 
-  it('all four sync aura resolvers (wolf/duplicity/lion/corona) drop skipRangeCheck when a map is active', async () => {
+  it('all three sync aura resolvers (wolf/duplicity/lion) drop skipRangeCheck when a map is active', async () => {
     setup();
     activeMap();
 
     await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
-    for (const util of [getWolfAdvantageAgainst, getDuplicityAdvantageAgainst, getLionDisadvantageAgainst, getCoronaSaveDisadvantage]) {
+    for (const util of [getWolfAdvantageAgainst, getDuplicityAdvantageAgainst, getLionDisadvantageAgainst]) {
       expect(util).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
       expect(util).not.toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: true }));
     }
+    // Corona no longer rides this lane at all (gridless OR measured).
+    expect(getCoronaSaveDisadvantage).not.toHaveBeenCalled();
   });
 });

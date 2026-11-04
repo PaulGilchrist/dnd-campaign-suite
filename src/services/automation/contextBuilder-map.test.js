@@ -612,6 +612,18 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
       const result = await buildAttack();
       expect(result.forcedMode).toBe('advantage');
     });
+
+    it('corona is NEVER counted into mapDis on the attack lane (save-only effect)', async () => {
+      setupAuraTest();
+      // bug-corona-save-disadv-applied-to-attack-roll: accumulateAuraCounts used
+      // to tax the ATTACK roll when the weapon's own damageType matched the
+      // corona buff's enemiesDisadvantageSaves. Corona rides the SAVE lane only
+      // (handleNpcSaveDamage / handlePlayerSaveDamage / aoeService / DivineSparkModal).
+      getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true, source: 'ElderPaladin' });
+      const result = await buildAttack();
+      expect(getCoronaSaveDisadvantage).not.toHaveBeenCalled();
+      expect(result.forcedMode).toBeUndefined();
+    });
   });
 
   describe('aura effects with map data — no target position', () => {
