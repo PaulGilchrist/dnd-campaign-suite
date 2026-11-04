@@ -31,7 +31,7 @@ describe('mapsService — empty-kebab lane segments (bug-map-name-empty-kebab)',
       ['deleteMap', () => deleteMap('testCampaign', '.json'), `${API}/.json`, { method: 'DELETE' }],
       ['renameMap', () => renameMap('testCampaign', '.json', 'Fixed Name'), `${API}/.json/rename`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newName: 'Fixed Name' }) }],
       ['activateMap', () => activateMap('testCampaign', '.json'), `${API}/.json/activate`, { method: 'PUT', headers: { 'Content-Type': 'application/json' } }],
-      ['loadMapData', () => loadMapData('testCampaign', '.json'), `${API}/.json`, { method: 'GET', headers: { 'Content-Type': 'application/json' } }],
+      ['loadMapData', () => loadMapData('testCampaign', '.json'), `${API}/.json`, { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'reload' }],
       ['saveMapData', () => saveMapData('testCampaign', '.json', { name: 'x' }), `${API}/.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'x' }) }],
       ['updateMapDescription', () => updateMapDescription('testCampaign', '.json', 'd'), `${API}/.json/description`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: 'd' }) }],
     ])('%s with the .json dotfile fileName targets %s (no wildcard collapse)', async (_name, invoke, url, options) => {

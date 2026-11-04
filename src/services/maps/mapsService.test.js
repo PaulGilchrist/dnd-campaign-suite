@@ -11,8 +11,11 @@
 // All sibling consumers (App.*, automation/*, components/map|hex-map/*) vi.mock this
 // module — this file is the only place real mapsService transport bytes are pinned.
 //
-// - No cache/guard lanes exist here: all 8 HTTP lanes fetch exactly once each; the two
-//   pure helpers cannot touch the network (zero-fetch proofs not applicable).
+// - Cache lane: loadMapData pins cache:'reload' (byte below) so name-keyed map
+//   reads never serve a browser-cached doc; the server mirrors it with
+//   Cache-Control: no-store (noStoreCampaignGets). All 8 HTTP lanes fetch exactly
+//   once each; the two pure helpers cannot touch the network (zero-fetch proofs not
+//   applicable).
 // - SSE: mapsService does not import EventSource/sseClient; the @app one-connection
 //   rule lives with subscribers, N/A in this lane. No timers in this service.
 //
@@ -85,7 +88,7 @@ describe('mapsService', () => {
     it.each([
       ['loadMaps GETs maps-list envelope', () => loadMaps('testCampaign'), API, { method: 'GET', headers: JSON_HEADERS }, 200, MAPS_LIST],
       ['createMap POSTs name with default type indoor', () => createMap('testCampaign', 'Dungeon'), API, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ name: 'Dungeon', type: 'indoor' }) }, 201, { message: 'Map created successfully', map: { name: 'Dungeon', fileName: 'dungeon.json' } }],
-      ['loadMapData GETs map-data envelope', () => loadMapData('testCampaign', 'Dungeon'), `${API}/dungeon`, { method: 'GET', headers: JSON_HEADERS }, 200, MAP_DATA],
+      ['loadMapData GETs map-data envelope cache:reload (no stale token reads)', () => loadMapData('testCampaign', 'Dungeon'), `${API}/dungeon`, { method: 'GET', headers: JSON_HEADERS, cache: 'reload' }, 200, MAP_DATA],
       ['saveMapData PUTs data as exact body bytes', () => saveMapData('testCampaign', 'Dungeon', MAP_DATA), `${API}/dungeon`, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify(MAP_DATA) }, 200, { message: 'Map saved successfully' }],
       ['deleteMap DELETEs slug with no headers', () => deleteMap('testCampaign', 'Dungeon'), `${API}/dungeon`, { method: 'DELETE' }, 200, { message: 'Map deleted successfully' }],
       ['renameMap PUTs slug/rename with newName body', () => renameMap('testCampaign', 'Old Name', 'New Name'), `${API}/old-name/rename`, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ newName: 'New Name' }) }, 200, { message: 'Map renamed successfully', map: { name: 'New Name', fileName: 'new-name.json' } }],

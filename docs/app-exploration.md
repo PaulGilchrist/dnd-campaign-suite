@@ -61,7 +61,6 @@ Event-check: commits since CM exit (2e0fcf5e8) = 64721eead (fix) + d85d2d099 (im
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- (2026-11-03 CN) Every name-keyed map read re-fetches without cache-busting (`mapsService.loadMapData` plain fetch, `GET /maps/:mapname` sends no `Cache-Control: no-store`) — positions consumed by `isWithinRange` aura gates and range math in cross-view automations could one day serve browser-cached stale tokens (§23's monsters.json precedent). Cheap hardening: `cache:'reload'` on loadMapData or a no-store header on campaign-scoped JSON GETs. `src/services/maps/mapsService.js server/routes/maps.js`.
 - (2026-11-03 CN) The generic change-data wildcard POST silently promotes any mistyped top-level key to a new bucket (`/WingedKobold` typo created a phantom bucket, swept only by admin clear). A one-line `console.warn('[changeData] new top-level key "<k>"')` on unseen-key creation (or an allowlist + 400 for known-char-name lookalikes) would surface client locator typos at write time instead of during cleanup. `server/utils/changeData.js campaigns-changedata.js POST /:key`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

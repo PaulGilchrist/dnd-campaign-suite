@@ -164,6 +164,10 @@ export const loadMapData = async (campaignName, mapName) => {
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
+      // Token positions feed isWithinRange aura gates and range math — never
+      // allow a browser-cached document here even if a proxy downgrades the
+      // server's Cache-Control: no-store (backlog 2026-11-03 CN).
+      cache: 'reload',
     });
     if (!response.ok) {
       const { error } = await response.json();

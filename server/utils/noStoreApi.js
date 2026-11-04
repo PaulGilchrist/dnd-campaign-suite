@@ -9,10 +9,13 @@
 // (run-Q observation). Mirror the static lane's directive centrally so the
 // whole route-served campaign JSON family is covered by one mechanism.
 //
-// GET-only: POST/PUT/DELETE/PATCH responses stay byte-identical. The SSE lane
+// GET/HEAD: the whole family serves through this one directive so even a
+// `curl -sI` probe reads the truth (the CL maps-no-store backlog probe was
+// HEAD and read the header as MISSING because this check was GET-only).
+// Mutating lanes (POST/PUT/DELETE/PATCH) stay byte-identical. The SSE lane
 // (/subscribe) lives outside this path prefix and keeps its own `no-cache`.
 export function noStoreCampaignGets(req, res, next) {
-    if (req.method === 'GET') {
+    if (req.method === 'GET' || req.method === 'HEAD') {
         res.setHeader('Cache-Control', 'no-store');
     }
     next();
