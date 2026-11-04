@@ -172,7 +172,9 @@ describe('onTokenMoveLanded', () => {
             expect(chargeSlot).toHaveBeenCalledWith({ creatureName: 'Goblin 1', bucket: 'reaction', campaignName: 'test-campaign' });
         }
         expect(setPopupHtml).toHaveBeenCalledTimes(1);
-        expect(setPopupHtml).toHaveBeenCalledWith(reason);
+        // OA advisories request sticky display (backlog 2026-11-03 CN) —
+        // the toast waits for an explicit dismiss instead of a 4s timer.
+        expect(setPopupHtml).toHaveBeenCalledWith(reason, { sticky: true });
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_triggered',
@@ -193,7 +195,8 @@ describe('onTokenMoveLanded', () => {
         // Denied face rides the same board channel — verbatim log reason.
         expect(setPopupHtml).toHaveBeenCalledTimes(1);
         expect(setPopupHtml).toHaveBeenCalledWith(
-            "Goblin 1's reaction is already used — no opportunity attack on Hero."
+            "Goblin 1's reaction is already used — no opportunity attack on Hero.",
+            { sticky: true }
         );
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
@@ -216,7 +219,7 @@ describe('onTokenMoveLanded', () => {
         expect(chargeSlot).not.toHaveBeenCalled();
         // te block (te.reason rides) surfaces on the SAME board channel.
         expect(setPopupHtml).toHaveBeenCalledTimes(1);
-        expect(setPopupHtml).toHaveBeenCalledWith(`Hero left Goblin 1's reach — ${blockedNote}`);
+        expect(setPopupHtml).toHaveBeenCalledWith(`Hero left Goblin 1's reach — ${blockedNote}`, { sticky: true });
         expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'enforcement_denied',

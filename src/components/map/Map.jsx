@@ -171,8 +171,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
     // §8.4 opportunity-attack advisories: `showMapNotice` threads into all
     // three move lanes (usePlayerDragging/useItemDragging/useSelectMove) as
     // `setPopupHtml`, so enforcement_triggered/denied text renders visibly
-    // on the board instead of living only in the campaign log.
-    const { message: mapNotice, show: showMapNotice } = useEphemeralToast(4000);
+    // on the board instead of living only in the campaign log. Those
+    // producers pass { sticky: true } (backlog 2026-11-03 CN) — the advisory
+    // stays until dismissed; the rejected-load lane keeps the 4000ms timer.
+    const {
+        message: mapNotice,
+        sticky: mapNoticeSticky,
+        show: showMapNotice,
+        dismiss: dismissMapNotice,
+    } = useEphemeralToast(4000);
 
     const { mapData, setMapData, placedItems, setPlacedItems, flushSave } = useMapLoader({
         campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost,
@@ -850,8 +857,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
 
             {/* Map notices (display-only — see MapNoticeToast.jsx): rejected
                 map loads AND §8.4 opportunity-attack advisories from the
-                three move lanes' setPopupHtml sink. */}
-            <MapNoticeToast message={mapNotice} />
+                three move lanes' setPopupHtml sink (enforcement advisories
+                arrive sticky — dismiss ×, no auto-hide). */}
+            <MapNoticeToast message={mapNotice} sticky={mapNoticeSticky} onDismiss={dismissMapNotice} />
         </div>
     );
 }

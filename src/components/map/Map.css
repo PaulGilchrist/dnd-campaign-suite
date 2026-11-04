@@ -897,6 +897,41 @@
     color: #7a5200;
 }
 
+/* Sticky enforcement advisory (backlog 2026-11-03 CN): OA notices stay until
+   the GM dismisses them, so this variant re-enables pointer-events for the
+   dismiss control only the sticky lane needs (the auto-hiding lanes stay
+   click-through above). Close-button tokens mirror .item-details-dock-close. */
+.map .map-toast.map-toast-sticky {
+    pointer-events: auto;
+}
+
+.map .map-toast-dismiss {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #999;
+    padding: 2px 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.map .map-toast-dismiss:hover {
+    border-color: #888;
+    color: #ccc;
+}
+
+[data-theme="light"] .map .map-toast-dismiss {
+    border-color: #b9945a;
+    color: #7a5200;
+}
+
+[data-theme="light"] .map .map-toast-dismiss:hover {
+    border-color: #8a6a30;
+    color: #4a3000;
+}
+
 /* Click-selected item details dock — the visible delete affordance that used
    to hide behind a right-click (backlog 2026-10-25). Fixed + centered above
    the map (same slot as the snap toast, one notch higher so a drag toast and

@@ -72,12 +72,16 @@ function defenderBlockedReason(defenderName, targetEffects) {
 /** One defender's trigger leg: blocked ⇒ audit deny; spent reaction ⇒ audit
  *  deny; otherwise charge the reaction + advisory popup/log. Every face —
  *  trigger AND both denials — rides the same `setPopupHtml` board channel
- *  (the log reason is the verbatim popup text, byte-identical). */
+ *  (the log reason is the verbatim popup text, byte-identical). Advisory
+ *  text is passed with { sticky: true } (backlog 2026-11-03 CN): the OA
+ *  enforcement toast used to auto-hide at 4s while its log row is permanent,
+ *  so a GM mid-drag missed WHY a reaction vanished — the sink keeps these
+ *  visible until an explicit dismiss instead. */
 function triggerDefender({ defender, campaignName, moverName, targetEffects, economyLive, setPopupHtml }) {
     const blocked = defenderBlockedReason(defender.name, targetEffects);
     if (blocked) {
         const reason = `${moverName} left ${defender.name}'s reach — ${blocked}`;
-        if (typeof setPopupHtml === 'function') setPopupHtml(reason);
+        if (typeof setPopupHtml === 'function') setPopupHtml(reason, { sticky: true });
         addEntry(campaignName, {
             type: 'enforcement_denied',
             creature: defender.name,
@@ -94,7 +98,7 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
     // (chargeSlot gates on that flag by design).
     if (economyLive && !chargeSlot({ creatureName: defender.name, bucket: 'reaction', campaignName })) {
         const reason = `${defender.name}'s reaction is already used — no opportunity attack on ${moverName}.`;
-        if (typeof setPopupHtml === 'function') setPopupHtml(reason);
+        if (typeof setPopupHtml === 'function') setPopupHtml(reason, { sticky: true });
         addEntry(campaignName, {
             type: 'enforcement_denied',
             creature: defender.name,
@@ -108,7 +112,7 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
 
     const spendNote = economyLive ? ' Reaction spent;' : '';
     const advisory = `${defender.name} reacts — ${moverName} left their reach.${spendNote} Resolve the Opportunity Attack on ${defender.name}'s sheet.`;
-    if (typeof setPopupHtml === 'function') setPopupHtml(advisory);
+    if (typeof setPopupHtml === 'function') setPopupHtml(advisory, { sticky: true });
     addEntry(campaignName, {
         type: 'enforcement_triggered',
         creature: defender.name,
@@ -127,7 +131,8 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
  * @param {{gridX,gridY}} ctx.fromCell   cell before the move
  * @param {{gridX,gridY}} ctx.toCell     cell the mover landed on
  * @param {object} ctx.mapData            current map data (tokens)
- * @param {Function} [ctx.setPopupHtml] advisory sink (map popup)
+ * @param {Function} [ctx.setPopupHtml] advisory sink (map toast) — called as
+ *   (text, { sticky }) so enforcement advisories request sticky display
  */
 export async function onTokenMoveLanded(ctx) {
     const { campaignName, moverName, moverIsPlayer, fromCell, toCell, mapData, setPopupHtml } = ctx;

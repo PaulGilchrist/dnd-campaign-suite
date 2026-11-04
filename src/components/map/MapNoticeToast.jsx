@@ -9,11 +9,28 @@
 // bottom-center amber slot as MapSnapToast.jsx; the auto-hide timer lives in
 // Map.jsx (display only, no game state). Hoisted out of Map.jsx to keep the
 // Map body under the complexity cap.
-const MapNoticeToast = ({ message }) => {
+//
+// Sticky lane (backlog 2026-11-03 CN): enforcement advisories pass
+// { sticky: true } at the producer, so the hook never arms an auto-hide and
+// this renders a visible × dismiss control (fa-xmark, mirroring the
+// ItemDetailsDock close button); non-sticky lanes render byte-identical to
+// before — timer decides, no control.
+const MapNoticeToast = ({ message, sticky = false, onDismiss }) => {
     if (!message) return null;
     return (
-        <div className="map-toast" role="status">
+        <div className={`map-toast${sticky ? ' map-toast-sticky' : ''}`} role="status">
             <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> {message}
+            {sticky && (
+                <button
+                    type="button"
+                    className="map-toast-dismiss"
+                    aria-label="Dismiss enforcement notice"
+                    title="Dismiss enforcement notice"
+                    onClick={onDismiss}
+                >
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </button>
+            )}
         </div>
     );
 };
