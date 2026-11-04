@@ -11,7 +11,7 @@
 
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage, buildLionAuraReason, buildDisadvantageReasons } from './MonsterCardModal.jsx';
+import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage, buildLionAuraReason, buildDisadvantageReasons, lionProximityWasMeasured } from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -102,20 +102,25 @@ vi.mock('../../services/shared/abilityLookup.js', () => ({
   getAbilitySaveModifier: vi.fn(() => 0),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: vi.fn((_key, propertyName) => {
-    if (propertyName === 'targetEffects') return [];
-    return null;
-  }),
-  getRuntimeValue: vi.fn((name, propertyName) => {
-    if (name === 'ElderPaladin' && propertyName === 'activeBuffs') {
-      return [{ name: 'Power of the Wilds', effect: 'power_of_wilds_option', optionName: 'Lion', range: '5 ft' }];
-    }
-    return null;
-  }),
-  setRuntimeValue: vi.fn(),
-  setRuntimeObject: vi.fn(),
-}));
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
+  let _activeMapName = null;
+  return {
+    useRuntimeValue: vi.fn((_key, propertyName) => {
+      if (propertyName === 'targetEffects') return [];
+      return null;
+    }),
+    getRuntimeValue: vi.fn((name, propertyName) => {
+      if (name === '__map__' && propertyName === 'activeMapName') return _activeMapName;
+      if (name === 'ElderPaladin' && propertyName === 'activeBuffs') {
+        return [{ name: 'Power of the Wilds', effect: 'power_of_wilds_option', optionName: 'Lion', range: '5 ft' }];
+      }
+      return null;
+    }),
+    __setActiveMapName(val) { _activeMapName = val; },
+    setRuntimeValue: vi.fn(),
+    setRuntimeObject: vi.fn(),
+  };
+});
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
@@ -129,6 +134,7 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 // ── Re-imports for assertions ──────────────────────────────────────────────
 
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
 import * as rangeValidation from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
@@ -168,8 +174,15 @@ function lionAuraLogCalls() {
   return addEntry.mock.calls.filter(([, entry]) => entry.automationType === 'lion_aura_disadvantage');
 }
 
+// 2026-11-03 QA backlog (honest lenient-face copy): the two pinned description
+// faces — measured adjacency keeps the proven "within 5 feet" prose
+// byte-identical; the cannot-gate face admits the proximity was never measured.
+const MEASURED_COPY = 'Goblin has Disadvantage on Scimitar: within 5 feet of raging ElderPaladin (Power of the Wilds — Lion).';
+const LENIENT_COPY = 'Goblin has Disadvantage on Scimitar: rage aura of ElderPaladin applied — proximity unmeasured (no token) — GM-enforced (Power of the Wilds — Lion).';
+
 beforeEach(() => {
   vi.clearAllMocks();
+  runtimeState.__setActiveMapName(null);
   useLoggedDiceRoll.__setPopupHtml(null);
   conditionEffects.__setCombineReturn('normal');
   getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: false });
@@ -213,7 +226,49 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
     expect(entry.type).toBe('automation');
     expect(entry.characterName).toBe('Goblin');
     expect(entry.abilityName).toBe('Scimitar');
-    expect(entry.description).toContain('ElderPaladin');
+    // 2026-11-03 QA backlog: gridless face never measured proximity — the log
+    // must carry the honest GM-enforced tail, never the "within 5 feet" claim.
+    expect(entry.description).toBe(LENIENT_COPY);
+  });
+
+  // Measured face (2026-11-03 QA backlog): active map + both attacker and
+  // bearer tokens positioned → the util's isWithinRange compared real
+  // coordinates, so the accurate "within 5 feet" copy stays byte-identical.
+  it('logs the byte-identical "within 5 feet" copy when proximity WAS measured', async () => {
+    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
+    runtimeState.__setActiveMapName('battle-arena');
+    mapsService.loadMapData.mockResolvedValue({
+      players: [{ name: 'ElderPaladin', gridX: 2, gridY: 8 }, { name: 'Player A', gridX: 8, gridY: 8 }],
+      placedItems: [{ name: 'Goblin', type: 'npc', gridX: 2, gridY: 7 }],
+    });
+
+    render(<MonsterCardModal {...goblinProps({ mapName: 'battle-arena' })} />);
+    await act(async () => {});
+    clickScimitarChip();
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    expect(rollAttack.mock.calls[0][2].forcedMode).toBe('disadvantage');
+    const [, entry] = lionAuraLogCalls()[0];
+    expect(entry.description).toBe(MEASURED_COPY);
+  });
+
+  // Post-delete face (CN re-demonstration): the active map was deleted
+  // (__map__ pointer → null) while the card still holds a stale positioned
+  // mapData snapshot — isWithinRange would return true without measuring, so
+  // the honest lenient tail must print despite positioned tokens in hand.
+  it('logs the lenient tail on the post-delete face (stale positioned mapData, no active map)', async () => {
+    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
+    mapsService.loadMapData.mockResolvedValue({
+      players: [{ name: 'ElderPaladin', gridX: 2, gridY: 8 }, { name: 'Player A', gridX: 8, gridY: 8 }],
+      placedItems: [{ name: 'Goblin', type: 'npc', gridX: 2, gridY: 7 }],
+    });
+
+    render(<MonsterCardModal {...goblinProps({ mapName: 'battle-arena' })} />);
+    await act(async () => {});
+    clickScimitarChip();
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    expect(lionAuraLogCalls()[0][1].description).toBe(LENIENT_COPY);
   });
 
   // 2026-11-03 QA backlog (multi-source disadvantage attribution): the aura
@@ -359,6 +414,43 @@ describe('resolveMonsterLionAura — lane census (mapData vs lenient skip)', () 
       campaignName: 'test-campaign',
       skipRangeCheck: true,
     });
+  });
+});
+
+// Unit pins for the honest-copy flag (2026-11-03 QA backlog): the branches
+// mirror rangeCheck.isWithinRange's own leniency fast-paths one-for-one.
+describe('lionProximityWasMeasured — measured-vs-lenient flag', () => {
+  const bearer = { name: 'ElderPaladin', gridX: 2, gridY: 8 };
+  const attacker = { name: 'Goblin', type: 'npc', gridX: 2, gridY: 7 };
+  const positionedMap = { players: [bearer], placedItems: [attacker] };
+
+  it('measured only when a map is active AND both tokens carry positions', () => {
+    runtimeState.__setActiveMapName('battle-arena');
+    expect(lionProximityWasMeasured({ mapData: positionedMap, monsterName: 'Goblin', bearerName: 'ElderPaladin' })).toBe(true);
+  });
+
+  it('lenient with no active map (post-delete/deactivated face, stale mapData)', () => {
+    runtimeState.__setActiveMapName(null);
+    expect(lionProximityWasMeasured({ mapData: positionedMap, monsterName: 'Goblin', bearerName: 'ElderPaladin' })).toBe(false);
+  });
+
+  it('lenient for a tokenless attacker (the skipRangeCheck cannot-gate face)', () => {
+    runtimeState.__setActiveMapName('battle-arena');
+    expect(lionProximityWasMeasured({ mapData: { players: [bearer], placedItems: [] }, monsterName: 'Goblin', bearerName: 'ElderPaladin' })).toBe(false);
+  });
+
+  it('lenient for a tokenless bearer (unplaced bearer cannot be measured)', () => {
+    runtimeState.__setActiveMapName('battle-arena');
+    expect(lionProximityWasMeasured({
+      mapData: { players: [{ name: 'ElderPaladin' }], placedItems: [attacker] },
+      monsterName: 'Goblin',
+      bearerName: 'ElderPaladin',
+    })).toBe(false);
+  });
+
+  it('lenient when the card holds no map snapshot at all', () => {
+    runtimeState.__setActiveMapName('battle-arena');
+    expect(lionProximityWasMeasured({ mapData: null, monsterName: 'Goblin', bearerName: 'ElderPaladin' })).toBe(false);
   });
 });
 

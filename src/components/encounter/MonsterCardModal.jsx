@@ -1179,13 +1179,39 @@ export function foldAuraDisadvantage(forcedMode, aura) {
   return forcedMode === 'advantage' ? 'normal' : 'disadvantage';
 }
 
-function logLionAuraApplied({ monsterName, actionName, bearerName, campaignName }) {
+// 2026-11-03 QA backlog (honest lenient-face copy): the aura log must not
+// claim "within 5 feet" when proximity was never MEASURED. Mirrors the exact
+// leniency branches of rangeCheck.isWithinRange (the gate the util used):
+// no active map (__map__ pointer — covers the post-delete/deactivated face),
+// or the attacker/bearer tokenless on the loaded mapData (covers the
+// skipRangeCheck cannot-gate face and gridless advisories). Only when both
+// tokens carry finite positions AND a map is active did the distance check
+// actually compare coordinates — every other face is house-law §44 leniency.
+// eslint-disable-next-line react-refresh/only-export-components
+export function lionProximityWasMeasured({ mapData, monsterName, bearerName }) {
+  if (!getRuntimeValue('__map__', 'activeMapName')) return false;
+  const tokens = [...(mapData?.players || []), ...(mapData?.placedItems || [])];
+  const hasPosition = name => {
+    const t = tokens.find(x => x.name === name);
+    return !!t && Number.isFinite(t.gridX) && Number.isFinite(t.gridY);
+  };
+  return hasPosition(monsterName) && hasPosition(bearerName);
+}
+
+function logLionAuraApplied({ monsterName, actionName, bearerName, campaignName, proximityMeasured }) {
+  // Measured face copy stays byte-identical (house law: honest adjacency rows
+  // keep their proven prose); the lenient face names the bearer's rage and
+  // admits the proximity was GM-enforced (advisory tone mirrors the
+  // "30-ft proximity GM-enforced (gridless advisory)" house-law family).
+  const clause = proximityMeasured
+    ? `within 5 feet of raging ${bearerName}`
+    : `rage aura of ${bearerName} applied — proximity unmeasured (no token) — GM-enforced`;
   addEntry(campaignName, {
     type: 'automation',
     automationType: 'lion_aura_disadvantage',
     characterName: monsterName,
     abilityName: actionName,
-    description: `${monsterName} has Disadvantage on ${actionName}: within 5 feet of raging ${bearerName} (Power of the Wilds — Lion).`,
+    description: `${monsterName} has Disadvantage on ${actionName}: ${clause} (Power of the Wilds — Lion).`,
     timestamp: Date.now(),
   }).catch((e) => { console.error('[MonsterCardModal] Error logging Lion aura disadvantage:', e); });
 }
@@ -2501,7 +2527,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const lionAura = hasLionBearerInScene({ mapData, campaignName })
       ? await resolveMonsterLionAura({ mapData, monsterName, target, campaignName })
         .then((aura) => {
-          if (aura) logLionAuraApplied({ monsterName, actionName: name, bearerName: aura.source, campaignName });
+          if (aura) logLionAuraApplied({
+            monsterName,
+            actionName: name,
+            bearerName: aura.source,
+            campaignName,
+            proximityMeasured: lionProximityWasMeasured({ mapData, monsterName, bearerName: aura.source }),
+          });
           return aura;
         })
         .catch((e) => { console.error('[MonsterCardModal] Error resolving Lion rage aura:', e); return null; })
