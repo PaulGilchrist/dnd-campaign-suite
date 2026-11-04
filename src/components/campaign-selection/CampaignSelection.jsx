@@ -93,6 +93,13 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // list in place with Retry (MapUnavailable "Check Again" pattern).
   const [foldersError, setFoldersError] = useState(null);
 
+  // One modal at a time: the New Campaign and seed modals each own a
+  // full-viewport .modal-overlay, and stacking two silently intercepts every
+  // click on the buried one. While any modal is open the quick-create buttons
+  // render disabled (visible not-allowed state) and the open handlers are
+  // guarded, so keyboard focus behind the overlay can never stack a second.
+  const modalOpen = showNewCampaignModal || seedPreset !== null;
+
   const loadCampaigns = useCallback(async () => {
     setLoading(true);
     try {
@@ -217,6 +224,10 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
     };
 
   const openNewCampaignModal = () => {
+      // Two modals never coexist: quick-create buttons are disabled while one
+      // is open, and this guard also blocks keyboard/programmatic activation
+      // (a stacked .modal-overlay silently intercepts every click).
+      if (modalOpen) return;
       setShowNewCampaignModal(true);
       setError(null);
   };
@@ -228,6 +239,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   };
 
   const openSeedModal = (presetKey) => {
+    if (modalOpen) return; // see openNewCampaignModal — no stacked overlays
     setSeedPreset(presetKey);
     setNewCampaignName(seededDefaultName(SEEDED_PRESETS[presetKey].prefix));
     setError(null);
@@ -298,14 +310,14 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
            </div>
          )}
          {isLocalhost && (
-           <button className="new-campaign-button" onClick={openNewCampaignModal}><i className="fas fa-plus"></i> New Campaign</button>
+           <button className="new-campaign-button" onClick={openNewCampaignModal} disabled={modalOpen}><i className="fas fa-plus"></i> New Campaign</button>
          )}
          {isLocalhost && Object.entries(SEEDED_PRESETS).map(([presetKey, cfg]) => (
            <button
              key={presetKey}
              className="new-campaign-button new-campaign-button--seeded"
              onClick={() => openSeedModal(presetKey)}
-             disabled={seeding}
+             disabled={modalOpen}
            >
              <i className={cfg.icon}></i> {cfg.button}
            </button>
