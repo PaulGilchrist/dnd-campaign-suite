@@ -233,6 +233,61 @@ export function erasesStoredPlayers(storedData, incomingData) {
     && !Array.isArray(incomingData?.players);
 }
 
+// players[] token-id normalization (backlog 2026-11-04 CQ): the editor keys
+// its token layer on `player.id` (Players.jsx) and the established token
+// hygiene is "id = lowercased name" (ElderPaladin → 'elderpaladin'). The
+// full-document save lanes used to persist id-less entries verbatim, and the
+// next editor open mounted with React duplicate-key errors (live-hit via the
+// API rig; GM import/clone paths can produce the same). One shared helper for
+// PUT and POST create, run BEFORE any disk write: an entry with no usable
+// string `id` is assigned its lowercased `name`, ids are made unique within
+// the document (the second — and any later — collision gains a `-2`, `-3`
+// suffix, so the duplicate-key error class is impossible after a successful
+// save), and an entry that already carries a valid, unused string `id` passes
+// through byte-unchanged. An entry from which no id can be derived (neither
+// valid `id` nor non-empty string `name`) is refused with the same plain-
+// English "Map save rejected: …" 400 tone as the players-clobber guard —
+// nothing is written. Returns { mapData, error }: the SAME object comes back
+// when nothing needed normalizing (echo lanes stay byte-identical).
+const hasPlayerId = (entry) => typeof entry?.id === 'string' && entry.id.trim() !== '';
+const playerName = (entry) => (typeof entry?.name === 'string' ? entry.name.trim() : '');
+
+export function normalizePlayerIds(mapData) {
+  const players = mapData?.players;
+  if (!Array.isArray(players) || players.length === 0) return { mapData, error: null };
+
+  const taken = new Set();
+  const uniqueId = (base) => {
+    let id = base;
+    let n = 2;
+    while (taken.has(id)) id = `${base}-${n++}`;
+    taken.add(id);
+    return id;
+  };
+
+  let changed = false;
+  const normalized = [];
+  for (let i = 0; i < players.length; i++) {
+    const entry = players[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return { mapData, error: `Map save rejected: every player token must carry an "id" or a "name" to derive one from — entry ${i} was ${rowKind(entry)}.` };
+    }
+    if (hasPlayerId(entry) && !taken.has(entry.id)) {
+      taken.add(entry.id);
+      normalized.push(entry);
+      continue;
+    }
+    if (!hasPlayerId(entry) && playerName(entry) === '') {
+      return { mapData, error: `Map save rejected: every player token must carry an "id" or a "name" to derive one from — entry ${i} has neither.` };
+    }
+    normalized.push({ ...entry, id: uniqueId(hasPlayerId(entry) ? entry.id : playerName(entry).toLowerCase()) });
+    changed = true;
+  }
+  return changed
+    ? { mapData: { ...mapData, players: normalized }, error: null }
+    : { mapData, error: null };
+}
+
 // Row-shape guard for the outdoor editor lanes (backlog 2026-11-02 BD): the
 // whole-document PUT happily accepted object rows in `rivers` before, and one
 // malformed row hard-locked the hex editor on EVERY later open — RiverLayer's
@@ -383,7 +438,17 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     ? buildOutdoorMapData(name, body)
     : buildIndoorMapData(name, body);
 
-  fs.writeFileSync(filePath, JSON.stringify(defaultMapData, null, 2));
+  // Same players[] token-id normalization as the PUT (shared helper, backlog
+  // 2026-11-04 CQ): a create body carrying an id-less (or name-less) player
+  // entry must never persist a document the editor mounts with duplicate
+  // keys. Refusal writes no file.
+  const normalizedCreate = normalizePlayerIds(defaultMapData);
+  if (normalizedCreate.error) {
+    console.log(`[maps] BLOCKED POST ${campaign} (create "${name}") — ${normalizedCreate.error}`);
+    return res.status(400).json({ error: normalizedCreate.error });
+  }
+
+  fs.writeFileSync(filePath, JSON.stringify(normalizedCreate.mapData, null, 2));
 
   // Broadcast maps list change (slug rides along so consumers of the raw
   // payload see the same handle the list route exposes)
@@ -444,9 +509,18 @@ router.put('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) => 
     return res.status(400).json({ error: rowsError });
   }
 
+  // players[] token-id normalization (backlog 2026-11-04 CQ) — BEFORE the
+  // write so the persisted document and the SSE echo below both carry the
+  // unique, lowercased-name ids the editor keys on.
+  const normalizedPlayers = normalizePlayerIds(req.body);
+  if (normalizedPlayers.error) {
+    console.log(`[maps] BLOCKED PUT ${campaign}/${fileName} — ${normalizedPlayers.error}`);
+    return res.status(400).json({ error: normalizedPlayers.error });
+  }
+
   const mapData = preserveAuthoredNames(
     storedData,
-    pruneRevealedToGrid(req.body)
+    pruneRevealedToGrid(normalizedPlayers.mapData)
   );
 
   if (!fs.existsSync(mapsDir)) {

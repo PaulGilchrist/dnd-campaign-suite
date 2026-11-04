@@ -698,7 +698,9 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
         expect(mapData.fog).toEqual([{ cells: [[0, 0, 5, 5]] }]);
         expect(mapData.paintCells).toEqual([{ x: 1, y: 1, color: 'red' }]);
         expect(mapData.items).toEqual([{ type: 'token' }]);
-        expect(mapData.players).toEqual([{ name: 'Hero', x: 0, y: 0 }]);
+        // id-less player entry is normalized on create (backlog 2026-11-04 CQ):
+        // id = lowercased name, so the editor never mounts duplicate keys.
+        expect(mapData.players).toEqual([{ name: 'Hero', x: 0, y: 0, id: 'hero' }]);
     });
 
     it('should preserve parentHex, parentTerrain, bgFill, generationMode, description, seed on indoor maps', async () => {
@@ -1140,8 +1142,9 @@ describe('maps - PUT authored-name preservation guard', () => {
         const saved = JSON.parse(MOCK_FS.get(`${mapsDir}/battle-arena.json`));
         expect(saved.displayName).toBe('Battle Arena');
         expect(saved.name).toBe('Battle Arena');
-        // positional data DID update from the body
-        expect(saved.players).toEqual([{ name: 'Astar The Redeemed', gridX: 16, gridY: 9 }]);
+        // positional data DID update from the body (id-less entry normalized
+        // to lowercased name — backlog 2026-11-04 CQ)
+        expect(saved.players).toEqual([{ name: 'Astar The Redeemed', gridX: 16, gridY: 9, id: 'astar the redeemed' }]);
 
         // Maps list display string unchanged
         const list = await request(app).get('/api/campaigns/test-campaign/maps');
