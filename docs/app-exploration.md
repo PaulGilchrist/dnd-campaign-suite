@@ -108,7 +108,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- (CP 2026-11-04) Quick-create seed modals (`CampaignSelection.jsx`) render `.modal-overlay/.modal-content` WITHOUT `role=dialog` (a `[role=dialog]` locator times out; typing needs the class path), while the newer `DeleteConfirmModal` rides the proper `role=dialog` tier. Add `role="dialog"` + `aria-modal`/labelledby to the seed modal for a11y + selector stability.
 - (CP 2026-11-04) Starter zero-char wizard auto-open can paint ~2 s AFTER the checklist is already interactive; sidebar clicks in between are silently swallowed by the overlay (Playwright interception; human users get a dead-feeling sidebar). Consider opening the wizard in the same paint as the checklist, or dimming the sidebar until the decision.
 - (CP 2026-11-04) Admin campaign-delete success now reloads to selection with NO success feedback (old native `Campaign deleted successfully.` alert retired by bfdd2e7ef); the vanished row is the only signal. A toast/inline note on the selection page ("qa-arena deleted") would close the loop.
 
