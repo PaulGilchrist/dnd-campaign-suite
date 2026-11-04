@@ -1198,6 +1198,21 @@ export function lionProximityWasMeasured({ mapData, monsterName, bearerName }) {
   return hasPosition(monsterName) && hasPosition(bearerName);
 }
 
+// 2026-11-04 CP backlog (honest lenient tail fork): the lenient face must name
+// the REAL blocker. No active map (`__map__` — the same gate
+// lionProximityWasMeasured reads at its head) means proximity could never be
+// compared even with positioned tokens in a stale snapshot → use the PC-lane
+// twin's word "(gridless)" (contextBuilder-sync auraSkipRangeCheck forks,
+// 15fcfebf3/2cd75b9de). The "(no token)" word stays reserved for the true
+// tokenless face: map ACTIVE but the attacker/bearer absent from the loaded
+// snapshot. Exported so the unit pins can drive both forks directly.
+// eslint-disable-next-line react-refresh/only-export-components
+export function lionProximityUnmeasuredTail() {
+  return getRuntimeValue('__map__', 'activeMapName')
+    ? 'proximity unmeasured (no token)'
+    : 'proximity unmeasured (gridless)';
+}
+
 function logLionAuraApplied({ monsterName, actionName, bearerName, campaignName, proximityMeasured }) {
   // Measured face copy stays byte-identical (house law: honest adjacency rows
   // keep their proven prose); the lenient face names the bearer's rage and
@@ -1205,7 +1220,7 @@ function logLionAuraApplied({ monsterName, actionName, bearerName, campaignName,
   // "30-ft proximity GM-enforced (gridless advisory)" house-law family).
   const clause = proximityMeasured
     ? `within 5 feet of raging ${bearerName}`
-    : `rage aura of ${bearerName} applied — proximity unmeasured (no token) — GM-enforced`;
+    : `rage aura of ${bearerName} applied — ${lionProximityUnmeasuredTail()} — GM-enforced`;
   addEntry(campaignName, {
     type: 'automation',
     automationType: 'lion_aura_disadvantage',
@@ -1233,9 +1248,12 @@ export function buildLionAuraReason(aura, proximityMeasured = true) {
   // tokenless attacker or bearer — the same seam lionProximityWasMeasured and
   // the log row name) must NOT assert "within 5 ft": proximity was never
   // compared, so the chip admits GM-enforcement like the log's lenient tail.
+  // The tail forks on the real blocker (lionProximityUnmeasuredTail):
+  // "(gridless)" with no active map, "(no token)" on an active but tokenless
+  // map — same seam, same words as the PC-lane twin.
   return proximityMeasured
     ? `Lion rage aura — within 5 ft of raging ${aura.source}`
-    : `Lion rage aura — raging ${aura.source} — proximity unmeasured (no token) — GM-enforced`;
+    : `Lion rage aura — raging ${aura.source} — ${lionProximityUnmeasuredTail()} — GM-enforced`;
 }
 
 // The aura's reason for THIS press, or null when it is not a live

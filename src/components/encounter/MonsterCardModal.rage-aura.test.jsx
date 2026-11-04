@@ -11,7 +11,7 @@
 
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage, buildLionAuraReason, lionAuraDisadvantageReason, buildDisadvantageReasons, lionProximityWasMeasured } from './MonsterCardModal.jsx';
+import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage, buildLionAuraReason, lionAuraDisadvantageReason, buildDisadvantageReasons, lionProximityWasMeasured, lionProximityUnmeasuredTail } from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -177,12 +177,18 @@ function lionAuraLogCalls() {
 // 2026-11-03 QA backlog (honest lenient-face copy): the two pinned description
 // faces — measured adjacency keeps the proven "within 5 feet" prose
 // byte-identical; the cannot-gate face admits the proximity was never measured.
+// 2026-11-04 CP backlog: the LENIENT tail forks on the real blocker (same
+// activeMapName seam as lionProximityWasMeasured) — "(gridless)" with no
+// active map (PC-lane twin word), "(no token)" reserved for the true
+// tokenless face (map ACTIVE, attacker/bearer absent from the snapshot).
 const MEASURED_COPY = 'Goblin has Disadvantage on Scimitar: within 5 feet of raging ElderPaladin (Power of the Wilds — Lion).';
-const LENIENT_COPY = 'Goblin has Disadvantage on Scimitar: rage aura of ElderPaladin applied — proximity unmeasured (no token) — GM-enforced (Power of the Wilds — Lion).';
+const GRIDLESS_COPY = 'Goblin has Disadvantage on Scimitar: rage aura of ElderPaladin applied — proximity unmeasured (gridless) — GM-enforced (Power of the Wilds — Lion).';
+const NO_TOKEN_COPY = 'Goblin has Disadvantage on Scimitar: rage aura of ElderPaladin applied — proximity unmeasured (no token) — GM-enforced (Power of the Wilds — Lion).';
 // 2026-11-04 backlog parity: the CHIP copies fork the same way (wolf pattern
 // 15fcfebf3) — measured stays byte-identical, lenient admits GM-enforcement.
 const MEASURED_CHIP = 'Lion rage aura — within 5 ft of raging ElderPaladin';
-const LENIENT_CHIP = 'Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced';
+const GRIDLESS_CHIP = 'Lion rage aura — raging ElderPaladin — proximity unmeasured (gridless) — GM-enforced';
+const NO_TOKEN_CHIP = 'Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -232,7 +238,31 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
     expect(entry.abilityName).toBe('Scimitar');
     // 2026-11-03 QA backlog: gridless face never measured proximity — the log
     // must carry the honest GM-enforced tail, never the "within 5 feet" claim.
-    expect(entry.description).toBe(LENIENT_COPY);
+    // 2026-11-04 CP fork: with no active map the tail names the MAP blocker
+    // ("(gridless)", PC-lane twin word), never "(no token)".
+    expect(entry.description).toBe(GRIDLESS_COPY);
+  });
+
+  // 2026-11-04 CP backlog: true tokenless face — the map is ACTIVE but the
+  // attacker token is stripped from placedItems → the blocker IS the missing
+  // token, so the copy stays byte-identical to the pre-fork lenient tail.
+  it('keeps "(no token)" on the true tokenless face (active map, attacker stripped)', async () => {
+    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
+    runtimeState.__setActiveMapName('battle-arena');
+    mapsService.loadMapData.mockResolvedValue({
+      players: [{ name: 'ElderPaladin', gridX: 2, gridY: 8 }, { name: 'Player A', gridX: 8, gridY: 8 }],
+      placedItems: [],
+    });
+
+    render(<MonsterCardModal {...goblinProps({ mapName: 'battle-arena' })} />);
+    await act(async () => {});
+    clickScimitarChip();
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    const [, , options] = rollAttack.mock.calls[0];
+    expect(options.forcedMode).toBe('disadvantage');
+    expect(options.advantageReason).toBe(NO_TOKEN_CHIP);
+    expect(lionAuraLogCalls()[0][1].description).toBe(NO_TOKEN_COPY);
   });
 
   // Measured face (2026-11-03 QA backlog): active map + both attacker and
@@ -260,6 +290,8 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
   // (__map__ pointer → null) while the card still holds a stale positioned
   // mapData snapshot — isWithinRange would return true without measuring, so
   // the honest lenient tail must print despite positioned tokens in hand.
+  // 2026-11-04 CP fork: tokens ARE in the doc → the witness face — the tail
+  // must blame the map ("(gridless)"), never claim "(no token)".
   it('logs the lenient tail on the post-delete face (stale positioned mapData, no active map)', async () => {
     getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
     mapsService.loadMapData.mockResolvedValue({
@@ -272,7 +304,8 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
     clickScimitarChip();
 
     await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-    expect(lionAuraLogCalls()[0][1].description).toBe(LENIENT_COPY);
+    expect(lionAuraLogCalls()[0][1].description).toBe(GRIDLESS_COPY);
+    expect(lionAuraLogCalls()[0][1].description).not.toContain('(no token)');
   });
 
   // 2026-11-03 QA backlog (multi-source disadvantage attribution): the aura
@@ -282,7 +315,8 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
   // advantageReason channel (2cd75b9de PC-lane pattern) so a SINGLE-source
   // aura press prints `Disadv (Lion rage aura — …)` instead of the generic
   // `Disadv (conditions)`, and the log row stays consistent with the chip.
-  // This press is the gridless face — the copy carries the honest tail.
+  // This press is the gridless face — the copy carries the honest tail, forked
+  // to blame the inactive map (2026-11-04 CP).
   it('threads the single aura reason into the roll options (no range source)', async () => {
     getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
 
@@ -291,8 +325,8 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
 
     await waitFor(() => expect(rollAttack).toHaveBeenCalled());
     const [, , options] = rollAttack.mock.calls[0];
-    expect(options.disadvantageReasons).toEqual([LENIENT_CHIP]);
-    expect(options.advantageReason).toBe(LENIENT_CHIP);
+    expect(options.disadvantageReasons).toEqual([GRIDLESS_CHIP]);
+    expect(options.advantageReason).toBe(GRIDLESS_CHIP);
     // Exactly ONE aura log row per press (acceptance: machine log unchanged).
     expect(lionAuraLogCalls()).toHaveLength(1);
   });
@@ -516,12 +550,24 @@ describe('buildLionAuraReason / buildDisadvantageReasons — multi-source attrib
   // 2026-11-04 backlog parity (wolf fork 15fcfebf3 pattern): the chip copy
   // forks on proximityMeasured exactly like the log row — the lenient face
   // never claims "within 5 ft"; measured (and the flag-less legacy default)
-  // stays byte-identical.
+  // stays byte-identical. 2026-11-04 CP: the lenient tail forks on the real
+  // blocker — no active map → "(gridless)"; active map → "(no token)".
   it('forks the chip copy: lenient admits unmeasured proximity, measured stays byte-identical', () => {
-    expect(buildLionAuraReason(aura, false)).toBe(LENIENT_CHIP);
+    runtimeState.__setActiveMapName(null);
+    expect(buildLionAuraReason(aura, false)).toBe(GRIDLESS_CHIP);
+    runtimeState.__setActiveMapName('battle-arena');
+    expect(buildLionAuraReason(aura, false)).toBe(NO_TOKEN_CHIP);
     expect(buildLionAuraReason(aura, true)).toBe(MEASURED_CHIP);
     expect(buildLionAuraReason(aura)).toBe(MEASURED_CHIP);
     expect(buildLionAuraReason(null, false)).toBeNull();
+  });
+
+  // Direct pin of the seam helper both lenient surfaces share.
+  it('lionProximityUnmeasuredTail names the real blocker on each lenient face', () => {
+    runtimeState.__setActiveMapName(null);
+    expect(lionProximityUnmeasuredTail()).toBe('proximity unmeasured (gridless)');
+    runtimeState.__setActiveMapName('battle-arena');
+    expect(lionProximityUnmeasuredTail()).toBe('proximity unmeasured (no token)');
   });
 
   it('lionAuraDisadvantageReason gates on a live disadvantage source', () => {
@@ -533,11 +579,20 @@ describe('buildLionAuraReason / buildDisadvantageReasons — multi-source attrib
 
   // Priority Target 1 audit face: band measured but aura proximity unmeasured
   // (e.g. bearer tokenless on an active map, or stale positioned snapshot
-  // after map delete) → the stacked aura chip must carry the honest tail.
-  it('stacks the LENIENT aura chip beside a measured band reason when proximity was unmeasured', () => {
+  // after map delete) → the stacked aura chip must carry the honest tail,
+  // forked to the blocker (2026-11-04 CP). The band chip stays unchanged.
+  it('stacks the gridless LENIENT aura chip beside a measured band reason (no active map)', () => {
+    runtimeState.__setActiveMapName(null);
     expect(buildDisadvantageReasons({
       foldedMode: 'disadvantage', rangeReason: bandReason, isAutoMiss: true, rangeForcedMode: null, lionAura: aura, lionProximityMeasured: false,
-    })).toEqual([bandReason, LENIENT_CHIP]);
+    })).toEqual([bandReason, GRIDLESS_CHIP]);
+  });
+
+  it('stacks the no-token LENIENT aura chip beside a measured band reason (active map, tokenless)', () => {
+    runtimeState.__setActiveMapName('battle-arena');
+    expect(buildDisadvantageReasons({
+      foldedMode: 'disadvantage', rangeReason: bandReason, isAutoMiss: true, rangeForcedMode: null, lionAura: aura, lionProximityMeasured: false,
+    })).toEqual([bandReason, NO_TOKEN_CHIP]);
   });
 
   it('stacks the range band FIRST, then the aura, when both apply (miss face)', () => {
