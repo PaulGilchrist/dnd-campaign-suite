@@ -207,6 +207,27 @@ export const saveOverlayFiles = () => {
 }
 
 /**
+ * Write-time observability for the generic change-data store
+ * (backlog 2026-11-03 CN): a typo'd top-level key (e.g. "WingedKobold" for
+ * "Winged Kobold") used to be silently promoted to a phantom bucket, swept
+ * only by admin clear. Every accepting write lane (wildcard per-key/full-store
+ * POST, positioning, music, active-map stamp, pipeline event) calls this with
+ * the key immediately BEFORE the assignment — if the campaign's in-memory
+ * store has never held the key, surface it in the server log at creation
+ * time. Warn-only by design: an allowlist/400 would break legitimate first
+ * writes (fresh character buckets, rig keys like combatSummary/__map__), so
+ * the write always proceeds. Since the key becomes seen the moment it is
+ * created, repeated writes never re-warn, and boot hydration (readFile) never
+ * calls this — loading persisted data stays silent.
+ */
+export const warnIfNewTopLevelKey = (campaign, key) => {
+    const store = characterChangeData.get(campaign);
+    if (!store || !Object.prototype.hasOwnProperty.call(store, key)) {
+        console.warn(`[changeData] new top-level key "${key}"`);
+    }
+};
+
+/**
  * Mark a campaign as having unsaved changes (debounced persist)
  */
 export const markDirty = (_campaign) => {

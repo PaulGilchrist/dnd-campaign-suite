@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import lodash from 'lodash';
-import { publish, activeMaps, characterChangeData, markDirty } from '../utils/changeData.js';
+import { publish, activeMaps, characterChangeData, markDirty, warnIfNewTopLevelKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignMapsDir, normalizeMapFile } from '../utils/campaignPaths.js';
 
@@ -90,6 +90,7 @@ function stampActiveMapContext(campaign, mapKey) {
     characterChangeData.set(campaign, {});
   }
   const value = { activeMapName: mapKey };
+  warnIfNewTopLevelKey(campaign, '__map__');
   characterChangeData.get(campaign).__map__ = value;
   markDirty(campaign);
   publish(`change-${campaign}-__map__`, value, campaign);

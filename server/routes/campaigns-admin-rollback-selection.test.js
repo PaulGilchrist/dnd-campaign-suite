@@ -57,6 +57,7 @@ vi.mock('../utils/campaignPaths.js', () => ({
 }));
 
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     characterChangeData: new Map(),
     spellOverlayData: new Map(),
     activeMaps: new Map(),

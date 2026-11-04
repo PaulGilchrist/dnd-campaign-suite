@@ -30,6 +30,7 @@ vi.mock('../utils/imageUtils.js', () => ({
 }));
 
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
     removeChangeDataKey: vi.fn(),
 }));

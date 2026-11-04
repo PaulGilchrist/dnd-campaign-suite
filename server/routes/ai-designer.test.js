@@ -33,6 +33,7 @@ vi.mock('../services/ai/authoring/designNotes.js', () => ({
 
 const store = new Map();
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     characterChangeData: { get: (c) => store.get(c) },
 }));
 vi.mock('../log.js', () => ({ addEntry: vi.fn() }));

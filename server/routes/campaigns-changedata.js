@@ -1,5 +1,5 @@
 import express from 'express';
-import { publish, characterChangeData, markDirty } from '../utils/changeData.js';
+import { publish, characterChangeData, markDirty, warnIfNewTopLevelKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { resolveOverrideTitles } from '../utils/resolveTrackTitles.js';
 import { validateRuntimeWrite } from '../validation/keyValidators.js';
@@ -44,6 +44,7 @@ router.post('/api/campaigns/:campaign/positioning', asyncHandler((req, res) => {
         characterChangeData.set(campaign, {});
     }
 
+    warnIfNewTopLevelKey(campaign, 'positioning');
     characterChangeData.get(campaign).positioning = positioning;
     markDirty(campaign);
 
@@ -119,6 +120,7 @@ router.post('/api/campaigns/:campaign/music', asyncHandler(async (req, res) => {
     if (!characterChangeData.has(campaign)) {
         characterChangeData.set(campaign, {});
     }
+    warnIfNewTopLevelKey(campaign, 'music');
     characterChangeData.get(campaign).music = merged;
     markDirty(campaign);
 
@@ -261,6 +263,7 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     // without a normalized value store the raw payload exactly as before.
     const storedValue = 'value' in validation ? validation.value : propertyValue;
 
+    warnIfNewTopLevelKey(campaign, key);
     characterChangeData.get(campaign)[key] = storedValue;
     markDirty(campaign);
 

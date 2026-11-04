@@ -38,6 +38,7 @@ vi.mock('../utils/campaignPaths.js', () => ({
 }));
 
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
     activeMaps: {
         get: vi.fn((c) => MOCK_ACTIVE.get(c)),

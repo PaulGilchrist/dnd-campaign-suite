@@ -20,6 +20,7 @@ vi.mock('../utils/campaignPaths.js', () => ({
     normalizeMapFile: vi.fn((name) => (name.endsWith('.json') ? name : `${name}.json`)),
 }));
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
     activeMaps: new Map(),
     characterChangeData: new Map(),

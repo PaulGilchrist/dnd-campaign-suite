@@ -14,6 +14,7 @@ import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
 
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     characterChangeData: new Map(),
     publish: vi.fn(),
     saveFile: vi.fn(),

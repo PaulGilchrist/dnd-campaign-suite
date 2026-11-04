@@ -35,6 +35,7 @@ vi.mock('../utils/encounterUtils.js', () => ({
 
 // Mock changeData
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
 }));
 

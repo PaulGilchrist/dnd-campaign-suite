@@ -68,6 +68,7 @@ vi.mock('../utils/campaignPaths.js', () => ({
 }));
 
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn((key, data) => {
         publishedEvents.push({ key, data });
     }),

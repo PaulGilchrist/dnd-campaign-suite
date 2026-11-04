@@ -34,6 +34,7 @@ vi.mock('../utils/campaignPaths.js', () => ({
 
 const publishSpy = vi.hoisted(() => vi.fn());
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: publishSpy,
 }));
 

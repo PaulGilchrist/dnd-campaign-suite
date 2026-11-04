@@ -26,6 +26,7 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
 }));
 

@@ -28,6 +28,7 @@ vi.mock('../../../utils/campaignPaths.js', () => ({
 }));
 
 vi.mock('../../../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
     markDirty: vi.fn(),
     activeMaps: new Map(),

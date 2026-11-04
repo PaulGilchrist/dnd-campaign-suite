@@ -29,6 +29,7 @@ vi.mock('../../../utils/campaignPaths.js', () => ({
 
 // routes/maps.js loads for its single toKebabCase implementation.
 vi.mock('../../../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn(),
     markDirty: vi.fn(),
     activeMaps: new Map(),

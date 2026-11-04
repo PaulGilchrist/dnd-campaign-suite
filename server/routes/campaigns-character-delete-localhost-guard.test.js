@@ -70,6 +70,7 @@ vi.mock('../utils/imageUtils.js', () => ({
 let publishedEvents = [];
 let removedKeys = [];
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: vi.fn((key, data) => { publishedEvents.push({ key, data }); }),
     removeChangeDataKey: vi.fn((campaign, name) => { removedKeys.push(`${campaign}/${name}`); }),
 }));

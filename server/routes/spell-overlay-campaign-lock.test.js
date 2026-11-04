@@ -13,6 +13,7 @@ import { setCampaignLock } from '../utils/campaignLock.js';
 
 // Mock the store module so the route shares these instances and no disk/debounce side-effects fire.
 vi.mock('../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     characterChangeData: new Map(),
     spellOverlayData: new Map(),
     activeMaps: new Map(),

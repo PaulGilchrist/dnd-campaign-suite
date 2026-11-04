@@ -1,5 +1,5 @@
 import express from 'express';
-import { publish, characterChangeData, markDirty } from '../utils/changeData.js';
+import { publish, characterChangeData, markDirty, warnIfNewTopLevelKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -28,10 +28,12 @@ router.post('/api/campaigns/:campaign/pipeline-event', asyncHandler((req, res) =
     }
 
     const storedData = data === undefined ? {} : data;
-    characterChangeData.get(campaign)[`pipeline-${campaign}-${key}`] = storedData;
+    const storedKey = `pipeline-${campaign}-${key}`;
+    warnIfNewTopLevelKey(campaign, storedKey);
+    characterChangeData.get(campaign)[storedKey] = storedData;
     markDirty(campaign);
 
-    publish(`pipeline-${campaign}-${key}`, storedData, campaign);
+    publish(storedKey, storedData, campaign);
 
     res.json({ message: 'Pipeline event recorded' });
 }));

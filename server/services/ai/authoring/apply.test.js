@@ -27,6 +27,7 @@ vi.mock('../../../utils/campaignPaths.js', () => ({
 
 const publish = vi.fn();
 vi.mock('../../../utils/changeData.js', () => ({
+    warnIfNewTopLevelKey: vi.fn(),
     publish: (...args) => publish(...args),
     saveFile: vi.fn(),
 }));
