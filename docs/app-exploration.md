@@ -87,7 +87,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- **[2026-11-04 CO] Admin typed-name delete still rides native prompt+confirm+confirm+alert:** the map/POI/overlay destructive lanes moved to the role=dialog tier (`useDeleteRequest`/`DeleteConfirmModal`, §258), but campaign delete's typed-confirmation is a raw `window.prompt` — invisible to a11y, and the dialog chain wedges Playwright `browser_run_code_unsafe` (every call aborts "does not handle the modal state" until drained). Migrate to a DeleteConfirmModal with typed-name input + single confirm; keep the mismatch alert as inline copy.
 - **[2026-11-04 CO] Charger/variant chooser overlay: container-level dismiss click can SELECT an option:** while flushing a hitting sheet press, an `el.click()` on the Charge Attack `.popup-overlay` container landed the first option (STR save prompt fired) instead of dismissing — backdrop handling should ignore clicks that land on option hit areas (or require the explicit Cancel/Skip buttons). Cheap first look: the chooser's overlay onClick in `DiceRollResult`/ChargeBonusOffer chain.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

@@ -1,26 +1,26 @@
 // @maintained-by-ai
 /**
- * Behavior tests for the "Delete Campaign" flow (handleDeleteCampaign).
+ * Behavior tests for the "Delete Campaign" flow (handleDeleteConfirm).
+ *
+ * Lane migrated off the native prompt→confirm→confirm→alert chain to the
+ * shared DeleteConfirmModal role="dialog" tier (backlog 2026-11-04 CO):
+ * the typed-name gate lives INSIDE the dialog, there is ONE confirm button,
+ * and mismatch/failure copy is inline (role="alert") — never a native
+ * prompt/confirm/alert. OWNED here: arm → type → gate → DELETE semantics;
+ * the dialog chrome/focus trap itself stays pinned by
+ * common/DeleteConfirmModal.test.jsx.
  *
  * Safety: fetch is stubbed in beforeEach and restored in afterEach, so no
  * DELETE can ever reach a live server. Only test-campaign (and a display-only
  * variant used strictly to exercise exact-name matching and URL encoding) is
  * ever passed to the component.
- *
- * Coverage map — each block is one distinct safety gate or outcome branch:
- *  - prompt: dismissed (silent abort) vs. non-exact input (empty / casing /
- *    whitespace) — each guards a different kind of accidental leniency
- *  - escalating confirms: decline at WARNING vs. decline at FINAL WARNING
- *  - success: exactly one DELETE to the URL-encoded endpoint, success alert,
- *    reload — only after every gate passes
- *  - failure: server error message, generic fallback, network rejection
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
 const CAMPAIGN = 'test-campaign';
-const MISMATCH_ALERT = 'Campaign name did not match. Deletion cancelled.';
+const MISMATCH_COPY = 'Campaign name did not match. Deletion cancelled.';
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
@@ -46,8 +46,9 @@ describe('CampaignAdmin - Delete Campaign', () => {
             fetch: global.fetch,
             location: window.location,
         };
-        // Safe defaults: the user has NOT consented to anything yet, so a test
-        // that forgets to answer a dialog can never trigger a real deletion.
+        // Every native dialog channel is spied so a regression back to
+        // prompt/confirm/alert fails, and a test that forgets consent can
+        // never trigger a real deletion (fetch is stubbed anyway).
         window.prompt = vi.fn();
         window.confirm = vi.fn(() => false);
         window.alert = vi.fn();
@@ -76,13 +77,23 @@ describe('CampaignAdmin - Delete Campaign', () => {
         render(<CampaignAdmin {...createDefaultProps(props)} />);
 
     const clickDeleteCampaign = () =>
-        fireEvent.click(screen.getByRole('button', { name: /delete campaign/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete Campaign' }));
 
-    // Walk the user through the safety gauntlet: type the name in the prompt,
-    // then answer the escalating WARNING / FINAL WARNING confirmations.
-    const consent = ({ name = CAMPAIGN, confirms = [true, true] } = {}) => {
-        window.prompt.mockReturnValueOnce(name);
-        confirms.forEach((answer) => window.confirm.mockReturnValueOnce(answer));
+    const openDeleteModal = (props = {}) => {
+        renderCampaignAdmin(props);
+        clickDeleteCampaign();
+        return screen.getByRole('dialog', { name: 'Delete Campaign' });
+    };
+
+    const typedInput = () =>
+        screen.getByLabelText(/Type the exact campaign name/i);
+
+    const clickConfirm = () =>
+        fireEvent.click(screen.getByRole('button', { name: `Delete "${CAMPAIGN}"` }));
+
+    const typeAndConfirm = (typed) => {
+        fireEvent.change(typedInput(), { target: { value: typed } });
+        clickConfirm();
     };
 
     // The view GETs /admin/snapshots on mount — scope fetch assertions to DELETEs.
@@ -101,86 +112,115 @@ describe('CampaignAdmin - Delete Campaign', () => {
         });
     };
 
-    const openAndClickDelete = () => {
-        renderCampaignAdmin();
-        clickDeleteCampaign();
+    const expectNoNativeDialogs = () => {
+        expect(window.prompt).not.toHaveBeenCalled();
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(window.alert).not.toHaveBeenCalled();
     };
 
-    describe('exact-name prompt', () => {
-        it.each([
-            { typed: null, label: 'dismissed', alert: null },
-            { typed: '', label: 'empty', alert: MISMATCH_ALERT },
-            { typed: 'Test-Campaign', label: 'typed with different casing', alert: MISMATCH_ALERT },
-            { typed: ` ${CAMPAIGN} `, label: 'padded with spaces', alert: MISMATCH_ALERT },
-        ])('aborts when the prompt is $label', ({ typed, alert }) => {
-            window.prompt.mockReturnValueOnce(typed);
-            openAndClickDelete();
+    const waitForDeletion = async (expectedUrl = `/api/campaigns/${CAMPAIGN}`) => {
+        await waitFor(() => {
+            expect(deleteRequests()).toHaveLength(1);
+        }, WAIT_OPTIONS);
+        expect(fetchSpy).toHaveBeenCalledWith(expectedUrl, { method: 'DELETE' });
+        await waitFor(() => {
+            expect(window.location.reload).toHaveBeenCalledTimes(1);
+        }, WAIT_OPTIONS);
+        expectNoNativeDialogs();
+    };
 
-            expect(window.prompt).toHaveBeenCalledWith(
-                `Type the exact campaign name to confirm deletion of "${CAMPAIGN}":`
+    describe('role=dialog modal', () => {
+        it('opens a labelled dialog with the typed-name input and exactly one destructive confirm', () => {
+            openDeleteModal();
+            const dialog = screen.getByRole('dialog', { name: 'Delete Campaign' });
+            expect(dialog).toHaveAttribute('aria-modal', 'true');
+            expect(dialog).toHaveTextContent(
+                `This will permanently delete the entire campaign '${CAMPAIGN}'`
             );
-            if (alert) {
-                expect(window.alert).toHaveBeenCalledWith(alert);
-            } else {
-                expect(window.alert).not.toHaveBeenCalled();
-            }
-            expect(window.confirm).not.toHaveBeenCalled();
-            expect(deleteRequests()).toHaveLength(0);
-            expect(window.location.reload).not.toHaveBeenCalled();
+            expect(typedInput()).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            // ONE destructive confirm inside the dialog (the trigger button
+            // behind the backdrop is not part of the dialog).
+            expect(
+                within(dialog).getAllByRole('button').map((b) => b.textContent.trim())
+            ).toEqual(['Cancel', `Delete "${CAMPAIGN}"`]);
+            expectNoNativeDialogs();
         });
     });
 
-    describe('escalating confirmations', () => {
+    describe('exact-name gate', () => {
         it.each([
-            { confirms: [false], lastWarning: 'permanently delete the entire campaign' },
-            { confirms: [true, false], lastWarning: 'FINAL WARNING' },
-        ])('aborts when the user declines at the last confirmation shown', ({ confirms, lastWarning }) => {
-            consent({ confirms });
-            openAndClickDelete();
+            { typed: '', label: 'left empty' },
+            { typed: 'Test-Campaign', label: 'typed with different casing' },
+            { typed: ` ${CAMPAIGN} `, label: 'padded with spaces' },
+        ])('shows inline copy and keeps the dialog open when the name is $label', ({ typed }) => {
+            openDeleteModal();
+            typeAndConfirm(typed);
 
-            expect(window.confirm).toHaveBeenCalledTimes(confirms.length);
-            expect(window.confirm).toHaveBeenLastCalledWith(
-                expect.stringContaining(lastWarning)
-            );
-            expect(window.alert).not.toHaveBeenCalled();
+            expect(screen.getByRole('alert')).toHaveTextContent(MISMATCH_COPY);
+            expect(screen.getByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
             expect(deleteRequests()).toHaveLength(0);
             expect(window.location.reload).not.toHaveBeenCalled();
+            expectNoNativeDialogs();
+        });
+
+        it('recovers: a mismatch followed by the exact name deletes', async () => {
+            openDeleteModal();
+            typeAndConfirm('wrong-name');
+            expect(screen.getByRole('alert')).toHaveTextContent(MISMATCH_COPY);
+
+            typeAndConfirm(CAMPAIGN);
+            await waitForDeletion();
+        });
+    });
+
+    describe('cancel affordance', () => {
+        it('dismisses the dialog with zero deletion and no reload', () => {
+            openDeleteModal();
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+            expect(screen.queryByRole('dialog', { name: 'Delete Campaign' })).not.toBeInTheDocument();
+            expect(deleteRequests()).toHaveLength(0);
+            expect(window.location.reload).not.toHaveBeenCalled();
+            expectNoNativeDialogs();
         });
     });
 
     describe('DELETE request', () => {
-        it.each([
-            { name: CAMPAIGN, url: `/api/campaigns/${CAMPAIGN}` },
-            { name: 'test campaign/1', url: '/api/campaigns/test%20campaign%2F1' },
-        ])('sends exactly one DELETE to $url and reloads only after every gate passes', async ({ name, url }) => {
-            consent({ name });
-            renderCampaignAdmin({ campaignName: name });
-            clickDeleteCampaign();
-
-            await waitFor(() => {
-                expect(deleteRequests()).toHaveLength(1);
-            }, WAIT_OPTIONS);
-            expect(fetchSpy).toHaveBeenCalledWith(url, { method: 'DELETE' });
-            expect(window.alert).toHaveBeenCalledWith('Campaign deleted successfully.');
-            expect(window.location.reload).toHaveBeenCalledTimes(1);
+        it('sends exactly one DELETE and reloads after the exact name is confirmed', async () => {
+            openDeleteModal();
+            typeAndConfirm(CAMPAIGN);
+            await waitForDeletion();
         });
 
+        it('URL-encodes campaign names with reserved characters', async () => {
+            const name = 'test campaign/1';
+            openDeleteModal({ campaignName: name });
+            fireEvent.change(typedInput(), { target: { value: name } });
+            fireEvent.click(screen.getByRole('button', { name: `Delete "${name}"` }));
+            await waitForDeletion('/api/campaigns/test%20campaign%2F1');
+        });
+    });
+
+    describe('failure lanes', () => {
         it.each([
             { label: 'server error message', response: jsonResponse(false, { error: 'Campaign not found' }), message: 'Campaign not found' },
             { label: 'generic fallback', response: jsonResponse(false, {}), message: 'Unknown error' },
             { label: 'network rejection', error: new Error('Network failed'), message: 'Network failed' },
-        ])('alerts "$message" without reloading on $label', async ({ response, error, message }) => {
-            consent();
+        ])('shows "$message" inline without reloading on $label', async ({ response, error, message }) => {
+            openDeleteModal();
             stubDeleteOutcome({ response, error });
-            openAndClickDelete();
+            typeAndConfirm(CAMPAIGN);
 
             await waitFor(() => {
-                expect(window.alert).toHaveBeenCalledWith(
+                expect(screen.getByRole('alert')).toHaveTextContent(
                     `Failed to delete campaign: ${message}`
                 );
             }, WAIT_OPTIONS);
+            expect(screen.getByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
             expect(deleteRequests()).toHaveLength(1);
             expect(window.location.reload).not.toHaveBeenCalled();
+            expectNoNativeDialogs();
         });
     });
 });

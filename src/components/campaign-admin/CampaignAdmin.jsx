@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './CampaignAdmin.css';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import EnforcementSection from './EnforcementSection.jsx';
 import AiRefereeSection from './AiRefereeSection.jsx';
 import SessionSection from './SessionSection.jsx';
@@ -265,6 +266,34 @@ function buildRollbackLatestModal(campaignName, snapshots, snapshotsState, onCon
     };
 }
 
+// Named-delete copy wrapper over the shared DeleteConfirmModal role="dialog"
+// tier (the same one the map/POI/overlay lanes ride). Replaces the old native
+// prompt→confirm→confirm→alert chain for campaign deletion (backlog
+// 2026-11-04 CO): ONE confirm button, the exact-name gate typed INSIDE the
+// dialog, mismatch surfaced as inline copy (see handleDeleteConfirm).
+function DeleteCampaignModal({ campaignName, typedName, onTypedNameChange, error, onCancel, onConfirm }) {
+    return (
+        <DeleteConfirmModal
+            titleId="delete-campaign-title"
+            title="Delete Campaign"
+            confirmLabel={`Delete "${campaignName}"`}
+            onCancel={onCancel}
+            onConfirm={onConfirm}
+            typedConfirm={{
+                label: `Type the exact campaign name to confirm deletion of "${campaignName}":`,
+                value: typedName,
+                onChange: onTypedNameChange,
+            }}
+            error={error}
+        >
+            This will permanently delete the entire campaign &apos;<strong>{campaignName}</strong>&apos;
+            and ALL its files — characters, maps, encounters, quests, factions, notes,
+            settlements, NPCs, and all runtime data. There is no recovery. This
+            <strong> cannot be undone</strong>.
+        </DeleteConfirmModal>
+    );
+}
+
 function ConfirmModal({ modal, onClose }) {
     return (
         <div className="ct-modal-overlay">
@@ -353,6 +382,11 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     // Starter adventure lane: non-null after load iff this campaign carries a
     // starter-seed document (seeded quick-create). Drives the Regenerate card.
     const [starterSeed, setStarterSeed] = useState(null);
+    // Delete-Campaign lane (role=dialog tier, backlog 2026-11-04 CO): modal
+    // open flag, the typed exact-name draft, and inline mismatch/failure copy.
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deleteTypedName, setDeleteTypedName] = useState('');
+    const [deleteError, setDeleteError] = useState(null);
     // The upload file input, so a dismissed (cancelled) Upload confirm can
     // reset it — otherwise the cancelled file stays selected and re-choosing
     // the SAME file fires no change event (silent no-op).
@@ -518,31 +552,37 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         }
     };
 
-    const handleDeleteCampaign = async () => {
-        const charCount = window.prompt(`Type the exact campaign name to confirm deletion of "${campaignName}":`);
-        if (charCount !== campaignName) {
-            if (charCount !== null) {
-                alert('Campaign name did not match. Deletion cancelled.');
-            }
-            return;
-        }
-        if (!window.confirm(`WARNING: This will permanently delete the entire campaign "${campaignName}" and ALL its files including characters, maps, encounters, quests, factions, notes, settlements, NPCs, and all runtime data. This CANNOT be undone. Are you absolutely sure?`)) {
-            return;
-        }
-        if (!window.confirm(`FINAL WARNING: ${campaignName} will be completely erased from the server. There is no recovery. Proceed?`)) {
+    const openDeleteModal = () => {
+        setDeleteTypedName('');
+        setDeleteError(null);
+        setDeleteModalOpen(true);
+    };
+
+    const closeDeleteModal = () => {
+        setDeleteModalOpen(false);
+        setDeleteError(null);
+    };
+
+    // Delete-Campaign gate inside the dialog: a mismatched (or empty) typed
+    // name surfaces inline copy and keeps the dialog open; the exact name
+    // fires the single DELETE. Success reloads onto the refreshed campaign
+    // selection — the same hand-off the old success alert + reload had, with
+    // zero native dialogs anywhere in the flow (backlog 2026-11-04 CO).
+    const handleDeleteConfirm = async () => {
+        if (deleteTypedName !== campaignName) {
+            setDeleteError('Campaign name did not match. Deletion cancelled.');
             return;
         }
         try {
             const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) {
-                alert('Failed to delete campaign: ' + (data.error || 'Unknown error'));
-            } else {
-                alert('Campaign deleted successfully.');
-                window.location.reload();
+                setDeleteError('Failed to delete campaign: ' + (data.error || 'Unknown error'));
+                return;
             }
+            window.location.reload();
         } catch (err) {
-            alert('Failed to delete campaign: ' + err.message);
+            setDeleteError('Failed to delete campaign: ' + err.message);
         }
     };
 
@@ -762,7 +802,7 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                     <div className="admin-action admin-action--danger">
                         <h3>Delete Campaign</h3>
                         <p>Permanently deletes the entire campaign and ALL its files. This cannot be undone.</p>
-                        <button className="ct-btn ct-btn-danger" onClick={handleDeleteCampaign}>
+                        <button className="ct-btn ct-btn-danger" onClick={openDeleteModal}>
                             <i className="fas fa-exclamation-triangle"></i> Delete Campaign
                         </button>
                     </div>
@@ -867,6 +907,17 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                     onSubmit={handleRenameSubmit}
                     error={renameError}
                     isBusy={renaming}
+                />
+            )}
+
+            {deleteModalOpen && (
+                <DeleteCampaignModal
+                    campaignName={campaignName}
+                    typedName={deleteTypedName}
+                    onTypedNameChange={setDeleteTypedName}
+                    error={deleteError}
+                    onCancel={closeDeleteModal}
+                    onConfirm={handleDeleteConfirm}
                 />
             )}
 

@@ -55,6 +55,39 @@ describe('DeleteConfirmModal', () => {
         expect(container.querySelector('.maps-manager-modal-overlay')).toBeInTheDocument();
     });
 
+    // Sanctioned extension (backlog 2026-11-04 CO, campaign-delete lane):
+    // an optional typed-name gate rendered INSIDE the dialog, above the
+    // action row, plus inline role="alert" copy that keeps the dialog open.
+    // Consumers that omit both props keep the tier above byte-identical.
+    it('arms an optional typed-name input that receives initial focus', () => {
+        const onChange = vi.fn();
+        renderModal({
+            typedConfirm: { label: 'Type the exact name:', value: 'draft', onChange }
+        });
+        const input = screen.getByLabelText('Type the exact name:');
+        expect(input).toHaveValue('draft');
+        expect(input).toHaveFocus(); // first focusable element in the dialog
+        fireEvent.change(input, { target: { value: 'typed' } });
+        expect(onChange).toHaveBeenCalledWith('typed');
+    });
+
+    it('shows inline error copy without touching the action row or firing dialogs', () => {
+        const onConfirm = vi.fn();
+        const confirmSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        renderModal({
+            typedConfirm: { label: 'Type the exact name:', value: 'wrong', onChange: vi.fn() },
+            error: 'Campaign name did not match. Deletion cancelled.',
+            onConfirm
+        });
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'Campaign name did not match. Deletion cancelled.'
+        );
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Yes, Delete' })).toBeEnabled();
+        expect(confirmSpy).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
+    });
+
     it('routes Cancel and Confirm to their callbacks without invoking window.confirm', () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const onCancel = vi.fn();

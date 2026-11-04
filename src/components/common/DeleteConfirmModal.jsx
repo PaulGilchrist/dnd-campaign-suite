@@ -20,7 +20,14 @@ function getModalFocusable(modalEl) {
     return Array.from(modalEl.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)).filter(el => !el.disabled);
 }
 
-function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm, children }) {
+// Optional typed-name extension (backlog 2026-11-04 CO, campaign-delete lane):
+// pass `typedConfirm={{ label, value, onChange }}` to arm an exact-name input
+// ABOVE the action row (the shared modal's initial focus lands on it, being
+// the first focusable element), and `error` to surface inline copy (role="alert")
+// WITHOUT closing the dialog — the destructive lanes that used to ride a raw
+// window.prompt for the typed gate. Consumers that omit both props render
+// byte-identical to the original tier (pinned by DeleteConfirmModal.test.jsx).
+function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm, children, typedConfirm, error }) {
     const modalRef = useRef(null);
 
     // Move focus into the dialog when it opens so keyboard and screen-reader
@@ -65,6 +72,24 @@ function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm,
             >
                 <h3 id={titleId}>{title}</h3>
                 <p>{children}</p>
+                {typedConfirm && (
+                    <div className="delete-confirm-typed">
+                        <label className="delete-confirm-typed-label" htmlFor={`${titleId}-typed-input`}>
+                            {typedConfirm.label}
+                        </label>
+                        <input
+                            id={`${titleId}-typed-input`}
+                            className="delete-confirm-typed-input"
+                            type="text"
+                            value={typedConfirm.value}
+                            onChange={(e) => typedConfirm.onChange(e.target.value)}
+                            autoComplete="off"
+                        />
+                    </div>
+                )}
+                {error && (
+                    <p className="delete-confirm-error" role="alert">{error}</p>
+                )}
                 <div className="maps-manager-modal-actions">
                     <button onClick={onCancel}>Cancel</button>
                     <button className="delete-confirm-btn" onClick={onConfirm}>
