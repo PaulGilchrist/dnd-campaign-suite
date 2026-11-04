@@ -324,9 +324,10 @@ describe('App - Map Navigation & View Management', () => {
     // `mapsView.type === 'none'` sub-state — MapsAreaView renders null there
     // while the sidebar still read "Maps", and the first re-entry click was
     // swallowed by handleMapsClick's "already on mapsManager" early return
-    // (hence the observed "second sidebar click to populate"). Manager Back
-    // no longer exists (sidebar is the exit), so the self-heal below guards
-    // the campaign-switch path that can still reach the blank sub-state.
+    // (hence the observed "second sidebar click to populate"). The
+    // handleMapsClick self-heal below guards any path that still reaches the
+    // blank sub-state; the campaign-switch path itself now resets activeView
+    // on select (bug-stale-character-sheet-cross-campaign-writes).
     it('re-clicking Maps while the listing is open is a no-op (sidebar stays on Maps)', async () => {
       clickMaps();
       await waitFor(() => {
@@ -365,8 +366,12 @@ describe('App - Map Navigation & View Management', () => {
       fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
       await flushEffects();
 
-      // Stranded state: sidebar still on "Maps", but nothing renders there.
-      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Maps');
+      // Campaign select now resets activeView (regression bug-stale-character-
+      // sheet-cross-campaign-writes, 2026-11-04 CR): the stale "Maps"
+      // indicator from the PREVIOUS campaign can no longer survive the switch
+      // — the zero-character wizard is the only surface — so no indicator
+      // renders and the maps pane stays unmounted until Maps is clicked.
+      expect(screen.queryByTestId('sidebar-active-indicator')).not.toBeInTheDocument();
       expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
 

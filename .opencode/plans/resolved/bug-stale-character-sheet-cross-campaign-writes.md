@@ -30,3 +30,21 @@ On campaign select, reset the view state alongside `setCombatSummaryLoaded(false
 
 ## Severity
 Data integrity risk — confirmed cross-campaign state bleed (ghost buckets written into a campaign that has no such character), reachable with plain sidebar clicks; only the localhost GM/first-client lane is checked, so player tabs behave identically.
+
+## Resolution
+FIXED 2026-11-04 (fix run, dev pair :5173, `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter'`).
+
+**Root cause (verified in code, slightly narrower than the guess):** the sheet is rendered by `activeView === 'charSheet' && activeCharacter` (App.jsx ~:787) and the App-level `handleCampaignSelect` (~:488) reset only `combatSummaryLoaded`. The select callback (App.jsx ~:361) re-arms `activeView='charSheet'` + `activeCharacter` only when the NEW campaign **has** characters; for a zero-character campaign it merely opens the wizard — so both stale vars survived the switch indefinitely, keeping the old campaign's sheet (with live Rest/Edit/Delete) mounted under the new header. The `!combatSummaryLoaded` loading gate covers only the fetch window, not the resting state. `useCampaignManagement.handleCampaignSelect` needed no change — it owns only `campaignName`/selection visibility.
+
+**Fix:** `src/App.jsx` — `handleCampaignSelect` now also resets `setActiveView(null)` + `setActiveCharacter(null)` alongside `setCombatSummaryLoaded(false)`, mirroring the existing sibling-reset pattern already used there (and the `campaignName`-effect resets for `mapsView`/`activeMapName`). The select callback re-arms both once the new roster loads; a zero-character campaign now shows only its auto-opened wizard, exactly like a fresh mount.
+
+**Files changed:**
+- `src/App.jsx` — view/character reset on campaign select (the fix).
+- `src/App.state-transitions.test.jsx` — NEW regression describe "Campaign switching clears the previous sheet": select campaign A (sheet open) → Campaigns → select zero-character campaign B → assert `char-sheet` + `sidebar-active-indicator` gone, wizard is the only surface, and zero POSTs to B mentioning A's character; twin test asserts a campaign WITH characters still lands on its own first sheet (guards the reset not breaking the normal re-arm). Empirically validated: reverting the two fix lines makes the new test fail on the stale `char-sheet` (Edit/Download buttons present).
+- `src/App.map-navigation.test.jsx` — pre-existing test "campaign switch to a characterless campaign cannot strand a blank Maps pane" had pinned the OLD contract (asserted the stale `Maps` sidebar indicator survives the switch — the same failure family this fix eliminates). Updated its three stranded-state assertions + comments to the new contract (no indicator survives; one Maps click still opens the new campaign's manager).
+
+**Verification:**
+- Pre-fix live repro (Playwright, test-campaign → Campaigns → quick-create `qa-arena`): header `qa-arena / ARENA BATTLE` with the full stale FeyRanger sheet mounted underneath (Edit/Delete/Upload/Download/Short Rest/Long Rest), wizard auto-opened under it; clicked **Long Rest** → `GET /api/campaigns/qa-arena/change-data` gained a full `FeyRanger` bucket (`hitPoints`, spell slots, rest keys) + `coverRefresh` while `GET /qa-arena/FeyRanger.json` = 404.
+- Post-fix live re-verify (same steps): entering qa-arena renders NO `.char-sheet`, zero Rest buttons anywhere, title `CharSheets`, wizard is the only surface; after wizard-cancel the shell matches a fresh zero-character mount; no stale-character writes in the network lane. Sanity: fresh test-campaign entry lands on the character view, test-campaign→qa-arena→test-campaign round trip re-arms the sheet correctly (first character, 7-char roster, 0 console errors).
+- `npx vitest run src/App.state-transitions.test.jsx` → 10/10; all App.* + useCampaignManagement sibling files → 79/79; FULL suite `npx vitest run` → 3061 files / 33,554 passed, 0 failures (3 expected-fail pre-existing). `npm run lint` → zero warnings.
+- Cleanup: test-campaign change-data `{}` + log `[]` (closed-tab admin clear, GET-verified); `qa-arena` deleted (Admin-scope DELETE `curl` — ghost GET 404, folder gone, no exit-hook re-materialization after 12 s); `public/campaigns/` git porcelain clean; dev pair killed.

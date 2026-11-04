@@ -485,8 +485,18 @@ function App() {
   // Reset the loaded flag when switching campaigns so stale characters from the
   // previous campaign can't render (or bleed into the new campaign's initiative
   // roster) while the new campaign's data is still loading.
+  // Regression (2026-11-04, run CR): the loaded-flag reset only covered the
+  // loading window — the select callback re-arms the sheet view ONLY when the
+  // new campaign HAS characters, so a zero-character campaign left the
+  // previous campaign's sheet mounted indefinitely under the new header, with
+  // live Rest/Edit/Delete buttons that POSTed the stale character's runtime
+  // bucket into the new campaign's change-data (ghost buckets). Drop the view
+  // and the held character here too; the select callback above re-arms
+  // activeView='charSheet' + activeCharacter once the new roster has loaded.
   const handleCampaignSelect = (campaign, characters) => {
     setCombatSummaryLoaded(false);
+    setActiveView(null);
+    setActiveCharacter(null);
     campaignMgmt.handleCampaignSelect(campaign, characters);
   };
 

@@ -13,7 +13,11 @@
  *    area state — a player who had a map open in the previous campaign
  *    must be able to open the new campaign's active map with one "Maps"
  *    click (a stale mapsView of type 'map' would silently swallow the
- *    click on the player branch of handleMapsClick).
+ *    click on the player branch of handleMapsClick). Selecting a campaign
+ *    also drops the previous campaign's character sheet — a zero-character
+ *    campaign must show ONLY its auto-opened wizard, never the stale sheet
+ *    whose Rest buttons would write ghost buckets into the new campaign
+ *    (bug-stale-character-sheet-cross-campaign-writes).
  *  - Idempotent sidebar navigation: re-clicking the button for the view
  *    you are already on keeps you there (view + sidebar indicator intact),
  *    without crashing. (Maps-specific no-op re-clicks are covered by
@@ -342,6 +346,61 @@ describe('App - State Transitions', () => {
       });
       expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Campaign switching clears the previous sheet', () => {
+    // Regression (bug-stale-character-sheet-cross-campaign-writes, CR run
+    // 2026-11-04): selecting a campaign only re-armed the sheet view when the
+    // NEW campaign had characters, so a zero-character campaign left the
+    // previous campaign's sheet mounted under the new header — live
+    // Rest/Edit/Delete buttons that POSTed the stale character's runtime
+    // bucket into the new campaign's change-data (character route 404s).
+    // Campaign select must now drop activeView + activeCharacter; the select
+    // callback re-arms them once the new roster loads.
+    it('entering a zero-character campaign never renders the previous campaign\'s sheet', async () => {
+      await renderInCampaign();
+
+      await backToCampaigns();
+      mockState.campaignName = 'qa-arena';
+      mockState.characters = [];
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('select-campaign-btn'));
+      });
+
+      // New campaign owns the shell, and the stale sheet (with its Rest
+      // affordances) is gone — the zero-character wizard is the only surface.
+      await waitFor(() => {
+        expect(screen.getByTestId('sidebar-campaign').textContent).toBe('qa-arena');
+      });
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('sidebar-active-indicator')).not.toBeInTheDocument();
+      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+
+      // Nothing carrying the old character's bucket was written to the new
+      // campaign while it had no roster to seed from. (The one-time
+      // '__campaign__' context stamp from MapContextSync is by-design noise —
+      // see App.runtime-events.test.jsx.)
+      const staleWrites = global.fetch.mock.calls.filter(([url, options]) =>
+        String(options?.method) === 'POST' && String(url).includes('qa-arena') && String(url).includes('FeyRanger'));
+      expect(staleWrites).toHaveLength(0);
+    });
+
+    it('selecting a campaign with characters still lands on its own first sheet', async () => {
+      await renderInCampaign();
+
+      await backToCampaigns();
+      mockState.campaignName = 'test-campaign-two';
+      mockState.characters = [{ name: 'SecondHero', level: 2 }];
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('select-campaign-btn'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sidebar-campaign').textContent).toBe('test-campaign-two');
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('character-name')).toHaveTextContent('SecondHero');
     });
   });
 
