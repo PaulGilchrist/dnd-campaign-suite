@@ -100,7 +100,6 @@ CP live facts (post-CO batch): wolf gridless fix 15fcfebf3 both faces; monster-l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- 2026-11-04 CQ: friendly-fire confirm is the last surviving native `window.confirm` on a core combat lane (bfdd2e7ef migrated admin delete off native chains; CN-era runs pushed the same direction). A dismiss gives zero feedback beyond the select reverting — an inline `DeleteConfirmModal`-tier overlay (role=dialog) with the same copy would match the modern pattern and be testable without the dialog-wedge dance. `src/components/initiative/createCreatureHandlers.js:289-299`.
 - 2026-11-04 CQ: full-doc map PUT accepts `players[]` entries without `id` — editor then mounts with React duplicate-key errors (self-triggered via API rig, but GM-side import/clone paths could produce the same). Normalize (assign lowercased-name id) on save or on load. `server/routes/maps.js` PUT lane / `Map.jsx` Players render.
 - 2026-11-04 CQ (minor, non-blocking): `POST /api/campaigns/:c/campaign` 400 message says "Use /api/campaigns/:campaign/:key for campaign-level data" — technically correct but the de-dupe could name the offending keys' correct route family (enforcement/aiConfig top-level precedent now twice documented). `server/routes/campaigns-changedata.js`.
 

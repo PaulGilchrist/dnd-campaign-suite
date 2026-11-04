@@ -1,13 +1,18 @@
 // @maintained-by-ai
 // Lane: createCreatureHandlers.js friendly-fire confirm (Phase 3.2 betrayal,
-// arena-starter §4). Arming a target from the attacker's OWN ally list asks a
-// UI-local confirm; cancel is inert, confirm arms normally and logs an
-// audit-flagged row. Unlisted (hostile) targets and unedited ally lists never
-// confirm — engine resolution is unchanged either way.
+// arena-starter §4; migrated off native window.confirm 2026-11-04 CQ). Arming
+// a target from the attacker's OWN ally list routes the pending pair to the
+// host-injected requestFriendlyFireConfirm overlay bridge — ZERO native
+// dialogs on this lane. Nothing writes until the host resumes via
+// confirmFriendlyFireTarget (accept = arm + audit row, byte-identical to the
+// retired native lane; cancel = the host simply never calls it ⇒ inert).
+// Unlisted (hostile) targets, self-targets, overlay targets and unedited ally
+// lists never prompt — engine resolution is unchanged either way.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createCreatureHandlers } from './createCreatureHandlers.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
+import storage from '../../services/ui/storage.js';
 import { setTarget } from '../../services/encounters/initiativeService.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -36,7 +41,7 @@ vi.mock('../../services/rules/effects/zoneDurationClock.js', () => ({ sweepNewCo
 
 const campaignName = 'test-campaign';
 
-function makeHandlers() {
+function makeHandlers(overrides = {}) {
     const combatSummary = {
         round: 1,
         creatures: [
@@ -46,6 +51,7 @@ function makeHandlers() {
         ],
     };
     const setCombatSummary = vi.fn();
+    const requestFriendlyFireConfirm = vi.fn();
     const handlers = createCreatureHandlers({
         combatSummary,
         campaignName,
@@ -58,14 +64,19 @@ function makeHandlers() {
         numOfNpc: 1,
         isLocalhost: true,
         showToast: vi.fn(),
+        requestFriendlyFireConfirm,
+        ...overrides,
     });
-    return { handlers, combatSummary, setCombatSummary };
+    return { handlers, combatSummary, setCombatSummary, requestFriendlyFireConfirm };
 }
 
 let confirmSpy;
+let errorSpy;
 beforeEach(() => {
     vi.clearAllMocks();
+    // The migrated lane must never touch a native dialog (criterion 1).
     confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
     vi.restoreAllMocks();
@@ -88,49 +99,110 @@ describe('handleClear', () => {
     })
 })
 
-describe('handleTargetChange — friendly-fire confirm', () => {
-    it('ally target: confirm asked; on OK the target arms AND the row is log-flagged', () => {
+describe('handleTargetChange — friendly-fire overlay bridge', () => {
+    it('ally target: routed to the overlay with the pending pair; NO native confirm; zero writes until resumed', () => {
         seedAllies(['Alice', 'Bob']);
-        const { handlers } = makeHandlers();
-        handlers.handleTargetChange('Alice', 'Bob');
-        expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Friendly fire'));
-        expect(setTarget).toHaveBeenCalledWith(expect.anything(), 'Alice', 'Bob');
-        const entry = addEntry.mock.calls.find(c => c[1]?.friendlyFire)?.[1];
-        expect(entry).toMatchObject({ characterName: 'Alice', friendlyFire: true });
-        expect(entry.description).toContain('Bob');
-    });
+        const { handlers, requestFriendlyFireConfirm, setCombatSummary } = makeHandlers();
 
-    it('cancel is fully inert: no arm, no log', () => {
-        seedAllies(['Alice', 'Bob']);
-        confirmSpy.mockReturnValue(false);
-        const { handlers, setCombatSummary } = makeHandlers();
         handlers.handleTargetChange('Alice', 'Bob');
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
+
+        expect(requestFriendlyFireConfirm).toHaveBeenCalledWith({ creatureName: 'Alice', targetName: 'Bob' });
+        expect(confirmSpy).not.toHaveBeenCalled();
+        // Fully inert pre-decision: no arm, no log, no board write.
         expect(setTarget).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
         expect(setCombatSummary).not.toHaveBeenCalled();
     });
 
-    it('non-ally target arms without a confirm', () => {
+    it('accept lane (confirmFriendlyFireTarget): arms AND logs exactly one audit-flagged row with the byte-exact copy', () => {
         seedAllies(['Alice', 'Bob']);
-        const { handlers } = makeHandlers();
-        handlers.handleTargetChange('Alice', 'Zombie');
+        const { handlers, combatSummary, setCombatSummary } = makeHandlers();
+
+        handlers.handleTargetChange('Alice', 'Bob');
+        handlers.confirmFriendlyFireTarget('Alice', 'Bob');
+
+        expect(setTarget).toHaveBeenCalledWith(combatSummary, 'Alice', 'Bob');
+        expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
+        expect(setCombatSummary).toHaveBeenCalledTimes(1);
+        const friendlyCalls = addEntry.mock.calls.filter(c => c[1]?.friendlyFire);
+        expect(friendlyCalls).toHaveLength(1);
+        expect(friendlyCalls[0][1]).toMatchObject({
+            type: 'ability_use',
+            characterName: 'Alice',
+            abilityName: 'Target Selection',
+            friendlyFire: true,
+            description: 'Alice armed Bob as a target — Bob is on Alice\'s ally list (friendly fire confirmed).',
+        });
+    });
+
+    it('cancel lane: the host never resumes — zero arms, zero logs, zero board writes', () => {
+        seedAllies(['Alice', 'Bob']);
+        const { handlers, setCombatSummary } = makeHandlers();
+
+        handlers.handleTargetChange('Alice', 'Bob');
+        // Cancel = the overlay closes without invoking confirmFriendlyFireTarget.
+
+        expect(setTarget).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
+        expect(setCombatSummary).not.toHaveBeenCalled();
+    });
+
+    it('fail closed: without a wired confirm host the ally target is NOT armed (named console.error, no native dialog)', () => {
+        seedAllies(['Alice', 'Bob']);
+        const { handlers, setCombatSummary } = makeHandlers({ requestFriendlyFireConfirm: undefined });
+
+        handlers.handleTargetChange('Alice', 'Bob');
+
         expect(confirmSpy).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('friendly-fire confirm host not wired'));
+        expect(setTarget).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
+        expect(setCombatSummary).not.toHaveBeenCalled();
+    });
+
+    it('non-ally target arms silently — zero prompt, zero confirm log', () => {
+        seedAllies(['Alice', 'Bob']);
+        const { handlers, requestFriendlyFireConfirm } = makeHandlers();
+
+        handlers.handleTargetChange('Alice', 'Zombie');
+
+        expect(requestFriendlyFireConfirm).not.toHaveBeenCalled();
+        expect(confirmSpy).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
         expect(setTarget).toHaveBeenCalledWith(expect.anything(), 'Alice', 'Zombie');
     });
 
-    it('unedited ally list (default self-only) never confirms legacy PvP arms', () => {
+    it('self-target arms silently (exempt face)', () => {
+        seedAllies(['Alice', 'Bob']);
+        const { handlers, requestFriendlyFireConfirm } = makeHandlers();
+
+        handlers.handleTargetChange('Alice', 'Alice');
+
+        expect(requestFriendlyFireConfirm).not.toHaveBeenCalled();
+        expect(setTarget).toHaveBeenCalledWith(expect.anything(), 'Alice', 'Alice');
+    });
+
+    it('unedited ally list (default self-only) never prompts; legacy PvP arms straight through', () => {
         getRuntimeValue.mockReturnValue(null);
-        const { handlers } = makeHandlers();
+        const { handlers, requestFriendlyFireConfirm } = makeHandlers();
+
         handlers.handleTargetChange('Alice', 'Bob');
+
+        expect(requestFriendlyFireConfirm).not.toHaveBeenCalled();
         expect(confirmSpy).not.toHaveBeenCalled();
         expect(setTarget).toHaveBeenCalledWith(expect.anything(), 'Alice', 'Bob');
     });
 
     it('overlay (AoE) arming bypasses the confirm lane', () => {
         seedAllies(['Alice', 'Bob']);
-        const { handlers } = makeHandlers();
+        const { handlers, requestFriendlyFireConfirm } = makeHandlers();
+
         handlers.handleTargetChange('Alice', 'overlay-abc');
+
+        expect(requestFriendlyFireConfirm).not.toHaveBeenCalled();
         expect(confirmSpy).not.toHaveBeenCalled();
         expect(setTarget).not.toHaveBeenCalled(); // unknown overlay id → no arm (existing behavior)
     });

@@ -133,6 +133,12 @@ export function createCreatureHandlers({
     numOfNpc,
     isLocalhost,
     showToast = () => {},
+    // Friendly-fire overlay bridge (backlog 2026-11-04 CQ): the host component
+    // (Initiative.jsx) injects a callback that opens the React confirm modal
+    // with the pending { creatureName, targetName } pair. Replaces the last
+    // native window.confirm on this core combat lane; hosts without the
+    // callback fail closed (see handleTargetChange).
+    requestFriendlyFireConfirm = null,
 }) {
     // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
     const writeNpcHp = function writeNpcHp(creature, newValue, oldHp, isMaxEdit, newMaxHp) {
@@ -278,26 +284,18 @@ export function createCreatureHandlers({
         setCombatSummary(cloneDeep(combatSummary))
     }
 
-    const handleTargetChange = function handleTargetChange(creatureName, targetName) {
-        if (!combatSummary) return
-        // Friendly-fire confirm (Phase 3.2 betrayal): arming a target that is
-        // on the attacker's OWN ally list requires a UI-local confirm — the
-        // engine still resolves the attack normally once confirmed (allegiance
-        // is an intent signal, not a hard block). Overlay (AoE) arming rides
-        // its own per-save careful-spell flow, so it is exempt here. Every
-        // confirmed friendly arm logs an audit row (repo log rule).
-        if (targetName && !targetName.startsWith('overlay-') && targetName !== creatureName
-            && getAllyList(creatureName).includes(targetName)) {
-            if (!window.confirm(`Friendly fire: ${targetName} is on ${creatureName}'s ally list. Arm them as the target anyway?`)) return
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: creatureName,
-                abilityName: 'Target Selection',
-                description: `${creatureName} armed ${targetName} as a target — ${targetName} is on ${creatureName}'s ally list (friendly fire confirmed).`,
-                friendlyFire: true,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error('[initiative] friendly-fire arming log failed:', e) })
-        }
+    // Friendly-fire gate predicate (Phase 3.2 betrayal): an armed target that
+    // is on the attacker's OWN ally list needs confirmation. Overlay (AoE)
+    // arming rides its own per-save careful-spell flow, and self-targets are
+    // exempt — every other face arms silently (byte-unchanged).
+    const isFriendlyFireTarget = function isFriendlyFireTarget(creatureName, targetName) {
+        return !!(targetName && !targetName.startsWith('overlay-') && targetName !== creatureName
+            && getAllyList(creatureName).includes(targetName))
+    }
+
+    // Shared write tail — byte-identical payload for the plain and the
+    // confirmed-friendly lane (setTarget + board POST + React republish).
+    const applyTargetSelection = function applyTargetSelection(creatureName, targetName) {
         if (targetName && targetName.startsWith('overlay-')) {
             const overlayId = targetName.slice('overlay-'.length)
             const overlay = overlays.find(o => o.id === overlayId)
@@ -309,6 +307,44 @@ export function createCreatureHandlers({
         }
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
+    }
+
+    const handleTargetChange = function handleTargetChange(creatureName, targetName) {
+        if (!combatSummary) return
+        // Friendly-fire confirm (Phase 3.2 betrayal, migrated off native
+        // window.confirm 2026-11-04 CQ): arming an ally-listed target routes
+        // through the host's React overlay (role=dialog, waits indefinitely —
+        // UI-local ephemeral state, never the runtime store). The engine still
+        // resolves the attack normally once confirmed (allegiance is an intent
+        // signal, not a hard block); a cancel reverts because nothing writes —
+        // the controlled target-select restores from the untouched combatSummary.
+        if (isFriendlyFireTarget(creatureName, targetName)) {
+            if (!requestFriendlyFireConfirm) {
+                // Fail closed: never silently arm an ally target when no
+                // confirm UI is wired (every production host injects one).
+                console.error('[handleTargetChange] friendly-fire confirm host not wired — ally target not armed')
+                return
+            }
+            requestFriendlyFireConfirm({ creatureName, targetName })
+            return
+        }
+        applyTargetSelection(creatureName, targetName)
+    }
+
+    // Overlay-confirm seam: Initiative.jsx invokes this after the user accepts
+    // the FriendlyFireConfirmModal prompt. Audit row + arm bytes match the
+    // retired native-confirm lane exactly (repo log rule).
+    const confirmFriendlyFireTarget = function confirmFriendlyFireTarget(creatureName, targetName) {
+        if (!combatSummary) return
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: creatureName,
+            abilityName: 'Target Selection',
+            description: `${creatureName} armed ${targetName} as a target — ${targetName} is on ${creatureName}'s ally list (friendly fire confirmed).`,
+            friendlyFire: true,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[initiative] friendly-fire arming log failed:', e) })
+        applyTargetSelection(creatureName, targetName)
     }
 
     // Phase 2 — control delegation. GM hands an NPC/monster to a player (their
@@ -432,6 +468,7 @@ export function createCreatureHandlers({
         handleInitiativeChange,
         handleNameChange,
         handleTargetChange,
+        confirmFriendlyFireTarget,
         handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,

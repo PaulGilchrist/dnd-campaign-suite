@@ -36,6 +36,7 @@ import AiDirectorPanel from './AiDirectorPanel.jsx'
 import { useTvPresentation } from './useTvPresentation.js'
 import { useAllyEditor } from './useAllyEditor.js'
 import AllyEditorModal from './AllyEditorModal.jsx'
+import FriendlyFireConfirmModal from './FriendlyFireConfirmModal.jsx'
 import TvToggleButton from './TvToggleButton.jsx'
 import TvNextUpStrip from './TvNextUpStrip.jsx'
 import VictoryBanner from './VictoryBanner.jsx'
@@ -296,6 +297,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     // Phase 3.2 — tracker-level ally editor (betrayal / split party / teams).
     const { allyEditorOpen, modalProps, openAllyEditor, closeAllyEditor, confirmAllyEditor } = useAllyEditor({ campaignName, isLocalhost })
 
+    // Friendly-fire overlay (backlog 2026-11-04 CQ): UI-LOCAL ephemeral prompt
+    // state — a half-answered confirm, not game state, so it never touches the
+    // runtime store. One prompt at a time: a newer ally-target selection
+    // replaces the pending pair. No timer resolves/dismisses it (No-Game-Timers).
+    const [pendingFriendlyFire, setPendingFriendlyFire] = React.useState(null)
+    const requestFriendlyFireConfirm = React.useCallback((pending) => {
+        setPendingFriendlyFire(pending)
+    }, [])
+
     React.useEffect(() => {
         if (!campaignName) return
         loadNPCs(campaignName).then(response => {
@@ -391,6 +401,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         handleInitiativeChange,
         handleNameChange,
         handleTargetChange,
+        confirmFriendlyFireTarget,
         handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,
@@ -408,7 +419,20 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         numOfNpc: creaturesOrEmpty(combatSummary).filter(isBareNpcPlaceholder).length,
         isLocalhost,
         showToast,
-    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters, showToast])
+        requestFriendlyFireConfirm,
+    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters, showToast, requestFriendlyFireConfirm])
+
+    // Overlay-confirm seam: accept arms through the factory (same audit row +
+    // board-write bytes the retired native-confirm lane produced); cancel is
+    // inert — the controlled target-select already restored to the previous
+    // target when React finished the change event with an untouched
+    // combatSummary, so closing the prompt is the whole revert.
+    const handleFriendlyFireConfirm = function handleFriendlyFireConfirm() {
+        if (!pendingFriendlyFire) return
+        const { creatureName, targetName } = pendingFriendlyFire
+        setPendingFriendlyFire(null)
+        confirmFriendlyFireTarget(creatureName, targetName)
+    }
 
     const { handleNpcClick } = React.useMemo(() => ({
         handleNpcClick: createNpcClickHandler({
@@ -832,6 +856,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 />
             )}
             <AllyEditorModal open={allyEditorOpen} modalProps={modalProps} onConfirm={confirmAllyEditor} onCancel={closeAllyEditor} />
+            <FriendlyFireConfirmModal
+                pending={pendingFriendlyFire}
+                onCancel={() => setPendingFriendlyFire(null)}
+                onConfirm={handleFriendlyFireConfirm}
+            />
             {conditionPopup && (
                 <ConditionSavePopup
                     popup={conditionPopup}
