@@ -368,46 +368,64 @@ async function resolvePreciseHunter(playerName, targetName, playerStats, campaig
     return undefined;
 }
 
-// Aura checks when no map is active — all creatures considered in range
+// Aura leniency gate for the sync lane (bug-wolf-aura-unmeasured-on-pc-roller-lane).
+// Gridless leniency (skipRangeCheck) is sanctioned ONLY when no active map exists
+// (house law §44). A lenient stamp here pre-empts the measured aura pass in
+// contextBuilder-map.js — its accumulateAuraCounts guard skips auras once
+// forcedMode is set — so with an active positioned map every aura axis went
+// unmeasured on the PC roller lane. Read the '__map__' pointer exactly like
+// rangeCheck.isWithinRange does: when a map is active the utils measure via
+// isWithinRange, which is itself lenient for token-less grids and refuses
+// unplaced creatures (no phantom adjacency). Bearers the combat-summary census
+// misses are still resolved by the map lane (forcedMode stays undefined →
+// accumulateAuraCounts runs with mapData).
+function auraSkipRangeCheck() {
+    return !getRuntimeValue('__map__', 'activeMapName');
+}
+
+// Wolf aura — measured when a map is active, lenient only when gridless (see
+// auraSkipRangeCheck). "advantage against any enemy of the bearer within 5 ft".
 async function resolveWolfAura(playerName, targetName, campaignName) {
-    const noMapWolf = await getWolfAdvantageAgainst({
+    const wolf = await getWolfAdvantageAgainst({
         attackerName: playerName,
         targetName,
         campaignName,
-        skipRangeCheck: true,
+        skipRangeCheck: auraSkipRangeCheck(),
     });
-    return noMapWolf.advantage ? { mode: 'advantage' } : undefined;
+    return wolf.advantage ? { mode: 'advantage' } : undefined;
 }
 
 async function resolveDuplicityAura(playerName, campaignName) {
-    const noMapDuplicity = await getDuplicityAdvantageAgainst({
+    const duplicity = await getDuplicityAdvantageAgainst({
         attackerName: playerName,
         campaignName,
-        skipRangeCheck: true,
+        skipRangeCheck: auraSkipRangeCheck(),
     });
-    return noMapDuplicity.advantage ? { mode: 'advantage', reason: 'Improved Duplicity' } : undefined;
+    return duplicity.advantage ? { mode: 'advantage', reason: 'Improved Duplicity' } : undefined;
 }
 
 async function resolveLionAura(playerName, targetName, campaignName) {
-    const noMapLion = await getLionDisadvantageAgainst({
+    const lion = await getLionDisadvantageAgainst({
         attackerName: playerName,
         targetName,
         campaignName,
-        skipRangeCheck: true,
+        skipRangeCheck: auraSkipRangeCheck(),
     });
-    return noMapLion.disadvantage ? { mode: 'disadvantage' } : undefined;
+    return lion.disadvantage ? { mode: 'disadvantage' } : undefined;
 }
 
 // CLA-063: async — the util is async; resolvers in the modeResolvers loop are
 // awaited, so the Promise unwraps at the seam (mirrors resolveWolfAura twins).
+// With an active map the util refuses without mapData (it cannot measure sync);
+// the map lane's accumulateAuraCounts owns the measured corona verdict there.
 async function resolveCoronaAura(targetName, campaignName, damageType) {
-    const noMapCorona = await getCoronaSaveDisadvantage({
+    const corona = await getCoronaSaveDisadvantage({
         targetName,
         campaignName,
         damageType,
-        skipRangeCheck: true,
+        skipRangeCheck: auraSkipRangeCheck(),
     });
-    return noMapCorona.disadvantage ? { mode: 'disadvantage' } : undefined;
+    return corona.disadvantage ? { mode: 'disadvantage' } : undefined;
 }
 
 // Blur and Foresight: attackers without Blindsight or Truesight have disadvantage on attacks against the target

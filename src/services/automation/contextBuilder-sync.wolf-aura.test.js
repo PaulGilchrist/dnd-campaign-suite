@@ -134,3 +134,72 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     expect(result.forcedMode).toBe('disadvantage');
   });
 });
+
+// bug-wolf-aura-unmeasured-on-pc-roller-lane: with an ACTIVE map the sync lane
+// must consult the aura utils MEASURED (skipRangeCheck:false). The unconditional
+// lenient stamp pre-empted the measured aura pass in contextBuilder-map.js
+// (accumulateAuraCounts is guarded by base.forcedMode === undefined), so a Wolf
+// bearer anywhere on a positioned map granted advantage at 15/25 ft distances.
+// The gridless faces above (getRuntimeValue → undefined, no '__map__') pin that
+// skipRangeCheck:true leniency stays the no-map fallback.
+describe('contextBuilder-sync - active map MEASURES the aura axes (skipRangeCheck gate)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // '__map__' mirrors what MapContextSync stamps when a map is activated; every
+  // other runtime read stays undefined (no buffs/tes) exactly like setup().
+  function activeMap(name = 'battle-arena') {
+    getRuntimeValue.mockImplementation((entity, key) => (
+      entity === '__map__' && key === 'activeMapName' ? name : undefined
+    ));
+  }
+
+  it('far-face: active map → wolf consulted measured; a refused measurement leaves mode normal', async () => {
+    setup();
+    activeMap();
+    getWolfAdvantageAgainst.mockResolvedValue({ advantage: false });
+
+    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
+
+    expect(getWolfAdvantageAgainst).toHaveBeenCalledWith({
+      attackerName: 'HexWarlock',
+      targetName: 'Thug 1',
+      campaignName: 'test-campaign',
+      skipRangeCheck: false,
+    });
+    expect(result.forcedMode).toBeUndefined();
+  });
+
+  it('near-face: active map + measured wolf advantage still stamps forcedMode advantage', async () => {
+    setup();
+    activeMap();
+    getWolfAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'DraconicDragon' });
+
+    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
+
+    expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
+    expect(result.forcedMode).toBe('advantage');
+  });
+
+  it('lion twin: active map + refused measurement no longer stamps a lenient disadvantage', async () => {
+    setup();
+    activeMap();
+    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: false });
+
+    const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
+
+    expect(getLionDisadvantageAgainst).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
+    expect(result.forcedMode).toBeUndefined();
+  });
+
+  it('all four sync aura resolvers (wolf/duplicity/lion/corona) drop skipRangeCheck when a map is active', async () => {
+    setup();
+    activeMap();
+
+    await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
+
+    for (const util of [getWolfAdvantageAgainst, getDuplicityAdvantageAgainst, getLionDisadvantageAgainst, getCoronaSaveDisadvantage]) {
+      expect(util).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
+      expect(util).not.toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: true }));
+    }
+  });
+});
