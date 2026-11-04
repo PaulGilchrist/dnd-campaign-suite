@@ -100,8 +100,6 @@ CP live facts (post-CO batch): wolf gridless fix 15fcfebf3 both faces; monster-l
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- 2026-11-04 CQ (minor, non-blocking): `POST /api/campaigns/:c/campaign` 400 message says "Use /api/campaigns/:campaign/:key for campaign-level data" — technically correct but the de-dupe could name the offending keys' correct route family (enforcement/aiConfig top-level precedent now twice documented). `server/routes/campaigns-changedata.js`.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CQ: PT1 (corona/duplicity sync-lane — 7 live faces, produced bug-corona-save-disadv-applied-to-attack-roll.md); PT2 (OA denied-on-sticky — full face set incl. dismiss); CP backlog copy nit (f1deeb510 both forks re-verified); backlog a11y note (f07304b66 role=dialog tier live); delete-success-toast + both throwaway lanes re-derived post-efa2d311a; friendly-fire/ally-consumer re-ride.

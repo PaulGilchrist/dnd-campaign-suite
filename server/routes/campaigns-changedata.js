@@ -54,6 +54,22 @@ router.post('/api/campaigns/:campaign/positioning', asyncHandler((req, res) => {
     res.json({ message: 'Positioning saved successfully' });
 }));
 
+/**
+ * Shared copy for the deprecated "campaign" key guard (GET/POST :campaign/campaign).
+ * When the POST body exposes top-level keys, name each offending key's real route
+ * (mirror the .json trap's tone of citing a concrete route); bodies with no usable
+ * keys keep the generic sentence so no face regresses to a worse message.
+ */
+function deprecatedCampaignKeyError(campaign, body) {
+    const keys = (body && typeof body === 'object' && !Array.isArray(body))
+        ? Object.keys(body).filter(k => k.length > 0)
+        : [];
+    if (keys.length === 0) {
+        return 'Use /api/campaigns/:campaign/:key for campaign-level data';
+    }
+    return `Use ${keys.map(k => `/api/campaigns/${campaign}/${k}`).join(' or ')} for campaign-level data`;
+}
+
 // GET /api/campaigns/:campaign/:key - Generic GET from in-memory change data store
 router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
@@ -65,7 +81,12 @@ router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
             'Check useRuntimeState.js or storage.js for getRuntimeValue("campaign", ...) or storage.getProperty("campaign", ...).',
             { campaign, key, stack: new Error().stack }
         );
-        return res.status(400).json({ error: 'Use /api/campaigns/:campaign/:key for campaign-level data' });
+        // No body to name on GET — the two documented top-level families are
+        // the honest static example, with the real campaign name interpolated.
+        return res.status(400).json({
+            error: `Use /api/campaigns/${campaign}/<key> for campaign-level data ` +
+                `(e.g. /api/campaigns/${campaign}/enforcement or /api/campaigns/${campaign}/aiConfig)`,
+        });
     }
     if (key === campaign) {
         console.error(
@@ -186,7 +207,7 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
             'Check useRuntimeState.js or storage.js for setRuntimeValue("campaign", ...) or storage.setProperty("campaign", ...).',
             { campaign, key, body: req.body, stack: new Error().stack }
         );
-        return res.status(400).json({ error: 'Use /api/campaigns/:campaign/:key for campaign-level data' });
+        return res.status(400).json({ error: deprecatedCampaignKeyError(campaign, req.body) });
     }
 
     if (key === campaign) {

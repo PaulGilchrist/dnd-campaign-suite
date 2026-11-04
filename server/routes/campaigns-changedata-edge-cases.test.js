@@ -81,18 +81,56 @@ describe('campaignsChangedata - "campaign" key deprecation warnings', () => {
         clearChangeData();
     });
 
-    it('should return 400 with deprecation warning when GET key === "campaign"', async () => {
+    it('should return 400 with interpolated route examples when GET key === "campaign"', async () => {
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign/campaign');
         expect(res.status).toBe(400);
-        expect(res.body.error).toBe('Use /api/campaigns/:campaign/:key for campaign-level data');
+        expect(res.body.error).toBe(
+            'Use /api/campaigns/test-campaign/<key> for campaign-level data ' +
+            '(e.g. /api/campaigns/test-campaign/enforcement or /api/campaigns/test-campaign/aiConfig)'
+        );
     });
 
-    it('should return 400 with deprecation warning when POST key === "campaign"', async () => {
+    it('GET face interpolates the actual campaign name, not a literal placeholder', async () => {
+        const app = createTestApp();
+        const res = await request(app).get('/api/campaigns/frostdale-vale/campaign');
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain('/api/campaigns/frostdale-vale/enforcement');
+        expect(res.body.error).toContain('/api/campaigns/frostdale-vale/aiConfig');
+        expect(res.body.error).not.toContain(':campaign/');
+    });
+
+    it('should return 400 naming each offending key\'s concrete route when POST key === "campaign"', async () => {
         const app = createTestApp();
         const res = await request(app).post('/api/campaigns/test-campaign/campaign').send({ value: { name: 'test' } });
         expect(res.status).toBe(400);
-        expect(res.body.error).toBe('Use /api/campaigns/:campaign/:key for campaign-level data');
+        expect(res.body.error).toBe('Use /api/campaigns/test-campaign/value for campaign-level data');
+    });
+
+    it('POST names BOTH real routes when body carries documented top-level keys', async () => {
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/campaign')
+            .send({ enforcement: { mode: 'on' }, aiConfig: { mode: 'off' } });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe(
+            'Use /api/campaigns/test-campaign/enforcement or /api/campaigns/test-campaign/aiConfig for campaign-level data'
+        );
+    });
+
+    it('POST keeps the generic sentence for bodies with no usable keys', async () => {
+        const app = createTestApp();
+        const empty = await request(app).post('/api/campaigns/test-campaign/campaign').send({});
+        expect(empty.status).toBe(400);
+        expect(empty.body.error).toBe('Use /api/campaigns/:campaign/:key for campaign-level data');
+
+        const emptyKeys = await request(app).post('/api/campaigns/test-campaign/campaign').send({ '': 'junk' });
+        expect(emptyKeys.status).toBe(400);
+        expect(emptyKeys.body.error).toBe('Use /api/campaigns/:campaign/:key for campaign-level data');
+
+        const arrayBody = await request(app).post('/api/campaigns/test-campaign/campaign').send(['junk']);
+        expect(arrayBody.status).toBe(400);
+        expect(arrayBody.body.error).toBe('Use /api/campaigns/:campaign/:key for campaign-level data');
     });
 
     it('should NOT save data when key === "campaign" (deprecated)', async () => {
