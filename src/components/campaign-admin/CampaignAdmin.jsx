@@ -580,6 +580,17 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                 setDeleteError('Failed to delete campaign: ' + (data.error || 'Unknown error'));
                 return;
             }
+            // Post-delete carry-over (mirrors the postRestoreNotice handoff
+            // below): one-shot sessionStorage notice the campaign-selection
+            // page consumes + clears to render "<name> deleted successfully!"
+            // across this reload boundary (backlog CP 2026-11-04: the retired
+            // success alert left the vanished row as the only signal).
+            // UI feedback only — never game state.
+            try {
+                sessionStorage.setItem('postDeleteNotice', JSON.stringify({ campaign: campaignName }));
+            } catch (err) {
+                console.error('Failed to store post-delete notice:', err);
+            }
             window.location.reload();
         } catch (err) {
             setDeleteError('Failed to delete campaign: ' + err.message);

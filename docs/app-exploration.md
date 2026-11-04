@@ -108,8 +108,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- (CP 2026-11-04) Admin campaign-delete success now reloads to selection with NO success feedback (old native `Campaign deleted successfully.` alert retired by bfdd2e7ef); the vanished row is the only signal. A toast/inline note on the selection page ("qa-arena deleted") would close the loop.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CP: CO PT1 (wolf gridless fix 15fcfebf3 — measured byte + gridless tail + multi-source lenient audit: honest copy survives even stacked beside a measured band chip; unconditional "within 5 ft" unreachable on lenient faces), CO PT2/backlog#1 (monster-lane single-source chip parity b15588852 — 6 live faces, log/chip/roll-row all consistent), CO row #69 re-derived post-bfdd2e7ef (admin delete = React role=dialog modal, zero native dialogs, inline mismatch), chooser-backdrop bullet bdba26868 verified doc-only. Seed-modal singleton + both quick-create lanes re-saw.

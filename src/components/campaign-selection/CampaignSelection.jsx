@@ -3,6 +3,7 @@ import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../se
 import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
 import { createSeededCampaign } from '../../services/campaign/seededCampaign.js';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
+import useEphemeralToast from '../map/hooks/useEphemeralToast.js';
 import SeededCampaignModal from './SeededCampaignModal.jsx';
 import './CampaignSelection.css';
 
@@ -76,6 +77,21 @@ function CampaignListArea({ foldersError, onRetry, campaigns, campaignTypes, sel
   );
 }
 
+/**
+ * Post-delete success notice sink — hoisted (complexity ceiling) from the
+ * CampaignSelection body. Renders the consumed 'postDeleteNotice' transport
+ * through the ephemeral-toast lane's message; null-when-idle mirrors the
+ * MapNoticeToast.jsx sink contract.
+ */
+function DeleteNotice({ message }) {
+  if (!message) return null;
+  return (
+    <div className="success-message" role="status">
+      <p>✅ {message}</p>
+    </div>
+  );
+}
+
 function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost = true }) {
   const [campaigns, setCampaigns] = useState([]);
   const [campaignTypes, setCampaignTypes] = useState({});
@@ -92,6 +108,30 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // buttons and SSE live-refresh stay mounted while the user recovers the
   // list in place with Retry (MapUnavailable "Check Again" pattern).
   const [foldersError, setFoldersError] = useState(null);
+
+  // Post-delete carry-over (backlog CP 2026-11-04): CampaignAdmin's typed-name
+  // delete stores a one-shot sessionStorage notice before its full page
+  // reload (same handoff as usePostRestoreNotice — UI feedback, never game
+  // state). Consume + remove it HERE on mount so the notice survives exactly
+  // one visit, and surface it through the shared ephemeral-toast lane
+  // (useEphemeralToast: auto-hide at 4s, display-only timer, already on the
+  // no-timers allowlist) rendered in this page's own .success-message box.
+  const { message: deletedMessage, show: showDeletedToast } = useEphemeralToast(4000);
+  useEffect(() => {
+    let notice = null;
+    try {
+      const raw = sessionStorage.getItem('postDeleteNotice');
+      if (!raw) return;
+      sessionStorage.removeItem('postDeleteNotice'); // single-use, even if corrupt
+      notice = JSON.parse(raw);
+    } catch (err) {
+      console.error('Failed to consume post-delete notice:', err);
+      return;
+    }
+    if (notice && notice.campaign) showDeletedToast(`${notice.campaign} deleted successfully.`);
+    // showDeletedToast is a stable useCallback (duration is a constant prop to
+    // the hook), so this effect is mount-once while staying lint-honest.
+  }, [showDeletedToast]);
 
   // One modal at a time: the New Campaign and seed modals each own a
   // full-viewport .modal-overlay, and stacking two silently intercepts every
@@ -309,6 +349,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
              <p>Reloading...</p>
            </div>
          )}
+         <DeleteNotice message={deletedMessage} />
          {isLocalhost && (
            <button className="new-campaign-button" onClick={openNewCampaignModal} disabled={modalOpen}><i className="fas fa-plus"></i> New Campaign</button>
          )}

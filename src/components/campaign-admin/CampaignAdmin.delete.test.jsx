@@ -46,6 +46,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
             fetch: global.fetch,
             location: window.location,
         };
+        sessionStorage.clear();
         // Every native dialog channel is spied so a regression back to
         // prompt/confirm/alert fails, and a test that forgets consent can
         // never trigger a real deletion (fetch is stubbed anyway).
@@ -118,7 +119,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
         expect(window.alert).not.toHaveBeenCalled();
     };
 
-    const waitForDeletion = async (expectedUrl = `/api/campaigns/${CAMPAIGN}`) => {
+    const waitForDeletion = async (expectedUrl = `/api/campaigns/${CAMPAIGN}`, expectedNotice = CAMPAIGN) => {
         await waitFor(() => {
             expect(deleteRequests()).toHaveLength(1);
         }, WAIT_OPTIONS);
@@ -127,6 +128,14 @@ describe('CampaignAdmin - Delete Campaign', () => {
             expect(window.location.reload).toHaveBeenCalledTimes(1);
         }, WAIT_OPTIONS);
         expectNoNativeDialogs();
+        // Post-delete carry-over (backlog CP 2026-11-04): the success reload
+        // arms the one-shot sessionStorage notice the selection page consumes
+        // (raw name — the notice names what was deleted, URL encoding is the
+        // transport's business only). Consumer rendering is pinned in
+        // campaign-selection/CampaignSelection.post-delete-notice.test.jsx.
+        expect(JSON.parse(sessionStorage.getItem('postDeleteNotice'))).toEqual({
+            campaign: expectedNotice,
+        });
     };
 
     describe('role=dialog modal', () => {
@@ -161,6 +170,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
             expect(screen.getByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
             expect(deleteRequests()).toHaveLength(0);
             expect(window.location.reload).not.toHaveBeenCalled();
+            expect(sessionStorage.getItem('postDeleteNotice')).toBeNull();
             expectNoNativeDialogs();
         });
 
@@ -182,6 +192,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
             expect(screen.queryByRole('dialog', { name: 'Delete Campaign' })).not.toBeInTheDocument();
             expect(deleteRequests()).toHaveLength(0);
             expect(window.location.reload).not.toHaveBeenCalled();
+            expect(sessionStorage.getItem('postDeleteNotice')).toBeNull();
             expectNoNativeDialogs();
         });
     });
@@ -198,7 +209,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
             openDeleteModal({ campaignName: name });
             fireEvent.change(typedInput(), { target: { value: name } });
             fireEvent.click(screen.getByRole('button', { name: `Delete "${name}"` }));
-            await waitForDeletion('/api/campaigns/test%20campaign%2F1');
+            await waitForDeletion('/api/campaigns/test%20campaign%2F1', name);
         });
     });
 
@@ -220,6 +231,7 @@ describe('CampaignAdmin - Delete Campaign', () => {
             expect(screen.getByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
             expect(deleteRequests()).toHaveLength(1);
             expect(window.location.reload).not.toHaveBeenCalled();
+            expect(sessionStorage.getItem('postDeleteNotice')).toBeNull();
             expectNoNativeDialogs();
         });
     });
