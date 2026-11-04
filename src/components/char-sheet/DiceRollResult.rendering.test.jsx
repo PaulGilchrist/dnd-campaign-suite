@@ -93,6 +93,43 @@ describe('DiceRollResult rendering', () => {
             expect(screen.getByText('Disadv (Beyond normal range (40 ft > 30 ft))')).toHaveAttribute('title', 'Beyond normal range (40 ft > 30 ft)');
         });
 
+        // 2026-11-03 QA backlog (attribution parity): the PC sync-lane lion and
+        // corona aura resolvers now thread their own reason (contextBuilder-sync
+        // resolveLionAura/resolveCoronaAura). It rides the advantageReason
+        // channel and must print under the DISADV prefix — measured face names
+        // proximity, lenient face admits GM-enforcement instead of claiming
+        // "within 5 ft" (3db9da635 honesty precedent).
+        it('disadvantage prints a threaded aura reason under the Disadv prefix', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                advantageReason: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft',
+            });
+            const badge = document.querySelector('.forced-mode-badge');
+            expect(badge).toHaveTextContent('Disadv (Lion rage aura — enemy of raging ElderPaladin within 5 ft)');
+            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
+        });
+
+        it('corona lenient reason prints its GM-enforced tail verbatim', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                advantageReason: 'Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced',
+            });
+            const badge = document.querySelector('.forced-mode-badge');
+            expect(badge).toHaveTextContent('Disadv (Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced)');
+            expect(badge).toHaveAttribute('title', 'Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced');
+        });
+
+        it('disadvantage prefers a threaded aura reason over a co-occurring range reason', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                advantageReason: 'Lion rage aura — enemy of raging ElderPaladin within 5 ft',
+                rangeReason: 'Beyond normal range (40 ft > 30 ft)',
+            });
+            const badges = document.querySelectorAll('.forced-mode-badge');
+            expect(badges).toHaveLength(1);
+            expect(badges[0]).toHaveTextContent('Disadv (Lion rage aura — enemy of raging ElderPaladin within 5 ft)');
+        });
+
         // 2026-11-03 QA backlog (multi-source disadvantage attribution): when
         // the roll seam carries 2+ reasons (range band + Lion rage aura), the
         // popup stacks one chip per source; ≤1 reason keeps the legacy single

@@ -129,6 +129,24 @@ describe('useActionSpellMetamagic - handleSpellAttackClick', () => {
     );
 
     expect(lastCast()[1].forcedMode).toBe('advantage');
+    // No threaded reason → the field stays undefined (legacy generic chip copy).
+    expect(lastCast()[1].advantageReason).toBeUndefined();
+  });
+
+  it('attribution parity: threads ctx.advantageReason alongside forcedMode (corona spell face)', async () => {
+    const spell = makeSpell();
+    const buildCtx = vi.fn(async () => ({
+      targetName: 'Zombie 1',
+      forcedMode: 'disadvantage',
+      advantageReason: 'Corona of Light — sunlight aura of War_Cleric — proximity unmeasured (gridless) — GM-enforced',
+    }));
+    const { lastCast } = await clickAttack(
+      { playerStats: makeNonSorcererStats({ spellAbilities: { spells: [spell] } }), buildCtx },
+    );
+
+    const castMetaCtx = lastCast()[1];
+    expect(castMetaCtx.forcedMode).toBe('disadvantage');
+    expect(castMetaCtx.advantageReason).toBe('Corona of Light — sunlight aura of War_Cleric — proximity unmeasured (gridless) — GM-enforced');
   });
 
   // ── Sorcerer: queue pending metamagic from the SPELL, not the attack row ──
@@ -201,6 +219,25 @@ describe('useActionSpellMetamagic - handleSpellAttackClick', () => {
     expect(castMetaCtx.forcedMode).toBe('advantage');
     expect(await castOpts.getTargetInfo()).toEqual({ name: 'Goblin A' });
     expect(result.current.pendingActionMetamagic).toBeNull();
+  });
+
+  it('attribution parity: queued metamagic cast carries ctx.advantageReason too (lion spell face)', async () => {
+    const spell = makeSpell();
+    const buildCtx = vi.fn(async () => ({
+      targetName: 'Goblin A',
+      forcedMode: 'disadvantage',
+      advantageReason: 'Lion rage aura — enemy of raging ElderPaladin — proximity unmeasured (gridless) — GM-enforced',
+    }));
+    const { result, lastCast } = await clickAttack({
+      playerStats: makePlayerStats({ spellAbilities: { spells: [spell] } }),
+      buildCtx,
+    });
+
+    await act(async () => {
+      await result.current.handleActionMetamagicConfirm({});
+    });
+
+    expect(lastCast()[1].advantageReason).toBe('Lion rage aura — enemy of raging ElderPaladin — proximity unmeasured (gridless) — GM-enforced');
   });
 
   it('CLA-230: metamagic-provided forcedMode (e.g. innate sorcery) wins over ctx value', async () => {

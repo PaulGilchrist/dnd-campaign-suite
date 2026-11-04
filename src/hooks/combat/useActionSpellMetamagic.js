@@ -265,9 +265,13 @@ export function useActionSpellMetamagic({
         // e.g. Moonlight Step next-attack advantage) into the spell attack roll —
         // previously only getTargetInfo().name survived, so spell attacks never saw it.
         // handleNoSavePath spreads metaCtx into the attack roll ctx.
+        // 2026-11-03 attribution parity: the threaded reason (resolveCoronaAura/
+        // resolveWolfAura etc.) rides the same fold so the popup's forced-mode chip
+        // prints the aura itself instead of the generic conditions copy — undefined
+        // reason keeps every legacy face byte-identical (`advantageReason || …`).
         const attackCtx = await buildCtx(attack);
         const castMetaCtx = attackCtx?.forcedMode && result.metaCtx?.forcedMode == null
-            ? { ...result.metaCtx, forcedMode: attackCtx.forcedMode }
+            ? { ...result.metaCtx, forcedMode: attackCtx.forcedMode, advantageReason: attackCtx.advantageReason }
             : result.metaCtx;
         const castResult = await executeSpellCast({ ...spell, name: attack.name, level: spellLevel }, castMetaCtx, {
             rollAttack,
@@ -300,9 +304,10 @@ export function useActionSpellMetamagic({
                 // CLA-230: thread ctx.forcedMode through the metamagic-resolved cast too
                 // (metamagic never sets forcedMode itself — an existing metaCtx value wins,
                 // mirroring handleNoSavePath's innate-sorcery `!metaCtx?.forcedMode` gate).
+                // Attribution parity fold for advantageReason — see castSpellAttackWithoutMetamagic.
                 const attackCtx = await buildCtx(attack);
                 const castMetaCtx = attackCtx?.forcedMode && metaCtx?.forcedMode == null
-                    ? { ...metaCtx, forcedMode: attackCtx.forcedMode }
+                    ? { ...metaCtx, forcedMode: attackCtx.forcedMode, advantageReason: attackCtx.advantageReason }
                     : metaCtx;
                 // L5-002: metamagic confirm is the resolution seam — charge now.
                 chargeSlot({ creatureName: playerStats.name, bucket: classifyBucket(spell), campaignName });

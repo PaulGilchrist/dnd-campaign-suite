@@ -409,28 +409,54 @@ async function resolveDuplicityAura(playerName, campaignName) {
     return duplicity.advantage ? { mode: 'advantage', reason: 'Improved Duplicity' } : undefined;
 }
 
+// Lion aura — 2026-11-03 attribution parity (QA backlog): threads a reason like
+// resolveWolfAura (it rides the deferred resolver's advantageReason channel,
+// which DiceRollResult.buildForcedModeChips prints under the Disadv prefix), so
+// a single-source aura press no longer prints the generic `Disadv (conditions)`.
+// Honesty (3db9da635 precedent): the gridless lenient face (skipRangeCheck true
+// = no active map) must NOT assert "within 5 ft" — proximity was never compared,
+// so it admits GM-enforcement like the monster lane's lenient log tail.
 async function resolveLionAura(playerName, targetName, campaignName) {
+    const skipRangeCheck = auraSkipRangeCheck();
     const lion = await getLionDisadvantageAgainst({
         attackerName: playerName,
         targetName,
         campaignName,
-        skipRangeCheck: auraSkipRangeCheck(),
+        skipRangeCheck,
     });
-    return lion.disadvantage ? { mode: 'disadvantage' } : undefined;
+    if (!lion.disadvantage) return undefined;
+    return {
+        mode: 'disadvantage',
+        reason: skipRangeCheck
+            ? `Lion rage aura — enemy of raging ${lion.source} — proximity unmeasured (gridless) — GM-enforced`
+            : `Lion rage aura — enemy of raging ${lion.source} within 5 ft`,
+    };
 }
 
 // CLA-063: async — the util is async; resolvers in the modeResolvers loop are
 // awaited, so the Promise unwraps at the seam (mirrors resolveWolfAura twins).
 // With an active map the util refuses without mapData (it cannot measure sync);
 // the map lane's accumulateAuraCounts owns the measured corona verdict there.
+// 2026-11-03 attribution parity: threads its own reason like the lion twin — on
+// this lane a granted verdict therefore implies gridless leniency (the map-active
+// face never fires sync), so the copy is always the honest no-distance form:
+// the aura is named with its bearer and the unmeasured proximity is admitted
+// (the radius is buff-variable too — coronaBuff.distance, default 60 ft).
 async function resolveCoronaAura(targetName, campaignName, damageType) {
+    const skipRangeCheck = auraSkipRangeCheck();
     const corona = await getCoronaSaveDisadvantage({
         targetName,
         campaignName,
         damageType,
-        skipRangeCheck: auraSkipRangeCheck(),
+        skipRangeCheck,
     });
-    return corona.disadvantage ? { mode: 'disadvantage' } : undefined;
+    if (!corona.disadvantage) return undefined;
+    return {
+        mode: 'disadvantage',
+        reason: skipRangeCheck
+            ? `Corona of Light — sunlight aura of ${corona.source} — proximity unmeasured (gridless) — GM-enforced`
+            : `Corona of Light — sunlight aura of ${corona.source}`,
+    };
 }
 
 // Blur and Foresight: attackers without Blindsight or Truesight have disadvantage on attacks against the target
