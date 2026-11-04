@@ -76,9 +76,6 @@ Run CO (post-CN 8-commit live batch, wolf-aura/adv-chip/lion-copy/OA-toast/seed-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- (2026-11-04 CR) `Short Rest` hit-dice overlay (`.short-rest-overlay`) intercepts ALL sidebar navigation (incl. Campaigns) until its Cancel button is clicked — Escape/× affordance or click-outside cancel would unblock nav; verify against No-Timers rules (pure UI dismiss).
-- (2026-11-04 CR) After delete + silent reload to campaign selection, the success toast renders as loose `.success-message` text between the heading and buttons — fine functionally (one-shot, ≤5 s) but no `role=status` was observed on this face (CQ recipe asserts `role=status` — re-check both).
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CR: post-CQ batch verification (all 5 commits live, 7 faces); CQ PT1 map-active corona attack twin (fix landed → both twins PASS); CQ PT4 corona save-lane (3 faces); friendly-fire modal migration both faces; map-deactivate incl. resurrection; map id-normalize; 400-copy; arena throwaway create/delete re-ride.
