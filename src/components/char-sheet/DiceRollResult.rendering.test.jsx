@@ -50,10 +50,10 @@ describe('DiceRollResult rendering', () => {
     describe('forced-mode badge', () => {
         it.each([
             {
-                label: 'advantage forced by range',
+                label: 'advantage with only a range reason present — range copy never rides the Adv prefix',
                 props: { name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage', rangeReason: 'Ranged disadvantage' },
-                badgeText: 'Adv (Ranged disadvantage)',
-                title: 'Ranged disadvantage',
+                badgeText: 'Adv (conditions)',
+                title: 'Automatically set by active conditions',
             },
             {
                 label: 'disadvantage forced with no explicit reason',
@@ -65,6 +65,32 @@ describe('DiceRollResult rendering', () => {
             renderRoll(props);
             const badge = screen.getByText(badgeText);
             expect(badge).toHaveAttribute('title', title);
+        });
+
+        // bug-adv-chip-borrows-range-reason: an aura advantage without a threaded
+        // reason + a range miss/band reason on the same press used to print
+        // "Adv (Target out of melee range (…))" — a disadvantage-family range fact
+        // attributed as the advantage reason. The Adv chip now prints the
+        // advantage's OWN threaded reason when present, and rangeReason stays on
+        // the Disadv chip / AUTO-MISS banner only.
+        it('advantage prefers its own threaded reason over any range reason', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage',
+                advantageReason: 'Wolf rage aura — enemy of raging DraconicDragon within 5 ft',
+                rangeReason: 'Target out of melee range (21 ft > 8 ft)',
+            });
+            const badges = document.querySelectorAll('.forced-mode-badge');
+            expect(badges).toHaveLength(1);
+            expect(badges[0]).toHaveTextContent('Adv (Wolf rage aura — enemy of raging DraconicDragon within 5 ft)');
+            expect(badges[0]).toHaveAttribute('title', 'Wolf rage aura — enemy of raging DraconicDragon within 5 ft');
+        });
+
+        it('disadvantage still borrows the range reason under its own prefix (byte-identical legacy face)', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                rangeReason: 'Beyond normal range (40 ft > 30 ft)',
+            });
+            expect(screen.getByText('Disadv (Beyond normal range (40 ft > 30 ft))')).toHaveAttribute('title', 'Beyond normal range (40 ft > 30 ft)');
         });
 
         // 2026-11-03 QA backlog (multi-source disadvantage attribution): when

@@ -385,6 +385,9 @@ function auraSkipRangeCheck() {
 
 // Wolf aura — measured when a map is active, lenient only when gridless (see
 // auraSkipRangeCheck). "advantage against any enemy of the bearer within 5 ft".
+// Threads an advantageReason like the monster-card lane's buildLionAuraReason
+// (bug-adv-chip-borrows-range-reason) so the popup's Adv chip prints the aura
+// itself instead of the generic conditions copy.
 async function resolveWolfAura(playerName, targetName, campaignName) {
     const wolf = await getWolfAdvantageAgainst({
         attackerName: playerName,
@@ -392,7 +395,9 @@ async function resolveWolfAura(playerName, targetName, campaignName) {
         campaignName,
         skipRangeCheck: auraSkipRangeCheck(),
     });
-    return wolf.advantage ? { mode: 'advantage' } : undefined;
+    return wolf.advantage
+        ? { mode: 'advantage', reason: `Wolf rage aura — enemy of raging ${wolf.source} within 5 ft` }
+        : undefined;
 }
 
 async function resolveDuplicityAura(playerName, campaignName) {

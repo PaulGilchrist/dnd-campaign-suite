@@ -101,6 +101,10 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
       skipRangeCheck: true,
     });
     expect(result.forcedMode).toBe('advantage');
+    // bug-adv-chip-borrows-range-reason: the sync wolf resolver must thread a
+    // reason (monster-card-lane buildLionAuraReason parity) so the popup's
+    // Adv chip prints the aura instead of borrowing a rangeReason.
+    expect(result.advantageReason).toBe('Wolf rage aura — enemy of raging DraconicDragon within 5 ft');
   });
 
   it('leaves one-shot vex te untouched when Wolf aura wins above the WM-008 consume rows', async () => {

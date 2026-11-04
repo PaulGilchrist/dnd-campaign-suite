@@ -248,6 +248,11 @@ function RollAdjustmentNotices({ props, state }) {
 // aura), stack one chip per source so neither "why" is silently dropped.
 // 0/1 reasons keep the legacy single-chip chain byte-identical (advantageReason
 // || rangeReason || 'conditions') — no phantom second chip.
+// bug-adv-chip-borrows-range-reason: rangeReason is ALWAYS disadvantage-family
+// prose (applyRangeEffect/applyMeleeProximity set it only on a band
+// disadvantage or an out-of-range auto-miss), so it must never ride the Adv
+// prefix — the AUTO-MISS banner already prints it. An advantage with no
+// threaded reason falls back to the generic conditions copy.
 function buildForcedModeChips({ forcedMode, advantageReason, rangeReason, disadvantageReasons }) {
     const prefix = forcedMode === 'advantage' ? 'Adv' : 'Disadv';
     const reasons = forcedMode === 'disadvantage' && Array.isArray(disadvantageReasons)
@@ -256,7 +261,7 @@ function buildForcedModeChips({ forcedMode, advantageReason, rangeReason, disadv
     if (reasons.length >= 2) {
         return reasons.map(reason => ({ label: `${prefix} (${reason})`, title: reason }));
     }
-    const single = advantageReason || rangeReason;
+    const single = advantageReason || (forcedMode === 'disadvantage' ? rangeReason : null);
     return [{
         label: `${prefix} (${single || 'conditions'})`,
         title: single || 'Automatically set by active conditions',
