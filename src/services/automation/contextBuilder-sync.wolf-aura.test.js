@@ -104,7 +104,10 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     // bug-adv-chip-borrows-range-reason: the sync wolf resolver must thread a
     // reason (monster-card-lane buildLionAuraReason parity) so the popup's
     // Adv chip prints the aura instead of borrowing a rangeReason.
-    expect(result.advantageReason).toBe('Wolf rage aura — enemy of raging DraconicDragon within 5 ft');
+    // bug-wolf-gridless-chip-claims-within-5ft-unmeasured: gridless lenient
+    // face must NOT claim "within 5 ft" — proximity was never measured (lion
+    // twin 2cd75b9de / 3db9da635 honesty precedent).
+    expect(result.advantageReason).toBe('Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced');
   });
 
   it('leaves one-shot vex te untouched when Wolf aura wins above the WM-008 consume rows', async () => {
@@ -203,6 +206,9 @@ describe('contextBuilder-sync - active map MEASURES the aura axes (skipRangeChec
 
     expect(getWolfAdvantageAgainst).toHaveBeenCalledWith(expect.objectContaining({ skipRangeCheck: false }));
     expect(result.forcedMode).toBe('advantage');
+    // Measured face keeps the honest "within 5 ft" prose byte-identical
+    // (isWithinRange compared bearer↔target) — mirrors the lion twin pin below.
+    expect(result.advantageReason).toBe('Wolf rage aura — enemy of raging DraconicDragon within 5 ft');
   });
 
   it('lion twin: active map + refused measurement no longer stamps a lenient disadvantage', async () => {

@@ -387,17 +387,25 @@ function auraSkipRangeCheck() {
 // auraSkipRangeCheck). "advantage against any enemy of the bearer within 5 ft".
 // Threads an advantageReason like the monster-card lane's buildLionAuraReason
 // (bug-adv-chip-borrows-range-reason) so the popup's Adv chip prints the aura
-// itself instead of the generic conditions copy.
+// itself instead of the generic conditions copy. Honesty (3db9da635/2cd75b9de
+// precedent, mirrors resolveLionAura): the gridless lenient face (skipRangeCheck
+// true = no active map) must NOT assert "within 5 ft" — proximity was never
+// compared, so it admits GM-enforcement like the monster lane's lenient tail.
 async function resolveWolfAura(playerName, targetName, campaignName) {
+    const skipRangeCheck = auraSkipRangeCheck();
     const wolf = await getWolfAdvantageAgainst({
         attackerName: playerName,
         targetName,
         campaignName,
-        skipRangeCheck: auraSkipRangeCheck(),
+        skipRangeCheck,
     });
-    return wolf.advantage
-        ? { mode: 'advantage', reason: `Wolf rage aura — enemy of raging ${wolf.source} within 5 ft` }
-        : undefined;
+    if (!wolf.advantage) return undefined;
+    return {
+        mode: 'advantage',
+        reason: skipRangeCheck
+            ? `Wolf rage aura — enemy of raging ${wolf.source} — proximity unmeasured (gridless) — GM-enforced`
+            : `Wolf rage aura — enemy of raging ${wolf.source} within 5 ft`,
+    };
 }
 
 async function resolveDuplicityAura(playerName, campaignName) {

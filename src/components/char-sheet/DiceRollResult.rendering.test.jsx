@@ -119,6 +119,19 @@ describe('DiceRollResult rendering', () => {
             expect(badge).toHaveAttribute('title', 'Corona of Light — sunlight aura of TestCleric — proximity unmeasured (gridless) — GM-enforced');
         });
 
+        // bug-wolf-gridless-chip-claims-within-5ft-unmeasured: the gridless wolf
+        // lenient face (resolveWolfAura fork, lion twin 2cd75b9de) must print its
+        // honest GM-enforced tail under the Adv prefix — no "within 5 ft" claim.
+        it('wolf lenient reason prints its GM-enforced tail under the Adv prefix', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage',
+                advantageReason: 'Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced',
+            });
+            const badge = document.querySelector('.forced-mode-badge');
+            expect(badge).toHaveTextContent('Adv (Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced)');
+            expect(badge).toHaveAttribute('title', 'Wolf rage aura — enemy of raging DraconicDragon — proximity unmeasured (gridless) — GM-enforced');
+        });
+
         it('disadvantage prefers a threaded aura reason over a co-occurring range reason', () => {
             renderRoll({
                 name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
