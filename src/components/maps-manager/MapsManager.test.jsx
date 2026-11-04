@@ -26,6 +26,7 @@ vi.mock('../../services/maps/mapsService.js', () => ({
     deleteMap: vi.fn(),
     renameMap: vi.fn(),
     activateMap: vi.fn(),
+    deactivateMap: vi.fn(),
     loadMapData: vi.fn(),
     updateMapDescription: vi.fn(),
 }));
@@ -378,6 +379,80 @@ describe('MapsManager', () => {
     });
 
     // -----------------------------------------------------------------------
+    // Deactivate Button (backlog 2026-11-04 CQ: active row had no deactivate
+    // affordance — the Deactivate twin of Activate)
+    // -----------------------------------------------------------------------
+    describe('Deactivate Button', () => {
+        it('renders Deactivate on the ACTIVE row and Activate only on inactive rows', async () => {
+            await renderWithMaps(
+                makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }),
+                makeMap({ name: 'Forest', fileName: 'forest.json' }),
+            );
+
+            const activeRow = screen.getByText('Cave').closest('li');
+            const deactivate = within(activeRow).getByRole('button', { name: 'Deactivate "Cave"' });
+            expect(deactivate).toHaveTextContent('Deactivate');
+            // The Active badge and the toggle sit on the same row…
+            expect(activeRow).toHaveTextContent('Active');
+            // …and Activate never renders there (single toggle per row).
+            expect(within(activeRow).queryByRole('button', { name: /^Activate/ })).not.toBeInTheDocument();
+
+            const inactiveRow = screen.getByText('Forest').closest('li');
+            expect(within(inactiveRow).getByRole('button', { name: 'Activate "Forest"' })).toBeInTheDocument();
+            expect(within(inactiveRow).queryByRole('button', { name: /^Deactivate/ })).not.toBeInTheDocument();
+        });
+
+        it('calls deactivateMap, reloads the list, and the row flips back to Activate without a page reload', async () => {
+            mapsService.deactivateMap.mockResolvedValue({ message: 'Map deactivated successfully', activeMap: null });
+            await renderWithMaps(makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }));
+            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Deactivate "Cave"' }));
+
+            await waitFor(() => {
+                expect(mapsService.deactivateMap).toHaveBeenCalledWith('test-campaign', 'cave.json');
+                // awaited re-fetch after the PUT — no page reload required
+                expect(mapsService.loadMaps).toHaveBeenCalledTimes(2);
+            });
+            // Server truth after deactivation: the row comes back inactive —
+            // badge gone, button flipped back to Activate.
+            mapsService.loadMaps.mockResolvedValue({ maps: [makeMap({ name: 'Cave', fileName: 'cave.json' })] });
+            await emitSSE({ key: 'maps-list-test-campaign' });
+            await waitFor(() => {
+                expect(screen.queryByText('Active')).not.toBeInTheDocument();
+                expect(screen.getByRole('button', { name: 'Activate "Cave"' })).toBeInTheDocument();
+            });
+        });
+
+        it('clears the Active badge directly on a map-activate SSE event with activeMap null (no re-fetch)', async () => {
+            await renderWithMaps(
+                makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }),
+                makeMap({ name: 'Forest', fileName: 'forest.json' }),
+            );
+            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
+
+            await emitSSE({ key: 'map-activate-test-campaign', data: { activeMap: null } });
+
+            expect(screen.queryByText('Active')).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Activate "Cave"' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Activate "Forest"' })).toBeInTheDocument();
+            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
+        });
+
+        it('shows the deactivation error message and keeps the Active row unchanged', async () => {
+            mapsService.deactivateMap.mockRejectedValue(new Error('Deactivation failed'));
+            await renderWithMaps(makeMap({ name: 'Cave', fileName: 'cave.json', isActive: true }));
+            fireEvent.click(screen.getByRole('button', { name: 'Deactivate "Cave"' }));
+
+            await waitFor(() => {
+                expect(screen.getByText('Deactivation failed')).toBeInTheDocument();
+            });
+            expect(screen.getByText('Active')).toBeInTheDocument();
+            expect(mapsService.loadMaps).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // Rename Flow
     // -----------------------------------------------------------------------
     describe('Rename Flow', () => {
@@ -624,10 +699,12 @@ describe('MapsManager', () => {
             expect(desc.querySelector('i.fa-solid.fa-pen')).not.toBeNull();
             expect(desc).toHaveAttribute('title', 'Edit description');
             expect(desc).toHaveAttribute('aria-label', 'Edit description for "Battle Arena"');
-            // Active row keeps Rename/Delete but never renders Activate.
+            // Active row keeps Rename/Delete, renders the Deactivate twin and
+            // never a second Activate (single toggle per row).
             const activeRow = screen.getByText('Cave').closest('li');
             within(activeRow).getByRole('button', { name: 'Rename "Cave"' });
             within(activeRow).getByRole('button', { name: 'Delete "Cave"' });
+            within(activeRow).getByRole('button', { name: 'Deactivate "Cave"' });
             expect(within(activeRow).queryByRole('button', { name: /^Activate/ })).not.toBeInTheDocument();
         });
 

@@ -150,6 +150,12 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                       ...m,
                       isActive: m.fileName.replace(/\.json$/, '') === activeMap
                    })));
+            } else if (activeMap === null) {
+                // Deactivate echo ({ activeMap: null }): no row is active any
+                // more — drop the badge and flip every row's button back to
+                // Activate with zero re-fetch (mirrors the direct-update
+                // contract of the activate face above).
+                setMapsGuarded(prev => prev.map(m => (m.isActive ? { ...m, isActive: false } : m)));
             }
           }
       }, [campaignName, loadMapsList, setMapsGuarded]);
@@ -196,6 +202,19 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
             await loadMapsList();
         } catch (err) {
             setError(err.message || 'Failed to activate map');
+        }
+    };
+
+    // Deactivate twin of handleActivate (backlog 2026-11-04 CQ): clears the
+    // server's active map (memory + '__map__' + SSE). The awaited list reload
+    // renders the flip immediately (SSE covers other tabs without a reload).
+    const handleDeactivate = async (fileName) => {
+        try {
+            setError(null);
+            await mapsService.deactivateMap(campaignName, fileName);
+            await loadMapsList();
+        } catch (err) {
+            setError(err.message || 'Failed to deactivate map');
         }
     };
 
@@ -414,7 +433,16 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                     can name the map the way the user just saw it (backlog
                                     map-load-notice-slug-naming) — the slug stays the storage key. */}
                                 <button onClick={() => onOpenMap(map.fileName.replace(/\.json$/, ''), map.name)} aria-label={`Open "${map.name}"`}>Open</button>
-                                {!map.isActive && <button onClick={() => handleActivate(map.fileName)} aria-label={`Activate "${map.name}"`}>Activate</button>}
+                                {/* Row-level activation toggle (backlog 2026-11-04 CQ):
+                                    active rows get Deactivate (the server route nulls
+                                    activeMaps + '__map__' and broadcasts activeMap:null),
+                                    inactive rows keep Activate — one toggle button per row,
+                                    same class/aria conventions as every sibling action. */}
+                                {map.isActive ? (
+                                    <button onClick={() => handleDeactivate(map.fileName)} aria-label={`Deactivate "${map.name}"`}>Deactivate</button>
+                                ) : (
+                                    <button onClick={() => handleActivate(map.fileName)} aria-label={`Activate "${map.name}"`}>Activate</button>
+                                )}
                                 <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
                                 <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>
                                 {/* AI Dress (campaign-authoring residual item 2): in-place op

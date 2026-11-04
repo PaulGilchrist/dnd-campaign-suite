@@ -137,6 +137,28 @@ export const activateMap = async (campaignName, mapName) => {
   }
 };
 
+// Deactivate twin of activateMap (backlog 2026-11-04 CQ): PUTs the server's
+// /deactivate lane which clears memory activeMaps + '__map__' and broadcasts
+// activeMap: null over SSE.
+export const deactivateMap = async (campaignName, mapName) => {
+  try {
+    const encodedCampaign = encodeURIComponent(campaignName);
+    const encodedMapName = mapSegment(mapName);
+    const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/deactivate`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      const { error } = await response.json();
+      throw new Error(error || 'Failed to deactivate map');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deactivating map:', error);
+    throw error;
+  }
+};
+
 export const saveMapData = async (campaignName, mapName, data) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);

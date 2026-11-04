@@ -9,7 +9,7 @@
 // Fetch-bytes convention mirrors mapsService.test.js (exact URL + options #1010).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createMap, deleteMap, renameMap, activateMap, saveMapData, loadMapData, updateMapDescription } from './mapsService.js';
+import { createMap, deleteMap, renameMap, activateMap, deactivateMap, saveMapData, loadMapData, updateMapDescription } from './mapsService.js';
 
 const API = '/api/campaigns/testCampaign/maps';
 const http = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
@@ -31,6 +31,7 @@ describe('mapsService — empty-kebab lane segments (bug-map-name-empty-kebab)',
       ['deleteMap', () => deleteMap('testCampaign', '.json'), `${API}/.json`, { method: 'DELETE' }],
       ['renameMap', () => renameMap('testCampaign', '.json', 'Fixed Name'), `${API}/.json/rename`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newName: 'Fixed Name' }) }],
       ['activateMap', () => activateMap('testCampaign', '.json'), `${API}/.json/activate`, { method: 'PUT', headers: { 'Content-Type': 'application/json' } }],
+      ['deactivateMap', () => deactivateMap('testCampaign', '.json'), `${API}/.json/deactivate`, { method: 'PUT', headers: { 'Content-Type': 'application/json' } }],
       ['loadMapData', () => loadMapData('testCampaign', '.json'), `${API}/.json`, { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'reload' }],
       ['saveMapData', () => saveMapData('testCampaign', '.json', { name: 'x' }), `${API}/.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'x' }) }],
       ['updateMapDescription', () => updateMapDescription('testCampaign', '.json', 'd'), `${API}/.json/description`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: 'd' }) }],
@@ -46,6 +47,7 @@ describe('mapsService — empty-kebab lane segments (bug-map-name-empty-kebab)',
     it.each([
       ['deleteMap', () => deleteMap('testCampaign', '!!!')],
       ['activateMap', () => activateMap('testCampaign', '!!!')],
+      ['deactivateMap', () => deactivateMap('testCampaign', '!!!')],
       ['loadMapData', () => loadMapData('testCampaign', '!!!')],
     ])('%s with a punctuation-only display name still sends a non-empty segment', async (_name, invoke) => {
       global.fetch.mockResolvedValueOnce(http(404, { error: 'Map not found' }));
@@ -63,6 +65,7 @@ describe('mapsService — empty-kebab lane segments (bug-map-name-empty-kebab)',
       ['deleteMap', () => deleteMap('testCampaign', '')],
       ['renameMap', () => renameMap('testCampaign', '', 'New')],
       ['activateMap', () => activateMap('testCampaign', null)],
+      ['deactivateMap', () => deactivateMap('testCampaign', null)],
       ['loadMapData', () => loadMapData('testCampaign', '')],
       ['saveMapData', () => saveMapData('testCampaign', null, {})],
       ['updateMapDescription', () => updateMapDescription('testCampaign', undefined, 'd')],

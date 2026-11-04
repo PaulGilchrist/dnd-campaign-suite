@@ -165,7 +165,20 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
 }
 
 function handleMapActivateEvent(event, { isLocalhost, activeView, mapsView, setMapsView, setActiveMapName }) {
-  const { activeMap } = event.data || {};
+  const data = event.data || {};
+  const { activeMap } = data;
+  // Deactivate echo (PUT /maps/<slug>/deactivate publishes { activeMap: null }):
+  // EVERY tab must disarm its map context (backlog 2026-11-04 CQ). A stale
+  // activeMapName here resurrects the old map: MapContextSync force-stamps
+  // '__map__' on its next activeMapName transition (campaign re-select mounts
+  // it with the stale prop), so the null-reset would survive only until then
+  // (playbook gridless-ritual §258 resurrection vector on the client side).
+  // Malformed payloads (null data dropped upstream, '' falls through below)
+  // are never deactivations — only an explicit null in the payload is.
+  if ('activeMap' in data && activeMap === null) {
+    setActiveMapName(null);
+    return;
+  }
   if (!activeMap) return;
   // GM (localhost) manages the view through the manager listing — an activation
   // never navigates them. But it MUST still arm their own tab's map context:

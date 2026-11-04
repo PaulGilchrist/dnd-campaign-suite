@@ -584,6 +584,50 @@ router.put('/api/campaigns/:campaign/maps/:mapname/activate', asyncHandler((req,
   res.json({ message: 'Map activated successfully', activeMap: mapKey });
 }));
 
+// PUT /api/campaigns/:campaign/maps/:mapname/deactivate - Deactivate a map
+// (backlog 2026-11-04 CQ: the list had ACTIVATE but no DEACTIVATE — a GM stuck
+// with a wrong active map had to delete+recreate the file or restart the server,
+// the only null-reset of the memory-only activeMaps). Mirrors /activate at
+// every seam: GM-only gate, normalizeMapFile resolution, activeMaps + '__map__'
+// (via stampActiveMapContext, same clear the delete lane performs at :481-483)
+// and the twin map-activate / maps-list publishes so every open tab adopts
+// activeMap: null over SSE without a reload.
+router.put('/api/campaigns/:campaign/maps/:mapname/deactivate', asyncHandler((req, res) => {
+  const { campaign, mapname } = req.params;
+  if (!refuseUnlessGm(req, res)) return;
+  const mapsDir = campaignMapsDir(campaign);
+  const fileName = normalizeMapFile(mapname);
+  const filePath = path.join(mapsDir, fileName);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Map not found' });
+  }
+
+  const mapKey = fileName.replace(/\.json$/, '');
+  const currentActive = activeMaps.get(campaign) || null;
+  // Honest refusal, zero writes: deactivating a non-active map must never
+  // blank the real active map (the memory dict only ever holds one entry per
+  // campaign, so a blind delete would silently corrupt the list's isActive).
+  if (currentActive !== mapKey) {
+    return res.status(409).json({
+      error: currentActive
+        ? `"${mapKey}" is not the active map — "${currentActive}" stays active.`
+        : `"${mapKey}" is not the active map — no map is currently active.`,
+      activeMap: currentActive,
+    });
+  }
+
+  activeMaps.delete(campaign);
+  stampActiveMapContext(campaign, null);
+
+  // Broadcast deactivation change (same channels/shape as activation —
+  // activeMap: null is the deactivate face both subscribers already parse)
+  publish(`map-activate-${campaign}`, { activeMap: null }, campaign);
+  publish(`maps-list-${campaign}`, { action: 'deactivated', activeMap: null, map: mapKey }, campaign);
+
+  res.json({ message: 'Map deactivated successfully', activeMap: null });
+}));
+
 // GET /api/campaigns/:campaign/active-map - Get the active map name
 router.get('/api/campaigns/:campaign/active-map', asyncHandler((req, res) => {
   const { campaign } = req.params;

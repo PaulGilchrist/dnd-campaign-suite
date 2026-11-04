@@ -13,7 +13,7 @@
 //
 // - Cache lane: loadMapData pins cache:'reload' (byte below) so name-keyed map
 //   reads never serve a browser-cached doc; the server mirrors it with
-//   Cache-Control: no-store (noStoreCampaignGets). All 8 HTTP lanes fetch exactly
+//   Cache-Control: no-store (noStoreCampaignGets). All 9 HTTP lanes fetch exactly
 //   once each; the two pure helpers cannot touch the network (zero-fetch proofs not
 //   applicable).
 // - SSE: mapsService does not import EventSource/sseClient; the @app one-connection
@@ -22,18 +22,18 @@
 // Old → new consolidation map (41 tests → 11 templates):
 //   toKebabCase ×10          → it.each table (each row is one distinct sanitization rule)
 //   formatMapName ×10        → it.each table
-//   7× per-fn success        → one transport-table it.each ×8 (bytes were unpinned before)
+//   7× per-fn success        → one transport-table it.each ×9 (bytes were unpinned before)
 //   createMap default POST   → transport table row (body bytes exact)
 //   createMap options passthrough → kept standalone (body-merge behavior)
 //   createMap 409 conflict   → conflict table on REAL server 400 'A map with this name
 //                              already exists' (maps.js:121 — old 409 fixture was fiction)
-//   per-fn non-ok throw ×7   → server-message + generic-fallback tables ×8 (fallback
+//   per-fn non-ok throw ×7   → server-message + generic-fallback tables ×9 (fallback
 //                              constants were previously unpinned for 7 of 8 lanes)
-//   network reject ×2        → network-reject table ×8 (pins thrown-not-swallowed #945)
+//   network reject ×2        → network-reject table ×9 (pins thrown-not-swallowed #945)
 //   (new) encode/slug        → campaign percent-encoding + slug-before-encode pin
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { toKebabCase, formatMapName, loadMaps, createMap, deleteMap, renameMap, activateMap, saveMapData, loadMapData, updateMapDescription } from './mapsService.js';
+import { toKebabCase, formatMapName, loadMaps, createMap, deleteMap, renameMap, activateMap, deactivateMap, saveMapData, loadMapData, updateMapDescription } from './mapsService.js';
 
 const API = '/api/campaigns/testCampaign/maps';
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -93,6 +93,7 @@ describe('mapsService', () => {
       ['deleteMap DELETEs slug with no headers', () => deleteMap('testCampaign', 'Dungeon'), `${API}/dungeon`, { method: 'DELETE' }, 200, { message: 'Map deleted successfully' }],
       ['renameMap PUTs slug/rename with newName body', () => renameMap('testCampaign', 'Old Name', 'New Name'), `${API}/old-name/rename`, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ newName: 'New Name' }) }, 200, { message: 'Map renamed successfully', map: { name: 'New Name', fileName: 'new-name.json' } }],
       ['activateMap PUTs slug/activate', () => activateMap('testCampaign', 'Dungeon'), `${API}/dungeon/activate`, { method: 'PUT', headers: JSON_HEADERS }, 200, { message: 'Map activated successfully', activeMap: 'dungeon' }],
+      ['deactivateMap PUTs slug/deactivate', () => deactivateMap('testCampaign', 'Dungeon'), `${API}/dungeon/deactivate`, { method: 'PUT', headers: JSON_HEADERS }, 200, { message: 'Map deactivated successfully', activeMap: null }],
       ['updateMapDescription PUTs slug/description', () => updateMapDescription('testCampaign', 'Dungeon', 'A dark dungeon'), `${API}/dungeon/description`, { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ description: 'A dark dungeon' }) }, 200, { message: 'Map description updated successfully' }],
     ])('%s', async (_title, invoke, url, options, status, body) => {
       global.fetch.mockResolvedValueOnce(http(status, body));
@@ -170,6 +171,7 @@ describe('mapsService', () => {
       ['deleteMap', () => deleteMap('testCampaign', 'Dungeon')],
       ['renameMap', () => renameMap('testCampaign', 'Old Name', 'New Name')],
       ['activateMap', () => activateMap('testCampaign', 'Dungeon')],
+      ['deactivateMap', () => deactivateMap('testCampaign', 'Dungeon')],
       ['updateMapDescription', () => updateMapDescription('testCampaign', 'Dungeon', 'desc')],
     ];
     const FALLBACKS = {
@@ -180,6 +182,7 @@ describe('mapsService', () => {
       deleteMap: 'Failed to delete map',
       renameMap: 'Failed to rename map',
       activateMap: 'Failed to activate map',
+      deactivateMap: 'Failed to deactivate map',
       updateMapDescription: 'Failed to update map description',
     };
 
