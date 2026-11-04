@@ -87,8 +87,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- **[2026-11-04 CO] Charger/variant chooser overlay: container-level dismiss click can SELECT an option:** while flushing a hitting sheet press, an `el.click()` on the Charge Attack `.popup-overlay` container landed the first option (STR save prompt fired) instead of dismissing — backdrop handling should ignore clicks that land on option hit areas (or require the explicit Cancel/Skip buttons). Cheap first look: the chooser's overlay onClick in `DiceRollResult`/ChargeBonusOffer chain.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED this run: CN Priority Target 1 (wolf fix — 4-face matrix verified; leftover gridless copy filed as its own ticket), CN Priority Target 2 (adv-chip fix verified), CN Priority Target 3 (PC-sheet cover legs — half cover live + control). Demoted CampaignSelection/seed rows re-derived (0b938e8fc follow-up). All 8 post-CN commits live-verified.
