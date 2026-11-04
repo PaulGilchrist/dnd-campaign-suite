@@ -172,6 +172,31 @@ describe('DiceRollResult rendering', () => {
             expect(screen.getByText('Disadv (Beyond normal range (15 ft > 8 ft))')).toBeInTheDocument();
         });
 
+        // 2026-11-04 backlog parity (monster-lane single-source chip): a
+        // ONE-reason aura list feeds the single-chip slot instead of falling
+        // through to the generic conditions copy (PC-lane lion shape 2cd75b9de).
+        it('single-source aura reason prints on the chip (no generic conditions copy)', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                disadvantageReasons: ['Lion rage aura — within 5 ft of raging ElderPaladin'],
+            });
+            const badge = document.querySelector('.forced-mode-badge');
+            expect(document.querySelectorAll('.forced-mode-badge')).toHaveLength(1);
+            expect(badge).toHaveTextContent('Disadv (Lion rage aura — within 5 ft of raging ElderPaladin)');
+            expect(badge).toHaveAttribute('title', 'Lion rage aura — within 5 ft of raging ElderPaladin');
+            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
+        });
+
+        it('lenient single-source aura chip carries the honest GM-enforced tail', () => {
+            renderRoll({
+                name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',
+                disadvantageReasons: ['Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced'],
+            });
+            const badge = document.querySelector('.forced-mode-badge');
+            expect(badge).toHaveTextContent('Disadv (Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced)');
+            expect(screen.queryByText('Disadv (conditions)')).toBeNull();
+        });
+
         it('empty/null reason list falls back to the conditions copy', () => {
             renderRoll({
                 name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage',

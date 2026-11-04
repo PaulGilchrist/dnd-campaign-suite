@@ -246,8 +246,11 @@ function RollAdjustmentNotices({ props, state }) {
 // Forced-mode chip copy. Multi-source disadvantage attribution (2026-11-03 QA
 // backlog): when the roll seam carries 2+ reasons (range band + Lion rage
 // aura), stack one chip per source so neither "why" is silently dropped.
-// 0/1 reasons keep the legacy single-chip chain byte-identical (advantageReason
-// || rangeReason || 'conditions') — no phantom second chip.
+// 2026-11-04 backlog parity: a 1-reason list now feeds the single-chip slot
+// too (monster-lane aura presses thread the reason via disadvantageReasons /
+// advantageReason), so an aura-only press prints its "why" instead of the
+// generic conditions copy; range-band-only singles are byte-identical because
+// the builder lists the band reason first. 0 reasons keep the legacy chain.
 // bug-adv-chip-borrows-range-reason: rangeReason is ALWAYS disadvantage-family
 // prose (applyRangeEffect/applyMeleeProximity set it only on a band
 // disadvantage or an out-of-range auto-miss), so it must never ride the Adv
@@ -261,7 +264,7 @@ function buildForcedModeChips({ forcedMode, advantageReason, rangeReason, disadv
     if (reasons.length >= 2) {
         return reasons.map(reason => ({ label: `${prefix} (${reason})`, title: reason }));
     }
-    const single = advantageReason || (forcedMode === 'disadvantage' ? rangeReason : null);
+    const single = advantageReason || reasons[0] || (forcedMode === 'disadvantage' ? rangeReason : null);
     return [{
         label: `${prefix} (${single || 'conditions'})`,
         title: single || 'Automatically set by active conditions',

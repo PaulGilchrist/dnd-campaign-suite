@@ -1226,18 +1226,54 @@ function logLionAuraApplied({ monsterName, actionName, bearerName, campaignName,
 // to THIS press, range band first (mirrors resolveForcedMode precedence) —
 // which the popup renders as stacked reason chips (DiceRollResult).
 // eslint-disable-next-line react-refresh/only-export-components
-export function buildLionAuraReason(aura) {
-  return aura ? `Lion rage aura — within 5 ft of raging ${aura.source}` : null;
+export function buildLionAuraReason(aura, proximityMeasured = true) {
+  if (!aura) return null;
+  // 2026-11-04 backlog parity (wolf fork 15fcfebf3 pattern): the measured face
+  // keeps the proven chip copy byte-identical; lenient faces (no active map /
+  // tokenless attacker or bearer — the same seam lionProximityWasMeasured and
+  // the log row name) must NOT assert "within 5 ft": proximity was never
+  // compared, so the chip admits GM-enforcement like the log's lenient tail.
+  return proximityMeasured
+    ? `Lion rage aura — within 5 ft of raging ${aura.source}`
+    : `Lion rage aura — raging ${aura.source} — proximity unmeasured (no token) — GM-enforced`;
+}
+
+// The aura's reason for THIS press, or null when it is not a live
+// disadvantage source (no aura verdict, or adv + aura cancelled out to
+// normal). Shared by buildDisadvantageReasons and the single-string
+// advantageReason channel (log row + chip parity, 2cd75b9de PC-lane pattern).
+// eslint-disable-next-line react-refresh/only-export-components
+export function lionAuraDisadvantageReason({ foldedMode, lionAura, proximityMeasured }) {
+  return lionAura && foldedMode === 'disadvantage'
+    ? buildLionAuraReason(lionAura, proximityMeasured)
+    : null;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura }) {
+export function buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura, lionProximityMeasured }) {
   const rangeBandApplies = Boolean(rangeReason) && (isAutoMiss || rangeForcedMode === 'disadvantage');
-  const auraApplies = Boolean(lionAura) && foldedMode === 'disadvantage';
   return [
     rangeBandApplies ? rangeReason : null,
-    auraApplies ? buildLionAuraReason(lionAura) : null,
+    lionAuraDisadvantageReason({ foldedMode, lionAura, proximityMeasured: lionProximityMeasured }),
   ].filter(Boolean);
+}
+
+// Full monster-lane aura press: resolve the verdict, derive the ONE
+// measured-vs-lenient flag, and log the grant — hoisted out of handleAttack
+// (complexity cap). The CALLER keeps the conditional await so the no-bearer
+// census face stays byte-identical synchronous (no microtask inserted).
+async function resolveAndLogMonsterLionAura({ mapData, monsterName, target, actionName, campaignName }) {
+  const aura = await resolveMonsterLionAura({ mapData, monsterName, target, campaignName })
+    .catch((e) => { console.error('[MonsterCardModal] Error resolving Lion rage aura:', e); return null; });
+  // 2026-11-04 backlog parity: ONE measured-vs-lenient flag feeds the log
+  // row, the reasons list and the single-string advantageReason channel so
+  // all three surfaces tell the same honest story per press.
+  const proximityMeasured = !aura
+    || lionProximityWasMeasured({ mapData, monsterName, bearerName: aura.source });
+  if (aura) {
+    logLionAuraApplied({ monsterName, actionName, bearerName: aura.source, campaignName, proximityMeasured });
+  }
+  return { aura, proximityMeasured };
 }
 
 // CLA-036: Bestial Fury rider transport fields — Fury-stamped Beast's Strike
@@ -1512,6 +1548,10 @@ function buildAttackRollOptions(v) {
     // REASONS LIST riding alongside the single rangeReason (AUTO-MISS line and
     // machine log copy unchanged) — DiceRollResult stacks one chip per reason
     // when 2+ sources applied, legacy single chip otherwise.
+    // 2026-11-04 backlog parity: single-source aura reason (wolf/lion PC-lane
+    // channel — printed under the Disadv prefix too) feeding the chip and the
+    // log row; null on every legacy press (byte-inert fallback chain).
+    advantageReason: v.advantageReason ?? null,
     disadvantageReasons: v.disadvantageReasons ?? null,
     coverAcBonus: v.coverAcBonus,
     coverLevel: v.coverLevel,
@@ -2524,22 +2564,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // aura fetch) and folded into the condition-derived forcedMode. The sync
     // bearer-census gate keeps the roll's microtask placement byte-identical
     // when no Wild Heart bearer is raging (sibling click→assert contract).
-    const lionAura = hasLionBearerInScene({ mapData, campaignName })
-      ? await resolveMonsterLionAura({ mapData, monsterName, target, campaignName })
-        .then((aura) => {
-          if (aura) logLionAuraApplied({
-            monsterName,
-            actionName: name,
-            bearerName: aura.source,
-            campaignName,
-            proximityMeasured: lionProximityWasMeasured({ mapData, monsterName, bearerName: aura.source }),
-          });
-          return aura;
-        })
-        .catch((e) => { console.error('[MonsterCardModal] Error resolving Lion rage aura:', e); return null; })
-      : null;
+    const lionResolution = hasLionBearerInScene({ mapData, campaignName })
+      ? await resolveAndLogMonsterLionAura({ mapData, monsterName, target, actionName: name, campaignName })
+      : { aura: null, proximityMeasured: true };
+    const lionAura = lionResolution.aura;
+    const lionProximityMeasured = lionResolution.proximityMeasured;
 
     const foldedMode = foldAuraDisadvantage(forcedMode, lionAura);
+    const lionAuraReason = lionAuraDisadvantageReason({ foldedMode, lionAura, proximityMeasured: lionProximityMeasured });
 
     rollAttack(name, effectiveBonus, buildAttackRollOptions({
       action,
@@ -2555,7 +2587,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       isAutoCrit,
       isAutoMiss,
       rangeReason,
-      disadvantageReasons: buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura }),
+      // 2026-11-04 backlog parity (2cd75b9de PC-lane pattern): the aura reason
+      // rides the single-string advantageReason channel so a single-source
+      // aura press prints `Disadv (Lion rage aura — …)` instead of the
+      // generic `Disadv (conditions)`, and the log row stays consistent with
+      // the chip. Multi-source presses stack via disadvantageReasons below.
+      advantageReason: lionAuraReason,
+      disadvantageReasons: buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura, lionProximityMeasured }),
       coverAcBonus,
       coverLevel,
       coverReason,

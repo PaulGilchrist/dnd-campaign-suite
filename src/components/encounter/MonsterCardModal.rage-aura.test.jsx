@@ -11,7 +11,7 @@
 
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage, buildLionAuraReason, buildDisadvantageReasons, lionProximityWasMeasured } from './MonsterCardModal.jsx';
+import MonsterCardModal, { resolveMonsterLionAura, foldAuraDisadvantage, buildLionAuraReason, lionAuraDisadvantageReason, buildDisadvantageReasons, lionProximityWasMeasured } from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -179,6 +179,10 @@ function lionAuraLogCalls() {
 // byte-identical; the cannot-gate face admits the proximity was never measured.
 const MEASURED_COPY = 'Goblin has Disadvantage on Scimitar: within 5 feet of raging ElderPaladin (Power of the Wilds — Lion).';
 const LENIENT_COPY = 'Goblin has Disadvantage on Scimitar: rage aura of ElderPaladin applied — proximity unmeasured (no token) — GM-enforced (Power of the Wilds — Lion).';
+// 2026-11-04 backlog parity: the CHIP copies fork the same way (wolf pattern
+// 15fcfebf3) — measured stays byte-identical, lenient admits GM-enforcement.
+const MEASURED_CHIP = 'Lion rage aura — within 5 ft of raging ElderPaladin';
+const LENIENT_CHIP = 'Lion rage aura — raging ElderPaladin — proximity unmeasured (no token) — GM-enforced';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -274,6 +278,11 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
   // 2026-11-03 QA backlog (multi-source disadvantage attribution): the aura
   // must ride the roll options as a REASON (not just a mode), so the popup can
   // name it alongside the range-band reason instead of silently dropping it.
+  // 2026-11-04 backlog parity: the reason ALSO rides the single-string
+  // advantageReason channel (2cd75b9de PC-lane pattern) so a SINGLE-source
+  // aura press prints `Disadv (Lion rage aura — …)` instead of the generic
+  // `Disadv (conditions)`, and the log row stays consistent with the chip.
+  // This press is the gridless face — the copy carries the honest tail.
   it('threads the single aura reason into the roll options (no range source)', async () => {
     getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
 
@@ -281,15 +290,37 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
     clickScimitarChip();
 
     await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-    expect(rollAttack.mock.calls[0][2].disadvantageReasons).toEqual([
-      'Lion rage aura — within 5 ft of raging ElderPaladin',
-    ]);
+    const [, , options] = rollAttack.mock.calls[0];
+    expect(options.disadvantageReasons).toEqual([LENIENT_CHIP]);
+    expect(options.advantageReason).toBe(LENIENT_CHIP);
     // Exactly ONE aura log row per press (acceptance: machine log unchanged).
     expect(lionAuraLogCalls()).toHaveLength(1);
   });
 
+  // Measured single-source face: map active + both tokens positioned, no band
+  // → the chip/log carry the byte-identical "within 5 ft" copy.
+  it('threads the measured aura copy on a single-source positioned-map press', async () => {
+    getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
+    runtimeState.__setActiveMapName('battle-arena');
+    mapsService.loadMapData.mockResolvedValue({
+      players: [{ name: 'ElderPaladin', gridX: 2, gridY: 8 }],
+      placedItems: [{ name: 'Goblin', type: 'npc', gridX: 2, gridY: 7 }],
+    });
+
+    render(<MonsterCardModal {...goblinProps({ mapName: 'battle-arena' })} />);
+    await act(async () => {});
+    clickScimitarChip();
+
+    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+    const [, , options] = rollAttack.mock.calls[0];
+    expect(options.disadvantageReasons).toEqual([MEASURED_CHIP]);
+    expect(options.advantageReason).toBe(MEASURED_CHIP);
+    expect(lionAuraLogCalls()[0][1].description).toBe(MEASURED_COPY);
+  });
+
   it('stacks BOTH the range-band and aura reasons when two sources apply', async () => {
     getLionDisadvantageAgainst.mockResolvedValue({ disadvantage: true, source: 'ElderPaladin' });
+    runtimeState.__setActiveMapName('battle-arena');
     // Positioned-map lane: goblin token placed, target 25 ft away → melee
     // range-band auto-miss reason, on top of the aura disadvantage.
     rangeValidation.getDistanceFeet.mockReturnValue(25);
@@ -314,8 +345,9 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
     expect(options.rangeReason).toBe('Target out of melee range (25 ft > 8 ft)');
     expect(options.disadvantageReasons).toEqual([
       'Target out of melee range (25 ft > 8 ft)',
-      'Lion rage aura — within 5 ft of raging ElderPaladin',
+      MEASURED_CHIP,
     ]);
+    expect(options.advantageReason).toBe(MEASURED_CHIP);
     expect(lionAuraLogCalls()).toHaveLength(1);
   });
 
@@ -325,6 +357,7 @@ describe('MonsterCardModal — handleAttack consults the Lion rage aura', () => 
 
     await waitFor(() => expect(rollAttack).toHaveBeenCalled());
     expect(rollAttack.mock.calls[0][2].disadvantageReasons).toEqual([]);
+    expect(rollAttack.mock.calls[0][2].advantageReason).toBeNull();
   });
 
   it('cancels advantage forward to normal when the aura applies (getNetAttackMode convention)', async () => {
@@ -478,6 +511,33 @@ describe('buildLionAuraReason / buildDisadvantageReasons — multi-source attrib
   it('names the bearer in the aura reason; null aura stays null', () => {
     expect(buildLionAuraReason(aura)).toBe(auraReason);
     expect(buildLionAuraReason(null)).toBeNull();
+  });
+
+  // 2026-11-04 backlog parity (wolf fork 15fcfebf3 pattern): the chip copy
+  // forks on proximityMeasured exactly like the log row — the lenient face
+  // never claims "within 5 ft"; measured (and the flag-less legacy default)
+  // stays byte-identical.
+  it('forks the chip copy: lenient admits unmeasured proximity, measured stays byte-identical', () => {
+    expect(buildLionAuraReason(aura, false)).toBe(LENIENT_CHIP);
+    expect(buildLionAuraReason(aura, true)).toBe(MEASURED_CHIP);
+    expect(buildLionAuraReason(aura)).toBe(MEASURED_CHIP);
+    expect(buildLionAuraReason(null, false)).toBeNull();
+  });
+
+  it('lionAuraDisadvantageReason gates on a live disadvantage source', () => {
+    expect(lionAuraDisadvantageReason({ foldedMode: 'disadvantage', lionAura: aura, proximityMeasured: true })).toBe(MEASURED_CHIP);
+    // adv + aura cancel to normal → not a reason for this press (log/chip parity).
+    expect(lionAuraDisadvantageReason({ foldedMode: 'normal', lionAura: aura, proximityMeasured: true })).toBeNull();
+    expect(lionAuraDisadvantageReason({ foldedMode: 'disadvantage', lionAura: null, proximityMeasured: false })).toBeNull();
+  });
+
+  // Priority Target 1 audit face: band measured but aura proximity unmeasured
+  // (e.g. bearer tokenless on an active map, or stale positioned snapshot
+  // after map delete) → the stacked aura chip must carry the honest tail.
+  it('stacks the LENIENT aura chip beside a measured band reason when proximity was unmeasured', () => {
+    expect(buildDisadvantageReasons({
+      foldedMode: 'disadvantage', rangeReason: bandReason, isAutoMiss: true, rangeForcedMode: null, lionAura: aura, lionProximityMeasured: false,
+    })).toEqual([bandReason, LENIENT_CHIP]);
   });
 
   it('stacks the range band FIRST, then the aura, when both apply (miss face)', () => {
