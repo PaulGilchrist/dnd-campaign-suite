@@ -19,7 +19,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
 }));
-vi.mock('../../services/ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
+vi.mock('../../services/ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn(), patch: vi.fn() } }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(async () => ({})) }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (n) => n, guid: () => 'guid' } }));
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
@@ -112,6 +112,7 @@ describe('handleTargetChange — friendly-fire overlay bridge', () => {
         expect(setTarget).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
         expect(storage.set).not.toHaveBeenCalled();
+        expect(storage.patch).not.toHaveBeenCalled();
         expect(setCombatSummary).not.toHaveBeenCalled();
     });
 
@@ -123,7 +124,10 @@ describe('handleTargetChange — friendly-fire overlay bridge', () => {
         handlers.confirmFriendlyFireTarget('Alice', 'Bob');
 
         expect(setTarget).toHaveBeenCalledWith(combatSummary, 'Alice', 'Bob');
-        expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
+        // Scoped arming write (backlog 2026-11-04 CR): the confirmed lane
+        // ships only the armed creature's targetName, never the full board.
+        expect(storage.patch).toHaveBeenCalledWith('combatSummary', { creatures: [{ name: 'Alice', targetName: 'Bob' }] }, campaignName);
+        expect(storage.set).not.toHaveBeenCalled();
         expect(setCombatSummary).toHaveBeenCalledTimes(1);
         const friendlyCalls = addEntry.mock.calls.filter(c => c[1]?.friendlyFire);
         expect(friendlyCalls).toHaveLength(1);
@@ -146,6 +150,7 @@ describe('handleTargetChange — friendly-fire overlay bridge', () => {
         expect(setTarget).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
         expect(storage.set).not.toHaveBeenCalled();
+        expect(storage.patch).not.toHaveBeenCalled();
         expect(setCombatSummary).not.toHaveBeenCalled();
     });
 
@@ -160,6 +165,7 @@ describe('handleTargetChange — friendly-fire overlay bridge', () => {
         expect(setTarget).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
         expect(storage.set).not.toHaveBeenCalled();
+        expect(storage.patch).not.toHaveBeenCalled();
         expect(setCombatSummary).not.toHaveBeenCalled();
     });
 

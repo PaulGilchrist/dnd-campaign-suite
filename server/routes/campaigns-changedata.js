@@ -1,4 +1,5 @@
 import express from 'express';
+import lodash from 'lodash';
 import { publish, characterChangeData, markDirty, warnIfNewTopLevelKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { resolveOverrideTitles } from '../utils/resolveTrackTitles.js';
@@ -292,6 +293,109 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     publish(`change-${campaign}-${key}`, storedValue, campaign);
 
     res.json({ message: 'Data saved successfully' });
+}));
+
+/**
+ * PATCH /api/campaigns/:campaign/:key — scoped field write into an object
+ * change-data bucket (backlog 2026-11-04 CR: arming an initiative target
+ * re-POSTed the ENTIRE combatSummary — {value:{round,creatures[14…]}} — for a
+ * one-field change, and a stale-mirror snapshot carried the known
+ * full-store-snapshot clobber family). Mirrors the campaigns-character.js
+ * PATCH doctrine (:227): the client ships ONLY the changed slice (wrapped in
+ * {value:{…}} like the POST lane), the SERVER merges it into its own current
+ * truth, and the SSE echo carries the FULL merged bucket on the normal
+ * change-<campaign>-<key> channel — cross-tab adoption bytes stay identical
+ * to a full POST, and the full-replace law for snapshot writers is untouched.
+ *
+ * Merge semantics (general, not key-specific):
+ *   • object + object ⇒ recursive field merge;
+ *   • array + array where BOTH sides are string-named records (the
+ *     combatSummary.creatures convention) ⇒ per-record field merge keyed by
+ *     name: a patch record overwrites its present fields on the stored
+ *     record, every other record survives untouched. A patch record whose
+ *     name has no stored match is warned + SKIPPED — structural writes
+ *     (join/remove/clear) keep riding the full POST;
+ *   • anything else ⇒ the patch field replaces the stored field.
+ */
+function isPlainRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+// Non-empty array whose every element is a record with a string name.
+function namedRecords(value) {
+    return Array.isArray(value) && value.length > 0 &&
+        value.every(r => isPlainRecord(r) && typeof r.name === 'string');
+}
+
+function mergeNamedRecords(stored, patchRecords, skipped) {
+    const byName = new Map(stored.map(r => [r.name, r]));
+    for (const record of patchRecords) {
+        const match = byName.get(record.name);
+        if (match) {
+            mergePatchFields(match, record, skipped);
+        } else {
+            skipped.push(record.name);
+        }
+    }
+}
+
+function mergePatchFields(target, patch, skipped) {
+    for (const [key, value] of Object.entries(patch)) {
+        if (isPlainRecord(target[key]) && isPlainRecord(value)) {
+            mergePatchFields(target[key], value, skipped);
+        } else if (namedRecords(target[key]) && namedRecords(value)) {
+            mergeNamedRecords(target[key], value, skipped);
+        } else {
+            target[key] = value;
+        }
+    }
+}
+
+// PATCH /api/campaigns/:campaign/:key — see the merge doctrine above.
+router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
+    const { campaign, key } = req.params;
+    if (key === 'log' || key.endsWith('.json')) return next();
+
+    const patch = ('value' in (req.body || {})) ? req.body.value : req.body;
+    if (!isPlainRecord(patch)) {
+        return res.status(400).json({ error: `PATCH to "${key}" must wrap an object patch in {value:{…}}` });
+    }
+
+    const data = characterChangeData.get(campaign);
+    if (!isPlainRecord(data?.[key])) {
+        return res.status(404).json({
+            error: `Cannot PATCH "${key}" — no object stored under this key. ` +
+                `Structural writes create the bucket via POST /api/campaigns/${campaign}/${key}.`,
+        });
+    }
+
+    const merged = lodash.cloneDeep(data[key]);
+    const skipped = [];
+    mergePatchFields(merged, patch, skipped);
+    if (skipped.length) {
+        console.error(
+            `[campaigns-changedata] PATCH ${key} (${campaign}) skipped unmatched record(s): ` +
+            `${skipped.join(', ')} — structural writes ride the full POST.`
+        );
+    }
+
+    // Validators run on the MERGED truth — the same chokepoint the POST lane
+    // pays (unregistered keys keep today's passive property scan).
+    const validation = validateRuntimeWrite(key, merged, { req, campaign, current: data });
+    if (!validation.ok) {
+        console.log(`[${key}] BLOCKED PATCH ${campaign} — ${validation.reason}`);
+        return res.status(400).json({ error: validation.reason });
+    }
+    const storedValue = 'value' in validation ? validation.value : merged;
+
+    characterChangeData.get(campaign)[key] = storedValue;
+    markDirty(campaign);
+
+    // Broadcast the FULL merged bucket — adopters never learn a patch lane
+    // exists (byte-identical to a full POST echo).
+    publish(`change-${campaign}-${key}`, storedValue, campaign);
+
+    res.json({ message: 'Data patched successfully' });
 }));
 
 // PUT /api/campaigns/:campaign/:key — reserved-key guard only.

@@ -48,7 +48,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
     };
 });
 vi.mock('../../services/ui/storage.js', () => ({
-    default: { get: vi.fn(), set: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },
+    default: { get: vi.fn(), set: vi.fn(), patch: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },
 }));
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
     clearDeathSavePrompt: vi.fn(), sendDeathSavePrompt: vi.fn(),

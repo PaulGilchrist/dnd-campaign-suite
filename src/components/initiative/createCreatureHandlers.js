@@ -293,19 +293,35 @@ export function createCreatureHandlers({
             && getAllyList(creatureName).includes(targetName))
     }
 
-    // Shared write tail — byte-identical payload for the plain and the
-    // confirmed-friendly lane (setTarget + board POST + React republish).
+    // Shared write tail — plain and confirmed-friendly lanes arm identically
+    // (setTarget + board write + React republish). Scoped write (backlog
+    // 2026-11-04 CR): arming changes exactly one creature's targetName, so the
+    // wire carries only `{creatures:[{name,targetName}]}` via storage.patch —
+    // the server PATCH lane (campaigns-changedata.js) merges it into current
+    // board truth by creature name and broadcasts the FULL merged board on the
+    // normal change-<campaign>-combatSummary SSE channel, so cross-tab
+    // adoption is byte-identical to the old full POST and no stale-mirror
+    // snapshot can clobber other combatants' fields. Every other board lane
+    // (HP, initiative, join, remove) keeps the full-replace storage.set law.
     const applyTargetSelection = function applyTargetSelection(creatureName, targetName) {
         if (targetName && targetName.startsWith('overlay-')) {
             const overlayId = targetName.slice('overlay-'.length)
             const overlay = overlays.find(o => o.id === overlayId)
-            if (overlay) {
-                setTarget(combatSummary, creatureName, targetName)
+            if (!overlay) {
+                // Unknown overlay id — nothing armed (the legacy lane still
+                // re-POSTed an unchanged full-board snapshot here; the scoped
+                // lane honestly writes nothing, only republishes the mirror so
+                // the controlled select restores its previous value).
+                setCombatSummary(cloneDeep(combatSummary))
+                return
             }
-        } else {
-            setTarget(combatSummary, creatureName, targetName)
         }
-        storage.set('combatSummary', combatSummary, campaignName)
+        setTarget(combatSummary, creatureName, targetName)
+        // Unknown creatures never arm (setTarget is inert for them too) — the
+        // server patch lane would skip such a record with a warning anyway.
+        if (combatSummary.creatures.some(c => c.name === creatureName)) {
+            storage.patch('combatSummary', { creatures: [{ name: creatureName, targetName: targetName || null }] }, campaignName)
+        }
         setCombatSummary(cloneDeep(combatSummary))
     }
 

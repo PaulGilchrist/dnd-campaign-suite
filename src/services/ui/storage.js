@@ -76,7 +76,34 @@ const storage = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value })
           }).catch((e) => { console.error("[storage:error]", e); });
-      }
+      },
+    // Scoped field-patch write (backlog 2026-11-04 CR): ships only the
+    // changed slice; the server PATCH lane (server/routes/campaigns-changedata.js)
+    // merges it into current truth and broadcasts the FULL merged bucket on the
+    // normal change-<campaign>-<key> SSE channel — cross-tab adoption is
+    // byte-identical to a full POST while the wire stays small. combatSummary
+    // patches serialize through the SAME per-campaign queue as full POSTs so a
+    // tab's scoped and snapshot writes keep their call order on the wire.
+    patch: (key, value, campaignName) => {
+        if (!campaignName) {
+            console.error('storage.patch called with undefined campaignName', { key, value, stack: new Error().stack });
+            return Promise.resolve(false);
+        }
+        const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`;
+        const send = () => fetch(fullUrl, {
+            method: 'PATCH',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value })
+        }).then((response) => response.ok)
+          .catch((e) => { console.error("[storage:error]", e); return false; });
+        if (key === 'combatSummary') {
+            const queue = getCombatSummaryQueue(campaignName);
+            queue.pending = queue.pending.then(send);
+            return queue.pending;
+        }
+        return send();
+    }
 }
 
 export default storage

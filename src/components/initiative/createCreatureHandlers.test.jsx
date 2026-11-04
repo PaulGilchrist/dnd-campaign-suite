@@ -51,7 +51,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
     };
 });
 vi.mock('../../services/ui/storage.js', () => ({
-    default: { get: vi.fn(), set: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },
+    default: { get: vi.fn(), set: vi.fn(), patch: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },
 }));
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({ clearDeathSavePrompt: vi.fn() }));
 vi.mock('../../services/npcs/monsterUtils.js', () => ({ getMonsterImageUrl: vi.fn(() => Promise.resolve(null)), getMonsterData: vi.fn(() => Promise.resolve(null)) }));
@@ -345,7 +345,10 @@ describe('handleNameChange', () => {
             handlers.handleTargetChange('Alice', 'Goblin');
 
             expect(setTarget).toHaveBeenCalledWith(combatSummary, 'Alice', 'Goblin');
-            expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
+            // Scoped arming write (backlog 2026-11-04 CR): only the armed
+            // creature's targetName rides the wire.
+            expect(storage.patch).toHaveBeenCalledWith('combatSummary', { creatures: [{ name: 'Alice', targetName: 'Goblin' }] }, campaignName);
+            expect(storage.set).not.toHaveBeenCalled();
         });
     });
 });
@@ -366,10 +369,17 @@ describe('handleTargetChange', () => {
 
         if (accepted) {
             expect(setTarget).toHaveBeenCalledWith(combatSummary, 'Alice', target);
+            // Scoped arming write (backlog 2026-11-04 CR): the select's change
+            // ships ONLY {creatures:[{name,targetName}]} — never the full
+            // {round,creatures[…]} board snapshot.
+            expect(storage.patch).toHaveBeenCalledWith('combatSummary', { creatures: [{ name: 'Alice', targetName: target || null }] }, campaignName);
         } else {
             expect(setTarget).not.toHaveBeenCalled();
+            // Unknown overlay: nothing armed, nothing written (the legacy lane
+            // still POSTed an unchanged full-board snapshot here).
+            expect(storage.patch).not.toHaveBeenCalled();
         }
-        expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
+        expect(storage.set).not.toHaveBeenCalled();
         expect(setCombatSummary).toHaveBeenCalledTimes(1);
     });
 });
@@ -580,6 +590,7 @@ describe('no-combat guards', () => {
         live.handlers.handleCreatureHpChange('Nobody', 5);
 
         expect(storage.set).not.toHaveBeenCalled();
+        expect(storage.patch).not.toHaveBeenCalled();
         expect(setCombatSummary).not.toHaveBeenCalled();
         expect(live.setCombatSummary).not.toHaveBeenCalled();
         expect(removeNpc).not.toHaveBeenCalled();

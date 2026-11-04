@@ -170,4 +170,70 @@ describe('storage — server-first fetch transport', () => {
             expect(fetchCalls[3].url).toBe('/api/campaigns/test-campaign-2/combatSummary');
         });
     });
+
+    // ── patch(key, value, campaignName) — scoped field-write lane ─────
+    // (improvement backlog 2026-11-04 CR: arming a target ships only the
+    // changed creature slice; the server PATCH lane merges + echoes the FULL
+    // bucket. See server/routes/campaigns-changedata.combatsummary-patch.test.js.)
+    describe('patch', () => {
+        it('PATCHs the exact encoded URL with the JSON {value} wrapper and every option byte pinned', async () => {
+            const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}, true));
+
+            await storage.patch('my key&t', { creatures: [{ name: 'Bandit', targetName: 'Alice' }] }, 'test campaign/e1');
+
+            expect(spy).toHaveBeenCalledWith(
+                '/api/campaigns/test%20campaign%2Fe1/my%20key%26t',
+                {
+                    method: 'PATCH',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{"value":{"creatures":[{"name":"Bandit","targetName":"Alice"}]}}',
+                }
+            );
+        });
+
+        it('serializes combatSummary patches behind full POSTs of the same campaign (shared write queue)', async () => {
+            fetchCalls.length = 0;
+            queueingFetch();
+
+            const pSet = storage.set('combatSummary', { round: 1, creatures: [] }, 'test-campaign');
+            const pPatch = storage.patch('combatSummary', { creatures: [{ name: 'Bandit', targetName: 'Alice' }] }, 'test-campaign');
+            await Promise.resolve(); // flush the queue — only the first write has fired
+
+            expect(fetchCalls).toHaveLength(1); // patch serialized behind the unresolved POST
+            expect(fetchCalls[0].opts.method).toBe('POST');
+            fetchCalls[0].resolve(jsonResponse({}));
+            await pSet;
+            expect(fetchCalls).toHaveLength(2);
+            expect(fetchCalls[1].opts.method).toBe('PATCH'); // call order preserved on the wire
+            fetchCalls[1].resolve(jsonResponse({ ok: true }));
+            await expect(pPatch).resolves.toBe(true);
+        });
+
+        it('resolves FALSE (not a throw) on PATCH rejection or transport failure, logging [storage:error] bytes', async () => {
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const spy = vi.spyOn(globalThis, 'fetch');
+
+            spy.mockResolvedValue(jsonResponse({}, false));
+            await expect(storage.patch('combatSummary', {}, 'test-campaign')).resolves.toBe(false);
+
+            const err = new Error('server down');
+            spy.mockRejectedValue(err);
+            await expect(storage.patch('someKey', {}, 'test-campaign')).resolves.toBe(false);
+            expect(errorSpy).toHaveBeenCalledWith('[storage:error]', err);
+        });
+
+        it('logs console bytes and resolves false without fetching when campaignName is missing', async () => {
+            const spy = vi.spyOn(globalThis, 'fetch');
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await expect(storage.patch('combatSummary', { creatures: [] })).resolves.toBe(false);
+
+            expect(spy).not.toHaveBeenCalled();
+            expect(errorSpy).toHaveBeenCalledWith(
+                'storage.patch called with undefined campaignName',
+                expect.objectContaining({ key: 'combatSummary', value: { creatures: [] } })
+            );
+        });
+    });
 });
