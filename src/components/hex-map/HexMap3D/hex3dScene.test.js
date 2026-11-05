@@ -10,6 +10,7 @@ import {
     chainRiverHexes,
     weatherParticlesFor,
     poiShapeSpec,
+    labelSpriteLayout,
     TERRAIN_BASE,
     TERRAIN_RELIEF,
     CONTOUR_BAND,
@@ -174,5 +175,45 @@ describe('chainRiverHexes', () => {
         expect(chains[0]).toHaveLength(2);
         expect(chainRiverHexes([], 10, 10)).toEqual([]);
         expect(chainRiverHexes(undefined, 10, 10)).toEqual([]);
+    });
+});
+
+describe('labelSpriteLayout', () => {
+    // The clip regression (CV 2026-11-05): names wider than the old fixed
+    // 512px canvas lost their first/last glyphs ("he Watcher Ston").
+
+    it('keeps the legacy 512×128 canvas + 64×16 sprite for short names', () => {
+        const l = labelSpriteLayout(200);
+        expect(l.canvasWidth).toBe(512);
+        expect(l.canvasHeight).toBe(128);
+        expect(l.centerX).toBe(256);
+        expect(l.centerY).toBe(64);
+        expect(l.spriteScaleX).toBe(64);
+        expect(l.spriteScaleY).toBe(16);
+    });
+
+    it('widens the canvas past text + outline + padding for long names', () => {
+        const l = labelSpriteLayout(620); // "The Watcher Stone" at bold 64px
+        expect(l.canvasWidth).toBeGreaterThanOrEqual(620 + 10 + 24 * 2);
+        expect(l.centerX).toBe(l.canvasWidth / 2);
+        // Half the outline + padding survives on each side of the glyphs.
+        expect(l.centerX - 620 / 2).toBeGreaterThanOrEqual(24 + 5);
+    });
+
+    it('keeps sprite aspect proportional to canvas aspect (no stretch, constant glyph height)', () => {
+        for (const w of [100, 512, 620, 1200]) {
+            const l = labelSpriteLayout(w);
+            expect(l.spriteScaleX / l.spriteScaleY).toBeCloseTo(l.canvasWidth / l.canvasHeight, 6);
+            expect(l.spriteScaleY).toBe(16);
+        }
+    });
+
+    it('is monotone: a wider measurement never shrinks the canvas', () => {
+        let prev = 0;
+        for (let w = 0; w <= 1500; w += 37) {
+            const l = labelSpriteLayout(w);
+            expect(l.canvasWidth).toBeGreaterThanOrEqual(prev);
+            prev = l.canvasWidth;
+        }
     });
 });

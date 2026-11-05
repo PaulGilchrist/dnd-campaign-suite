@@ -267,6 +267,33 @@ const POI_MODEL_CACHE = new Map();
 const POI_MODEL_SPAN = 48;
 const POI_MODEL_MAX_H = 72;
 
+// Label-sprite canvas metrics: glyph font, stroke outline half-slop, side
+// padding, and the world height every label keeps (short names ride the old
+// 512×128 floor untouched; long names widen the canvas instead of clipping).
+const LABEL_FONT = 'bold 64px -apple-system, sans-serif';
+const LABEL_CANVAS_HEIGHT = 128;
+const LABEL_OUTLINE = 10;
+const LABEL_PADDING = 24;
+const LABEL_MIN_WIDTH = 512;
+const LABEL_WORLD_HEIGHT = 16;
+
+// Canvas + sprite geometry for a measured text width (px from ctx.measureText).
+// Exported pure so tests can pin the sizing lane without a WebGL context: the
+// sprite scale stays proportional to the canvas aspect (glyph size constant),
+// and the draw centre is always the canvas midpoint at textAlign 'center'.
+export function labelSpriteLayout(measuredWidth) {
+    const needed = Math.ceil(measuredWidth) + LABEL_OUTLINE + LABEL_PADDING * 2;
+    const canvasWidth = Math.max(LABEL_MIN_WIDTH, needed);
+    return {
+        canvasWidth,
+        canvasHeight: LABEL_CANVAS_HEIGHT,
+        centerX: canvasWidth / 2,
+        centerY: LABEL_CANVAS_HEIGHT / 2,
+        spriteScaleX: LABEL_WORLD_HEIGHT * (canvasWidth / LABEL_CANVAS_HEIGHT),
+        spriteScaleY: LABEL_WORLD_HEIGHT,
+    };
+}
+
 export class Hex3DScene {
     constructor(container) {
         this.container = container;
@@ -464,21 +491,28 @@ export class Hex3DScene {
     _makeLabel(text) {
         const THREE = this.THREE;
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
+        // Measure on the default context, then size the canvas around the text
+        // so first/last glyphs never clip (resizing resets ctx state, so all
+        // styling is (re)applied afterwards).
+        const measureCtx = canvas.getContext('2d');
+        measureCtx.font = LABEL_FONT;
+        const measured = measureCtx.measureText(text).width;
+        const layout = labelSpriteLayout(measured);
+        canvas.width = layout.canvasWidth;
+        canvas.height = layout.canvasHeight;
         const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 64px -apple-system, sans-serif';
+        ctx.font = LABEL_FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.lineWidth = 10;
+        ctx.lineWidth = LABEL_OUTLINE;
         ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-        ctx.strokeText(text, 256, 64);
+        ctx.strokeText(text, layout.centerX, layout.centerY);
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(text, 256, 64);
+        ctx.fillText(text, layout.centerX, layout.centerY);
         const tex = new THREE.CanvasTexture(canvas);
         tex.anisotropy = 4;
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-        sprite.scale.set(64, 16, 1);
+        sprite.scale.set(layout.spriteScaleX, layout.spriteScaleY, 1);
         sprite.renderOrder = 999;
         sprite.userData.isTokenLabel = true;
         sprite.visible = this.showLabels;

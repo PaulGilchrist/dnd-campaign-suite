@@ -73,7 +73,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- **2026-11-05 CV — hex-3D POI labels clip:** sprite-label textures cut first/last glyphs ("he Watcher Ston", "Barrow of Whisp", "Barrow of Whisq" top-down) — widen the label canvas/padding in `hex3dScene.js` label builder.
 - **2026-11-05 CV — `web` sprite contrast:** nearly invisible on the dark indoor grid at native 36 px (item-showcase row 4) — art pass for stroke contrast/brightness; `torch` flame sits visibly off-centre in its top-down render (cosmetic).
 
 ## Blocked / Deepen Targets (fold-gate ledger)
