@@ -15,7 +15,7 @@
 // NOT mocked here — it is a pure exact-name lookup (shared/featFinder.js) exercised for real
 // against the disk rows.
 //
-// CARRIED DEFECT/QUIRK PIN x3 (#2016/#2018/#2020 carry; playbook test-setup-playbook.md:357)
+// CARRIED DEFECT/QUIRK PIN x3 (#2016/#2018/#2020 carry; playbook test-setup-playbook.md §13 "Feats/ASI mechanics")
 // — SPA-CACHE ROW MUTATION at featBuffService.js:626-627:
 //   feature.automation.saveType = resolved; delete feature.automation.fallbackTypes;
 //   feature.automation reaches the resolver as a DIRECT REFERENCE, not a copy, whenever the

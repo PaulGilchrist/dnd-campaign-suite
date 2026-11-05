@@ -14,8 +14,8 @@
 // DELEGATION DISCHARGE (#1538, verbatim claim: 'Removed: "no-space paren" (nameUtils.test.js owns the regex, covered)'):
 //   Owned rows live: no-space-paren arm 'Grimjaw(Orc)' + 'Damage(No Weapons)' below; strip/extract arms
 //   (empty-paren, multi-paren greedy, mid-string $-anchor, nested no-match) all pinned here. Cite rows: k2/k3/k4.
-// PLAYBOOK INTERSECTION (docs/test-setup-playbook.md:393 '2024 feat PUT: string-form feats only — dict form
-//   breaks findFeat name.replace'): findFeat delegates the crash to THIS layer — contract pinned byte-exact in
+// PLAYBOOK INTERSECTION (docs/test-setup-playbook.md §16 "Char-JSON / campaign data safety":
+//   '2024 feat PUT: string-form feats only — dict form breaks findFeat name.replace'): findFeat delegates the crash to THIS layer — contract pinned byte-exact in
 //   'unguarded deref' tests: dict/number/array -> TypeError 'name.replace is not a function' (stripParenthetical).
 // NORMALIZATION LAW MATRIX:
 //   stripParenthetical: name.replace(/\s*\([^)]*\)\s*$/, '').trim() — trailing-only paren block, \s-class flanks,
@@ -86,7 +86,7 @@ describe('stripParenthetical — trailing paren-block removal (featFinder/featVa
     expect(stripped.map(stripParenthetical)).toEqual(stripped);
   });
 
-  it('unguarded deref: every non-string throws TypeError, nullish NOT absorbed; dict-form crash precedent docs/test-setup-playbook.md:393', () => {
+  it('unguarded deref: every non-string throws TypeError, nullish NOT absorbed; dict-form crash precedent docs/test-setup-playbook.md §16', () => {
     expect(() => stripParenthetical(null)).toThrow(TypeError);
     expect(() => stripParenthetical(undefined)).toThrow(TypeError);
     // dict form (the PUT-pitfall shape that crashes findFeat, featFinder.test.js:98 cites this lane):

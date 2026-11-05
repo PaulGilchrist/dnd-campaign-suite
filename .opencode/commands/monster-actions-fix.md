@@ -39,7 +39,7 @@ Monster-action bugs live in **two layers**, and the subagent must fix the right 
       - the deleted bug file (`git rm` the path if it still shows as deleted-but-unstaged).
       Commit message: first line `fix(<BUG-ID>): <title>` where `<BUG-ID>` is the row id (e.g. `MA-0031`) and `<title>` is the `## Title` text from the bug file (for disproved outcomes use `disproved(<BUG-ID>): <title>`). Do not add `Co-authored-by` or other trailers unless the repo history already uses them.
 
-   e. **If the subagent reported a new playbook recipe or pitfall it hit,** append it to `docs/test-setup-playbook.md` now, so later bugs in this same run benefit.
+   e. **If the subagent reported a new playbook recipe or pitfall it hit,** fold it into `docs/test-setup-playbook.md` — file it per the playbook's charter NOW (a single bullet under the matching canonical section; correct stale bullets IN PLACE — never a "SUPERSEDES" note, never a new dated/ticket heading; per-run narratives belong in `docs/test-setup-playbook-archive-2026-11.md`), so later items in this same run — and future runs — benefit.
 
    f. **Retry rule (FAILED only):** re-dispatch exactly once with the subagent's failure notes prepended, so the retry doesn't repeat the same dead end. If the retry also fails, leave the bug file in place, set the manifest row per (c), and move on. Do not retry a third time — that needs a human.
 

@@ -28,7 +28,7 @@ __ROW_JSON__
 8. Summon-type spells (summon_spirit: Animate Objects, Summon Beast & kin): verify via the CAST path — caster PC casts, merged combatant's card is the test target. A flat EB-direct copy with suppressed dynamic rows is HONEST BY DESIGN (MA-0286) — never FAIL for that.
 9. When a monster forces a save on a character, arm the target on the MONSTER's own card (`targetName` select) — unarmed monster rolls hang forever.
 
-## Playbook essentials (full: docs/test-setup-playbook.md — read its sections 1–8 if you need more; extra detail in ctx/playbook-core.md)
+## Playbook essentials (full: docs/test-setup-playbook.md — read its sections 1–8 if you need more; extra detail in ctx/playbook-core.md; pre-2026-11-05 run history: grep docs/test-setup-playbook-archive-2026-11.md)
 - EB joins: checkbox `input.checked` must be TRUE before Join (may need 2-3 mouse clicks); Join may MCP-timeout while succeeding — poll /api/campaigns/test-campaign/combatSummary.
 - Arm target via initiative-card `[data-testid="target-select"]` Playwright selectOption BEFORE clicking attack/save chips; anchor the target-select under `img.avatar-image[alt="<Name>"]`'s ancestor card.
 - HIT popup "Done" = `button.dice-roll-reroll-btn` — Done applies damage, backdrop dismiss ABANDONS. Click "Done" after attacks resolve; do not skip.

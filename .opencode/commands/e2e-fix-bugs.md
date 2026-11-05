@@ -38,7 +38,7 @@ If a bounded attempt times out, treat it as missing information, not a failure t
       - the fixed source file(s) and new regression test file(s) as listed in the subagent's return message,
       - the bug file's move: `git add` both the old path (deletion) and `.opencode/plans/resolved/<bug-file>.md`.
       Commit message: first line `fix(<slug>): <title>` where `<slug>` is the bug file's slug and `<title>` is the `## Summary` text from the bug file (for disproved outcomes use `disproved(<slug>): <title>`). Do not add `Co-authored-by` or other trailers unless the repo history already uses them. Never commit on FAILED.
-   e. **If the subagent reported a new playbook recipe or a new pitfall it hit**, append it to `docs/test-setup-playbook.md` now, so later bugs in this same run benefit.
+   e. **If the subagent reported a new playbook recipe or a new pitfall it hit**, fold it into `docs/test-setup-playbook.md` — file it per the playbook's charter NOW (a single bullet under the matching canonical section; correct stale bullets IN PLACE — never a "SUPERSEDES" note, never a new dated/ticket heading; per-run narratives belong in `docs/test-setup-playbook-archive-2026-11.md`), so later items in this same run — and future runs — benefit.
    f. Move to the next bug file. Each subagent starts with clean context — do not carry findings or code changes from one bug into the next.
 5. When the queue is empty, report a summary: how many bugs were fixed, disproved, and failed, with the commit hash for committed rows and the resolved file paths.
 

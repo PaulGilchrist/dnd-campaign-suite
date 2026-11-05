@@ -35,7 +35,7 @@ If the manifest row's wording contradicts canonical PHB/app data and the GM supp
 
 ## Support files (create if they don't exist)
 
-- `docs/test-setup-playbook.md` — accumulated known-good recipes ("how to build a 2024 Monk," "how to force a failed saving throw," "how to join an encounter with a specific monster") **and** the pitfalls list above. Grows over time as subagents succeed or get tripped up.
+- `docs/test-setup-playbook.md` — accumulated known-good recipes ("how to build a 2024 Monk," "how to force a failed saving throw," "how to join an encounter with a specific monster") **and** the pitfalls list above, organized ONLY under its canonical sections (fix stale bullets in place; dated run/ticket narratives go to `docs/test-setup-playbook-archive-2026-11.md`). Grows over time as subagents succeed or get tripped up.
 - `docs/test-character-registry.json` — list of existing test characters and NPCs already present in "test-campaign," keyed by class/subclass/race/subrace/feat/background (for characters) or name (for NPCs), so reuse is a lookup instead of a search.
 - `docs/test-monster-registry.json` — monsters already in `test-campaign` initiative, keyed by monster name, with the config each test needed, so reuse is a lookup not a rebuild. The playbook above is SHARED with monster-actions-verify — append to it, don't fork it.
 
@@ -55,7 +55,7 @@ If the manifest row's wording contradicts canonical PHB/app data and the GM supp
 
     e. **If the subagent reports a new character/NPC** (whether created or reused-and-confirmed), record it in `docs/test-character-registry.json` now; **if it reports a monster newly placed into `test-campaign` initiative, record it in `docs/test-monster-registry.json`** — before moving to the next row.
 
-   f. **If the subagent reports a new playbook recipe or a new pitfall it ran into** (something that cost it real time before it figured out the fix), append it to `docs/test-setup-playbook.md` now, so later rows in this same run — and future runs — benefit from it.
+   f. **If the subagent reports a new playbook recipe or a new pitfall it ran into** (something that cost it real time before it figured out the fix), fold it into `docs/test-setup-playbook.md` — file it per the playbook's charter NOW (a single bullet under the matching canonical section; correct stale bullets IN PLACE — never a "SUPERSEDES" note, never a new dated/ticket heading; per-run narratives belong in `docs/test-setup-playbook-archive-2026-11.md`), so later items in this same run — and future runs — benefit.
 
    g. **If a row comes back "incomplete":** FIRST check the incomplete-report against the verdict rules. If its stated reason is that the feature is unimplemented / has no consumer / is an inert row / a control probe shows zero delta — that is FAIL: convert the row to `"broken — see .opencode/plans/bug-<slug>.md"` yourself (write the bug file from the report's evidence; keep any design notes inside the bug file's Notes section) and delete the incomplete file. Only genuine setup-blocked incompletes proceed: re-dispatch exactly once more with the same inputs plus the note from its incomplete-report (what it got stuck on) prepended, so the retry doesn't repeat the same dead end. If the retry is *also* incomplete, leave it as `"incomplete — needs manual setup — see .opencode/plans/incomplete-<slug>.md"` and move on. Do not retry a third time automatically — that's a signal it genuinely needs a human, not more subagent time.
 

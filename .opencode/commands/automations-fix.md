@@ -10,7 +10,7 @@ This command pairs with `automations-verify`: verify produces the bug files in `
 ## Support files
 
 - `docs/automations-manifest.json` — the coverage manifest. Each row has an `id`, `name`, `verified` field (`"verified"`, `"broken — see ..."`, `"incomplete — ..."`, or `"needs manual decision — ..."`), plus handler/router/infoBuilder paths and expectedBehavior.
-- `docs/test-setup-playbook.md` — accumulated known-good setup recipes and pitfalls (maintained by automations-verify; read it if present, and have subagents append new pitfalls).
+- `docs/test-setup-playbook.md` — accumulated known-good setup recipes and pitfalls, canonical sections only (maintained by automations-verify; read it if present; per-run history lives in `docs/test-setup-playbook-archive-2026-11.md`).
 - `docs/app-exploration.md` — read before any subagent touches the running app.
 
 ## Primary agent steps
@@ -34,7 +34,7 @@ This command pairs with `automations-verify`: verify produces the bug files in `
       - the deleted bug file (`git rm` the path if it still shows as deleted-but-unstaged).
        Commit message: first line `fix(<BUG-ID>): <title>` where `<BUG-ID>` is the row id (e.g. `CLA-192`) and `<title>` is the `## Title` text from the bug file (for disproved outcomes use `disproved(<BUG-ID>): <title>`). Do not add `Co-authored-by` or other trailers unless the repo history already uses them.
 
-   e. **If the subagent reported a new playbook recipe or a new pitfall it hit**, append it to `docs/test-setup-playbook.md` now, so later bugs in this same run benefit.
+   e. **If the subagent reported a new playbook recipe or a new pitfall it hit**, fold it into `docs/test-setup-playbook.md` — file it per the playbook's charter NOW (a single bullet under the matching canonical section; correct stale bullets IN PLACE — never a "SUPERSEDES" note, never a new dated/ticket heading; per-run narratives belong in `docs/test-setup-playbook-archive-2026-11.md`), so later items in this same run — and future runs — benefit.
 
    f. **Retry rule (FAILED only):** re-dispatch exactly once with the subagent's failure notes prepended to the prompt, so the retry doesn't repeat the same dead end. If the retry also fails, leave the bug file in place, set the manifest row per (c), and move on. Do not retry a third time — that's a signal it needs a human.
 

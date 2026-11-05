@@ -36,7 +36,7 @@ If a row's `description` contradicts canonical app/PHB data and the GM supplies 
 
 ## Support files (create if they don't exist)
 
-- `docs/test-setup-playbook.md` — accumulated known-good recipes ("how to put a specific monster into initiative," "how to force a monster failed saving throw," "how to line up two targets for an AoE cone") **and** the pitfalls list above. This is the SAME playbook automations-verify maintains — append monster recipes to it, don't fork it.
+- `docs/test-setup-playbook.md` — accumulated known-good recipes ("how to put a specific monster into initiative," "how to force a monster failed saving throw," "how to line up two targets for an AoE cone") **and** the pitfalls list above, organized ONLY under its canonical sections (fix stale bullets in place; dated run/ticket narratives go to `docs/test-setup-playbook-archive-2026-11.md`). This is the SAME playbook automations-verify maintains — add monster recipes to it, don't fork it.
 - `docs/test-monster-registry.json` — monsters already added to `test-campaign` initiative keyed by monster name, with the config each test needed (targets, CR, any edits), so reuse is a lookup not a rebuild.
 
 ## Primary agent steps
@@ -53,7 +53,7 @@ If a row's `description` contradicts canonical app/PHB data and the GM supplies 
 
    d. **If the subagent reports a monster newly placed into `test-campaign`,** record it in `docs/test-monster-registry.json` now, before the next row.
 
-   e. **If it reports a new playbook recipe or a new pitfall** that cost real time, append it to `docs/test-setup-playbook.md` now.
+   e. **If it reports a new playbook recipe or a new pitfall** that cost real time, fold it into `docs/test-setup-playbook.md` — file it per the playbook's charter NOW (a single bullet under the matching canonical section; correct stale bullets IN PLACE — never a "SUPERSEDES" note, never a new dated/ticket heading; per-run narratives belong in `docs/test-setup-playbook-archive-2026-11.md`), so later items in this same run — and future runs — benefit.
 
    f. **If a row comes back "incomplete":** check it against the verdict rules first. If its stated reason is that the mechanic is unimplemented / inert / has no consumer / the control probe shows zero delta — that is FAIL: convert the row to `"broken — see .opencode/plans/bug-mon-<id>-<slug>.md"` yourself (write the bug file from the report's evidence, keep design notes in its Notes section) and delete the incomplete file. Only genuine setup-blocked incompletes proceed: re-dispatch exactly once with the same inputs plus its blocker note prepended. If the retry is also incomplete, leave it `"incomplete — needs manual setup — see ..."` and move on. Do not retry a third time — that's a signal it needs a human.
 

@@ -15,7 +15,7 @@
 //   #2020 computeAllFeatBuffs.edge-cases             — aggregate null/undefined tolerance
 //   #2021 computeAllFeatBuffs.resilient              — aggregate saveType resolution via
 //         resolveFeatChosenAbility (NOTE: mutates SPA-cached feats.json rows in place,
-//         L626-627 — see test-setup-playbook.md:357)
+//         L626-627 — see test-setup-playbook.md §13 "Feats/ASI mechanics")
 //   #2022 computeFeatBuffs.2024                        — single-feat parser, structured benefits
 //   #2023 computeFeatBuffs.5e                          — single-feat parser, first-match-wins
 //         text rules (BENEFIT_TEXT_RULES_5E, L95-109) with 'Passive Benefit' fallback
