@@ -26,3 +26,8 @@
     opacity: 0.7;
     font-size: 0.85em;
 }
+
+/* Self-only "trust no one" hint (sp-overlay family note, scoped spacing only). */
+.ally-hostile-hint {
+    margin: 0 0 8px;
+}

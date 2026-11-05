@@ -181,6 +181,50 @@ describe('AllySelectionModal', () => {
     expect(onConfirm).toHaveBeenCalledWith(['Goblin']);
   });
 
+  // ── Self-only "trust no one" hint ──
+
+  const hint = () =>
+    screen.queryByText(/Select only yourself to trust no one/i);
+
+  it('shows the self-only hint while nothing is selected, beside the disabled Confirm', () => {
+    renderModal();
+
+    expect(hint()).toBeVisible();
+    expect(screen.getByRole('button', { name: /Confirm Allies \(0\)/ })).toBeDisabled();
+  });
+
+  it('hides the self-only hint as soon as one ally is selected', () => {
+    renderModal();
+    expect(hint()).toBeInTheDocument();
+
+    fireEvent.click(checkboxFor('Goblin'));
+
+    expect(hint()).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Confirm Allies \(1\)/ })).not.toBeDisabled();
+  });
+
+  it('re-shows the hint when the last selection is cleared', () => {
+    renderModal({ currentAllies: ['Orc'] });
+    expect(hint()).not.toBeInTheDocument();
+
+    fireEvent.click(checkboxFor('Orc'));
+
+    expect(hint()).toBeInTheDocument();
+  });
+
+  it('keeps the hint hidden when pre-selected allies are present', () => {
+    renderModal({ currentAllies: ['Goblin', 'Orc'] });
+
+    expect(hint()).not.toBeInTheDocument();
+  });
+
+  it('does not show the hint when there are no creatures to select', () => {
+    renderModal({ creatures: [] });
+
+    expect(hint()).not.toBeInTheDocument();
+    expect(screen.getByText('No creatures available.')).toBeInTheDocument();
+  });
+
   // ── Confirm ──
 
   it('disables confirm until at least one ally is selected', () => {

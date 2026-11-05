@@ -55,6 +55,14 @@ export default function AllySelectionModal({
                         </button>
                         <span className="ally-count">{selected.length} selected</span>
                     </div>
+                    {/* Self-only is the sanctioned "trust no one" route (useAllyEditor
+                        mirrors the monster-card lane); surface it while Confirm is
+                        still disabled at 0 so the escape hatch is not invisible. */}
+                    {selected.length === 0 && creatures.length > 0 && (
+                        <p className="sp-note ally-hostile-hint">
+                            Select only yourself to trust no one.
+                        </p>
+                    )}
                     <div className="secondary-target-list">
                         {creatures.map((creature, i) => {
                         const name = creature.name;
