@@ -294,6 +294,26 @@ function DeleteCampaignModal({ campaignName, typedName, onTypedNameChange, error
     );
 }
 
+// Regenerate-Adventure gate (backlog 2026-11-04 CS): the Admin starter lane's
+// last native window.confirm migrated onto the shared DeleteConfirmModal
+// role="dialog" tier — the same reuse precedent FriendlyFireConfirmModal set.
+// The retired native copy lives here VERBATIM (minus the "Continue?" tail the
+// explicit buttons now answer) so the table sees the exact same ask; the
+// confirm label differs from the trigger button so role queries stay unique.
+function RegenerateAdventureModal({ campaignName, onCancel, onConfirm }) {
+    return (
+        <DeleteConfirmModal
+            titleId="regenerate-adventure-title"
+            title="Regenerate Adventure"
+            confirmLabel="Yes, Regenerate"
+            onCancel={onCancel}
+            onConfirm={onConfirm}
+        >
+            {`Regenerate the adventure in "${campaignName}"? A brand-new dungeon with fresh monsters and treasure replaces the current one, and the portal and main quest are re-pointed at it. The settlement, party, and log stay.`}
+        </DeleteConfirmModal>
+    );
+}
+
 function ConfirmModal({ modal, onClose }) {
     return (
         <div className="ct-modal-overlay">
@@ -387,6 +407,10 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [deleteTypedName, setDeleteTypedName] = useState('');
     const [deleteError, setDeleteError] = useState(null);
+    // Regenerate-Adventure gate (role=dialog tier, backlog 2026-11-04 CS):
+    // ephemeral modal-open flag only — the mutation itself stays in
+    // confirmRegenerateAdventure, mirroring the old confirm→work shape.
+    const [regenModalOpen, setRegenModalOpen] = useState(false);
     // The upload file input, so a dismissed (cancelled) Upload confirm can
     // reset it — otherwise the cancelled file stays selected and re-choosing
     // the SAME file fires no change event (silent no-op).
@@ -447,13 +471,14 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         loadSnapshots();
     }, [loadSnapshots]);
 
-    // Starter adventure regenerate (arena-starter §3.2): named-confirm before
-    // the durable mutation (house canon). Re-rolls dungeon/monsters/treasure
-    // through the shared orchestrator; settlement, party, and log untouched.
-    const handleRegenerateAdventure = async () => {
-        if (!window.confirm(`Regenerate the adventure in "${campaignName}"? A brand-new dungeon with fresh monsters and treasure replaces the current one, and the portal and main quest are re-pointed at it. The settlement, party, and log stay. Continue?`)) {
-            return;
-        }
+    // Starter adventure regenerate (arena-starter §3.2): the old native
+    // window.confirm gate now opens the shared RegenerateAdventureModal
+    // (role=dialog tier, backlog 2026-11-04 CS); the mutation runs
+    // UNCHANGED from the modal's Confirm — Re-rolls dungeon/monsters/
+    // treasure through the shared orchestrator; settlement, party, and log
+    // untouched. Cancel is fully inert: no status, no request.
+    const confirmRegenerateAdventure = async () => {
+        setRegenModalOpen(false);
         setStatus('regenerating-adventure');
         try {
             const result = await regenerateAdventure(campaignName);
@@ -832,7 +857,7 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                                 main quest. The village, party, and campaign log stay exactly as they are.
                             </p>
                             {isLocalhost ? (
-                                <button className="ct-btn ct-btn-primary" onClick={handleRegenerateAdventure} disabled={isBusy}>
+                                <button className="ct-btn ct-btn-primary" onClick={() => setRegenModalOpen(true)} disabled={isBusy}>
                                     <i className="fas fa-dice"></i> Regenerate Adventure
                                 </button>
                             ) : (
@@ -929,6 +954,14 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                     error={deleteError}
                     onCancel={closeDeleteModal}
                     onConfirm={handleDeleteConfirm}
+                />
+            )}
+
+            {regenModalOpen && (
+                <RegenerateAdventureModal
+                    campaignName={campaignName}
+                    onCancel={() => setRegenModalOpen(false)}
+                    onConfirm={confirmRegenerateAdventure}
                 />
             )}
 
