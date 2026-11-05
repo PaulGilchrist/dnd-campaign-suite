@@ -868,6 +868,31 @@
     color: #996600;
 }
 
+/* Deactivated-map advisory chip (backlog 2026-11-05 CW) — sits in the map
+   header between the title and the toolbar when the mounted board is no
+   longer the campaign's active map. Same amber hint tokens as .ruler-hint
+   (informational, non-blocking); inline chip so the sticky toolbar row keeps
+   its single-line layout. */
+.map .map-deactivated-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-bottom: 12px; /* mirrors the h4's baseline offset in the header row */
+    background: rgba(255, 204, 0, 0.12);
+    border: 1px solid rgba(255, 204, 0, 0.35);
+    border-radius: 4px;
+    color: #ffcc00;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+[data-theme="light"] .map .map-deactivated-hint {
+    background: rgba(255, 204, 0, 0.08);
+    border-color: #cc9900;
+    color: #996600;
+}
+
 /* Enforcement snap-back toast — display-only visibility for the movement-budget
    clamp (mirrors the .sessions-toast / .encounter-toast / .music-toast tokens;
    amber = enforcement notice, not a success). Fixed + centered so it reads

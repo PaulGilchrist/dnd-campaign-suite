@@ -76,8 +76,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- [2026-11-05 CW] A player left viewing a map the GM just deactivated keeps the full board with zero signal it is no longer "the table's map" (never-hijack is correct, the silence is the gap): consider a subtle header hint (e.g. "GM deactivated this map — view continues read-only"). `App.jsx` null-activation branch + map header.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CW 2026-11-05: CV PT3 (outdoor prop drop lane — 7-item arm + 3 sprite drops + stacking face); CV PT4 / open deactivate-while-player-map-open face (never-hijack wins, no blank); ghost-type bug's fix verified both 2D lanes + 3D + recoverability loop; 7/7 post-CV commits live-verified; hex3d label-clip; skeleton palette row; wizard close name; web/torch art pass; burst-coalescing question re-answered (now ONE request).

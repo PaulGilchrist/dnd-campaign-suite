@@ -12,10 +12,27 @@ const TOGGLE_TOOLS = [
 // ESLint complexity cap (backlog 2026-11-01 BB mount-condition widening).
 const hasActiveOverlays = (overlays) => overlays?.length > 0;
 
+// Hoisted out of the component body (complexity cap, playbook §50): the
+// deactivated-map advisory (backlog 2026-11-05 CW) renders a subtle header
+// hint ONLY while the mounted map is not the campaign's active map. Unknown
+// prop (undefined from older callers) reads as active — no hint.
+const MapDeactivatedHint = ({ mapIsActive = true }) =>
+    mapIsActive ? null : (
+        // The GM deactivated (or switched away from) this map while the view
+        // stayed open. Never-hijack keeps the board intact — the hint is what
+        // breaks the silence. Subtle status chip, not a modal; derived from
+        // the '__map__' activation SSE seam in App.jsx.
+        <span className="map-deactivated-hint" role="status">
+            <i className="fa-solid fa-circle-info" aria-hidden="true"></i>
+            GM deactivated this map — view continues read-only
+        </span>
+    );
+
 const MapToolbar = ({
     mapName,
     displayName,
     isLocalhost,
+    mapIsActive,
     tool,
     setTool,
     gridSize,
@@ -81,6 +98,7 @@ const MapToolbar = ({
                     </button>
                 )}
                 <h4>{displayName || mapsService.formatMapName(mapName) || 'Map'}</h4>
+                <MapDeactivatedHint mapIsActive={mapIsActive} />
                 {isLocalhost && (
                     <label className="grid-size-label no-print">
                         Grid Size&nbsp;&nbsp;

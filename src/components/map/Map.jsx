@@ -147,7 +147,7 @@ function mergeNewlyRevealed(visible, revealed) {
     return Array.from(current);
 }
 
-function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, onBack, onEncounterCreated, onPoiEntered }) {
+function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, mapIsActive, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const svgRef = useRef(null);
@@ -581,6 +581,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                 mapName={mapName}
                 displayName={mapData.displayName}
                 isLocalhost={isLocalhost}
+                // Deactivated-map advisory flag (App '__map__' seam) — the
+                // toolbar renders the subtle header hint when false.
+                mapIsActive={mapIsActive}
                 tool={tool}
                 setTool={setTool}
                 gridSize={gridSize}

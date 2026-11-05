@@ -192,12 +192,37 @@ function handleMapActivateEvent(event, { isLocalhost, activeView, mapsView, setM
     setActiveMapName(activeMap);
     return;
   }
+  // A player's open map view is NEVER hijacked by an activation (the
+  // "never hijacks" contract pinned by App.map-activate.test.jsx). But the
+  // tab's map context must still follow the table: arm it with the newly
+  // activated map (roller lanes consume it; it mirrors the server '__map__').
+  // This is also the LIVE-CLEAR seam for the deactivated-map header hint: a
+  // re-activation of the mounted map clears the advisory without a reload,
+  // while a switch to another map keeps it on the orphaned view.
+  if (mapsView.type === 'map') {
+    setActiveMapName(activeMap);
+    return;
+  }
   // Player stranded on the blank maps view (no active map when they clicked
   // "Map") — open the map the GM just activated with zero further clicks.
-  if (activeView === 'mapsManager' && mapsView.type !== 'map') {
+  if (activeView === 'mapsManager') {
     setMapsView({ type: 'map', mapName: activeMap });
     setActiveMapName(activeMap);
   }
+}
+
+// Advisory derivation (backlog 2026-11-05 CW "silence gap"): a mounted map
+// view is "the table's map" only while the campaign's active map — the
+// '__map__' SSE seam mirrored into App state by handleMapActivateEvent —
+// matches what the view has mounted. A deactivation (activeMap: null) or a
+// switch (activeMap: <other>) leaves the open board fully intact
+// (never-hijack) but no longer table-active, so the map header surfaces a
+// subtle hint. Slug comparison strips .json like MapContextSync does.
+const mapSlug = (name) => String(name || '').replace(/\.json$/i, '');
+function isMountedMapActive(activeMapName, mountedMapName) {
+  return activeMapName != null
+    && mapSlug(activeMapName) !== ''
+    && mapSlug(activeMapName) === mapSlug(mountedMapName);
 }
 
 async function fetchCampaignChangeData(campaignName) {
@@ -258,7 +283,7 @@ function seedCampaignRuntimeData(serverData) {
   }
 }
 
-function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
+function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, activeMapName, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
   if (mapsView.type === 'manager') {
     return (
       <MapsManager
@@ -284,6 +309,11 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
           isLocalhost={isLocalhost}
           mapName={mapsView.mapName}
           mapDisplayName={mapsView.mapDisplayName}
+          // Deactivated-map advisory (backlog 2026-11-05 CW): false once the
+          // campaign's active map ('__map__' SSE seam) no longer matches the
+          // mounted board — the GM deactivated or switched while this view was
+          // open. The board itself is never blanked (never-hijack).
+          mapIsActive={isMountedMapActive(activeMapName, mapsView.mapName)}
           onBack={onBackFromMap}
           onEncounterCreated={onEncounterCreated}
           onPoiEntered={onEncounterCreated}
@@ -839,6 +869,7 @@ function App() {
             npcs={npcs}
             isLocalhost={isLocalhost}
             mapsView={mapsView}
+            activeMapName={activeMapName}
             onBackFromMap={handleBackFromMap}
             onEncounterCreated={handleEnterMap}
             setMapsView={setMapsView}
