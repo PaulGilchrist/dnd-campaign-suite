@@ -42,7 +42,7 @@ describe('PlacedItems - rendering', () => {
     'renders %s icon and GM hit area, highlighted as %s while dragging',
     (type, shape) => {
       const { container, rerender } = renderItems([makeItem({ type })]);
-      expect(container.querySelector(`g.placed-item use[href="#${type}"]`)).toBeInTheDocument();
+      expect(container.querySelector(`g.placed-item image[href="/images/items/${type}.png"]`)).toBeInTheDocument();
       expect(container.querySelector('.item-hit-area')).toBeInTheDocument();
       expect(container.querySelector('.reposition-highlight')).toBeNull();
 
@@ -73,17 +73,17 @@ describe('PlacedItems - grid placement', () => {
     ['vertical bed', { type: 'bed', rotation: 90 }, '-11', '27'],
   ])('anchors the %s icon', (_label, item, x, y) => {
     const { container } = renderItems([makeItem(item)]);
-    const useEl = container.querySelector(`use[href="#${item.type}"]`);
-    expect(useEl).toBeInTheDocument();
-    expect(useEl).toHaveAttribute('x', x);
-    expect(useEl).toHaveAttribute('y', y);
+    const el = container.querySelector(`image[href="/images/items/${item.type}.png"]`);
+    expect(el).toBeInTheDocument();
+    expect(el).toHaveAttribute('x', x);
+    expect(el).toHaveAttribute('y', y);
   });
 });
 
 describe('PlacedItems - door open/closed state', () => {
   it('renders a closed door as the door icon without pane rects', () => {
     const { container } = renderItems([makeItem({ type: 'door' })]);
-    expect(container.querySelector('use[href="#door"]')).toBeInTheDocument();
+    expect(container.querySelector('image[href="/images/items/door.png"]')).toBeInTheDocument();
     expect(container.querySelectorAll('rect[fill="#8B5A2B"]')).toHaveLength(0);
   });
 
@@ -92,7 +92,7 @@ describe('PlacedItems - door open/closed state', () => {
     ['vertical panes', { rotation: 90 }, '5', '36'],
   ])('replaces the icon with %s when open', (_label, extra, w, h) => {
     const { container } = renderItems([makeItem({ type: 'door', open: true, ...extra })]);
-    expect(container.querySelector('use[href="#door"]')).toBeNull();
+    expect(container.querySelector('image[href="/images/items/door.png"]')).toBeNull();
     const rects = container.querySelectorAll('rect[fill="#8B5A2B"]');
     expect(rects).toHaveLength(2);
     expect(rects[0]).toHaveAttribute('width', w);
@@ -101,26 +101,25 @@ describe('PlacedItems - door open/closed state', () => {
 });
 
 describe('PlacedItems - rotation', () => {
-  // Most rotatable icons honor any angle; the wide altar/table only swap
-  // their anchor at 90, and cell-size props ignore rotation entirely.
+  // Sprite lane: every rotatable type transforms at ANY non-zero angle (the
+  // art spins about the footprint centre). Wide types swap their anchor box
+  // only at 90/270. Cell-size non-rotatable props ignore rotation entirely.
   const ANY_ANGLE = ['arrowSlitWall', 'bed', 'bookshelf', 'chair', 'door',
-    'secretDoor', 'stairs', 'torch'];
-  const ONLY_90 = ['altar', 'table'];
+    'secretDoor', 'stairs', 'torch', 'altar', 'table'];
   const NEVER = ['barrel', 'chest', 'firepit', 'trap'];
 
   it.each([
     ...ANY_ANGLE.map((type) => [type, 45, true]),
     ...ANY_ANGLE.map((type) => [type, undefined, false]),
-    ...ONLY_90.map((type) => [type, 90, true]),
-    ...ONLY_90.map((type) => [type, 180, false]),
+    ...ANY_ANGLE.filter(t => ['altar', 'table'].includes(t)).map((type) => [type, 180, true]),
     ...NEVER.map((type) => [type, 90, false]),
   ])('%s with rotation=%s expects a transform: %s', (type, rotation, hasTransform) => {
     const { container } = renderItems([makeItem({ type, rotation })]);
-    const useEl = container.querySelector(`use[href="#${type}"]`);
-    expect(useEl).toBeInTheDocument();
-    expect(useEl.hasAttribute('transform')).toBe(hasTransform);
+    const artEl = container.querySelector(`image[href="/images/items/${type}.png"]`);
+    expect(artEl).toBeInTheDocument();
+    expect(artEl.hasAttribute('transform')).toBe(hasTransform);
     if (hasTransform) {
-      expect(useEl.getAttribute('transform')).toMatch(new RegExp(`rotate\\(${rotation},`));
+      expect(artEl.getAttribute('transform')).toMatch(new RegExp(`rotate\\(${rotation},`));
     }
   });
 });

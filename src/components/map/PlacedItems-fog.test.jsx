@@ -26,7 +26,7 @@ describe('PlacedItems - Fog of war hiding', () => {
     { name: 'empty Map', fog: new Map() },
   ])('shows items to remote clients when fog is $name', ({ fog }) => {
     const { container } = render(placedItemsEl([makeItem('barrel')], fog));
-    expect(container.querySelector('use[href="#barrel"]')).toBeInTheDocument();
+    expect(container.querySelector('image[href="/images/items/barrel.png"]')).toBeInTheDocument();
   });
 
   it('hides items on fogged cells and shows items on clear cells', () => {
@@ -36,8 +36,8 @@ describe('PlacedItems - Fog of war hiding', () => {
       makeItem('npc', { name: 'Goblin', gridX: 2, gridY: 2 }),
     ];
     const { container, rerender } = render(placedItemsEl(items, new Map([['0,0', true]])));
-    expect(container.querySelector('use[href="#barrel"]')).toBeNull();
-    expect(container.querySelector('use[href="#chest"]')).toBeInTheDocument();
+    expect(container.querySelector('image[href="/images/items/barrel.png"]')).toBeNull();
+    expect(container.querySelector('image[href="/images/items/chest.png"]')).toBeInTheDocument();
     expect(container.querySelector('circle.npc-circle')).toBeInTheDocument();
 
     // Fog covering every cell hides everything (including open-door rects)
@@ -53,7 +53,7 @@ describe('PlacedItems - Fog of war hiding', () => {
     const { container } = render(
       placedItemsEl([makeItem('barrel', { visible: false })], new Map([['0,0', true]]), true),
     );
-    const el = container.querySelector('use[href="#barrel"]');
+    const el = container.querySelector('image[href="/images/items/barrel.png"]');
     expect(el).toBeInTheDocument();
     expect(el.getAttribute('opacity')).toBe(String(HIDDEN_MARKER_OPACITY));
   });
@@ -62,6 +62,6 @@ describe('PlacedItems - Fog of war hiding', () => {
     const { container } = render(
       placedItemsEl([makeItem('barrel', { visible: false })], new Map([['1,1', true]])),
     );
-    expect(container.querySelector('use[href="#barrel"]')).toBeNull();
+    expect(container.querySelector('image[href="/images/items/barrel.png"]')).toBeNull();
   });
 });

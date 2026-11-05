@@ -87,7 +87,15 @@ function ItemContextMenu({
     };
 
     return (
-          <g className="item-context-menu" onClick={(e) => e.stopPropagation()}>
+          // stopPropagation on pointerdown/up too: the svg root's Select/Paint
+          // lanes call setPointerCapture on every pointerdown, which retargets
+          // the matching pointerup/click to the svg and away from the menu
+          // text — the entry's onClick would never fire (rotate/open-door/
+          // delete all dead, found live 2026-11-05).
+          <g className="item-context-menu"
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}>
               <g>
                   <rect x={menuX} y={menuY} width="120" height={effectiveHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
                   {entries.map(entry => (

@@ -1,5 +1,6 @@
 
 import { CELL_SIZE, HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
+import { itemSpriteHref } from '../../services/maps/itemSprites';
 // One label, one source of truth (ItemDetailsDock.jsx uses the same fn):
 // renamed/AI-Dressed items title as their plain `name`; unnamed props as
 // `type (x,y)` so two same-type markers are distinguishable by a pure DOM
@@ -8,6 +9,26 @@ import { CELL_SIZE, HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 // had the same gap, so the title rides every marker in both lanes.
 import { placedItemLabel } from './hooks/usePlacedItems.js';
 const RADIUS = 20;
+const SPRITE = 36;      // single-cell sprite edge (SVG units)
+const WIDE_SPRITE = 72; // two-cell sprite long edge at rotation 0
+
+// Sprite box keeps the art's aspect (72×36 wide, 36×36 cell) and spins about
+// the footprint centre; the centre itself follows the CURRENT orientation so
+// a rotated two-cell prop stays on its cells (fixes the legacy 90° drift).
+function propGeometry(item, opts, gridCenterX, gridCenterY) {
+    const rotation = opts.rotatable ? (item.rotation || 0) : 0;
+    const vertical = rotation % 180 === 90;
+    const cx = gridCenterX(item.gridX) + (opts.wide ? (vertical ? 0 : CELL_SIZE / 2) : 0);
+    const cy = gridCenterY(item.gridY) + (opts.wide ? (vertical ? CELL_SIZE / 2 : 0) : 0);
+    const bw = opts.wide ? WIDE_SPRITE : SPRITE;
+    const bh = SPRITE;
+    return {
+        cx, cy, bw, bh,
+        boxW: vertical ? bh : bw,
+        boxH: vertical ? bw : bh,
+        transform: rotation ? `rotate(${rotation}, ${cx}, ${cy})` : undefined,
+    };
+}
 
 function PlacedItems({
     placedItems,
@@ -48,91 +69,86 @@ function PlacedItems({
             style={{ cursor: 'grab' }} />
     );
 
-    const renderBarrel = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
+    // Data-driven props: the old per-type renderers were identical apart from
+    // footprint, rotation support, and the barrel's circular hit area.
+    // A placed two-cell prop spans gridX (wide) or gridY (tall); markers spin
+    // about the CURRENT orientation's footprint centre, so every angle lands
+    // centred on its cells. Sprite art (Blender top-down PNG) replaces the
+    // legacy inline SVG symbol whenever it exists — same footprint either way.
+    const renderProp = (item, opts) => {
         if (!isVisible(item)) return null;
+        const g = propGeometry(item, opts, gridCenterX, gridCenterY);
+        const { cx, cy, bw, bh, boxW, boxH, transform } = g;
+        const art = itemSpriteHref(item.type);
+        // Drag highlight geometry per legacy contract: barrel circle (r+4),
+        // firepit circle r=18 over a rect hit area, everything else rect.
+        const hlCircle = opts.circle || opts.circleHl;
+        const hlR = opts.circle ? RADIUS + 4 : SPRITE / 2;
+        const visual = art ? (
+            <image
+                href={art}
+                x={cx - bw / 2}
+                y={cy - bh / 2}
+                width={bw}
+                height={bh}
+                opacity={itemOpacity(item)}
+                transform={transform}
+            />
+        ) : (
+            <use
+                href={`#${item.type}`}
+                x={cx - bw / 2}
+                y={cy - bh / 2}
+                opacity={itemOpacity(item)}
+                transform={transform}
+            />
+        );
+        const dragChrome = (
+            <>
+                {opts.circle ? (
+                    <circle cx={cx} cy={cy} r={RADIUS} fill="transparent" className="item-hit-area placed-hit-area"
+                        onPointerDown={onDown(item)}
+                        onContextMenu={onContext(item)}
+                        style={{ cursor: 'grab' }} />
+                ) : rectHitArea(item, cx - boxW / 2, cy - boxH / 2, boxW, boxH)}
+                {isDragging(item) && (hlCircle ? (
+                    <circle cx={cx} cy={cy} r={hlR} fill="none" className="reposition-highlight" />
+                ) : (
+                    <rect x={cx - boxW / 2} y={cy - boxH / 2} width={boxW} height={boxH} fill="none" className="reposition-highlight" />
+                ))}
+            </>
+        );
         return (
             <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#barrel" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        <circle cx={cx} cy={cy} r={RADIUS} fill="transparent" className="item-hit-area placed-hit-area"
-                            onPointerDown={onDown(item)}
-                            onContextMenu={onContext(item)}
-                            style={{ cursor: 'grab' }} />
-                        {isDragging(item) && (
-                            <circle cx={cx} cy={cy} r={RADIUS + 4} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
+                {visual}
+                {isLocalhost && dragChrome}
             </g>
         );
     };
 
-    const renderTable = (item) => {
-        const isRotated = (item.rotation || 0) === 90;
-        const cx = isRotated ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
-        const cy = isRotated ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        const tableW = isRotated ? 36 : 72;
-        const tableH = isRotated ? 72 : 36;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#table" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - tableW / 2, cy - tableH / 2, tableW, tableH)}
-                        {isDragging(item) && (
-                            <rect x={cx - tableW / 2} y={cy - tableH / 2} width={tableW} height={tableH} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderBed = (item) => {
-        const isVertical = (item.rotation || 0) % 180 === 90;
-        const cx = isVertical ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
-        const cy = isVertical ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        const bedW = isVertical ? 36 : 72;
-        const bedH = isVertical ? 72 : 36;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#bed" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - bedW / 2, cy - bedH / 2, bedW, bedH)}
-                        {isDragging(item) && (
-                            <rect x={cx - bedW / 2} y={cy - bedH / 2} width={bedW} height={bedH} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderFirepit = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#firepit" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <circle cx={cx} cy={cy} r={18} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
+    const propRenderers = {
+        altar: { wide: true, rotatable: true },
+        arrowSlitWall: { rotatable: true },
+        barrel: { circle: true },
+        bed: { wide: true, rotatable: true },
+        bookshelf: { wide: true, rotatable: true },
+        boulder: {},
+        bush: {},
+        chair: { rotatable: true },
+        chest: {},
+        crate: {},
+        firepit: { circleHl: true },
+        fountain: {},
+        pillar: {},
+        secretDoor: { rotatable: true },
+        skeleton: { rotatable: true },
+        stairs: { rotatable: true },
+        statue: {},
+        table: { wide: true, rotatable: true },
+        torch: { rotatable: true },
+        trap: {},
+        tree: {},
+        web: {},
     };
 
     const renderDoor = (item) => {
@@ -140,11 +156,17 @@ function PlacedItems({
         const cy = gridCenterY(item.gridY);
         if (!isVisible(item)) return null;
         const isOpen = !!item.open;
+        const art = itemSpriteHref('door');
+        const transform = item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined;
         return (
             <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 {!isOpen ? (
-                    <use href="#door" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
-                        transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
+                    art ? (
+                        <image href={art} x={cx - 18} y={cy - 18} width={SPRITE} height={SPRITE}
+                            opacity={itemOpacity(item)} transform={transform} />
+                    ) : (
+                        <use href="#door" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} transform={transform} />
+                    )
                 ) : (
                     <>
                         {(!item.rotation || item.rotation === 0) ? (
@@ -160,285 +182,6 @@ function PlacedItems({
                         )}
                     </>
                 )}
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderSecretDoor = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#secretDoor" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderTrap = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#trap" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderPillar = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#pillar" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderStairs = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#stairs" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderAltar = (item) => {
-        const isRotated = (item.rotation || 0) === 90;
-        const cx = isRotated ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
-        const cy = isRotated ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        const altarW = isRotated ? 36 : 72;
-        const altarH = isRotated ? 72 : 36;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#altar" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - altarW / 2, cy - altarH / 2, altarW, altarH)}
-                        {isDragging(item) && (
-                            <rect x={cx - altarW / 2} y={cy - altarH / 2} width={altarW} height={altarH} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderBookshelf = (item) => {
-        const rotation = item.rotation || 0;
-        const isVertical = rotation % 180 === 90;
-        const cx = isVertical ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
-        const cy = isVertical ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        const w = isVertical ? 36 : 72;
-        const h = isVertical ? 72 : 36;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#bookshelf" x={cx - 36} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={rotation ? `rotate(${rotation}, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - w / 2, cy - h / 2, w, h)}
-                        {isDragging(item) && (
-                            <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderChair = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#chair" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderChest = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#chest" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderCrate = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#crate" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderFountain = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#fountain" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderSkeleton = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#skeleton" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderStatue = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#statue" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderTorch = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#torch" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderWeb = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#web" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
                 {isLocalhost && (
                     <>
                         {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
@@ -532,116 +275,35 @@ function PlacedItems({
         );
     };
 
-    const renderNpc = (item) => renderCreature(item, false);
-
-    const renderMonster = (item) => renderCreature(item, true);
-
-    const renderArrowSlitWall = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#arrowSlitWall" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)}
-                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderTree = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#tree" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderBoulder = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#boulder" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
-    const renderBush = (item) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
-        return (
-            <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
-                <use href="#bush" x={cx - 18} y={cy - 18} opacity={itemOpacity(item)} />
-                {isLocalhost && (
-                    <>
-                        {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
-                        {isDragging(item) && (
-                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
-                        )}
-                    </>
-                )}
-            </g>
-        );
-    };
-
     const renderItems = (type, renderFn) => placedItems.filter(i => i.type === type).map(renderFn).filter(Boolean)
 
     return (
         <>
-            {renderItems('altar', renderAltar)}
-            {renderItems('arrowSlitWall', renderArrowSlitWall)}
-            {renderItems('barrel', renderBarrel)}
-            {renderItems('bed', renderBed)}
-            {renderItems('bookshelf', renderBookshelf)}
-            {renderItems('boulder', renderBoulder)}
-            {renderItems('bush', renderBush)}
-            {renderItems('chair', renderChair)}
-            {renderItems('chest', renderChest)}
-            {renderItems('crate', renderCrate)}
+            {renderItems('altar', i => renderProp(i, propRenderers.altar))}
+            {renderItems('arrowSlitWall', i => renderProp(i, propRenderers.arrowSlitWall))}
+            {renderItems('barrel', i => renderProp(i, propRenderers.barrel))}
+            {renderItems('bed', i => renderProp(i, propRenderers.bed))}
+            {renderItems('bookshelf', i => renderProp(i, propRenderers.bookshelf))}
+            {renderItems('boulder', i => renderProp(i, propRenderers.boulder))}
+            {renderItems('bush', i => renderProp(i, propRenderers.bush))}
+            {renderItems('chair', i => renderProp(i, propRenderers.chair))}
+            {renderItems('chest', i => renderProp(i, propRenderers.chest))}
+            {renderItems('crate', i => renderProp(i, propRenderers.crate))}
             {renderItems('door', renderDoor)}
-            {renderItems('firepit', renderFirepit)}
-            {renderItems('fountain', renderFountain)}
-            {renderItems('monster', renderMonster)}
-            {renderItems('npc', renderNpc)}
-            {renderItems('pillar', renderPillar)}
-            {renderItems('secretDoor', renderSecretDoor)}
-            {renderItems('skeleton', renderSkeleton)}
-            {renderItems('stairs', renderStairs)}
-            {renderItems('statue', renderStatue)}
-            {renderItems('table', renderTable)}
-            {renderItems('torch', renderTorch)}
-            {renderItems('trap', renderTrap)}
-            {renderItems('tree', renderTree)}
-            {renderItems('web', renderWeb)}
+            {renderItems('firepit', i => renderProp(i, propRenderers.firepit))}
+            {renderItems('fountain', i => renderProp(i, propRenderers.fountain))}
+            {renderItems('monster', i => renderCreature(i, true))}
+            {renderItems('npc', i => renderCreature(i, false))}
+            {renderItems('pillar', i => renderProp(i, propRenderers.pillar))}
+            {renderItems('secretDoor', i => renderProp(i, propRenderers.secretDoor))}
+            {renderItems('skeleton', i => renderProp(i, propRenderers.skeleton))}
+            {renderItems('stairs', i => renderProp(i, propRenderers.stairs))}
+            {renderItems('statue', i => renderProp(i, propRenderers.statue))}
+            {renderItems('table', i => renderProp(i, propRenderers.table))}
+            {renderItems('torch', i => renderProp(i, propRenderers.torch))}
+            {renderItems('trap', i => renderProp(i, propRenderers.trap))}
+            {renderItems('tree', i => renderProp(i, propRenderers.tree))}
+            {renderItems('web', i => renderProp(i, propRenderers.web))}
         </>
     );
 }

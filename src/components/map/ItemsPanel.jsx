@@ -20,28 +20,29 @@ import TorchSVG from './TorchSVG.jsx';
 import TrapSVG from './TrapSVG.jsx';
 import TreeSVG from './TreeSVG.jsx';
 import WebSVG from './WebSVG.jsx';
+import { itemSpriteHref } from '../../services/maps/itemSprites';
 
 function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], mapVariant = 'indoor', campaignName }) {
     const createDragGhost = (e) => {
-        const svgEl = e.currentTarget.querySelector('svg');
-        if (!svgEl) return;
+        const visualEl = e.currentTarget.querySelector('svg, img.items-panel-thumb');
+        if (!visualEl) return;
 
-        const clonedSvg = svgEl.cloneNode(true);
-        const origW = parseInt(svgEl.getAttribute('width'), 10) || 36;
-        const origH = parseInt(svgEl.getAttribute('height'), 10) || 36;
+        const cloned = visualEl.cloneNode(true);
+        const origW = parseInt(visualEl.getAttribute('width'), 10) || 36;
+        const origH = parseInt(visualEl.getAttribute('height'), 10) || 36;
         const maxSize = 48;
         const scale = Math.min(maxSize / Math.max(origW, origH), 1);
         const ghostW = Math.round(origW * scale);
         const ghostH = Math.round(origH * scale);
 
-        clonedSvg.setAttribute('width', ghostW);
-        clonedSvg.setAttribute('height', ghostH);
+        cloned.setAttribute('width', ghostW);
+        cloned.setAttribute('height', ghostH);
 
         const ghost = document.createElement('div');
         ghost.style.position = 'absolute';
         ghost.style.top = '-9999px';
         ghost.style.left = '-9999px';
-        ghost.appendChild(clonedSvg);
+        ghost.appendChild(cloned);
         document.body.appendChild(ghost);
         e.dataTransfer.setDragImage(ghost, ghostW / 2, ghostH / 2);
         setTimeout(() => document.body.removeChild(ghost), 0);
@@ -90,14 +91,23 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
     const missingChars = characters.filter(c => !playerNames.has(c.name));
     const isOutdoor = mapVariant === 'outdoor';
 
-    const Item = ({ type, viewBox, width, children, label }) => (
-        <div className="items-panel-item" draggable
-            onDragStart={(e) => { e.dataTransfer.setData('text/plain', type); createDragGhost(e); }}
-        >
-            <svg viewBox={viewBox} width={width} height="36">{children}</svg>
-            <span>{label}</span>
-        </div>
-    );
+    // Palette thumbnails show the Blender sprite when its art exists, else
+    // the inline SVG symbol (same registry the map itself renders through).
+    const Item = ({ type, viewBox, width, children, label }) => {
+        const art = itemSpriteHref(type);
+        return (
+            <div className="items-panel-item" draggable
+                onDragStart={(e) => { e.dataTransfer.setData('text/plain', type); createDragGhost(e); }}
+            >
+                {art ? (
+                    <img className="items-panel-thumb" src={art} width={width} height="36" alt="" aria-hidden="true" />
+                ) : (
+                    <svg viewBox={viewBox} width={width} height="36">{children}</svg>
+                )}
+                <span>{label}</span>
+            </div>
+        );
+    };
 
     return (
         <div className="items-panel">

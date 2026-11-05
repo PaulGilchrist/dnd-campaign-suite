@@ -340,7 +340,7 @@ describe('Map container — availability & composition', () => {
         expect(container.querySelector('svg.grid-svg')).toBeTruthy();
         expect(screen.getByTitle('View map in 3D')).toBeInTheDocument();
         expect(container.querySelector('.creature-group')).toBeTruthy();
-        expect(container.querySelector('use[href="#barrel"]')).toBeTruthy();
+        expect(container.querySelector('image[href="/images/items/barrel.png"]')).toBeTruthy();
         expect(container.querySelector('.fog-cell')).toBeNull();
         expect(container.querySelector('.items-panel')).toBeNull();
 

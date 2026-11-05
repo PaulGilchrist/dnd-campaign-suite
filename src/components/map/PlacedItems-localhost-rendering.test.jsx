@@ -115,10 +115,10 @@ describe('PlacedItems - NPC localhost gating', () => {
     });
     const barrels = container.querySelectorAll('g.placed-item');
     expect(barrels).toHaveLength(2);
-    expect(barrels[0].querySelector('use')).toHaveAttribute('href', '#barrel');
-    expect(barrels[0].querySelector('use')).toHaveAttribute('x', '7');
-    expect(barrels[1].querySelector('use')).toHaveAttribute('href', '#barrel');
-    expect(barrels[1].querySelector('use')).toHaveAttribute('x', '57');
+    expect(barrels[0].querySelector('image')).toHaveAttribute('href', '/images/items/barrel.png');
+    expect(barrels[0].querySelector('image')).toHaveAttribute('x', '7');
+    expect(barrels[1].querySelector('image')).toHaveAttribute('href', '/images/items/barrel.png');
+    expect(barrels[1].querySelector('image')).toHaveAttribute('x', '57');
     expect(container.querySelectorAll('g.npc-group')).toHaveLength(1);
   });
 });

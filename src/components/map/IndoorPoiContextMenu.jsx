@@ -28,7 +28,10 @@ function IndoorPoiContextMenu({
     const hidden = poi.visible === false;
 
     return (
-        <g className="item-context-menu poi-context-menu" onClick={(e) => e.stopPropagation()}>
+        <g className="item-context-menu poi-context-menu"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}>
             <g>
                 <rect x={menuX} y={menuY} width="120" height="54" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
                 <text

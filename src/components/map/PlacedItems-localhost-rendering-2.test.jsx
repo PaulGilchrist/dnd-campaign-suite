@@ -36,15 +36,15 @@ describe('PlacedItems - localhost-only elements hidden from remote clients', () 
     'skeleton', 'stairs', 'statue', 'table', 'torch', 'trap', 'tree', 'web',
   ])('renders %s icon on remote without hit area or highlight', (type) => {
     const { container } = renderItems([makeItem({ type })], false);
-    expect(container.querySelector(`use[href="#${type}"]`)).toBeInTheDocument();
+    expect(container.querySelector(`image[href="/images/items/${type}.png"]`)).toBeInTheDocument();
     expect(container.querySelector('.item-hit-area')).toBeNull();
     expect(container.querySelector('.reposition-highlight')).toBeNull();
   });
 
   it.each([false, true])('keeps the secret-door icon GM-only when visible=%s', (visible) => {
     const items = [makeItem({ type: 'secretDoor', visible })];
-    expect(renderItems(items, true).container.querySelector('use[href="#secretDoor"]')).toBeInTheDocument();
-    expect(renderItems(items, false).container.querySelector('use[href="#secretDoor"]')).not.toBeInTheDocument();
+    expect(renderItems(items, true).container.querySelector('image[href="/images/items/secretDoor.png"]')).toBeInTheDocument();
+    expect(renderItems(items, false).container.querySelector('image[href="/images/items/secretDoor.png"]')).not.toBeInTheDocument();
   });
 
   it('renders hit area and highlight for the GM (control for the remote assertions)', () => {
