@@ -19,8 +19,9 @@
  *
  * Mock strategy: fetch is the ONLY boundary (vi.spyOn + manual deferreds);
  * storage.get/set are NEVER spied (never mock the unit under test). console.error
- * bytes pinned for guard/error arms. No timers — queue proof uses microtask flush
- * (`await Promise.resolve()`) + manual resolves (no-clock law).
+ * bytes pinned for guard/error arms. Queue proofs use microtask flush
+ * (`await Promise.resolve()`) + manual resolves; only the coalesced PATCH lane
+ * (CV 2026-11-05) needs bounded fake-timer advances past its debounce window.
  * Campaign names 'test-campaign'/'test-campaign-2' are synthetic strings against a
  * mocked fetch (campaign lockdown honored; no live route is ever contacted).
  */
@@ -193,21 +194,32 @@ describe('storage — server-first fetch transport', () => {
         });
 
         it('serializes combatSummary patches behind full POSTs of the same campaign (shared write queue)', async () => {
-            fetchCalls.length = 0;
-            queueingFetch();
+            // Coalesced patch lane (CV 2026-11-05): the PATCH now leaves the
+            // queue lane only when its debounce window flushes, but when it
+            // does it still rides the SAME per-campaign queue — the
+            // patch-behind-POST serialization contract is unchanged.
+            vi.useFakeTimers();
+            try {
+                fetchCalls.length = 0;
+                queueingFetch();
 
-            const pSet = storage.set('combatSummary', { round: 1, creatures: [] }, 'test-campaign');
-            const pPatch = storage.patch('combatSummary', { creatures: [{ name: 'Bandit', targetName: 'Alice' }] }, 'test-campaign');
-            await Promise.resolve(); // flush the queue — only the first write has fired
+                const pSet = storage.set('combatSummary', { round: 1, creatures: [] }, 'test-campaign');
+                const pPatch = storage.patch('combatSummary', { creatures: [{ name: 'Bandit', targetName: 'Alice' }] }, 'test-campaign');
+                await Promise.resolve(); // flush the queue — only the POST has fired
 
-            expect(fetchCalls).toHaveLength(1); // patch serialized behind the unresolved POST
-            expect(fetchCalls[0].opts.method).toBe('POST');
-            fetchCalls[0].resolve(jsonResponse({}));
-            await pSet;
-            expect(fetchCalls).toHaveLength(2);
-            expect(fetchCalls[1].opts.method).toBe('PATCH'); // call order preserved on the wire
-            fetchCalls[1].resolve(jsonResponse({ ok: true }));
-            await expect(pPatch).resolves.toBe(true);
+                expect(fetchCalls).toHaveLength(1); // patch serialized behind the unresolved POST
+                expect(fetchCalls[0].opts.method).toBe('POST');
+                fetchCalls[0].resolve(jsonResponse({}));
+                await pSet;
+                expect(fetchCalls).toHaveLength(1); // PATCH still buffered in its coalesce window
+                await vi.advanceTimersByTimeAsync(300); // beyond quiet + max-wait
+                expect(fetchCalls).toHaveLength(2);
+                expect(fetchCalls[1].opts.method).toBe('PATCH'); // wire order vs the POST preserved
+                fetchCalls[1].resolve(jsonResponse({ ok: true }));
+                await expect(pPatch).resolves.toBe(true);
+            } finally {
+                vi.useRealTimers();
+            }
         });
 
         it('resolves FALSE (not a throw) on PATCH rejection or transport failure, logging [storage:error] bytes', async () => {

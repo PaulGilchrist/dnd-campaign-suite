@@ -73,7 +73,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- **2026-11-05 CV — burst arming is chatty:** 3 rapid same-select target changes = 3 in-flight scoped PATCHes + 3 full-board SSE echoes (measured 62 ms window). Coalesce pending same-key scoped patches within one tick (last-writer content) to one PATCH + one echo; correctness already LWW-safe. Files: `storage.js` patch queue, `createCreatureHandlers.js`.
 - **2026-11-05 CV — wizard auto-close control unnamed:** `button.close-btn` (× ) in `.character-creation-wizard-overlay` has no `aria-label` — assistive tech reads "×" and automation must class-anchor; add `aria-label="Close character wizard"`. (Every other overlay × gained labels this era.)
 - **2026-11-05 CV — skeleton item orphaned:** registry + demo-map render + palette comment (`ItemsPanel.jsx:140`) — `skeleton.png` art and `propRenderers.skeleton` ship but no UI affordance creates one; either restore the palette row or drop it from `ART_TYPES`/showcase to avoid an API-only ghost that the ghost-type bug makes undeletable.
 - **2026-11-05 CV — hex-3D POI labels clip:** sprite-label textures cut first/last glyphs ("he Watcher Ston", "Barrow of Whisp", "Barrow of Whisq" top-down) — widen the label canvas/padding in `hex3dScene.js` label builder.
