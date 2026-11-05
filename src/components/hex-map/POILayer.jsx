@@ -1,6 +1,7 @@
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { HIDDEN_MARKER_OPACITY } from '../../config/mapConfig';
 import { hexToPixel, hexDistance } from '../../services/maps/hexMapUtils';
+import { poiSpriteHref } from '../../services/maps/poiSprites';
 
 function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHover, isLocalhost = false, partyPosition, onPoiEnter, validLinkedMaps, roadStartPoiId }) {
     const isAdjacentToParty = (poi) => {
@@ -64,8 +65,22 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                             />
                         )}
 
-                        {/* The POI SVG icon */}
-                        <use href={`#poi-${poi.type}`} x={cx - 18} y={cy - 18} />
+                        {/* The POI icon: Blender-rendered sprite when available
+                            (real materials/lighting, isometric framing), else the
+                            inline SVG symbol for legacy/unknown types. */}
+                        {poiSpriteHref(poi.type) ? (
+                            <image
+                                href={poiSpriteHref(poi.type)}
+                                x={cx - 23}
+                                y={cy - 27}
+                                width={46}
+                                height={46}
+                                className="poi-sprite"
+                                pointerEvents="none"
+                            />
+                        ) : (
+                            <use href={`#poi-${poi.type}`} x={cx - 18} y={cy - 18} />
+                        )}
 
                         {/* Label text below the POI */}
                         {poi.label && (

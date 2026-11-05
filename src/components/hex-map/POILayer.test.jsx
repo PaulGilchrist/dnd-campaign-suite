@@ -55,7 +55,9 @@ function renderEnterable(overrides = {}) {
 function renderedPoiIds(container) {
     return [...container.querySelectorAll('g.poi-item')].map((g) => {
         const label = g.querySelector('text');
-        return label ? label.textContent : g.querySelector('use').getAttribute('href');
+        if (label) return label.textContent;
+        const art = g.querySelector('image') || g.querySelector('use');
+        return art.getAttribute('href');
     });
 }
 
@@ -74,13 +76,16 @@ describe('POILayer', () => {
 
             const first = items[0];
             const oracle = hexToPixel(0, 0, HEX_SIZE);
-            expect(first.querySelector('use').getAttribute('href')).toBe('#poi-city');
-            expect(first.querySelector('use').getAttribute('x')).toBe(String(oracle.x - 18));
-            expect(first.querySelector('use').getAttribute('y')).toBe(String(oracle.y - 18));
+            // 'city' has Blender sprite art → rendered as an <image> sprite
+            expect(first.querySelector('image').getAttribute('href')).toBe('/images/pois/city.png');
+            expect(first.querySelector('image').getAttribute('x')).toBe(String(oracle.x - 23));
+            expect(first.querySelector('image').getAttribute('y')).toBe(String(oracle.y - 27));
             expect(screen.getByText('City A')).toHaveAttribute('x', String(oracle.x));
 
-            expect(items[1].querySelector('use').getAttribute('href')).toBe('#poi-camp');
+            expect(items[1].querySelector('image').getAttribute('href')).toBe('/images/pois/camp.png');
             expect(screen.getByText('Camp B')).toBeInTheDocument();
+            // Legacy/unknown type falls back to the inline SVG symbol
+            expect(items[2].querySelector('use').getAttribute('href')).toBe('#poi-ruins');
             // POI without a label renders its icon but no text element
             expect(items[2].querySelectorAll('text')).toHaveLength(0);
         });

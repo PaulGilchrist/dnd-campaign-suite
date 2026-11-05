@@ -1,8 +1,10 @@
 // Read-only 3D diorama for outdoor hex maps. Mirrors the indoor
 // map3dScene.js lifecycle (init → buildMap → patch lanes → dispose) but
 // consumes the hex document shape (terrain/rivers/roads/pois keyed q,r) and
-// never mutates it. No textures or glTF assets: every surface is procedural,
-// so the whole scene lives in this file.
+// never mutates it. POIs are Blender-authored GLB models (public/models/pois/)
+// loaded through GLTFLoader with a shared per-type cache; terrain, rivers and
+// roads stay procedural, and every POI keeps its procedural primitive shape as
+// a fallback while the model streams in (or if it fails to load).
 import { DEFAULT_TERRAIN, HEX_SIZE, TERRAIN_TYPES } from '../../../config/outdoorConfig.js';
 import { HIDDEN_MARKER_OPACITY } from '../../../config/mapConfig.js';
 import {
@@ -10,6 +12,7 @@ import {
     getHexGridPixelDimensions, isValidHexKey,
 } from '../../../services/maps/hexMapUtils.js';
 import { tintedTerrainRgb } from '../../../services/maps/hexColors.js';
+import { poiModelHref } from '../../../services/maps/poiSprites.js';
 
 // World units are the SVG pixel space 1:1 (hexToPixel output), centred on the
 // grid middle. The Y axis carries the ELEVATION TOPOGRAPHY — the thing the
@@ -252,6 +255,18 @@ const PARTY_COLOR = 0xE8C34A;
 const PARTY_RING = 0xFFD700;
 const PATH_COLOR = 0xD4AF37;
 
+// Blender GLB cache shared across scenes (geometries are immutable per type;
+// each placement clones the root and copies materials so per-instance dimming
+// never leaks). Failed/absent types cache as null and keep the procedural
+// poiShapeSpec fallback permanently.
+const POI_MODEL_CACHE = new Map();
+// World-px footprint a POI model is normalized to (~1.6 hexes) and the height
+// cap. The cap only binds for the tower (~72px ≈ two contour bands) so the
+// spire reads as the tallest structure without dwarfing the mountain terraces
+// the way the old 110px cap did (live-pass feedback 2026-11-05).
+const POI_MODEL_SPAN = 48;
+const POI_MODEL_MAX_H = 72;
+
 export class Hex3DScene {
     constructor(container) {
         this.container = container;
@@ -473,7 +488,9 @@ export class Hex3DScene {
     // ---- disposal ---------------------------------------------------------------
     _disposeObject(obj) {
         obj.traverse((o) => {
-            if (o.geometry) o.geometry.dispose();
+            // POI model geometries are cache-owned and shared across
+            // instances — never dispose them with a single placement.
+            if (o.geometry && !o.userData.sharedPoiAsset) o.geometry.dispose();
             const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
             for (const m of mats) {
                 // Sprite labels own their canvas texture; nothing else has maps.
@@ -510,7 +527,7 @@ export class Hex3DScene {
         this._buildDecorations();
         this._buildRivers(rivers);
         this._buildRoads(roads);
-        this._buildPois(pois, isLocalhost);
+        await this._buildPois(pois, isLocalhost, gen);
         if (gen !== this.buildGen || this.disposed) return;
         this._frameCamera(`${hexCols}x${hexRows}`);
     }
@@ -624,11 +641,19 @@ export class Hex3DScene {
 
     // Forest trees, hill ridges and mountain snow caps sit exactly on the
     // terraced surface (same quantizeElevation the mesh uses at hex centers).
+    // Every decoration is noise-jittered (girth, height, yaw) so nothing
+    // repeats as a perfect solid of revolution — the terrain already reads as
+    // hand-sculpted relief, and the props have to match that.
     _buildDecorations() {
         const THREE = this.THREE;
-        const place = (geo, colorHex, items, rough = 0.9) => {
+        const place = (geo, colorHex, items, rough = 0.9, vertexColors = false) => {
             if (items.length === 0) return;
-            const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: rough });
+            const mat = new THREE.MeshStandardMaterial({
+                color: vertexColors ? 0xffffff : colorHex,
+                roughness: rough,
+                flatShading: true,
+                vertexColors,
+            });
             const inst = new THREE.InstancedMesh(geo, mat, items.length);
             items.forEach((it, i) => {
                 inst.setMatrixAt(i, this._instanceMatrix(it));
@@ -639,24 +664,26 @@ export class Hex3DScene {
             this.mapGroup.add(inst);
         };
         const trees = [];
-        const domes = [];
         const peaks = [];
-        const snow = [];
         for (const c of this._relief.centers.values()) {
             const h = quantizeElevation(c.e);
             const x = c.x - this._centerX;
             const z = c.z - this._centerY;
-            if (c.id === 'forest') trees.push({ x, y: h + 8, z });
-            else if (c.id === 'hills') domes.push({ x, y: h - 2, z });
-            else if (c.id === 'mountains') {
-                peaks.push({ x, y: h + 11, z });
-                snow.push({ x, y: h + 19, z });
+            const n = noiseAt(c.q * 3 + 17, c.r * 5 - 11); // per-hex prop seed
+            const yaw = n * Math.PI * 2;
+            if (c.id === 'forest') {
+                trees.push({ x, y: h + 8, z, s: 0.8 + n * 0.5, qy: yaw });
+            } else if (c.id === 'hills') {
+                // No props: the terraced contour relief IS the hill. Mound
+                // props sat on top of the terrace as lit discs and read as
+                // foreign objects (live-pass feedback 2026-11-05).
+            } else if (c.id === 'mountains') {
+                const s = 0.85 + n * 0.5;
+                peaks.push({ x, y: h, z, s, qy: yaw });
             }
         }
-        place(new THREE.ConeGeometry(9, 16, 6), 0x2D5E37, trees);
-        place(new THREE.SphereGeometry(1, 14, 8), 0x70986A, domes.map((d) => ({ ...d, sx: 22, sy: 6, sz: 22 })), 0.95);
-        place(new THREE.ConeGeometry(24, 26, 6), 0xB9B9AE, peaks);
-        place(new THREE.ConeGeometry(8, 10, 6), 0xEFEFF4, snow, 0.6);
+        place(this._jitteredCone(1, 9, 17, 7), 0x2D5E37, trees);
+        place(this._mountainGeometry(), 0xA8A89C, peaks, 0.95, true);
     }
 
     _instanceMatrix(it) {
@@ -665,10 +692,82 @@ export class Hex3DScene {
         this._q = this._q || new THREE.Quaternion();
         this._p = this._p || new THREE.Vector3();
         this._s = this._s || new THREE.Vector3();
-        this._q.identity();
+        this._e = this._e || new THREE.Euler();
+        if (it.qy) this._e.set(0, it.qy, 0);
+        else this._e.set(0, 0, 0);
+        this._q.setFromEuler(this._e);
         this._p.set(it.x, it.y, it.z);
-        this._s.set(it.sx ?? 1, it.sy ?? 1, it.sz ?? 1);
+        const s = it.s ?? 1;
+        this._s.set((it.sx ?? 1) * s, (it.sy ?? 1) * s, (it.sz ?? 1) * s);
         return this._m.compose(this._p, this._q, this._s);
+    }
+
+    // Cone (or blunt-tipped frustum) whose base ring / girth / height are
+    // deterministic-noise jittered — removes the "lathe-perfect cone" game-
+    // token silhouette. A blunt rTop gives craggy flat summits that snow can
+    // actually sit on.
+    _jitteredCone(seed, r, h, segs = 7, rTop = 0) {
+        const THREE = this.THREE;
+        const geo = rTop > 0
+            ? new THREE.CylinderGeometry(rTop, r, h, segs, 2)
+            : new THREE.ConeGeometry(r, h, segs, 2);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const y = pos.getY(i);
+            const z = pos.getZ(i);
+            if (Math.abs(x) < 1e-6 && Math.abs(z) < 1e-6) continue; // apex
+            const n1 = noiseAt(Math.round(x * 13 + seed * 31), Math.round(z * 17 - seed * 13));
+            const n2 = noiseAt(Math.round(z * 11 + seed * 7), Math.round(x * 19 + seed * 3));
+            const k = 0.75 + n1 * 0.5;   // 0.75..1.25 girth
+            pos.setX(i, x * k);
+            pos.setZ(i, z * (0.75 + n2 * 0.5));
+            pos.setY(i, y * (0.85 + n1 * 0.4));
+        }
+        geo.computeVertexNormals();
+        geo.translate(0, -2, 0); // bury the jittered base rim into the terrace
+        return geo;
+    }
+
+    // Craggy peak with the snowline BAKED into vertex colours: tinting the
+    // real (jittered) summit surface instead of dropping a separate snow blob
+    // on top means snow can never float or sink — it follows whatever height
+    // the rock actually reaches.
+    _mountainGeometry() {
+        const THREE = this.THREE;
+        // A ROOTED massif: the cone's skirt runs ~60 units below the hex
+        // surface — deeper than the terrace step down to the neighbouring
+        // hills (~48) — so no part of the rim ever overhangs lower ground
+        // (that overhang was the "floating boulder" look). Only the rocky
+        // crest (+1..+14 after jitter) emerges above the surface (y=0).
+        const geo = this._jitteredCone(2, 40, 60, 8, 6);
+        geo.translate(0, -22, 0);
+        const pos = geo.attributes.position;
+        const hx = (h) => ({ r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16) });
+        const base = linearRgb(hx(TERRAIN_LOOKUP.mountains?.fill || '#8B8B7A'));
+        const rock = linearRgb({ r: 0x95, g: 0x95, b: 0x89 }); // barely a step above the terrace
+        const snow = linearRgb({ r: 0xF2, g: 0xF5, b: 0xFA });
+        const baseV = [base.r, base.g, base.b];
+        const rockV = [rock.r, rock.g, rock.b];
+        const snowV = [snow.r, snow.g, snow.b];
+        const col = new Float32Array(pos.count * 3);
+        // Instance sits AT the surface, so local y=0 is exactly the terrace
+        // line: colour starts as the terrain tint there and grows into rock,
+        // with snow on the crest — the seam can never be a hard edge.
+        for (let i = 0; i < pos.count; i++) {
+            const y = pos.getY(i);
+            // Gentle ramp: terrain tint at the surface easing into rock only
+            // near the crest (smoothstep keeps the transition free of a band).
+            const u = Math.max(0, Math.min(1, y / 13));
+            const tRock = u * u * (3 - 2 * u);
+            const tSnow = Math.max(0, Math.min(1, (y - 4) / 8));
+            for (let c = 0; c < 3; c++) {
+                const lower = baseV[c] + (rockV[c] - baseV[c]) * tRock;
+                col[i * 3 + c] = lower + (snowV[c] - lower) * tSnow;
+            }
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        return geo;
     }
 
     _curveThrough(points) {
@@ -728,32 +827,118 @@ export class Hex3DScene {
     }
 
     // Mirrors POILayer.jsx:29 — players never see hidden POIs; the GM sees
-    // them dimmed.
-    _buildPois(pois, isLocalhost) {
-        const THREE = this.THREE;
+    // them dimmed. Procedural primitives paint immediately; the Blender GLB
+    // for the type swaps in as soon as it loads (per-type cache, so re-builds
+    // are instant). Unknown types / failed loads keep the primitives.
+    async _buildPois(pois, isLocalhost, gen) {
+        const placed = [];
         for (const poi of pois || []) {
             if (!isLocalhost && poi.visible === false) continue;
-            const group = new THREE.Group();
-            let top = 0;
-            for (const part of poiShapeSpec(poi.type)) {
-                let geo;
-                if (part.shape === 'cone') geo = new THREE.ConeGeometry(part.r, part.h, 6);
-                else if (part.shape === 'cylinder') geo = new THREE.CylinderGeometry(part.r, part.r, part.h, 10);
-                else geo = new THREE.BoxGeometry(part.w, part.h, part.d);
-                const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: part.color, roughness: 0.85 }));
-                mesh.position.set(part.x || 0, part.cy, part.z || 0);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                group.add(mesh);
-                top = Math.max(top, part.cy + part.h / 2);
-            }
-            const label = this._makeLabel(poi.label || poi.type);
-            label.position.y = top + 12;
-            group.add(label);
-            const { x, z } = this._world(poi.q, poi.r);
-            group.position.set(x, this._surface(poi.q, poi.r), z);
-            if (isLocalhost && poi.visible === false) this._setDimmed(group);
+            const { group, label } = this._buildPoiPlaceholder(poi, isLocalhost);
             this.mapGroup.add(group);
+            if (poiModelHref(poi.type)) {
+                placed.push({ type: poi.type, group, label, dimmed: isLocalhost && poi.visible === false });
+            }
+        }
+        if (placed.length === 0) return;
+        await Promise.all(placed.map(async (p) => {
+            p.model = await this._loadPoiModel(p.type);
+        }));
+        if (gen !== this.buildGen || this.disposed) return;
+        for (const p of placed) this._swapInPoiModel(p);
+    }
+
+    // Primitive stand-in group (cone/box/cylinder recipe + floating label).
+    _buildPoiPlaceholder(poi, isLocalhost) {
+        const THREE = this.THREE;
+        const group = new THREE.Group();
+        let top = 0;
+        for (const part of poiShapeSpec(poi.type)) {
+            let geo;
+            if (part.shape === 'cone') geo = new THREE.ConeGeometry(part.r, part.h, 6);
+            else if (part.shape === 'cylinder') geo = new THREE.CylinderGeometry(part.r, part.r, part.h, 10);
+            else geo = new THREE.BoxGeometry(part.w, part.h, part.d);
+            const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: part.color, roughness: 0.85 }));
+            mesh.position.set(part.x || 0, part.cy, part.z || 0);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+            top = Math.max(top, part.cy + part.h / 2);
+        }
+        const label = this._makeLabel(poi.label || poi.type);
+        label.position.y = top + 12;
+        group.add(label);
+        const { x, z } = this._world(poi.q, poi.r);
+        group.position.set(x, this._surface(poi.q, poi.r), z);
+        if (isLocalhost && poi.visible === false) this._setDimmed(group);
+        return { group, label };
+    }
+
+    _swapInPoiModel(p) {
+        if (!p.model) return;
+        const instance = this._instantiatePoiModel(p.model);
+        if (!instance) return;
+        // Drop the primitive stand-ins (everything except the label sprite).
+        for (const child of [...p.group.children]) {
+            if (child === p.label) continue;
+            p.group.remove(child);
+            this._disposeObject(child);
+        }
+        p.group.add(instance.root);
+        p.label.position.y = instance.height + 12;
+        if (p.dimmed) this._setDimmed(instance.root);
+    }
+
+    async _loadPoiModel(type) {
+        const href = poiModelHref(type);
+        if (!href) return null;
+        if (!POI_MODEL_CACHE.has(type)) {
+            POI_MODEL_CACHE.set(type, (async () => {
+                try {
+                    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+                    const gltf = await new GLTFLoader().loadAsync(href);
+                    return gltf.scene;
+                } catch (err) {
+                    console.error(`[hex3dScene] POI model load failed for ${href}:`, err);
+                    return null;
+                }
+            })());
+        }
+        const root = await POI_MODEL_CACHE.get(type);
+        return root || null;
+    }
+
+    // Clone the cached template for one placement: shared (cache-owned)
+    // geometry, per-instance materials (dimming is per POI), normalized to the
+    // board's pixel scale with the model's base on y=0.
+    _instantiatePoiModel(template) {
+        const THREE = this.THREE;
+        try {
+            const root = template.clone(true);
+            const box = new THREE.Box3().setFromObject(root);
+            const size = box.getSize(new THREE.Vector3());
+            const span = Math.max(size.x, size.z);
+            if (!isFinite(span) || span <= 0 || !isFinite(size.y)) return null;
+            let s = POI_MODEL_SPAN / span;
+            if (size.y * s > POI_MODEL_MAX_H) s = POI_MODEL_MAX_H / size.y;
+            root.scale.setScalar(s);
+            const box2 = new THREE.Box3().setFromObject(root);
+            const center = box2.getCenter(new THREE.Vector3());
+            // Settle models ~3px into the terraced surface so flat bottoms
+            // and disc-shaped props (pools, pads) never show a floating rim.
+            root.position.set(-center.x, -box2.min.y - 3, -center.z);
+            root.traverse((o) => {
+                if (!o.isMesh) return;
+                o.castShadow = true;
+                o.receiveShadow = true;
+                o.userData.sharedPoiAsset = true; // cache owns the geometry
+                if (Array.isArray(o.material)) o.material = o.material.map((m) => m.clone());
+                else if (o.material) o.material = o.material.clone();
+            });
+            return { root, height: size.y * s };
+        } catch (err) {
+            console.error('[hex3dScene] POI model instance failed:', err);
+            return null;
         }
     }
 
