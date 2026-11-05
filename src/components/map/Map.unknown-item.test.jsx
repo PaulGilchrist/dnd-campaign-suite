@@ -107,6 +107,10 @@ describe('indoor map ghost-item lane (unregistered type)', () => {
         const menu = container.querySelector('.item-context-menu');
         expect(menu).toBeTruthy();
         expect(menu.textContent).toContain('Delete');
+        // Backlog 2026-11-05 CW: Rotate is hidden for ghost dispatch (the
+        // #generic-prop chip never consumes rotation — clicking it was an
+        // invisible disk write).
+        expect(menu.textContent).not.toContain('Rotate');
 
         fireEvent.click([...menu.querySelectorAll('text')].find(t => t.textContent === 'Delete'));
         const dialog = screen.getByRole('dialog', { name: 'Delete from Map' });

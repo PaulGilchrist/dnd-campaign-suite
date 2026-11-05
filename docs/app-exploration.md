@@ -76,7 +76,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- [2026-11-05 CW] Ghost-'?' props offer Rotate that writes `rotation:90` to disk but never renders (`renderProp(i,{})` ignores rotation, and the dashed chip is rotation-invariant anyway): invisible state write. Hide Rotate for ghost-dispatched types OR pass `rotatable:true` so at least the transform matches the data. `src/components/map/PlacedItems.jsx` ghosts pass + `ItemContextMenu.jsx` buildMenuModel.
 - [2026-11-05 CW] A player left viewing a map the GM just deactivated keeps the full board with zero signal it is no longer "the table's map" (never-hijack is correct, the silence is the gap): consider a subtle header hint (e.g. "GM deactivated this map — view continues read-only"). `App.jsx` null-activation branch + map header.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

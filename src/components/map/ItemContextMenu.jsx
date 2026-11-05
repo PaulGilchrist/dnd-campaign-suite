@@ -1,14 +1,25 @@
+import { itemSpriteHref } from '../../services/maps/itemSprites';
 
 // Rotation-invariance audit (backlog 2026-11-01 BA): creature tokens (npc +
 // monster, which is what AI-Dress `ai-dress-token-*` rows are) have NO
 // transform consumer in either render lane — 2D PlacedItems.jsx
 // renderCreature and 3D map3dScene._buildNpcs both ignore `rotation` — so
-// Rotate was a silent persisted knob for them. Every other placedItems type
-// consumes rotation in at least one lane (2D furniture/door transforms, 3D
+// Rotate was a silent persisted knob for them. Registered sprite types
+// consume rotation in at least one lane (2D furniture/door transforms, 3D
 // mesh rotation), so they keep the entry. Same pattern as showRenameOption:
 // menu visibility is derived from the item type inside the entries builder.
+//
+// Ghost-'?' props (backlog 2026-11-05 CW): types unknown to the sprite
+// registry render through PlacedItems' generic-prop dispatch (`renderProp(i,
+// {})` — no `rotatable` opt, and the dashed `#generic-prop` chip is
+// rotation-invariant anyway), so Rotate there was the same invisible state
+// write: it persisted `rotation: 90` to disk with zero visual delta. Owner
+// decision: hide it (do NOT add the rotatable transform path). `item` absent
+// (id not in placedItems) keeps the legacy base menu.
 function isRotationInvariant(item) {
-    return !!item && (item.type === 'npc' || item.type === 'monster');
+    if (!item) return false;
+    if (item.type === 'npc' || item.type === 'monster') return true;
+    return !itemSpriteHref(item.type);
 }
 
 function menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption) {

@@ -5,23 +5,26 @@
 //
 // Menu label census (exact render order; close glyph '✕' is always last):
 //   state                        labels
-//   token visible              → ['Hide','Delete','Rotate','✕']
-//   token hidden             → ['Show','Delete','Rotate','✕']
+//   registered prop visible    → ['Hide','Delete','Rotate','✕']
+//   registered prop hidden     → ['Show','Delete','Rotate','✕']
 //   monster token            → ['Hide','Delete','✕']          (no Rotate — rotation-invariant lane)
 //   npc, monster not found   → ['Hide','Delete','Rename','✕'] (no Rotate)
 //   npc, monster found       → ['Hide','Delete','Rename','View Stats','✕'] (no Rotate)
+//   ghost '?' prop (cauldron)  → ['Hide','Delete','✕']         (no Rotate — generic-prop lane)
 //   rotatable prop (table)   → ['Hide','Delete','Rotate','✕']
 //   door closed              → ['Hide','Delete','Open Door','Rotate','✕']
 //   door open                → ['Hide','Delete','Close Door','Rotate','✕']
-//   unknown type             → ['Hide','Delete','Rotate','✕']
-//   id not in placedItems    → ['Hide','Delete','Rotate','✕']
+//   id not in placedItems    → ['Hide','Delete','Rotate','✕'] (legacy base menu kept)
 //   no selection (null)      → renders nothing
 //
 // Rotate visibility is type-derived (showRotateOption, mirroring
 // showRenameOption): creature types npc/monster have zero transform consumers
 // in either render lane (2D PlacedItems renderCreature, 3D map3dScene
 // _buildNpcs), so Rotate is hidden for them — silent persisted knob
-// (backlog 2026-11-01 BA).
+// (backlog 2026-11-01 BA). Ghost types (no entry in services/maps/itemSprites
+// ART_TYPES → renderProp(i, {}) `#generic-prop` dashed chip, rotation never
+// consumed) hide Rotate for the same reason (backlog 2026-11-05 CW, owner
+// decision: hide the affordance, not add the transform path).
 //
 // NOT OWNED — cited to owner lanes (dispatch args pinned here only):
 //   door open/closed pane swap + resulting placed state → PlacedItems lanes (#899/#909)
@@ -57,7 +60,7 @@ const createMocks = () => ({
 
 const placedItem = (overrides = {}) => ({
     id: 'item-1',
-    type: 'token',
+    type: 'barrel',
     visible: true,
     open: false,
     name: 'Test NPC',
@@ -107,8 +110,8 @@ describe('no selection', () => {
 
 describe('menu content census', () => {
     it.each([
-        ['token visible', { type: 'token', visible: true }, false, ['Hide', 'Delete', 'Rotate', '✕']],
-        ['token hidden', { type: 'token', visible: false }, false, ['Show', 'Delete', 'Rotate', '✕']],
+        ['registered prop visible', { type: 'barrel', visible: true }, false, ['Hide', 'Delete', 'Rotate', '✕']],
+        ['registered prop hidden', { type: 'barrel', visible: false }, false, ['Show', 'Delete', 'Rotate', '✕']],
         ['npc monster not found', { type: 'npc' }, false, ['Hide', 'Delete', 'Rename', '✕']],
         ['npc monster found', { type: 'npc' }, true, ['Hide', 'Delete', 'Rename', 'View Stats', '✕']],
         ['monster token', { type: 'monster', name: 'Goblin' }, false, ['Hide', 'Delete', '✕']],
@@ -116,7 +119,9 @@ describe('menu content census', () => {
         ['rotatable prop (table)', { type: 'table' }, false, ['Hide', 'Delete', 'Rotate', '✕']],
         ['door closed, monster found', { type: 'door', open: false }, true, ['Hide', 'Delete', 'Open Door', 'Rotate', '✕']],
         ['door open', { type: 'door', open: true }, false, ['Hide', 'Delete', 'Close Door', 'Rotate', '✕']],
-        ['unknown type', { type: 'chest' }, true, ['Hide', 'Delete', 'Rotate', '✕']],
+        ['registered prop unrotatable (chest)', { type: 'chest' }, true, ['Hide', 'Delete', 'Rotate', '✕']],
+        ['ghost type (cauldron)', { type: 'cauldron' }, false, ['Hide', 'Delete', '✕']],
+        ['ghost type hidden (roundTable)', { type: 'roundTable', visible: false }, false, ['Show', 'Delete', '✕']],
     ])('%s → exact labels', (_state, item, monsterFound, expected) => {
         const mocks = createMocks();
         const { container } = renderMenu(mocks, {
@@ -133,17 +138,24 @@ describe('menu content census', () => {
     });
 });
 
-// ── Rotation-invariant creature tokens: Rotate menu is unreachable ──
+// ── Rotation-invariant rows: Rotate menu is unreachable ──
 // Backlog 2026-11-01 BA: npc/monster render lanes (2D PlacedItems
 // renderCreature, 3D map3dScene._buildNpcs) never consume `rotation`, so the
-// menu must not advertise Rotate for them — every creature-menu click must
-// leave handleRotate unfired (no silent persisted knob).
+// menu must not advertise Rotate for them. Backlog 2026-11-05 CW: ghost-'?'
+// props (types absent from itemSprites ART_TYPES) render through
+// renderProp(i, {}) with no `rotatable` opt and a rotation-invariant dashed
+// chip — clicking Rotate persisted `rotation: 90` to disk with zero visual
+// delta (invisible state write). Every such menu click must leave
+// handleRotate unfired.
 
-describe('creature tokens never dispatch rotate', () => {
+describe('rotation-invariant rows never dispatch rotate', () => {
     it.each([
         ['npc', { type: 'npc', name: 'Marta' }],
         ['monster', { type: 'monster', name: 'Goblin' }],
-    ])('%s dress-token row: clicking every menu entry leaves handleRotate untouched', (_label, item) => {
+        ['ghost cauldron', { type: 'cauldron' }],
+        ['ghost roundTable', { type: 'roundTable' }],
+        ['ghost token', { type: 'token' }],
+    ])('%s row: clicking every menu entry leaves handleRotate untouched', (_label, item) => {
         const mocks = createMocks();
         const { container } = renderMenu(mocks, { placedItems: [placedItem(item)] });
         expect(screen.queryByText('Rotate')).not.toBeInTheDocument();
@@ -167,6 +179,7 @@ describe('menu panel height', () => {
         ['npc + stats (no Rotate)', { type: 'npc' }, true, 116],
         ['rotatable prop keeps Rotate row', { type: 'table' }, false, 76],
         ['door keeps Rotate row', { type: 'door' }, false, 116],
+        ['ghost prop drops Rotate row', { type: 'cauldron' }, false, 54],
     ])('%s', (_label, item, monsterFound, expected) => {
         const mocks = createMocks();
         const { container } = renderMenu(mocks, {
