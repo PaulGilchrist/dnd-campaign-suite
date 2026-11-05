@@ -66,7 +66,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- **2026-11-04 CS — PATCH change-data "success" on zero-applied overlays.** `PATCH /combatSummary` with an all-unmatched creatures overlay replies 200 "Data patched successfully"; truth only in the server console (`…skipped unmatched record(s)…`, campaigns-changedata.js:375). Consider `applied:0`/`skipped:[…]` in the response body so clients can detect silently-dropped arms (playbook §5-style error-vs-silent rule).
 - **2026-11-04 CS — Allies "hostile to all" convention has no on-screen hint.** Confirm Allies (0) is silently disabled; the intentional self-only escape hatch ("self-only is exactly 'trust no one'", useAllyEditor.js:23-24) is invisible in the modal. Add one helper line when count=0 ("Select only yourself to trust no one").
 
 ## Blocked / Deepen Targets (fold-gate ledger)

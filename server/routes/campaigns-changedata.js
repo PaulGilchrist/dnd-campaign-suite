@@ -316,6 +316,11 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
  *     name has no stored match is warned + SKIPPED — structural writes
  *     (join/remove/clear) keep riding the full POST;
  *   • anything else ⇒ the patch field replaces the stored field.
+ *
+ * Response honesty (backlog 2026-11-04 CS): alongside the existing
+ * `message`, the 200 body reports `applied` (count of named records that
+ * merged) and `skipped` (names with no stored match) so clients can detect
+ * silently-dropped arms instead of trusting a blanket success.
  */
 function isPlainRecord(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -327,24 +332,25 @@ function namedRecords(value) {
         value.every(r => isPlainRecord(r) && typeof r.name === 'string');
 }
 
-function mergeNamedRecords(stored, patchRecords, skipped) {
+function mergeNamedRecords(stored, patchRecords, stats) {
     const byName = new Map(stored.map(r => [r.name, r]));
     for (const record of patchRecords) {
         const match = byName.get(record.name);
         if (match) {
-            mergePatchFields(match, record, skipped);
+            stats.applied += 1;
+            mergePatchFields(match, record, stats);
         } else {
-            skipped.push(record.name);
+            stats.skipped.push(record.name);
         }
     }
 }
 
-function mergePatchFields(target, patch, skipped) {
+function mergePatchFields(target, patch, stats) {
     for (const [key, value] of Object.entries(patch)) {
         if (isPlainRecord(target[key]) && isPlainRecord(value)) {
-            mergePatchFields(target[key], value, skipped);
+            mergePatchFields(target[key], value, stats);
         } else if (namedRecords(target[key]) && namedRecords(value)) {
-            mergeNamedRecords(target[key], value, skipped);
+            mergeNamedRecords(target[key], value, stats);
         } else {
             target[key] = value;
         }
@@ -370,8 +376,17 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     }
 
     const merged = lodash.cloneDeep(data[key]);
-    const skipped = [];
-    mergePatchFields(merged, patch, skipped);
+    // Merge accounting (backlog 2026-11-04 CS): the old reply said "Data
+    // patched successfully" even when EVERY record was skipped — the truth
+    // lived only in the server console, so a silently-dropped arming arm was
+    // undetectable client-side. The response now reports how many named
+    // records actually merged (`applied`) and which had no stored match
+    // (`skipped`). Field-level patches with no named-record arrays report
+    // applied: 0 / skipped: [] — nothing was dropped, there were just no
+    // records to merge; clients detect drops via `skipped.length > 0`.
+    const stats = { applied: 0, skipped: [] };
+    mergePatchFields(merged, patch, stats);
+    const { skipped } = stats;
     if (skipped.length) {
         console.error(
             `[campaigns-changedata] PATCH ${key} (${campaign}) skipped unmatched record(s): ` +
@@ -395,7 +410,7 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     // exists (byte-identical to a full POST echo).
     publish(`change-${campaign}-${key}`, storedValue, campaign);
 
-    res.json({ message: 'Data patched successfully' });
+    res.json({ message: 'Data patched successfully', applied: stats.applied, skipped });
 }));
 
 // PUT /api/campaigns/:campaign/:key — reserved-key guard only.
