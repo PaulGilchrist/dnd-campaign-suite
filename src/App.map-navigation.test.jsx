@@ -23,7 +23,11 @@
  *    triggers no reload.
  *  - Leaving to another view (Log) and back re-mounts the map view and
  *    re-resolves the active map (a GM activation while away is honored).
- *  - Back from a map lands on the waiting placeholder, never the manager.
+ *  - Back from a map with an EMPTY stack no longer strands the player on the
+ *    waiting placeholder while a map is active — the Back-transition self-
+ *    heal seed re-opens the active map with zero clicks (backlog 2026-11-05
+ *    CV); the placeholder-only face (no active map) is covered in
+ *    App.map-self-heal.test.jsx. Never the manager either way.
  *  - With no active map, re-clicking "Maps" re-runs the load (campaign-
  *    scoped) and opens the map once the GM has activated one.
  *
@@ -545,7 +549,12 @@ describe('App - Map Navigation & View Management', () => {
       expect(window.alert).not.toHaveBeenCalled();
     });
 
-    it('back from a map lands on the waiting placeholder, never the manager', async () => {
+    // Backlog 2026-11-05 CV: Back with an empty stack used to land on the
+    // "Waiting for the GM to open a map…" placeholder even while the map was
+    // still active on the server (only NEW activation SSE events auto-opened
+    // while blank). The Back-transition self-heal seed now re-opens the view from
+    // the armed active-map context with zero clicks — and never the manager.
+    it('back from a map self-heals onto the still-active map, never the manager', async () => {
       loadMaps.mockResolvedValue({
         maps: [{ fileName: 'dungeon-1.json', isActive: true }],
       });
@@ -555,9 +564,11 @@ describe('App - Map Navigation & View Management', () => {
 
       backFromMap();
       await waitFor(() => {
-        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
       });
-      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      // Re-opened from the armed context — no waiting pane, no manager,
+      // no manual "Check Again", and no extra server round-trip needed.
+      expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
       expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       expect(window.alert).not.toHaveBeenCalled();
     });

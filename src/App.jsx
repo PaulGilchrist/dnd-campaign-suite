@@ -292,7 +292,8 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
     );
   }
   // Player with no active map — friendly waiting state until the GM
-  // activates one (the map-activate SSE auto-open swaps this out).
+  // activates one (the map-activate SSE auto-open, or the Back-transition
+  // self-heal seed + auto-check, swaps this out when a map is active).
   if (!isLocalhost) {
     return <MapUnavailable onRetry={onRetryActiveMap} />;
   }
@@ -471,14 +472,28 @@ function App() {
     setActiveMapName(mapName);
   }, [mapsView]);
 
-  const handleBackFromMap = useCallback(() => {
+  // Self-heal the player's Back transition (backlog 2026-11-05 CV): Back with
+  // an empty stack reset mapsView to 'none' even while an active map existed,
+  // stranding the player on the MapUnavailable placeholder until a manual
+  // "Check Again" — only NEW activation SSE events auto-opened while blank
+  // (handleMapActivateEvent view-gate). On entering the blank state, seed
+  // instantly from the armed active-map context AND run the single auto-check
+  // (loadActiveMapAndOpen, the exact "Check Again" lane) that re-opens the
+  // CURRENT server-active map — covering an unarmed/stale tab context too.
+  // The check only ever OPENS (no active map ⇒ the placeholder stays visible,
+  // no-map case unchanged) and this branch runs solely while LEAVING a map
+  // view, so an open view is never hijacked or re-switched.
+  const handleBackFromMap = () => {
     if (mapHistoryRef.current.length > 0) {
       const prevMap = mapHistoryRef.current.pop();
       setMapsView({ type: 'map', mapName: prevMap });
+    } else if (isLocalhost) {
+      setMapsView({ type: 'manager' });
     } else {
-      setMapsView({ type: isLocalhost ? 'manager' : 'none' });
+      setMapsView(activeMapName ? { type: 'map', mapName: activeMapName } : { type: 'none' });
+      loadActiveMapAndOpen();
     }
-  }, [isLocalhost]);
+  };
 
   const [combatSummaryLoaded, setCombatSummaryLoaded] = useState(false);
 
