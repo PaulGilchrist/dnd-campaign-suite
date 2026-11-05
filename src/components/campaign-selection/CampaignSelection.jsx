@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/campaignMetaService.js';
-import { createSeededCampaign } from '../../services/campaign/seededCampaign.js';
+import { createSeededCampaign, localDateStamp } from '../../services/campaign/seededCampaign.js';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import useEphemeralToast from '../map/hooks/useEphemeralToast.js';
 import SeededCampaignModal from './SeededCampaignModal.jsx';
@@ -27,7 +27,7 @@ const SEEDED_PRESETS = {
 };
 
 function seededDefaultName(prefix) {
-  return `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  return `${prefix}-${localDateStamp()}`;
 }
 
 /**

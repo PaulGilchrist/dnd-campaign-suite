@@ -21,7 +21,10 @@ vi.mock('../../services/campaign/campaignMetaService.js', () => ({
 vi.mock('../../services/ui/sseClient.js', () => ({
   subscribeToSSE: vi.fn(() => () => {}),
 }));
-vi.mock('../../services/campaign/seededCampaign.js', () => ({
+// Keep the real localDateStamp (the modal default uses it); mock only the
+// orchestrator that POSTs to the server.
+vi.mock('../../services/campaign/seededCampaign.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   createSeededCampaign: vi.fn(),
 }));
 

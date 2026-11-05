@@ -248,8 +248,18 @@ function pickPoiHexes(terrain) {
 // Presets
 // ---------------------------------------------------------------------------
 
+/**
+ * YYYYMMDD stamp from the LOCAL date parts. Quick-create defaults must show
+ * the user's own date — the old `toISOString().slice(0,10)` recipe rolled to
+ * "tomorrow" after local evening (UTC-ahead offsets, 2026-11-04 backlog).
+ */
+export function localDateStamp(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+}
+
 const ARENA_PRESET = {
-  defaultName: () => `Arena-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+  defaultName: () => `Arena-${localDateStamp()}`,
   metaType: 'arena',
   async seed(campaignName, seed) {
     const rng = mulberry32(seed);
@@ -292,7 +302,7 @@ const ARENA_PRESET = {
 };
 
 const STARTER_PRESET = {
-  defaultName: () => `Starter-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+  defaultName: () => `Starter-${localDateStamp()}`,
   metaType: 'starter',
   async seed(campaignName, seed) {
     const rng = mulberry32(seed);

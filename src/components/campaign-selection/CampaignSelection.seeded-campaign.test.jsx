@@ -7,7 +7,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CampaignSelection from './CampaignSelection.jsx';
-import { createSeededCampaign } from '../../services/campaign/seededCampaign.js';
+import { createSeededCampaign, localDateStamp } from '../../services/campaign/seededCampaign.js';
 import {
   getCharacterFolders,
   getCharacterFiles,
@@ -20,7 +20,10 @@ vi.mock('../../services/campaign/campaignService.js', () => ({
   loadCharacters: vi.fn(),
 }));
 
-vi.mock('../../services/campaign/seededCampaign.js', () => ({
+// Keep the real localDateStamp (the modal default uses it); mock only the
+// orchestrator that POSTs to the server.
+vi.mock('../../services/campaign/seededCampaign.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   createSeededCampaign: vi.fn(),
 }));
 
@@ -59,7 +62,7 @@ describe('seeded quick-create buttons', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /New Arena Battle/ }));
     expect(screen.getByRole('heading', { level: 2, name: 'New Arena Battle' })).toBeInTheDocument();
-    const expectedDefault = `Arena-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+    const expectedDefault = `Arena-${localDateStamp()}`;
     expect(screen.getByPlaceholderText('Enter campaign name')).toHaveValue(expectedDefault);
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
@@ -78,5 +81,28 @@ describe('seeded quick-create buttons', () => {
 
     await waitFor(() => expect(createSeededCampaign).toHaveBeenCalledWith('starter', { name: 'qa-starter' }));
     await waitFor(() => expect(screen.getByText('Campaign creation is locked')).toBeInTheDocument());
+  });
+
+  it('defaults both modal flavors to the LOCAL date when UTC has rolled ahead', async () => {
+    // 2026-11-05T00:30Z is 2026-11-04 19:30 in New York — the old UTC-ISO
+    // recipe offered `Arena-20261105` ("tomorrow") at that moment.
+    const realTz = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    // Fake ONLY Date — full fake timers would freeze waitFor's polling.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-05T00:30:00Z'));
+    try {
+      await renderSelection({ isLocalhost: true });
+
+      fireEvent.click(screen.getByRole('button', { name: /New Arena Battle/ }));
+      expect(screen.getByPlaceholderText('Enter campaign name')).toHaveValue('Arena-20261104');
+      fireEvent.click(screen.getByRole('button', { name: /Cancel/ }));
+
+      fireEvent.click(screen.getByRole('button', { name: /New Starter Adventure/ }));
+      expect(screen.getByPlaceholderText('Enter campaign name')).toHaveValue('Starter-20261104');
+    } finally {
+      vi.useRealTimers();
+      process.env.TZ = realTz;
+    }
   });
 });
