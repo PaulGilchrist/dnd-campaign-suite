@@ -36,6 +36,7 @@ vi.mock('./FirePitSVG.jsx', () => ({ default: () => 'FirePitSVG' }));
 vi.mock('./FountainSVG.jsx', () => ({ default: () => 'FountainSVG' }));
 vi.mock('./PillarSVG.jsx', () => ({ default: () => 'PillarSVG' }));
 vi.mock('./SecretDoorSVG.jsx', () => ({ default: () => 'SecretDoorSVG' }));
+vi.mock('./SkeletonSVG.jsx', () => ({ default: () => 'SkeletonSVG' }));
 vi.mock('./StairsSVG.jsx', () => ({ default: () => 'StairsSVG' }));
 vi.mock('./StatueSVG.jsx', () => ({ default: () => 'StatueSVG' }));
 vi.mock('./TableSVG.jsx', () => ({ default: () => 'TableSVG' }));
@@ -69,6 +70,7 @@ const INDOOR_PALETTE = [
     { label: 'Fountain', type: 'fountain' },
     { label: 'Pillar', type: 'pillar' },
     { label: 'Secret Door', type: 'secretDoor' },
+    { label: 'Skeleton', type: 'skeleton' },
     { label: 'Stairs', type: 'stairs' },
     { label: 'Statue', type: 'statue' },
     { label: 'Table', type: 'table' },

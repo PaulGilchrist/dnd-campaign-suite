@@ -13,6 +13,7 @@ import FirePitSVG from './FirePitSVG.jsx';
 import FountainSVG from './FountainSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
 import SecretDoorSVG from './SecretDoorSVG.jsx';
+import SkeletonSVG from './SkeletonSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
 import StatueSVG from './StatueSVG.jsx';
 import TableSVG from './TableSVG.jsx';
@@ -137,7 +138,7 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
                     <Item type="fountain" viewBox="0 0 36 36" width="36" label="Fountain"><FountainSVG /></Item>
                     <Item type="pillar" viewBox="0 0 36 36" width="36" label="Pillar"><PillarSVG /></Item>
                     <Item type="secretDoor" viewBox="0 0 36 36" width="36" label="Secret Door"><SecretDoorSVG /></Item>
-                    {/* <Item type="skeleton" viewBox="0 0 36 36" width="36" label="Skeleton"><SkeletonSVG /></Item> */}
+                    <Item type="skeleton" viewBox="0 0 36 36" width="36" label="Skeleton"><SkeletonSVG /></Item>
                     <Item type="stairs" viewBox="0 0 36 36" width="36" label="Stairs"><StairsSVG /></Item>
                     <Item type="statue" viewBox="0 0 36 36" width="36" label="Statue"><StatueSVG /></Item>
                     <Item type="table" viewBox="0 0 72 36" width="72" label="Table"><TableSVG /></Item>
