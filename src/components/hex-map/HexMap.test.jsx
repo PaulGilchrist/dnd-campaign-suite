@@ -532,20 +532,6 @@ describe('HexMap', () => {
             ]);
         });
 
-        it('drops a character onto the marching order and seeds party position once', () => {
-            const { ml, allowed } = dropWith({ dragData: 'character:Thorin', hex: { q: 4, r: 7 } });
-            expect(allowed).toBe(false);
-            expect(ml.setPois).not.toHaveBeenCalled();
-            expect(ml.setMarchingOrder).toHaveBeenCalledTimes(1);
-            expect(ml.setMarchingOrder.mock.calls[0][0]([])).toEqual(['Thorin']);
-            const present = ['Thorin'];
-            expect(ml.setMarchingOrder.mock.calls[0][0](present)).toBe(present); // no duplicates
-            expect(ml.setPartyPosition).toHaveBeenCalledTimes(1);
-            expect(ml.setPartyPosition.mock.calls[0][0](null)).toEqual({ q: 4, r: 7 });
-            const existingPos = { q: 1, r: 1 };
-            expect(ml.setPartyPosition.mock.calls[0][0](existingPos)).toBe(existingPos); // never overwrites
-        });
-
         it('ignores drops with an unknown type, out-of-bounds hex, or an occupied hex', () => {
             const existing = [{ id: 'poi-0', q: 10, r: 5, type: 'camp', visible: true, label: 'Camp' }];
             const getHex = vi.fn(() => ({ q: 10, r: 5 }));

@@ -582,13 +582,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         if (!hex) return;
         if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
 
-        if (dragData.startsWith('character:')) {
-            const charName = dragData.slice('character:'.length);
-            setMarchingOrder(prev => prev.includes(charName) ? prev : [...prev, charName]);
-            setPartyPosition(prev => prev || { q: hex.q, r: hex.r });
-            return;
-        }
-
         const poiType = POI_TYPES.find(t => t.id === dragData);
         if (!poiType) return;
 
@@ -599,7 +592,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             type: poiType.id, q: hex.q, r: hex.r,
             visible: true, label: poiType.name,
         }]);
-    }, [pois, getHexFromEvent, hexCols, hexRows, setMarchingOrder, setPartyPosition, setPois]);
+    }, [pois, getHexFromEvent, hexCols, hexRows, setPois]);
 
     return (
         // data-testid: outdoor twin of the Map.jsx mount-proof hook — the maps
