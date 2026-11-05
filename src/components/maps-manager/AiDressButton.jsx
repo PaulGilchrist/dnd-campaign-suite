@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { dressMapProposal } from '../../services/ai/aiClient.js';
 import { saveMapData } from '../../services/maps/mapsService.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import AiInstructionModal from '../common/AiInstructionModal.jsx';
 import './AiDressButton.css';
 
@@ -35,9 +36,15 @@ function failureText(res) {
   return (res.errors || [res.error || res.code || 'dress failed']).join(' · ');
 }
 
-function AiDressAsk({ instruction, setInstruction, busy, onAsk }) {
+function AiDressAsk({ instruction, setInstruction, busy, aiLive, onAsk }) {
   return (
     <>
+      {!aiLive && (
+        <p className="ai-instruction-hint" role="status">
+          <i className="fa-solid fa-circle-info" /> AI is not enabled for this campaign —
+          configure it in Campaign Admin → AI Referee, then reopen this dialog.
+        </p>
+      )}
       <label className="ai-instruction-field">
         Instruction
         <textarea
@@ -53,7 +60,7 @@ function AiDressAsk({ instruction, setInstruction, busy, onAsk }) {
       </label>
       <p className="ai-instruction-hint">⌘/Ctrl+Enter proposes — nothing saves until you preview and Apply.</p>
       <div className="ai-instruction-actions">
-        <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !instruction.trim()} onClick={onAsk}>
+        <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !aiLive || !instruction.trim()} onClick={onAsk}>
           <i className="fa-solid fa-wand-magic-sparkles" /> {busy ? 'Thinking…' : 'Dress map'}
         </button>
       </div>
@@ -83,6 +90,14 @@ function AiDressPreview({ proposal, busy, onApply, docked }) {
 }
 
 function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) {
+  const aiConfig = useRuntimeValue('campaign', 'aiConfig', campaignName);
+  // Backlog (2026-11-05 CX) no-config-path-POSTs-before-telling: gate on the
+  // SAME aiConfig lane the referee surfaces use (AiRefereeSection: `mode &&
+  // mode !== 'off'`). Unset/off ⇒ the ask form shows an inline notice and the
+  // submit stays disabled — zero round-trip, zero console-error noise instead
+  // of the old fire-then-403 dance. The read is live (store listener + SSE
+  // echo), so configuring AI while the dialog is open enables it immediately.
+  const aiLive = !!(aiConfig && aiConfig.mode && aiConfig.mode !== 'off');
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [busy, setBusy] = useState(false);
@@ -105,7 +120,7 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
 
   const ask = async () => {
     const text = instruction.trim();
-    if (!text || busy) return;
+    if (!text || busy || !aiLive) return;
     setBusy(true);
     setError(null);
     const res = await dressMapProposal({ campaignName, mapName: mapKey, instruction: text });
@@ -149,7 +164,7 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
       overlayClassName={docked ? 'ai-instruction-overlay-dock' : undefined}>
       {proposal
         ? <AiDressPreview proposal={proposal} busy={busy} onApply={apply} docked={docked} />
-        : <AiDressAsk instruction={instruction} setInstruction={setInstruction} busy={busy} onAsk={ask} />}
+        : <AiDressAsk instruction={instruction} setInstruction={setInstruction} busy={busy} aiLive={aiLive} onAsk={ask} />}
       {error && <p className="ai-dress-error" role="alert">{error}</p>}
     </AiInstructionModal>
   );

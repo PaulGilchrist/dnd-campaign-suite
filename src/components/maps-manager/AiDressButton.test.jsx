@@ -9,6 +9,14 @@ const dressMapProposal = vi.fn();
 const saveMapData = vi.fn();
 const addEntry = vi.fn();
 
+// aiConfig runtime-store lane (backlog 2026-11-05 CX no-config pre-disable):
+// stubbed the same way AiDirectorPanel.test.jsx stubs the synced state — the
+// tests set `synced.aiConfig` to steer the gate.
+const synced = {};
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    useRuntimeValue: (_key, prop) => (prop in synced ? synced[prop] : null),
+}));
+
 vi.mock('../../services/ai/aiClient.js', () => ({ dressMapProposal: (...a) => dressMapProposal(...a) }));
 vi.mock('../../services/maps/mapsService.js', () => ({ saveMapData: (...a) => saveMapData(...a) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: (...a) => addEntry(...a) }));
@@ -16,6 +24,7 @@ vi.mock('../../services/ui/logService.js', () => ({ addEntry: (...a) => addEntry
 import AiDressButton from './AiDressButton.jsx';
 
 const MAP = { name: 'Battle Arena', fileName: 'battle-arena.json', slug: 'battle-arena' };
+const CONFIGURED = { endpoint: 'http://localhost:11434/v1', model: 'stub-llm', mode: 'suggest' };
 const PROPOSAL = {
     ok: true,
     map: 'battle-arena',
@@ -28,6 +37,7 @@ beforeEach(() => {
     dressMapProposal.mockReset(); saveMapData.mockReset(); addEntry.mockReset();
     saveMapData.mockResolvedValue({ message: 'Map saved successfully' });
     addEntry.mockResolvedValue({});
+    synced.aiConfig = CONFIGURED; // ask/Apply lanes below assume a live config
 });
 afterEach(cleanup);
 
@@ -210,6 +220,49 @@ describe('AiDressButton', () => {
             // preview stage → still exactly one dialog, still no trigger to stack
             expect(trigger()).toBeNull();
             expect(screen.getAllByRole('dialog')).toHaveLength(1);
+        });
+    });
+
+    // Backlog (2026-11-05 CX) no-config-path-POSTs-before-telling: with AI
+    // unset/off the ask form told you only AFTER a POST drew the server's
+    // by-design 403. Now the gate mirrors AiRefereeSection (`mode && mode !==
+    // 'off'`): notice up-front, submit disabled from the first paint, and the
+    // Cmd/Ctrl+Enter lane guarded too — the whole open→type→close flow is
+    // zero traffic.
+    describe('no-config pre-disable', () => {
+        for (const [label, cfg] of [['unset (null)', null], ['mode off', { ...CONFIGURED, mode: 'off' }]]) {
+            it(`${label}: notice + disabled submit before typing, typing and ⌘Enter stay inert`, () => {
+                synced.aiConfig = cfg;
+                render(<AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={vi.fn()} />);
+                fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+
+                expect(screen.getByRole('status').textContent).toMatch(/AI is not enabled for this campaign/i);
+                const submit = screen.getByRole('button', { name: /dress map/i });
+                expect(submit).toBeDisabled(); // BEFORE anything is typed
+
+                fireEvent.change(screen.getByPlaceholderText(/how should this map change/i), { target: { value: 'line the gallery with banners' } });
+                expect(submit).toBeDisabled(); // typing changes nothing
+                fireEvent.keyDown(screen.getByPlaceholderText(/how should this map change/i), { key: 'Enter', metaKey: true });
+                fireEvent.click(submit); // jsdom dispatches on disabled? belt-and-braces inertness check
+                expect(dressMapProposal).not.toHaveBeenCalled();
+
+                fireEvent.click(screen.getByRole('button', { name: /close ai dress/i }));
+                expect(dressMapProposal).not.toHaveBeenCalled(); // open→type→close: zero POSTs
+            });
+        }
+
+        it('the gate is live: config arriving while the dialog is open enables submit (SSE echo face)', () => {
+            synced.aiConfig = null;
+            render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+            expect(screen.getByRole('button', { name: /dress map/i })).toBeDisabled();
+
+            // Simulate the store update an SSE aiConfig echo produces: new
+            // hook value on the next render.
+            synced.aiConfig = CONFIGURED;
+            fireEvent.change(screen.getByPlaceholderText(/how should this map change/i), { target: { value: 'add a chest' } });
+            expect(screen.queryByRole('status')).toBeNull(); // notice gone…
+            expect(screen.getByRole('button', { name: /dress map/i })).toBeEnabled(); // …button live-enables
         });
     });
 });

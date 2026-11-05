@@ -73,7 +73,6 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-05 CX] **AI-Dress no-config path POSTs before telling**: with aiConfig null the dock modal lets you type + "Dress map", fires the POST, server answers the by-design 403 (campaigns-ai.js:26) and the client shows the inline notice — works, but a config-aware disabled button (notice up-front, zero round-trip, no console-error noise) would be cleaner. Likely 1-liner in the AiDress component reading the same aiConfig the badge already renders.
 - [2026-11-05 CX] **PC sheet Actions spell rows have no visible cast affordance until clicked** — Burning Hands rendered as bare `div.left.clickable` text (same as cantrips/weapon rows); a wand icon or hover hint would surface the spell-detail popup flow discovered only via trial. Adjacent nit: the Spells tab's slot-level sections didn't list Burning Hands where the Actions section did — worth a consistency look at why a known 1st-level spell renders in one section only.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
