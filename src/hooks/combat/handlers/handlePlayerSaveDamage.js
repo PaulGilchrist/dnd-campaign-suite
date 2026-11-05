@@ -104,11 +104,13 @@ async function applyForcedSuccessSave({ context, combatSummary, target, characte
 
 async function resolvePlayerSaveDisadvantage({ context, target, campaignName, characterName, targetEffects, restoreBalance, saveType }) {
     // CLA-063: awaited — the util is async; un-awaited it was always undefined.
+    // 2026-11-04 range fix: no skipRangeCheck — the util measures the 60 ft
+    // aura when both tokens are positioned on the active map, gridless-lenient
+    // otherwise.
     const coronaDisadvantage = (await getCoronaSaveDisadvantage({
         targetName: target.name,
         campaignName,
         damageType: context?.damageType,
-        skipRangeCheck: true,
     })).disadvantage || false;
     const elderChampionDisadvantage = await getElderChampionSaveDisadvantage({
         attackerName: characterName,

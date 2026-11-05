@@ -38,14 +38,15 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
   return affected;
 }
 
-function resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget, saveType) {
-  // CLA-063: sync lane — getCoronaSaveDisadvantageSync honors skipRangeCheck
-  // gridless-lenient and falls back to combat-summary participants.
+function resolveNpcSaveDisadvantage({ creature, campaignName, damageType, heightenTarget, saveType, mapData }) {
+  // CLA-063 + 2026-11-04 range fix: sync lane measures bearer↔victim distance
+  // from the active-map tokens carried in mapData (aoeCtx); gridless/unplaced
+  // pairs stay consulted-and-passes lenient inside the util.
   const coronaResult = getCoronaSaveDisadvantageSync({
     targetName: creature.name,
     campaignName,
     damageType,
-    skipRangeCheck: true,
+    mapData,
   });
   if (coronaResult.disadvantage) return true;
   if (heightenTarget && creature.name === heightenTarget) return true;
@@ -62,11 +63,11 @@ function resolveNpcSaveDisadvantage(creature, campaignName, damageType, heighten
   return false;
 }
 
-export function processAoeNpcs({ combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters, heightenTarget }) {
+export function processAoeNpcs({ combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters, heightenTarget, mapData }) {
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
-    const disadvantage = resolveNpcSaveDisadvantage(creature, campaignName, damageType, heightenTarget, saveType);
+    const disadvantage = resolveNpcSaveDisadvantage({ creature, campaignName, damageType, heightenTarget, saveType, mapData });
     const advantage = isCircleOfPowerActive(creature.name, campaignName);
     const saveResult = rollSaveForCreature(creature, saveType, saveDc, disadvantage, advantage);
     const isSoulstitchProtected = hasSoulstitchProtection(creature.name, attackerName, campaignName);
@@ -88,7 +89,7 @@ export function processAoeNpcs({ combatSummary, affected, rawDamage, damageType,
   return results;
 }
 
-export function sendAoePlayerSaves({ affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, spellName, attackerName, formula, heightenTarget }) {
+export function sendAoePlayerSaves({ affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, spellName, attackerName, formula, heightenTarget, mapData }) {
   const pendingList = [];
   for (const { creature } of affected) {
     if (creature.type !== 'player') continue;
@@ -99,12 +100,12 @@ export function sendAoePlayerSaves({ affected, rawDamage, damageType, saveDc, sa
       creature,
      });
 
-    // CLA-063: sync lane, gridless-lenient (see resolveNpcSaveDisadvantage).
+    // CLA-063: sync lane, mapData-measured / gridless-lenient (see resolveNpcSaveDisadvantage).
     const coronaResult = getCoronaSaveDisadvantageSync({
       targetName: creature.name,
       campaignName,
       damageType,
-      skipRangeCheck: true,
+      mapData,
     });
     const heightenDisadvantage = !!(heightenTarget && creature.name === heightenTarget);
     const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];

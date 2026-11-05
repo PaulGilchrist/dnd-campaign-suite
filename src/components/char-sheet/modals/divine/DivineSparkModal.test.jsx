@@ -69,7 +69,7 @@ vi.mock('../../../../services/automation/common/savePrompt.js', () => ({
 }));
 
 vi.mock('../../../../services/combat/auras/coronaAuraUtils.js', () => ({
-  getCoronaSaveDisadvantageSync: vi.fn(() => ({ disadvantage: false })),
+  getCoronaSaveDisadvantage: vi.fn(async () => ({ disadvantage: false })),
 }));
 
 // CLA-092: canonical choke points — clamping heal + typed damage application mocks.
@@ -215,7 +215,8 @@ describe('DivineSparkModal', () => {
     logService.addEntry.mockReset();
     healingRoll.logHealingToSSE.mockReset();
     savePrompt.createSaveListener.mockReset();
-    corona.getCoronaSaveDisadvantageSync.mockReset();
+    corona.getCoronaSaveDisadvantage.mockReset();
+    corona.getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: false });
     damageUtils.getCombatContext.mockReset();
     applyHealing.applyHealingToTarget.mockReset();
     applyDamage.applyDamageToTarget.mockReset();
@@ -466,11 +467,10 @@ describe('DivineSparkModal', () => {
       expect(diceRoller.rollExpression).toHaveBeenCalledTimes(1);
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('3d6');
       expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Paladin1', 'Orc Warrior', 30);
-      expect(corona.getCoronaSaveDisadvantageSync).toHaveBeenCalledWith({
+      expect(corona.getCoronaSaveDisadvantage).toHaveBeenCalledWith({
         targetName: 'Orc Warrior',
         damageType: 'Radiant',
         campaignName: 'test-campaign',
-        skipRangeCheck: true,
       });
       // CLA-063: prompt payload is the machine-truth channel consumed by SavePromptModal.
       expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
@@ -552,7 +552,7 @@ describe('DivineSparkModal', () => {
     // CLA-063: Corona of Light — Radiant/Fire saves vs a sunlit enemy arm
     // with disadvantage on the payload flag.
     it('threads corona sunlight disadvantage onto the save prompt payload (CLA-063)', async () => {
-      corona.getCoronaSaveDisadvantageSync.mockReturnValue({ disadvantage: true, source: 'War_Cleric' });
+      corona.getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: true, source: 'War_Cleric' });
       renderModal();
 
       await act(async () => {
@@ -581,7 +581,7 @@ describe('DivineSparkModal', () => {
       });
 
       expect(paragraphWithText('Orc Warrior is out of range for Divine Spark (30 ft).')).toBeInTheDocument();
-      expect(corona.getCoronaSaveDisadvantageSync).not.toHaveBeenCalled();
+      expect(corona.getCoronaSaveDisadvantage).not.toHaveBeenCalled();
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
       expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
       expect(findLogEntry('ability_use')).toBeUndefined();
@@ -740,11 +740,10 @@ describe('DivineSparkModal', () => {
     await act(async () => {
       fireEvent.click(fireHarmBtn);
     });
-    expect(corona.getCoronaSaveDisadvantageSync).toHaveBeenCalledWith({
+    expect(corona.getCoronaSaveDisadvantage).toHaveBeenCalledWith({
       targetName: 'Orc Warrior',
       damageType: 'Fire',
       campaignName: 'test-campaign',
-      skipRangeCheck: true,
     });
     expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       damageFormula: '3d6 Fire',

@@ -210,8 +210,11 @@ describe('createLogDamageAndShow - NPC save disadvantage integration', () => {
             expect(getCoronaSaveDisadvantage).toHaveBeenCalledWith(expect.objectContaining({
                 targetName: 'Goblin',
                 damageType: 'fire',
-                skipRangeCheck: true,
             }));
+            // 2026-11-04 range fix: no skipRangeCheck escape hatch from callers.
+            expect(getCoronaSaveDisadvantage).not.toHaveBeenCalledWith(
+                expect.objectContaining({ skipRangeCheck: expect.anything() })
+            );
             expect(saveRollArgs()).toEqual([
                 expect.objectContaining({ name: 'Goblin' }),
                 'DEX',

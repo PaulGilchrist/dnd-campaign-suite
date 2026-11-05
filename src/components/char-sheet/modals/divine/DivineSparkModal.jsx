@@ -4,7 +4,7 @@ import { hasHealingMaximization } from '../../../../services/combat/automation/a
 import { addEntry } from '../../../../services/ui/logService.js';
 import { logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
 import { createSaveListener } from '../../../../services/automation/common/savePrompt.js';
-import { getCoronaSaveDisadvantageSync } from '../../../../services/combat/auras/coronaAuraUtils.js';
+import { getCoronaSaveDisadvantage } from '../../../../services/combat/auras/coronaAuraUtils.js';
 import { applyHealingToTarget } from '../../../../services/rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js';
@@ -158,12 +158,14 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         // CLA-063: Corona of Light — enemies in the bright light have
         // Disadvantage on saves vs Fire/Radiant; the prompt payload flag is
         // the machine-truth channel consumed by SavePromptModal getSaveDisadvantage.
-        const coronaSaveDisadvantage = getCoronaSaveDisadvantageSync({
+        // 2026-11-04 range fix: awaited async lane — handleHarm is already
+        // async (30 ft gate above), so the util measures the 60 ft aura when
+        // both tokens are positioned on the active map, gridless-lenient otherwise.
+        const coronaSaveDisadvantage = (await getCoronaSaveDisadvantage({
             targetName,
             damageType,
             campaignName,
-            skipRangeCheck: true,
-        }).disadvantage || false;
+        })).disadvantage || false;
 
         // CLA-092: damage transport on the prompt payload — createSaveListener
         // stamps damageFormula/damageType/rawDamage onto its save_result log.

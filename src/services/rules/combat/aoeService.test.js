@@ -386,6 +386,38 @@ describe('processAoeNpcs', () => {
     expect(rollSaveForCreature).toHaveBeenCalledWith(expect.objectContaining({ name: 'Goblin' }), 'dexterity', 15, true, false);
   });
 
+  // Regression lock (bug-corona-save-disadvantage-ignores-60ft-range.md): the
+  // threaded mapData lets the sync corona lane MEASURE bearer↔victim distance —
+  // a victim 65 ft from the bearer on the active map must NOT pay disadvantage,
+  // while the in-range twin still does.
+  it('corona range is measured from mapData tokens: 65 ft victim NOT disadvantaged, 60 ft twin is', () => {
+    getCombatSummary.mockReturnValue(makeCombatSummary([createPlayerCreature('TestHero')]));
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'TestHero' && prop === 'activeBuffs') {
+        return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'], distance: '60 ft' }];
+      }
+      if (key === 'TestHero' && prop === 'coronaOfLightEnemies') return ['Goblin'];
+      return null;
+    });
+    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
+    computeDamageAfterEvasion.mockReturnValue(6);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
+
+    const farMapData = {
+      players: [{ name: 'TestHero', gridX: 5, gridY: 5 }],
+      placedItems: [{ name: 'Goblin', type: 'npc', gridX: 18, gridY: 5 }],
+    };
+    processAoeNpcs(npcArgs(createNpcCreature('Goblin'), { mapData: farMapData }));
+    expect(rollSaveForCreature).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Goblin' }), 'dexterity', 15, false, false);
+
+    const nearMapData = {
+      players: [{ name: 'TestHero', gridX: 5, gridY: 5 }],
+      placedItems: [{ name: 'Goblin', type: 'npc', gridX: 17, gridY: 5 }],
+    };
+    processAoeNpcs(npcArgs(createNpcCreature('Goblin'), { mapData: nearMapData }));
+    expect(rollSaveForCreature).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Goblin' }), 'dexterity', 15, true, false);
+  });
+
   it('heightenTarget disadvantages the named target only', () => {
     rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
     computeDamageAfterEvasion.mockReturnValue(6);

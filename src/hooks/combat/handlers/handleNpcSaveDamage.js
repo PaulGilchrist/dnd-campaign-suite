@@ -107,7 +107,10 @@ async function resolveSaveDisadvantage({ targetName, campaignName, damageType, a
     }
     if (abilityScopedSaveDisadvantage(targetName, campaignName, saveType)) return true;
     // CLA-063: awaited — the util is async; un-awaited it was always undefined.
-    const coronaResult = await getCoronaSaveDisadvantage({ targetName, campaignName, damageType, skipRangeCheck: true });
+    // 2026-11-04 range fix: no skipRangeCheck — the util's internal fork
+    // measures bearer↔victim distance when the active map tracks both tokens
+    // and stays gridless-lenient otherwise (author behaviour was a bug).
+    const coronaResult = await getCoronaSaveDisadvantage({ targetName, campaignName, damageType });
     if (coronaResult.disadvantage) return true;
     const elderChampionResult = await getElderChampionSaveDisadvantage({ attackerName, attackerStats, targetName });
     return !!elderChampionResult.disadvantage;

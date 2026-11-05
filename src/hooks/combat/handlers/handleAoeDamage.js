@@ -27,10 +27,10 @@ async function applyZeroDamageResults({ combatSummary, creatures, damageType, ca
     }
 }
 
-function processSaveNpcs({ combatSummary, affected, isCarefulAlly, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, casterName, characters, heightenTarget, npcResults }) {
+function processSaveNpcs({ combatSummary, affected, isCarefulAlly, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, casterName, characters, heightenTarget, npcResults, mapData }) {
     const nonCarefulAffected = affected.filter(a => !isCarefulAlly(a.creature.name));
     const carefulAffected = affected.filter(a => isCarefulAlly(a.creature.name));
-    npcResults.push(...processAoeNpcs(combatSummary, nonCarefulAffected, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, casterName, characters, heightenTarget));
+    npcResults.push(...processAoeNpcs({ combatSummary, affected: nonCarefulAffected, rawDamage: adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName: casterName, characters, heightenTarget, mapData }));
     return carefulAffected.filter(a => a.creature.type === 'npc');
 }
 
@@ -107,9 +107,9 @@ async function resolveOverlayContext(context, campaignName) {
     return overlayId ? readAoeContext(campaignName, overlayId) : null;
 }
 
-function queuePlayerSavePrompts({ playersNeedingSave, saveDc, saveType, adjustedTotal, damageType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget, modifier, context, pendingSaves, setPopupHtml }) {
+function queuePlayerSavePrompts({ playersNeedingSave, saveDc, saveType, adjustedTotal, damageType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget, modifier, context, pendingSaves, setPopupHtml, mapData }) {
     if (!playersNeedingSave.length || !saveDc || !saveType) return;
-    const playerPrompts = sendAoePlayerSaves({ affected: playersNeedingSave, rawDamage: adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, spellName: name, attackerName: casterName, formula, heightenTarget });
+    const playerPrompts = sendAoePlayerSaves({ affected: playersNeedingSave, rawDamage: adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, spellName: name, attackerName: casterName, formula, heightenTarget, mapData });
     for (const pp of playerPrompts) {
         pendingSaves[pp.promptId] = buildPendingSaveEntry({ pp, name, formula, modifier, rolls, context, adjustedTotal, saveDc, saveType, dcSuccess, damageType, casterName, campaignName, setPopupHtml });
     }
@@ -143,6 +143,9 @@ export function createAoeDamageHandler(deps) {
 
         const { overlay, players, npcs } = aoeCtx;
         const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
+        // Corona 60 ft gate (2026-11-04): the sync save lane measures bearer↔
+        // victim distance from these tokens — hand the live map document down.
+        const mapData = { players, placedItems: npcs };
         const casterName = attackerName || characterName;
         const isCarefulSpell = context?.metamagicCareful || false;
         const allyList = isCarefulSpell ? getAllyList(casterName) : null;
@@ -157,7 +160,7 @@ export function createAoeDamageHandler(deps) {
         const carefulAllyResults = [];
 
         if (saveDc && saveType) {
-            const carefulNpcs = processSaveNpcs({ combatSummary, affected, isCarefulAlly, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, casterName, characters, heightenTarget, npcResults });
+            const carefulNpcs = processSaveNpcs({ combatSummary, affected, isCarefulAlly, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, casterName, characters, heightenTarget, npcResults, mapData });
             await applyZeroDamageResults({ combatSummary, creatures: carefulNpcs, damageType, campaignName, characters, casterName, results: carefulAllyResults, extra: { carefulSpell: true } });
         } else {
             await processNonSaveCreatures({ combatSummary, affected, isCarefulAlly, adjustedTotal, damageType, campaignName, characters, casterName, npcResults, carefulAllyResults });
@@ -171,7 +174,7 @@ export function createAoeDamageHandler(deps) {
         await applyZeroDamageResults({ combatSummary, creatures: soulstitchProtectedPlayers, damageType, campaignName, characters, casterName, results: carefulAllyResults, extra: { soulstitchProtected: true } });
         await applyZeroDamageResults({ combatSummary, creatures: carefulSpellPlayers, damageType, campaignName, characters, casterName, results: carefulAllyResults, extra: { carefulSpell: true } });
 
-        queuePlayerSavePrompts({ playersNeedingSave, saveDc, saveType, adjustedTotal, damageType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget, modifier, context, pendingSaves, setPopupHtml });
+        queuePlayerSavePrompts({ playersNeedingSave, saveDc, saveType, adjustedTotal, damageType, dcSuccess, campaignName, name, casterName, rolls, formula, heightenTarget, modifier, context, pendingSaves, setPopupHtml, mapData });
         const overlayLabel = overlay.label || overlay.shape || 'AoE';
         const allResults = [...npcResults, ...carefulAllyResults];
         const html = buildAoeSummaryHtml({ overlayLabel, name, formula, adjustedTotal, total, damageType, saveDc, saveType, allResults, playersNeedingSave });

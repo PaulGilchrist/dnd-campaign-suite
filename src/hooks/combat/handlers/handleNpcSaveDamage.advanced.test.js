@@ -183,8 +183,12 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
             expect(getCoronaSaveDisadvantage).toHaveBeenCalledWith(expect.objectContaining({
                 targetName: 'Goblin',
                 damageType: 'fire',
-                skipRangeCheck: true,
             }));
+            // 2026-11-04 range fix: callers no longer force-skip the 60 ft aura
+            // measurement; the util forks measured/map vs lenient/gridless itself.
+            expect(getCoronaSaveDisadvantage).not.toHaveBeenCalledWith(
+                expect.objectContaining({ skipRangeCheck: expect.anything() })
+            );
             expect(deps.setPopupHtml.mock.calls[0][0].forcedMode).toBe('disadvantage');
             expect(rollSaveForCreature).toHaveBeenCalledWith(expect.any(Object), 'dex', 12, true, false);
         });

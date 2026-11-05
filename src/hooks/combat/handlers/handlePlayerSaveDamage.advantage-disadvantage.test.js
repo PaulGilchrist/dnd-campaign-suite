@@ -159,8 +159,12 @@ describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {
             expect.objectContaining({
                 targetName: 'TestWizard',
                 damageType: 'Fire',
-                skipRangeCheck: true,
             })
+        );
+        // 2026-11-04 range fix: the caller no longer force-skips the 60 ft aura
+        // measurement — the util forks measured/map vs lenient/gridless itself.
+        expect(getCoronaSaveDisadvantage).not.toHaveBeenCalledWith(
+            expect.objectContaining({ skipRangeCheck: expect.anything() })
         );
         expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('metamagicHeighten', true);
         expect(sendSavePrompt).toHaveBeenCalledWith(
