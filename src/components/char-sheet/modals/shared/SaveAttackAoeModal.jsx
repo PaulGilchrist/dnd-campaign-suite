@@ -15,6 +15,8 @@ import { isCircleOfPowerActive } from '../../../../services/automation/handlers/
 import { resolveAoESaveEvasion, evasionLedgerName } from '../../../../services/rules/combat/evasionUtils.js';
 import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
+import { getCoronaSaveDisadvantageSync } from '../../../../services/combat/auras/coronaAuraUtils.js';
+import { loadMapData } from '../../../../services/maps/mapsService.js';
 import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
 import { stageParalysisTargets } from '../../../../services/rules/features/paralyzingBreathService.js';
 import { grantWeakeningBreath } from '../../../../services/rules/features/weakeningBreathService.js';
@@ -41,9 +43,9 @@ function fireBewitchingRider(action, playerStats, campaignName, storeLastAttack)
         .catch((e) => { console.error('[SaveAttackAoeModal] Bewitching Magic rider error:', e); });
 }
 
-// Decide the NPC's save roll against the AoE DC, honouring heighten / rider / slow disadvantage.
+// Decide the NPC's save roll against the AoE DC, honouring heighten / rider / slow / corona-aura disadvantage.
 function computeNpcSave(targetName, ctx) {
-    const { target, saveType, saveDc, heightenTarget } = ctx;
+    const { target, saveType, saveDc, heightenTarget, coronaDisadvantage } = ctx;
     const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
     const isHeightenTarget = heightenTarget === targetName;
     const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
@@ -58,7 +60,10 @@ function computeNpcSave(targetName, ctx) {
     const abilitySaveDisadvantage = abilitySaveDisadvantageActive(targetEffects, targetName, saveType);
     const saveRollRaw1 = Math.floor(Math.random() * 20) + 1;
     const saveRollRaw2 = Math.floor(Math.random() * 20) + 1;
-    const hasSaveDisadvantage = isHeightenTarget || hasRiderDisadvantage || slowDexDisadvantage || abilitySaveDisadvantage;
+    // Corona of Light (CLA-063): the picker route must honour the aura exactly
+    // like the aoeService sync lane — disadvantage resolved by the caller from
+    // the active-map tokens (gridless/unplaced pairs stay lenient).
+    const hasSaveDisadvantage = isHeightenTarget || hasRiderDisadvantage || slowDexDisadvantage || abilitySaveDisadvantage || Boolean(coronaDisadvantage);
     const saveRoll = hasSaveDisadvantage ? Math.min(saveRollRaw1, saveRollRaw2) : saveRollRaw1;
     const saveTotal = saveRoll + saveBonus;
     const success = saveTotal >= saveDc;
@@ -89,6 +94,27 @@ function buildNpcSaveLogEntry({ action, playerStats, targetDamageFormula, damage
         finalDamage: finalDamage,
         timestamp: Date.now(),
     };
+}
+
+// CLA-063 (picker-route pin): prompt disadvantage channel = heighten target OR
+// Corona of Light aura — same fold shape as sendAoePlayerSaves (aoeService).
+function promptDisadvantage(heightenTarget, coronaDisadvantage, targetName) {
+    return heightenTarget === targetName || Boolean(coronaDisadvantage);
+}
+
+// Corona gate: read the active map document ONCE per cast (same { players,
+// placedItems }-carrying document handleAoeDamage builds for the aoeService
+// sync lane) so bearer↔victim distances are measured; no map / failed load
+// stays mapData=null → the util's consulted-and-passes lenient convention.
+async function loadCoronaMapData(campaignName) {
+    const activeMapName = getRuntimeValue('__map__', 'activeMapName');
+    if (!activeMapName) return null;
+    try {
+        return await loadMapData(campaignName, activeMapName);
+    } catch (e) {
+        console.error('[SaveAttackAoeModal] Active map load for the corona save gate failed:', e);
+        return null;
+    }
 }
 
 function rollDamageFormula(formula, overchannelActive) {
@@ -246,7 +272,7 @@ function resolveNpcTarget(ctx) {
 
 // Resolve a PC target: soulstitch/careful auto-protect (returns { result }) or a save prompt ({ prompt }).
 function resolvePcTarget(ctx) {
-    const { action, targetName, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, isCarefulSpell, isCarefulAlly, heightenTarget, playerStats, campaignName, saveConditions } = ctx;
+    const { action, targetName, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, isCarefulSpell, isCarefulAlly, heightenTarget, coronaDisadvantage, playerStats, campaignName, saveConditions } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
 
@@ -304,7 +330,10 @@ function resolvePcTarget(ctx) {
         rawDamage,
         ...(secondary ? { secondaryRawDamage: secondary.rawDamage, secondaryDamageType: secondary.damageType } : {}),
         dcSuccess,
-        disadvantage: heightenTarget === targetName,
+        // CLA-063: the payload flag is the machine-truth channel consumed by
+        // SavePromptModal — heighten target OR corona aura (see
+        // promptDisadvantage).
+        disadvantage: promptDisadvantage(heightenTarget, coronaDisadvantage, targetName),
         // MA-0079: carry the authored failed-save conditions onto the prompt
         // so the quick-roll lastAttack stamp keeps saveConditions (was []).
         saveConditions: saveConditions || [],
@@ -1624,12 +1653,20 @@ function SaveAttackAoeModal({
         // every other target's roll folds zero.
         const empoweredEvocationTarget = stampEmpoweredEvocationTarget({ playerStats, campaignName, selectedNames, combatSummary, empoweredEvocationIntMod });
 
+        // Corona of Light (CLA-063) — the picker route re-implemented save
+        // resolution without the aura the verified seams apply; measure
+        // bearer↔victim per target from the active-map tokens (see
+        // loadCoronaMapData).
+        const coronaMapData = await loadCoronaMapData(campaignName);
+
         for (const targetName of selectedNames) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
             if (!target) continue;
 
+            const coronaDisadvantage = getCoronaSaveDisadvantageSync({ targetName, mapData: coronaMapData, damageType, campaignName }).disadvantage;
+
             const isNpc = target.type === 'npc';
-            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, heightenTarget, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
+            const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, heightenTarget, coronaDisadvantage, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
 
             if (isNpc) {
                 results.push(resolveNpcTarget(ctx));
