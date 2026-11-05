@@ -79,7 +79,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- [2026-11-04 CU] Regenerate Adventure DOES leave a success status ("New adventure rolled: <dungeon> — waves re-rolled, portal and main quest re-pointed." via `setStatus({success})`) but the generic `StatusDisplay` div renders as `.admin-status--success` WITHOUT `role="status"`/aria-live (CampaignAdmin.jsx:153) — invisible to assistive tech and easy to miss entirely (CU's own probe missed it), unlike the sibling post-import banner at :802 which correctly has `role=status`. Cheap: add `role="status"` (+ `aria-live="polite"`) to the StatusDisplay success/error div. Files: `CampaignAdmin.jsx` StatusDisplay.
 - [2026-11-04 CU] On the starter Admin page the accessible name "Regenerate…" is ambiguous: the checklist step button "Re-roll the adventure anytime — Admin → Regenerate (keeps <village>)" (`campaign-starter-step`) and the primary "Regenerate Adventure" (`ct-btn`) both match `/Regenerate/i` — a `.first()` role-query silently lands on the deep-link step (lands on Admin itself = confusing no-op feel). Cheap: give the ct-btn a `data-testid` or the step an aria-label that doesn't contain "Regenerate Adventure". Files: `FirstSessionChecklist.jsx` step label + `CampaignAdmin.jsx`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)

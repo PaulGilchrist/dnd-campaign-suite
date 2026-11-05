@@ -103,6 +103,11 @@ describe('CampaignAdmin - Regenerate Adventure confirm modal', () => {
         expect(screen.queryByRole('dialog', { name: 'Regenerate Adventure' })).not.toBeInTheDocument();
         const status = await screen.findByText(/New adventure rolled: New Dungeon/, {}, WAIT_OPTIONS);
         expect(status.closest('.admin-status')).toHaveClass('admin-status--success');
+        // The generic StatusDisplay must be announced by assistive tech
+        // (backlog 2026-11-04 CU: it rendered visually only, unlike the
+        // sibling post-import banner).
+        expect(status).toHaveAttribute('role', 'status');
+        expect(status).toHaveAttribute('aria-live', 'polite');
         // Exactly one orchestrator call for this campaign (same API lane as
         // the retired native-confirm flow — the service owns the requests).
         expect(regenerateAdventure).toHaveBeenCalledTimes(1);
@@ -121,6 +126,8 @@ describe('CampaignAdmin - Regenerate Adventure confirm modal', () => {
 
         const status = await screen.findByText('Regen refused by server', {}, WAIT_OPTIONS);
         expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
+        expect(status).toHaveAttribute('role', 'status');
+        expect(status).toHaveAttribute('aria-live', 'polite');
         expect(regenerateAdventure).toHaveBeenCalledTimes(1);
         expect(screen.getByRole('button', { name: 'Regenerate Adventure' })).toBeEnabled();
         expect(window.confirm).not.toHaveBeenCalled();

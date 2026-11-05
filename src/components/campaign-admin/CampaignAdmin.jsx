@@ -150,7 +150,7 @@ function StatusDisplay({ status }) {
     const statusText = typeof status === 'string' ? BUSY_STATUS_TEXT[status] : null;
     const kind = typeof status === 'string' ? 'loading' : (status.error ? 'error' : 'success');
     return (
-        <div className={`admin-status admin-status--${kind}`}>
+        <div className={`admin-status admin-status--${kind}`} role="status" aria-live="polite">
             {statusText ? (
                 <span>
                     <i className="fas fa-spinner fa-spin"></i> {statusText}
