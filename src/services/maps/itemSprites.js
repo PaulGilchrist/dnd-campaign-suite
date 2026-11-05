@@ -2,7 +2,9 @@
 // top-down rendered sprite PNG in public/images/items/<type>.png (2D tactical
 // map), mirroring poiSprites.js. The matching GLB models for the 3D view live
 // in src/assets/3d-map/. Unknown/legacy type ids and types whose art has not
-// been rendered yet fall back to the inline SVG symbols in Map.jsx <defs>.
+// been rendered yet render through the shared "?" placeholder symbol
+// (#generic-prop, GenericPropSVG.jsx) in Map.jsx <defs> — see the ghost lane
+// in PlacedItems.jsx — so their rows stay visible and selectable.
 const ART_TYPES = new Set([
     'altar', 'arrowSlitWall', 'barrel', 'bed', 'bookshelf', 'boulder', 'bush',
     'chair', 'chest', 'crate', 'door', 'firepit', 'fountain', 'pillar',

@@ -356,7 +356,11 @@ describe('Map container — availability & composition', () => {
             'barrel', 'table', 'bed', 'firepit', 'door', 'secretDoor', 'trap',
             'pillar', 'stairs', 'altar', 'arrowSlitWall', 'bookshelf', 'chair',
             'chest', 'crate', 'fountain', 'skeleton', 'statue', 'torch', 'web',
-            'tree', 'boulder', 'bush', 'poi-landmark',
+            'tree', 'boulder', 'bush',
+            // Ghost-type placeholder (bug-unregistered-placeditem-type-
+            // invisible-ghost): #generic-prop must be mounted so unknown
+            // placed-item types resolve their <use> fallback.
+            'generic-prop', 'poi-landmark',
         ]);
     });
 

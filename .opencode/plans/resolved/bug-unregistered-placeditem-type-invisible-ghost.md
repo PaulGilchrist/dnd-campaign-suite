@@ -50,3 +50,24 @@ Start by reading `PlacedItems.jsx` (dispatch tail) and `Map3D/Map3D.jsx` counts.
 ## Severity
 
 Data integrity risk (minor-to-moderate): silent, persistent, UI-unrecoverable rows created by an app-sanctioned lane (AI-Dress) with zero feedback, plus a lying status-bar count. No crash, but GM-authored content can be permanently invisible in the shared view.
+
+## Resolution
+
+**FIXED 2026-11-05.** Reproduced live in test-campaign (dev pair on localhost): POSTed the sandbox map with the `cauldron` ghost row, opened it as GM — `g.placed-item` titles were `["table (9,3)"]` only, `.item-hit-area` count 1, zero `<use>`: the ghost had no DOM and no context-menu affordance, exactly as described.
+
+**What was actually wrong** (vs the original guess): the 2D diagnosis was exact — `PlacedItems.jsx` ends in a 24-type whitelist dispatch, so unknown types never reach `renderProp`, whose `<use href={#${item.type}}>` fallback resolved to a non-existent symbol anyway. The **3D face did not reproduce**: `map3dScene._buildPlacedItems` already falls back to a grey `_fallbackBox` when `getAssetUrl('type.glb')` is null, so the ghost DOES render in 3D and the status-bar count was honest ("2 items" for 2 visible meshes — grey box + table, screenshot-verified). Only the 2D lane silently dropped the row.
+
+**Fix (option 1 of the suggested plan — generic fallback, kept recoverable):**
+- `src/components/map/GenericPropSVG.jsx` — NEW shared "?" placeholder def (dashed rounded chip + glyph), follows the sibling `*SVG.jsx` def pattern.
+- `src/components/map/Map.jsx` — mounts it in `<defs>` as `#generic-prop` (after `bush`, before the POI landmark).
+- `src/components/map/PlacedItems.jsx` — (a) final dispatch pass renders every non-whitelisted row through `renderProp` with default opts (single cell, non-rotatable); (b) `renderProp`'s `<use>` fallback now points at `#generic-prop` (the per-type symbol only ever existed for art-backed types — dead href before). Ghosts inherit the full shared law: fog/hidden visibility, GM dim, drag + right-click hit areas → Hide/Delete/Rotate reachable.
+- `src/services/maps/itemSprites.js` — module comment corrected (it promised an unreachable per-type `<defs>` fallback; now describes the actual placeholder lane).
+- Write lanes left permissive by design (server accept + client render) so existing/AI-authored rows become recoverable rather than erroring — matches "a visible placeholder + selectable" branch of the Expected.
+
+**Verification:**
+- Live repro steps re-run post-fix: titles `["table (9,3)","cauldron (3,3)"]`, `use[href="#generic-prop"]`, hit-area count 2, def mounted in defs. Right-click at (3,3) opened the menu (Hide/Delete/Rotate/✕); Delete → `Delete "cauldron (3,3)" from the map?` dialog → Yes, Delete removed the marker AND persisted (disk GET 12 s later shows only `cv-table`). 3D: `2 items` with grey box + table both rendering.
+- New tests (all pass): `PlacedItems.unknown-type.test.jsx` (8 — ghost marker/title/hit-area/context-menu/drag wiring, hidden+fogged LAN law, legacy `token` rows, registered types never touch the placeholder), `Map.unknown-item.test.jsx` (2 — container seam: placeholder + def on the live board, Delete→dialog→autosave PUT carries the filtered array), `GenericPropSVG.test.jsx` (3 — def census/byte pins, sibling `*SVG.test` pattern).
+- `npx vitest run src/components/map src/services/maps`: 96 files / 1131 tests pass (after updating the golden defs-census pin in `Map.test.jsx` T3 to include `generic-prop` — an intentional contract change).
+- `npm run lint`: clean (zero warnings). `node .opencode/plans/no-timers-guard.mjs`: OK.
+- Cleanup: scratch map "CV Sprite Lane" deleted (maps back to the 4 baseline rows), change-data + campaign log cleared via Admin.
+

@@ -31,6 +31,7 @@ import WebSVG from './WebSVG.jsx';
 import TreeSVG from './TreeSVG.jsx';
 import BoulderSVG from './BoulderSVG.jsx';
 import BushSVG from './BushSVG.jsx';
+import GenericPropSVG from './GenericPropSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
 import IndoorPoiLayer from './IndoorPoiLayer.jsx';
 import IndoorPoiContextMenu from './IndoorPoiContextMenu.jsx';
@@ -654,6 +655,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, o
                     <TreeSVG id="tree" />
                     <BoulderSVG id="boulder" />
                     <BushSVG id="bush" />
+                    {/* Shared "?" placeholder — PlacedItems renders it for
+                        placed-item rows whose type is unknown to the app
+                        (legacy or AI-Dress-invented), so ghosts stay visible
+                        and selectable instead of silently disappearing. */}
+                    <GenericPropSVG id="generic-prop" />
                     {/* Shared POI marker (hex-map/svg) — the indoor pois lane
                         (AI Dress writes landmark rows) renders through this id,
                         same href as the outdoor POILayer. */}

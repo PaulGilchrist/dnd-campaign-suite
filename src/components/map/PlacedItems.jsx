@@ -95,8 +95,14 @@ function PlacedItems({
                 transform={transform}
             />
         ) : (
+            // Ghost lane (bug-unregistered-placeditem-type-invisible-ghost):
+            // every DISPATCHED type has Blender art, so reaching this branch
+            // means the row's type is unknown to the app (legacy or AI-invented)
+            // and no `#${item.type}` symbol exists — the old per-type `<use>`
+            // resolved to nothing and the row vanished. Render the shared
+            // "?" placeholder instead so the marker stays selectable.
             <use
-                href={`#${item.type}`}
+                href="#generic-prop"
                 x={cx - bw / 2}
                 y={cy - bh / 2}
                 opacity={itemOpacity(item)}
@@ -277,6 +283,17 @@ function PlacedItems({
 
     const renderItems = (type, renderFn) => placedItems.filter(i => i.type === type).map(renderFn).filter(Boolean)
 
+    // Ghost lane (bug-unregistered-placeditem-type-invisible-ghost): the map
+    // API and AI-Dress `add item` ops accept any non-empty `type`, but the
+    // dispatch below is a fixed whitelist — unknown rows used to render zero
+    // DOM (no sprite, no hit area) and were unselectable/undeletable ghosts.
+    // One final pass renders them via renderProp's `#generic-prop` placeholder
+    // (single-cell, non-rotatable) so every persisted row stays touchable.
+    const dispatchedTypes = new Set([
+        ...Object.keys(propRenderers), 'door', 'npc', 'monster',
+    ]);
+    const ghosts = placedItems.filter(i => !dispatchedTypes.has(i.type));
+
     return (
         <>
             {renderItems('altar', i => renderProp(i, propRenderers.altar))}
@@ -304,6 +321,7 @@ function PlacedItems({
             {renderItems('trap', i => renderProp(i, propRenderers.trap))}
             {renderItems('tree', i => renderProp(i, propRenderers.tree))}
             {renderItems('web', i => renderProp(i, propRenderers.web))}
+            {ghosts.map(i => renderProp(i, {})).filter(Boolean)}
         </>
     );
 }
