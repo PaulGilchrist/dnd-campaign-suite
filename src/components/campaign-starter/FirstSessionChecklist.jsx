@@ -64,7 +64,18 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
   if (isLocalhost) {
     steps.push(
       { icon: 'fa-handshake', label: 'Use 🤝 Allies on the tracker to split teams (or betray them)', view: 'initiative' },
-      { icon: 'fa-dice', label: `Re-roll the adventure anytime — Admin → Regenerate (keeps ${settlement})`, view: 'campaignRepair' },
+      // backlog 2026-11-04 CU: this deep-link step shared the accessible-name
+      // token "Regenerate" with the Admin page's primary ct-btn, so a
+      // /Regenerate/i role query could silently land here (a no-op view
+      // switch). The aria-label names the ACTION (open Admin) without that
+      // token; the visible label stays, and the testid pins the step itself.
+      {
+        icon: 'fa-dice',
+        label: `Re-roll the adventure anytime — Admin → Regenerate (keeps ${settlement})`,
+        view: 'campaignRepair',
+        ariaLabel: `Open Campaign Admin to re-roll the adventure (keeps ${settlement})`,
+        testId: 'starter-step-regenerate',
+      },
     );
   }
 
@@ -85,7 +96,12 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
       <ol className="campaign-starter-checklist-steps">
         {steps.map((step) => (
           <li key={step.label}>
-            <button className="campaign-starter-step" onClick={() => go(step)}>
+            <button
+              className="campaign-starter-step"
+              aria-label={step.ariaLabel}
+              data-testid={step.testId}
+              onClick={() => go(step)}
+            >
               <i className={`fa-solid ${step.icon}`}></i> {step.label}
             </button>
           </li>

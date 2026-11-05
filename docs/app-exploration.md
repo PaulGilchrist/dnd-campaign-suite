@@ -79,8 +79,6 @@
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
-- [2026-11-04 CU] On the starter Admin page the accessible name "Regenerate…" is ambiguous: the checklist step button "Re-roll the adventure anytime — Admin → Regenerate (keeps <village>)" (`campaign-starter-step`) and the primary "Regenerate Adventure" (`ct-btn`) both match `/Regenerate/i` — a `.first()` role-query silently lands on the deep-link step (lands on Admin itself = confusing no-op feel). Cheap: give the ct-btn a `data-testid` or the step an aria-label that doesn't contain "Regenerate Adventure". Files: `FirstSessionChecklist.jsx` step label + `CampaignAdmin.jsx`.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CS: stale-sheet fix (3 faces); scoped-PATCH arming lane (incl. ff-accept + skip face); allies-editor re-entry; PT1 corona range (bug filed; fix since verified); qa-starter seeded lanes re-ride; quick-create/delete both flavors.

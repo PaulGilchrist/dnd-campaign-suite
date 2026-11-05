@@ -67,6 +67,26 @@ describe('FirstSessionChecklist', () => {
     expect(onNavigate).toHaveBeenCalledWith('campaignLog');
   });
 
+  // Backlog 2026-11-04 CU: the Admin deep-link step must NOT be findable via a
+  // /Regenerate/i (or /Regenerate Adventure/i) accessible-name query — that
+  // token belongs to the primary Admin ct-btn alone (see the disambiguation
+  // pin in campaign-admin/CampaignAdmin.regenerate.test.jsx).
+  it('the Admin regenerate step disambiguates its accessible name but keeps its visible label', async () => {
+    loadStarterSeed.mockResolvedValue(SEED);
+    const onNavigate = vi.fn();
+    render(<FirstSessionChecklist campaignName="qa-starter" onNavigate={onNavigate} isLocalhost />);
+
+    const step = await screen.findByTestId('starter-step-regenerate');
+    expect(step).toHaveAccessibleName('Open Campaign Admin to re-roll the adventure (keeps Thornhollow)');
+    expect(step.getAttribute('aria-label')).not.toMatch(/Regenerate/i);
+    expect(screen.queryByRole('button', { name: /Regenerate Adventure/i })).not.toBeInTheDocument();
+    // Sighted users still read the original copy.
+    expect(step).toHaveTextContent('Re-roll the adventure anytime — Admin → Regenerate (keeps Thornhollow)');
+    // And the deep link is untouched (criterion: still lands on Admin).
+    fireEvent.click(step);
+    expect(onNavigate).toHaveBeenCalledWith('campaignRepair');
+  });
+
   it('shows the GM-only betrayal + regenerate rows only on localhost', async () => {
     loadStarterSeed.mockResolvedValue(SEED);
     render(<FirstSessionChecklist campaignName="qa-starter" isLocalhost={false} />);

@@ -857,7 +857,10 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                                 main quest. The village, party, and campaign log stay exactly as they are.
                             </p>
                             {isLocalhost ? (
-                                <button className="ct-btn ct-btn-primary" onClick={() => setRegenModalOpen(true)} disabled={isBusy}>
+                                // backlog 2026-11-04 CU: testid pins the PRIMARY action so
+                                // role/testid queries can never land on the checklist's
+                                // Admin deep-link step button.
+                                <button className="ct-btn ct-btn-primary" data-testid="regenerate-adventure-btn" onClick={() => setRegenModalOpen(true)} disabled={isBusy}>
                                     <i className="fas fa-dice"></i> Regenerate Adventure
                                 </button>
                             ) : (

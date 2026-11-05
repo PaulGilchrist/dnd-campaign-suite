@@ -15,6 +15,7 @@
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
+import FirstSessionChecklist from '../campaign-starter/FirstSessionChecklist.jsx';
 import { loadStarterSeed } from '../../services/campaign/starterSeedService.js';
 import { regenerateAdventure } from '../../services/campaign/seededCampaign.js';
 
@@ -25,6 +26,11 @@ vi.mock('../../services/campaign/starterSeedService.js', () => ({
 }));
 vi.mock('../../services/campaign/seededCampaign.js', () => ({
     regenerateAdventure: vi.fn(async () => ({ dungeonTitle: 'New Dungeon' })),
+}));
+// The checklist rides the ONE shared SSE client — inert here (no EventSource
+// in jsdom), the sync lane is pinned in FirstSessionChecklist.sse-sync.test.jsx.
+vi.mock('../../services/ui/sseClient.js', () => ({
+    subscribeToSSE: vi.fn(() => () => {}),
 }));
 
 const CAMPAIGN = 'test-campaign';
@@ -141,5 +147,81 @@ describe('CampaignAdmin - Regenerate Adventure confirm modal', () => {
             await screen.findByRole('heading', { level: 3, name: 'Regenerate Adventure' }, WAIT_OPTIONS)
         ).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Regenerate Adventure' })).not.toBeInTheDocument();
+    });
+
+    // Backlog 2026-11-04 CU: on the live starter Admin page the persistent
+    // checklist aside renders UNDER the Admin view, and its "Admin → Regenerate"
+    // deep-link step used to share the /Regenerate/i accessible-name token with
+    // the primary ct-btn — a `.first()` role query could silently land on the
+    // step (a confusing no-op view switch). These tests pin the disambiguation.
+    describe('query disambiguation vs the first-session checklist', () => {
+        const FULL_SEED = {
+            entities: {
+                settlement: 'Thornhollow',
+                dungeonTitle: 'Old Dungeon',
+                quests: ['Starter — Into the Ruins', 'Starter — Trouble in Town', 'Starter — The Spoils'],
+                encounters: ['Dungeon Wave 1', 'Dungeon Wave 2', 'Dungeon Wave 3'],
+            },
+        };
+
+        const renderAdminWithChecklist = async () => {
+            loadStarterSeed.mockResolvedValue(FULL_SEED);
+            const onNavigate = vi.fn();
+            render(
+                <>
+                    <CampaignAdmin
+                        campaignName={CAMPAIGN}
+                        theme="dark"
+                        toggleTheme={vi.fn()}
+                        onRenameCampaign={vi.fn()}
+                        isLocalhost
+                    />
+                    <FirstSessionChecklist campaignName={CAMPAIGN} onNavigate={onNavigate} isLocalhost />
+                </>
+            );
+            // Both the Admin card AND the checklist step resolve from the seed.
+            await screen.findByTestId('regenerate-adventure-btn', {}, WAIT_OPTIONS);
+            await screen.findByTestId('starter-step-regenerate', {}, WAIT_OPTIONS);
+            return onNavigate;
+        };
+
+        it('a /Regenerate Adventure/ role query resolves UNAMBIGUOUSLY to the ct-btn', async () => {
+            await renderAdminWithChecklist();
+
+            const matches = screen.getAllByRole('button', { name: /Regenerate Adventure/i });
+            expect(matches).toHaveLength(1);
+            expect(matches[0]).toHaveClass('ct-btn');
+            expect(matches[0]).toHaveAttribute('data-testid', 'regenerate-adventure-btn');
+            // A .first()-style query therefore lands on the primary action, and
+            // clicking it opens the modal (role=dialog, labelledby pinned below).
+            fireEvent.click(matches[0]);
+            expect(await screen.findByRole('dialog', { name: 'Regenerate Adventure' }, WAIT_OPTIONS)).toBeInTheDocument();
+        });
+
+        it('no /Regenerate/i role query can land on the checklist step', async () => {
+            await renderAdminWithChecklist();
+
+            // The deep-link step's accessible name no longer carries the
+            // "Regenerate" token at all…
+            const step = screen.getByTestId('starter-step-regenerate');
+            expect(step.getAttribute('aria-label')).not.toMatch(/Regenerate/i);
+            expect(step.getAttribute('aria-label')).toMatch(/Open Campaign Admin to re-roll the adventure/);
+            // …so /Regenerate/i matches ONLY the primary ct-btn (+ the modal's
+            // own "Yes, Regenerate" once open, which lives inside the dialog).
+            expect(screen.getAllByRole('button', { name: /Regenerate/i })).toEqual([
+                screen.getByTestId('regenerate-adventure-btn'),
+            ]);
+            // Visible label is unchanged for sighted users.
+            expect(step).toHaveTextContent(/Admin → Regenerate \(keeps Thornhollow\)/);
+        });
+
+        it('the checklist step still deep-links the Admin view', async () => {
+            const onNavigate = await renderAdminWithChecklist();
+
+            fireEvent.click(screen.getByTestId('starter-step-regenerate'));
+            expect(onNavigate).toHaveBeenCalledWith('campaignRepair');
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+            expect(regenerateAdventure).not.toHaveBeenCalled();
+        });
     });
 });
