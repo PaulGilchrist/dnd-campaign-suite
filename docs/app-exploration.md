@@ -74,7 +74,6 @@
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them (DONE/BLOCKED/skipped are recorded in the run summary, never left as markers). FAILED bullets stay open. -->
 
 - **2026-11-05 CV — `web` sprite contrast:** nearly invisible on the dark indoor grid at native 36 px (item-showcase row 4) — art pass for stroke contrast/brightness; `torch` flame sits visibly off-centre in its top-down render (cosmetic).
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CV 2026-11-05: CU PT2 (burst PATCH coalescing question — answered: none, ordered LWW, honest) + PT3 (two-tab allies race — LWW + live convergence); sprite-commit demotions (2D item/POI, both 3D scenes, counts, drop, context menus, player fog face); improve-pair 2a4b9ec0b + d500d221f live-verified.
