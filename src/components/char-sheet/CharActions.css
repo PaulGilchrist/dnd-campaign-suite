@@ -13,6 +13,12 @@
     padding-right: 10px;
 }
 
+/* Cast affordance on Actions spell rows (wand matches SpellDetailPopup's cast icon) */
+.char-actions .attacks .spell-cast-icon {
+    color: #8f64f4;
+    margin-right: 5px;
+}
+
 .char-actions .disabled-attack {
     opacity: 0.35;
     cursor: not-allowed;

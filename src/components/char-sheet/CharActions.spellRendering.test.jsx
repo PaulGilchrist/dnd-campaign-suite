@@ -388,6 +388,31 @@ describe('CharActions spell rendering', () => {
     }
   });
 
+  it('spell name cell shows a wand cast affordance icon with a title hint', async () => {
+    await renderActions(statsWithSpells([
+      spell('Fire Bolt', { level: 0, attack_type: 'ranged', damage: '1d10' }),
+    ]));
+
+    const nameCell = screen.getByText('Fire Bolt');
+    expect(nameCell).toHaveClass('left', 'clickable');
+    expect(nameCell).toHaveAttribute('title', 'Open spell details to cast');
+    const icon = nameCell.querySelector('i.fa-solid.fa-wand-magic-sparkles');
+    expect(icon).toBeInTheDocument();
+    expect(icon).toHaveClass('spell-cast-icon');
+  });
+
+  it('weapon attack rows keep a bare name cell (no spell icon or cast hint)', async () => {
+    const stats = {
+      ...basePlayerStats,
+      attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
+    };
+    await renderActions(stats);
+
+    const nameCell = screen.getByText('Longsword');
+    expect(nameCell.querySelector('i')).toBeNull();
+    expect(nameCell).not.toHaveAttribute('title');
+  });
+
   it('routes a save-DC attack-row damage click to resolveSpellDamage', async () => {
     const resolveSpellDamage = vi.fn();
     useActionSpellMetamagic.mockReturnValue({

@@ -73,8 +73,6 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-05 CX] **PC sheet Actions spell rows have no visible cast affordance until clicked** — Burning Hands rendered as bare `div.left.clickable` text (same as cantrips/weapon rows); a wand icon or hover hint would surface the spell-detail popup flow discovered only via trial. Adjacent nit: the Spells tab's slot-level sections didn't list Burning Hands where the Actions section did — worth a consistency look at why a known 1st-level spell renders in one section only.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CX 2026-11-05: CW backlog pair (ghost Rotate hidden; deactivated-map advisory both legs); PT3 hex character-drag (handler matrix complete: append/dup/bounds/persist + orphan-lane finding); PT4 coalesced merged-batch cross-tab adoption; aoeService SYNC lane correctness (live in-page probe); AI-Dress no-config honesty face.
