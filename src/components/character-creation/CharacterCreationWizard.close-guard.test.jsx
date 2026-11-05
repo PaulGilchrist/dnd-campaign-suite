@@ -89,7 +89,7 @@ function typeName(value) {
 }
 
 const cancelBtn = () => screen.getByRole('button', { name: 'Cancel' });
-const closeX = () => document.querySelector('.close-btn');
+const closeX = () => screen.getByRole('button', { name: 'Close character wizard' });
 
 describe('CharacterCreationWizard - unsaved-changes guard', () => {
   describe('create flow', () => {

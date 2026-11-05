@@ -19,8 +19,11 @@ describe('WizardHeader', () => {
   it('routes the × close button click to onClose exactly once', () => {
     const props = createProps();
     render(<WizardHeader {...props} />);
+    const close = screen.getByRole('button', { name: 'Close character wizard' });
+    // Lock the accessible name — the × glyph alone is unreadable to AT.
+    expect(close).toHaveAttribute('aria-label', 'Close character wizard');
     expect(props.onClose).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '×' }));
+    fireEvent.click(close);
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 });
