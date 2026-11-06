@@ -162,7 +162,16 @@ export function useDiceRollState(props) {
     // popup's recomputed hit agrees with the flipped hit and "Done" appears.
     const homingStrikesApplied = computeHomingStrikesApplied(rollType, homingStrikesBonus, isAutoMiss);
     const finalTotal = baseTotal + (homingStrikesApplied ? Number(homingStrikesBonus) : 0);
-    const showFumble = isNatural1 && rollType === 'attack';
+    // bug-boon-nat1-conversion-keeps-critical-miss-banner: a miss→hit
+    // conversion (the FT-007 channels — host AttackResultPopup's
+    // `missToHitApplied` prop, or a standalone Boon-offer click's `boonUsed`
+    // state) removes the miss, so the natural-1 fumble notice must not
+    // survive on the converted face beside "✓ HIT" (mirror of the e923a05ef
+    // convertedNat20 suppression that replaced the "Natural 20!" face). An
+    // unconverted natural-1 miss keeps its "Critical Miss!" banner
+    // byte-unchanged.
+    const missToHitConversion = missToHitApplied || boonUsed;
+    const showFumble = isNatural1 && rollType === 'attack' && !missToHitConversion;
 
     // SP-105: trust the resolver's authoritative effectiveAc when forwarded
     // (covers Shield of Faith, Shield, cover, reactions); otherwise recompute
@@ -170,7 +179,7 @@ export function useDiceRollState(props) {
     const effectiveAc = computeEffectiveAc(props);
     // FT-007: boonUsed (standalone offer click) or missToHitApplied (host
     // AttackResultPopup conversion) both authoritatively flip a miss to a hit.
-    const computedHit = computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal, missToHitApplied: missToHitApplied || boonUsed });
+    const computedHit = computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTotal, missToHitApplied: missToHitConversion });
 
     const isSaveDamageType = type === 'save-damage';
 
