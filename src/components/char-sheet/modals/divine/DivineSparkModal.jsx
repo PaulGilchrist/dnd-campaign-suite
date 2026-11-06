@@ -184,6 +184,7 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         const handleSaveResult = async (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handleSaveResult);
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
 
             const success = event.detail.success;
 
@@ -227,6 +228,21 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         };
 
         window.addEventListener('save-result', handleSaveResult);
+
+        // Dismiss-softlock fix (2026-11-05): a GM Dismiss on the un-rolled
+        // prompt never dispatches save-result (dismiss doctrine — a dismissed
+        // save never resolves), so this modal used to park at "Rolling…"
+        // with zero buttons forever. The prompt queue broadcasts the
+        // abandonment as `save-dismissed`; refuse() logs the
+        // divine_spark_refused row and renders the result view with a
+        // working Done.
+        const handleSaveDismissed = (event) => {
+            if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
+            window.removeEventListener('save-result', handleSaveResult);
+            refuse('save was dismissed — no damage dealt');
+        };
+        window.addEventListener('save-dismissed', handleSaveDismissed);
 
         addEntry(campaignName, {
             type: 'ability_use',

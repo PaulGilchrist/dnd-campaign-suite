@@ -148,6 +148,7 @@ export function createSaveListener(campaignName, config) {
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handler);
+            window.removeEventListener('save-dismissed', onDismissed);
             // Spread before deleting (playbook §41): in-place mutation of the
             // stored reference made setRuntimeValue's valuesEqual(new===old)
             // skip the broadcast POST, leaving a stale row server-side.
@@ -157,6 +158,18 @@ export function createSaveListener(campaignName, config) {
             resolve(event.detail);
          };
         window.addEventListener('save-result', handler);
+        // Dismiss detaches the save-result listener WITHOUT resolving the
+        // promise (dismiss-softlock family, 2026-11-05): before this, every
+        // dismissed prompt leaked `handler` on window forever, and a stray
+        // late echo for the swept promptId could resurrect a phantom
+        // resolution. Fire-and-forget `.promise` consumers keep the original
+        // never-resolves doctrine untouched.
+        const onDismissed = (event) => {
+            if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-dismissed', onDismissed);
+            window.removeEventListener('save-result', handler);
+        };
+        window.addEventListener('save-dismissed', onDismissed);
      });
 
     const saveResultPromise = promise.then(async (detail) => {
@@ -176,11 +189,15 @@ export function createSaveListener(campaignName, config) {
 // Dismiss hygiene (backlog 2026-11-03 save-prompt-queue-dismiss-orphan):
 // createSaveListener registers the promptId in the campaign pendingSavePrompts
 // bucket (and pendingSaveListenerPrompts). Those rows are only pruned by the
-// save-result resolution path — a DISMISSED save never resolves, so nothing
-// else swept them and every ghost prompt leaked an orphan row the Admin
-// clear had to keep absorbing. Dismiss drops the prompt from both buckets
-// itself — surviving rows write through the broadcast-POST, the FINAL row
-// evicts its bucket key outright (drain-to-evict, setSavePromptBucket) — so
+// save-result resolution path — a DISMISSED save never resolves its `.promise`
+// (the queue's un-rolled Dismiss broadcasts a separate `save-dismissed` event
+// instead, 2026-11-05, which only detaches listeners and lets modal
+// producers opt into a refusal outcome — resolving with a falsy success
+// would read as "save failed → damage" to the fire-and-forget consumers),
+// so nothing else swept them and every ghost prompt leaked an orphan row
+// the Admin clear had to keep absorbing. Dismiss drops the prompt from both
+// buckets itself — surviving rows write through the broadcast-POST, the FINAL
+// row evicts its bucket key outright (drain-to-evict, setSavePromptBucket) — so
 // peers and server truth match the drained UI and no `{}` / `[]` dust
 // outlives the queue. Idempotent: absent ids write nothing (no pointless
 // POST/DELETE churn).

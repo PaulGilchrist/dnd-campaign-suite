@@ -910,6 +910,18 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     // arrival key, then advance.
     getPendingSavePrompt(current.promptId);
     getPendingPopupSetter(current.promptId);
+    // Producer abandonment notice (Divine Spark dismiss-softlock 2026-11-05):
+    // producers parked on a raw `save-result` window listener never resolve
+    // here, so modal families (DivineSparkModal et al) stranded at
+    // "Rolling…" with no buttons. A dedicated `save-dismissed` event carries
+    // the promptId so opted-in producers can refuse(); it is NOT a
+    // `save-result` — the createSaveListener promise doctrine ("a DISMISSED
+    // save never resolves", savePrompt.js) stays intact, because the ~40
+    // `.promise` consumers all treat a falsy `success` as "save failed →
+    // apply damage" and must never see an un-rolled save as an outcome.
+    window.dispatchEvent(new CustomEvent('save-dismissed', {
+      detail: { promptId: current.promptId, targetName: current.targetName },
+    }));
     dropPendingSavePrompt(campaignName, current.promptId);
     clearPrompt(current);
     advance();
