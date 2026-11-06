@@ -368,6 +368,14 @@ function buildPreRollBreakdown(abilityLabel, saveBonus, aura) {
   // there and no board membership — co-presence is assumed by the
   // gridless-lenient doctrine. Display-honesty only; bonus values unchanged.
   const assumedCaveat = aura?.assumedCoPresent ? ' — assumed co-present (no token)' : '';
+  // Tokened-bearer drop note (backlog 2026-11-06): computeAuraBonus flags
+  // targetUnpositionedBearer when the aura was dropped SOLELY because the
+  // target has no positioned token on an active positioned map. The bonus is
+  // NOT applied (total stays honest) — the note only explains the absence,
+  // mirroring the phantom caveat above.
+  const unmeasuredNote = aura?.targetUnpositionedBearer
+    ? `Aura of Protection from ${aura.targetUnpositionedBearer} — target not positioned, unmeasured`
+    : null;
   return {
     promptId: null,
     baseLabel: `${abilityLabel} ${signedBonus(saveBonus)}`,
@@ -375,6 +383,7 @@ function buildPreRollBreakdown(abilityLabel, saveBonus, aura) {
     auraTooltip: auraBonus > 0 && aura.sourceName
       ? `Aura of Protection from ${aura.sourceName}${assumedCaveat}`
       : 'Aura of Protection',
+    auraUnmeasuredNote: unmeasuredNote,
     totalLabel: `= ${signedBonus(saveBonus + auraBonus)}`,
   };
 }
@@ -748,6 +757,28 @@ function DualDamageNotice({ current }) {
   );
 }
 
+// Pre-roll save-bonus breakdown + aura-unmeasured note (display-only lane,
+// same buildPreRollBreakdown compute the post-roll view keeps rendering).
+// Extracted from SavePromptDialog mirroring the DualDamageNotice/SaveResultPanel
+// component shapes.
+function PreRollBreakdown({ preRoll, current }) {
+  if (!preRoll || !current || preRoll.promptId !== current.promptId) return null;
+  return (
+    <>
+      <div className="sp-preroll-bonus" data-testid="sp-preroll-bonus">
+        <span className="sp-preroll-base">{preRoll.baseLabel}</span>
+        {preRoll.auraLabel && (
+          <CreatureBadge icon="fa-shield-heart" label={preRoll.auraLabel} cls="effect-buff" tooltip={preRoll.auraTooltip} />
+        )}
+        <span className="sp-preroll-total">{preRoll.totalLabel}</span>
+      </div>
+      {preRoll.auraUnmeasuredNote && (
+        <p className="sp-note" data-testid="sp-aura-unmeasured">{preRoll.auraUnmeasuredNote}</p>
+      )}
+    </>
+  );
+}
+
 function SavePromptDialog({
   current, prompts, dimmed, characters, campaignName, display, hasResult, preRoll,
   rerollUsedForSave, rerollAvailability, handlers,
@@ -766,15 +797,7 @@ function SavePromptDialog({
         <div className="sp-body">
           <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.{promptHasAdvantage ? <span className="sp-advantage-badge"> (Advantage)</span> : ''}{promptHasDisadvantage ? <span className="sp-disadvantage-badge"> (Disadvantage)</span> : ''}</p>
           <p className="sp-dc">DC {current.saveDc}</p>
-          {preRoll && preRoll.promptId === current.promptId && (
-            <div className="sp-preroll-bonus" data-testid="sp-preroll-bonus">
-              <span className="sp-preroll-base">{preRoll.baseLabel}</span>
-              {preRoll.auraLabel && (
-                <CreatureBadge icon="fa-shield-heart" label={preRoll.auraLabel} cls="effect-buff" tooltip={preRoll.auraTooltip} />
-              )}
-              <span className="sp-preroll-total">{preRoll.totalLabel}</span>
-            </div>
-          )}
+          <PreRollBreakdown preRoll={preRoll} current={current} />
           {current.dcSuccess === 'half' && (
             <EvasionNote current={current} characters={characters} campaignName={campaignName} />
           )}

@@ -186,6 +186,47 @@ describe('SavePromptModal — pre-roll save-bonus breakdown', () => {
     expect(chip).toHaveAttribute('title', 'Aura of Protection from ElderPaladin — assumed co-present (no token)');
   });
 
+  // Backlog 2026-11-06 (DB): tokened-bearer vs unpositioned-target display lane.
+  // The aura bonus is NOT applied (total byte-identical to the no-aura face) —
+  // the breakdown gains an explicit note naming the bearer/aura so the dropped
+  // chip is explained instead of silently vanishing.
+  it('notes an unmeasured aura instead of a chip when the target has no token', async () => {
+    computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: null, targetUnpositionedBearer: 'ElderPaladin' });
+    renderModal();
+
+    const breakdown = await openBreakdown('trigger-aura-target');
+    expect(within(breakdown).getByText('DEX +2')).toBeInTheDocument();
+    expect(within(breakdown).getByText('= +2')).toBeInTheDocument();
+    expect(within(breakdown).queryByTestId('creature-badge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sp-aura-unmeasured')).toHaveTextContent(
+      'Aura of Protection from ElderPaladin — target not positioned, unmeasured'
+    );
+  });
+
+  it('keeps the unmeasured note visible post-Roll with unchanged bonus math', async () => {
+    computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: null, targetUnpositionedBearer: 'ElderPaladin' });
+    rollD20.mockReturnValue(15);
+    renderModal();
+
+    const modal = await openPrompt('trigger-aura-target');
+    await openBreakdown('trigger-aura-target');
+    fireEvent.click(screen.getByRole('button', { name: /Roll Save/ }));
+    await waitFor(() => {
+      expect(modal.getByText(/SAVE (SUCCESS|FAILURE)/)).toBeInTheDocument();
+    });
+    // Bonus is exactly the base (+2, no aura pad) — the note explains, never pays.
+    expect(modal.getByText('d20 (15) + 2')).toBeInTheDocument();
+    expect(screen.getByTestId('sp-aura-unmeasured')).toBeInTheDocument();
+  });
+
+  it('shows no unmeasured note on the plain zero-bonus face (no flag)', async () => {
+    computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: null });
+    renderModal();
+
+    await openBreakdown('trigger-aura-target');
+    expect(screen.queryByTestId('sp-aura-unmeasured')).not.toBeInTheDocument();
+  });
+
   it('shows zero-bonus breakdown (= +0) without an aura chip', async () => {
     computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: null });
     getAbilitySaveBonus.mockReturnValue(0);

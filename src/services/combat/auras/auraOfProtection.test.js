@@ -364,3 +364,81 @@ describe('computeAuraBonus — assumed-co-present caveat (phantom bearer)', () =
       .toEqual({ bonus: 0, sourceName: null });
   });
 });
+
+// Backlog 2026-11-06 (DB): tokened-bearer vs UNPOSITIONED-target display lane.
+// Once the active map tracks token positions, isWithinRange's either-unplaced
+// leg drops the aura entirely for a bearer WITH a token against a target with
+// no token. computeAuraBonus keeps the bonus at 0 (mechanics untouched) but
+// names the dropped bearer via targetUnpositionedBearer so the save-prompt
+// breakdown can explain the missing chip. Every other face keeps the exact
+// historical { bonus, sourceName } zero envelope.
+describe('computeAuraBonus — target-unpositioned drop note (tokened bearer)', () => {
+  const paladin = (name = 'ElderPaladin', cha = 5) => [bearer(name, ['Aura of Protection'], [{ name: 'Charisma', bonus: cha }])];
+  const bearerTokenMap = { players: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }] };
+  const tokenedTargetMap = { players: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }, { name: 'Cleric', gridX: 9, gridY: 9 }] };
+
+  beforeEach(() => {
+    isWithinRange.mockResolvedValue(false);
+    loadMapData.mockResolvedValue(bearerTokenMap);
+  });
+
+  it('names the bearer when a positioned map, placed bearer, and unplaced target drop the aura', async () => {
+    const result = await compute(paladin(), 'Cleric');
+    expect(result).toEqual({ bonus: 0, sourceName: null, targetUnpositionedBearer: 'ElderPaladin' });
+    expect(loadMapData).toHaveBeenCalledWith('test-campaign', 'Map');
+  });
+
+  it('does NOT flag when the target has a positioned token (genuine out-of-range drop)', async () => {
+    loadMapData.mockResolvedValue(tokenedTargetMap);
+    expect(await compute(paladin(), 'Cleric')).toEqual({ bonus: 0, sourceName: null });
+  });
+
+  it('does NOT flag when the bearer is also unplaced (either-unplaced leg, not the target\'s fault)', async () => {
+    loadMapData.mockResolvedValue({ players: [{ name: 'ElderPaladin' }, { name: 'Cleric', gridX: 2, gridY: 2 }] });
+    expect(await compute(paladin(), 'Cleric')).toEqual({ bonus: 0, sourceName: null });
+  });
+
+  it('does NOT flag on a zero-positioned-token map (gridless fallback — nothing was dropped)', async () => {
+    loadMapData.mockResolvedValue({ players: [{ name: 'ElderPaladin' }], placedItems: [{ name: 'Decor' }] });
+    expect(await compute(paladin(), 'Cleric')).toEqual({ bonus: 0, sourceName: null });
+  });
+
+  it('gridless campaign (no active map): never flags, never loads a map', async () => {
+    getRuntimeValue.mockImplementation((entity, key) =>
+      (entity === '__map__' && key === 'activeMapName' ? null : [])
+    );
+    const result = await computeAuraBonus({
+      targetName: 'Cleric',
+      characters: paladin(),
+      campaignName: 'test-campaign',
+      activeMapName: null,
+    });
+    expect(result).toEqual({ bonus: 0, sourceName: null });
+    expect(loadMapData).not.toHaveBeenCalled();
+  });
+
+  it('names the STRONGEST dropped bearer when several auras fall to the same unplaced target', async () => {
+    const characters = [...paladin('SirLow', 2), ...paladin('ElderPaladin', 5)];
+    loadMapData.mockResolvedValue({ players: [{ name: 'SirLow', gridX: 1, gridY: 1 }, { name: 'ElderPaladin', gridX: 2, gridY: 2 }] });
+    expect(await compute(characters, 'Cleric'))
+      .toEqual({ bonus: 0, sourceName: null, targetUnpositionedBearer: 'ElderPaladin' });
+  });
+
+  it('never flags when another bearer wins — the chip is present, nothing vanished', async () => {
+    isWithinRange.mockImplementation(src => src === 'Aldric');
+    loadMapData.mockResolvedValue({ players: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }] });
+    const characters = [...paladin('Aldric', 2), ...paladin('ElderPaladin', 5)];
+    const result = await compute(characters, 'Cleric');
+    expect(result.bonus).toBe(2);
+    expect(result.sourceName).toBe('Aldric');
+    expect(result.targetUnpositionedBearer).toBeUndefined();
+  });
+
+  it.each([
+    ['the map document fails to load', () => loadMapData.mockRejectedValue(new Error('fetch down'))],
+    ['the map document is absent (null)', () => loadMapData.mockResolvedValue(null)],
+  ])('fails OPEN (no note) when %s', async (_case, setup) => {
+    setup();
+    expect(await compute(paladin(), 'Cleric')).toEqual({ bonus: 0, sourceName: null });
+  });
+});

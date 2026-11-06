@@ -73,9 +73,48 @@ export async function isBearerAssumedCoPresent(bearerName, { campaignName, activ
   }
 }
 
+// Display-honesty probe #2 (backlog 2026-11-06): the sibling face of
+// isBearerAssumedCoPresent. Once the active map tracks token positions,
+// isWithinRange returns false for EITHER unplaced leg ("no phantom adjacency"),
+// so a bearer that HAS a token silently loses the whole aura against a target
+// with no token — the chip drops out of the save breakdown with zero
+// explanation. This flags exactly that leg — bearer placed, target unplaced on
+// a positioned map — so the breakdown can name the dropped aura. Never gates
+// or grants a bonus. Fail-open on every unreadable face, like the sibling.
+export async function isTargetUnpositionedOnActiveMap(bearerName, targetName, { campaignName, activeMapName }) {
+  if (!bearerName || !targetName) return false;
+  const mapName = activeMapName || getRuntimeValue('__map__', 'activeMapName');
+  if (!mapName) return false; // gridless — nothing was dropped, nothing to explain
+  try {
+    const data = await loadMapData(campaignName || getRuntimeValue('__campaign__', 'campaignName'), mapName);
+    if (!data) return false; // unresolvable map document — cannot assert unplaced-ness
+    const tokens = [...(data.players || []), ...(data.placedItems || [])];
+    const hasPosition = t => !!t && Number.isFinite(t.gridX) && Number.isFinite(t.gridY);
+    // Zero positioned tokens → the gridless fallback measured nothing and the
+    // aura PADDED (phantom face) — this drop never happened.
+    if (!tokens.some(hasPosition)) return false;
+    // Only blame the target when the bearer itself is measurable.
+    if (!hasPosition(tokens.find(t => t?.name === bearerName))) return false;
+    return !hasPosition(tokens.find(t => t?.name === targetName));
+  } catch {
+    return false; // map unreadable — never claim a note we could not verify
+  }
+}
+
+// Keeps the strongest bearer whose aura fell to the unplaced-target leg only
+// (never a bearer once a winner exists, never one with a smaller bonus).
+async function noteDroppedAura(drop, bearerName, bonus, targetName, probeOpts) {
+  if (drop.sourceName || bonus <= drop.bonus) return drop;
+  if (await isTargetUnpositionedOnActiveMap(bearerName, targetName, probeOpts)) {
+    return { bonus, bearerName };
+  }
+  return drop;
+}
+
 export async function computeAuraBonus({ targetName, characters, campaignName, activeMapName, allCreatures }) {
   let bestBonus = 0;
   let bestSource = null;
+  let dropped = { bonus: 0, bearerName: null };
 
   // Legacy ally set for the unedited-bearer split: combat-summary entries
   // flagged type 'player' are the party tokens (great-split doctrine —
@@ -93,14 +132,28 @@ export async function computeAuraBonus({ targetName, characters, campaignName, a
     const bonus = Math.max(1, chaMod);
     const range = getAuraRangeFromStats(stats);
     const inRange = await isWithinRange(name, targetName, range);
-    if (!inRange) continue;
+    if (!inRange) {
+      // Dropped ONLY because the target has no positioned token? Remember the
+      // strongest such bearer for the breakdown note (max-'>' mirrors the
+      // winner selection above). Bonus stays 0 — display-honesty only.
+      dropped = await noteDroppedAura(dropped, name, bonus, targetName, { campaignName, activeMapName });
+      continue;
+    }
     if (bonus > bestBonus) {
       bestBonus = bonus;
       bestSource = name;
     }
   }
 
-  if (!bestSource) return { bonus: bestBonus, sourceName: bestSource };
+  if (!bestSource) {
+    // Zero-envelope keeps its historical shape; the note lane names the bearer
+    // WITHOUT populating sourceName (every { bonus, sourceName } consumer reads
+    // sourceName only beside a >0 bonus — keep that contract byte-inert).
+    if (dropped.bearerName) {
+      return { bonus: 0, sourceName: null, targetUnpositionedBearer: dropped.bearerName };
+    }
+    return { bonus: 0, sourceName: null };
+  }
   const result = { bonus: bestBonus, sourceName: bestSource };
   // Carried ONLY when the co-presence is assumed (all other lanes keep the
   // historical { bonus, sourceName } shape); consumed by the SavePromptModal

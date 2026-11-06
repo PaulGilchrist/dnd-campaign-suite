@@ -90,7 +90,6 @@ A4. **Grant-lane facts:** slot paid PRE-modal at "Cast Spell" (L2 ledger 3→2�
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[DB 2026-11-06] Tokened aura bearer silently loses the whole aura vs unpositioned targets.** Once the active map has ANY positioned tokens, an aura bearer WITH a token still fails rangeCheck against a board target with no token — the save breakdown drops the aura chip entirely ("CON +6 = +6", no bonus, no explanation), which reads as the feature vanishing. Consider a breakdown note ("target not positioned — aura unmeasured") or measuring gridless-lenient when only the TARGET is unplaced. Files: `auraOfProtection.js rangeCheck.js SavePromptModal.jsx`.
 - **[DB 2026-11-06] Heavy Armor Master reduction is log-invisible on the hp ledger.** 7→1 applied damage printed only as an `automation` row ("reduces this Bludgeoning") while the `hp_change` delta (1) carried no reduction breakdown entry (`damageBreakdown` absent) — popup copy was the only place the shrink was explained end-to-end. Consider folding feat-reduction into `damageBreakdown:[{…,status:'reduced'}]` like resistance does. Files: `applyDamage.js CharSheet.handlers.js`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
