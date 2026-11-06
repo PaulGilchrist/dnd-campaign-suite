@@ -51,6 +51,7 @@ vi.mock('./services/encounters/combatData.js', async () => ({
 }));
 
 vi.mock('./hooks/runtime/useRuntimeState.js', () => ({
+  useRuntimeValue: vi.fn(() => null),
   setRuntimeObject: vi.fn(),
   seedTrackedResources: vi.fn(),
   getStore: vi.fn(() => new Map()),

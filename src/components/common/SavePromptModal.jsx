@@ -8,7 +8,7 @@ import CreatureBadge from './CreatureBadge.jsx';
 import { getSaveDisadvantage, getHolyAuraSaveAdvantage, getHolyNimbusSaveAdvantage } from './savePromptUtils.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
@@ -201,6 +201,39 @@ function findWardingBondSaveBonus(current, campaignName) {
   return wardingBondBuff ? wardingBondBuff.saveBonus : 0;
 }
 
+// Display-side twins of the roll lane's FLAT activeBuffs folds (findWardingBond-
+// SaveBonus + consumeBurstOfIngenuityBuff): same effect keys, same "first
+// matching buff wins" reads, so the header breakdown line equals the modifier
+// the Roll seam will fold. Dice-based folds (Bane/Bless effect dice) and the
+// at-roll Cosmic Omen draw stay roll-time-only — they cannot be known pre-roll.
+const LIVE_BUFF_SAVE_BONUSES = [
+  { effect: 'warding_bond', label: 'Warding Bond', icon: 'fa-ring' },
+  { effect: 'burst_of_ingenuity', label: 'Burst of Ingenuity', icon: 'fa-lightbulb' },
+];
+
+function getLiveBuffSaveBonusParts(activeBuffs) {
+  const buffs = Array.isArray(activeBuffs) ? activeBuffs : [];
+  const parts = [];
+  for (const def of LIVE_BUFF_SAVE_BONUSES) {
+    const buff = buffs.find(b => b && b.effect === def.effect);
+    if (!buff) continue;
+    // warding_bond folds only a truthy saveBonus (roll reader `&& b.saveBonus`);
+    // burst folds Number(saveBonus) (non-numeric → 0). A 0 fold adds nothing —
+    // no chip, matching the roll's effective contribution.
+    const value = Number(buff.saveBonus) || 0;
+    if (!value) continue;
+    parts.push({
+      key: def.effect,
+      value,
+      icon: def.icon,
+      cls: value < 0 ? 'effect-debuff' : 'effect-buff',
+      label: `${signedBonus(value)} (${def.label})`,
+      tooltip: `${def.label}: ${signedBonus(value)} to saving throws — folded into the pending roll`,
+    });
+  }
+  return parts;
+}
+
 function buildBonusDetail({ auraBonusStr, cosmicOmenDetail, baneSaveRoll, baneAttackerRoll, blessSaveRoll, wardingBondSaveBonus }) {
   const bonusDetailParts = [auraBonusStr, cosmicOmenDetail];
   if (baneSaveRoll) {
@@ -243,13 +276,17 @@ function buildSecondaryDamageFields(current) {
   };
 }
 
-function buildLastAttackData(current, { finalRoll, roll1, roll2, saveBonus, auraBonus, cosmicOmenAppliedBonus, total, success }) {
+function buildLastAttackData(current, { finalRoll, roll1, roll2, result, total, success }) {
   return {
     attackerName: current.attackerName || current.targetName,
     targetName: current.targetName,
     d20: finalRoll,
     d20Rolls: [roll1, roll2],
-    bonus: saveBonus + auraBonus + cosmicOmenAppliedBonus,
+    // FULL folded bonus (base + aura + omen + bane/bless dice + warding-bond/
+    // burst flat folds) — d20 + bonus === total, so save consumers that
+    // recompute the total from this record (Boon of Fate, reroll re-surfaces)
+    // can never disagree with the modal's live breakdown line.
+    bonus: result.saveBonus,
     total,
     rollType: 'save',
     saveType: current.saveType || null,
@@ -359,9 +396,12 @@ function signedBonus(n) {
 
 // Pre-roll save-bonus breakdown for the prompt panel (display-only — the Roll
 // seam recomputes everything at commit time). Same computeAuraBonus call the
-// resolve lane uses (auraOfProtection.js), so base + aura here agrees with the
-// post-roll bonus line whenever no roll-time dice bonuses (Bane/Bless) apply.
-function buildPreRollBreakdown(abilityLabel, saveBonus, aura) {
+// resolve lane uses (auraOfProtection.js), plus the LIVE flat activeBuffs
+// folds (Warding Bond / Burst of Ingenuity) read from the same runtime store
+// the roll seam reads, so the header sum equals the modifier a pending roll
+// will use even when buffs are stamped mid-prompt (DG 2026-11-06 header-stale
+// fix). Roll-time dice draws (Bane/Bless) remain post-roll-only by nature.
+function buildPreRollBreakdown(abilityLabel, saveBonus, aura, buffParts = []) {
   const auraBonus = aura?.bonus > 0 ? aura.bonus : 0;
   // Phantom-bearer caveat (backlog 2026-11-06): computeAuraBonus flags
   // assumedCoPresent when the active map exists but the bearer has no token
@@ -376,6 +416,7 @@ function buildPreRollBreakdown(abilityLabel, saveBonus, aura) {
   const unmeasuredNote = aura?.targetUnpositionedBearer
     ? `Aura of Protection from ${aura.targetUnpositionedBearer} — target not positioned, unmeasured`
     : null;
+  const buffTotal = buffParts.reduce((sum, part) => sum + part.value, 0);
   return {
     promptId: null,
     baseLabel: `${abilityLabel} ${signedBonus(saveBonus)}`,
@@ -384,21 +425,26 @@ function buildPreRollBreakdown(abilityLabel, saveBonus, aura) {
       ? `Aura of Protection from ${aura.sourceName}${assumedCaveat}`
       : 'Aura of Protection',
     auraUnmeasuredNote: unmeasuredNote,
-    totalLabel: `= ${signedBonus(saveBonus + auraBonus)}`,
+    buffChips: buffParts,
+    totalLabel: `= ${signedBonus(saveBonus + auraBonus + buffTotal)}`,
   };
 }
 
 // Live per-prompt aura/base read: re-derived whenever the front prompt
 // changes (promptId is the staleness key — an aura resolved for a previous
 // prompt is discarded via the active-flag guard, never shown on a new one).
-function usePreRollSaveBreakdown(current, abilityLabel, characters, campaignName, activeMapName) {
-  const [preRoll, setPreRoll] = useState(null);
+// The flat activeBuffs contribution is layered at RENDER time from the
+// reactive store read, so a mid-prompt buff stamp re-renders the line
+// without waiting for a prompt swap.
+function usePreRollSaveBreakdown(current, characters, campaignName, activeMapName, buffParts) {
+  const [core, setCore] = useState(null);
   const latestRef = useRef(null);
-  latestRef.current = { current, abilityLabel, characters, activeMapName };
+  latestRef.current = { current, characters, activeMapName };
   const promptId = current?.promptId || null;
+  const abilityLabel = (current?.saveType || '').toUpperCase();
 
   useEffect(() => {
-    setPreRoll(null);
+    setCore(null);
     if (!promptId) return undefined;
     let active = true;
     (async () => {
@@ -414,7 +460,7 @@ function usePreRollSaveBreakdown(current, abilityLabel, characters, campaignName
         allCreatures: getCombatSummary(campaignName)?.creatures,
       });
       if (active) {
-        setPreRoll({ ...buildPreRollBreakdown(snapshot.abilityLabel, saveBonus, aura), promptId });
+        setCore({ promptId, saveBonus, aura });
       }
     })().catch((e) => { console.error('[SavePromptModal] Pre-roll save breakdown failed:', e); });
     return () => { active = false; };
@@ -422,7 +468,12 @@ function usePreRollSaveBreakdown(current, abilityLabel, characters, campaignName
     // latestRef at effect time so unstable prop identities never re-loop.
   }, [promptId, campaignName]);
 
-  return preRoll;
+  // Recomposed on EVERY live buff change (DG 2026-11-06): base + aura come
+  // from the prompt-open read, the flat buff folds from the live store.
+  return useMemo(() => {
+    if (!core || core.promptId !== promptId) return null;
+    return { ...buildPreRollBreakdown(abilityLabel, core.saveBonus, core.aura, buffParts), promptId };
+  }, [core, promptId, abilityLabel, buffParts]);
 }
 
 function findTargetCharacter(current, characters) {
@@ -760,7 +811,7 @@ function DualDamageNotice({ current }) {
 // Pre-roll save-bonus breakdown + aura-unmeasured note (display-only lane,
 // same buildPreRollBreakdown compute the post-roll view keeps rendering).
 // Extracted from SavePromptDialog mirroring the DualDamageNotice/SaveResultPanel
-// component shapes.
+// component shapes. Buff chips re-render live (mid-prompt stamps).
 function PreRollBreakdown({ preRoll, current }) {
   if (!preRoll || !current || preRoll.promptId !== current.promptId) return null;
   return (
@@ -770,6 +821,9 @@ function PreRollBreakdown({ preRoll, current }) {
         {preRoll.auraLabel && (
           <CreatureBadge icon="fa-shield-heart" label={preRoll.auraLabel} cls="effect-buff" tooltip={preRoll.auraTooltip} />
         )}
+        {preRoll.buffChips.map(chip => (
+          <CreatureBadge key={chip.key} icon={chip.icon} label={chip.label} cls={chip.cls} tooltip={chip.tooltip} />
+        ))}
         <span className="sp-preroll-total">{preRoll.totalLabel}</span>
       </div>
       {preRoll.auraUnmeasuredNote && (
@@ -1030,7 +1084,14 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = computePromptDisplayState(current, campaignName);
   const hasResult = current?.result != null;
 
-  const preRoll = usePreRollSaveBreakdown(current, abilityLabel, characters, campaignName, activeMapName);
+  // Reactive target-buff read (CharReactions live-row pattern): an SSE echo of
+  // a mid-prompt activeBuffs write notifies the runtime store, re-renders
+  // here, and the breakdown line re-sums from the SAME store the roll seam
+  // (findWardingBondSaveBonus / consumeBurstOfIngenuityBuff) reads at commit.
+  const liveTargetBuffs = useRuntimeValue(current?.targetName, 'activeBuffs', campaignName);
+  const liveBuffParts = useMemo(() => getLiveBuffSaveBonusParts(liveTargetBuffs), [liveTargetBuffs]);
+
+  const preRoll = usePreRollSaveBreakdown(current, characters, campaignName, activeMapName, liveBuffParts);
 
   useEffect(() => {
     setRerollUsedForSave(false);

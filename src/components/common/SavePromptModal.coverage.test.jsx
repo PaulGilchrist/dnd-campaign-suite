@@ -51,6 +51,7 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  useRuntimeValue: vi.fn(() => null),
   getStore: vi.fn(() => new Map()),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),

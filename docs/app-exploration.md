@@ -31,7 +31,7 @@ Live facts (DG, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 ## Depth Seeds (live 2026-11-06 DG unless noted)
 
-- **VT picker rig (DG):** active map + adjacent tokens (players[] PUT, coords in cells; 1 cell=5ft) → sneak cycle → Trip fail via MID-PROMPT `warding_bond saveBonus:-19` stamp on the victim bucket (roll-time read, header lie). VT chooser radios exclude primary, include self. Healthy chain only on the FIRST sneak cycle per tab load (see bug).
+- **VT picker rig (DG):** active map + adjacent tokens (players[] PUT, coords in cells; 1 cell=5ft) → sneak cycle → Trip fail via MID-PROMPT `warding_bond saveBonus:-19` stamp on the victim bucket (roll-time read; header breakdown re-computes live since the 2026-11-06 improve — §11). VT chooser radios exclude primary, include self. Healthy chain only on the FIRST sneak cycle per tab load (see bug).
 - **Nat-1 hunt rig (DG):** DM(+11)/EP(sheet AC 19) sheet-lane, drain loop ≤9 rolls/call at ~1.5s cadence; boon button exact text after trim (` Boon of Combat Prowess` leading space); MISS popups close via `.popup-close-btn` one click; HIT popups stage-2 via same loop. Re-arm boon per press via scoped cs round bump.
 - **Stroke-crit rig (DF, post-fix):** sanctioned EvasiveFighter Rogue/Arcane Trickster/lv20 2-field disk surgery (md5 `0df29ff3…` restore law + API GET re-proof). DG bonus: stroke on a nat-1 keeps the converted `CRITICAL HIT!` face and the fumble banner is suppressed too.
 - **Boon face (DF+DG):** zero-surgery Disciplined_Monk lv20; converted records persist `isNatural1:true` honestly; no `convertedNat20` key.
@@ -65,7 +65,6 @@ Live facts (DG, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (DG 2026-11-06) Save-prompt header bonus breakdown is computed at prompt-OPEN and never re-renders — a mid-prompt `activeBuffs` change (e.g. warding_bond) IS read at roll time (resolved row honest) while the header still shows the stale sum (`= +16` vs actual `+ -3`). Recompute the breakdown line at roll, or label it "at prompt open". `SavePromptModal.jsx`.
 - (DG 2026-11-06) Devious Strikes chooser `Cancel` AFTER `Apply Effects` has already paid a cost keeps the Cunning Strike spend (ability_use cost row stays, dice deducted) while the chooser itself cancels — either disable Cancel post-apply or roll back unconsumed legs' costs. `CharSheet handler chooser host + attackRiderHandler.js`.
 - (DG 2026-11-06) Saved (successful-save) Trip legs leave descriptor-shaped `targetEffects` rows at campaign root (`effect:'prone'`, no clock observed) — GM effect lists/badges could misread them as live prone; add a `saveOutcome` field or evict on save resolution. `attackRiderHandler.applyRiderEffect + targetEffectDefinitions.js`.
 - (DG 2026-11-06) VT secondary-target list offers the ATTACKER itself as a trip candidate (`EvasiveFighter` radio in the chooser) — RAW "another creature" excludes self; filter the holder. `versatileTricksterHandler/chooser host`.

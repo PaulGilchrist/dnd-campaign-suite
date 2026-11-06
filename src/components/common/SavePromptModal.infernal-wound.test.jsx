@@ -23,7 +23,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({ rollD20: vi.fn(() => 15), 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({ sendSaveResult: vi.fn(), clearSavePrompt: vi.fn() }));
 vi.mock('../../services/combat/auras/auraOfProtection.js', () => ({ computeAuraBonus: vi.fn(async () => ({ bonus: 0, sourceName: null })) }));
 vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({ getAbilitySaveBonus: vi.fn(() => 3) }));
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({ getRuntimeValue: vi.fn(() => null), setRuntimeValue: vi.fn(), getStore: vi.fn(() => new Map()), useSyncedState: vi.fn(() => [null, vi.fn()]), listeners: new Map() }));
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({ useRuntimeValue: vi.fn(() => null), getRuntimeValue: vi.fn(() => null), setRuntimeValue: vi.fn(), getStore: vi.fn(() => new Map()), useSyncedState: vi.fn(() => [null, vi.fn()]), listeners: new Map() }));
 vi.mock('../../services/encounters/combatData.js', () => ({ getCombatSummary: vi.fn(() => null) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/storage.js', () => ({ default: { set: vi.fn(), get: vi.fn(() => null) } }));
