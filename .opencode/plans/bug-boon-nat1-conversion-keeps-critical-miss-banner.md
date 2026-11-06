@@ -40,3 +40,6 @@ Follow the e923a05ef pattern: thread a suppression flag so that when a miss→hi
 
 ## Severity
 Minor UX issue — display-copy inconsistency on an edge-case face (nat-1 + boon). No state or damage corruption observed; the ledger and persisted records are honest.
+
+## Owner ruling (2026-11-06, DF+ session)
+**Allow the conversion; fix the banner.** Fearless Aim legitimately applies to natural-1 auto-misses (the authored copy has no nat-1 carve-out) — the defect is purely that `showFumble` survives the miss→hit conversion. Fix target: suppress the "Critical Miss!" notice on the converted face (mirror of the `convertedNat20` suppression pattern in `e923a05ef`), keeping the no-boon nat-1 face byte-unchanged.
