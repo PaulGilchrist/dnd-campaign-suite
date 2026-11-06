@@ -90,6 +90,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-result', handleSaveResult);
+        window.removeEventListener('save-dismissed', handleSaveDismissed);
 
         const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
         const conditions = Array.isArray(storedConditions) ? storedConditions : [];
@@ -135,11 +137,28 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 { type: 'stunned', condition: 'stunned' }
             ], campaignName, rounds: undefined, expireOnCreatureName: targetName });
         }
+    };
 
+    // Dismiss hygiene (save-dismissed family, 2026-11-05): a GM Dismiss on the
+    // un-rolled prompt never dispatches save-result (dismiss doctrine — a
+    // dismissed save never resolves), so this raw listener used to leak one
+    // window listener + closure set per dismissed cast while createSaveListener's
+    // own listener detached itself. Mirrors savePrompt.js:167-172 /
+    // DivineSparkModal's save-dismissed opt-in: detach BOTH listeners and log
+    // the abandonment as <feature>_refused (save_dismissed) — zero further
+    // state; the spend stays (§9 pay-early family).
+    const handleSaveDismissed = (event) => {
+        if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-dismissed', handleSaveDismissed);
         window.removeEventListener('save-result', handleSaveResult);
+        // Popup return value is unused (the queued prompt is gone; the cast's
+        // ability_use spend row already landed) — this call logs the refusal.
+        saveOnlyRefusal(action, playerStats, campaignName, 'save_dismissed',
+            `${action.name} abandoned — the save prompt was dismissed, no condition applied to ${targetName}.`);
     };
 
     window.addEventListener('save-result', handleSaveResult);
+    window.addEventListener('save-dismissed', handleSaveDismissed);
 
     return {
         type: 'popup',

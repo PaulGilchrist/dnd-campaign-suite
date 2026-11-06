@@ -14,7 +14,26 @@ import { grantFleetStep } from '../../services/rules/features/fleetStepService.j
 
 const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
 
-async function gateStunningStrike({ action, auto, playerName, campaignName, getRuntimeValue, addEntry, setPopupHtml }) {
+// Target-validity leg of gateStunningStrike (hoisted for the complexity ceiling):
+// the armed target can go stale between the qualifying hit and this click (GM
+// empties the dropdown) or be self-armed. Refuses with the SAME resolution
+// (getTargetFromAttacker on the combat context) and byte-identical wording as
+// saveOnlyHandler's own no_target/cannot_target_self refusal — but in the GATE,
+// BEFORE spendMonkFocusPoint burns the Focus Point + once-per-turn latch
+// (zero-spend refusal, §5). Returns true when a refusal was issued.
+async function refuseStaleStunningStrikeTarget({ action, playerStats, playerName, combat, campaignName, setPopupHtml, addEntry }) {
+    const armedTargetName = getTargetFromAttacker(combat, playerName)?.name || null;
+    if (armedTargetName && armedTargetName !== playerStats.name) return false;
+    const isSelf = armedTargetName !== null;
+    await refuseTriggerGate({ action, playerStats, campaignName, setPopupHtml, addEntry,
+        message: isSelf
+            ? `You can't target yourself with ${action.name} — it requires another creature.`
+            : `No target selected — ${action.name} requires another creature. Select a target in combat first.`,
+        reasonToken: isSelf ? 'cannot_target_self' : 'no_target' });
+    return true;
+}
+
+async function gateStunningStrike({ action, auto, playerStats, playerName, campaignName, getRuntimeValue, addEntry, setPopupHtml }) {
     if (!(action.name === 'Stunning Strike' && auto?.trigger === 'monk_weapon_or_unarmed_hit')) {
         return { armed: false, round: 1, blocked: false };
     }
@@ -45,6 +64,10 @@ async function gateStunningStrike({ action, auto, playerName, campaignName, getR
     }
     if (lastAttack.hit !== true) {
         denyStunningStrike('Last melee attack did not hit.');
+        return { armed: false, round: stunningStrikeRound, blocked: true };
+    }
+    // Target-validity leg BEFORE the Focus pre-spend (see refuseStaleStunningStrikeTarget).
+    if (await refuseStaleStunningStrikeTarget({ action, playerStats, playerName, combat, campaignName, setPopupHtml, addEntry })) {
         return { armed: false, round: stunningStrikeRound, blocked: true };
     }
     return { armed: true, round: stunningStrikeRound, blocked: false };
@@ -429,7 +452,7 @@ export default function useCharActionsAutomation({
         // CLA-342: Stunning Strike fires only when your own melee weapon/unarmed
         // attack HIT, once per turn — refuse before any Focus Point/ki is spent
         // (mirrors the verified quiveringPalmHandler lastAttack hit gates).
-        const ssGate = await gateStunningStrike({ action, auto, playerName, campaignName, getRuntimeValue, addEntry, setPopupHtml });
+        const ssGate = await gateStunningStrike({ action, auto, playerStats, playerName, campaignName, getRuntimeValue, addEntry, setPopupHtml });
         if (ssGate.blocked) return;
         const stunningStrikeArmed = ssGate.armed;
         const stunningStrikeRound = ssGate.round;

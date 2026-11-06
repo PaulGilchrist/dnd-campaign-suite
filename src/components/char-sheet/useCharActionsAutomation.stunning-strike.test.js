@@ -1,8 +1,9 @@
 // @maintained-by-ai
 // CLA-342 Stunning Strike row-gate lane (gateStunningStrike / markStunningStrikeUsed):
 // a save_only 'Stunning Strike' row (trigger monk_weapon_or_unarmed_hit) arms ONLY on your
-// own melee HIT (not auto-miss), once per turn. Every refusal is popup + byte-exact
-// "<name> blocked — <reason>" log with ZERO runtime writes and ZERO dispatch, BEFORE any
+// own melee HIT (not auto-miss), once per turn, with a legal OTHER-creature target CURRENTLY
+// armed (stale/self-armed targets refuse BEFORE any spend — zero-spend refusal, §5).
+// Every refusal is popup + log with ZERO runtime writes and ZERO dispatch, BEFORE any
 // Focus Point pre-spend. Positive leg pins the spend seam byte-exact: 1 FP written first,
 // round-attributed latch stamp second, target-named spend log, then executeHandler dispatch
 // (the save-dispatch args). Save resolution + condition granting live in saveOnlyHandler.js
@@ -31,6 +32,11 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => ({ round: combatRound.current, creatures: [] })),
     getTargetFromAttacker: vi.fn(),
 }));
+// The gate's target-validity leg resolves the armed target with the SAME helper
+// saveOnlyHandler's resolveTarget wraps — configured per-test (mockReturnValue is
+// an implementation; vi.clearAllMocks keeps it, so every test that reaches the
+// target leg stamps its own value).
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 
 const SS_ACTION = {
     name: 'Stunning Strike',
@@ -107,6 +113,9 @@ describe('CLA-342 Stunning Strike row gate (own melee hit, once per turn)', () =
         { rules: '5e', spendWord: 'ki point' },
     ])('arms on a qualifying melee hit ($rules): spends 1 FP, stamps round-attributed latch, logs spend by target, dispatches save', async ({ rules, spendWord }) => {
         combatRound.current = 7;
+        // A legal OTHER-creature target is currently armed — the gate's target
+        // leg must admit and let the spend/dispatch lane run.
+        getTargetFromAttacker.mockReturnValue({ name: 'Thug 1' });
         const { hooks, setRuntimeValue } = makeHarness({
             rules,
             lastAttack: HIT,
@@ -132,5 +141,59 @@ describe('CLA-342 Stunning Strike row gate (own melee hit, once per turn)', () =
         });
         // Positive leg reached dispatch, so the absence of any refusal popup is real gating.
         expect(hooks.setPopupHtml).not.toHaveBeenCalled();
+    });
+
+    // Target-validity leg — the armed target can go stale (GM empties the dropdown)
+    // or be self-armed AFTER the qualifying hit landed. Refusal must fire in the
+    // gate, BEFORE spendMonkFocusPoint: no focusPoints write, no latch stamp, no
+    // spend log, no dispatch — popup + ONE <feature>_refused automation row with the
+    // reason token, wording byte-identical to saveOnlyHandler's own refusal.
+    describe('target-validity leg (stale/self-armed target after the hit): zero-spend refusal', () => {
+        it.each([
+            {
+                rules: '2024',
+                token: 'no_target',
+                armed: null,
+                message: 'No target selected — Stunning Strike requires another creature. Select a target in combat first.',
+            },
+            {
+                rules: '5e',
+                token: 'no_target',
+                armed: null,
+                message: 'No target selected — Stunning Strike requires another creature. Select a target in combat first.',
+            },
+            {
+                rules: '2024',
+                token: 'cannot_target_self',
+                armed: { name: 'TestFighter' },
+                message: "You can't target yourself with Stunning Strike — it requires another creature.",
+            },
+            {
+                rules: '5e',
+                token: 'cannot_target_self',
+                armed: { name: 'TestFighter' },
+                message: "You can't target yourself with Stunning Strike — it requires another creature.",
+            },
+        ])('refuses $token ($rules): popup + exactly one stunning_strike_refused row, focusPoints UNCHANGED, latch NOT stamped, no dispatch', async ({ rules, token, armed, message }) => {
+            getTargetFromAttacker.mockReturnValue(armed);
+            const { hooks, setRuntimeValue } = makeHarness({ rules, lastAttack: HIT, focusPoints: 4 });
+
+            await useCharActionsAutomation(hooks).handleAutomationAction(SS_ACTION);
+
+            expect(hooks.setPopupHtml).toHaveBeenCalledWith(`<b>Stunning Strike</b><br/>${message}`);
+            // ONE refusal row only — the gate blocks before executeHandler, so the
+            // handler-level (defense-in-depth) refusal never also fires.
+            expect(hooks.addEntry).toHaveBeenCalledTimes(1);
+            expect(hooks.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'automation',
+                characterName: 'TestFighter',
+                automationType: 'stunning_strike_refused',
+                name: 'Stunning Strike',
+                description: `Stunning Strike refused — ${token}: ${message}`,
+            }));
+            // Zero-spend: no focusPoints decrement, no _StunningStrike_usedRound stamp.
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(hooks.executeHandler).not.toHaveBeenCalled();
+        });
     });
 });

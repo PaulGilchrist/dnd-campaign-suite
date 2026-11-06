@@ -763,6 +763,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
         const handleSaveResult = (event) => {
             if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-result', handleSaveResult);
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
 
             if (!event.detail.success) {
                 const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
@@ -796,11 +798,35 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     description: `${targetName} succeeded on WIS save. ${featureName} has no effect.`,
                 }).catch((e) => { console.error("[beguilingTwist] Error:", e); });
             }
+        };
 
+        // Dismiss hygiene (save-dismissed family, 2026-11-05): a GM Dismiss on
+        // the un-rolled prompt never dispatches save-result (dismiss doctrine —
+        // a dismissed save never resolves), so this raw listener used to leak
+        // one window listener + closure set per dismissed cast while
+        // createSaveListener's own listener detached itself. Mirrors
+        // savePrompt.js:167-172 / DivineSparkModal's save-dismissed opt-in:
+        // detach BOTH listeners and log the abandonment as
+        // beguiling_twist_refused — zero further state; the reaction spend
+        // stays (§9 pay-early family).
+        const handleSaveDismissed = (event) => {
+            if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
             window.removeEventListener('save-result', handleSaveResult);
+            addEntry(btCampaignName, {
+                type: 'automation',
+                characterName: btPlayerStats.name,
+                abilityName: featureName,
+                automationType: 'reaction_save',
+                automationDetail: 'beguiling_twist_refused',
+                reason: 'save_dismissed',
+                description: `${featureName} refused — ${targetName}'s save prompt was dismissed, no condition applied.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error("[beguilingTwist] Error:", e); });
         };
 
         window.addEventListener('save-result', handleSaveResult);
+        window.addEventListener('save-dismissed', handleSaveDismissed);
 
         setPopupHtml({
             type: 'automation_info',
