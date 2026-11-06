@@ -132,10 +132,33 @@ function applyStoreUpdate(storeKey, data) {
   }
 }
 
+// The module-level combatData cache (getCombatSummary readers — e.g. the Aura
+// of Protection board-member guard behind the phantom-bearer caveat) must
+// track board writes on EVERY lane, not just the Initiative view that
+// refreshes it from its own SSE subscription: a sheet-only tab stayed
+// boot-stale no matter how long it settled, so the caveat wrongly asserted
+// "assumed co-present (no token)" for an ally verifiably on the server board
+// (bug-aura-caveat-asserts-for-on-board-bearer-stale-cache). Memory-only
+// adoption (skipSync law — an echo is never re-POSTed). Same guard as the
+// Initiative lane's handleCombatSummaryChange: a null (cleared-key) echo
+// evicts the cache, only echoes carrying a board are adopted, anything else
+// leaves the cache untouched. On Initiative tabs this runs first (the root
+// Subscriber subscribes before the view's) and the Initiative handler's
+// merged write still wins afterwards — that lane is behaviour-unchanged.
+function syncCombatSummaryCache(storeKey, data, campaignName) {
+  if (storeKey !== 'combatSummary') return;
+  if (data === null) {
+    setCombatSummaryCache(null, campaignName);
+  } else if (data?.creatures) {
+    setCombatSummaryCache(data, campaignName);
+  }
+}
+
 function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
   const prefix = `change-${campaignName}-`;
   if (!event.key.startsWith(prefix)) return;
   const storeKey = event.key.slice(prefix.length);
+  syncCombatSummaryCache(storeKey, event.data, campaignName);
   if (event.data === null || typeof event.data !== 'object') {
     // Null payloads are cleared-key echoes (POST null / key DELETE both publish
     // null from campaigns-changedata.js) and scalars are plain value updates
