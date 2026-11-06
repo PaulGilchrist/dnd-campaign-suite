@@ -30,6 +30,7 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js'
 import { logHealingToSSE } from '../../services/automation/common/healingRoll.js'
 import { addEntry } from '../../services/ui/logService.js'
 import SecondaryModals from './CharActionModals.SecondaryModals.jsx';
+import { mergeModalStates } from './modalStateMerge.js';
 
 const CLOCKWORK_CHOICE_MODAL_KEYS = {
     heal: 'clockworkCavalcadeHealModal',
@@ -286,8 +287,7 @@ function CharActionModals({
 }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const mergedModalState = React.useMemo(() => {
-        const result = { ...modalState, ...spellModalState };
-        return result;
+        return mergeModalStates(modalState, spellModalState);
     }, [modalState, spellModalState]);
 
     useEffect(() => {

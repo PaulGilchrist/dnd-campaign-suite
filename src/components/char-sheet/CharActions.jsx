@@ -32,6 +32,7 @@ import { toggleBuff } from '../../services/automation/common/buffToggle.js';
 import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import CharActionModals from './CharActionModals.jsx';
+import { mergeModalStates } from './modalStateMerge.js';
 import CharActionSpellPopups from './CharActionSpellPopups.jsx';
 import CharBonusActions from './CharBonusActions.jsx';
 import useCharActionModals from './useCharActionModals.js';
@@ -275,7 +276,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
         }
     }, [setModalStateInternal, onSpellModalStateChange]);
 
-    const mergedModalState = React.useMemo(() => ({ ...modalState, ...spellModalState }), [modalState, spellModalState]);
+    const mergedModalState = React.useMemo(() => mergeModalStates(modalState, spellModalState), [modalState, spellModalState]);
 
     const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState('campaign', 'cleavePending', false, campaignName);
     const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState('campaign', 'cleaveSecondTargets', [], campaignName);
