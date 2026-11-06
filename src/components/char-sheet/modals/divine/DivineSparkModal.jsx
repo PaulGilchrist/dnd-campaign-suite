@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { rollExpression, rollExpressionMaximized } from '../../../../services/dice/diceRoller.js';
 import { hasHealingMaximization } from '../../../../services/combat/automation/automationService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
 import { createSaveListener } from '../../../../services/automation/common/savePrompt.js';
 import { getCoronaSaveDisadvantage } from '../../../../services/combat/auras/coronaAuraUtils.js';
@@ -56,11 +57,44 @@ function DivineSparkResultView({ result, targetName }) {
     return null;
 }
 
-function DivineSparkModal({ featureName, attackerName, targetName, campaignName, healExpression, damageExpression, damageTypes, saveType, wisModifier, playerStats, onClose }) {
+function DivineSparkModal({ featureName, attackerName, targetName, campaignName, healExpression, damageExpression, damageTypes, saveType, wisModifier, channelDivinityCharges, playerStats, onClose }) {
     const [mode, setMode] = useState(null);
     const [damageType, setDamageType] = useState(damageTypes[0] || 'Radiant');
     const [rolling, setRolling] = useState(false);
     const [result, setResult] = useState(null);
+    // Pay-at-CONFIRM (2026-11-05, playbook §166 SetConditionModal pattern): the
+    // Channel Divinity charge + ability_use spend log used to happen at
+    // row-click in divineSparkHandler — Cancel and out-of-range refusals kept
+    // the paid charge (§9 leak family). Both now move atomically to the branch
+    // confirm, after its gates pass; the ref guard pins exactly ONE spend per
+    // modal session even if a branch aborts and a second branch is clicked.
+    const chargeSpentRef = useRef(false);
+
+    const spendCharge = (description) => {
+        if (chargeSpentRef.current) return;
+        chargeSpentRef.current = true;
+        if (typeof channelDivinityCharges === 'number') {
+            // Mirrors SetConditionModal.handleApplyOverride: decrement written
+            // straight to the runtime store (absent key → initialized to
+            // pool-max − 1, since the payload carries max when stored is null).
+            setRuntimeValue(attackerName, 'channelDivinityCharges', channelDivinityCharges - 1, campaignName);
+        }
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: attackerName,
+            abilityName: featureName,
+            description,
+        }).catch((e) => { console.error("[divineSparkModal:log-error]", e); });
+    };
+
+    // Spend-row copy mirrors SetConditionModal: branch detail + honest
+    // remaining-charge tail.
+    const chargeDescription = (branch, detail) => {
+        const base = `${featureName} (${branch}) — targeting ${targetName}, ${detail}.`;
+        return typeof channelDivinityCharges === 'number'
+            ? `${base} Channel Divinity: ${channelDivinityCharges - 1} remaining.`
+            : base;
+    };
 
     const refuse = (reason) => {
         addEntry(campaignName, {
@@ -116,6 +150,8 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
             newHp,
             maxHp,
         });
+
+        spendCharge(chargeDescription('Heal', `healed ${actualHeal} HP`));
 
         setResult({
             type: 'heal',
@@ -244,12 +280,11 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         };
         window.addEventListener('save-dismissed', handleSaveDismissed);
 
-        addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: attackerName,
-            abilityName: featureName,
-            description: `${featureName} (Harm) — targeting ${targetName}, ${damageType} damage, ${saveType} save DC ${saveDc}.`,
-        }).catch((e) => { console.error("[divineSparkModal:log-error]", e); });
+        // Pay-at-CONFIRM (replaces the old row-click spend + activation log):
+        // every harm gate passed and the prompt is armed — write exactly one
+        // charge decrement and its matching ability_use row together. A later
+        // Dismiss keeps the charge spent (doctrine, playbook §5/§9).
+        spendCharge(chargeDescription('Harm', `${damageType} damage, ${saveType} save DC ${saveDc}`));
     };
 
     return (
@@ -257,6 +292,11 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-star-of-life"></i> {featureName}
+                    {typeof channelDivinityCharges === 'number' && (
+                        <span className="sp-resource-info">
+                            {channelDivinityCharges} charge{channelDivinityCharges === 1 ? '' : 's'} remaining
+                        </span>
+                    )}
                 </div>
                 <div className="sp-body">
                     {!mode && !rolling && !result && (

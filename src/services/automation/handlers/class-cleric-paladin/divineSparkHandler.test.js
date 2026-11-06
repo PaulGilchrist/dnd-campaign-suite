@@ -89,27 +89,35 @@ describe('divineSparkHandler.handle', () => {
     });
   });
 
-  describe('charge deduction', () => {
+  describe('no spend at handler phase (pay-at-CONFIRM move, 2026-11-05)', () => {
     beforeEach(() => {
-      // Fix (no-target self-harm bug): charges only spend once a LEGAL
-      // (other-creature) target is armed.
+      // Fix (no-target self-harm bug): a LEGAL (other-creature) target must be
+      // armed before the modal opens. Fix (charge-visibility improve): the
+      // charge write + ability_use spend log MOVED to DivineSparkModal's
+      // branch-confirm — the handler must now write/spend NOTHING.
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
       useRuntimeState.getRuntimeValue.mockReturnValue(3);
     });
 
-    it('deducts 1 from stored charges', async () => {
+    it('writes no channelDivinityCharges and logs no ability_use row on the happy path', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        2,
-        campaignName,
-        true,
-      );
+      expect(result.type).toBe('modal');
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      const loggedTypes = logService.addEntry.mock.calls.map(c => c[1]?.type);
+      expect(loggedTypes).not.toContain('ability_use');
+    });
+
+    it('passes the runtime stored charges through the payload for the modal header', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.channelDivinityCharges).toBe(3);
     });
 
     it('CLA-092: lv8 caster with no stored charges and no class_levels entry falls back to 3 (classes.json), not 2', async () => {
@@ -118,15 +126,12 @@ describe('divineSparkHandler.handle', () => {
       const ps = makePlayerStats({ level: 8, class: undefined });
       const action = makeAction();
 
-      await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        2,
-        campaignName,
-        true,
-      );
+      // Absent stored key → the payload carries the pool MAX (the modal's
+      // confirm initializes stored to max − 1).
+      expect(result.payload.channelDivinityCharges).toBe(3);
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('uses class_specific.channel_divinity_charges when channel_divinity is 0', async () => {
@@ -147,15 +152,10 @@ describe('divineSparkHandler.handle', () => {
       });
       const action = makeAction();
 
-      await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        3,
-        campaignName,
-        true,
-      );
+      expect(result.payload.channelDivinityCharges).toBe(4);
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
@@ -179,6 +179,7 @@ describe('divineSparkHandler.handle', () => {
           attackerName: ps.name,
           targetName: 'Ally',
           campaignName,
+          channelDivinityCharges: 2,
           healExpression: '1d8 + 2',
           damageExpression: '1d8 + 2',
           damageTypes: ['Necrotic', 'Radiant'],
@@ -300,7 +301,7 @@ describe('divineSparkHandler.handle', () => {
       }));
     });
 
-    it('resolves the target BEFORE the charge spend on the happy path', async () => {
+    it('resolves the target before opening the modal on the happy path', async () => {
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
 
       const ps = makePlayerStats();
@@ -310,13 +311,7 @@ describe('divineSparkHandler.handle', () => {
 
       expect(result.type).toBe('modal');
       expect(result.payload.targetName).toBe('Ally');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'channelDivinityCharges',
-        1,
-        campaignName,
-        true,
-      );
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
@@ -326,7 +321,7 @@ describe('divineSparkHandler.handle', () => {
       targetResolver.resolveTarget.mockResolvedValue(null);
     });
 
-    it('calls addEntry with correct ability_use data and target name in description', async () => {
+    it('logs no ability_use activation row — the spend row moved to modal confirm', async () => {
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
 
       const ps = makePlayerStats();
@@ -334,12 +329,8 @@ describe('divineSparkHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: ps.name,
-        abilityName: action.name,
-        description: 'Divine Spark activated — targeting Ally.',
-      });
+      const loggedTypes = logService.addEntry.mock.calls.map(c => c[1]?.type);
+      expect(loggedTypes).not.toContain('ability_use');
     });
   });
 

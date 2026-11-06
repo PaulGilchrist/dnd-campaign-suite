@@ -69,11 +69,17 @@ vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn(async () => true),
 }));
 
+// Pay-at-CONFIRM: the modal writes the charge decrement itself; pin the seam.
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  setRuntimeValue: vi.fn(),
+}));
+
 import * as diceRoller from '../../../../services/dice/diceRoller.js';
 import * as automationService from '../../../../services/combat/automation/automationService.js';
 import * as logService from '../../../../services/ui/logService.js';
 import * as savePrompt from '../../../../services/automation/common/savePrompt.js';
 import * as applyDamage from '../../../../services/rules/combat/applyDamage.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
 const baseProps = Object.freeze({
   featureName: 'Divine Spark',
@@ -85,6 +91,7 @@ const baseProps = Object.freeze({
   damageTypes: Object.freeze(['Radiant']),
   saveType: 'CON',
   wisModifier: 3,
+  channelDivinityCharges: 2,
   playerStats: Object.freeze({ name: 'Paladin1', level: 3, proficiency: 2, hitPoints: 40 }),
 });
 
@@ -161,6 +168,13 @@ describe('DivineSparkModal — dismissed save prompt', () => {
     });
     expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
     expect(rollCalls()).toHaveLength(0);
+    // Pay-at-confirm (criterion 6): the charge was legitimately spent at
+    // harm-confirm BEFORE the prompt; Dismiss must keep it spent exactly once
+    // — the refusal row adds no further decrement.
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Paladin1', 'channelDivinityCharges', 1, 'test-campaign',
+    );
   });
 
   it('a save-dismissed for a different promptId stays inert (mismatch guard)', async () => {

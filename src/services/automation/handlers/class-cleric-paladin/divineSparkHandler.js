@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -65,9 +65,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Rules text (public/data/2024/classes.json Cleric lv2): "another creature
     // you can see within 30 feet of yourself" — self is never a legal target.
-    // Resolve the armed target BEFORE spending a Channel Divinity charge (the
-    // old `|| playerStats.name` fallback silently self-targeted and burned the
-    // scarce resource). Resolve-then-spend mirrors handOfUltimateMercyHandler.
+    // Resolve the armed target BEFORE any resource decision (the old
+    // `|| playerStats.name` fallback silently self-targeted). The charge
+    // itself is NO LONGER spent here (2026-11-05 improve): spend moved to
+    // branch-confirm in DivineSparkModal (SetConditionModal.handleApplyOverride
+    // pattern, playbook §166) so Cancel/out-of-range refusals never burn a
+    // charge and the spend log agrees with the spend.
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
     const targetName = targetInfo?.target?.name || null;
 
@@ -81,18 +84,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             "You can't target yourself with Divine Spark — it requires another creature.");
     }
 
-    const newCharges = currentCharges - 1;
-    setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName, true);
-
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
     const wisModifier = wis?.bonus || 0;
-
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: action.name,
-        description: `Divine Spark activated — targeting ${targetName}.`,
-    }).catch((e) => { console.error("[divineSparkHandler:log-error]", e); });
 
     return {
         type: 'modal',
@@ -102,6 +95,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             attackerName: playerStats.name,
             targetName,
             campaignName,
+            // Charges visible at modal-open (stored value, or pool max when
+            // the key is absent) — the modal spends at confirm from this base.
+            channelDivinityCharges: currentCharges,
             healExpression: `1d8 + ${wisModifier}`,
             damageExpression: `1d8 + ${wisModifier}`,
             damageTypes: auto.damageTypes || ['Necrotic', 'Radiant'],

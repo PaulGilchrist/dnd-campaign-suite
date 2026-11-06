@@ -99,6 +99,12 @@ vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn(async () => true),
 }));
 
+// Pay-at-CONFIRM (2026-11-05): the modal now writes the Channel Divinity
+// decrement to the runtime store itself — pin the write through the mock.
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  setRuntimeValue: vi.fn(),
+}));
+
 // ── Re-import mocked modules ──
 
 import * as diceRoller from '../../../../services/dice/diceRoller.js';
@@ -111,6 +117,7 @@ import * as damageUtils from '../../../../services/rules/combat/damageUtils.js';
 import * as applyHealing from '../../../../services/rules/combat/applyHealing.js';
 import * as applyDamage from '../../../../services/rules/combat/applyDamage.js';
 import * as rangeCheck from '../../../../services/rules/combat/rangeCheck.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Fixtures & helpers ──
 
@@ -126,6 +133,7 @@ const baseProps = Object.freeze({
   damageTypes: Object.freeze(['Radiant']),
   saveType: 'CON',
   wisModifier: 3,
+  channelDivinityCharges: 2,
   playerStats: defaultPlayerStats,
 });
 
@@ -221,6 +229,7 @@ describe('DivineSparkModal', () => {
     applyHealing.applyHealingToTarget.mockReset();
     applyDamage.applyDamageToTarget.mockReset();
     rangeCheck.isWithinRange.mockReset();
+    useRuntimeState.setRuntimeValue.mockReset();
   });
 
   // ── Rendering ──
@@ -229,7 +238,9 @@ describe('DivineSparkModal', () => {
     it('renders the overlay, header, prompt line, and enabled Heal/Harm/Cancel exactly', () => {
       renderModal();
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(screen.getByText('Divine Spark')).toBeInTheDocument();
+      // Header carries the charge readout — split-text: pin via container.
+      expect(document.querySelector('.sp-header')).toHaveTextContent('Divine Spark');
+      expect(screen.getByText('2 charges remaining')).toBeInTheDocument();
       expect(paragraphWithText('Channel divine energy at Orc Warrior.')).toBeInTheDocument();
       expect(healBtn()).toBeEnabled();
       expect(harmBtn()).toBeEnabled();
@@ -290,6 +301,8 @@ describe('DivineSparkModal', () => {
     expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
     expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
     expect(logService.addEntry).not.toHaveBeenCalled();
+    // Pay-at-confirm: Cancel is the leak this move closes — no spend.
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
   // ── Heal flow ──
@@ -497,7 +510,7 @@ describe('DivineSparkModal', () => {
           type: 'ability_use',
           characterName: 'Paladin1',
           abilityName: 'Divine Spark',
-          description: 'Divine Spark (Harm) — targeting Orc Warrior, Radiant damage, CON save DC 13.',
+          description: 'Divine Spark (Harm) — targeting Orc Warrior, Radiant damage, CON save DC 13. Channel Divinity: 1 remaining.',
         },
       },
       {
@@ -507,7 +520,7 @@ describe('DivineSparkModal', () => {
           type: 'ability_use',
           characterName: 'Cleric1',
           abilityName: 'Channel Divinity',
-          description: 'Channel Divinity (Harm) — targeting Orc Warrior, Radiant damage, CON save DC 13.',
+          description: 'Channel Divinity (Harm) — targeting Orc Warrior, Radiant damage, CON save DC 13. Channel Divinity: 1 remaining.',
         },
       },
     ])('logs ability_use with the exact description ($label)', async ({ overrides, entry }) => {
@@ -752,7 +765,7 @@ describe('DivineSparkModal', () => {
     }));
     const abilityCall = findLogEntry('ability_use');
     expect(abilityCall).toBeDefined();
-    expect(abilityCall[1].description).toBe('Divine Spark (Harm) — targeting Orc Warrior, Fire damage, CON save DC 13.');
+    expect(abilityCall[1].description).toBe('Divine Spark (Harm) — targeting Orc Warrior, Fire damage, CON save DC 13. Channel Divinity: 1 remaining.');
 
     await act(async () => {
       window.dispatchEvent(dispatchSaveResult(false));
@@ -879,5 +892,130 @@ describe('DivineSparkModal', () => {
 
     fireEvent.click(done);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Channel Divinity charge economy (pay-at-CONFIRM, 2026-11-05) ──
+  // Handler row-click no longer spends; the charge write + ability_use spend
+  // row move atomically into branch-confirm (SetConditionModal.handleApplyOverride
+  // pattern, playbook §166). Cancel and every refusal lane stay zero-spend.
+
+  describe('charge economy', () => {
+    it('renders the header charge readout with singular grammar', () => {
+      renderModal({ channelDivinityCharges: 1 });
+      expect(screen.getByText('1 charge remaining')).toBeInTheDocument();
+      expect(screen.queryByText(/1 charges/)).not.toBeInTheDocument();
+    });
+
+    it('omits the header readout for legacy payloads without the prop', () => {
+      renderModal({ channelDivinityCharges: undefined });
+      expect(document.querySelector('.sp-header')).toHaveTextContent('Divine Spark');
+      expect(screen.queryByText(/charge(s)? remaining/)).not.toBeInTheDocument();
+    });
+
+    it('spends exactly once on harm confirm — one decrement write, remaining counted down', async () => {
+      renderModal({ channelDivinityCharges: 3 });
+
+      await act(async () => {
+        fireEvent.click(harmBtn());
+      });
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Paladin1', 'channelDivinityCharges', 2, 'test-campaign',
+      );
+      // The spend row and the write share one atomic seam (log agrees with spend).
+      expect(findLogEntry('ability_use')).toBeDefined();
+    });
+
+    it('spends exactly once on heal confirm with the heal spend row', async () => {
+      renderModal({ channelDivinityCharges: 2 });
+
+      await act(async () => {
+        fireEvent.click(healBtn());
+      });
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Paladin1', 'channelDivinityCharges', 1, 'test-campaign',
+      );
+      const abilityCall = findLogEntry('ability_use');
+      expect(abilityCall).toBeDefined();
+      expect(abilityCall[1]).toEqual({
+        type: 'ability_use',
+        characterName: 'Paladin1',
+        abilityName: 'Divine Spark',
+        description: 'Divine Spark (Heal) — targeting Orc Warrior, healed 10 HP. Channel Divinity: 1 remaining.',
+      });
+    });
+
+    it('initializes the stored key to pool-max − 1 when the run starts from the fallback pool', async () => {
+      // Handler sends max when channelDivinityCharges is absent on the store;
+      // confirm must WRITE max−1 (initializing the key).
+      renderModal({ channelDivinityCharges: 3 });
+
+      await act(async () => {
+        fireEvent.click(healBtn());
+      });
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Paladin1', 'channelDivinityCharges', 2, 'test-campaign',
+      );
+    });
+
+    it.each([
+      { label: 'heal', button: () => healBtn() },
+      { label: 'harm', button: () => harmBtn() },
+    ])('refuses an out-of-range $label with ZERO charge spend and no spend row', async ({ button }) => {
+      rangeCheck.isWithinRange.mockResolvedValueOnce(false);
+      renderModal();
+
+      await act(async () => {
+        fireEvent.click(button());
+      });
+
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(findLogEntry('ability_use')).toBeUndefined();
+    });
+
+    it('refuses a heal whose choke point returns null with ZERO charge spend', async () => {
+      applyHealing.applyHealingToTarget.mockImplementationOnce(() => null);
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      renderModal();
+
+      await act(async () => {
+        fireEvent.click(healBtn());
+      });
+
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(findLogEntry('ability_use')).toBeUndefined();
+      errorSpy.mockRestore();
+    });
+
+    it('logs the spend row without a runtime write for legacy payloads without the prop', async () => {
+      renderModal({ channelDivinityCharges: undefined });
+
+      await act(async () => {
+        fireEvent.click(healBtn());
+      });
+
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      const abilityCall = findLogEntry('ability_use');
+      expect(abilityCall).toBeDefined();
+      expect(abilityCall[1].description).toBe('Divine Spark (Heal) — targeting Orc Warrior, healed 10 HP.');
+    });
+
+    it('never spends when a branch aborts on a null roll, even before a successful confirm', async () => {
+      diceRoller.rollExpression.mockReturnValueOnce(null);
+      renderModal();
+
+      fireEvent.click(healBtn());
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(harmBtn());
+      });
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+    });
   });
 });

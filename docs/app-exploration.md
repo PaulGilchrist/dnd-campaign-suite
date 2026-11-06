@@ -51,7 +51,7 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 | Divine Spark lane (row-click spend → modal → harm/heal → prompt drain → corona async 60/65/type-gate → refusals → self-target defect) | **deep (CZ — PT1 CLOSED; 2 bugs filed)** | `divineSparkHandler.js DivineSparkModal.jsx classes.json(Cleric lv2) savePrompt.js SavePromptModal.jsx coronaAuraUtils.js` |
 | Corona async-lane measurement (awaited util, active-map self-load, exact-60 inside) | **deep (CZ)** — family now COMPLETE across all seams (picker CY, sync CV-era, attack-lane CQ/CR, async CZ) | `coronaAuraUtils.js getCoronaSaveDisadvantage` |
 | SavePromptModal single-target drain + Dismiss doctrine ("dismissed never resolves") | **deep (CZ — producer soft-lock bug filed)** | `SavePromptModal.jsx:897 savePrompt.js:176` |
-| Channel Divinity economy on feature-modal handlers (max fallback table, spend-at-row-click, zero popup) | deep (CZ) | `divineSparkHandler.js CLA-092 fallback` |
+| Channel Divinity economy on feature-modal handlers (max fallback table, spend-at-confirm, zero popup) | deep (CZ; pay-at-confirm improve 2026-11-05) | `divineSparkHandler.js DivineSparkModal.jsx CLA-092 fallback` |
 | Corona family (picker route BOTH seams + prompt payload + inline mode + damage-type gate + range 60/65) | carried — event-clear (CY live-verified, CZ re-rode async twin) | `SaveAttackAoeModal.jsx coronaAuraUtils.js aoeService.js` |
 | Save-AoE prompt queue UX (header (Disadvantage), evasion stack, Results close, Evasion halves) | carried — event-clear (CY; 591e1f621 dispatch-latch in playbook §4) | `SavePromptModal.jsx LeadingEvasion UI in sp-overlay family` |
 | handleAoeDamage overlay branch reachability | carried — event-clear (improve aoe-overlay-lane-disposition, live-proved) | `useLoggedDiceRollDamage.js handleAoeDamage.js savePath.js MonsterCardModal.jsx:getTarget` |
@@ -79,7 +79,6 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-05 CZ) **Divine Spark charge/target visibility + spend timing:** the modal shows neither remaining Channel Divinity charges nor a target picker — the charge is spent at row-click BEFORE any gate (Cancel/out-of-range keeps it — §9 leak family; deferring the spend to branch-confirm would shrink that family here), and an unarmed click silently self-targets (filed as bug). Surface "N charges remaining" in the sp-header and prefer confirm-time spend. Files: `divineSparkHandler.js`, `DivineSparkModal.jsx`.
 - (2026-11-05 CZ) **`save-result` producer census:** Dismiss doctrine ("dismissed saves never resolve", savePrompt.js:176) is fine for fire-and-forget producers but strands any producer that parks a modal on the event — emit a `save-dismissed` (or resolve with `{dismissed:true}`) and sweep the five listener sites (see bug file blast radius). Fixing bug #1 well = this census.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
