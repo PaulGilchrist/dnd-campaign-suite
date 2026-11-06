@@ -54,3 +54,26 @@ export function buildDamageBreakdownEntry(applyResult, damageType, amount) {
         status: applyResult?.resistanceDetails?.[0]?.status || null,
     };
 }
+
+// Array twin: the resistance entry plus, when a feat damage-reduction
+// (e.g. Heavy Armor Master) fired inside applyDamage, a sibling entry shaped
+// like the resistance entries with status 'reduced'. It re-uses the amount
+// convention (POST-reduction value) and adds reducedFrom/reducedBy so the
+// hp_change row explains the shrink end-to-end. Non-reduced hits return the
+// exact single-entry array the old callers built inline.
+export function buildDamageBreakdownEntries(applyResult, damageType, amount) {
+    const entries = [buildDamageBreakdownEntry(applyResult, damageType, amount)];
+    const fr = applyResult?.featureReduction;
+    if (fr && fr.reducedBy > 0) {
+        entries.push({
+            damageType: fr.damageType || damageType,
+            amount: fr.amount,
+            resisted: false,
+            status: 'reduced',
+            source: fr.source,
+            reducedFrom: fr.reducedFrom,
+            reducedBy: fr.reducedBy,
+        });
+    }
+    return entries;
+}

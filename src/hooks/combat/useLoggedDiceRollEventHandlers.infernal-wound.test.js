@@ -64,6 +64,7 @@ vi.mock('./handlers/damageHandlerUtils.js', () => ({
     getHpThreshold: vi.fn(() => null),
     assignSecondaryFields: vi.fn(),
     buildDamageBreakdownEntry: vi.fn((r, t, d) => ({ type: t, amount: d })),
+    buildDamageBreakdownEntries: vi.fn((r, t, d) => [{ type: t, amount: d }]),
     resolveAppliedDamage: vi.fn((r) => r?.finalDamage ?? 0),
 }));
 

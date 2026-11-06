@@ -81,6 +81,21 @@ describe('Log > HpChangeEntry (damage lane)', () => {
     expect(q('.log-hp-current').textContent).toBe(' 20/25 remaining');
   });
 
+  // DB 2026-11-06 backlog: feat damage-reduction ('reduced' status, e.g. Heavy
+  // Armor Master 7→1) renders through the SAME breakdown lane — source named,
+  // pre→post bytes visible — re-using the resistance badge class.
+  it('renders a feat-reduction breakdown entry with source and pre→post bytes', () => {
+    const breakdown = [
+      { damageType: 'Bludgeoning', amount: 1, resisted: false, status: 'reduced', source: 'Heavy Armor Master', reducedFrom: 7, reducedBy: 6 },
+    ];
+    setup(Log, [hp({ delta: -1, damageBreakdown: breakdown, timestamp: FIXED_TS })]);
+    expect(q('.log-hp-delta').textContent).toBe('-1 HPBludgeoningHeavy Armor Master 7→1');
+    const badge = q('.log-resistance-badge');
+    expect(badge.textContent).toBe('Heavy Armor Master 7→1');
+    expect(badge.getAttribute('title')).toBe('Heavy Armor Master reduces Bludgeoning damage from 7 to 1');
+    expect(document.querySelectorAll('.log-immunity-badge')).toHaveLength(0);
+  });
+
   // Temp-HP absorption leg: shield+label, and current/max bytes suppressed (!isTemp).
   it('renders temp-HP leg with shield and no current/max bytes', () => {
     setup(Log, [hp({ delta: 12, isTempHp: true, currentHp: 5, timestamp: FIXED_TS })]);

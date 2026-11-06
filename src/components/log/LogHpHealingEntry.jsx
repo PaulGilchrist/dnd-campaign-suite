@@ -53,6 +53,9 @@ function DamageBreakdown({ entry }) {
           <span className="log-damage-type">{db.damageType}</span>
           {db.status === 'resistant' && <span className="log-resistance-badge">Resistance</span>}
           {db.status === 'immune' && <span className="log-immunity-badge">Immune</span>}
+          {db.status === 'reduced' && (
+            <span className="log-resistance-badge" title={`${db.source} reduces ${db.damageType} damage from ${db.reducedFrom} to ${db.amount}`}>{db.source} {db.reducedFrom}→{db.amount}</span>
+          )}
         </span>
       ))}
     </span>

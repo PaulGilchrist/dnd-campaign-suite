@@ -470,17 +470,38 @@ function reductionApplies(auto, playerStats, damageType, isWearingHeavyArmor) {
     return true;
 }
 
-export function getDamageReduction(playerStats, damageType, isWearingHeavyArmor) {
-    if (!playerStats) return null;
+// Human label for a reduction entry — disk HAM rows carry the generic benefit
+// name "Damage Reduction" under the Heavy Armor Master FEAT, so worn-armor
+// provenance wins over auto.name (mirrors applyDamage's own FT-045 applied-log
+// detection); named rows (automationPassives.test.js FT-045 fixture shape)
+// keep their explicit name.
+function reductionSourceLabel(auto) {
+    if ((auto.condition || '') === 'wearing_heavy_armor') return 'Heavy Armor Master';
+    if (auto.name) return auto.name;
+    if (auto.trigger === 'damage_taken_of_chosen_resistance_type') return 'Resistance';
+    return 'Damage Reduction';
+}
+
+// Same gate/resolution as getDamageReduction, plus the names of the entries
+// that contributed (for damageBreakdown 'reduced' rows). total keeps the
+// legacy null shape: null when nothing applies.
+export function getDamageReductionDetails(playerStats, damageType, isWearingHeavyArmor) {
+    if (!playerStats) return { total: null, sources: [] };
     const automation = playerStats.automation || {};
     const allAutomations = [...(automation.passives || []), ...(automation.reactions || []), ...(automation.specialActions || [])];
     let totalReduction = 0;
+    const sources = [];
     for (const auto of allAutomations) {
         if (!reductionApplies(auto, playerStats, damageType, isWearingHeavyArmor)) continue;
         const reduction = resolveEntryReduction(auto, playerStats);
         if (typeof reduction === 'number' && reduction > 0) {
             totalReduction += reduction;
+            sources.push(reductionSourceLabel(auto));
         }
     }
-    return totalReduction > 0 ? totalReduction : null;
+    return { total: totalReduction > 0 ? totalReduction : null, sources };
+}
+
+export function getDamageReduction(playerStats, damageType, isWearingHeavyArmor) {
+    return getDamageReductionDetails(playerStats, damageType, isWearingHeavyArmor).total;
 }

@@ -182,6 +182,15 @@ describe('FT-045 Heavy Armor Master damage reduction (applyDamage consumer seam)
 
     expect(result.finalDamage).toBe(1);
     expect(result.damageReducedByFeature).toBe(5);
+    // DB 2026-11-06 backlog: the reduction record feeds the hp_change
+    // damageBreakdown 'reduced' entry — feat named, pre/post amounts explicit.
+    expect(result.featureReduction).toEqual({
+      damageType: 'Slashing',
+      source: 'Heavy Armor Master',
+      reducedBy: 5,
+      reducedFrom: 6,
+      amount: 1,
+    });
     const hpWrite = setRuntimeValue.mock.calls.find(c => c[1] === 'currentHitPoints');
     expect(hpWrite[2]).toBe(111);
 
@@ -203,6 +212,13 @@ describe('FT-045 Heavy Armor Master damage reduction (applyDamage consumer seam)
 
     expect(result.finalDamage).toBe(0);
     expect(result.damageReducedByFeature).toBe(5);
+    expect(result.featureReduction).toEqual({
+      damageType: 'Slashing',
+      source: 'Heavy Armor Master',
+      reducedBy: 5,
+      reducedFrom: 3,
+      amount: 0,
+    });
 
     const applied = hamLogCalls().filter(c => c[1].automationType === 'heavy_armor_master_applied');
     expect(applied).toHaveLength(1);
@@ -219,6 +235,7 @@ describe('FT-045 Heavy Armor Master damage reduction (applyDamage consumer seam)
 
     expect(result.finalDamage).toBe(raw);
     expect(result.damageReducedByFeature).toBe(0);
+    expect(result.featureReduction).toBeNull();
 
     const refused = hamLogCalls().filter(c => c[1].automationType === 'heavy_armor_master_refused');
     expect(refused).toHaveLength(1);
@@ -233,6 +250,7 @@ describe('FT-045 Heavy Armor Master damage reduction (applyDamage consumer seam)
 
     expect(result.finalDamage).toBe(6);
     expect(result.damageReducedByFeature).toBe(0);
+    expect(result.featureReduction).toBeNull();
     expect(hamLogCalls()).toHaveLength(0);
   });
 });

@@ -7,7 +7,7 @@ import { getActiveTargetEffect } from '../../combat/conditions/targetEffectDefin
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js'
 import { cleanupConcentrationEffects } from '../../combat/concentration/concentrationService.js';
 import { addEntry } from '../../ui/logService.js';
-import { getDamageReduction, getDamageResistances } from '../../combat/automation/automationPassives.js';
+import { getDamageReductionDetails, getDamageResistances } from '../../combat/automation/automationPassives.js';
 import { checkHeavyArmor } from '../core/speedUtils.js';
 import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js';
 import { computeAuraComboEffects } from '../../combat/auras/auraComboEffects.js';
@@ -396,7 +396,8 @@ function markChosenResistanceUsed(playerComputed, creatureName, campaignName) {
 // Apply damage reduction from features (e.g., Heavy Armor Master)
 function applyFeatureDamageReduction({ creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName }) {
   const isWearingHeavyArmor = isTargetWearingHeavyArmor(playerComputed, playerStats);
-  const reduction = getDamageReduction(playerComputed, damageTypes[0], isWearingHeavyArmor) || 0;
+  const { total: totalReduction, sources } = getDamageReductionDetails(playerComputed, damageTypes[0], isWearingHeavyArmor);
+  const reduction = totalReduction || 0;
   const ham = findHeavyArmorMasterPassive(playerComputed, playerStats);
   if (reduction > 0) {
     const rawBeforeReduction = finalDamage;
@@ -405,13 +406,24 @@ function applyFeatureDamageReduction({ creature, playerComputed, playerStats, da
     if (ham) {
       logHeavyArmorMaster({ creature, rawDamage: rawBeforeReduction, finalDamage, reduction, damageType: damageTypes[0], campaignName });
     }
-    return { finalDamage, damageReducedByFeature: reduction };
+    // Reduction breakdown record consumed by the hp_change damageBreakdown
+    // (buildDamageBreakdownEntries) — amount is the POST-reduction value, same
+    // field convention resistance uses for its halved amount; reducedFrom/
+    // reducedBy expose the shrink end-to-end on the log row.
+    const featureReduction = {
+      damageType: damageTypes[0],
+      source: [...new Set(sources)].join(' + '),
+      reducedBy: reduction,
+      reducedFrom: rawBeforeReduction,
+      amount: finalDamage,
+    };
+    return { finalDamage, damageReducedByFeature: reduction, featureReduction };
   }
   if (ham && finalDamage > 0) {
     const reason = isWearingHeavyArmor ? 'non_bp_s_damage' : 'not_wearing_heavy_armor';
     logHeavyArmorMasterRefused({ creature, reason, damageType: damageTypes[0], campaignName });
   }
-  return { finalDamage, damageReducedByFeature: 0 };
+  return { finalDamage, damageReducedByFeature: 0, featureReduction: null };
 }
 
 // Self-damage: Arcane Ward absorbs damage to the wizard themselves
@@ -865,8 +877,9 @@ function handlePlayerZeroHpAndConcentration({ creature, characters, playerComput
 // Feature damage reduction → Arcane Ward → Temp HP absorption, in order.
 function absorbThroughFeaturesAndWards({ creature, isPlayer, playerComputed, playerStats, damageTypes, finalDamage, campaignName }) {
   let damageReducedByFeature = 0;
+  let featureReduction = null;
   if (isPlayer) {
-    ({ finalDamage, damageReducedByFeature } = applyFeatureDamageReduction({ creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName }));
+    ({ finalDamage, damageReducedByFeature, featureReduction } = applyFeatureDamageReduction({ creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName }));
   }
   // Arcane Ward: absorb damage before it hits HP
   let wardDamage = finalDamage;
@@ -875,7 +888,7 @@ function absorbThroughFeaturesAndWards({ creature, isPlayer, playerComputed, pla
   }
   // Temp HP absorbs damage first for all creatures
   const damageAfterTempHp = absorbWithTempHp(creature, wardDamage, campaignName);
-  return { finalDamage, damageReducedByFeature, wardDamage, damageAfterTempHp };
+  return { finalDamage, damageReducedByFeature, featureReduction, wardDamage, damageAfterTempHp };
 }
 
 // Post-HP events for damage that landed on the ward: projected-ward record,
@@ -1048,7 +1061,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
   await consumeElementalAbsorptionOnApply({ creature, rawDamage, finalDamage: resResult.finalDamage, damageTypes, resistanceDetails: resResult.typeDetails, campaignName });
 
   const absorbed = absorbThroughFeaturesAndWards({ creature, isPlayer, playerComputed, playerStats, damageTypes, finalDamage: resResult.finalDamage, campaignName });
-  const { finalDamage, damageReducedByFeature, wardDamage, damageAfterTempHp } = absorbed;
+  const { finalDamage, damageReducedByFeature, featureReduction, wardDamage, damageAfterTempHp } = absorbed;
 
   await revertPolymorphIfBufferDepleted(creature, campaignName);
 
@@ -1081,7 +1094,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   persistAndLogDamageOutcome({ combatSummary, combatSummaryChanged, existingAttack, creature, finalDamage, oldHp, newHp, suppressHpLog, campaignName });
 
-  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature, resistanceDetails: resResult.typeDetails, holyAuraSaveResult: wardEvents.holyAuraSaveResult };
+  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature, featureReduction: featureReduction || null, resistanceDetails: resResult.typeDetails, holyAuraSaveResult: wardEvents.holyAuraSaveResult };
 }
 
 // Identifies a Dominate (Person/Monster/Beast) target: Charmed condition + a caster

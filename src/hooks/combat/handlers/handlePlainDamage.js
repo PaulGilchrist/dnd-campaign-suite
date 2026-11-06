@@ -15,7 +15,7 @@ import { addExpiration } from '../../../services/rules/effects/expirationQueue.j
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { consumePendingRedirectOnResolve } from '../../../services/encounters/monsterRedirectAttack.js';
 import { consumePendingJinxOnResolve } from '../../../services/encounters/monsterJinx.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntries, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp, resolveAppliedDamage } from './damageHandlerUtils.js';
 import { applyHpMaxReduce } from '../../../services/rules/features/hpMaxReduceService.js';
 import { applyHealingToTarget } from '../../../services/rules/combat/applyHealing.js';
 import { getMonsterData } from '../../../services/npcs/monsterUtils.js';
@@ -1150,9 +1150,9 @@ function writePlainHpResults({ campaignName, target, totalDamageDealt, hpAfterDa
 }
 
 function buildDamageBreakdown(applyResult, secondaryResult, damageType, appliedDamage, reducedTotal) {
-    const damageBreakdown = [buildDamageBreakdownEntry(applyResult, damageType, appliedDamage || reducedTotal)];
+    const damageBreakdown = buildDamageBreakdownEntries(applyResult, damageType, appliedDamage || reducedTotal);
     if (secondaryResult) {
-        damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
+        damageBreakdown.push(...buildDamageBreakdownEntries(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
     }
     return damageBreakdown;
 }

@@ -23,7 +23,7 @@ import { isLeadingEvasionSelected } from '../../services/rules/combat/evasionUti
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, resolveAppliedDamage } from './handlers/damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntries, resolveAppliedDamage } from './handlers/damageHandlerUtils.js';
 import { grantSoulTomeTrap } from '../../services/rules/features/soulTomeTrapService.js';
 import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
 import { setSavePromptBucket } from '../../services/automation/common/savePrompt.js';
@@ -383,9 +383,9 @@ function buildApplyDamageOptions(secondaryData, finalDamage, isSpellDamage) {
 }
 
 function buildSaveDamageBreakdown(applyResult, pending, appliedDamage, finalDamage, secondaryResult) {
-    const damageBreakdown = [buildDamageBreakdownEntry(applyResult, pending.damageType, appliedDamage || finalDamage)];
+    const damageBreakdown = buildDamageBreakdownEntries(applyResult, pending.damageType, appliedDamage || finalDamage);
     if (secondaryResult) {
-        damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
+        damageBreakdown.push(...buildDamageBreakdownEntries(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
     }
     return damageBreakdown;
 }

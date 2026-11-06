@@ -22,7 +22,7 @@ import { normalizeSchool } from '../../../services/automation/common/damageRollb
 import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
 import { grantInfernalWound } from '../../../services/rules/features/infernalWoundService.js';
 import { stagePetrifyingBiteTargets } from '../../../services/rules/features/cockatricePetrifyService.js';
-import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntry, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp } from './damageHandlerUtils.js';
+import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntries, computeGwfAdjustedSecondaryTotal, findTargetByContext, resolveTargetMaxHp } from './damageHandlerUtils.js';
 import { abilitySaveDisadvantageActive } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage', 'SaveResult', 'SaveRoll', 'SaveBonus', 'SaveRawRolls', 'DcSuccess'];
@@ -614,9 +614,9 @@ function writeNpcDamageOutcome({ target, primaryApplyResult, secondaryResult, se
         : target.maxHp;
     const threshold = getHpThreshold({ oldHp, newHp, maxHp });
 
-    const damageBreakdown = [buildDamageBreakdownEntry(primaryApplyResult, damageType, primaryFinalDamage)];
+    const damageBreakdown = buildDamageBreakdownEntries(primaryApplyResult, damageType, primaryFinalDamage);
     if (secondaryResult) {
-        damageBreakdown.push(buildDamageBreakdownEntry(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
+        damageBreakdown.push(...buildDamageBreakdownEntries(secondaryResult, secondaryResult.damageType, secondaryResult.finalDamage));
     }
 
     writeDamageResults({ campaignName, target, totalDamageDealt, newHp, oldHp, isDead, maxHp, threshold, damageBreakdown });

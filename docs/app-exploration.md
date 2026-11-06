@@ -90,8 +90,6 @@ A4. **Grant-lane facts:** slot paid PRE-modal at "Cast Spell" (L2 ledger 3→2�
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[DB 2026-11-06] Heavy Armor Master reduction is log-invisible on the hp ledger.** 7→1 applied damage printed only as an `automation` row ("reduces this Bludgeoning") while the `hp_change` delta (1) carried no reduction breakdown entry (`damageBreakdown` absent) — popup copy was the only place the shrink was explained end-to-end. Consider folding feat-reduction into `damageBreakdown:[{…,status:'reduced'}]` like resistance does. Files: `applyDamage.js CharSheet.handlers.js`.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at DC 2026-11-06: modal-family save-dismissed live face (pitfall-10 grant recipe proven end-to-end — 5/5 faces PASS, see DC addendum A1–A4).
