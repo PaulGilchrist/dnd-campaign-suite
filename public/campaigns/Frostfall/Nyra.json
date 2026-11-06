@@ -1,13 +1,13 @@
 {
   "name": "Nyra",
-  "level": 2,
+  "level": 3,
   "alignment": "Lawful Good",
   "abilities": [
     {
       "name": "Strength",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -21,7 +21,7 @@
       "name": "Constitution",
       "baseScore": 15,
       "featIncrease": 1,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -117,7 +117,8 @@
   "spells": [
     "Searing Smite",
     "Thunderous Smite",
-    "Compelled Duel"
+    "Compelled Duel",
+    "Divine Smite"
   ],
   "magicInitiateInstances": [],
   "rules": "2024",

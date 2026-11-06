@@ -1,6 +1,6 @@
 {
   "name": "Luna",
-  "level": 2,
+  "level": 3,
   "alignment": "Neutral Good",
   "abilities": [
     {
@@ -28,14 +28,14 @@
       "name": "Intelligence",
       "baseScore": 8,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -119,11 +119,10 @@
     "Cure Wounds",
     "Guiding Bolt",
     "Healing Word",
-    "Shield",
-    "Poison Spray",
-    "Ray of Frost",
     "Guidance",
-    "Speak with Animals"
+    "Hold Person",
+    "Prayer of Healing",
+    "Silence"
   ],
   "magicInitiateInstances": [
     {
@@ -140,9 +139,5 @@
   "xpMode": "milestone",
   "background": "Acolyte",
   "imagePath": "images/Luna.png",
-  "featAbilityChoices": {
-    "Boon Of Energy Resistance-0": {
-      "assignment": "Strength"
-    }
-  }
+  "featAbilityChoices": {}
 }

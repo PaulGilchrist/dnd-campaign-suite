@@ -1,6 +1,6 @@
 {
   "name": "Ezren",
-  "level": 2,
+  "level": 3,
   "alignment": "True Neutral",
   "abilities": [
     {
@@ -121,7 +121,14 @@
     "Thieves' Tools"
   ],
   "specialActions": [],
-  "spells": [],
+  "spells": [
+    "Poison Spray",
+    "Dancing Lights",
+    "Friends",
+    "Disguise Self",
+    "Shield",
+    "Color Spray"
+  ],
   "magicInitiateInstances": [],
   "rules": "2024",
   "xp": 0,

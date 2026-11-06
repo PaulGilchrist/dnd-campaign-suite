@@ -127,7 +127,8 @@ function getEditBannerDescriptors({ formData, modals }) {
 // Mystic Arcanum selection component for Warlock
 function WizardStepSpells({ stepNumber, formData, allSpells, onArrayFieldChange, preSelectedSpells }) {
   const preSelected = useMemo(() => preSelectedSpells || [], [preSelectedSpells]);
-  const isWarlock = formData?.class?.name === 'Warlock';
+  const characterClassName = formData?.class?.name;
+  const isWarlock = characterClassName === 'Warlock';
   const charLevel = parseInt(formData?.level) || 1;
   const magicalSecrets = useMagicalSecretsPool(formData, allSpells, charLevel);
   const [expandedArcanumSpell, setExpandedArcanumSpell] = useState(null);
@@ -460,6 +461,9 @@ function WizardStepSpells({ stepNumber, formData, allSpells, onArrayFieldChange,
        label: 'Class',
        field: 'class',
        className: 'class-filter',
+       // Default the dropdown to the character's class, but the user can
+       // switch to another class or 'All' at any time
+       defaultValue: characterClassName,
        getValue: (spell) => {
           const classes = spell.classes || [];
          if (classes.includes('Wizard')) {

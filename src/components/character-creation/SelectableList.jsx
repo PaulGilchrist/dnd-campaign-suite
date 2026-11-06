@@ -114,11 +114,12 @@ function SelectableList({
   const [showFullDetails, setShowFullDetails] = useState({});
   const [showOnlySelected, setShowOnlySelected] = useState(false);
 
-  // Initialize filter states from config
+  // Initialize filter states from config; a filter may start pre-selected via
+  // defaultValue while still offering defaultLabel ('All') as the reset option
   const [filterStates, setFilterStates] = useState(() => {
     const states = {};
     filters.forEach(filter => {
-      states[filter.field] = filter.defaultLabel || 'All';
+      states[filter.field] = filter.defaultValue || filter.defaultLabel || 'All';
     });
     return states;
   });
@@ -128,6 +129,9 @@ function SelectableList({
     const options = {};
     filters.forEach(filter => {
       const optionSet = new Set([filter.defaultLabel || 'All']);
+      if (filter.defaultValue) {
+        optionSet.add(String(filter.defaultValue));
+      }
       if (items && items.length > 0) {
         items.forEach(item => {
           const value = filter.getValue ? filter.getValue(item) : item[filter.field];

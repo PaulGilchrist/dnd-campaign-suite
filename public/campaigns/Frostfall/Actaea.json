@@ -1,6 +1,6 @@
 {
   "name": "Actaea",
-  "level": 2,
+  "level": 3,
   "alignment": "True Neutral",
   "abilities": [
     {
@@ -21,7 +21,7 @@
       "name": "Constitution",
       "baseScore": 13,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -35,7 +35,7 @@
       "name": "Wisdom",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -98,7 +98,6 @@
     "History",
     "Insight",
     "Perception",
-    "Investigation",
     "Animal Handling"
   ],
   "toolProficiencies": [
@@ -117,7 +116,8 @@
     "Thunderwave",
     "Purify Food and Drink",
     "Animal Friendship",
-    "Shield"
+    "Summon Beast",
+    "Bestial Spirit"
   ],
   "magicInitiateInstances": [
     {
@@ -134,9 +134,5 @@
   "xpMode": "milestone",
   "background": "Sage",
   "imagePath": "images/Actaea.png",
-  "featAbilityChoices": {
-    "Boon Of Energy Resistance-0": {
-      "assignment": "Strength"
-    }
-  }
+  "featAbilityChoices": {}
 }

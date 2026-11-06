@@ -131,6 +131,21 @@ describe('SelectableList', () => {
     expect(screen.queryByText('Eldritch Blast')).not.toBeInTheDocument();
   });
 
+  it('pre-selects defaultValue on mount while keeping All as a reset option', () => {
+    renderComponent({
+      filters: [{ field: 'type', defaultLabel: 'All', label: 'Type', defaultValue: 'Type1' }],
+    });
+    const select = document.querySelector('select');
+    expect(select.value).toBe('Type1');
+    expect(selectOptions()).toEqual(['All', 'Type1', 'Type2']);
+    // Filtering is active from the start
+    expectVisible(['Item A', 'Item C']);
+    fireEvent.change(select, { target: { value: 'Type2' } });
+    expectVisible(['Item B']);
+    fireEvent.change(select, { target: { value: 'All' } });
+    expectVisible(ITEM_NAMES);
+  });
+
   it('applies sortFn ordering and renderOption labels to dropdown options', () => {
     renderComponent({
       filters: [{

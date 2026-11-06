@@ -246,6 +246,20 @@ describe('WizardStepSpells', () => {
     expect(levelFilter.getByText('3')).toBeInTheDocument();
   });
 
+  it('defaults the class filter to the character class while allowing it to change', async () => {
+    const props = makeProps();
+    props.formData = { ...props.formData, class: { name: 'Cleric' } };
+    render(<WizardStepSpells {...props} />);
+
+    await waitFor(() => {
+      const listProps = SelectableList.mock.calls.at(-1)[0];
+      const classFilter = listProps.filters.find(f => f.field === 'class');
+      expect(classFilter.defaultValue).toBe('Cleric');
+      // 'All' reset stays available because defaultLabel is untouched
+      expect(classFilter.defaultLabel).toBeUndefined();
+    });
+  });
+
   describe('validation warnings', () => {
     it('renders warnings returned by getSpellValidationInfo', async () => {
       spellValidation.getSpellValidationInfo.mockResolvedValueOnce({
