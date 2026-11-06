@@ -6,6 +6,7 @@ import { rollD20 } from '../../../services/dice/diceRoller.js';
 import { playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
 import { getAuraConditionImmunities, auraCoversCondition, logAuraConditionImmunity } from '../../../services/combat/auras/auraConditionImmunity.js';
 import { sendSavePrompt, sendSaveResult } from '../../../services/combat/conditions/savePromptService.js';
+import { logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../services/automation/common/damageRollback.js';
 import utils from '../../../services/ui/utils.js';
@@ -383,14 +384,54 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
         setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
     }, [pendingPrompts, attackerName, campaignName, saveDc, featureName, characters]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05, playbook §66):
+    // the GM's un-rolled Dismiss never dispatches save-result, so a dismissed
+    // prompt used to strand the pending row and the spell silently resolved
+    // nothing. Drain it with a save_dismissed log row and show the Done popup
+    // — the target is simply unaffected (no condition applied).
+    const handleSaveDismissed = useCallback(async (event) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pending = pendingPrompts.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        await logSaveDismissed(campaignName, {
+            casterName: attackerName,
+            abilityName: featureName,
+            targetName: pending.targetName,
+            saveDc,
+            saveType: 'WIS',
+            logPrefix: '[eyebiteEffectModal]',
+        });
+
+        setPopup({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${pending.targetName}'s save was dismissed — ${pending.targetName} is unaffected.`,
+            },
+        });
+
+        setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
+    }, [pendingPrompts, attackerName, campaignName, saveDc, featureName]);
+
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
         const handleSaveEvent = (event) => {
             handleSaveResult(event);
         };
+        const handleDismissedEvent = (event) => {
+            handleSaveDismissed(event);
+        };
         window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
-    }, [pendingPrompts.length, handleSaveResult]);
+        window.addEventListener('save-dismissed', handleDismissedEvent);
+        return () => {
+            window.removeEventListener('save-result', handleSaveEvent);
+            window.removeEventListener('save-dismissed', handleDismissedEvent);
+        };
+    }, [pendingPrompts.length, handleSaveResult, handleSaveDismissed]);
 
     if (popup) {
         return (

@@ -43,6 +43,8 @@ const { promptState, store } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
     // Real contract (savePrompt.js:105-145): (campaignName, config) =>
     // { promptId, promise }. promptId is utils.guid() — name-agnostic, unique
     // per mint, never prompt-<targetName> (shared name-based ids latent-

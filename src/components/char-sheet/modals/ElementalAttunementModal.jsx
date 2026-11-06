@@ -3,6 +3,8 @@ import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { computeDamageAfterSave, computeDamageAfterResistancesWithDetails, applyDamageToTarget, normalizeSaveType } from '../../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
+import { logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
+import { dismissedNoEffectResult } from './shared/AreaEffectSaveFlow.utils.js';
 import { getAffectedCreatures } from '../../../services/rules/combat/aoeService.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { addEntry } from '../../../services/ui/logService.js';
@@ -519,8 +521,28 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
             setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
         };
 
+        const handleDismissedEvent = (event) => {
+            const detail = event.detail;
+            if (!detail || !detail.promptId) return;
+
+            const pending = pendingPrompts.find(p => p.promptId === detail.promptId);
+            if (!pending) return;
+
+            // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): drain
+            // the un-rolled Dismiss with a neutral "dismissed — no effect" row +
+            // save_dismissed log row. Without this the "Waiting for save roll..."
+            // view (which has NO buttons) stranded forever.
+            logSaveDismissed(campaignName, { casterName: playerStats.name, abilityName: action.name, targetName: pending.targetName, saveDc, saveType, logPrefix: '[ElementalAttunementModal]' });
+            setResults(prev => (prev.some(r => r.targetName === pending.targetName) ? prev : [...prev, dismissedNoEffectResult(pending.targetName)]));
+            setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
+        };
+
         window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
+        window.addEventListener('save-dismissed', handleDismissedEvent);
+        return () => {
+            window.removeEventListener('save-result', handleSaveEvent);
+            window.removeEventListener('save-dismissed', handleDismissedEvent);
+        };
     }, [pendingPrompts.length, campaignName, action.name, playerStats.name, chosenElement, elementData, saveType, saveDc, pendingPrompts]);
 
     const handleSkip = useCallback(() => {
@@ -628,11 +650,13 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
                         <div className="abjure-results-list">
                             {results.map(r => (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                    <strong>{r.targetName}</strong>: {r.success
+                                    <strong>{r.targetName}</strong>: {r.dismissed
+                                        ? 'Save dismissed — unaffected'
+                                        : r.success
                                         ? (r.finalDamage ?? 0) > 0
                                             ? `Saved — takes ${r.finalDamage} ${r.damageType || ''} damage (rolled ${r.roll ?? 0}, halved)`
                                             : 'Saved — no effect (rolled ' + (r.roll ?? 0) + ')'
-                                        : 'Failed — ' + (r.effect === 'speed_reduction' ? 'speed reduced by 15 ft.' : 'takes ' + (r.finalDamage ?? 0) + ' ' + (r.damageType || '') + ' damage (rolled ' + (r.roll ?? 0) + ')') }
+                                        : 'Failed — ' + (r.effect === 'speed_reduction' ? 'speed reduced by 15 ft.' : 'takes ' + (r.finalDamage ?? 0) + ' ' + (r.damageType ?? '') + ' damage (rolled ' + (r.roll ?? 0) + ')') }
                                 </div>
                             ))}
                             {pendingPrompts.map(p => (
@@ -665,7 +689,9 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
                                     const resultClass = r.success ? 'abjure-result-success' : 'abjure-result-fail';
                                     return (
                                         <div key={r.targetName} className={resultClass}>
-                                            <strong>{r.targetName}</strong>: {r.effect === 'speed_reduction'
+                                            <strong>{r.targetName}</strong>: {r.dismissed
+                                                ? 'Save dismissed — unaffected.'
+                                                : r.effect === 'speed_reduction'
                                                 ? r.success
                                                     ? `Saved (d20 ${r.roll ?? 0}+${r.saveBonus} = ${r.total}) — no effect.`
                                                     : `Failed (d20 ${r.roll ?? 0}+${r.saveBonus} = ${r.total}) — speed reduced by 15 ft.`

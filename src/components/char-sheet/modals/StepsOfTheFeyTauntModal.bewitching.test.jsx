@@ -11,6 +11,8 @@ import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 const promptState = vi.hoisted(() => ({ n: 0 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
     // Real contract (savePrompt.js:105): createSaveListener(campaignName, config)
     // — ARITY 2, campaignName FIRST. The old mock destructured config fields off
     // the FIRST arg into a fully-shared prompt-<targetName> id: two listeners on

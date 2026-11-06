@@ -65,6 +65,8 @@ vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
 }));
 
 vi.mock('../../../../services/automation/common/savePrompt.js', () => ({
+  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
   createSaveListener: vi.fn(() => ({ promptId: `test-prompt-${++promptSeq.n}` })),
 }));
 

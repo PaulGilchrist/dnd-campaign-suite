@@ -14,12 +14,14 @@ import {
 import {
     useCarefulSpellSelection,
     useSaveResultListener,
+    useSaveDismissedListener,
     useCarefulEligibleTargets,
     rollNpcSave,
     issuePlayerSavePrompt,
     logAbilityUseSelection,
     dropPendingPrompt,
 } from './AreaEffectSaveFlow.utils.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
 
 async function resolveCalmNpcSave(ctx, targetName, target) {
     const { campaignName, casterName, saveType, saveDc, isCarefulSpell, isCarefulAlly, choice } = ctx;
@@ -224,14 +226,38 @@ function CalmEmotionsModal({
         dropPendingPrompt(setPendingPrompts, detail.promptId, onClose);
     }, [campaignName, saveDc, saveType, pendingPrompts, playerStats.name, onClose]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): drain the
+    // un-rolled Dismiss with a save_dismissed log row via the same
+    // drain-to-close path as a resolved save; a dismissed target is simply
+    // unaffected (no immunity/indifference registered).
+    const handleSaveDismissed = useCallback(async (event) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pending = pendingPrompts.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        await logSaveDismissed(campaignName, {
+            casterName: playerStats.name,
+            abilityName: action.name,
+            targetName: pending.targetName,
+            saveDc,
+            saveType,
+            logPrefix: '[calmEmotions]',
+        });
+
+        dropPendingPrompt(setPendingPrompts, detail.promptId, onClose);
+    }, [campaignName, saveDc, saveType, pendingPrompts, action.name, playerStats.name, onClose]);
+
+    useSaveResultListener(pendingPrompts, handleSaveResult);
+    useSaveDismissedListener(pendingPrompts, handleSaveDismissed);
+
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
         await logAbilityUseSelection(campaignName, { casterName: playerStats.name, abilityName: action.name, targetCount: selectedNames.length, saveDc, saveType, logPrefix: '[calmEmotions]' });
 
         const { prompts } = await resolveAllSaves(selectedNames);
         setPendingPrompts(prompts);
     }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSaves]);
-
-    useSaveResultListener(pendingPrompts, handleSaveResult);
 
     const handleToggleTarget = useCallback((targetName) => {
         setExcludedTargets(prev => ({ ...prev, [targetName]: !prev[targetName] }));

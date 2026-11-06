@@ -6,6 +6,8 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
+import { dismissedNoEffectResult } from './AreaEffectSaveFlow.utils.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
@@ -282,6 +284,34 @@ async function handleSaveResultCore({ event, pendingPrompts, campaignName, caste
     });
 }
 
+// Dismiss hygiene (save-dismissed sweep family, 2026-11-05): the GM's
+// un-rolled Dismiss on a queued prompt never dispatches save-result, so this
+// modal used to strand its "Waiting for save roll..." row (and the base's
+// all-resolved gate) forever — the divine-spark-dismiss softlock shape. The
+// queue broadcasts `save-dismissed`; drain the prompt with an honest neutral
+// "dismissed — unaffected" result row + a save_dismissed log row (no
+// fabricated roll). promptId gating mirrors the save-result lane.
+async function handleSaveDismissedCore({ event, pendingPrompts, campaignName, casterName, abilityName, saveType, saveDc, setResults, setPendingPrompts, onAllPromptsResolved }) {
+    const detail = event.detail;
+    if (!detail || !detail.promptId) return;
+
+    const pendingIndex = pendingPrompts.findIndex(p => p.promptId === detail.promptId);
+    if (pendingIndex === -1) return;
+
+    const targetName = pendingPrompts[pendingIndex].targetName;
+
+    await logSaveDismissed(campaignName, { casterName, abilityName, targetName, saveDc, saveType, logPrefix: '[AOEConditionModal]' });
+
+    setResults(prev => (prev.some(r => r.targetName === targetName) ? prev : [...prev, dismissedNoEffectResult(targetName)]));
+    setPendingPrompts(prev => {
+        const updated = prev.filter(p => p.promptId !== detail.promptId);
+        if (updated.length === 0 && onAllPromptsResolved) {
+            onAllPromptsResolved();
+        }
+        return updated;
+    });
+}
+
 
 // Shared core for the two ability_use lanes (fix#227 clone-debt (b), step 2 of 2 —
 // consolidate AFTER drift-fix, per fix#269 degenerate-fold lesson inverted): the
@@ -459,14 +489,34 @@ function AOEConditionModal({
         onAllPromptsResolved: () => setShowResults(true),
     }), [campaignName, saveDc, saveType, pendingPrompts, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
 
+    const handleSaveDismissed = useCallback((event) => handleSaveDismissedCore({
+        event,
+        pendingPrompts,
+        campaignName,
+        casterName: playerStats.name,
+        abilityName: action.name,
+        saveType,
+        saveDc,
+        setResults,
+        setPendingPrompts,
+        onAllPromptsResolved: () => setShowResults(true),
+    }), [campaignName, saveDc, saveType, pendingPrompts, action.name, playerStats.name]);
+
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
         const handleSaveEvent = (event) => {
             handleSaveResult(event);
         };
+        const handleDismissedEvent = (event) => {
+            handleSaveDismissed(event);
+        };
         window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
-    }, [pendingPrompts.length, handleSaveResult]);
+        window.addEventListener('save-dismissed', handleDismissedEvent);
+        return () => {
+            window.removeEventListener('save-result', handleSaveEvent);
+            window.removeEventListener('save-dismissed', handleDismissedEvent);
+        };
+    }, [pendingPrompts.length, handleSaveResult, handleSaveDismissed]);
 
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
@@ -533,9 +583,11 @@ function AOEConditionModal({
                     <div className="abjure-results-list">
                         {ctx.results.map(r => (
                             <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                <strong>{r.targetName}</strong>: {r.success
-                                    ? `Saved — unaffected (rolled ${r.roll ?? 0}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = ${r.total})`
-                                    : `Failed — ${conditionLabel}! (rolled ${r.roll ?? 0}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = ${r.total})`}
+                                <strong>{r.targetName}</strong>: {r.dismissed
+                                    ? 'Save dismissed — unaffected'
+                                    : r.success
+                                        ? `Saved — unaffected (rolled ${r.roll ?? 0}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = ${r.total})`
+                                        : `Failed — ${conditionLabel}! (rolled ${r.roll ?? 0}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = ${r.total})`}
                             </div>
                         ))}
                         {ctx.pendingPrompts.map(p => (
@@ -609,6 +661,21 @@ function AOEConditionModal({
         setPendingPrompts: ctx.setPendingPrompts,
     }), [campaignName, saveDc, saveType, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
 
+    // Overlay-lane dismiss companion (save-dismissed sweep family, 2026-11-05):
+    // drains the BASE ctx pending row so the base's allResolved gate still
+    // fires (results.length >= selected includes the neutral dismissed row).
+    const handleSaveDismissedOverride = useCallback((event, ctx) => handleSaveDismissedCore({
+        event,
+        pendingPrompts: ctx.pendingPrompts,
+        campaignName,
+        casterName: playerStats.name,
+        abilityName: action.name,
+        saveType,
+        saveDc,
+        setResults: ctx.setResults,
+        setPendingPrompts: ctx.setPendingPrompts,
+    }), [campaignName, saveDc, saveType, action.name, playerStats.name]);
+
     if (isOverlayTargeted && activeOverlay) {
         return (
             <AreaEffectTargetModalBase
@@ -625,6 +692,7 @@ function AOEConditionModal({
                 icon="fa-solid fa-dice-d20"
                 handleApplyOverride={handleApplyOverride}
                 handleSaveResultOverride={handleSaveResultOverride}
+                handleSaveDismissedOverride={handleSaveDismissedOverride}
                 extraState={extraState}
                 renderBody={renderBody}
                 renderActions={renderActions}

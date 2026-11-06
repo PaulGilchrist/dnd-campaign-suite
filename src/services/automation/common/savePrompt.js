@@ -215,6 +215,30 @@ export function dropPendingSavePrompt(campaignName, promptId) {
     }
 }
 
+// Dismiss-hygiene log row (save-dismissed sweep family, 2026-11-05): every
+// modal-parking producer that opts into `save-dismissed` must leave an honest
+// campaign-log trace when the GM abandons an un-rolled prompt — same row
+// vocabulary as saveOnlyHandler/CharReactions (`automation` +
+// automationDetail 'save_dismissed', zero fabricated roll rows). Sites with
+// their own refusal helper (DivineSparkModal's refuse(), saveOnlyRefusal)
+// keep logging through it; this is the shared home for the sites that have
+// none.
+export function logSaveDismissed(campaignName, { casterName, abilityName, targetName, saveDc, saveType, logPrefix }) {
+    return addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'save_dismissed',
+        automationDetail: 'save_dismissed',
+        characterName: casterName,
+        abilityName,
+        targetName,
+        saveDc,
+        saveType,
+        reason: 'save was dismissed — no effect',
+        description: `${targetName}'s ${saveType} save (DC ${saveDc}) against ${abilityName} was dismissed before rolling — no effect.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error(`${logPrefix || '[savePrompt]'} Error logging dismissed save:`, e); });
+}
+
 function describeSaveRoll({ roll, saveBonus, total, advantage, disadvantage, success, dcSuccess }) {
     let rollDetail = `rolled ${roll}${saveBonus !== 0 ? ' +' + saveBonus : ''} = ${total}`;
     if (advantage && disadvantage) {

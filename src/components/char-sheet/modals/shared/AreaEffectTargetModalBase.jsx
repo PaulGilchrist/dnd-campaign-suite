@@ -69,6 +69,7 @@ function AreaEffectTargetModalBase({
   icon = 'fa-solid fa-dice-d20',
   handleApplyOverride,
   handleSaveResultOverride,
+  handleSaveDismissedOverride,
   extraState = {},
   onAllResolved,
   renderBody,
@@ -134,14 +135,17 @@ function AreaEffectTargetModalBase({
   const handleApplyOverrideRef = useRef(() => {});
   // eslint-disable-next-line server-first/no-local-game-state
   const handleSaveResultOverrideRef = useRef(() => {});
+  // eslint-disable-next-line server-first/no-local-game-state
+  const handleSaveDismissedOverrideRef = useRef(() => {});
 
   handleApplyOverrideRef.current = handleApplyOverride || (() => {});
   handleSaveResultOverrideRef.current = handleSaveResultOverride || (() => {});
+  handleSaveDismissedOverrideRef.current = handleSaveDismissedOverride || (() => {});
 
   const ctxRef = useRef({
     processing: false, allResolved: false, selected: new Set(), eligibleTargets: [],
     results: [], pendingPrompts: [], toggleTarget: () => {},
-    handleApply: () => {}, handleSaveResult: () => {},
+    handleApply: () => {}, handleSaveResult: () => {}, handleSaveDismissed: () => {},
     saveType, saveDc, rangeFeet, featureName, maxTargets,
     combatSummary, attackerName, campaignName, mapData, onClose, characters,
     setSelected, setProcessing, setResults, setPendingPrompts,
@@ -157,10 +161,19 @@ function AreaEffectTargetModalBase({
     handleSaveResultOverrideRef.current(event, ctxRef.current);
   }, []);
 
+  // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): same lifetime
+  // as the save-result listener — while the lane is processing, forward the
+  // queue's un-rolled Dismiss broadcast to the consumer's override so it can
+  // drain the stranded pending row (opt-in: consumers without an override
+  // keep the previous inert behavior).
+  const handleSaveDismissed = useCallback((event) => {
+    handleSaveDismissedOverrideRef.current(event, ctxRef.current);
+  }, []);
+
   ctxRef.current = {
     processing, allResolved, selected, eligibleTargets,
     results, pendingPrompts, toggleTarget,
-    handleApply, handleSaveResult,
+    handleApply, handleSaveResult, handleSaveDismissed,
     saveType, saveDc, rangeFeet, featureName, maxTargets,
     combatSummary, attackerName, campaignName, mapData, onClose, characters,
     setSelected, setProcessing, setResults, setPendingPrompts,
@@ -172,6 +185,12 @@ function AreaEffectTargetModalBase({
     window.addEventListener('save-result', handleSaveResult);
     return () => window.removeEventListener('save-result', handleSaveResult);
   }, [processing, handleSaveResult]);
+
+  useEffect(() => {
+    if (!processing) return;
+    window.addEventListener('save-dismissed', handleSaveDismissed);
+    return () => window.removeEventListener('save-dismissed', handleSaveDismissed);
+  }, [processing, handleSaveDismissed]);
 
   useEffect(() => {
     if (processing) return;

@@ -26,6 +26,8 @@ const { promptState, store } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
     // Real contract (savePrompt.js:105-145): (campaignName, config) =>
     // { promptId, promise }. Name-agnostic unique-per-mint ids (mirrors
     // utils.guid(); prompt-<targetName>-n ids latent-collide — fix#1426/

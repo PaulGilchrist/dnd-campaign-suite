@@ -54,8 +54,8 @@ export function renderResultsSection({ results, pendingPrompts, allResolved, sav
       <div className="abjure-results-list">
         {results.map(r => (
           <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-            <strong>{r.targetName}</strong>: {typeof getResultText === 'function' ? getResultText(r) : (r.success ? 'Saved — unaffected' : 'Failed!')}
-            {typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
+            <strong>{r.targetName}</strong>: {typeof getResultText === 'function' ? getResultText(r) : (r.dismissed ? 'Save dismissed — unaffected' : (r.success ? 'Saved — unaffected' : 'Failed!'))}
+            {!r.dismissed && typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
           </div>
         ))}
         {pendingPrompts.map(p => (

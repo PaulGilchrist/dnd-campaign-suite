@@ -4,6 +4,7 @@ import { sendSavePrompt } from '../../../../services/combat/conditions/savePromp
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import { prepareSpellCast, isFreeCastAuthorized } from '../../../../services/rules/spells/spellPreparationService.js';
 import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
@@ -274,14 +275,51 @@ function MassSuggestionModal({
         });
     }, [campaignName, saveDc, saveType, pendingPrompts, applyCharmedToTarget, playerStats.name, onClose]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): an un-rolled
+    // GM Dismiss never dispatches save-result, so the dismissed row used to sit
+    // in pendingPrompts forever and the modal never drained to close. Drain it
+    // with a save_dismissed log row and the same drain-to-close timing as the
+    // resolve path; a dismissed target is simply NOT charmed (neutral outcome).
+    const handleSaveDismissed = useCallback(async (event) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pending = pendingPrompts.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        await logSaveDismissed(campaignName, {
+            casterName: playerStats.name,
+            abilityName: action.name,
+            targetName: pending.targetName,
+            saveDc,
+            saveType,
+            logPrefix: '[MassSuggestionModal]',
+        });
+
+        setPendingPrompts(prev => {
+            const updated = prev.filter(p => p.promptId !== detail.promptId);
+            if (updated.length === 0) {
+                setTimeout(() => onClose(), 500);
+            }
+            return updated;
+        });
+    }, [campaignName, saveDc, saveType, pendingPrompts, action.name, playerStats.name, onClose]);
+
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
         const handleSaveEvent = (event) => {
             handleSaveResult(event);
         };
+        const handleDismissedEvent = (event) => {
+            handleSaveDismissed(event);
+        };
         window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
-    }, [pendingPrompts.length, handleSaveResult]);
+        window.addEventListener('save-dismissed', handleDismissedEvent);
+        return () => {
+            window.removeEventListener('save-result', handleSaveEvent);
+            window.removeEventListener('save-dismissed', handleDismissedEvent);
+        };
+    }, [pendingPrompts.length, handleSaveResult, handleSaveDismissed]);
 
     const combatSummary = getCombatSummary(campaignName);
 

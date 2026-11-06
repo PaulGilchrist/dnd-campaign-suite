@@ -4,7 +4,8 @@ export function ResultsSummaryModal({ results, conditionLabel, onClose }) {
     const handleClose = useCallback(() => {
         onClose();
     }, [onClose]);
-    const successCount = results.filter(r => r.success).length;
+    const dismissedCount = results.filter(r => r.dismissed).length;
+    const successCount = results.filter(r => r.success && !r.dismissed).length;
     const failCount = results.filter(r => !r.success).length;
 
     return (
@@ -14,15 +15,17 @@ export function ResultsSummaryModal({ results, conditionLabel, onClose }) {
                     <i className="fa-solid fa-dice-d20"></i> Save Results
                 </div>
                 <div className="sp-body">
-                    <p><strong>{successCount}</strong> target{successCount !== 1 ? 's' : ''} saved, <strong>{failCount}</strong> target{failCount !== 1 ? 's' : ''} failed.</p>
+                    <p><strong>{successCount}</strong> target{successCount !== 1 ? 's' : ''} saved, <strong>{failCount}</strong> target{failCount !== 1 ? 's' : ''} failed{dismissedCount > 0 && <>, <strong>{dismissedCount}</strong> dismissed</>}.</p>
                     <div className="abjure-results-list">
                         {results.map(r => {
                             const saveBonusText = r.saveBonus !== 0 ? ' +' + r.saveBonus : '';
                             return (
                                 <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                    <strong>{r.targetName}</strong>: {r.success
-                                        ? 'Saved — unaffected (rolled ' + (r.roll ?? 0) + saveBonusText + ' = ' + r.total + ')'
-                                        : 'Failed — ' + conditionLabel + '! (rolled ' + (r.roll ?? 0) + saveBonusText + ' = ' + r.total + ')'}
+                                    <strong>{r.targetName}</strong>: {r.dismissed
+                                        ? 'Save dismissed — unaffected'
+                                        : r.success
+                                            ? 'Saved — unaffected (rolled ' + (r.roll ?? 0) + saveBonusText + ' = ' + r.total + ')'
+                                            : 'Failed — ' + conditionLabel + '! (rolled ' + (r.roll ?? 0) + saveBonusText + ' = ' + r.total + ')'}
                                 </div>
                             );
                         })}

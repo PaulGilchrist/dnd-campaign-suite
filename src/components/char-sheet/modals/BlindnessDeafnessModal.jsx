@@ -6,6 +6,8 @@ import { rollD20 } from '../../../services/dice/diceRoller.js';
 import { addCondition } from '../../../services/combat/conditions/conditionSaveService.js';
 import utils from '../../../services/ui/utils.js';
 import { sendSavePrompt, sendSaveResult } from '../../../services/combat/conditions/savePromptService.js';
+import { logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
+import { dismissedNoEffectResult } from './shared/AreaEffectSaveFlow.utils.js';
 import { getEffectOptions } from '../../../services/automation/handlers/spells/blindnessDeafnessHandler.js';
 import AreaEffectTargetModalBase from './shared/AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './shared/AreaEffectTargetModalBase.utils.jsx';
@@ -144,6 +146,25 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
         ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
     }, [campaignName, attackerName, saveDc, featureName, addConditionToCreature, selectedEffect]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): the base
+    // forwards the queue's un-rolled Dismiss broadcast here while processing;
+    // drain the pending row with an honest neutral "dismissed — unaffected"
+    // entry (no condition applied) + a save_dismissed log row, so the base's
+    // all-resolved gate fires and the Done button appears instead of the
+    // buttonless "Resolving CON saving throws…" freeze.
+    const handleSaveDismissedOverride = useCallback((event, ctx) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pending = ctx.pendingPrompts.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        logSaveDismissed(campaignName, { casterName: attackerName, abilityName: featureName, targetName: pending.targetName, saveDc, saveType: 'CON', logPrefix: '[BlindnessDeafnessModal]' });
+
+        ctx.setResults(prev => [...prev, dismissedNoEffectResult(pending.targetName)]);
+        ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
+    }, [campaignName, attackerName, saveDc, featureName]);
+
     const effectLabel = selectedEffect ? selectedEffect.label : '';
 
     useEffect(() => {
@@ -233,7 +254,7 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
                 <div className="abjure-results-list">
                     {ctx.results.map(r => (
                         <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                            <strong>{r.targetName}</strong>: {r.success ? 'Saved — unaffected' : `Failed — ${effectLabel}!`}{typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
+                            <strong>{r.targetName}</strong>: {r.dismissed ? 'Save dismissed — unaffected' : r.success ? 'Saved — unaffected' : `Failed — ${effectLabel}!`}{!r.dismissed && typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
                         </div>
                     ))}
                     {ctx.pendingPrompts.map(p => (
@@ -302,6 +323,7 @@ function BlindnessDeafnessModal({ combatSummary, attackerName, attackerPos, save
             icon="fa-solid fa-eye"
             handleApplyOverride={handleApplyOverride}
             handleSaveResultOverride={handleSaveResultOverride}
+            handleSaveDismissedOverride={handleSaveDismissedOverride}
             extraState={extraState}
             renderBody={renderBody}
             renderActions={renderActions}

@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/conditions/savePromptService.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
+import { dismissedNoEffectResult } from './AreaEffectSaveFlow.utils.js';
 import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import utils from '../../../../services/ui/utils.js';
@@ -219,6 +221,23 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
         ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
     }, [campaignName, attackerName, saveDc, featureName, saveType, damageExpression, damageType, combatSummary]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): drain the
+    // queue's un-rolled Dismiss with a neutral "dismissed — no damage" row +
+    // save_dismissed log row (no damage applied) so the base's all-resolved
+    // gate fires instead of the buttonless "Waiting for save roll..." freeze.
+    const handleSaveDismissedOverride = useCallback((event, ctx) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pending = ctx.pendingPrompts.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        logSaveDismissed(campaignName, { casterName: attackerName, abilityName: featureName, targetName: pending.targetName, saveDc, saveType, logPrefix: '[SaveAttackHealModal]' });
+
+        ctx.setResults(prev => [...prev, { ...dismissedNoEffectResult(pending.targetName), rawDamage: 0, finalDamage: 0 }]);
+        ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
+    }, [campaignName, attackerName, saveDc, featureName, saveType]);
+
     const handleHeal = useCallback((ctx) => {
         if (!healedTarget) return;
         ctx.setProcessing(true);
@@ -267,11 +286,13 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                 <div className="abjure-results-list">
                     {ctx.results.map(r => (
                         <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                            <strong>{r.targetName}</strong>: {r.success
-                                ? r.finalDamage > 0
-                                    ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.rawDamage}, halved)`
-                                    : `Saved — takes no damage (rolled ${r.rawDamage})`
-                                : `Failed — takes ${r.finalDamage} ${damageType} damage (rolled ${r.rawDamage})`}
+                            <strong>{r.targetName}</strong>: {r.dismissed
+                                ? 'Save dismissed — no damage'
+                                : r.success
+                                    ? r.finalDamage > 0
+                                        ? `Saved — takes ${r.finalDamage} ${damageType} damage (rolled ${r.rawDamage}, halved)`
+                                        : `Saved — takes no damage (rolled ${r.rawDamage})`
+                                    : `Failed — takes ${r.finalDamage} ${damageType} damage (rolled ${r.rawDamage})`}
                         </div>
                     ))}
                     {ctx.pendingPrompts.map(p => (
@@ -341,6 +362,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
             featureName={featureName} saveType={saveType} rangeFeet={rangeFeet}
             onClose={onClose} icon="fa-solid fa-dice-d20"
             handleApplyOverride={handleApplyOverride} handleSaveResultOverride={handleSaveResultOverride}
+            handleSaveDismissedOverride={handleSaveDismissedOverride}
             extraState={extraState} renderBody={renderBody} renderActions={renderActions}
             shape={shape} attackerGridX={attackerGridX} attackerGridY={attackerGridY}
         />

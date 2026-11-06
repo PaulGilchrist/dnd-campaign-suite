@@ -19,6 +19,8 @@ import { addExpiration } from '../../../services/rules/effects/expirations.js';
 const promptState = vi.hoisted(() => ({ n: 0 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
     // Real contract (savePrompt.js:105): createSaveListener(campaignName, config)
     // — ARITY 2, campaignName FIRST. The old mock destructured config fields off
     // the FIRST arg (campaignName), yielding prompt-undefined-<ts> — the class-

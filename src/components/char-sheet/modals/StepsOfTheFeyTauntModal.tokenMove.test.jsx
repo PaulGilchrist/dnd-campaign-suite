@@ -25,6 +25,8 @@ const { promptState, anchorState } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
     createSaveListener: vi.fn((_campaignName, _config) => {
         const promptId = `save-guid-${++promptState.n}`;
         const promise = new Promise((resolve) => {

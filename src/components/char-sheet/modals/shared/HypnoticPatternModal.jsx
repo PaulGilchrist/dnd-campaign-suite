@@ -22,7 +22,9 @@ import {
     resolveNpcSaveSuccess,
     resolveNpcSaveFailure,
     dropPendingPrompt,
+    useSaveDismissedListener,
 } from './AreaEffectSaveFlow.utils.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
 
 function HypnoticPatternModal({
     action,
@@ -194,7 +196,31 @@ function HypnoticPatternModal({
         dropPendingPrompt(setPendingPrompts, detail.promptId, onClose);
     }, [campaignName, saveDc, saveType, pendingPrompts, applyHypnoticConditionsToTarget, playerStats.name, onClose]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): drain the
+    // un-rolled Dismiss with a save_dismissed log row via the same
+    // drain-to-close path as a resolved save; a dismissed target is simply
+    // unaffected (no condition applied).
+    const handleSaveDismissed = useCallback(async (event) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pending = pendingPrompts.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        await logSaveDismissed(campaignName, {
+            casterName: playerStats.name,
+            abilityName: action.name,
+            targetName: pending.targetName,
+            saveDc,
+            saveType,
+            logPrefix: '[HypnoticPatternModal]',
+        });
+
+        dropPendingPrompt(setPendingPrompts, detail.promptId, onClose);
+    }, [campaignName, saveDc, saveType, pendingPrompts, action.name, playerStats.name, onClose]);
+
     useSaveResultListener(pendingPrompts, handleSaveResult);
+    useSaveDismissedListener(pendingPrompts, handleSaveDismissed);
 
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');

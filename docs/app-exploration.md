@@ -79,7 +79,6 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-05 CZ) **`save-result` producer census:** Dismiss doctrine ("dismissed saves never resolve", savePrompt.js:176) is fine for fire-and-forget producers but strands any producer that parks a modal on the event — emit a `save-dismissed` (or resolve with `{dismissed:true}`) and sweep the five listener sites (see bug file blast radius). Fixing bug #1 well = this census.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

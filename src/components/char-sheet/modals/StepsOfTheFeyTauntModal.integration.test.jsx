@@ -17,6 +17,8 @@ import { createSaveListener } from '../../../services/automation/common/saveProm
 const promptState = vi.hoisted(() => ({ n: 0 }));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+  // save-dismissed sweep (2026-11-05): components under test may now import the shared dismissal log helper.
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
     // Real contract (savePrompt.js:105-145): (campaignName, config) =>
     // { promptId, promise }. Deterministic name-agnostic unique-per-mint ids
     // (mirrors utils.guid() minting; the old Math.random suffix was

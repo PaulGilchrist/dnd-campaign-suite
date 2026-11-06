@@ -8,6 +8,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
 import { triggerBewitchingMagic } from '../../../../services/rules/spells/postCastRiderService.js';
 import { registerTargetEffect, abilitySaveDisadvantageActive, getEffectDefinition } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
 import { isZonesEnforced } from '../../../../services/rules/features/zoneRepeatTurnEndService.js';
@@ -1225,7 +1226,15 @@ function damageTotalsText(r, damageType) {
 
 // fix#347: the three staged-ladder flags ride ONE object param (max-params
 // law) — { sleepStaging, stagedParalysis, stagedPetrify }.
-function resultRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify }) {
+// Dismiss hygiene (save-dismissed sweep family, 2026-11-05): a dismissed
+// prompt resolves to a neutral row — wrapped here so the outcome-text
+// complexity below stays under the lint cap.
+function resultRowText(r, damage, damageType, opts) {
+    if (r.dismissed) return 'Save dismissed — unaffected';
+    return saveOutcomeRowText(r, damage, damageType, opts);
+}
+
+function saveOutcomeRowText(r, damage, damageType, { sleepStaging, stagedParalysis, stagedPetrify }) {
     if (r.soulstitchProtected) return 'Soulstitch — automatically succeeds, takes no damage';
     if (r.success) {
         return (r.finalDamage ?? 0) > 0
@@ -1867,14 +1876,57 @@ function SaveAttackAoeModal({
         appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, targetResult, detail.promptId);
     }, [campaignName, characters, damage, damageType, radiantSoulChaMod, empoweredEvocationIntMod, dcSuccess, action, playerStats, saveDc, saveType, pendingPrompts, overchannelActive, pullMarkerEffect, logSaveSuccess, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): the GM's
+    // un-rolled Dismiss never dispatches save-result, so the dismissed row
+    // used to strand this modal's "Waiting for save roll..." view (selection
+    // lane) or block the base's all-resolved gate (overlay lane) forever.
+    // Drain with an honest neutral row + save_dismissed log row. Shared
+    // (event, ctx) signature serves both lanes: ctx==null → local setters.
+    const handleSaveDismissed = useCallback(async (event, ctx) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pendingList = ctx ? ctx.pendingPrompts : pendingPrompts;
+        const pending = pendingList.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        await logSaveDismissed(campaignName, {
+            casterName: playerStats.name,
+            abilityName: action.name,
+            targetName: pending.targetName,
+            saveDc,
+            saveType,
+            logPrefix: '[SaveAttackAoeModal]',
+        });
+
+        const setters = ctx || { setResults, setPendingPrompts };
+        appendPromptTargetResult(setters.setResults, setters.setPendingPrompts, {
+            targetName: pending.targetName,
+            success: true,
+            dismissed: true,
+            roll: null,
+            total: 0,
+            saveBonus: 0,
+            rawDamage: 0,
+            finalDamage: 0,
+        }, detail.promptId);
+    }, [campaignName, action, playerStats, saveDc, saveType, pendingPrompts]);
+
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
         const handleSaveEvent = (event) => {
             handleSaveResult(event, null);
         };
+        const handleDismissedEvent = (event) => {
+            handleSaveDismissed(event, null);
+        };
         window.addEventListener('save-result', handleSaveEvent);
-        return () => window.removeEventListener('save-result', handleSaveEvent);
-    }, [pendingPrompts.length, handleSaveResult]);
+        window.addEventListener('save-dismissed', handleDismissedEvent);
+        return () => {
+            window.removeEventListener('save-result', handleSaveEvent);
+            window.removeEventListener('save-dismissed', handleDismissedEvent);
+        };
+    }, [pendingPrompts.length, handleSaveResult, handleSaveDismissed]);
 
     const handleApply = useCallback(async (ctx) => {
         if (!summary) {
@@ -2070,6 +2122,7 @@ function SaveAttackAoeModal({
                 icon="fa-solid fa-bomb"
                 handleApplyOverride={handleApply}
                 handleSaveResultOverride={handleSaveResult}
+                handleSaveDismissedOverride={handleSaveDismissed}
                 extraState={extraState}
                 onAllResolved={handleAllResolved}
                 renderBody={renderBody}

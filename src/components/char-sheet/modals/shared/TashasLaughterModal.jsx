@@ -9,10 +9,13 @@ import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import {
     usePendingPromptsCleanup,
     useSaveResultListener,
+    useSaveDismissedListener,
+    dismissedNoEffectResult,
     rollNpcSave,
     issuePlayerSavePrompt,
     logAbilityUseSelection,
 } from './AreaEffectSaveFlow.utils.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
 
 function buildLaughterConditionEntry(targetName, actionName) {
     return {
@@ -55,10 +58,14 @@ function buildLaughterTargetResult(targetName, success, detail) {
 
 function finishLaughterResolution(allResults, actionName, onClose, setPopupHtml) {
     const failedResults = allResults.filter(r => !r.success);
-    const savedCount = allResults.filter(r => r.success).length;
-    if (failedResults.length > 0) {
+    const dismissedCount = allResults.filter(r => r.dismissed).length;
+    const savedCount = allResults.filter(r => r.success && !r.dismissed).length;
+    if (failedResults.length > 0 || dismissedCount > 0) {
         const failedNames = failedResults.map(r => r.targetName).join(', ');
-        const popupDesc = `${failedResults.length} creature(s) failed their save and are Prone and Incapacitated: ${failedNames}. ${savedCount} creature(s) saved.`;
+        const dismissedClause = dismissedCount > 0 ? ` ${dismissedCount} save(s) dismissed — unaffected.` : '';
+        const popupDesc = failedResults.length > 0
+            ? `${failedResults.length} creature(s) failed their save and are Prone and Incapacitated: ${failedNames}. ${savedCount} creature(s) saved.${dismissedClause}`
+            : `Tasha's Hideous Laughter: no creature failed the save. ${savedCount} creature(s) saved.${dismissedClause}`;
         if (setPopupHtml) {
             setTimeout(() => {
                 setPopupHtml({
@@ -285,7 +292,42 @@ function TashasLaughterModal({
         });
     }, [campaignName, saveDc, saveType, pendingPrompts, applyLaughterConditionsToTarget, playerStats.name, action.name, onClose, setPopupHtml]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): drain the
+    // un-rolled Dismiss with a save_dismissed log row and a neutral
+    // dismissed-no-effect tally entry; a dismissed target never becomes Prone
+    // or Incapacitated. Drain-to-empty rides the SAME finishLaughterResolution
+    // close path as a resolved save.
+    const handleSaveDismissed = useCallback(async (event) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pendingIndex = pendingPrompts.findIndex(p => p.promptId === detail.promptId);
+        if (pendingIndex === -1) return;
+
+        const targetName = pendingPrompts[pendingIndex].targetName;
+
+        await logSaveDismissed(campaignName, {
+            casterName: playerStats.name,
+            abilityName: action.name,
+            targetName,
+            saveDc,
+            saveType,
+            logPrefix: '[TashasLaughterModal]',
+        });
+
+        allResultsRef.current = [...allResultsRef.current, dismissedNoEffectResult(targetName)];
+
+        setPendingPrompts(prompts => {
+            const updated = prompts.filter(p => p.promptId !== detail.promptId);
+            if (updated.length === 0) {
+                finishLaughterResolution(allResultsRef.current, action.name, onClose, setPopupHtml);
+            }
+            return updated;
+        });
+    }, [campaignName, saveDc, saveType, pendingPrompts, playerStats.name, action.name, onClose, setPopupHtml]);
+
     useSaveResultListener(pendingPrompts, handleSaveResult);
+    useSaveDismissedListener(pendingPrompts, handleSaveDismissed);
 
     const combatSummary = getCombatSummary(campaignName);
 

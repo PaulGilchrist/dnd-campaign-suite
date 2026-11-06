@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
+import { createSaveListener, logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { KEY as EXPIRATION_KEY } from '../../../services/rules/effects/expirations.js';
 import { getCurrentCombatRound } from '../../../services/encounters/combatData.js';
@@ -108,8 +108,39 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
             timestamp: Date.now(),
         }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
 
+        // Success/neutral cleanup: strip the pre-granted advantage/disadvantage
+        // effects, cancel the armed clock, and clear the active target + badge.
+        // Shared by the save-success branch and the save-dismissed refuse path.
+        const clearClairvoyantGrant = async () => {
+            const filteredEffects = (getRuntimeValue('campaign', 'targetEffects', campaignName) || []).filter(
+                e => !(e.target === targetName && e.source === featureName && e.effect === 'clairvoyant_combatant')
+            );
+            await setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
+
+            // Cancel the armed clock (endSelfBuffOnTrigger shape) — an un-cancelled
+            // clock would strip a later pact-magic-refire grant's buff early.
+            const queue = getRuntimeValue(playerName, EXPIRATION_KEY, campaignName);
+            const keptQueue = Array.isArray(queue)
+                ? queue.filter(en => !(en.target === playerName && Array.isArray(en.effects)
+                    && en.effects.some(ef => ef.type === 'remove_target_effect' && ef.effectKey === 'clairvoyant_combatant' && ef.source === featureName)))
+                : queue;
+
+            // Clear the active target + remove from activeBuffs
+            const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+            const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+            const filteredBuffs = buffs.filter(b => !(b.effect === 'clairvoyant_combatant' && b.target === targetName));
+
+            setRuntimeObject(playerName, {
+                clairvoyantCombatantTarget: null,
+                activeBuffs: filteredBuffs,
+                ...(Array.isArray(queue) ? { [EXPIRATION_KEY]: keptQueue } : {}),
+            }, campaignName);
+        };
+
         const handleSaveResult = async (event) => {
             if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-result', handleSaveResult);
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
 
             const saveRoll = event.detail.roll;
             const saveTotal = event.detail.total;
@@ -129,31 +160,8 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
                     timestamp: Date.now(),
                 }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
             } else {
-                // Target succeeded — remove the effects (campaign te store is a
-                // separate route; every player-store key merges into ONE write §39).
-                const filteredEffects = (getRuntimeValue('campaign', 'targetEffects', campaignName) || []).filter(
-                    e => !(e.target === targetName && e.source === featureName && e.effect === 'clairvoyant_combatant')
-                );
-                await setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
-
-                // Cancel the armed clock (endSelfBuffOnTrigger shape) — an un-cancelled
-                // clock would strip a later pact-magic-refire grant's buff early.
-                const queue = getRuntimeValue(playerName, EXPIRATION_KEY, campaignName);
-                const keptQueue = Array.isArray(queue)
-                    ? queue.filter(en => !(en.target === playerName && Array.isArray(en.effects)
-                        && en.effects.some(ef => ef.type === 'remove_target_effect' && ef.effectKey === 'clairvoyant_combatant' && ef.source === featureName)))
-                    : queue;
-
-                // Clear the active target + remove from activeBuffs
-                const storedBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-                const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
-                const filteredBuffs = buffs.filter(b => !(b.effect === 'clairvoyant_combatant' && b.target === targetName));
-
-                setRuntimeObject(playerName, {
-                    clairvoyantCombatantTarget: null,
-                    activeBuffs: filteredBuffs,
-                    ...(Array.isArray(queue) ? { [EXPIRATION_KEY]: keptQueue } : {}),
-                }, campaignName);
+                // Target succeeded — remove the pre-granted effects.
+                await clearClairvoyantGrant();
 
                 await addEntry(campaignName, {
                     type: 'save_result',
@@ -169,11 +177,26 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
                 }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
             }
 
-            window.removeEventListener('save-result', handleSaveResult);
             setResult({ saveSuccess });
         };
 
+        // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): an
+        // un-rolled GM Dismiss never dispatches save-result, so this modal
+        // used to park at result===null (renders nothing — the cast silently
+        // never resolves with its grant left applied). Detach BOTH listeners,
+        // revoke the pre-grant, log the abandonment, and show the neutral
+        // result view with a working Done.
+        const handleSaveDismissed = (event) => {
+            if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
+            window.removeEventListener('save-result', handleSaveResult);
+            logSaveDismissed(campaignName, { casterName: playerName, abilityName: featureName, targetName, saveDc, saveType, logPrefix: '[clairvoyantCombatant]' });
+            clearClairvoyantGrant().catch((e) => { console.error("[clairvoyantCombatant] Error revoking grant on dismissed save:", e); });
+            setResult({ saveSuccess: true, dismissed: true });
+        };
+
         window.addEventListener('save-result', handleSaveResult);
+        window.addEventListener('save-dismissed', handleSaveDismissed);
     };
 
     // Info screen — shows error message when can't use
@@ -226,7 +249,9 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
         const { saveSuccess } = result;
         let description = '';
 
-        if (!saveSuccess) {
+        if (result.dismissed) {
+            description = `${targetName}'s save was dismissed — Clairvoyant Combatant has no effect.`;
+        } else if (!saveSuccess) {
             description = `${targetName} failed ${saveType} save — Clairvoyant Combatant active. ${targetName} has Disadvantage on attacks against you, you have Advantage on attacks against ${targetName}.`;
         } else {
             description = `${targetName} succeeded on ${saveType} save — Clairvoyant Combatant has no effect.`;

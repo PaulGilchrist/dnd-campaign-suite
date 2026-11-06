@@ -93,6 +93,9 @@ vi.mock('../../../services/automation/common/savePrompt.js', () => {
   let seq = 0;
   return {
     createSaveListener: vi.fn(() => ({ promptId: `branch-prompt-${++seq}` })),
+    // save-dismissed sweep (2026-11-05): HurlThroughHellModal now imports the
+    // shared dismissal log helper.
+    logSaveDismissed: vi.fn(() => Promise.resolve()),
   };
 });
 

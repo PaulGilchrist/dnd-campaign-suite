@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import CreatureSelectionModal from './shared/CreatureSelectionModal.jsx';
-import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
+import { createSaveListener, logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -27,8 +27,11 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     const listenerLedgerRef = useRef([]);
 
     useEffect(() => () => {
-        listenerLedgerRef.current.forEach((handleSaveResult) =>
-            window.removeEventListener('save-result', handleSaveResult));
+        // Entries are {type, handler} pairs (save-dismissed sweep family,
+        // 2026-11-05): the ledger holds BOTH the save-result handler and its
+        // save-dismissed companion, each removed under its own event type.
+        listenerLedgerRef.current.forEach(({ type, handler }) =>
+            window.removeEventListener(type, handler));
         listenerLedgerRef.current = [];
     }, []);
 
@@ -243,16 +246,40 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     // removeEventListener is idempotent, so the two paths can never double-fire an
     // error; splicing on arrival means the unmount drain only ever sees truly
     // pending handlers.
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): the lane used
+    // to await Promise.all(save-result) forever when the GM Dismissed an
+    // un-rolled prompt (dismiss doctrine — a dismissed save never resolves as
+    // a save-result). The companion resolve reports {dismissed:true} so the
+    // lane treats the target as UNAFFECTED — a NEUTRAL outcome, NOT a failure
+    // (no condition/damage on an un-rolled save).
     const waitForSaveResult = (targetName, promptId) => new Promise((resolve) => {
+        const untrack = (type, handler) => {
+            const index = listenerLedgerRef.current
+                .findIndex(entry => entry.type === type && entry.handler === handler);
+            if (index >= 0) listenerLedgerRef.current.splice(index, 1);
+        };
         const handleSaveResult = (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handleSaveResult);
-            const index = listenerLedgerRef.current.indexOf(handleSaveResult);
-            if (index >= 0) listenerLedgerRef.current.splice(index, 1);
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
+            untrack('save-result', handleSaveResult);
+            untrack('save-dismissed', handleSaveDismissed);
             resolve({ targetName, success: event.detail.success });
         };
-        listenerLedgerRef.current.push(handleSaveResult);
+        const handleSaveDismissed = (event) => {
+            if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
+            window.removeEventListener('save-result', handleSaveResult);
+            untrack('save-result', handleSaveResult);
+            untrack('save-dismissed', handleSaveDismissed);
+            resolve({ targetName, success: true, dismissed: true });
+        };
+        listenerLedgerRef.current.push(
+            { type: 'save-result', handler: handleSaveResult },
+            { type: 'save-dismissed', handler: handleSaveDismissed },
+        );
         window.addEventListener('save-result', handleSaveResult);
+        window.addEventListener('save-dismissed', handleSaveDismissed);
     });
 
     const handleTauntConfirm = async (selectedTargets) => {
@@ -284,9 +311,17 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
 
         let failedCount = 0;
         let savedCount = 0;
+        let dismissedCount = 0;
         const resultsDetail = [];
 
-        for (const { targetName, success } of saveResults) {
+        for (const { targetName, success, dismissed } of saveResults) {
+            if (dismissed) {
+                // Neutral dismiss outcome: no effect applied, honest log row.
+                dismissedCount++;
+                await logSaveDismissed(campaignName, { casterName: playerName, abilityName: featureName, targetName, saveDc, saveType: 'WIS', logPrefix: '[stepsOfTheFey]' });
+                resultsDetail.push(`${targetName} save dismissed — no effect.`);
+                continue;
+            }
             if (success) {
                 savedCount++;
                 addEntry(campaignName, {
@@ -341,7 +376,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.${move.moved ? ` ${movedClause(move)}` : ''}`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Taunting Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — Disadvantage on attack rolls vs others. ${savedCount} saved.${dismissedCount > 0 ? ` ${dismissedCount} dismissed — no effect.` : ''}${move.moved ? ` ${movedClause(move)}` : ''}`;
         setResult({ description });
         setApplied(true);
     };
@@ -377,10 +412,18 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
 
         let failedCount = 0;
         let savedCount = 0;
+        let dismissedCount = 0;
         let totalDamage = 0;
         const resultsDetail = [];
 
-        for (const { targetName, success } of saveResults) {
+        for (const { targetName, success, dismissed } of saveResults) {
+            if (dismissed) {
+                // Neutral dismiss outcome: no damage, honest log row.
+                dismissedCount++;
+                await logSaveDismissed(campaignName, { casterName: playerName, abilityName: featureName, targetName, saveDc, saveType: 'WIS', logPrefix: '[dreadfulStep]' });
+                resultsDetail.push(`${targetName} save dismissed — no effect.`);
+                continue;
+            }
             if (success) {
                 savedCount++;
                 addEntry(campaignName, {
@@ -418,7 +461,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             }
         }
 
-        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.${move.moved ? ` ${movedClause(move)}` : ''}`;
+        const description = `${featureName}: Cast Misty Step without expending a spell slot${remainingSuffix}.<br/><br/><b>Dreadful Step:</b> ${selectedTargets.length} creature(s) targeted. ${failedCount} failed save — ${totalDamage} Psychic damage. ${savedCount} saved.${dismissedCount > 0 ? ` ${dismissedCount} dismissed — no effect.` : ''}${move.moved ? ` ${movedClause(move)}` : ''}`;
         setResult({ description });
         setApplied(true);
     };

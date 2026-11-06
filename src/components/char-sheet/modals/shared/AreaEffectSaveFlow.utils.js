@@ -39,6 +39,32 @@ export function useSaveResultListener(pendingPrompts, handleSaveResult) {
   }, [pendingPrompts.length, handleSaveResult]);
 }
 
+// Dismiss hygiene (save-dismissed sweep family, 2026-11-05): mirrors
+// useSaveResultListener for the queue's un-rolled Dismiss broadcast. A modal
+// parked on pendingPrompts must drain the dismissed prompt too, or its
+// "Resolving saves… / Waiting for save roll…" view freezes with no buttons
+// (divine-spark-dismiss softlock shape). Consumers gate themselves on
+// pendingPrompts membership, so a save-dismissed for a different promptId is
+// inert (guid-gating doctrine, playbook §66).
+export function useSaveDismissedListener(pendingPrompts, handleSaveDismissed) {
+  useEffect(() => {
+    if (pendingPrompts.length === 0) return;
+    const handleDismissedEvent = (event) => {
+      handleSaveDismissed(event);
+    };
+    window.addEventListener('save-dismissed', handleDismissedEvent);
+    return () => window.removeEventListener('save-dismissed', handleDismissedEvent);
+  }, [pendingPrompts.length, handleSaveDismissed]);
+}
+
+// Neutral result row for a dismissed prompt: renders as an honest
+// "dismissed — unaffected" line (every renderer that shows this row branches
+// on `dismissed`), and counts toward the base's `results.length >= selected`
+// all-resolved gate so the modal drains instead of stranding.
+export function dismissedNoEffectResult(targetName) {
+  return { targetName, success: true, dismissed: true, roll: null, total: 0, saveBonus: 0, conditionApplied: false };
+}
+
 export function useCarefulEligibleTargets(combatSummary, isCarefulSpell, isCarefulAlly) {
   return useMemo(() => {
     if (!combatSummary?.creatures) return [];

@@ -6,6 +6,8 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { playerIsImmuneToCondition } from '../../../../services/combat/automation/automationService.js';
 import utils from '../../../../services/ui/utils.js';
 import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/conditions/savePromptService.js';
+import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
+import { dismissedNoEffectResult } from './AreaEffectSaveFlow.utils.js';
 import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -187,6 +189,23 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
     }, [campaignName, attackerName, saveDc, featureName, saveType, addConditionToCreature, logCondition, logImmunity]);
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): drain the
+    // queue's un-rolled Dismiss with a neutral "dismissed — unaffected" row +
+    // save_dismissed log row (no condition applied) so the base's all-resolved
+    // gate fires and Done appears — instead of the buttonless freeze.
+    const handleSaveDismissedOverride = useCallback((event, ctx) => {
+        const detail = event.detail;
+        if (!detail || !detail.promptId) return;
+
+        const pending = ctx.pendingPrompts.find(p => p.promptId === detail.promptId);
+        if (!pending) return;
+
+        logSaveDismissed(campaignName, { casterName: attackerName, abilityName: featureName, targetName: pending.targetName, saveDc, saveType, logPrefix: '[SetConditionModal]' });
+
+        ctx.setResults(prev => [...prev, dismissedNoEffectResult(pending.targetName)]);
+        ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
+    }, [campaignName, attackerName, saveDc, featureName, saveType]);
+
     const conditionLabel = conditionName.charAt(0).toUpperCase() + conditionName.slice(1)
         + (additionalCondition ? ' & ' + additionalCondition.charAt(0).toUpperCase() + additionalCondition.slice(1) : '');
 
@@ -231,7 +250,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                 <div className="abjure-results-list">
                     {ctx.results.map(r => (
                         <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                            <strong>{r.targetName}</strong>: {r.success ? 'Saved — unaffected' : `Failed — ${conditionLabel}!`}{typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
+                            <strong>{r.targetName}</strong>: {r.dismissed ? 'Save dismissed — unaffected' : r.success ? 'Saved — unaffected' : `Failed — ${conditionLabel}!`}{!r.dismissed && typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
                         </div>
                     ))}
                     {ctx.pendingPrompts.map(p => (
@@ -289,6 +308,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             icon="fa-solid fa-dice-d20"
             handleApplyOverride={handleApplyOverride}
             handleSaveResultOverride={handleSaveResultOverride}
+            handleSaveDismissedOverride={handleSaveDismissedOverride}
             onAllResolved={onAllResolved}
             renderBody={renderBody}
             renderActions={renderActions}

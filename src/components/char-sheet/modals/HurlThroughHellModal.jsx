@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
+import { createSaveListener, logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
@@ -208,10 +208,26 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
             }
 
             window.removeEventListener('save-result', handleSaveResult);
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
             setResult({ saveSuccess, actualDamage: 0 });
         };
 
+        // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): the GM's
+        // un-rolled Dismiss never dispatches save-result, so this modal parked
+        // at result===null forever (renders nothing — the cast silently never
+        // resolved). All Hurl effects apply only on a FAILED save, so the
+        // neutral outcome is a clean no-op: detach BOTH listeners, log the
+        // abandonment, and show the dismissed result view with a working Done.
+        const handleSaveDismissed = (event) => {
+            if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-dismissed', handleSaveDismissed);
+            window.removeEventListener('save-result', handleSaveResult);
+            logSaveDismissed(campaignName, { casterName: playerName, abilityName: featureName, targetName, saveDc, saveType, logPrefix: '[hurlThroughHell]' });
+            setResult({ saveSuccess: true, dismissed: true, actualDamage: 0 });
+        };
+
         window.addEventListener('save-result', handleSaveResult);
+        window.addEventListener('save-dismissed', handleSaveDismissed);
     };
 
     // Info screen — shows error message when can't use
@@ -271,7 +287,9 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
         const { saveSuccess } = result;
         let description = '';
 
-        if (!saveSuccess) {
+        if (result.dismissed) {
+            description = `${targetName}'s save was dismissed — not hurled through the lower planes.`;
+        } else if (!saveSuccess) {
             description = `${targetName} failed ${saveType} save — hurled through the lower planes.`;
         } else {
             description = `${targetName} succeeded on ${saveType} save — resists the effect and is not hurled through the lower planes.`;
