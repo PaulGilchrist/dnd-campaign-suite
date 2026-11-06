@@ -271,3 +271,50 @@ describe('miss→hit conversion persists the hit flag', () => {
     expect(mockStore.get('campaign:lastAttack').missConverted).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// QA 2026-11-06: harmonized miss→hit conversion copy — both conversion
+// handlers end their ability_use description with ONE identical sentence
+// (roll-detail prefixes may differ); the check/save face omits it.
+// ---------------------------------------------------------------------------
+
+describe('harmonized miss→hit conversion copy', () => {
+  const SHARED_SENTENCE = 'Miss converted to Hit.';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStore.clear();
+  });
+
+  it('boon description ends with the shared conversion sentence', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
+
+    await handleStrokeOfLuck(createPlayerStats(), campaignName, missAttackPopup(), 'boonOfCombatProwess');
+
+    const entry = addEntry.mock.calls.at(-1)[1];
+    expect(entry.abilityName).toBe('Boon of Combat Prowess');
+    expect(entry.description.endsWith(SHARED_SENTENCE)).toBe(true);
+  });
+
+  it('stroke attack-face description ends with the identical shared sentence', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
+
+    await handleStrokeOfLuck(createPlayerStats(), campaignName, missAttackPopup(), 'strokeOfLuck');
+
+    const entry = addEntry.mock.calls.at(-1)[1];
+    expect(entry.abilityName).toBe('Stroke of Luck');
+    expect(entry.description.endsWith(SHARED_SENTENCE)).toBe(true);
+    // Roll-detail prefix is stroke's own and stays intact.
+    expect(entry.description).toContain('d20 6 → 20 (total 17 → 31)');
+  });
+
+  it('stroke check-face description carries no conversion sentence', async () => {
+    const { addEntry } = await import('../../services/ui/logService.js');
+
+    await handleStrokeOfLuck(createPlayerStats(), campaignName, { name: 'Persuasion', rolls: [4], bonus: 5 }, 'strokeOfLuck');
+
+    const entry = addEntry.mock.calls.at(-1)[1];
+    expect(entry.description).not.toMatch(/Miss converted/i);
+    expect(entry.description.endsWith('(total 9 → 25).')).toBe(true);
+  });
+});

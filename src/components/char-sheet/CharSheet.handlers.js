@@ -92,6 +92,14 @@ function persistConvertedAttackHit(playerName, campaignName, popupHtml, converte
     }
 }
 
+// QA 2026-11-06: one shape for "miss→hit converted" log copy — both
+// conversion handlers (FT-007 Boon of Combat Prowess, Stroke of Luck attack
+// face) end their ability_use description with this exact sentence so
+// log-scanning tests/players match a single string. Feature-specific
+// roll-detail prefixes (= N vs TARGET / d20 X → 20 (total A → B)) may
+// legitimately differ; check/save conversions never append it.
+const MISS_TO_HIT_CONVERSION = 'Miss converted to Hit.'
+
 // FT-007 Boon of Combat Prowess: convert a missed attack roll into a hit,
 // stamp the once-per-turn round latch (re-arms at the holder's next turn /
 // round-wrap clears), rewrite the persisted last-attack records so hit-riders
@@ -108,7 +116,7 @@ async function handleBoonOfCombatProwess(playerStats, campaignName, popupHtml) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: 'Boon of Combat Prowess',
-        description: `${playerName} used Boon of Combat Prowess on ${popupHtml?.name || 'an attack roll'}: d20 ${d20} + ${bonus} = ${total}${popupHtml?.targetName ? ` vs ${popupHtml.targetName}` : ''} — Miss converted to Hit.`,
+        description: `${playerName} used Boon of Combat Prowess on ${popupHtml?.name || 'an attack roll'}: d20 ${d20} + ${bonus} = ${total}${popupHtml?.targetName ? ` vs ${popupHtml.targetName}` : ''} — ${MISS_TO_HIT_CONVERSION}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[CharSheet] Error logging Boon of Combat Prowess:', e); });
 }
@@ -143,7 +151,7 @@ export async function handleStrokeOfLuck(playerStats, campaignName, popupHtml, f
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: 'Stroke of Luck',
-        description: `${playerStats.name} used Stroke of Luck on ${popupHtml?.name || 'a D20 Test'}: d20 ${d20} → 20 (total ${originalTotal} → ${newTotal}).${popupHtml?.hit === false ? ' Miss converted to a hit.' : ''}`,
+        description: `${playerStats.name} used Stroke of Luck on ${popupHtml?.name || 'a D20 Test'}: d20 ${d20} → 20 (total ${originalTotal} → ${newTotal}).${popupHtml?.hit === false ? ` ${MISS_TO_HIT_CONVERSION}` : ''}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[CharSheet] Error logging Stroke of Luck:', e); });
 }

@@ -91,8 +91,6 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-06 (DE): Sibling conversion log rows use inconsistent copy — boon: "…= N vs TARGET — Miss converted to Hit." vs stroke: "…(total A → B). Miss converted to a hit." (`CharSheet.handlers.js` handleBoonOfCombatProwess :107 vs handleStrokeOfLuck :130). Harmonize wording (and ideally share a tiny builder) so log-scanning tests/players see one shape for "miss→hit converted". Likely files: `CharSheet.handlers.js`; approach: one `conversionDescription(feature, popupHtml)` helper. Non-blocking.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at DE 2026-11-06: PT1 aura-caveat stale-cache fix-verify 4/4 (2c1c51cf7 DEAD); 517d48416 drop-note both views; 24afdd995 HAM breakdown data+UI; Stroke-of-Luck live attack-face + economy latch via grant recipe (1 new bug filed).
