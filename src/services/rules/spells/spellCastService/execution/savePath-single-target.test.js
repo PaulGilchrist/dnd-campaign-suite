@@ -255,6 +255,28 @@ describe('savePath.js — single-target save lane', () => {
     expect(payload.context.spellSchool).toBe(args.fullSpell.school);
   });
 
+  it('producer pin (backlog aoe-overlay-lane-disposition): the overlay-armed getTargetInfo shape rides context.targetName verbatim into the useLoggedDiceRollDamage overlay branch', async () => {
+    // Live-proved producer (2026-11-05): PC sheet cast of a non-AoE damage save
+    // spell with `overlay-<id>` armed on the character's initiative card —
+    // CharSpells.jsx:155 SP-097 fallback resolves to { name: 'overlay-<id>' }
+    // and this lane ships it as context.targetName (:214, no metaCtx.targetName
+    // to overwrite it), where useLoggedDiceRollDamage.js:136 routes the roll to
+    // handleAoeDamage's area adjudication (lane KEPT — see that hook's
+    // aoe-overlay suite). Kills any future "zero live producers" census claim
+    // without a code deletion of THIS seam.
+    const args = makeArgs({
+      metaCtx: { slotLevel: 1, metamagicHeighten: false },
+      getTargetInfo: vi.fn(async () => ({ name: 'overlay-qa-aoe-lane' })),
+    });
+    rollExpression.mockReturnValue(rollerResult(9, [2, 3, 4], 0, '2d10'));
+
+    await handleSavePath(args);
+
+    expect(args.rollDamage).toHaveBeenCalledTimes(1);
+    const payload = args.rollDamage.mock.calls[0][0];
+    expect(payload.context.targetName).toBe('overlay-qa-aoe-lane');
+  });
+
   it('consumes the pre-baked Empowered Evocation formula byte-identical in ONE roll — never refolded (#1455/#1462 consumer face, #1493 shared-roll contract)', async () => {
     // Row provenance: disk 5e Hellish Rebuke slot-1 '2d10' + INT 3 baked by
     // damageCalculation.js:48 → '2d10 + 3 [Empowered Evocation]' (verbatim

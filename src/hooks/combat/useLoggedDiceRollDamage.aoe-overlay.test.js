@@ -1,4 +1,10 @@
 // @maintained-by-ai: 2026-10-14
+// Lane status (backlog aoe-overlay-lane-disposition, 2026-11-05): LIVE — producer
+// live-proved as the PC sheet cast of a non-AoE damage save spell with an
+// `overlay-<id>` target armed on the caster's initiative card (CharSpells
+// SP-097 getTargetInfo fallback → savePath handleSingleTargetSave context
+// .targetName → useLoggedDiceRollDamage.js:136 'overlay-' branch). The CY code
+// census ("zero live producers / orphan lane") was disproven; do NOT delete.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
