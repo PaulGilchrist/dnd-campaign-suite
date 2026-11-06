@@ -1,13 +1,13 @@
 {
   "name": "Nemeria",
-  "level": 2,
+  "level": 3,
   "alignment": "Chaotic Neutral",
   "abilities": [
     {
       "name": "Strength",
       "baseScore": 14,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
@@ -28,7 +28,7 @@
       "name": "Intelligence",
       "baseScore": 10,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
@@ -97,23 +97,18 @@
     "Dice Set"
   ],
   "specialActions": [],
-  "spells": [],
+  "spells": [
+    "Blade Ward",
+    "Thunderclap",
+    "Comprehend Languages",
+    "Feather Fall",
+    "Protection from Evil and Good"
+  ],
   "magicInitiateInstances": [],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
   "background": "Guard",
-  "featAbilityChoices": {
-    "Ability Score Improvement-0": {
-      "mode": "single",
-      "assignments": {
-        "single": "Strength",
-        "dual": [
-          "Strength",
-          ""
-        ]
-      }
-    }
-  },
+  "featAbilityChoices": {},
   "imagePath": "images/Nemeria.png"
 }
