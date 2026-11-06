@@ -60,6 +60,18 @@ function computeComputedHit({ isAutoMiss, targetName, hit, effectiveAc, finalTot
     return hit;
 }
 
+// bug-stroke-of-luck-natural-20-no-crit-damage: the 2024 Stroke of Luck
+// wording ("turn the roll into a 20") makes the d20 FACE a 20 — on an attack
+// roll that is a natural 20 = critical hit (the 2024 crit rule keys on the
+// face). Gate: stroke actually pressed (strokeResult), attack face, 2024
+// host. The 5e twin's canonical wording is "turn the miss into a hit" (no
+// face-20 → never crits), check/save conversions never hit the attack gate,
+// and the Boon of Combat Prowess twin ("you can hit instead") never sets
+// strokeResult — all three stay byte-unchanged.
+function computeConvertedNat20({ strokeResult, rollType, playerStats }) {
+    return strokeResult !== null && rollType === 'attack' && playerStats?.rules === '2024';
+}
+
 function computeD20TestFailed({ waitingForPlayerSave, computedHit, isAutoMiss, saveResult, success }) {
     if (waitingForPlayerSave) return false;
     if (computedHit !== undefined) return !computedHit && !isAutoMiss;
@@ -169,6 +181,8 @@ export function useDiceRollState(props) {
     const { saveResult, success, waitingForPlayerSave } = props;
     const d20TestFailed = computeD20TestFailed({ waitingForPlayerSave, computedHit, isAutoMiss, saveResult, success });
 
+    const convertedNat20 = computeConvertedNat20({ strokeResult, rollType, playerStats: props.playerStats });
+
     return {
         mode, setMode,
         rerollUsed, setRerollUsed, rerollResult, setRerollResult,
@@ -189,6 +203,6 @@ export function useDiceRollState(props) {
         safeRolls, finalRoll, originalTotal, displayRoll, displayTotal,
         appliesReplace, strReplaceApplied, finalDisplayTotal, wisBonus, wisDisplayTotal,
         reliableTalentTotal, d20Floor10Total, starryDragonFloorTotal, finalTotal, showFumble,
-        effectiveAc, computedHit, isNatural1, homingStrikesApplied, d20TestFailed,
+        effectiveAc, computedHit, isNatural1, homingStrikesApplied, d20TestFailed, convertedNat20,
     };
 }

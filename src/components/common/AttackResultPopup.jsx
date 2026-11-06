@@ -35,6 +35,12 @@ function DiceRollPopupContent({ popupHtml, playerStats, missToHitApplied, boonUs
 
 function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, playerStats, setPopupHtml, onBeforeBiDefense, onAfterBiDefense, onStrokeOfLuck, ...callbacks }) {
   const [missToHitApplied, setMissToHitApplied] = useState(false);
+  // bug-stroke-of-luck-natural-20-no-crit-damage: a 2024 Stroke of Luck press
+  // turns the d20 face into a 20 — on an attack roll that is a natural 20, so
+  // the Done dispatch must arm crits on the SAME isCrit channel a genuine
+  // nat-20 uses. The Boon twin ("hit instead", never a 20) and check/save
+  // conversions never set this.
+  const [strokeNat20Applied, setStrokeNat20Applied] = useState(false);
   const hasBoonBeenUsedRef = useRef(false);
 
   // FT-007: round-latch consult (campaignName threaded) — the boon re-arms
@@ -50,17 +56,23 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
         ? { ...popupHtml.autoDamage, damageType: chosenDamageType }
         : popupHtml.autoDamage;
       window.dispatchEvent(new CustomEvent('dice-roll-done', {
-        detail: { autoDamage, isCrit: popupHtml.isCrit, hit: true },
+        // strokeNat20Applied first so a popup that never knew crits keeps
+        // dispatching isCrit:undefined byte-identically (close-behavior/
+        // MA-1363 pins); the stroke-converted face wins with true.
+        detail: { autoDamage, isCrit: strokeNat20Applied || popupHtml.isCrit, hit: true },
       }));
     }
     if (onClose) onClose();
-  }, [popupHtml, onClose, missToHitApplied]);
+  }, [popupHtml, onClose, missToHitApplied, strokeNat20Applied]);
 
   const handleMissToHit = useCallback((featureKey) => {
     if (!popupHtml || missToHitApplied || (featureKey === 'boonOfCombatProwess' && hasBoonBeenUsedRef.current)) return;
     setMissToHitApplied(true);
+    if (featureKey === 'strokeOfLuck' && popupHtml?.rollType === 'attack' && playerStats?.rules === '2024') {
+      setStrokeNat20Applied(true);
+    }
     if (onStrokeOfLuck) onStrokeOfLuck(featureKey);
-  }, [popupHtml, missToHitApplied, onStrokeOfLuck]);
+  }, [popupHtml, missToHitApplied, onStrokeOfLuck, playerStats]);
 
   const handleBardicInspirationDefense = useCallback(async (dieValue, dieSize, newAc, willMiss) => {
     if (!popupHtml) return;

@@ -66,24 +66,28 @@ export function handleReroll(playerStats, campaignName, conditionEffects, reroll
 // (targetAc/d20 stay honest — the marker explains the flag), one write each.
 // Only attack popups (hit === false) qualify — check/save D20 tests carry no
 // hit field and must never launder a stale last-attack record.
-function persistConvertedAttackHit(playerName, campaignName, popupHtml, convertedBy) {
+// convertedNat20 (2024 Stroke of Luck attack face — the d20 face becomes a 20
+// = natural 20 = critical hit): also stamp the crit side so riders/consumers
+// see the crit the popup announces; the convertedNat20 marker sits beside
+// missConverted and explains the honest-original d20/total fields. The Boon
+// twin ("hit instead", not a 20) and 5e stroke ("turn the miss into a hit")
+// never pass it and stay byte-unchanged.
+function persistConvertedAttackHit(playerName, campaignName, popupHtml, convertedBy, convertedNat20 = false) {
     if (popupHtml?.hit !== false) return;
+    const conversion = { hit: true, missConverted: true, convertedBy };
+    if (convertedNat20) Object.assign(conversion, { convertedNat20: true, isCrit: true, isNatural20: true });
     const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
     if (lastAttack && lastAttack.attackerName === playerName && lastAttack.hit === false) {
         setRuntimeValue('campaign', 'lastAttack', {
             ...lastAttack,
-            hit: true,
-            missConverted: true,
-            convertedBy,
+            ...conversion,
         }, campaignName);
     }
     const lastAttackRoll = getRuntimeValue(playerName, 'lastAttackRoll', campaignName);
     if (lastAttackRoll && lastAttackRoll.attackerName === playerName && lastAttackRoll.hit === false) {
         setRuntimeValue(playerName, 'lastAttackRoll', {
             ...lastAttackRoll,
-            hit: true,
-            missConverted: true,
-            convertedBy,
+            ...conversion,
         }, campaignName);
     }
 }
@@ -109,6 +113,15 @@ async function handleBoonOfCombatProwess(playerStats, campaignName, popupHtml) {
     }).catch((e) => { console.error('[CharSheet] Error logging Boon of Combat Prowess:', e); });
 }
 
+// 2024 Stroke of Luck turns the d20 FACE into a 20 — on an attack roll that
+// is a natural 20 → crit the persisted records. Gated so the 5e twin ("turn
+// the miss into a hit", non-crit by its own canonical wording), check/save
+// conversions, and the Boon of Combat Prowess twin ("hit instead") never
+// arm it. Extracted to keep handleStrokeOfLuck under the complexity ceiling.
+function isStrokeConvertedNat20(playerStats, popupHtml) {
+    return popupHtml?.hit === false && playerStats?.rules === '2024';
+}
+
 export async function handleStrokeOfLuck(playerStats, campaignName, popupHtml, featureKey) {
     if (!playerStats) return;
     if (featureKey === 'boonOfCombatProwess') {
@@ -121,8 +134,11 @@ export async function handleStrokeOfLuck(playerStats, campaignName, popupHtml, f
     const originalTotal = d20 + bonus + modifier;
     const newTotal = 20 + bonus + modifier;
     // Attack-roll face converts a MISS into a hit — flip the persisted records
-    // too (guard inside the helper skips check/save conversions).
-    persistConvertedAttackHit(playerStats.name, campaignName, popupHtml, 'Stroke of Luck');
+    // too (guard inside the helper skips check/save conversions). On a 2024
+    // host the converted face IS a natural 20 → crit side lands in both records
+    // (the Done dispatch doubles the damage pool on the same channel).
+    persistConvertedAttackHit(playerStats.name, campaignName, popupHtml, 'Stroke of Luck',
+        isStrokeConvertedNat20(playerStats, popupHtml));
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,

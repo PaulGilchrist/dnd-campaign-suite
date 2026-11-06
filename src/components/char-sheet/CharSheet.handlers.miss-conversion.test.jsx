@@ -183,6 +183,62 @@ describe('miss→hit conversion persists the hit flag', () => {
     expect(mockStore.get('Disciplined_Monk:strokeOfLuckUsed')).toBe(true);
   });
 
+  // bug-stroke-of-luck-natural-20-no-crit-damage: the 2024 wording turns the
+  // d20 FACE into a 20 → attack rolls crit. Both persisted records must carry
+  // the crit side; the 5e twin ("turn the miss into a hit") and the Boon
+  // ("hit instead") must NOT.
+  it('2024 Stroke on a missed ATTACK roll also stamps the crit side (isCrit/isNatural20/convertedNat20) on BOTH records', async () => {
+    mockStore.set('campaign:lastAttack', missLastAttack());
+    mockStore.set('Disciplined_Monk:lastAttackRoll', missLastAttackRoll());
+
+    await handleStrokeOfLuck(createPlayerStats({ rules: '2024' }), campaignName, missAttackPopup(), 'strokeOfLuck');
+
+    for (const key of ['campaign:lastAttack', 'Disciplined_Monk:lastAttackRoll']) {
+      const record = mockStore.get(key);
+      expect(record.hit).toBe(true);
+      expect(record.missConverted).toBe(true);
+      expect(record.convertedBy).toBe('Stroke of Luck');
+      expect(record.convertedNat20).toBe(true);
+      expect(record.isCrit).toBe(true);
+      expect(record.isNatural20).toBe(true);
+      // Honest-logging fields stay byte-unchanged (the die really was a 6).
+      expect(record.d20).toBe(6);
+      expect(record.bonus).toBe(11);
+    }
+    expect(mockStore.get('campaign:lastAttack').total).toBe(17);
+  });
+
+  it('5e Stroke on a missed ATTACK roll stays non-crit (no crit-side keys)', async () => {
+    mockStore.set('campaign:lastAttack', missLastAttack());
+    mockStore.set('Disciplined_Monk:lastAttackRoll', missLastAttackRoll());
+
+    await handleStrokeOfLuck(createPlayerStats({ rules: '5e' }), campaignName, missAttackPopup(), 'strokeOfLuck');
+
+    for (const key of ['campaign:lastAttack', 'Disciplined_Monk:lastAttackRoll']) {
+      const record = mockStore.get(key);
+      expect(record.hit).toBe(true);
+      expect(record.missConverted).toBe(true);
+      expect(record.isCrit).toBe(false);
+      expect(record.isNatural20).toBeUndefined();
+      expect(record.convertedNat20).toBeUndefined();
+    }
+  });
+
+  it('2024 Boon conversion stays non-crit (hit instead, never a 20)', async () => {
+    mockStore.set('campaign:lastAttack', missLastAttack());
+    mockStore.set('Disciplined_Monk:lastAttackRoll', missLastAttackRoll());
+
+    await handleStrokeOfLuck(createPlayerStats({ rules: '2024' }), campaignName, missAttackPopup(), 'boonOfCombatProwess');
+
+    for (const key of ['campaign:lastAttack', 'Disciplined_Monk:lastAttackRoll']) {
+      const record = mockStore.get(key);
+      expect(record.hit).toBe(true);
+      expect(record.missConverted).toBe(true);
+      expect(record.isCrit).toBe(false);
+      expect(record.convertedNat20).toBeUndefined();
+    }
+  });
+
   it('Stroke of Luck on a check/save D20 test (no hit:false popup) writes nothing to the last-attack records', async () => {
     mockStore.set('campaign:lastAttack', missLastAttack());
     mockStore.set('Disciplined_Monk:lastAttackRoll', missLastAttackRoll());

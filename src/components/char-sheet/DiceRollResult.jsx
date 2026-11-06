@@ -308,11 +308,11 @@ function RollModeToggles({ props, state }) {
 
 function CritNotices({ props, state }) {
     const { isCrit, isAutoCrit } = props;
-    const { isCritDamage, displayRoll, showFumble } = state;
+    const { isCritDamage, displayRoll, showFumble, convertedNat20 } = state;
     return (
         <>
-            {(isCritDamage || isCrit || isAutoCrit) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
-            {(state.isD20 && !isCrit && !isAutoCrit && displayRoll === 20) && <div className="dice-roll-crit">Natural 20!</div>}
+            {(isCritDamage || isCrit || isAutoCrit || convertedNat20) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
+            {(state.isD20 && !isCrit && !isAutoCrit && !convertedNat20 && displayRoll === 20) && <div className="dice-roll-crit">Natural 20!</div>}
             {showFumble && <div className="dice-roll-crit dice-roll-crit-miss">Critical Miss!</div>}
         </>
     );
