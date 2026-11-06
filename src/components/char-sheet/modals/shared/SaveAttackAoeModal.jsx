@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { rollExpression, rollExpressionMaximized } from '../../../../services/dice/diceRoller.js';
 import { resolveScaling } from '../../../../services/combat/automation/automationExpressions.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -1602,6 +1602,15 @@ function SaveAttackAoeModal({
     const [pendingPrompts, setPendingPrompts] = useState([]);
     const [results, setResults] = useState([]);
     const [heightenTarget, setHeightenTarget] = useState(null);
+    // picker-confirm-live-while-prompts-stack: once the picker dispatches a
+    // cast it stays mounted behind the save-prompt/evasion/Results overlay
+    // stack until Close. Without this latch the confirm button stays live
+    // the whole time and a stray click re-runs the ENTIRE cast (double
+    // ability_use log + second savePrompt-* wave). The ref guards same-tick
+    // re-entry (before React flushes the state); the state drives the
+    // button's disabled attribute for the rest of the queue.
+    const [dispatched, setDispatched] = useState(false);
+    const dispatchedRef = useRef(false);
 
     const isCarefulSpell = metamagicCareful || false;
     const allyList = isCarefulSpell ? getAllyList(playerStats.name) : null;
@@ -1920,6 +1929,9 @@ function SaveAttackAoeModal({
     }, []);
 
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
+        if (dispatchedRef.current) return;
+        dispatchedRef.current = true;
+        setDispatched(true);
         setSelected(new Set(selectedNames));
 
         if (zoneOnly) {
@@ -2077,6 +2089,7 @@ function SaveAttackAoeModal({
             note={pickerCopy.note}
             confirmLabel={action.name}
             confirmIcon="fa-bomb"
+            confirmDisabled={dispatched}
             onConfirm={handleCreatureSelectionConfirm}
             onSkip={handleCreatureSelectionSkip}
             metamagicHeighten={metamagicHeighten}

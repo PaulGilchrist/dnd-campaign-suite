@@ -11,6 +11,12 @@ export default function CreatureSelectionModal({
     maxTargets,
     confirmLabel,
     confirmIcon,
+    // picker-confirm-live-while-prompts-stack: consumers that dispatch a
+    // fire-and-forget cast from onConfirm pass this once the cast is in
+    // flight so the picker (which stays mounted behind the prompt queue)
+    // cannot re-dispatch. Falsy default = byte-identical for every other
+    // consumer.
+    confirmDisabled,
     onConfirm,
     onSkip,
     defaultSelected,
@@ -64,7 +70,7 @@ export default function CreatureSelectionModal({
     };
 
     const handleConfirm = () => {
-        if (selected.length === 0) return;
+        if (selected.length === 0 || confirmDisabled) return;
         onConfirm(selected);
     };
 
@@ -150,7 +156,7 @@ export default function CreatureSelectionModal({
                     <button
                         className="sp-roll-btn"
                         onClick={handleConfirm}
-                        disabled={selected.length === 0}
+                        disabled={selected.length === 0 || confirmDisabled}
                         type="button"
                     >
                         <i className={`fa-solid ${iconClass}`}></i> {label} ({selected.length})

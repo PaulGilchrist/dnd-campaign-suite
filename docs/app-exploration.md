@@ -76,8 +76,6 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-05 CY] picker-confirm-live-while-prompts-stack:** after confirming "Burning Hands (N)" the picker `.sp-overlay` stays mounted with its confirm button live until the Results modal closes, while save-prompt + Leading-Evasion overlays stack above it; my first drain loop burned a 30s tool timeout clicking an intercepted button beneath the evasion chooser. Suggest: disable/unmount the picker confirm at dispatch (results modal already summarizes) so stacked-overlay geometry can't strand clicks and no double-cast path exists. Non-blocking UX.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at CY 2026-11-05: PT1 corona picker-route fix verification (6 faces, both casts); PT2 handleAoeDamage producer census (answer: none — orphan → backlog); AI-Dress no-config pre-disable face; hex orphan-branch deletion; spell-cast affordance.
