@@ -54,9 +54,44 @@ export function handleReroll(playerStats, campaignName, conditionEffects, reroll
     }
 }
 
+// Miss→hit conversions (FT-007 Boon of Combat Prowess, Stroke of Luck attack
+// face) apply damage AS A HIT — Done dispatches dice-roll-done {hit:true} —
+// but roll-time persistence (attackPostProcessing.storeCampaignLastAttack /
+// storeLastAttackRoll) stamped hit:false before the popup existed. Without
+// this rewrite every "after you hit a creature" rider (Stunning Strike gate,
+// hit-condition riders) reads the stale flag and denies a legitimate hit —
+// Homing Strikes has no such split because its bonus folds into finalHit
+// BEFORE the store. Mirror the merged re-read/write lane handlePlainDamage /
+// monsterJinx use: read the record, spread hit:true + a missConverted marker
+// (targetAc/d20 stay honest — the marker explains the flag), one write each.
+// Only attack popups (hit === false) qualify — check/save D20 tests carry no
+// hit field and must never launder a stale last-attack record.
+function persistConvertedAttackHit(playerName, campaignName, popupHtml, convertedBy) {
+    if (popupHtml?.hit !== false) return;
+    const lastAttack = getRuntimeValue('campaign', 'lastAttack', campaignName);
+    if (lastAttack && lastAttack.attackerName === playerName && lastAttack.hit === false) {
+        setRuntimeValue('campaign', 'lastAttack', {
+            ...lastAttack,
+            hit: true,
+            missConverted: true,
+            convertedBy,
+        }, campaignName);
+    }
+    const lastAttackRoll = getRuntimeValue(playerName, 'lastAttackRoll', campaignName);
+    if (lastAttackRoll && lastAttackRoll.attackerName === playerName && lastAttackRoll.hit === false) {
+        setRuntimeValue(playerName, 'lastAttackRoll', {
+            ...lastAttackRoll,
+            hit: true,
+            missConverted: true,
+            convertedBy,
+        }, campaignName);
+    }
+}
+
 // FT-007 Boon of Combat Prowess: convert a missed attack roll into a hit,
 // stamp the once-per-turn round latch (re-arms at the holder's next turn /
-// round-wrap clears), and log the spend (mirrors the Stroke-of-Luck sibling —
+// round-wrap clears), rewrite the persisted last-attack records so hit-riders
+// see the hit, and log the spend (mirrors the Stroke-of-Luck sibling —
 // every automation resolution logs).
 async function handleBoonOfCombatProwess(playerStats, campaignName, popupHtml) {
     const playerName = playerStats.name;
@@ -64,6 +99,7 @@ async function handleBoonOfCombatProwess(playerStats, campaignName, popupHtml) {
     const bonus = Number(popupHtml?.bonus) || 0;
     const total = d20 + bonus;
     await markBoonOfCombatProwessUsed(playerName, campaignName);
+    persistConvertedAttackHit(playerName, campaignName, popupHtml, 'Boon of Combat Prowess');
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
@@ -73,7 +109,7 @@ async function handleBoonOfCombatProwess(playerStats, campaignName, popupHtml) {
     }).catch((e) => { console.error('[CharSheet] Error logging Boon of Combat Prowess:', e); });
 }
 
-export function handleStrokeOfLuck(playerStats, campaignName, popupHtml, featureKey) {
+export async function handleStrokeOfLuck(playerStats, campaignName, popupHtml, featureKey) {
     if (!playerStats) return;
     if (featureKey === 'boonOfCombatProwess') {
         return handleBoonOfCombatProwess(playerStats, campaignName, popupHtml);
@@ -84,6 +120,9 @@ export function handleStrokeOfLuck(playerStats, campaignName, popupHtml, feature
     const modifier = Number(popupHtml?.modifier) || 0;
     const originalTotal = d20 + bonus + modifier;
     const newTotal = 20 + bonus + modifier;
+    // Attack-roll face converts a MISS into a hit — flip the persisted records
+    // too (guard inside the helper skips check/save conversions).
+    persistConvertedAttackHit(playerStats.name, campaignName, popupHtml, 'Stroke of Luck');
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,

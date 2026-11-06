@@ -35,3 +35,24 @@ In the conversion path (attack side of `handleStrokeOfLuck`/`handleBoonOfCombatP
 
 ## Severity
 Broken feature / data-integrity split. Damage applies as a hit while the machine-truth flag says miss; any hit-conditional rider silently denies after a legitimate converted hit (and the campaign log's attack row also mislabels the converted attack as a miss). Not a crash; scope = FT-007 holders (DMG boons) + any Stroke-of-Luck attack conversions.
+
+## Resolution
+FIXED 2026-11-06 (bugfix descent).
+
+**What was actually wrong** — the original diagnosis was correct: `handleBoonOfCombatProwess` (CharSheet.handlers.js) stamped the once-per-turn latch and logged the spend but never rewrote the persisted roll records, while `handleDone` (AttackResultPopup.jsx) dispatches `dice-roll-done {hit:true}` so damage applies as a hit. Homing Strikes has no such split because its bonus folds into `finalHit` BEFORE `processAttackAfterResult` stores — the conversion lanes here act AFTER the store, so they must write the record back. The Stroke-of-Luck sibling audit came back positive too: its attack face (`popupHtml.hit === false`, "Miss converted to a hit." log tail) applies damage as a hit via the same Done dispatch and had the identical stale-flag defect.
+
+**Fix** — `src/components/char-sheet/CharSheet.handlers.js`:
+- New `persistConvertedAttackHit(playerName, campaignName, popupHtml, convertedBy)` helper: guards on `popupHtml.hit === false` (so check/save D20 tests can never launder a stale record), then re-reads `campaign.lastAttack` and `<attacker>.lastAttackRoll`, and for records with `attackerName === playerName && hit === false` writes back one merged spread with `hit:true, missConverted:true, convertedBy`. d20/total/targetAc stay byte-honest (the marker explains the flag). Uses the canonical `setRuntimeValue` merged re-read/write lane (`handlePlainDamage`/`monsterJinx` lineage — `getRuntimeValue` mirror updates synchronously, and the campaign-bucket write POSTs the single property, so the later damage-merge read preserves `hit:true`). Not the BI-defense `storageService.set` lane — that only persists the combatSummary snapshot it is handed.
+- `handleBoonOfCombatProwess`: calls the helper (after the awaited latch stamp — sequential same-bucket writes, playbook §5) → `convertedBy: 'Boon of Combat Prowess'`.
+- `handleStrokeOfLuck`: made async, calls the helper → `convertedBy: 'Stroke of Luck'` (helper's hit-guard keeps check/save uses write-free).
+- Dual ruleset: both lanes are ruleset-shared (single CharSheet.handlers.js) — 5e and 2024 covered by the one fix.
+
+**Files changed:** `src/components/char-sheet/CharSheet.handlers.js` (fix), `src/components/char-sheet/CharSheet.handlers.miss-conversion.test.jsx` (new regression ledger, 7 tests).
+
+**Verification:**
+- New test: `npx vitest run CharSheet.handlers.miss-conversion.test.jsx` → 7/7 (flip both records + marker + honest d20 fields preserved, latch/log survive, SoL attack face flips, SoL check face writes nothing, foreign-attacker/already-hit records untouched).
+- Touched folders: `npx vitest run src/components/char-sheet src/components/common` → 616 files / 5958 tests passed. `npm run lint` → zero warnings. `no-timers-guard` OK.
+- Live re-repro (Playwright, test-campaign): Quarterstaff MISS (d20 3+11=14 vs AC 18) → Boon convert → popup "✓ HIT … Miss converted to Hit" and, at CONVERSION time (before Done), `GET change-data` showed `campaign.lastAttack {hit:true, missConverted:true, convertedBy:"Boon of Combat Prowess", d20:3, total:14, targetAc:18}` + `Disciplined_Monk.lastAttackRoll` twin flipped. Done → damage applied (11→5 HAM-reduced, hp_change) and the merge PRESERVED `hit:true` with `damageApplied:true, actualDamage:5`. Stunning Strike then ADMITTED: "Target EvasiveFighter must make a CON saving throw (DC 21)" popup + `.sp-overlay` prompt, FP 20→19, `_StunningStrike_usedRound {round:2}` stamped, prompt Dismiss drained clean (`save_dismissed` row, bucket evicted, zero console errors). Adjacent sanity: natural-hit path byte-unchanged (many Done-damaged hits ridden during the miss-hunt), boon round-latch re-arm honored (lockout observed at round 1, re-offered at round 2).
+- Cleanup: Admin panel cleared change-data (`{}` GET-verified, stays empty after quiet) + campaign log (`[]`) for test-campaign; no character-file writes (`git status public/campaigns` clean).
+
+**Known-accepted residual (out of scope here):** the historical campaign-log attack `roll` row still prints `hit:false` for the converted attack (rows are append-only; the `ability_use` "Miss converted to Hit" row is the honest companion). Machine-truth gating now reads the flipped record, which was the broken behavior.
