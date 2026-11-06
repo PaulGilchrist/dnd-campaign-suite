@@ -91,7 +91,9 @@ describe('divineSparkHandler.handle', () => {
 
   describe('charge deduction', () => {
     beforeEach(() => {
-      targetResolver.resolveTarget.mockResolvedValue(null);
+      // Fix (no-target self-harm bug): charges only spend once a LEGAL
+      // (other-creature) target is armed.
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
       useRuntimeState.getRuntimeValue.mockReturnValue(3);
     });
 
@@ -160,7 +162,7 @@ describe('divineSparkHandler.handle', () => {
   describe('modal payload', () => {
     beforeEach(() => {
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
-      targetResolver.resolveTarget.mockResolvedValue(null);
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
     });
 
     it('returns the full modal payload for default inputs', async () => {
@@ -175,7 +177,7 @@ describe('divineSparkHandler.handle', () => {
         payload: {
           featureName: action.name,
           attackerName: ps.name,
-          targetName: ps.name,
+          targetName: 'Ally',
           campaignName,
           healExpression: '1d8 + 2',
           damageExpression: '1d8 + 2',
@@ -233,6 +235,88 @@ describe('divineSparkHandler.handle', () => {
 
       expect(result.payload.targetName).toBe('Ally');
       expect(targetResolver.resolveTarget).toHaveBeenCalledWith(campaignName, ps.name);
+    });
+  });
+
+  // Regression (bug-divine-spark-no-target-self-harms): an unarmed row-click
+  // used to fall back to `playerStats.name`, silently self-targeting and
+  // spending a Channel Divinity charge; Harm then forced the caster's own CON
+  // save vs their DC. Rules text (2024 classes.json Cleric lv2): "another
+  // creature you can see within 30 feet of yourself" — both refusals must
+  // happen BEFORE the charge spend with zero write.
+  describe('no-legal-target refusal (zero charge spend)', () => {
+    beforeEach(() => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    });
+
+    it('refuses with an automation_info popup and spends nothing when no target is armed', async () => {
+      targetResolver.resolveTarget.mockResolvedValue(null);
+
+      const ps = makePlayerStats();
+      const action = makeAction();
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: action.name,
+          automationType: 'divine_spark',
+          description: 'No target selected — Divine Spark requires another creature within 30 feet.',
+          automation: action.automation,
+        },
+      });
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'automation',
+        characterName: ps.name,
+        abilityName: action.name,
+        automationDetail: 'divine_spark_refused',
+        reason: 'no_target',
+      }));
+      // No ability_use activation row on refusal.
+      const loggedTypes = logService.addEntry.mock.calls.map(c => c[1]?.type);
+      expect(loggedTypes).not.toContain('ability_use');
+    });
+
+    it('refuses and spends nothing when the armed target is the caster themselves', async () => {
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'TestHero' } });
+
+      const ps = makePlayerStats();
+      const action = makeAction();
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe(
+        "You can't target yourself with Divine Spark — it requires another creature."
+      );
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        automationDetail: 'divine_spark_refused',
+        reason: 'cannot_target_self',
+      }));
+    });
+
+    it('resolves the target BEFORE the charge spend on the happy path', async () => {
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally' } });
+
+      const ps = makePlayerStats();
+      const action = makeAction();
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('modal');
+      expect(result.payload.targetName).toBe('Ally');
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        ps.name,
+        'channelDivinityCharges',
+        1,
+        campaignName,
+        true,
+      );
     });
   });
 

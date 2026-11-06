@@ -153,14 +153,54 @@ describe('saveOnlyHandler.handle - popup return value', () => {
     });
   });
 
-  it('uses player name as target when resolveTarget returns null', async () => {
+  it('refuses with a popup and no save prompt when resolveTarget returns null', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ saveType: 'CON' });
     targetResolver.resolveTarget.mockResolvedValue(null);
 
     const result = await handle(action, ps, campaignName, mapName);
 
-    expect(result.payload.targetName).toBe('TestHero');
+    // Regression (self-harm fallback family, shared with divineSparkHandler):
+    // every save_only consumer (Stunning Strike, Color Spray, Entangle, Grease,
+    // Arms of Hadar, Dominate Monster) requires another creature — an unarmed
+    // click must never queue a saving-throw prompt against the caster.
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Stunning Strike',
+        automationType: 'save_only',
+        description: 'No target selected — Stunning Strike requires another creature. Select a target in combat first.',
+        automation: { saveType: 'CON' },
+      },
+    });
+    expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'automation',
+      characterName: 'TestHero',
+      abilityName: 'Stunning Strike',
+      automationDetail: 'stunning_strike_refused',
+      reason: 'no_target',
+    }));
+  });
+
+  it('refuses with a popup and no save prompt when the armed target is the caster', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ saveType: 'CON' });
+    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'TestHero' } });
+
+    const result = await handle(action, ps, campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.description).toBe(
+      "You can't target yourself with Stunning Strike — it requires another creature."
+    );
+    expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      automationDetail: 'stunning_strike_refused',
+      reason: 'cannot_target_self',
+    }));
   });
 });
 

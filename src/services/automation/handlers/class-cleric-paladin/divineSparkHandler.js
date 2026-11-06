@@ -19,6 +19,32 @@ function resolveSparkCharges(playerStats) {
     return storedCharges != null ? Number(storedCharges) : maxCharges;
 }
 
+// Refusal shape mirrors bewitchingMagicHandler.bewitchingRefusal (automation +
+// divine_spark_refused + reason token, zero spend) with the infoPopup payload
+// convention used by the no-charges branch below.
+function divineSparkRefusal(action, playerStats, campaignName, reason, message) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        automationType: action.automation?.type || 'divine_spark',
+        automationDetail: 'divine_spark_refused',
+        reason,
+        description: `${action.name} refused — ${reason}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[divineSparkHandler:refusal-log-error]', e); });
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: action.automation?.type || 'divine_spark',
+            description: message,
+            automation: action.automation,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
@@ -37,11 +63,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    // Rules text (public/data/2024/classes.json Cleric lv2): "another creature
+    // you can see within 30 feet of yourself" — self is never a legal target.
+    // Resolve the armed target BEFORE spending a Channel Divinity charge (the
+    // old `|| playerStats.name` fallback silently self-targeted and burned the
+    // scarce resource). Resolve-then-spend mirrors handOfUltimateMercyHandler.
+    const targetInfo = await resolveTarget(campaignName, playerStats.name);
+    const targetName = targetInfo?.target?.name || null;
+
+    if (!targetName) {
+        return divineSparkRefusal(action, playerStats, campaignName, 'no_target',
+            'No target selected — Divine Spark requires another creature within 30 feet.');
+    }
+
+    if (targetName === playerStats.name) {
+        return divineSparkRefusal(action, playerStats, campaignName, 'cannot_target_self',
+            "You can't target yourself with Divine Spark — it requires another creature.");
+    }
+
     const newCharges = currentCharges - 1;
     setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName, true);
-
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const targetName = targetInfo?.target?.name || playerStats.name;
 
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
     const wisModifier = wis?.bonus || 0;

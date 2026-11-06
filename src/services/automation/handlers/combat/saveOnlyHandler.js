@@ -21,12 +21,57 @@ function getDefaultEffects(automationName, auto) {
     return { success: [], fail: [{ type: 'stunned', condition: auto?.effects?.fail?.[0]?.condition || 'stunned' }] };
 }
 
+// Refusal slug convention: derived from the ACTION name (monsterSelfBuff
+// precedent — Stunning Strike → stunning_strike_refused).
+function refusalSlug(actionName) {
+    return String(actionName || 'save_only').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+function saveOnlyRefusal(action, playerStats, campaignName, reason, message) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        automationType: action.automation?.type || 'save_only',
+        automationDetail: `${refusalSlug(action.name)}_refused`,
+        reason,
+        description: `${action.name} refused — ${reason}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveOnly] Error logging refusal:', e); });
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: action.automation?.type || 'save_only',
+            description: message,
+            automation: action.automation,
+        },
+    };
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
     const saveDc = buildSaveDc(auto, playerStats);
+
+    // Every save_only consumer requires another creature (Stunning Strike:
+    // "when you hit a creature"; Color Spray/Entangle/Grease/Arms of Hadar/
+    // Dominate Monster: creatures in an area/point of your choice) — self is
+    // never a legal target. Refuse with a popup instead of the old
+    // `|| playerStats.name` fallback that forced a save prompt on the caster.
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const targetName = targetInfo?.target?.name || playerStats.name;
+    const targetName = targetInfo?.target?.name || null;
+
+    if (!targetName) {
+        return saveOnlyRefusal(action, playerStats, campaignName, 'no_target',
+            `No target selected — ${action.name} requires another creature. Select a target in combat first.`);
+    }
+
+    if (targetName === playerStats.name) {
+        return saveOnlyRefusal(action, playerStats, campaignName, 'cannot_target_self',
+            `You can't target yourself with ${action.name} — it requires another creature.`);
+    }
 
     const effects = auto.effects || getDefaultEffects(action.name, auto);
     const { promptId } = createSaveListener(campaignName, {
