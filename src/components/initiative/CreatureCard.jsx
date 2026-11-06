@@ -179,6 +179,15 @@ function overlayLabel(o) {
 }
 
 function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, overlays, onTargetChange }) {
+    // Overlay targets are live ONLY on the PC cast lane (CharSpells
+    // getTargetInfo SP-097 fallback → useLoggedDiceRollDamage 'overlay-'
+    // branch → handleAoeDamage area adjudication). Monster damage chips
+    // resolve their target through MonsterCardModal.getTarget()'s name
+    // lookup, which can never match `overlay-<id>` — a monster with an
+    // overlay armed rolls plain untargeted damage (targetName:undefined).
+    // Suppress the inert options on monster cards (backlog
+    // aoe-overlay-dead-lane trap fix).
+    const showOverlays = creature.type === 'player' && overlays.length > 0
     return (
         <div className='creature-target'>Target&nbsp;
             <select
@@ -195,7 +204,7 @@ function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, o
                         <option key={c.name} value={c.name}>{c.name}</option>
                     ))
                 }
-                {overlays.length > 0 && (
+                {showOverlays && (
                     <optgroup label="─── Overlays ───">
                         {overlays.map(o => (
                             <option key={`overlay-${o.id}`} value={`overlay-${o.id}`}>
