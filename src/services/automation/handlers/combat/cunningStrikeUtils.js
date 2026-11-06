@@ -2,6 +2,19 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 
 const SIZE_ORDER = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
 
+/**
+ * Canonical name list for the Cunning Strike rider family: the 5e twins and
+ * the 2024 Devious Strikes umbrella. Single source of truth shared by the
+ * once-per-turn latch-key choice (attackRiderHandler.oncePerTurnUsedKey),
+ * the chooser-host close/resume gate (CharActionModals) and the post-apply
+ * committed-cost copy in AttackRiderModal.
+ */
+export const CUNNING_STRIKE_FEATURE_NAMES = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'];
+
+export function isCunningStrikeFeatureName(name) {
+    return CUNNING_STRIKE_FEATURE_NAMES.includes(name);
+}
+
 function hasRequiredToolOrItem(option, playerStats) {
     const toolProficiencies = playerStats?.toolProficiencies || [];
     const hasProficiency = toolProficiencies.some(p =>

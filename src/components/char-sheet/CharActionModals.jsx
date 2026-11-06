@@ -31,6 +31,7 @@ import { logHealingToSSE } from '../../services/automation/common/healingRoll.js
 import { addEntry } from '../../services/ui/logService.js'
 import SecondaryModals from './CharActionModals.SecondaryModals.jsx';
 import { mergeModalStates } from './modalStateMerge.js';
+import { isCunningStrikeFeatureName } from '../../services/automation/handlers/combat/cunningStrikeUtils.js';
 
 const CLOCKWORK_CHOICE_MODAL_KEYS = {
     heal: 'clockworkCavalcadeHealModal',
@@ -426,7 +427,7 @@ function CharActionModals({
             // (Apply path) or gated by the skip flag (Cancel path).
             await resumeAttackPipeline?.();
         }
-        const isCunningStrikeVariant = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(modalAction?.name);
+        const isCunningStrikeVariant = isCunningStrikeFeatureName(modalAction?.name);
         if (isCunningStrikeVariant) {
             resumeAttackPipeline?.();
         }

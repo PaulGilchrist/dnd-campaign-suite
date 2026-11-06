@@ -1,5 +1,5 @@
 // @maintained-by-ai
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AttackRiderModal from './AttackRiderModal.jsx';
 
@@ -184,6 +184,67 @@ describe('AttackRiderModal', () => {
     expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Post-apply committed-cost lock (DG backlog)', () => {
+    // Deferred applyRiderOption: models the real window where the cost leg has
+    // paid (ability_use row + sneak dice deducted) and a save prompt stacks
+    // behind the still-open chooser — Cancel must be disabled for all of it.
+    function deferred() {
+      let resolve;
+      const promise = new Promise(r => { resolve = r; });
+      return { promise, resolve };
+    }
+
+    it('Cunning Strike chooser: Apply disables Cancel and shows the committed-cost copy mid-dispatch; a re-click never re-dispatches', async () => {
+      const { promise, resolve } = deferred();
+      applyRiderOption.mockReturnValue(promise);
+      const onClose = vi.fn();
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction, onClose })} />);
+      clickCheckbox(1); // Trip — pays the 1d6 Cunning Strike cost inside applyRiderOption
+      expect(screen.getByRole('button', { name: 'Cancel' })).not.toBeDisabled();
+      clickApplyMulti();
+      await waitFor(() => expect(applyRiderOption).toHaveBeenCalledTimes(1));
+      // Paid-cost escape hatch is closed: Cancel disabled, honest copy shown,
+      // Apply disabled so a stray re-click can never pay a second cost row.
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Apply Effects$/ })).toBeDisabled();
+      expect(screen.getByText(/Cunning Strike cost is already committed/)).toBeInTheDocument();
+      clickApplyMulti(); // same-tick/double-press — the ref latch refuses a second dispatch
+      expect(applyRiderOption).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+      // Trip save legs resolve to null (CLA-376): after the legs finish the
+      // chooser auto-closes ONCE (resume path in the host), no Cancel needed.
+      await act(async () => { resolve(null); });
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    });
+
+    it('single-select non-CS chooser shows the generic committed copy and the result overlay after resolve', async () => {
+      const { promise, resolve } = deferred();
+      applyRiderOption.mockReturnValue(promise);
+      const onClose = vi.fn();
+      render(<AttackRiderModal {...makeProps({ onClose })} />);
+      selectSingleOption('Burning Hands');
+      clickApplySingle();
+      await waitFor(() => expect(applyRiderOption).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+      expect(screen.getByText(/this choice is already committed/)).toBeInTheDocument();
+      await act(async () => { resolve(defaultResult); });
+      expect(screen.getByText('Effect applied successfully.')).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('pre-apply Cancel on the multi-select chooser stays enabled and spends nothing (unpaid exit unchanged)', () => {
+      const onClose = vi.fn();
+      render(<AttackRiderModal {...makeProps({ action: cunningStrikeAction, onClose })} />);
+      clickCheckbox(1);
+      const cancel = screen.getByRole('button', { name: 'Cancel' });
+      expect(cancel).not.toBeDisabled();
+      expect(screen.queryByText(/committed/)).not.toBeInTheDocument();
+      fireEvent.click(cancel);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(applyRiderOption).not.toHaveBeenCalled();
+    });
   });
 
   it('renders safely with empty options and with an action that has no automation', () => {

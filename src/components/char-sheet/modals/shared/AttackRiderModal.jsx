@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { applyRiderOption } from '../../../../services/automation/handlers/combat/attackRiderHandler.js';
+import { isCunningStrikeFeatureName } from '../../../../services/automation/handlers/combat/cunningStrikeUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import SecondaryTargetModal from './SecondaryTargetModal.jsx';
 import '../../CharSheet.css';
@@ -162,6 +163,18 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const [stalkersFlurryTargets, setStalkersFlurryTargets] = useState(null);
     const [sfApplied, setSfApplied] = useState(false);
     const [sfResult, setSfResult] = useState(null);
+    // DG 2026-11-06: pressing Apply Effects dispatches applyRiderOption,
+    // which PAYS the Cunning Strike cost (ability_use row + Sneak dice
+    // deducted) before awaiting save prompts — those stack behind this
+    // still-open chooser. A Cancel pressed in that window kept the spend
+    // but abandoned the effect (playbook §9 paid-cost family). Once
+    // dispatched the choice is committed: Cancel/Apply disable until the
+    // legs resolve (SaveAttackAoeModal `dispatched`-latch precedent —
+    // state drives the disabled attribute, the ref guards same-tick
+    // re-entry so a double-click can never pay a second cost row).
+    // Pre-apply Cancel remains a free "roll with no effect" exit.
+    const [dispatched, setDispatched] = useState(false);
+    const dispatchedRef = useRef(false);
 
     useEffect(() => {
         if (applied && !result && !versatileTricksterTargets && !stalkersFlurryTargets) {
@@ -198,23 +211,17 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     }, [applied, result, playerStats.name, campaignName]);
 
     const handleApply = async () => {
-        if (multiSelect) {
-            if (selectedMulti.length === 0) return;
-            const res = await applyRiderOption(action, playerStats, campaignName, targetName, selectedMulti);
-            setResult(res);
-            // CLA-376: Trip save legs return null — open the VT picker off the
-            // freshly-written (entry-cleared) persisted keys, not result truthiness.
-            const vtTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
-            if (vtTargets && vtTargets.length > 0) setVersatileTricksterTargets(vtTargets);
-            setApplied(true);
-        } else {
-            if (!selected) return;
-            const res = await applyRiderOption(action, playerStats, campaignName, targetName, selected ? [selected] : []);
-            setResult(res);
-            const vtTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
-            if (vtTargets && vtTargets.length > 0) setVersatileTricksterTargets(vtTargets);
-            setApplied(true);
-        }
+        const chosenNames = multiSelect ? selectedMulti : (selected ? [selected] : []);
+        if (chosenNames.length === 0 || dispatchedRef.current) return;
+        dispatchedRef.current = true;
+        setDispatched(true);
+        const res = await applyRiderOption(action, playerStats, campaignName, targetName, chosenNames);
+        setResult(res);
+        // CLA-376: Trip save legs return null — open the VT picker off the
+        // freshly-written (entry-cleared) persisted keys, not result truthiness.
+        const vtTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
+        if (vtTargets && vtTargets.length > 0) setVersatileTricksterTargets(vtTargets);
+        setApplied(true);
     };
 
     const toggleMultiSelect = (optName) => {
@@ -282,12 +289,19 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
                             {selectedMulti.length}/{maxEffects} selected
                         </p>
                     )}
+                    {dispatched && (
+                        <p className="sp-note">
+                            {isCunningStrikeFeatureName(action.name)
+                                ? 'Cunning Strike cost is already committed — resolve the effect to continue.'
+                                : 'Effects are being applied — this choice is already committed.'}
+                        </p>
+                    )}
                 </div>
                 <div className="sp-actions">
-                    <button className="sp-roll-btn" onClick={handleApply} disabled={!canApply}>
+                    <button className="sp-roll-btn" onClick={handleApply} disabled={!canApply || dispatched}>
                         <i className="fa-solid fa-bolt"></i> Apply Effect{multiSelect ? 's' : ''}
                     </button>
-                    <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
+                    <button className="sp-dismiss-btn" onClick={onClose} disabled={dispatched} title={dispatched ? 'Cost already committed — resolve the effect instead' : undefined}>Cancel</button>
                 </div>
             </div>
         </div>

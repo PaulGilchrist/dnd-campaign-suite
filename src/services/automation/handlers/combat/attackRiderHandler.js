@@ -11,7 +11,7 @@ import { parseMagicItemName } from '../../../rules/core/attackCalc.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { restoreBaseAttackAfterBash } from '../../../combat/steps/features/shieldBash.js';
 import { resolveMassFear } from './massFearHandler.js';
-import { validateCunningStrikeOption, getCombatContextSync, applyCunningStrikeCost } from './cunningStrikeUtils.js';
+import { validateCunningStrikeOption, getCombatContextSync, applyCunningStrikeCost, isCunningStrikeFeatureName } from './cunningStrikeUtils.js';
 
 // Slashing damage hit validation (used by Slasher feat Hamstring)
 async function validateSlashingHit(action, playerStats, campaignName) {
@@ -205,8 +205,7 @@ async function handleShieldBash(action, auto, options, playerStats, campaignName
 }
 
 function oncePerTurnUsedKey(action) {
-    const isCsFeature = ['Cunning Strike', 'Improved Cunning Strike', 'Devious Strikes'].includes(action.name);
-    return isCsFeature ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+    return isCunningStrikeFeatureName(action.name) ? '_CunningStrike_usedRound' : `_${action.name.replace(/\s+/g, '_')}_usedRound`;
 }
 
 function expandPushOrProneOptions(auto, options) {

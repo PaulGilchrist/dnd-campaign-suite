@@ -15,7 +15,7 @@ vi.mock('../../../encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => mockCombatSummary),
 }));
 
-import { getCombatContextSync, validateCunningStrikeOption, applyCunningStrikeCost } from './cunningStrikeUtils.js';
+import { getCombatContextSync, validateCunningStrikeOption, applyCunningStrikeCost, isCunningStrikeFeatureName } from './cunningStrikeUtils.js';
 
 const campaignName = 'test-campaign';
 
@@ -308,5 +308,19 @@ describe('applyCunningStrikeCost (Sneak Attack dice accumulator + log)', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_cunningStrikeCostUsed', 1, campaignName);
         expect(errSpy).toHaveBeenCalled();
         errSpy.mockRestore();
+    });
+});
+
+describe('isCunningStrikeFeatureName (canonical CS-family name list)', () => {
+    it('accepts exactly the Cunning Strike rider family (5e twins + 2024 Devious Strikes)', () => {
+        expect(isCunningStrikeFeatureName('Cunning Strike')).toBe(true);
+        expect(isCunningStrikeFeatureName('Improved Cunning Strike')).toBe(true);
+        expect(isCunningStrikeFeatureName('Devious Strikes')).toBe(true);
+    });
+
+    it('rejects sibling riders and undefined (host closes with a missing action)', () => {
+        expect(isCunningStrikeFeatureName('Hamstring')).toBe(false);
+        expect(isCunningStrikeFeatureName("Stalker's Flurry")).toBe(false);
+        expect(isCunningStrikeFeatureName(undefined)).toBe(false);
     });
 });
