@@ -132,9 +132,23 @@ describe('versatileTricksterHandler', () => {
                 for (const creature of sizes) {
                     setRuntimeValue.mockClear();
                     addEntry.mockClear();
+                    getRuntimeValue.mockReset();
                     getCombatContext.mockResolvedValue(
                         makeCombatContext([creature])
                     );
+                    // Store-backed mirror so the save-success eviction is
+                    // observable: the append lands, then gets evicted.
+                    const teStore = { effects: [] };
+                    getRuntimeValue.mockImplementation((scope, key) =>
+                        scope === 'campaign' && key === 'targetEffects'
+                            ? teStore.effects
+                            : null
+                    );
+                    setRuntimeValue.mockImplementation(async (scope, key, value) => {
+                        if (scope === 'campaign' && key === 'targetEffects') {
+                            teStore.effects = value;
+                        }
+                    });
 
                     const result = await applyVersatileTrickster(
                         makeAction(),
@@ -154,10 +168,15 @@ describe('versatileTricksterHandler', () => {
                         },
                     });
 
-                    // Exactly one write: the targetEffects append. No
-                    // activeConditions write on a succeeded save.
-                    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-                    expect(setRuntimeValue).toHaveBeenCalledWith(
+                    // Save SUCCESS face (DG 2026-11-06 improve): the append
+                    // write is immediately followed by the descriptor-row
+                    // eviction, so no prone-shaped residue survives at root.
+                    // No activeConditions write on a succeeded save.
+                    const teWrites = setRuntimeValue.mock.calls.filter(
+                        (c) => c[1] === 'targetEffects'
+                    );
+                    expect(teWrites).toHaveLength(2);
+                    expect(teWrites[0]).toEqual([
                         'campaign',
                         'targetEffects',
                         [
@@ -183,7 +202,19 @@ describe('versatileTricksterHandler', () => {
                             },
                         ],
                         'test-campaign'
-                    );
+                    ]);
+                    expect(teWrites[1]).toEqual([
+                        'campaign',
+                        'targetEffects',
+                        [],
+                        'test-campaign'
+                    ]);
+                    expect(teStore.effects).toEqual([]);
+                    expect(
+                        setRuntimeValue.mock.calls.some(
+                            (c) => c[1] === 'activeConditions'
+                        )
+                    ).toBe(false);
 
                     expect(addEntry).toHaveBeenCalledTimes(1);
                     expect(addEntry).toHaveBeenCalledWith(
@@ -372,6 +403,13 @@ describe('versatileTricksterHandler', () => {
                 );
                 expect(proneWrites).toHaveLength(1);
                 expect(proneWrites[0][2]).toEqual(['restrained', 'prone']);
+                // Fail face keeps the descriptor row (exactly one te write —
+                // no eviction when the save fails).
+                expect(
+                    setRuntimeValue.mock.calls.filter(
+                        (c) => c[1] === 'targetEffects'
+                    )
+                ).toHaveLength(1);
                 expect(result.payload.description).toBe(
                     'Versatile Trickster: Trip also applied to Thug 2 — failed its Dexterity save (DC 16) and gained the Prone condition.'
                 );

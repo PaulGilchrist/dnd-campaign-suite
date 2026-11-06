@@ -642,6 +642,28 @@ async function applyEnvenomWeapons(playerStats, campaignName, targetName) {
     }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
 }
 
+// DG-2026-11-06 improve: a rider leg that resolves as a SAVE SUCCESS grants
+// nothing, so the descriptor row applyRiderEffect wrote pre-save must not
+// linger at campaign root where a prone/condition-shaped row (no clock, no
+// badge, invisible to every keyed sweep) could later be misread as live.
+// Consumer census (2026-11-06): no reader keys on these rows post-resolution
+// — the audit trail is the ability_use log row. Scoped by the exact
+// target+source+option+effect tuple buildRiderEffect writes, so every other
+// rider's rows are untouched. Spread-new-array law (never mutate the store ref).
+function evictSavedRiderEffect({ playerStats, campaignName, targetName, option }) {
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    if (!Array.isArray(storedEffects)) return;
+    const keptEffects = storedEffects.filter(te => !(
+        te.target === targetName &&
+        te.source === playerStats.name &&
+        te.option === option.name &&
+        te.effect === option.effect
+    ));
+    if (keptEffects.length !== storedEffects.length) {
+        setRuntimeValue('campaign', 'targetEffects', keptEffects, campaignName);
+    }
+}
+
 async function handleRiderSave(action, playerStats, campaignName, targetName, option) {
     const saveDc = buildSaveDc(option, playerStats);
     const { promise } = createSaveListener(campaignName, {
@@ -653,6 +675,12 @@ async function handleRiderSave(action, playerStats, campaignName, targetName, op
     });
 
     const saveResult = await promise;
+
+    // Saved legs leave no state: evict this option's descriptor row (fail
+    // legs keep it exactly as before — the row + the granted condition stand).
+    if (saveResult.success === true) {
+        evictSavedRiderEffect({ playerStats, campaignName, targetName, option });
+    }
 
     if (saveResult.success === false && option.condition) {
         const conditions = getRuntimeValue(targetName, 'activeConditions') || [];

@@ -16,6 +16,24 @@ function buildTricksterPopup(action, auto, description) {
     };
 }
 
+// DG 2026-11-06 improve: a successful save grants nothing — evict the
+// descriptor row written above so no prone-shaped residue lingers at campaign
+// root (mirrors the primary-leg eviction in attackRiderHandler.handleRiderSave;
+// the ability_use log is the audit trail). Fail legs keep the row byte-identical.
+async function evictSavedTripDescriptor(newEffect, secondaryTargetName, campaignName, saveResult) {
+    if (saveResult.success !== true) return;
+    const freshEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const keptEffects = freshEffects.filter(te => !(
+        te.target === secondaryTargetName &&
+        te.source === newEffect.source &&
+        te.option === 'Trip' &&
+        te.effect === 'prone'
+    ));
+    if (keptEffects.length !== freshEffects.length) {
+        await setRuntimeValue('campaign', 'targetEffects', keptEffects, campaignName);
+    }
+}
+
 export async function applyVersatileTrickster(action, playerStats, campaignName, secondaryTargetName) {
     const auto = action.automation || {};
 
@@ -78,6 +96,8 @@ export async function applyVersatileTrickster(action, playerStats, campaignName,
 
     const saveResult = await promise;
     const saveFailed = saveResult.success === false;
+
+    await evictSavedTripDescriptor(newEffect, secondaryTargetName, campaignName, saveResult);
 
     if (saveFailed) {
         const conditions = getRuntimeValue(secondaryTargetName, 'activeConditions') || [];

@@ -65,7 +65,6 @@ Live facts (DG, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (DG 2026-11-06) Saved (successful-save) Trip legs leave descriptor-shaped `targetEffects` rows at campaign root (`effect:'prone'`, no clock observed) — GM effect lists/badges could misread them as live prone; add a `saveOutcome` field or evict on save resolution. `attackRiderHandler.applyRiderEffect + targetEffectDefinitions.js`.
 - (DG 2026-11-06) VT secondary-target list offers the ATTACKER itself as a trip candidate (`EvasiveFighter` radio in the chooser) — RAW "another creature" excludes self; filter the holder. `versatileTricksterHandler/chooser host`.
 
 ## Blocked / Deepen Targets (fold-gate ledger)
