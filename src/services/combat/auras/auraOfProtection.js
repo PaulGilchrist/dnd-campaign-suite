@@ -1,6 +1,7 @@
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getAllyList, hasExplicitAllyList } from '../../../hooks/useAllySelection.js';
+import { loadMapData } from '../../maps/mapsService.js';
 
 export const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
 export const DEFAULT_AURA_RANGE_FT = 10;
@@ -49,7 +50,30 @@ function bearerCoversTarget(bearerName, targetName, partyNames) {
   return partyNames.has(targetName) || targetName === bearerName;
 }
 
-export async function computeAuraBonus({ targetName, characters, allCreatures }) {
+// Display-honesty probe (backlog 2026-11-06): when an active map exists but the
+// winning bearer has NO token on it AND is not a combat-board member, the
+// aura's co-presence is merely ASSUMED by the gridless-lenient doctrine
+// ("phantom bearer" — computeAuraBonus iterates the whole roster, isWithinRange
+// consults-and-passes for unplaced creatures). This NEVER gates the bonus —
+// it only flags the assumption so the save-prompt breakdown can caveat it.
+// Token lookup mirrors the established map lanes (coronaAuraUtils.findMapToken):
+// players/placedItems entries matched by exact name.
+export async function isBearerAssumedCoPresent(bearerName, { campaignName, activeMapName, allCreatures }) {
+  if (!bearerName) return false;
+  const mapName = activeMapName || getRuntimeValue('__map__', 'activeMapName');
+  if (!mapName) return false; // gridless campaign — co-presence is the norm, nothing to caveat
+  if ((allCreatures || []).some(c => c?.name === bearerName)) return false; // combat-board member
+  try {
+    const data = await loadMapData(campaignName || getRuntimeValue('__campaign__', 'campaignName'), mapName);
+    if (!data) return false; // unresolvable map document — cannot assert absence (fail-open)
+    const tokens = [...(data.players || []), ...(data.placedItems || [])];
+    return !tokens.some(t => t?.name === bearerName);
+  } catch {
+    return false; // map unreadable — never claim a caveat we could not verify
+  }
+}
+
+export async function computeAuraBonus({ targetName, characters, campaignName, activeMapName, allCreatures }) {
   let bestBonus = 0;
   let bestSource = null;
 
@@ -76,5 +100,13 @@ export async function computeAuraBonus({ targetName, characters, allCreatures })
     }
   }
 
-  return { bonus: bestBonus, sourceName: bestSource };
+  if (!bestSource) return { bonus: bestBonus, sourceName: bestSource };
+  const result = { bonus: bestBonus, sourceName: bestSource };
+  // Carried ONLY when the co-presence is assumed (all other lanes keep the
+  // historical { bonus, sourceName } shape); consumed by the SavePromptModal
+  // pre-roll aura breakdown tooltip. Bonus math is untouched.
+  if (await isBearerAssumedCoPresent(bestSource, { campaignName, activeMapName, allCreatures })) {
+    result.assumedCoPresent = true;
+  }
+  return result;
 }

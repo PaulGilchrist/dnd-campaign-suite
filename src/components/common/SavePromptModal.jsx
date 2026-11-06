@@ -363,12 +363,17 @@ function signedBonus(n) {
 // post-roll bonus line whenever no roll-time dice bonuses (Bane/Bless) apply.
 function buildPreRollBreakdown(abilityLabel, saveBonus, aura) {
   const auraBonus = aura?.bonus > 0 ? aura.bonus : 0;
+  // Phantom-bearer caveat (backlog 2026-11-06): computeAuraBonus flags
+  // assumedCoPresent when the active map exists but the bearer has no token
+  // there and no board membership — co-presence is assumed by the
+  // gridless-lenient doctrine. Display-honesty only; bonus values unchanged.
+  const assumedCaveat = aura?.assumedCoPresent ? ' — assumed co-present (no token)' : '';
   return {
     promptId: null,
     baseLabel: `${abilityLabel} ${signedBonus(saveBonus)}`,
     auraLabel: auraBonus > 0 ? `${signedBonus(auraBonus)} (Aura of Protection)` : null,
     auraTooltip: auraBonus > 0 && aura.sourceName
-      ? `Aura of Protection from ${aura.sourceName}`
+      ? `Aura of Protection from ${aura.sourceName}${assumedCaveat}`
       : 'Aura of Protection',
     totalLabel: `= ${signedBonus(saveBonus + auraBonus)}`,
   };

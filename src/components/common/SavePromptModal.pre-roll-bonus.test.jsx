@@ -171,6 +171,21 @@ describe('SavePromptModal — pre-roll save-bonus breakdown', () => {
     }));
   });
 
+  // Backlog 2026-11-06 (DA): phantom-bearer display honesty. When
+  // computeAuraBonus reports assumedCoPresent (active map exists, bearer has
+  // no token on it, not a board member) the tooltip caveats the assumption.
+  // The pad value/labels are IDENTICAL to the flag-absent face above.
+  it('caveats a phantom bearer\'s tooltip with "assumed co-present (no token)"', async () => {
+    computeAuraBonus.mockResolvedValue({ bonus: 5, sourceName: 'ElderPaladin', assumedCoPresent: true });
+    renderModal();
+
+    const breakdown = await openBreakdown('trigger-aura-target');
+    expect(within(breakdown).getByText('+5 (Aura of Protection)')).toBeInTheDocument();
+    expect(within(breakdown).getByText('= +7')).toBeInTheDocument();
+    const chip = within(breakdown).getByTestId('creature-badge');
+    expect(chip).toHaveAttribute('title', 'Aura of Protection from ElderPaladin — assumed co-present (no token)');
+  });
+
   it('shows zero-bonus breakdown (= +0) without an aura chip', async () => {
     computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: null });
     getAbilitySaveBonus.mockReturnValue(0);

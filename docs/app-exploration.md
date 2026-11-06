@@ -79,7 +79,7 @@ Live facts (all re-derived THIS run, test-campaign, dev pair `CAMPAIGN_LOCK='tes
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-06 (DA) **Party-wide aura co-presence is invisible in the prompt:** an Aura of Protection bearer NOT on the combat board still pads saves (gridless-lenient by doctrine, and the prompt does name the source — "…(+5 aura from ElderPaladin)") — surface an explicit affordance: when the active map exists but the bearer has no token/board membership, show "assumed co-present (no token)" in the aura breakdown tooltip so GMs can reason about phantom-bearer buffs. `src/services/combat/auras/auraOfProtection.js`, `SavePromptModal.jsx` aura breakdown UI.
+(no open items)
 
 ## Blocked / Deepen Targets (fold-gate ledger)
 

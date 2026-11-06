@@ -6,8 +6,11 @@
 // gating semantics are pinned once, HERE.
 // App semantics pinned from source, not book:
 // - computeAuraBonus returns { bonus, sourceName } (consumed by savePromptHandlers,
-//   concentrationService, conditionSaveService, CharConditions). Callers pass
-//   campaignName/activeMapName which this pure helper ignores; allCreatures
+//   concentrationService, conditionSaveService, CharConditions), plus
+//   assumedCoPresent: true ONLY when the active map exists but the winning
+//   bearer has no token on it and no combat-board membership (gridless-lenient
+//   phantom-bearer caveat, backlog 2026-11-06 — display-only, bonus untouched).
+//   campaignName/activeMapName feed that probe; allCreatures
 //   feeds the unedited-bearer legacy party split (type 'player' entries).
 // - every gate-passing bearer clamps to a MINIMUM bonus of 1; strict '>' keeps the
 //   first-set highest source on ties (duplicate bearers never stack).
@@ -33,6 +36,10 @@ vi.mock('../../rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn(),
 }));
 
+vi.mock('../../maps/mapsService.js', () => ({
+  loadMapData: vi.fn(),
+}));
+
 import {
   CANNOT_ACT_CONDITIONS,
   DEFAULT_AURA_RANGE_FT,
@@ -47,6 +54,7 @@ import {
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getAllyList, hasExplicitAllyList } from '../../../hooks/useAllySelection.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
+import { loadMapData } from '../../maps/mapsService.js';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -274,5 +282,85 @@ describe('computeAuraBonus — ally gate (unedited legacy split vs edited narrow
       cs(['Paladin', 'player'], ['Cleric', 'player'])
     );
     expect(result).toEqual({ bonus: 0, sourceName: null });
+  });
+});
+
+// Backlog 2026-11-06 (DA): phantom-bearer padding is ACCEPTED by the
+// gridless-lenient doctrine — the assumedCoPresent flag is a DISPLAY-HONESTY
+// probe only (SavePromptModal pre-roll tooltip). It fires when the active map
+// exists AND the winning bearer has NO token there AND is not a combat-board
+// member; every other face keeps the historical { bonus, sourceName } shape.
+// Bonus values are identical on every face.
+describe('computeAuraBonus — assumed-co-present caveat (phantom bearer)', () => {
+  const paladin = () => [bearer('ElderPaladin', ['Aura of Protection'])];
+
+  beforeEach(() => {
+    hasExplicitAllyList.mockReturnValue(false);
+    loadMapData.mockResolvedValue({ players: [], placedItems: [] });
+  });
+
+  const board = (...names) => names.map(name => ({ name, type: 'player' }));
+
+  it('flags the bearer when a map is active, they have no token, and they are off the board', async () => {
+    const result = await compute(paladin(), 'Cleric', board('Cleric'));
+    expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin', assumedCoPresent: true });
+    expect(loadMapData).toHaveBeenCalledWith('test-campaign', 'Map');
+  });
+
+  it('does NOT flag a bearer with a token on the active map', async () => {
+    loadMapData.mockResolvedValue({ players: [{ name: 'ElderPaladin', gridX: 3, gridY: 4 }] });
+    const result = await compute(paladin(), 'Cleric', board('Cleric'));
+    expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin' });
+    expect(result.assumedCoPresent).toBeUndefined();
+  });
+
+  it('does NOT flag a board member even without a token', async () => {
+    const result = await compute(paladin(), 'Cleric', board('Cleric', 'ElderPaladin'));
+    expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin' });
+    expect(loadMapData).not.toHaveBeenCalled();
+  });
+
+  it('gridless campaign (no active map, param or runtime): never flags, never loads a map', async () => {
+    getRuntimeValue.mockImplementation((entity, key) =>
+      (entity === '__map__' && key === 'activeMapName' ? null : [])
+    );
+    const result = await computeAuraBonus({
+      targetName: 'Cleric',
+      characters: paladin(),
+      campaignName: 'test-campaign',
+      activeMapName: null,
+      allCreatures: board('Cleric'),
+    });
+    expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin' });
+    expect(loadMapData).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the runtime __map__ key when no activeMapName is passed', async () => {
+    getRuntimeValue.mockImplementation((entity, key) =>
+      (entity === '__map__' && key === 'activeMapName' ? 'battle-arena' : [])
+    );
+    const result = await computeAuraBonus({
+      targetName: 'Cleric',
+      characters: paladin(),
+      campaignName: 'test-campaign',
+      allCreatures: board('Cleric'),
+    });
+    expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin', assumedCoPresent: true });
+    expect(loadMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena');
+  });
+
+  it.each([
+    ['the map document fails to load', () => loadMapData.mockRejectedValue(new Error('fetch down'))],
+    ['the map document is absent (null)', () => loadMapData.mockResolvedValue(null)],
+  ])('fails OPEN (no caveat) when %s', async (_case, setup) => {
+    setup();
+    const result = await compute(paladin(), 'Cleric', board('Cleric'));
+    expect(result).toEqual({ bonus: 5, sourceName: 'ElderPaladin' });
+  });
+
+  it('zero-envelope result never carries the flag', async () => {
+    isWithinRange.mockResolvedValue(false);
+    expect(await compute(paladin(), 'Cleric', board('Cleric')))
+      .toEqual({ bonus: 0, sourceName: null });
   });
 });
