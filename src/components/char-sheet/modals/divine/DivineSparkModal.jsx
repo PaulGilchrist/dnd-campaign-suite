@@ -69,10 +69,17 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
     // confirm, after its gates pass; the ref guard pins exactly ONE spend per
     // modal session even if a branch aborts and a second branch is clicked.
     const chargeSpentRef = useRef(false);
+    // Header freeze fix (2026-11-06): the ref guards the double-spend but never
+    // re-renders — on the harm lane spendCharge is the last statement (no setState
+    // follows until the save resolves), so the header kept showing the open-time
+    // count. The parallel state flag re-renders it immediately to match the
+    // spend row's "N remaining" tail through the Rolling/result/dismissed views.
+    const [chargeSpent, setChargeSpent] = useState(false);
 
     const spendCharge = (description) => {
         if (chargeSpentRef.current) return;
         chargeSpentRef.current = true;
+        setChargeSpent(true);
         if (typeof channelDivinityCharges === 'number') {
             // Mirrors SetConditionModal.handleApplyOverride: decrement written
             // straight to the runtime store (absent key → initialized to
@@ -287,14 +294,20 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         spendCharge(chargeDescription('Harm', `${damageType} damage, ${saveType} save DC ${saveDc}`));
     };
 
+    // Single derived readout: what the header shows equals the spend row's
+    // "Channel Divinity: N−1 remaining." tail from the moment of spend.
+    const displayedCharges = typeof channelDivinityCharges === 'number'
+        ? channelDivinityCharges - (chargeSpent ? 1 : 0)
+        : null;
+
     return (
         <div className="sp-overlay">
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-star-of-life"></i> {featureName}
-                    {typeof channelDivinityCharges === 'number' && (
+                    {displayedCharges !== null && (
                         <span className="sp-resource-info">
-                            {channelDivinityCharges} charge{channelDivinityCharges === 1 ? '' : 's'} remaining
+                            {displayedCharges} charge{displayedCharges === 1 ? '' : 's'} remaining
                         </span>
                     )}
                 </div>

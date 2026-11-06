@@ -929,6 +929,92 @@ describe('DivineSparkModal', () => {
       expect(findLogEntry('ability_use')).toBeDefined();
     });
 
+    // Header-freeze regression (2026-11-06 DA): the open-time prop froze the
+    // header count while the store moved on — the header must decrement at the
+    // confirm itself and stay decremented through every later view.
+    it('decrements the header to N−1 immediately at harm confirm, matching the spend-row tail', async () => {
+      renderModal({ channelDivinityCharges: 3 });
+      expect(screen.getByText('3 charges remaining')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(harmBtn());
+      });
+
+      // Still the "Rolling…" face — the header has already moved.
+      expect(screen.getByText(/Rolling/i)).toBeInTheDocument();
+      expect(screen.getByText('2 charges remaining')).toBeInTheDocument();
+      expect(screen.queryByText('3 charges remaining')).not.toBeInTheDocument();
+      // Criterion 3: header equals the ability_use row's remaining tail.
+      const abilityCall = findLogEntry('ability_use');
+      expect(abilityCall).toBeDefined();
+      expect(abilityCall[1].description).toContain('Channel Divinity: 2 remaining.');
+    });
+
+    it('keeps the decremented header through the harm result view', async () => {
+      renderModal({ channelDivinityCharges: 3 });
+
+      await act(async () => {
+        fireEvent.click(harmBtn());
+      });
+      await act(async () => {
+        window.dispatchEvent(dispatchSaveResult(false));
+      });
+
+      expect(paragraphWithText('Orc Warrior takes 10 Radiant damage.')).toBeInTheDocument();
+      expect(screen.getByText('2 charges remaining')).toBeInTheDocument();
+      expect(screen.queryByText('3 charges remaining')).not.toBeInTheDocument();
+    });
+
+    it('decrements the header to N−1 at heal confirm and keeps it through the result view', async () => {
+      renderModal({ channelDivinityCharges: 2 });
+
+      await act(async () => {
+        fireEvent.click(healBtn());
+      });
+
+      expect(paragraphWithText('Orc Warrior healed for 10 HP.')).toBeInTheDocument();
+      expect(screen.getByText('1 charge remaining')).toBeInTheDocument();
+      expect(screen.queryByText('2 charges remaining')).not.toBeInTheDocument();
+      const abilityCall = findLogEntry('ability_use');
+      expect(abilityCall).toBeDefined();
+      expect(abilityCall[1].description).toContain('Channel Divinity: 1 remaining.');
+    });
+
+    it('switches the decremented header to singular grammar when the last charge is spent', async () => {
+      renderModal({ channelDivinityCharges: 2 });
+
+      await act(async () => {
+        fireEvent.click(harmBtn());
+      });
+
+      expect(screen.getByText('1 charge remaining')).toBeInTheDocument();
+      expect(screen.queryByText(/1 charges/)).not.toBeInTheDocument();
+    });
+
+    it.each([
+      { label: 'out-of-range', setup: () => rangeCheck.isWithinRange.mockResolvedValueOnce(false) },
+      { label: 'null-roll abort', setup: () => diceRoller.rollExpression.mockReturnValueOnce(null) },
+    ])('leaves the header at N through an unsubspent $label refusal', async ({ setup }) => {
+      setup();
+      renderModal({ channelDivinityCharges: 3 });
+
+      await act(async () => {
+        fireEvent.click(harmBtn());
+      });
+
+      expect(screen.getByText('3 charges remaining')).toBeInTheDocument();
+      expect(screen.queryByText('2 charges remaining')).not.toBeInTheDocument();
+    });
+
+    it('leaves the header at N when Cancel closes before any confirm', () => {
+      renderModal({ channelDivinityCharges: 3 });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.getByText('3 charges remaining')).toBeInTheDocument();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
     it('spends exactly once on heal confirm with the heal spend row', async () => {
       renderModal({ channelDivinityCharges: 2 });
 

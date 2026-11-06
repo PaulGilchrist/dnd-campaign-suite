@@ -155,6 +155,12 @@ describe('DivineSparkModal — dismissed save prompt', () => {
     });
     expect(screen.getByText('save was dismissed — no damage dealt')).toBeInTheDocument();
 
+    // Header-freeze regression (2026-11-06): the charge was legitimately spent
+    // at harm-confirm, so the after-spend refusal view must show the
+    // decremented count (2 charges → spent → 1), never the open-time value.
+    expect(screen.getByText('1 charge remaining')).toBeInTheDocument();
+    expect(screen.queryByText('2 charges remaining')).not.toBeInTheDocument();
+
     const done = screen.getByRole('button', { name: 'Done' });
     fireEvent.click(done);
     expect(onClose).toHaveBeenCalledTimes(1);
