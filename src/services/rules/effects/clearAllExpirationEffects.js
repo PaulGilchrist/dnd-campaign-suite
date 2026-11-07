@@ -45,7 +45,7 @@ function clearMyOutgoingExpirations(characterName, campaignName) {
         return;
     }
     for (const entry of myList) {
-        clearExpirationEffects(entry.effects, entry.target, characterName, campaignName);
+        clearExpirationEffects(entry.effects, entry.target, characterName, campaignName, entry);
     }
     setRuntimeValue(characterName, KEY, [], campaignName);
 }
@@ -67,7 +67,7 @@ function clearIncomingExpirations(charLower, campaignName) {
 
             // Clear if the effect targets me
             if (targetLower === charLower) {
-                clearExpirationEffects(entry.effects, entry.target, key, campaignName);
+                clearExpirationEffects(entry.effects, entry.target, key, campaignName, entry);
                 continue;
             }
 

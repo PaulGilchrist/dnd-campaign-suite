@@ -336,11 +336,12 @@ describe('#755 stagedParalysis duration-owner: combat-scoped shape, no round clo
   it('combat-end clear (#1348 seams): sweepCombatScopedExpirations drains until:combat entries at a new initiative roll; unmarked legacy clocks are never swept', () => {
     const caster = 'Ancient Silver Dragon 1';
     const effects = [{ type: 'condition', condition: 'paralyzed' }];
-    runtime.store[`${caster}.pendingExpirations`] = [
-      { target: 'ElderPaladin', effects, appliedRound: 3, expiryRounds: Infinity, until: 'combat' },
-    ];
+    const sweptEntry = { target: 'ElderPaladin', effects, appliedRound: 3, expiryRounds: Infinity, until: 'combat' };
+    runtime.store[`${caster}.pendingExpirations`] = [sweptEntry];
     expect(sweepCombatScopedExpirations({ campaignName: 'test-campaign', ownerName: caster })).toBe(1);
-    expect(cleared).toEqual([[effects, 'ElderPaladin', caster, 'test-campaign']]);
+    // The swept entry rides along as the 5th dispatch arg (clock-provenance
+    // logging in the condition legs).
+    expect(cleared).toEqual([[effects, 'ElderPaladin', caster, 'test-campaign', sweptEntry]]);
     expect(runtime.store[`${caster}.pendingExpirations`]).toEqual([]);
     // Legacy numeric-rounds entry WITHOUT the marker: sweep honors byte-parity
     // and never touches it (expirationQueue.js:118-119).

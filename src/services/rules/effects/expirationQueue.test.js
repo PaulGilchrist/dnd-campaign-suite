@@ -91,7 +91,7 @@ describe('#1298 processExpirationList — null entry loud-skip, siblings process
     // Entry after the poison is evaluated and cleared (pre-fix the null at :47
     // TypeErrors and this entry never existed to the loop).
     expect(clearExpirationEffects).toHaveBeenCalledTimes(1);
-    expect(clearExpirationEffects).toHaveBeenCalledWith(expired.effects, 'Orc', OWNER, CAMPAIGN);
+    expect(clearExpirationEffects).toHaveBeenCalledWith(expired.effects, 'Orc', OWNER, CAMPAIGN, expired);
     expect(r).toEqual({ processed: [live, null], expiredCount: 1, changed: true });
     // Loud-skip byte: the null is warned (never silent) and RETAINED (never
     // silently dropped) — it leaves only via a real seam or manual cleanup.
@@ -127,7 +127,7 @@ describe('#1298 processExpirationList — null entry loud-skip, siblings process
     expect(expireForTarget('Orc', 3, CAMPAIGN)).toBe(true);
 
     expect(clearExpirationEffects).toHaveBeenCalledTimes(1);
-    expect(clearExpirationEffects).toHaveBeenCalledWith(matured.effects, 'Orc', 'StoreB', CAMPAIGN);
+    expect(clearExpirationEffects).toHaveBeenCalledWith(matured.effects, 'Orc', 'StoreB', CAMPAIGN, matured);
     expect(setRuntimeValue).toHaveBeenCalledWith('StoreB', KEY, [], CAMPAIGN);
     expect(warnCalls('[expirationQueue] null entry skipped')).toHaveLength(1);
   });
@@ -216,7 +216,7 @@ describe('#1298 designed-immortal stays silent and clear-throws stay local (#134
     const r = processExpirationList([designed, corrupt, expired], 3, OWNER, CAMPAIGN, OWNER);
 
     expect(clearExpirationEffects).toHaveBeenCalledTimes(1);
-    expect(clearExpirationEffects).toHaveBeenCalledWith(expired.effects, 'Orc', OWNER, CAMPAIGN);
+    expect(clearExpirationEffects).toHaveBeenCalledWith(expired.effects, 'Orc', OWNER, CAMPAIGN, expired);
     expect(r).toEqual({ processed: [designed, corrupt], expiredCount: 1, changed: true });
     expect(consoleSpy).toHaveBeenCalledTimes(1); // ONLY the corrupt arm speaks
     expect(warnTexts()[0]).toContain('cannot age');
@@ -236,7 +236,7 @@ describe('#1298 designed-immortal stays silent and clear-throws stay local (#134
     expect(r.expiredCount).toBe(1);
     expect(r.changed).toBe(true);
     expect(clearExpirationEffects).toHaveBeenCalledTimes(2);
-    expect(clearExpirationEffects).toHaveBeenLastCalledWith(sibling.effects, 'Troll', OWNER, CAMPAIGN);
+    expect(clearExpirationEffects).toHaveBeenLastCalledWith(sibling.effects, 'Troll', OWNER, CAMPAIGN, sibling);
     const throws = warnCalls('[expirationQueue] entry processing failed — retained for next seam');
     expect(throws).toHaveLength(1);
     expect(throws[0][2]).toBeInstanceOf(Error);

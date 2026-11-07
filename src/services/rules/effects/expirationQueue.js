@@ -121,7 +121,9 @@ export function processExpirationList(list, currentRound, targetOwner, campaignN
                 currentRound > item.appliedRound;
             const isExpired = isRoundExpired || isCreatureExpired;
             if (isExpired) {
-                clearExpirationEffects(item.effects, item.target, targetOwner, campaignName);
+                // The entry itself rides along so condition legs can log
+                // round-anchor vs rounds-clock provenance in the removed row.
+                clearExpirationEffects(item.effects, item.target, targetOwner, campaignName, item);
                 expiredCount++;
                 changed = true;
             } else {
@@ -207,7 +209,7 @@ export function sweepCombatScopedExpirations({ campaignName, ownerName = null })
         if (!Array.isArray(list) || !list.length) continue;
         const doomed = list.filter((e) => e?.until === 'combat');
         if (!doomed.length) continue;
-        doomed.forEach((e) => clearExpirationEffects(e.effects, e.target, key, campaignName));
+        doomed.forEach((e) => clearExpirationEffects(e.effects, e.target, key, campaignName, e));
         setRuntimeValue(key, KEY, list.filter((e) => e?.until !== 'combat'), campaignName);
         swept += doomed.length;
     }

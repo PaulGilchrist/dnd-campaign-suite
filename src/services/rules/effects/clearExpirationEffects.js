@@ -30,6 +30,57 @@ function removeConditionEverywhere(targetName, conditionName, campaignName) {
     removeNpcCondition(targetName, conditionName, campaignName);
 }
 
+// [2026-11-07 clock-expiry audit] The clock lane stripped conditions in total
+// silence — the GM log showed the grant but never the clock-based end, while
+// the repeat-save lane already prints `condition removed` rows with a reason
+// (sleepService.js:231, frightfulPresenceService.js:191 — same
+// type:'condition' action:'removed' addEntry family as logConditionEvent).
+// Mirror that copy: exactly ONE removed row per clock leg that actually
+// strips an ACTIVE condition; a silent no-op (condition already gone) stays
+// silent. Provenance comes from the clock entry shape (expirationQueue
+// addExpiration :23 contract): expireOnCreatureName set → round-anchor clock
+// (expiryRounds Infinity serializes to null through the JSON store); finite
+// expiryRounds → rounds clock. Multi-condition clocks write one row per
+// stripped condition — each removal is its own audit event.
+function isConditionActive(targetName, conditionName) {
+    const stored = getRuntimeValue(targetName, 'activeConditions');
+    return Array.isArray(stored)
+        && stored.some(c => String(c).toLowerCase() === String(conditionName).toLowerCase());
+}
+
+function capitalizeCondition(conditionName) {
+    const name = String(conditionName);
+    return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function conditionExpiryReason(conditionName, clock) {
+    const label = capitalizeCondition(conditionName);
+    if (clock && clock.expireOnCreatureName) {
+        return `${label} ends (round-anchor clock expired at ${clock.expireOnCreatureName}'s turn start)`;
+    }
+    if (clock && Number.isFinite(clock.expiryRounds)) {
+        return `${label} ends (${clock.expiryRounds}-round clock expired)`;
+    }
+    // No clock entry (or a clock with neither seam resolvable): honest
+    // duration-expiry copy mirroring the CLA-096 precedent rows in this file.
+    return `${label} ends (duration has expired)`;
+}
+
+function removeConditionWithExpiryLog(targetName, conditionName, attackerName, campaignName, clock) {
+    const wasActive = isConditionActive(targetName, conditionName);
+    removeConditionEverywhere(targetName, conditionName, campaignName);
+    if (!wasActive) return;
+    addEntry(campaignName, {
+        type: 'condition',
+        action: 'removed',
+        characterName: targetName,
+        condition: capitalizeCondition(conditionName),
+        reason: conditionExpiryReason(conditionName, clock),
+        sourceName: attackerName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[clearExpirationEffects:condition-expiry-log-error]', e); });
+}
+
 function readBuffs(targetName) {
     return Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
 }
@@ -395,9 +446,9 @@ function handleClearSilenceZone(effect, targetName, _attackerName, campaignName)
     }
 }
 
-// Handler factories — each produces a uniform (effect, targetName, attackerName, campaignName) handler.
+// Handler factories — each produces a uniform (effect, targetName, attackerName, campaignName, clock) handler.
 const clearFlagKeys = (keys) => (_effect, targetName, _attackerName, campaignName) => clearKeys(targetName, campaignName, keys);
-const clearConditionEverywhere = (conditionName) => (_effect, targetName, _attackerName, campaignName) => removeConditionEverywhere(targetName, conditionName, campaignName);
+const clearConditionEverywhere = (conditionName) => (_effect, targetName, attackerName, campaignName, clock) => removeConditionWithExpiryLog(targetName, conditionName, attackerName, campaignName, clock);
 const endFlagAndClearBuff = (flagKey, buffEffect) => (_effect, targetName, _attackerName, campaignName) => {
     setRuntimeValue(targetName, flagKey, false, campaignName);
     removeBuffByEffect(targetName, buffEffect, campaignName);
@@ -447,7 +498,7 @@ const EXPIRATION_HANDLERS = {
     'remove_bulwark_of_force': clearFlagKeys(['bulwarkOfForceActive', 'bulwarkOfForceTargets']),
     'unbreakable_majesty': clearFlagKeys(['unbreakableMajestyActive', 'unbreakableMajestySaveDc']),
     'remove_cosmic_omen': clearFlagKeys(['cosmicOmenEffect']),
-    'condition': (effect, targetName, _attackerName, campaignName) => removeConditionEverywhere(targetName, effect.condition, campaignName),
+    'condition': (effect, targetName, attackerName, campaignName, clock) => removeConditionWithExpiryLog(targetName, effect.condition, attackerName, campaignName, clock),
     'polymorph': (_effect, targetName, _attackerName, campaignName) => revertPolymorph(targetName, campaignName),
     'animal_shapes': (_effect, targetName, _attackerName, campaignName) => revertAnimalShapes(targetName, campaignName),
     'true_polymorph': (_effect, targetName, _attackerName, campaignName) => revertTruePolymorph(targetName, campaignName),
@@ -524,14 +575,19 @@ const EXPIRATION_HANDLERS = {
 /**
  * Clear expiration effects from a target when an expiration entry is removed.
  * This is the large switch that handles all effect type cleanup.
+ * `clock` (optional) is the pendingExpirations entry being fired
+ * ({ target, effects, appliedRound, expiryRounds, expireOnCreatureName }):
+ * the condition-stripping legs use its shape to log round-anchor vs
+ * rounds-clock provenance in the `condition removed` row. Legacy 4-arg
+ * callers keep working — they fall back to the duration-expiry copy.
  */
-export function clearExpirationEffects(effects, targetName, attackerName, campaignName) {
+export function clearExpirationEffects(effects, targetName, attackerName, campaignName, clock = null) {
     if (!effects || !Array.isArray(effects)) return;
 
     for (const effect of effects) {
         const handler = EXPIRATION_HANDLERS[effect.type];
         if (handler) {
-            handler(effect, targetName, attackerName, campaignName);
+            handler(effect, targetName, attackerName, campaignName, clock);
         }
     }
 }

@@ -147,7 +147,7 @@ describe('expireStaleEffects — queue maturity boundary table', () => {
 
     if (expires) {
       expect(clearExpirationEffects).toHaveBeenCalledTimes(1);
-      expect(clearExpirationEffects).toHaveBeenCalledWith(entry.effects, 'Orc', 'Caster', CAMPAIGN);
+      expect(clearExpirationEffects).toHaveBeenCalledWith(entry.effects, 'Orc', 'Caster', CAMPAIGN, entry);
       expect(setRuntimeValue).toHaveBeenCalledWith('Caster', KEY, [], CAMPAIGN);
     } else {
       expect(clearExpirationEffects).not.toHaveBeenCalled();
@@ -169,7 +169,7 @@ describe('expireStaleEffects — queue maturity boundary table', () => {
     seedStore({ 'Caster.pendingExpirations': [entry] });
 
     await expireStaleEffects(CAMPAIGN, 'Caster');
-    expect(clearExpirationEffects).toHaveBeenCalledWith(entry.effects, 'Orc', 'Caster', CAMPAIGN);
+    expect(clearExpirationEffects).toHaveBeenCalledWith(entry.effects, 'Orc', 'Caster', CAMPAIGN, entry);
     expect(setRuntimeValue).toHaveBeenCalledWith('Caster', KEY, [], CAMPAIGN);
   });
 
@@ -186,7 +186,7 @@ describe('expireStaleEffects — queue maturity boundary table', () => {
     await expireStaleEffects(CAMPAIGN, 'Caster');
 
     expect(clearExpirationEffects).toHaveBeenCalledTimes(1);
-    expect(clearExpirationEffects).toHaveBeenCalledWith(matured.effects, 'Orc', 'Caster', CAMPAIGN);
+    expect(clearExpirationEffects).toHaveBeenCalledWith(matured.effects, 'Orc', 'Caster', CAMPAIGN, matured);
     expect(setRuntimeValue).toHaveBeenCalledWith('Caster', KEY, [live], CAMPAIGN);
   });
 

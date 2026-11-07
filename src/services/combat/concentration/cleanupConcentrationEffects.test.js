@@ -386,8 +386,8 @@ describe('cleanupConcentrationEffects — break cleanup filter semantics', () =>
         await cleanupConcentrationEffects('Alice', 'Witch Bolt', CAMPAIGN)
 
         expect(clearExpirationEffects).toHaveBeenCalledTimes(2)
-        expect(clearExpirationEffects).toHaveBeenNthCalledWith(1, ['exp1'], 'Bob', 'Alice', CAMPAIGN)
-        expect(clearExpirationEffects).toHaveBeenNthCalledWith(2, ['exp2'], 'Eve', 'Alice', CAMPAIGN)
+        expect(clearExpirationEffects).toHaveBeenNthCalledWith(1, ['exp1'], 'Bob', 'Alice', CAMPAIGN, exp1)
+        expect(clearExpirationEffects).toHaveBeenNthCalledWith(2, ['exp2'], 'Eve', 'Alice', CAMPAIGN, exp2)
         expect(h.doc('Alice').pendingExpirations).toEqual([])
         expect(teWrites()).toHaveLength(0)
     })

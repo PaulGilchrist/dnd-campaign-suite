@@ -290,7 +290,7 @@ function clearPendingExpirations(casterName, campaignName) {
     const expirations = getRuntimeValue(casterName, 'pendingExpirations') || []
     if (!Array.isArray(expirations) || expirations.length === 0) return
     for (const entry of expirations) {
-        clearExpirationEffects(entry.effects, entry.target, casterName, campaignName)
+        clearExpirationEffects(entry.effects, entry.target, casterName, campaignName, entry)
     }
     setRuntimeValue(casterName, 'pendingExpirations', [], campaignName)
 }

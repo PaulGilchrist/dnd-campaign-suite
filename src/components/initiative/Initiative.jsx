@@ -151,7 +151,7 @@ function clearDominatedExpirations(creature, campaignName) {
         if (entry.effects && Array.isArray(entry.effects)) {
             for (const effect of entry.effects) {
                 if (effect.type === 'dominated') {
-                    clearExpirationEffects([effect], entry.target, creature.name, campaignName)
+                    clearExpirationEffects([effect], entry.target, creature.name, campaignName, entry)
                 }
             }
         }

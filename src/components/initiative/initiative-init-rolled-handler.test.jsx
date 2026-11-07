@@ -240,7 +240,10 @@ describe('Initiative - initiative-rolled seam', () => {
         await act(async () => { window.dispatchEvent(new Event('initiative-rolled')); });
 
         expect(clearExpirationEffects.mock.calls.slice(expireBefore)).toEqual([
-            [[{ type: 'dominated', effect: 'dominated', duration: '1 round' }], 'Enemy1', 'Alice', 'test-campaign'],
+            // The owning queue entry rides along as the 5th arg (clock
+            // provenance for the condition-expiry log row).
+            [[{ type: 'dominated', effect: 'dominated', duration: '1 round' }], 'Enemy1', 'Alice', 'test-campaign',
+                { target: 'Enemy1', effects: [{ type: 'dominated', effect: 'dominated', duration: '1 round' }] }],
         ]);
         // The filtered write keeps the charmed entry byte-exactly.
         expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'pendingExpirations', [
