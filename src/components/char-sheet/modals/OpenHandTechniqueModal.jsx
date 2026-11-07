@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { applyOpenHandTechnique } from '../../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
+import ChooserModalFooter from './shared/ChooserModalFooter.jsx';
+import { CHOOSER_FOOTER_LABELS } from './shared/chooserFooterLabels.js';
 import '../CharSheet.css';
 
 function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName, saveDc, onClose, onConfirm }) {
@@ -82,12 +84,14 @@ function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName,
                         })}
                     </div>
                 </div>
-                <div className="sp-actions">
-                    <button className="sp-roll-btn" onClick={handleApply} disabled={!selected}>
-                        <i className="fa-solid fa-hand-rock"></i> Apply Effect
-                    </button>
-                    <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
-                </div>
+                <ChooserModalFooter
+                    confirmIcon="fa-hand-rock"
+                    confirmLabel={CHOOSER_FOOTER_LABELS.applyEffect}
+                    onConfirm={handleApply}
+                    confirmDisabled={!selected}
+                    declineLabel={CHOOSER_FOOTER_LABELS.cancel}
+                    onDecline={onClose}
+                />
             </div>
         </div>
     );

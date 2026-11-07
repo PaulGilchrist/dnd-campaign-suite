@@ -3,6 +3,8 @@ import { applyRiderOption } from '../../../../services/automation/handlers/comba
 import { isCunningStrikeFeatureName } from '../../../../services/automation/handlers/combat/cunningStrikeUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import SecondaryTargetModal from './SecondaryTargetModal.jsx';
+import ChooserModalFooter from './ChooserModalFooter.jsx';
+import { CHOOSER_FOOTER_LABELS } from './chooserFooterLabels.js';
 import '../../CharSheet.css';
 
 const RIDER_EFFECT_LABELS = [
@@ -87,7 +89,7 @@ function VersatileTricksterFlow({ targets, vtApplied, vtResult, targetName, play
             description={`Trip applied to <b>${targetName}</b>. Versatile Trickster allows you to also Trip another creature within 5 feet of the spectral hand:`}
             onTargetSelected={handleVtTargetSelected}
             onSkip={onClose}
-            confirmLabel="Trip Secondary Target"
+            confirmLabel={CHOOSER_FOOTER_LABELS.tripSecondaryTarget}
             confirmIcon="fa-bolt"
             showSize={true}
         />
@@ -132,7 +134,7 @@ function StalkersFlurryFlow({ targets, sfApplied, sfResult, targetName, playerSt
                 : `Mass Fear: Choose a target for the fear effect. The target and creatures within 10 ft will make a Wisdom save or be Frightened.`}
             onTargetSelected={handleSfTargetSelected}
             onSkip={onClose}
-            confirmLabel={isSuddenStrike ? "Attack Target" : "Apply Fear"}
+            confirmLabel={isSuddenStrike ? CHOOSER_FOOTER_LABELS.attackTarget : CHOOSER_FOOTER_LABELS.applyFear}
             confirmIcon="fa-bolt"
             showSize={true}
         />
@@ -297,12 +299,15 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
                         </p>
                     )}
                 </div>
-                <div className="sp-actions">
-                    <button className="sp-roll-btn" onClick={handleApply} disabled={!canApply || dispatched}>
-                        <i className="fa-solid fa-bolt"></i> Apply Effect{multiSelect ? 's' : ''}
-                    </button>
-                    <button className="sp-dismiss-btn" onClick={onClose} disabled={dispatched} title={dispatched ? 'Cost already committed — resolve the effect instead' : undefined}>Cancel</button>
-                </div>
+                <ChooserModalFooter
+                    confirmIcon="fa-bolt"
+                    confirmLabel={multiSelect ? CHOOSER_FOOTER_LABELS.applyEffects : CHOOSER_FOOTER_LABELS.applyEffect}
+                    onConfirm={handleApply}
+                    confirmDisabled={!canApply}
+                    committed={dispatched}
+                    declineLabel={CHOOSER_FOOTER_LABELS.cancel}
+                    onDecline={onClose}
+                />
             </div>
         </div>
     );

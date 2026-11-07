@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { applyShieldBashEffect } from '../../../services/combat/steps/features/shieldBash.js';
+import ChooserModalFooter from './shared/ChooserModalFooter.jsx';
+import { CHOOSER_FOOTER_LABELS } from './shared/chooserFooterLabels.js';
 import '../CharSheet.css';
 import './ShieldBashChoiceModal.css';
 
@@ -35,6 +37,13 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
             console.error('Shield Bash failed', e);
             setError(`Failed to apply Shield Bash: ${e.message}`);
         }
+    };
+
+    // Honest zero-spend exit: dispatch the skip leg (no ability_use row, no
+    // use consumed) and close immediately — unchanged pre-refactor behavior.
+    const handleSkip = () => {
+        applyShieldBashEffect({ action, playerStats, campaignName, targetName, chosenOption: 'skip', saveDc }).catch((e) => console.error('Shield Bash skip failed', e));
+        onClose();
     };
 
     if (applied && result) {
@@ -82,12 +91,14 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
                         })}
                     </div>
                 </div>
-                <div className="sp-actions">
-                    <button className="sp-roll-btn" onClick={handleApply} disabled={!selected}>
-                        <i className="fa-solid fa-shield-halved"></i> Apply Effect
-                    </button>
-                    <button className="sp-dismiss-btn" onClick={() => { applyShieldBashEffect({ action, playerStats, campaignName, targetName, chosenOption: 'skip', saveDc }).catch((e) => console.error('Shield Bash skip failed', e)); onClose(); }}>Skip (do not consume use)</button>
-                </div>
+                <ChooserModalFooter
+                    confirmIcon="fa-shield-halved"
+                    confirmLabel={CHOOSER_FOOTER_LABELS.applyEffect}
+                    onConfirm={handleApply}
+                    confirmDisabled={!selected}
+                    declineLabel={CHOOSER_FOOTER_LABELS.skipNoConsumeUse}
+                    onDecline={handleSkip}
+                />
             </div>
         </div>
     );
