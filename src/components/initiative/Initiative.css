@@ -1475,6 +1475,12 @@
 
 .initiative--tv .carousel-container {
     gap: 18px;
+    /* The spotlight card grows via `zoom` (layout-affecting), so it also sets
+       the row's cross size — with the default `stretch` every neighbour card
+       stretched to the spotlight's height + margin and rendered TALLER than
+       it. Centre instead so each card keeps its intrinsic size and the
+       spotlight's 1.25× zoom actually reads as bigger in both dimensions. */
+    align-items: center;
     /* Modest vertical padding: the spotlight card now grows via `zoom`
        (layout-affecting), so the row/canvas grows with it instead of the
        card overflowing a clipped padding box the way transform-scale did. */
