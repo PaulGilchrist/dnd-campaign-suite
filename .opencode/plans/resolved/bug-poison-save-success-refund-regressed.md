@@ -60,3 +60,48 @@ runtime in the resumed step.
 Data integrity risk (damage over-dealt by the full cost dice on every poison-save success; ledger
 row lies about the payment). Confirmed live once on HEAD 616289b98 with three in-session option/outcome
 controls that all deduct; the prior disproof suggests flakiness, so sample ≥3 success faces when fixing.
+
+## Resolution
+**FIX: DISPROVED (2026-11-07, re-run on HEAD 6293d6243)** — no source/test changes. The refund face
+did not appear in SIX consecutive full DS cycles on current HEAD (after the crit-ledger-shape / VT-copy /
+spellValidation trio AND the two DS fixes f19ecf028 daze-expiry + 6293d6243 repeat-save-descriptor that
+landed on top of it). Five of those cycles were Poison-save-SUCCESS faces — the exact claimed leak lane —
+sampled past the ≥3 mandate, all showing the healthy `9d6` fingerprint. No "fix" applied to working code.
+
+Repro rig (playbook §7, run live in test-campaign on :5173): EvasiveFighter disk surgery → 2024
+Rogue/Arcane Trickster lv20 + Poisoner's Kit (baseline md5 `0df29ff3` restored byte-exact + API GET proof
+Fighter/18/backpack[Shortsword]); hand-rolled full-store combatSummary POST, 3-creature type:player board
+EF/EP/DM, EF.row.targetName=EP; EP bucket `activeBuffs [{effect:'warding_bond', saveBonus:+19}]` forcing
+CON SUCCESS vs DC 15; sneak re-armed per cycle via scoped `PATCH combatSummary {round:N}`; EP bucket
+topped to 200 between hits; drain = last `.sp-overlay` first (`Roll Save|Done|Cancel|Skip*`), Shield-Bash
+fail-chooser declined via `Skip (do not consume use)`.
+
+Per-face evidence (each: log `Forgoing 1d6 …` row → `save_result … succeeded CON save … full success` →
+`Poison applied … succeeded — no effect` → damage `roll` row):
+1. Crit (nat 20, +19 dial): `1d6*2+3 [slashing] + 9d6*2 [Sneak Attack]`, rolls len **10**, total 85,
+   save 13+29=42 — DEDUCTED.
+2. Non-crit: `1d6+3 + 9d6 [Sneak Attack]`, rolls len **10**, total 41, save 20+29=49 — DEDUCTED.
+3. Non-crit: `1d6+3 + 9d6`, rolls len **10**, total 32, save 1+29=30 — DEDUCTED.
+4. Non-crit: `1d6+3 + 9d6`, rolls len **10**, total 41, save 2+29=31 — DEDUCTED.
+5. Non-crit: `1d6+3 + 9d6`, rolls len **10**, total 41, save 4+29=33 — DEDUCTED. Mid-pause API GET (after
+   Apply Effects, while the save prompt was still unresolved) showed `EvasiveFighter._cunningStrikeCostUsed
+   = 1` persisted server-side with the `poisoned|Poison|ElderPaladin` te row present — the exact lifecycle
+   window the hypothesis claimed loses the latch. Post-cycle the key resets to 0 every time.
+6. Control Poison-save-FAIL (dial −19): `9d6`, rolls len 10, total 38 — DEDUCTED; plus the landed
+   repeat-save fix is live: te row carries `repeatSave:{saveType:'CON',dc:15,condition:'poisoned'}` OBJECT.
+
+Discriminator scan: whole-log grep for `10d6` in any `formula` = **zero hits** (no crit cost-free faces
+were taken this session, so the raw grep is directly decisive); counts match exactly: 5 Forgoing rows =
+5 succeeded-save rows = 5 cost-reduced damage rows = 5 hp_change deltas (−85/−41/−32/−41/−41).
+
+Root-cause note: the hypothesized lifecycle defect (`_cunningStrikeCostUsed` lost across the prompt-pause)
+is not observable on this HEAD — the commit→resume chain reads the synchronous local runtime store and the
+mid-pause GET proves server persistence; the §107 full-store-resurrection hazard remains theoretically
+live for jammed queues but produced zero refunds in 6/6 cycles here (and 4/4 in 5949aa22b's disproof).
+The n=1 fingerprint on 616289b98 stands as that run's observation; the lane is clean on current HEAD.
+Closed as second disproof; if a third sighting occurs, capture the mid-pause GET of
+`_cunningStrikeCostUsed` + `pendingExpirations`/lastAttack snapshot then, not post-hoc.
+
+Cleanup: closed-tab two-pass admin clears → change-data `{}` + log `[]` GET-verified; EF fixture restored
+byte-exact (md5 `0df29ff3`, API GET Fighter/Battle Master 18, backpack [Shortsword]); no maps/monsters/
+throwaways touched; git status clean apart from this file's move.
