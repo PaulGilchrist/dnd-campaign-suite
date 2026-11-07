@@ -26,13 +26,14 @@
 //     findSpellcastingInClass :173) — Barbarian/Fighter/Monk/Rogue and off-disk
 //     'Artificer' refuse; caster classes pass on their lv1 rows; 5e Eldritch
 //     Knight/Arcane Trickster pass only via subclass rows at lv>=3.
-//  Q2 FIXED #1530: the Magic Initiate capture 'two' is now catalog-refused + console.error'd;
-//     grantedCantrips stays [] (guard row below).
+//  Q2 FIXED #1530 (quiet channel 2026-11-06): the Magic Initiate capture 'two' is catalog-refused
+//     and stoplist-dropped at console.debug (no console.error); grantedCantrips stays [].
 //  Q3 FIXED #342: feat descriptions are coerced (Array.isArray ? join(' ') : raw) BEFORE
 //     the includes-gate, so 5e ARRAY descriptions (all 42 disk feats) parse through the
 //     same catalog-validated path 2024 strings always used. Over-grant audit: zero disk
 //     grants change (no 5e feat text has <em> markup or a catalog-matched capture;
-//     Magic Initiate's 'two' is now refused LOUDLY — the audible proof the parser runs).
+//     Magic Initiate's 'two' is stoplist-dropped at console.debug — the debug call proves
+//     the parser runs).
 //  Q4 FIXED #1530: 'Mending and Prestidigitation' now SPLITS on the conjunction and both
 //     parts catalog-match (deduped against the em-arm hits); no multi-word junk token survives.
 //  Q5 FIXED #1530: pattern-arm captures are canonicalized through the spell catalog with a
@@ -58,10 +59,11 @@
 //  K1 selectedSpells `|| []` arm -> V-shortcircuit(null/undefined); K2 length===0 early return
 //  -> V-shortcircuit loader-call census; K3/K4 getClassSpellList found/index/!found arms -> C
 //  rows; K5 em vs pattern arms + buckets -> G-gnome/Tiefling exact arrays; K6 dedup arms ->
-//  G-gnome duplicate Minor Illusion dedup; K7 catalog filter + conjunction split + loud-drop ->
-//  #1530 guard rows ('two' dropped+errored, 'Mending and Prestidigitation' splits to two valid
+//  G-gnome duplicate Minor Illusion dedup; K7 catalog filter + conjunction split + stoplist
+//  debug-drop ('two') vs real-miss console.error ->
+//  #1530 guard rows ('two' dropped+debugged, 'Mending and Prestidigitation' splits to two valid
 //  titled spells, lowercase 'thaumaturgy' canonicalized, 'Armor' substring junk refused); K8 desc
-//  coercion+includes-gate -> G-feats 5e live-parse rows (fix#342: loud-drop + STRUCT array feat); K9 feat-name hardcodes -> G-feats 2024 exact block;
+//  coercion+includes-gate -> G-feats 5e live-parse rows (fix#342: quantifier debug-drop + STRUCT array feat); K9 feat-name hardcodes -> G-feats 2024 exact block;
 //  K10 features||traits fallback -> B-rows; K11 5e join vs 2024 coercion (version branch) ->
 //  E-struct row (identical fixture, divergent output); K12 sourceName ?. -> '' names in G-guard;
 //  K13 loader gates -> G-guard call census; K14 Fighter/Rogue proxy line -> P-row allow+refuse;
@@ -127,6 +129,7 @@ const OUTSIDE_ONE = 'Spell (1) chosen outside of the class spell list.';
 const OUTSIDE_TWO = 'Spell(s) (2) chosen outside of the class spell list.';
 
 let consoleError;
+let consoleDebug;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -145,9 +148,11 @@ beforeEach(() => {
   vi.mocked(dataLoader.loadSpells).mockImplementation(async (version = '5e') =>
     version === '2024' ? spells2024 : spells5e,
   );
-  // #1530 loud-drop channel: console.error is the sanctioned non-silent junk path;
-  // spy to keep lane output clean and let guard rows assert the exact drop messages.
+  // #1530 drop channels: console.error stays the real-validation-failure path; benign
+  // prose quantifiers ('two'/'another') go to console.debug (backlog 2026-11-06) — spy
+  // both to keep lane output clean and let guard rows assert the exact drop messages.
   consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  consoleDebug = vi.spyOn(console, 'debug').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -203,8 +208,9 @@ describe('spellValidation', () => {
         ['Magic Initiate', 'Fey Touched', 'Shadow Touched', 'Telepathy', 'Not A Feat'],
         {
           grantedSpells: ['Misty Step', 'Invisibility', 'Detect Thoughts'],
-          // #1530: disk text "You learn two cantrips" captured 'two' as a pseudo-cantrip;
-          // the token is now catalog-refused (console.error'd twice: desc + spell benefit).
+          // #1530 + stoplist 2026-11-06: disk text "You learn two cantrips" captured 'two';
+          // the token is catalog-refused (console.debug'd twice: desc + spell benefit) and
+          // never reaches console.error.
           grantedCantrips: [],
           spellListAccess: ['Any class (chosen by player)'],
         },
@@ -215,7 +221,7 @@ describe('spellValidation', () => {
         // Q3 FIXED #342: array desc is coerced to joined text before the gate, so the
         // parse arm now RUNS on 5e disk prose. Over-grant audit: granted lists unchanged —
         // 'You learn two cantrips' hits the #1530 catalog filter and 'two' is refused;
-        // the loud-drop assertion below is the proof of live parsing (was: inert, Q3).
+        // the stoplist debug-drop asserted below is the proof of live parsing (was: inert, Q3).
         // 'Not A Feat' is silently skipped (find-miss).
         { grantedSpells: [], grantedCantrips: [], spellListAccess: ['Any class (chosen by player)'] },
       ],
@@ -225,8 +231,9 @@ describe('spellValidation', () => {
       expect(result.feats).toStrictEqual(expected);
       if (version === '5e') {
         // fix#342(b) falsifier: the array-shaped description reaches the parser,
-        // which drops 'two' via the catalog (console.error was NEVER fired pre-fix).
-        expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('"two"'));
+        // which drops 'two' via the catalog (pre-#1530 the token was SILENTLY stored).
+        expect(consoleDebug).toHaveBeenCalledWith(expect.stringContaining('"two"'));
+        expect(consoleError).not.toHaveBeenCalled();
       }
     });
 
@@ -371,15 +378,17 @@ describe('spellValidation', () => {
       expect(consoleError).not.toHaveBeenCalled();
     });
 
-    it("'two' from Magic Initiate prose is refused loudly and never enters grantedCantrips", async () => {
+    it("'two' from Magic Initiate prose is stoplist-dropped quietly and never enters grantedCantrips", async () => {
       const sources = await getSpellSources(
         { class: { name: 'Wizard' }, feats: ['Magic Initiate'] },
         '2024',
       );
       expect(sources.feats.grantedCantrips).toStrictEqual([]);
-      // desc arm + benefits[type==='spell'] arm each capture 'two' -> two loud drops
-      expect(consoleError).toHaveBeenCalledTimes(2);
-      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('"two"'));
+      // desc arm + benefits[type==='spell'] arm each capture 'two' -> two quiet debug drops;
+      // console.error stays clean (backlog 2026-11-06: benign quantifiers are not app faults)
+      expect(consoleDebug).toHaveBeenCalledTimes(2);
+      expect(consoleDebug).toHaveBeenCalledWith(expect.stringContaining('"two"'));
+      expect(consoleError).not.toHaveBeenCalled();
     });
 
     it("'Mending and Prestidigitation' splits on the conjunction into two valid titled cantrips", async () => {
@@ -424,7 +433,7 @@ describe('spellValidation', () => {
       expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('"Armor"'));
     });
 
-    it('quantifier junk ("another cantrip") is dropped; real prose captures across traits each validate', async () => {
+    it('quantifier junk ("another"/"two" cantrip prose) is debug-dropped; real prose captures each validate', async () => {
       vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
         {
           name: 'STRUCT Race',
@@ -439,10 +448,11 @@ describe('spellValidation', () => {
         '5e',
       );
       expect(sources.race.cantrips).toStrictEqual(['Guidance']);
-      // loud drops for 'another' and 'two', in capture order
-      expect(consoleError).toHaveBeenCalledTimes(2);
-      expect(consoleError).toHaveBeenNthCalledWith(1, expect.stringContaining('"another"'));
-      expect(consoleError).toHaveBeenNthCalledWith(2, expect.stringContaining('"two"'));
+      // stoplist drops for 'another' and 'two', in capture order — zero console.error
+      expect(consoleDebug).toHaveBeenCalledTimes(2);
+      expect(consoleDebug).toHaveBeenNthCalledWith(1, expect.stringContaining('"another"'));
+      expect(consoleDebug).toHaveBeenNthCalledWith(2, expect.stringContaining('"two"'));
+      expect(consoleError).not.toHaveBeenCalled();
     });
   });
 

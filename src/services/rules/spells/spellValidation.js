@@ -9,10 +9,21 @@ import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData, loadSpel
 // #1530: canonical spell-catalog index (one Map per ruleset version, lazily built once).
 // Prose-parser captures MUST match this catalog with a case-insensitive EXACT key
 // comparison (Map.get on the lowercased token — never substring: 'Armor' must not match
-// 'Mage Armor'). Matched tokens are canonicalized to the catalog's disk title;
-// unmatched junk ('two', unsplittable clause fragments) is dropped loudly via console.error
-// and never enters a result bucket / the allowed-spells set.
+// 'Mage Armor'). Matched tokens are canonicalized to the catalog's disk title; unmatched
+// tokens are dropped — benign prose quantifiers (see PROSE_QUANTIFIER_TOKENS) quietly via
+// console.debug, everything else loudly via console.error — and never enter a result
+// bucket / the allowed-spells set.
 const spellCatalogIndexCache = {};
+
+// Backlog 2026-11-06: the 'know/learn X cantrip' pattern also captures RAW quantity prose
+// ("You learn two cantrips", "you learn another cantrip") on EVERY caster sheet/wizard open.
+// These words can never be spell names, so they are stoplisted and dropped at console.debug
+// (parser noise, not an app fault); console.error stays reserved for real validation
+// failures — plausible spell-name tokens missing from the catalog (#1530 contract).
+const PROSE_QUANTIFIER_TOKENS = new Set([
+  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'twice', 'another', 'other', 'additional', 'several', 'both', 'this', 'that', 'some', 'any'
+]);
 
 async function getSpellCatalogIndex(version) {
   if (!spellCatalogIndexCache[version]) {
@@ -72,12 +83,37 @@ async function extractRaceSpells(raceData, version = '5e') {
   return result;
 }
 
+// One captured clause from the 'know/learn X cantrip' pattern: split on conjunctions/slashes,
+// case-fold EXACT-match each part against the spell catalog, and drop misses on the channel
+// that matches their kind (stoplisted quantifiers -> console.debug, real misses ->
+// console.error). Hoisted to keep the parser under the complexity cap (playbook §5).
+function recordCantripCapture(catalog, captured, result, version) {
+  for (const fragment of captured.split(/\s+and\s+|\s*\/\s*/)) {
+    const token = fragment.trim();
+    if (!token) continue;
+    const canonicalName = catalog.get(token.toLowerCase());
+    if (!canonicalName) {
+      const dropMessage = `spellValidation: dropping non-spell token "${token}" captured from feature text (not in ${version} spell catalog)`;
+      if (PROSE_QUANTIFIER_TOKENS.has(token.toLowerCase())) {
+        console.debug(dropMessage);
+      } else {
+        console.error(dropMessage);
+      }
+      continue;
+    }
+    if (!result.cantrips.includes(canonicalName) && !result.spells.includes(canonicalName)) {
+      result.cantrips.push(canonicalName);
+    }
+  }
+}
+
 /**
  * Extracts spell names from a text description
  * This is a heuristic approach - looks for italicized spell names
  * #1530: pattern-arm captures are catalog-validated (case-fold EXACT match via
  * loadSpells), conjunction/slash fragments are split before matching, and junk
- * tokens are console.error'd and dropped — never stored as pseudo-spells.
+ * tokens are dropped (benign quantifiers console.debug'd, real misses
+ * console.error'd) — never stored as pseudo-spells.
  * @param {string} description - The text description
  * @param {object} result - The result object to add spells to
  * @param {string} version - '5e' or '2024' (selects the spell catalog)
@@ -122,23 +158,14 @@ async function extractSpellsFromDescription(description, result, version = '5e')
   // The lazy capture grabs whole clause fragments, so each capture is first split on
   // conjunctions/slashes ("Mending and Prestidigitation"), then every part is looked up
   // in the spell catalog case-insensitively (rescues lowercase prose like 'thaumaturgy').
-  // Catalog misses ('two', 'another') are junk: console.error + drop.
+  // Catalog misses split by the stoplist (backlog 2026-11-06): benign quantifiers ('two',
+  // 'another') drop at console.debug; any other miss is a real validation failure and stays
+  // a console.error.
   const cantripPattern = /(?:know|learn)\s+(?:the\s+)?([\w\s/]+?)\s+cantrip/gi;
   let catalog = null;
   while ((match = cantripPattern.exec(description)) !== null) {
-    for (const fragment of match[1].split(/\s+and\s+|\s*\/\s*/)) {
-      const token = fragment.trim();
-      if (!token) continue;
-      catalog = catalog || await getSpellCatalogIndex(version);
-      const canonicalName = catalog.get(token.toLowerCase());
-      if (!canonicalName) {
-        console.error(`spellValidation: dropping non-spell token "${token}" captured from feature text (not in ${version} spell catalog)`);
-        continue;
-      }
-      if (!result.cantrips.includes(canonicalName) && !result.spells.includes(canonicalName)) {
-        result.cantrips.push(canonicalName);
-      }
-    }
+    catalog = catalog || await getSpellCatalogIndex(version);
+    recordCantripCapture(catalog, match[1], result, version);
   }
 }
 
@@ -199,7 +226,7 @@ async function extractFeatSpells(featData, version = '5e') {
   // extractor uses) so both shapes flow through the identical validated parse path.
   // Over-grant audit (fix#342): re-enabled parsing admits ZERO new disk grants — no 5e feat
   // text carries <em> markup or a catalog-matched 'know/learn X cantrip' capture; Magic
-  // Initiate's 'two' is refused loudly by the #1530 catalog filter.
+  // Initiate's 'two' is refused quietly by the stoplist (backlog 2026-11-06).
   const desc = joinDescription(featData.description);
   
   // Magic Initiate feat
