@@ -39,6 +39,18 @@ function writeNotes(campaign, notes) {
     fs.writeFileSync(campaignDataFile(campaign, FILE), JSON.stringify(notes, null, 2));
 }
 
+/**
+ * Blank the whole ledger (Admin-adjacent "Clear Designer Conversation" lane,
+ * backlog 2026-11-07): the BLANK shape written verbatim so a chat/plan/error
+ * residue cannot outlive the campaign cleanup ritual. Deliberately touches
+ * ONLY design-notes.json — snapshots and every other campaign file stay.
+ */
+export function clearNotes(campaign) {
+    const blank = { ...BLANK, messages: [], plans: [] };
+    writeNotes(campaign, blank);
+    return blank;
+}
+
 export function appendMessages(campaign, ...entries) {
     const notes = loadNotes(campaign);
     const now = Date.now();

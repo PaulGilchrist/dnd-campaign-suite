@@ -93,6 +93,21 @@ export async function loadDesignerConversation({ campaignName }) {
 }
 
 /**
+ * Blank the campaign's designer conversation ledger (backlog 2026-11-07 DJ)
+ * through the dedicated clear lane — snapshots and every other campaign file
+ * stay untouched. Returns { ok, notes? } so the section can reset from the
+ * server's own blank shape.
+ */
+export async function clearDesignerConversation({ campaignName }) {
+    const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/ai/designer/clear-conversation`, {
+        method: 'POST',
+    })
+    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
+    if (!res.ok) return { ok: false, error: data.error }
+    return data
+}
+
+/**
  * Persist (or clear, with scope:null) the GM's pending build plan + count
  * edits so view navigation/reload rehydrates the PlanEditor from design-notes.
  */

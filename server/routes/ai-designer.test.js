@@ -25,8 +25,10 @@ vi.mock('../services/ai/authoring/dressMap.js', () => ({
 }));
 const savePendingPlan = vi.fn((c, scope) => ({ pendingPlan: scope ? { ...scope, savedAt: 1 } : null }));
 const setDesignerError = vi.fn((c, stage, error) => ({ lastError: error ? { stage, error } : null }));
+const clearNotes = vi.fn(() => ({ storySummary: null, messages: [], plans: [], pendingPlan: null, lastError: null }));
 vi.mock('../services/ai/authoring/designNotes.js', () => ({
     loadNotes: () => ({ messages: [], plans: [], pendingPlan: null, lastError: null }),
+    clearNotes: (...a) => clearNotes(...a),
     savePendingPlan: (...a) => savePendingPlan(...a),
     setDesignerError: (...a) => setDesignerError(...a),
 }));
@@ -131,6 +133,28 @@ describe('ai-designer route authority', () => {
         const clear = await request(app).post(url).set('Host', 'localhost').send({ scope: null });
         expect(clear.body).toEqual({ ok: true, pending: false });
         expect(savePendingPlan).toHaveBeenLastCalledWith('test-campaign', null);
+    });
+
+    // --- authoring-residue-reset (backlog 2026-11-07 DJ) --------------------
+
+    it('clear-conversation blanks the ledger — GM-only, works even with AI off', async () => {
+        clearNotes.mockClear();
+        const url = '/api/campaigns/test-campaign/ai/designer/clear-conversation';
+
+        const lan = await request(app).post(url).set('Host', '10.0.0.5');
+        expect(lan.status).toBe(403);
+        expect(clearNotes).not.toHaveBeenCalled();
+
+        // authority mirrors the conversation GET: a GM must be able to clear
+        // residue even after removing the AI config entirely
+        store.set('test-campaign', { aiConfig: { mode: 'off' } });
+        const off = await request(app).post(url).set('Host', 'localhost');
+        expect(off.status).toBe(200);
+        expect(off.body).toEqual({
+            ok: true,
+            notes: { storySummary: null, messages: [], plans: [], pendingPlan: null, lastError: null },
+        });
+        expect(clearNotes).toHaveBeenCalledWith('test-campaign');
     });
 
     it('plan/generate/chat outcomes ride into design-notes: plan stored, errors recorded, plan consumed on success', async () => {

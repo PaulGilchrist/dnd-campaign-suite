@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAiStatus, loadDesignerConversation, saveDesignerPendingPlan, designerChat, designerPlan, designerGenerate } from '../../services/ai/aiClient.js';
+import { getAiStatus, loadDesignerConversation, clearDesignerConversation, saveDesignerPendingPlan, designerChat, designerPlan, designerGenerate } from '../../services/ai/aiClient.js';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import './AiDesignerSection.css';
 
 const PLAN_KINDS = ['faction', 'settlement', 'npc', 'quest', 'encounter', 'session', 'mapPlan'];
@@ -115,6 +116,7 @@ function AiDesignerSection({ campaignName, onGenerated }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const threadEnd = useRef(null);
   const saveTimerRef = useRef(null); // debounce handle (network only — the server holds the truth)
   const stagedPlanRef = useRef(null); // latest plan edit not yet POSTed to design-notes
@@ -146,6 +148,25 @@ function AiDesignerSection({ campaignName, onGenerated }) {
     setPlan(null);
     saveDesignerPendingPlan({ campaignName, scope: null })
       .catch(err => console.error('[ai-designer] pending plan clear failed', err));
+  };
+
+  // Backlog 2026-11-07 DJ: authoring residue (conversation + plans + pending
+  // plan + last error) lives OUTSIDE the change-data reset lane, so the
+  // designer carries its own honest wipe. Blank design-notes.json through
+  // the dedicated clear route, then reset local state to the fresh-campaign
+  // shape — no reload, and nothing else is touched.
+  const clearConversation = async () => {
+    stopPlanDebounce();
+    const res = await clearDesignerConversation({ campaignName });
+    if (res.ok) {
+      setMessages([]);
+      setPlan(null);
+      setError(null);
+      setResult(null);
+      setDraft('');
+    } else {
+      setError(res.error || 'designer conversation clear failed');
+    }
   };
 
   useEffect(() => {
@@ -251,7 +272,14 @@ function AiDesignerSection({ campaignName, onGenerated }) {
 
   return (
     <div className="ai-designer-section">
-      <h3><i className="fa-solid fa-wand-magic-sparkles" /> AI Designer</h3>
+      <h3>
+        <i className="fa-solid fa-wand-magic-sparkles" /> AI Designer
+        <button type="button" className="ct-btn ai-designer-clear-btn" disabled={busy}
+          onClick={() => setConfirmClear(true)}
+          title="Clear this campaign's designer conversation, plans and error state">
+          <i className="fa-solid fa-broom" /> Clear Designer Conversation
+        </button>
+      </h3>
       {error && <div className="ai-designer-error" role="alert">{error}</div>}
       {result && <ResultNotice result={result} />}
 
@@ -289,6 +317,18 @@ function AiDesignerSection({ campaignName, onGenerated }) {
             </button>
           </div>
         </>
+      )}
+
+      {confirmClear && (
+        <DeleteConfirmModal
+          titleId="clear-designer-conversation-title"
+          title="Clear Designer Conversation"
+          confirmLabel="Yes, Clear"
+          onCancel={() => setConfirmClear(false)}
+          onConfirm={() => { setConfirmClear(false); clearConversation(); }}
+        >
+          {`Clear the AI Designer conversation, plans, and error state for this campaign? Only the designer ledger (data/design-notes.json) is blanked — snapshots, drafts, and all other campaign data stay untouched. This cannot be undone.`}
+        </DeleteConfirmModal>
       )}
     </div>
   );

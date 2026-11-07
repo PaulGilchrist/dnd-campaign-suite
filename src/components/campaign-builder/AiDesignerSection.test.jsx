@@ -11,6 +11,7 @@ import { vi } from 'vitest';
 const api = vi.hoisted(() => ({
     getAiStatus: vi.fn(),
     loadDesignerConversation: vi.fn(),
+    clearDesignerConversation: vi.fn(),
     saveDesignerPendingPlan: vi.fn(),
     designerChat: vi.fn(),
     designerPlan: vi.fn(),
@@ -25,6 +26,7 @@ beforeEach(() => {
     api.getAiStatus.mockResolvedValue({ configured: true });
     api.loadDesignerConversation.mockResolvedValue({ messages: [{ role: 'ai', content: 'What are we building?', at: 1 }] });
     api.saveDesignerPendingPlan.mockResolvedValue({ ok: true, pending: true });
+    api.clearDesignerConversation.mockResolvedValue({ ok: true });
 });
 
 describe('AiDesignerSection', () => {

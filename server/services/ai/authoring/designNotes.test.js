@@ -20,7 +20,7 @@ vi.mock('fs', () => ({
     },
 }));
 
-import { loadNotes, savePendingPlan, setDesignerError } from './designNotes.js';
+import { loadNotes, clearNotes, savePendingPlan, setDesignerError } from './designNotes.js';
 
 beforeEach(() => { state.stored = null; state.writes = 0; });
 
@@ -29,6 +29,24 @@ describe('loadNotes', () => {
         expect(loadNotes('fresh')).toEqual({
             storySummary: null, messages: [], plans: [], pendingPlan: null, lastError: null,
         });
+    });
+});
+
+describe('clearNotes', () => {
+    it('blanks the whole ledger — the conversation reset lane (2026-11-07 DJ)', () => {
+        state.stored = {
+            storySummary: 'spine',
+            messages: [{ role: 'gm', content: 'hi', at: 1 }],
+            plans: [{ scope: 'arc', proposedAt: 2 }],
+            pendingPlan: { scope: 'arc', savedAt: 3 },
+            lastError: { stage: 'chat', error: 'boom', at: 4 },
+        };
+        const notes = clearNotes('c');
+        const BLANK = { storySummary: null, messages: [], plans: [], pendingPlan: null, lastError: null };
+        expect(notes).toEqual(BLANK);
+        expect(state.stored).toEqual(BLANK); // the blank shape actually hit disk
+        expect(state.writes).toBe(1);
+        expect(loadNotes('c')).toEqual(BLANK); // and a re-read sees it
     });
 });
 

@@ -66,7 +66,6 @@ Live facts (DJ, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-07 DJ] AI-authoring artifacts live outside the change-data reset lane** — the designer conversation + plans persist to `data/design-notes.json` and every generate writes a snapshot zip to `public/campaigns/.snapshots/`; Admin "Clear Change Data" clears NEITHER, so test/authoring residue silently outlives the standard cleanup ritual. Suggest: surface a "clear designer conversation" affordance (or include design-notes in the admin clear) and document/rotate the campaign snapshot dir.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

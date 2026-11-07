@@ -11,6 +11,7 @@ import { vi } from 'vitest';
 const api = vi.hoisted(() => ({
     getAiStatus: vi.fn(),
     loadDesignerConversation: vi.fn(),
+    clearDesignerConversation: vi.fn(),
     saveDesignerPendingPlan: vi.fn(),
     designerChat: vi.fn(),
     designerPlan: vi.fn(),

@@ -5,6 +5,7 @@
  *   POST /api/campaigns/:campaign/ai/designer/plan     {}               → { scope }   (GM edits/confirms this)
  *   POST /api/campaigns/:campaign/ai/designer/generate { scope }        → applyBlueprint result (drafts)
  *   POST /api/campaigns/:campaign/ai/designer/pending-plan { scope|null } → persist/clear the GM's un-revised plan
+ *   POST /api/campaigns/:campaign/ai/designer/clear-conversation           → blank design-notes.json (GM residue reset)
  *   GET  /api/campaigns/:campaign/ai/designer/conversation              → design-notes.json
  *
  * The pending-plan/conversation pair keeps the PlanEditor crash-proof: plan +
@@ -24,7 +25,7 @@ import { aiConfigLive } from '../services/ai/index.js';
 import { designChat, proposePlan, generateBlueprint } from '../services/ai/authoring/designer.js';
 import { refineEntity } from '../services/ai/authoring/refine.js';
 import { dressMapProposal } from '../services/ai/authoring/dressMap.js';
-import { loadNotes, savePendingPlan, setDesignerError } from '../services/ai/authoring/designNotes.js';
+import { loadNotes, clearNotes, savePendingPlan, setDesignerError } from '../services/ai/authoring/designNotes.js';
 
 const router = express.Router();
 
@@ -50,6 +51,27 @@ router.get('/api/campaigns/:campaign/ai/designer/conversation', (req, res) => {
     } catch (e) {
         console.error('[ai-designer:conversation]', e);
         res.status(500).json({ error: 'designer conversation read failed' });
+    }
+});
+
+/**
+ * "Clear Designer Conversation" (backlog 2026-11-07 DJ): blanks
+ * design-notes.json through this dedicated lane so authoring residue
+ * (conversation + plans + pending plan + last error) cannot silently outlive
+ * the Admin "Clear Change Data" ritual — which stays byte-unchanged (owner
+ * ruling: the brainstorm is campaign memory, so its reset is opt-in here,
+ * not folded into the runtime-store clear). GM-only like the conversation
+ * read and pending-plan lanes, and deliberately NOT aiConfigLive-gated:
+ * residue must stay clearable even with AI off. Touches NOTHING else —
+ * snapshots, entities and change-data are untouched.
+ */
+router.post('/api/campaigns/:campaign/ai/designer/clear-conversation', (req, res) => {
+    try {
+        if (!isGM(req)) return res.status(403).json({ error: 'GM-only' });
+        res.json({ ok: true, notes: clearNotes(req.params.campaign) });
+    } catch (e) {
+        console.error('[ai-designer:clear-conversation]', e);
+        res.status(500).json({ error: 'designer conversation clear failed' });
     }
 });
 
