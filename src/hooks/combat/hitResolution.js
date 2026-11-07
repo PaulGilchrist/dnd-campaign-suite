@@ -237,7 +237,30 @@ function computeDeathStrikeSaveDc(ps) {
     return 8 + (dexAbility?.bonus || 0) + prof;
 }
 
+// Death Strike is a SUBCLASS feature (both rulesets: classes.json → Rogue →
+// Assassin → level 17, automation type 'attack_rider' with trigger
+// 'first_round_sneak_attack_hit' + damageDoubled — the collector routes it to
+// automation.passives). Gate on the character's DERIVED automation so a
+// non-Assassin sneak-attacker (e.g. lv20 Arcane Trickster) is never granted
+// the double-damage te — findProcessedAttackRider (rules.js) scans the same
+// buckets.
+function hasDeathStrikeFeature(playerStats) {
+    const automation = playerStats?.automation;
+    if (!automation) return false;
+    const riders = [
+        ...(automation.passives || []),
+        ...(automation.actions || []),
+        ...(automation.bonusActions || []),
+        ...(automation.reactions || []),
+        ...(automation.specialActions || []),
+    ];
+    return riders.some(a => a?.type === 'attack_rider'
+        && a?.trigger === 'first_round_sneak_attack_hit'
+        && a?.damageDoubled === true);
+}
+
 async function maybeStoreDeathStrike(characterName, campaignName, context, targetName) {
+    if (!hasDeathStrikeFeature(context?.playerStats)) return;
     const cs2 = await getCombatContext(campaignName);
     const currentRound2 = getCurrentCombatRound(campaignName);
     if (!cs2 || currentRound2 !== 1) return;

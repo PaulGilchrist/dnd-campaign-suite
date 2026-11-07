@@ -71,3 +71,75 @@ the round-1 + sneak-hit trigger, but it silently misrepresents character capabil
 Live 2026-11-07 (run DJ, test-campaign, HEAD 9c0dcec13): grant row byte-captured, consumer prompt +
 success eviction observed, sheet-feature control face (no Death Strike row on AT lv20) confirmed,
 zero log rows for the resolution leg.
+
+## Resolution
+FIXED 2026-11-07 (fix-verify run, test-campaign, dev:locked lane). Both claims reproduced live
+BEFORE fixing: lv20 Arcane Trickster (sanctioned EF disk surgery, backup md5 0df29ff3) round-1
+sneak HIT stored the te row byte-exact `{"target":"ElderPaladin","source":"Death Strike",
+"effect":"death_strike","saveType":"CON","saveDc":15,"saveAbility":"DEX","damageDoubled":true}`
+with ZERO producer rows; the same-cycle damage leg queued the nameless CON DC15 prompt, and the
+Roll-Save SUCCESS (EP +29 via warding_bond +19 dial) evicted the te with a ZERO-row log delta
+(21 rows before, 21 after, no row mentioning Death Strike anywhere).
+
+### Root cause (matched the bug file's guess)
+- Producer `maybeStoreDeathStrike` (src/hooks/combat/hitResolution.js) had NO feature lookup —
+  gates were only round===1 + sneak>0 + hit + !hasActed, so any lv17+ sneak-attacker got the
+  Assassin-exclusive lv17 multiplier.
+- Consumer `resolveDeathStrike` (src/hooks/combat/handlers/handlePlainDamage.js) only wrote a
+  log row in the FAIL branch; SUCCESS evicted the te silently. Prompt also carried no
+  `sourceName`, so it rendered producer-nameless (sibling prompts show "Source: Shield Bash").
+
+### Fix
+- `hitResolution.js`: new `hasDeathStrikeFeature(playerStats)` gate consulted at the top of
+  `maybeStoreDeathStrike` — scans the character's DERIVED `playerStats.automation` buckets
+  (same `findProcessedAttackRider` bucket set in rules.js / the collection that feeds the sheet
+  rows) for the authored Death Strike envelope: `type:'attack_rider' &&
+  trigger:'first_round_sneak_attack_hit' && damageDoubled === true`. This is the canonical-data
+  shape in BOTH rulesets (`public/data/2024/classes.json` Rogue→majors→Assassin lv17 and
+  `public/data/classes.json` Rogue→subclasses→Assassin lv17) — the collector routes it to
+  `automation.passives` (trigger predicate in automationRouter.routeAttackRider), so the
+  dual-ruleset twin needed no separate change. Assassinate's same-trigger row is
+  `damage_bonus`-shaped (no damageDoubled) and cannot false-positive the gate.
+- `handlePlainDamage.js`: success branch now logs one `save_result` row (characterName,
+  targetName, saveDc, saveType, success:true, roll/total/saveBonus, copy
+  "X succeeded on CON save (DC N) — Death Strike: <attacker>'s attack damage is not doubled.")
+  mirroring the saveOnlyHandler/rider success shapes; `sendSavePrompt` payload gains
+  `sourceName:'Death Strike'` so the prompt names its producer.
+
+### Files changed
+- src/hooks/combat/hitResolution.js (gate)
+- src/hooks/combat/handlers/handlePlainDamage.js (success `save_result` row + prompt sourceName)
+- src/hooks/combat/hitResolution.death-strike.test.js (NEW — 6 ledgers: AT-no-store,
+  Assassin-store-with-DC-15-from-own-DEX+PB, round-2 / hasActed / miss / no-automation all
+  store nothing; proven to FAIL on gate-off, PASS on gate-on)
+- src/hooks/combat/handlers/handlePlainDamage.deathStrike.test.js (extended — success face now
+  pins the single `save_result` row + `sourceName` on the prompt + legacy `bonus`-only detail
+  fallback; existing fail/no-delta/eviction ledgers byte-unchanged; proven to FAIL when the
+  success log is neutered)
+
+### Verification
+- `npx vitest run` on both touched files: 12/12 green. Touched-area run
+  `src/hooks/combat/**` + handlers: 231 files, 1954 passed / 3 expected-fail. `npm run lint`:
+  zero problems. `node .opencode/plans/no-timers-guard.mjs`: OK.
+- Live re-verify (browser, Vite dev lane :5173, test-campaign header-verified):
+  AT lv20 face — round-1 sneak HIT (d20 15+9=24, `1d6+3 + 10d6` sneak landed) → change-data
+  `targetEffects` NULL, zero Death Strike rows in log delta, no CON prompt. Control face on the
+  same sheet (stroke/versatile rows present, Death Strike row absent).
+  Assassin face (sanctioned disk subclass swap + reload+re-select, sheet row auto-derived) —
+  round-1 sneak HIT stored the te row byte-identical, prompt rendered "Source: Death Strike",
+  success save (dial +19) produced the new row "ElderPaladin succeeded on CON save (DC 15) —
+  Death Strike: EvasiveFighter's attack damage is not doubled.", te evicted ([]), damage
+  un-doubled (64 = 1d6+3 + 10d6 + honest Assassinate +20 leg, log carries its ability_use row).
+- Cleanup: EF fixture restored md5 0df29ff3… byte-exact (API GET re-proves Fighter/Battle
+  Master/18 + backpack [Shortsword]); Admin clear-change-data + clear-log (scripted, no dialog)
+  two-pass → change-data `{}` + log `[]` + combatSummary absent, GET-verified with tabs closed.
+
+## Summary
+Death Strike (Assassin lv17 subclass feature) was granted to ANY lv17+ sneak-attacker — the
+producer stored the double-damage te on a round-1 sneak HIT with zero feature lookup, and the
+consumer's save-SUCCESS resolution evicted it with zero log rows. Fixed: producer now gates on the
+character's derived automation carrying the authored attack_rider/damageDoubled/first-round
+envelope (works for both rulesets from canonical classes.json), and the success leg logs a
+`save_result` verdict row while the prompt names its producer. Live AT face no longer grants,
+Assassin face still grants honestly (byte-identical te, DC from own DEX+PB) and now logs both
+save faces; 2 new regression ledgers lock each half, 46→52-file touched-area suite green, lint zero.

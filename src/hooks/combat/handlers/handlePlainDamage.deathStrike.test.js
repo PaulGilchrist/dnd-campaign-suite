@@ -225,6 +225,46 @@ describe('Plain damage death strike', () => {
         expect(cleanedTargetEffects()).toEqual([]);
     });
 
+    it('save success logs its verdict: one save_result row (no silent eviction)', async () => {
+        armCampaignEffects({ effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'CON' });
+
+        await hitThenSave({ success: true, roll: 18, total: 21, saveBonus: 3 });
+
+        // The prompt also names its producer (Source: Death Strike) on the
+        // modal — sibling prompts (Shield Bash et al.) never render nameless.
+        expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            targetName: 'Goblin',
+            sourceName: 'Death Strike',
+        }));
+
+        const saveRows = deps.logEntry.mock.calls
+            .map((call) => call[0])
+            .filter((entry) => entry?.type === 'save_result');
+        expect(saveRows).toHaveLength(1);
+        expect(saveRows[0]).toMatchObject({
+            characterName: 'TestFighter',
+            targetName: 'Goblin',
+            saveDc: 15,
+            saveType: 'CON',
+            success: true,
+            roll: 18,
+            total: 21,
+            saveBonus: 3,
+            description: expect.stringContaining('Death Strike'),
+        });
+        expect(saveRows[0].description).toContain('not doubled');
+    });
+
+    it('save success (legacy detail shape with bonus, no saveBonus/total): row still lands', async () => {
+        armCampaignEffects({ effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'CON' });
+
+        await hitThenSave({ success: true, roll: 18, bonus: 3 });
+
+        const saveRow = deps.logEntry.mock.calls.map((call) => call[0]).find((entry) => entry?.type === 'save_result');
+        expect(saveRow).toBeDefined();
+        expect(saveRow.saveBonus).toBe(3);
+    });
+
     it('re-arms for the next hit: consumes only this target death_strike, keeps other effects', async () => {
         armCampaignEffects(
             { effect: 'death_strike', target: 'Goblin', saveDc: 15, saveType: 'strength' },

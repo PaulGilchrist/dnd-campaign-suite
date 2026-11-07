@@ -237,6 +237,7 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
             targetName: target.name,
             saveType: dsSaveType,
             saveDc: dsSaveDc,
+            sourceName: 'Death Strike',
             dcSuccess: false,
             advantage: false,
             disadvantage: false,
@@ -285,6 +286,23 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
                 deathStrikeSaveDc: dsSaveDc,
                 deathStrikeFinalDamage: dsApplyResult?.finalDamage,
             }));
+        } else {
+            // Every adjudicated resolution logs: the success verdict gets its
+            // own save_result row (mirrors the saveOnlyHandler / rider-lane
+            // "succeeded — no effect" shape) — the te eviction below used to
+            // consume the effect with zero audit trail.
+            logEntry({
+                type: 'save_result',
+                characterName,
+                targetName: target.name,
+                saveDc: dsSaveDc,
+                saveType: dsSaveType,
+                success: true,
+                roll: dsSaveResult.roll,
+                total: dsSaveResult.total,
+                saveBonus: dsSaveResult.saveBonus ?? dsSaveResult.bonus,
+                description: `${target.name} succeeded on ${dsSaveType} save (DC ${dsSaveDc}) — Death Strike: ${characterName}'s attack damage is not doubled.`,
+            });
         }
     }
     const cleanedEffects = storedEffects.filter(te => te.effect !== 'death_strike' || te.target !== target.name);
