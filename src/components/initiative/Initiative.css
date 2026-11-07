@@ -1453,8 +1453,10 @@
 }
 
 /* ---- TV mode layout ---- */
+/* The app shell unmounts the fixed sidebar while TV mode is on (tvModeStore
+   broadcast), so the tracker owns the full viewport width. */
 .initiative--tv {
-    padding: 28px 36px;
+    padding: 24px 28px;
 }
 
 .initiative--tv .combat-header {
@@ -1475,21 +1477,30 @@
     gap: 18px;
     /* Tall vertical padding: overflow-x:auto forces vertical clipping, and the
        scaled-up spotlight card needs the room to glow without being cut. */
-    padding: 180px 12px;
+    padding: 90px 12px;
 }
 
 .initiative--tv .creature-card {
     width: 250px;
     min-width: 250px;
     max-width: 250px;
+    /* Whole-card magnifier for the living room: zoom scales EVERYTHING inside
+       the card uniformly (padding, badges, and the inline-sized 150px avatars
+       that class CSS alone cannot reach), so cards read from far away and on
+       small TVs. The active spotlight's transform scale composes with zoom. */
+    zoom: 1.5;
 }
 
 /* Spotlight: the active creature scales up and breathes IN PLACE. Initiative
    order is authoritative — do NOT re-order the row with flex `order` (that
    made every turn change visibly shuffle the lineup on the TV). The active
-   card is centered by the scrollIntoView effect in Initiative.jsx instead. */
+   card is centered by the scrollIntoView effect in Initiative.jsx instead.
+   Keep this scale modest: with the larger zoomed base card, visibility of the
+   FULL active card plus its previous/next neighbours is the hard constraint —
+   prefer bigger cards over a bigger spotlight pop. */
 .initiative--tv .creature-card.active {
-    transform: scale(1.4);
+    margin: 12px 18px;
+    transform: scale(1.12);
     animation: tv-active-pulse 2.2s ease-in-out infinite;
 }
 
@@ -1553,6 +1564,19 @@
 .initiative--tv .npc-remove-btn,
 .initiative--tv .effect-add-btn {
     display: none;
+}
+
+/* Short screens (720p TVs, laptops): dial the card magnifier back just enough
+   that the FULL active card and its previous/next neighbours still fit the
+   viewport height — extra creatures stay reachable by horizontal scroll. */
+@media (max-height: 900px) {
+    .initiative--tv .creature-card {
+        zoom: 1.15;
+    }
+
+    .initiative--tv .carousel-container {
+        padding: 64px 12px;
+    }
 }
 
 /* ============ Control delegation (Phase 2) ============ */

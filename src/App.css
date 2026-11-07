@@ -12,6 +12,12 @@
     min-height: 0;
 }
 
+/* Initiative TV mode: SidebarShell unmounts the fixed sidebar (tvModeStore
+   broadcast), so reclaim its 180px gutter for the creature-card carousel. */
+.app-body:not(:has(.sidebar)) {
+    padding-left: 0;
+}
+
 .half-line {
   height: 0.5em;      /* half of the font-size */
   line-height: 0.5em; /* optional: aligns content if any */

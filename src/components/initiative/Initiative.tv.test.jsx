@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import Initiative from './Initiative.jsx';
 import * as combatData from '../../services/encounters/combatData.js';
+import { getTvModeActive } from '../../services/ui/tvModeStore.js';
 
 const syncStateStore = new Map();
 let lastCombatResult = null;
@@ -203,11 +204,31 @@ describe('Initiative TV mode', () => {
 
     it('restores TV mode from the saved per-client preference on mount', async () => {
         localStorage.setItem('initiative-tv', '1');
-        await act(async () => { render(<Initiative {...props} />); });
+        let view;
+        await act(async () => { view = render(<Initiative {...props} />); });
         await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
 
         expect(document.querySelector('.initiative').className).toContain('initiative--tv');
         expect(screen.getByRole('button', { name: /TV/i })).toHaveAttribute('aria-pressed', 'true');
+        // Restored-TV also re-broadcasts the shell-wide sidebar gate.
+        expect(getTvModeActive()).toBe(true);
+        // Leaving the tracker view clears the broadcast (navigation returns).
+        act(() => { view.unmount(); });
+        expect(getTvModeActive()).toBe(false);
+    });
+
+    it('broadcasts TV mode to the app shell sidebar gate on toggle', async () => {
+        expect(getTvModeActive()).toBe(false);
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
+        expect(getTvModeActive()).toBe(false);
+
+        const button = screen.getByRole('button', { name: /TV/i });
+        fireEvent.click(button);
+        expect(getTvModeActive()).toBe(true);
+
+        fireEvent.click(button);
+        expect(getTvModeActive()).toBe(false);
     });
 
     it('up-next strip lists the following creatures in turn order (wraparound), never the active one', async () => {

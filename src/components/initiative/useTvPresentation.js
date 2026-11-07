@@ -9,6 +9,7 @@
 
 import React from 'react'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { setTvModeActive } from '../../services/ui/tvModeStore.js'
 
 const TV_PREF_KEY = 'initiative-tv'
 const VICTORY_DISMISS_KEY = 'initiative-victory-dismissed'
@@ -48,6 +49,13 @@ export function useTvPresentation({ campaignName, displayCreatures, activeCreatu
         document.addEventListener('fullscreenchange', onFullscreenChange)
         return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
     }, [])
+    // Broadcast to the app shell: TV mode hides the left sidebar (nobody reads
+    // it from across the room) and reclaims its gutter for the card carousel.
+    // The unmount clear keeps every non-tracker view navigable.
+    React.useEffect(() => {
+        setTvModeActive(tvMode)
+        return () => setTvModeActive(false)
+    }, [tvMode])
 
     // ── Damage/heal floaters ── display-only diff of each creature's HP across
     // renders (the container survives the per-tick card remounts). Events live

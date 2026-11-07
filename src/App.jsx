@@ -8,7 +8,7 @@ import CharSheet from './components/char-sheet/CharSheet.jsx';
 import Initiative from './components/initiative/Initiative.jsx';
 import CampaignSelection from './components/campaign-selection/CampaignSelection.jsx';
 import CharacterCreationWizard from './components/character-creation/CharacterCreationWizard.jsx';
-import Sidebar from './components/sidebar/Sidebar.jsx';
+import SidebarShell from './components/sidebar/SidebarShell.jsx';
 import Map from './components/map/Map.jsx';
 import MapUnavailable from './components/map/MapUnavailable.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
@@ -830,7 +830,7 @@ function App() {
           (2026-11-03 QA backlog). */}
       <input key={Date.now()} type="file" accept=".json" multiple ref={inputRef} onChange={handleUploadChange} hidden aria-label="Import campaign JSON" />
       <div className="app-body">
-        <Sidebar
+        <SidebarShell
           campaignName={campaignName}
           characters={characters}
           activeCharacter={activeCharacter}
