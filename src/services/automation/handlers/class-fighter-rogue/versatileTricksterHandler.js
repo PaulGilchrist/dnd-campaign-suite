@@ -114,5 +114,8 @@ export async function applyVersatileTrickster(action, playerStats, campaignName,
 
     return buildTricksterPopup(action, auto, saveFailed
         ? `Versatile Trickster: Trip also applied to ${secondaryTargetName} — failed its Dexterity save (DC ${saveDc}) and gained the Prone condition.`
-        : `Versatile Trickster: Trip also applied to ${secondaryTargetName} — succeeded its Dexterity save (DC ${saveDc}) — no effect.`);
+        // DG 2026-11-06 improve: honest success copy — the old "Trip also
+        // applied … no effect" contradicted itself in one sentence. A saved
+        // trip attempts nothing that lands (see evictSavedTripDescriptor).
+        : `Versatile Trickster: Trip attempted on ${secondaryTargetName} but ${secondaryTargetName} succeeded its Dexterity save (DC ${saveDc}) — no trip.`);
 }

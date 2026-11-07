@@ -68,7 +68,6 @@ Live facts (DH, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-06 DH VT success copy: `Versatile Trickster — Trip also applied to <T> — succeeded its Dexterity save (DC 15) — no effect.` contradicts itself in one sentence ("applied … no effect"). Reword to "…was tripped via Versatile Trickster but succeeded its Dexterity save (DC 15)".
 - 2026-11-06 DH wizard edit-mode footer inconsistency: Edit wizard shows `Cancel` at step 1 but only `×` from mid-steps on (× closes with NO discard-confirm even when steps were opened — fine today because nothing mutates until ✓Save, but an accidental × after a long edit session silently loses everything; consider a "Discard changes?" confirm when any step state is dirty).
 
 ## Blocked / Not Verified (fold-gate ledger)

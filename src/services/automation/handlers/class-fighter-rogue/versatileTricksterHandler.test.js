@@ -163,10 +163,20 @@ describe('versatileTricksterHandler', () => {
                             type: 'automation_info',
                             name: 'Versatile Trickster',
                             automationType: 'versatile_trickster',
-                            description: `Versatile Trickster: Trip also applied to ${creature.name} — succeeded its Dexterity save (DC 16) — no effect.`,
+                            description: `Versatile Trickster: Trip attempted on ${creature.name} but ${creature.name} succeeded its Dexterity save (DC 16) — no trip.`,
                             automation: { type: 'versatile_trickster' },
                         },
                     });
+
+                    // DG 2026-11-06 improve: the success popup must state the
+                    // save succeeded and no condition landed — never the old
+                    // self-contradictory "also applied … no effect" pairing.
+                    expect(result.payload.description).toContain(
+                        'succeeded its Dexterity save'
+                    );
+                    expect(result.payload.description).not.toMatch(
+                        /also applied.*no effect/
+                    );
 
                     // Save SUCCESS face (DG 2026-11-06 improve): the append
                     // write is immediately followed by the descriptor-row
@@ -282,7 +292,7 @@ describe('versatileTricksterHandler', () => {
                 );
 
                 expect(result.payload.description).toBe(
-                    `Versatile Trickster: Trip also applied to ${target} — succeeded its Dexterity save (DC 16) — no effect.`
+                    `Versatile Trickster: Trip attempted on ${target} but ${target} succeeded its Dexterity save (DC 16) — no trip.`
                 );
                 expect(setRuntimeValue).toHaveBeenCalledTimes(1);
                 expect(setRuntimeValue).toHaveBeenCalledWith(
