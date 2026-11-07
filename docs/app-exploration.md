@@ -66,7 +66,6 @@ Live facts (DJ, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-07 DJ] Duplicate same-kind overlay mounts** — a single dispatch sometimes stacks TWO identical save-prompt overlays (and once, two identical VT pickers) in one tab; downstream dedup keeps resolution honest (single save roll, single log row) but drain loops must pop both and a GM could mid-click the stale twin. Intermittent (load-dependent; second tab load mounted singly). Suggest: trace the prompt/queue producer for double-dispatch (local write + SSE echo both mounting?) and dedupe at mount.
 - **[2026-11-07 DJ] AI-authoring artifacts live outside the change-data reset lane** — the designer conversation + plans persist to `data/design-notes.json` and every generate writes a snapshot zip to `public/campaigns/.snapshots/`; Admin "Clear Change Data" clears NEITHER, so test/authoring residue silently outlives the standard cleanup ritual. Suggest: surface a "clear designer conversation" affordance (or include design-notes in the admin clear) and document/rotate the campaign snapshot dir.
 
 ## Blocked / Not Verified (fold-gate ledger)

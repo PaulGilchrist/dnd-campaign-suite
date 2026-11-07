@@ -484,15 +484,37 @@ function findTargetCharacter(current, characters) {
   }) || null;
 }
 
+// Identity gate for the prompt queue (duplicate-overlay double-mount backlog
+// 2026-11-07). A prompt's identity is its promptId when BOTH the queued entry
+// and the incoming echo carry one (per-prompt lane); otherwise it falls back
+// to the ARRIVAL KEY — one server key holds exactly one live prompt, so a
+// second value echo on the same key is an echo of the queued prompt (a local
+// write racing its own SSE echo), never a new prompt. This suppresses the
+// stale-twin face: an echo whose payload lacks the promptId the queue already
+// stored (undefined !== 'p-1' used to pass the old promptId-only check and
+// append a second overlay over the SAME server key — rolling/Dismissing one
+// DELETEd the key and stranded the twin until its null echo happened to
+// land). Genuine multi-prompt stacking is untouched: different promptIds —
+// even two prompts sharing one legacy bare-target key (producer collapse
+// face, pinned by .dismiss-hygiene) — still decide by promptId. And with
+// promptId-unknown on both sides, distinct targets/keys no longer collide
+// into a false suppression the way the old `undefined === undefined` equality
+// did. A null cleared-key echo reviving/evicting stays in handleEvent's
+// cleared branch (clearedPromptKeysRef doctrine in the component below).
+function isSamePrompt(p, promptId, keySuffix) {
+  if (p.promptId && promptId) return p.promptId === promptId;
+  return p.promptKeySuffix === keySuffix;
+}
+
 function appendSavePrompt(prev, event, prefix) {
-  if (prev.some(p => p.promptId === event.data.promptId)) return prev;
+  const keySuffix = event.key.slice(prefix.length);
+  if (prev.some(p => isSamePrompt(p, event.data.promptId, keySuffix))) return prev;
   const { sourceAttackerName, attackerName: eventDataAttackerName, targetName: dataTargetName, promptId, ...restData } = event.data;
   // The arrival key identifies the SERVER key this prompt lives on:
   // '<Target>-<promptId>' (per-prompt lane) or bare '<Target>' (legacy/
   // staged producers). Queue it verbatim so Dismiss/Done clear exactly the
   // key that exists instead of guessing at a sibling shape (drained-queue
   // 404 class, backlog 2026-11-03).
-  const keySuffix = event.key.slice(prefix.length);
   const targetName = dataTargetName
     || (promptId && keySuffix.endsWith(`-${promptId}`)
       ? keySuffix.slice(0, -(promptId.length + 1))
