@@ -570,7 +570,7 @@ function pickOrNull(value) {
 }
 
 function buildRiderEffect(action, targetName, playerStats, option, auto) {
-    return {
+    const effect = {
         target: targetName,
         source: playerStats.name,
         option: option.name,
@@ -594,6 +594,29 @@ function buildRiderEffect(action, targetName, playerStats, option, auto) {
         damageType: pickOrNull(option.damageType),
         label: auto.name || action.name,
     };
+    // DI bug fix (bug-devious-strikes-poison-repeat-save-never-fires): options
+    // authored `repeatingSave: true` (Devious Strikes Poison/Knock Out, Cunning
+    // Strike Poison, Soulknife Rend Mind) advertise a turn-END repeat save but
+    // only stamped the BOOLEAN — the generic turn-END roller
+    // (repeatSaveService.applyRepeatSaveTurnEnd, navigationHandlers seam) filters
+    // `te.repeatSave` OBJECTS (the grantRepeatSaveEffect descriptor shape), so
+    // the advertised save never fired and the condition never ended on a
+    // success. Emit the consumer's contract alongside the authored boolean:
+    // repeating save = the SAME save the rider's primary leg rolled
+    // (option.saveType, target's ability) against the SAME resolved source DC
+    // (buildSaveDc reads saveAbility as the DC-source ability — the Cunning
+    // Strike DC is 8 + PB + DEX by design, mirroring the primary save exactly).
+    // The condition gate in resolveOneRepeatSave keeps the pre-save descriptor
+    // inert until the failed save grants the condition; success evicts the whole
+    // row via evictSavedRiderEffect.
+    if (option.repeatingSave && option.saveDc) {
+        effect.repeatSave = {
+            saveType: option.saveType || 'CON',
+            dc: buildSaveDc(option, playerStats),
+            condition: option.condition ? String(option.condition).toLowerCase() : null,
+        };
+    }
+    return effect;
 }
 
 // Log speed_reduction effect immediately (before save handling)
