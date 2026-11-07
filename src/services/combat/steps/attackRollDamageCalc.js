@@ -4,6 +4,18 @@ import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js';
 
+// DH crit-ledger-shape (2026-11-06 improve): the monster lane pins its crit damage row as
+// `1d6*2+1 (N)` via formatDamageFormula (diceRoller.js), while the sheet lane rolled the
+// doubled pool (rollExpressionDoubled) but kept logging the PLAIN `1d6+1` string — same
+// value, two shapes. Stamp the same per-dice-group `*2` marker idiom onto every group the
+// base/sneak steps ACTUALLY rolled doubled. Flat modifiers are never touched (they don't
+// double on crit, playbook §4). Display-string only: total/rolls keep the single-set
+// shape machine consumers pin. The (?!\*2) guard keeps the stamp idempotent.
+function markCritDoubledGroups(formula) {
+  if (!formula) return formula;
+  return formula.replace(/(\d+d\d+)(?!\*2)/g, '$1*2');
+}
+
 function getPositiveCharismaModifier(ps) {
   const charismaAbility = ps.abilities?.find(a => a.name === 'Charisma');
   return Math.max(0, charismaAbility?.bonus || 0);
@@ -90,6 +102,10 @@ export function buildRollBaseDamageStep() {
 
       markRadiantSoulUsed(ctx, ps, formula);
 
+      // Overchannel beats crit upstream (rollExpressionMaximized ran, nothing doubled),
+      // so the *2 stamp fires only on the roll that actually used rollExpressionDoubled.
+      if (wasCrit && !isOverchannel) formula = markCritDoubledGroups(formula);
+
       return {
         data: { formula, total: result.total, rolls: result.rolls, modifier: result.modifier },
       };
@@ -136,7 +152,8 @@ export function buildSneakAttackStep() {
         const sneakFormula = `${effective}d6`;
         const result = wasCrit ? rollExpressionDoubled(sneakFormula) : rollExpression(sneakFormula);
         if (result) {
-          formula += ` + ${sneakFormula} [Sneak Attack]`;
+          // Crit sneak pool really rolled doubled → same `*2` marker idiom as the base group.
+          formula += ` + ${wasCrit ? markCritDoubledGroups(sneakFormula) : sneakFormula} [Sneak Attack]`;
           total += result.total;
           rolls = [...rolls, ...result.rolls];
           await setRuntimeValue(ctx.playerStats.name, '_SneakAttack_usedRound', getCurrentCombatRound(ctx.campaignName), ctx.campaignName);

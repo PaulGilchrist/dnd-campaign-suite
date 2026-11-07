@@ -230,7 +230,9 @@ describe('useAttackDamageResolution — base hook seam', () => {
             expect(critDeps.setPopupHtml).toHaveBeenCalledWith(null);
             expect(critDeps.rollDamage).toHaveBeenCalledWith({
                 name: 'Longsword',
-                formula: '1d8+3 [slashing]',
+                // DH crit-ledger-shape (2026-11-06): doubled sheet-lane groups log with the
+                // monster-lane `*2` marker; roller still receives the plain formula (line 228).
+                formula: '1d8*2+3 [slashing]',
                 total: 10,
                 rolls: [5, 5],
                 modifier: 6,

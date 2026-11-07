@@ -198,7 +198,9 @@ describe('rollBaseDamage — formula → roller → total pipeline', () => {
     expect(rollExpression).not.toHaveBeenCalled();
     expect(rollExpressionMaximized).not.toHaveBeenCalled();
     expect(result.data).toEqual({
-      formula: '8d6',
+      // DH crit-ledger-shape (2026-11-06): doubled base groups carry the monster-lane
+      // `*2` marker (attackRollDamageCalc-crit-ledger-shape.test.js owns the shape).
+      formula: '8d6*2',
       total: 64, // (8d6 raw 32) * 2 + 0
       rolls: [4, 4, 4, 4, 4, 4, 4, 4],
       modifier: 0,
@@ -328,7 +330,8 @@ describe('sneakAttack — sneak dice fold into the running damage payload', () =
     expect(rollExpressionDoubled).toHaveBeenCalledWith('2d6');
     expect(rollExpression).not.toHaveBeenCalled();
     expect(crit.data).toEqual({
-      formula: '1d8+3 + 2d6 [Sneak Attack]',
+      // DH crit-ledger-shape (2026-11-06): the doubled sneak group logs with the `*2` marker.
+      formula: '1d8+3 + 2d6*2 [Sneak Attack]',
       total: 27, // 11 + (2d6 raw 8) * 2
       rolls: [8, 3, 4, 4],
       effectiveSneakDice: 2,
