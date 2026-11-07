@@ -158,26 +158,43 @@ export function createDiceRollHandlers(props, state) {
     const handleSavageAttacker = () => {
         if (!rolls || rolls.length === 0 || !formula || !onSavageAttacker) return;
 
-        const diceMatch = formula.match(/(\d+)d(\d+)/);
-        if (!diceMatch) return;
-
-        const numDice = parseInt(diceMatch[1], 10);
-        const dieSize = parseInt(diceMatch[2], 10);
-        if (numDice !== rolls.length || dieSize <= 0) return;
-
-        const originalRolls = [...rolls];
-        const originalTotal = originalRolls.reduce((sum, r) => sum + r, 0);
-
-        const newRolls = [];
-        for (let i = 0; i < numDice; i++) {
-            newRolls.push(Math.floor(Math.random() * dieSize) + 1);
+        // Group-aware dice census (mirror handlePuncture): multi-group popups
+        // like "1d6+3 [slashing] + 9d6 [Sneak Attack]" carry the base + bonus
+        // pool in ONE rolls array, so the guard must match the formula's TOTAL
+        // dice against the pool, never just the first group's count.
+        const diceSizes = [];
+        for (const diceMatch of formula.matchAll(/(\d+)d(\d+)/gi)) {
+            const count = parseInt(diceMatch[1], 10);
+            const size = parseInt(diceMatch[2], 10);
+            if (size <= 0) return;
+            for (let i = 0; i < count; i++) diceSizes.push(size);
         }
-        const newTotal = newRolls.reduce((sum, r) => sum + r, 0);
+        if (diceSizes.length !== rolls.length) {
+            console.error('[SavageAttacker] roll pool size', rolls.length,
+                'does not match the formula dice —', formula);
+            return;
+        }
+
+        // RAW (feats.json 5e + 2024): the feat rerolls the WEAPON's damage dice
+        // only — the FIRST formula group. Bonus groups (Sneak Attack, riders)
+        // keep their original rolls. Crit "*2" markers are display-only: the
+        // pool carries a single set, exactly as single-group crit popups do.
+        const weaponDice = parseInt(formula.match(/(\d+)d(\d+)/i)[1], 10);
+        const originalWeapon = rolls.slice(0, weaponDice);
+        const newWeapon = originalWeapon.map((_, i) => Math.floor(Math.random() * diceSizes[i]) + 1);
+        const newRolls = [...rolls];
+        newWeapon.forEach((value, i) => { newRolls[i] = value; });
+
+        const originalTotal = originalWeapon.reduce((sum, r) => sum + r, 0);
+        const newTotal = newWeapon.reduce((sum, r) => sum + r, 0);
 
         setSavageAttackerResult({
-            original: originalRolls.join(', '),
-            rerolled: newRolls.join(', '),
-            originalRolls,
+            original: originalWeapon.join(', '),
+            rerolled: newWeapon.join(', '),
+            // Full pools ride into the choice handler so Keep-Reroll settles the
+            // weapon-dice delta (bonus dice are identical in both arrays) and the
+            // popup keeps showing every rolled die.
+            originalRolls: [...rolls],
             newRolls,
             originalTotal,
             newTotal,
@@ -186,14 +203,16 @@ export function createDiceRollHandlers(props, state) {
         });
         setSavageAttackerUsed(true);
 
+        // Audit payload carries only the rerolled weapon dice (CharSheet.handlers
+        // .handleSavageAttacker logs/compares exactly these).
         onSavageAttacker({
             damageFormula: formula,
-            rolls: originalRolls,
+            rolls: originalWeapon,
             rawDamage: total,
             targetName: targetName,
             damageTypes: damageType ? [damageType] : [],
-            originalRolls,
-            newRolls,
+            originalRolls: originalWeapon,
+            newRolls: newWeapon,
         });
     };
 
