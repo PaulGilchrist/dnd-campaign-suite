@@ -330,9 +330,13 @@ function describeRiderOption(opt, targetName) {
 }
 
 // If Trip was applied and Versatile Trickster is available, find secondary targets.
-async function scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, targetName, campaignName) {
+// DG 2026-11-06: RAW "another creature within 5 feet of the target" excludes the
+// holder themself — drop the attacker at the producer (same style as the
+// primary-target exclusion in scanNearbySecondaryTargets) so no consumer can
+// render a self radio.
+async function scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, playerStats, targetName, campaignName) {
     if (!(chosen.effect === 'prone' && hasVersatileTricksterPassive && targetName)) return null;
-    const secondaryTargets = await scanNearbySecondaryTargets(campaignName, targetName);
+    const secondaryTargets = await scanNearbySecondaryTargets(campaignName, targetName, playerStats.name);
     return secondaryTargets.length > 0 ? secondaryTargets : null;
 }
 
@@ -419,7 +423,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         const res = await applyRiderEffect({ action, playerStats, campaignName, targetName, option: chosen });
         results.push(res);
 
-        const secondaryTargets = await scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, targetName, campaignName);
+        const secondaryTargets = await scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, playerStats, targetName, campaignName);
         if (secondaryTargets) versatileTricksterSecondaryTarget = secondaryTargets;
     }
 
@@ -502,12 +506,15 @@ async function resolveStalkersFlurrySecondaryTargets(chosenOptions, targetName, 
     return await scanNearbySecondaryTargets(campaignName, targetName);
 }
 
-async function scanNearbySecondaryTargets(campaignName, targetName) {
+// excludeName (optional): an extra creature never offered as a candidate
+// (e.g. the Versatile Trickster holder — RAW "another creature" excludes self).
+async function scanNearbySecondaryTargets(campaignName, targetName, excludeName) {
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures) return [];
     const secondaryTargets = [];
     for (const c of cs.creatures) {
         if (c.name === targetName) continue;
+        if (excludeName && c.name === excludeName) continue;
         if (await isWithinRange(targetName, c.name, 5)) secondaryTargets.push(c);
     }
     return secondaryTargets;

@@ -356,6 +356,74 @@ describe('attackRiderHandler', () => {
             expect(vtCalls.at(-1)[2]).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Skeleton' })]));
         });
 
+        // DG 2026-11-06: RAW "another creature within 5 feet of the target"
+        // excludes the holder — the candidate producer must never offer the
+        // attacker themself (EvasiveFighter was live-listed as a radio).
+        it('DG 2026-11-06: VT secondary scan excludes the holder but keeps other nearby creatures', async () => {
+            mockTargetEffects();
+            vi.mocked(isWithinRange).mockResolvedValue(true);
+            vi.mocked(getCombatContext).mockResolvedValue({
+                creatures: [
+                    { name: 'TestHero', size: 'Medium' },
+                    { name: 'Goblin', size: 'Medium' },
+                    { name: 'Skeleton', size: 'Medium' },
+                ],
+            });
+            const stats = makePlayerStats({
+                automation: { passives: [{ type: 'passive_rule', effect: 'versatile_trickster' }] },
+            });
+            await applyRiderOption(makeAction(), stats, 'campaign', 'Goblin', ['Trip']);
+
+            const vtCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'versatileTricksterSecondaryTargets');
+            const stamped = vtCalls.at(-1)[2];
+            expect(stamped).toEqual([expect.objectContaining({ name: 'Skeleton' })]);
+            expect(stamped.some(c => c.name === 'TestHero')).toBe(false);
+        });
+
+        it('DG 2026-11-06: holder exclusion is VT-only — Stalker\'s Flurry scan is unchanged', async () => {
+            mockTargetEffects();
+            vi.mocked(isWithinRange).mockResolvedValue(true);
+            vi.mocked(getCombatContext).mockResolvedValue({
+                creatures: [
+                    { name: 'TestHero', size: 'Medium' },
+                    { name: 'Goblin', size: 'Medium' },
+                    { name: 'Skeleton', size: 'Medium' },
+                ],
+            });
+            const stats = makePlayerStats({
+                automation: { passives: [{ type: 'passive_rule', effect: 'versatile_trickster' }] },
+            });
+            await applyRiderOption(makeAction(), stats, 'campaign', 'Goblin', ['Trip', 'Sudden Strike']);
+
+            const vtStamped = setRuntimeValue.mock.calls
+                .filter(c => c[1] === 'versatileTricksterSecondaryTargets').at(-1)[2];
+            const sfStamped = setRuntimeValue.mock.calls
+                .filter(c => c[1] === 'stalkersFlurrySecondaryTargets').at(-1)[2];
+            expect(vtStamped.map(c => c.name)).toEqual(['Skeleton']);
+            expect(sfStamped.map(c => c.name)).toEqual(['TestHero', 'Skeleton']);
+        });
+
+        it('DG 2026-11-06: when the only nearby creature is the holder, no VT keys are stamped (picker never opens)', async () => {
+            mockTargetEffects();
+            vi.mocked(isWithinRange).mockResolvedValue(true);
+            vi.mocked(getCombatContext).mockResolvedValue({
+                creatures: [
+                    { name: 'TestHero', size: 'Medium' },
+                    { name: 'Goblin', size: 'Medium' },
+                ],
+            });
+            const stats = makePlayerStats({
+                automation: { passives: [{ type: 'passive_rule', effect: 'versatile_trickster' }] },
+            });
+            await applyRiderOption(makeAction(), stats, 'campaign', 'Goblin', ['Trip']);
+
+            const vtCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'versatileTricksterSecondaryTargets');
+            expect(vtCalls).toHaveLength(1); // only the CLA-376 entry clear
+            expect(vtCalls[0][2]).toBeNull();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'versatileTricksterPrimaryTarget', 'Goblin', 'campaign');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'versatileTricksterAction', expect.objectContaining({ type: 'versatile_trickster' }), 'campaign');
+        });
+
         it('should apply Envenom Weapons damage when CON poison save fails and passive exists', async () => {
             vi.mocked(rollExpression).mockReturnValue({ total: 8 });
             vi.mocked(getCombatContext).mockResolvedValue({

@@ -65,8 +65,6 @@ Live facts (DG, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (DG 2026-11-06) VT secondary-target list offers the ATTACKER itself as a trip candidate (`EvasiveFighter` radio in the chooser) — RAW "another creature" excludes self; filter the holder. `versatileTricksterHandler/chooser host`.
-
 ## Blocked / Deepen Targets (fold-gate ledger)
 
 - CLOSED at DG 2026-11-06: PT1 boon nat-1 fix-verify (all faces + 23 ledgers); PT2 VT "Trip Secondary Target" PICKER face (full prone chain); dice-tail-starvation suspicion (engine census uniform; r1/r2 spare explained).
