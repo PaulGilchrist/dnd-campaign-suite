@@ -68,7 +68,9 @@
   },
   "immunities": [],
   "inventory": {
-    "backpack": [],
+    "backpack": [
+      "Test ZABLE send to part inv"
+    ],
     "equipped": [],
     "gold": 10,
     "magicItems": []
@@ -103,5 +105,6 @@
   "xp": 0,
   "xpMode": "milestone",
   "background": "Wayfarer",
-  "imagePath": "images/Zable.png"
+  "imagePath": "images/Zable.png",
+  "featAbilityChoices": {}
 }
