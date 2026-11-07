@@ -150,6 +150,10 @@ vi.mock('./components/log/Log.jsx', async () => {
   const { MockLog } = await import('./test/mockComponents.jsx');
   return { default: MockLog };
 });
+vi.mock('./components/music/MusicPlayer.jsx', async () => {
+  const { MockMusicPlayer } = await import('./test/mockComponents.jsx');
+  return { default: MockMusicPlayer };
+});
 vi.mock('./components/campaign-admin/CampaignAdmin.jsx', async () => {
   const { MockCampaignAdmin } = await import('./test/mockComponents.jsx');
   return { default: MockCampaignAdmin };
@@ -309,6 +313,37 @@ describe('App - State Transitions', () => {
         expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
       });
       expect(screen.queryByTestId(viewTestId)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Music player survives view navigation', () => {
+    // Owner ruling 2026-11-06: ambience plays continuously across the app —
+    // it silences ONLY via the player's Pause/Stop (component lane:
+    // MusicPlayer.continuous-playback.test.jsx). App keeps MusicPlayer
+    // persistent-mounted outside the view outlet; navigation only flips the
+    // `visible` prop (panel display), never unmounts the player.
+    it('stays mounted while visible tracks the Music view', async () => {
+      const { musicPlayerLifecycle } = await import('./test/mockComponents.jsx');
+      musicPlayerLifecycle.mounts = 0;
+      musicPlayerLifecycle.unmounts = 0;
+
+      await renderInCampaign();
+      // Mounted alongside the sheet, panel hidden.
+      expect(screen.getByTestId('music-player')).toHaveAttribute('data-visible', 'false');
+
+      // Open the Music view: panel shows.
+      await openView('music-btn', 'music-player');
+      expect(screen.getByTestId('music-player')).toHaveAttribute('data-visible', 'true');
+
+      // Navigate away to another view: panel hides, player NEVER unmounts.
+      fireEvent.click(screen.getByTestId('notes-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('notes-view')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('music-player')).toHaveAttribute('data-visible', 'false');
+
+      expect(musicPlayerLifecycle.mounts).toBe(1);
+      expect(musicPlayerLifecycle.unmounts).toBe(0);
     });
   });
 

@@ -365,7 +365,6 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     campaignBuilder: <CampaignBuilder campaignName={campaignName} />,
     partyInventory: <PartyInventory campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
-    music: <MusicPlayer campaignName={campaignName} />,
     campaignRepair: (
       <CampaignAdmin
         campaignName={campaignName}
@@ -913,6 +912,14 @@ function App() {
           restoredSnapshot={restoredSnapshot}
         />
         </ErrorBoundary>
+        {/* Persistent music player: mounted once per campaign and kept alive
+            across view navigation (the view outlet above unmounts views on
+            switch, which used to destroy the player and cut audio). The
+            panel only renders on the Music view; the hidden iframe survives
+            everywhere else. Audio stops solely via the player's Pause/Stop
+            buttons (or leaving the campaign entirely). Mounted OUTSIDE the
+            ErrorBoundary so a crash in another view cannot kill playback. */}
+        <MusicPlayer campaignName={campaignName} visible={activeView === 'music'} />
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allClasses={classes} campaignName={campaignName} existingCharacters={characters} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allClasses={classes} characterData={activeCharacter} isEditing={true} campaignName={campaignName} existingCharacters={characters} />}

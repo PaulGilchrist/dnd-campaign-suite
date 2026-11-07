@@ -209,6 +209,7 @@ const SIDEBAR_NAV_BUTTONS = [
   ['npcs-btn', 'onNPCsClick'],
   ['quests-btn', 'onQuestsClick'],
   ['settlements-btn', 'onSettlementsClick'],
+  ['music-btn', 'onMusicClick'],
 ];
 
 function allSidebarHandlers() {
@@ -238,6 +239,7 @@ describe('MockSidebar', () => {
     ['npcs', 'NPCs'],
     ['settlements', 'Settlements'],
     ['campaignLog', 'Log'],
+    ['music', 'Music'],
     ['unknownView', ''], // unknown views get an empty label, not a crash
   ];
 

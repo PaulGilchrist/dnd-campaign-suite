@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { useEffect } from 'react';
 import { mockState } from './appTestState.js';
 
 export const MockCharSheet = vi.fn((props) => (
@@ -52,12 +53,13 @@ const MOCK_VIEW_LABELS = {
   npcs: 'NPCs',
   settlements: 'Settlements',
   campaignLog: 'Log',
+  music: 'Music',
 };
 
 export const MockSidebar = vi.fn(({
   campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick,
   onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick,
-  onNPCsClick, onSettlementsClick, onLogClick, onRepairClick, isLocalhost, activeView,
+  onNPCsClick, onSettlementsClick, onLogClick, onMusicClick, onRepairClick, isLocalhost, activeView,
 }) => {
   const activeLabel = activeView === 'charSheet' && activeCharacter
     ? activeCharacter.name
@@ -110,6 +112,9 @@ export const MockSidebar = vi.fn(({
       </button>
       <button data-testid="log-btn" onClick={onLogClick}>
         Log
+      </button>
+      <button data-testid="music-btn" onClick={onMusicClick}>
+        Music
       </button>
       {isLocalhost && (
         <button data-testid="admin-btn" onClick={onRepairClick}>
@@ -183,6 +188,22 @@ export const MockLog = vi.fn(({ campaignName, characters }) => (
     <span data-testid="log-char-count">{characters?.length || 0}</span>
   </div>
 ));
+
+// Persistent-mounted player (App renders it outside the view outlet). The
+// visible flag mirrors activeView === 'music' — tests assert the component
+// stays mounted (never unmounted) while visible flips across navigation.
+export const musicPlayerLifecycle = { mounts: 0, unmounts: 0 };
+export const MockMusicPlayer = vi.fn(({ campaignName, visible }) => {
+  useEffect(() => {
+    musicPlayerLifecycle.mounts += 1;
+    return () => { musicPlayerLifecycle.unmounts += 1; };
+  }, []);
+  return (
+    <div data-testid="music-player" data-visible={String(visible)}>
+      <span data-testid="music-campaign">{campaignName}</span>
+    </div>
+  );
+});
 
 export const MockFactions = vi.fn(({ campaignName, isLocalhost }) => (
   <div data-testid="factions-view">

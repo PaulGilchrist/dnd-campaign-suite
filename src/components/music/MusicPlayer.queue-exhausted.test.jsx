@@ -109,21 +109,23 @@ describe('MusicPlayer queue-exhaustion un-arm', () => {
     expect(townButton()).toHaveClass('active');
   });
 
-  it('unmount removes the listener but disarms the mood (leaving the view stops audio)', () => {
+  it('unmount removes the listener and disarms the mood (leaving the CAMPAIGN tears the player down)', () => {
     const stub = stubMusicServer();
     const { unmount } = render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     fireEvent.click(townButton());
     const postsAfterPlay = stub.posts.length;
     unmount();
 
-    // View-unmount lane: the iframe is destroyed with the panel, so the
-    // shared mood must be un-armed honestly (one disarm POST + stop row).
+    // Teardown lane: the app no longer unmounts this component on view
+    // navigation (it is persistent-mounted), so this only fires when the
+    // campaign itself is left — the iframe dies with the DOM, so the shared
+    // mood must be un-armed honestly (one disarm POST + stop row).
     expect(stub.posts).toHaveLength(postsAfterPlay + 1);
     expect(stub.posts.at(-1)).toMatchObject({ mood: null, playing: false });
     expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'music',
       action: 'stop',
-      message: 'Stopped ambience (left Music view)'
+      message: 'Stopped ambience (left campaign)'
     }));
 
     // The exhaustion listener itself is gone — a late event adds nothing.

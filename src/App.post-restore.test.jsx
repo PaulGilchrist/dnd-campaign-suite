@@ -122,6 +122,10 @@ vi.mock('./components/log/Log.jsx', async () => {
   const { MockLog } = await import('./test/mockComponents.jsx');
   return { default: MockLog };
 });
+vi.mock('./components/music/MusicPlayer.jsx', async () => {
+  const { MockMusicPlayer } = await import('./test/mockComponents.jsx');
+  return { default: MockMusicPlayer };
+});
 
 // CampaignSelection double: auto-selects without a click when App passes
 // autoSelectCampaign (mirrors the real component, verified in its own test

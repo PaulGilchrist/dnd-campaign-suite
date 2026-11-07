@@ -28,7 +28,11 @@ function parseTrackList(text) {
 }
 
 // Ambience duty is delegable: the view is open to players, not GM-only.
-function MusicPlayer({ campaignName }) {
+// `visible` (App: activeView === 'music') only controls whether the PANEL
+// renders — the component itself stays mounted across view navigation so the
+// YouTube player survives and audio plays continuously wherever the user is.
+// Only Pause/Stop (or closing the campaign) ever silences it.
+function MusicPlayer({ campaignName, visible = true }) {
   const [rawMusic, setMusic] = useSyncedState('campaign', 'music', DEFAULT_MUSIC, campaignName);
   const music = useMemo(
     () => (rawMusic && typeof rawMusic === 'object' ? { ...DEFAULT_MUSIC, ...rawMusic } : DEFAULT_MUSIC),
@@ -147,18 +151,19 @@ function MusicPlayer({ campaignName }) {
     return () => youtubePlayer.dispose();
   }, [playerMounted]);
 
-  // The panel now lives in the main content area (it used to be pinned to the
-  // sidebar footer, always mounted): navigating to another view unmounts it,
-  // the mount effect's cleanup destroys the iframe, and the audio really
-  // stops. Un-arm the shared mood on that unmount so no tab is left claiming
-  // playback this window no longer owns (the stop button's honest state, plus
-  // a log row naming the seam).
+  // The panel is now persistent-mounted (App renders it outside the view
+  // outlet, hidden via the `visible` prop when another view is active), so
+  // navigating between views never unmounts it and the audio plays on. This
+  // lane only fires on a REAL teardown — leaving the campaign / unmounting
+  // the app — where the iframe dies with the DOM: un-arm the shared mood so
+  // no tab is left claiming playback this window no longer owns (the stop
+  // button's honest state, plus a log row naming the seam).
   useEffect(() => () => {
     const state = leaveViewRef.current;
     if (!state || !state.playerMounted || !state.music.playing) return;
     youtubePlayer.stop();
     commitMusic({ ...state.music, mood: null, playing: false });
-    addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience (left Music view)' });
+    addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience (left campaign)' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -346,7 +351,7 @@ function MusicPlayer({ campaignName }) {
 
   const playing = music.playing;
 
-  return (
+  const panel = (
     <div className="music-player">
       <div className="ct-header">
         <h2 className="ct-title">
@@ -452,10 +457,18 @@ function MusicPlayer({ campaignName }) {
         </div>
       )}
       </div>
+    </div>
+  );
+
+  // The player frame lives OUTSIDE the view panel: hidden views keep it
+  // mounted, so ambience plays continuously wherever the user navigates.
+  return (
+    <>
+      {visible && panel}
       {playerMounted && (
         <div className="yt-music-frame"><div id={YT_FRAME_ID}></div></div>
       )}
-    </div>
+    </>
   );
 }
 
