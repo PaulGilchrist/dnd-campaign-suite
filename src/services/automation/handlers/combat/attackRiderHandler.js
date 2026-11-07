@@ -671,6 +671,40 @@ function evictSavedRiderEffect({ playerStats, campaignName, targetName, option }
     }
 }
 
+// DI regression (bug-devious-strikes-daze-never-expires): save-gated rider legs stamped
+// te rows with until_start_of_next_turn / until_end_of_next_turn but registered NO
+// clock (the FT-082 addExpiration in logSpeedReduction is scoped to the non-save
+// speed_reduction writers), so a failed-save dazed/blinded condition persisted for the
+// whole combat — contextBuilder-sync counts dazed/slow and grants every later attack
+// "Adv (conditions)" against the victim. Register ONE FT-082-style clock on the
+// failed-save leg, anchored the same way as the verified duration-token patterns:
+// - until_start_of_next_turn → attacker-anchored (fires at the attacker's next
+//   turn-start, currentRound > appliedRound — FT-082 Hamstring / CLA-148
+//   giant-ancestry lane; the victim's restricted "next turn" always falls inside).
+// - until_end_of_next_turn → rounds:2 target-axis backstop (CLA-169 Hills Tumble
+//   shape; the attacker-anchored anchor is off the target axis for this token).
+// One merged write evicts this option's descriptor te row (tuple-scoped so other
+// riders' rows survive) AND strips the granted condition. Poison/Knock Out author a
+// 1_minute repeating-save duration — combat-scoped by the duration policy, their
+// repeat-save lane owns termination (separate filed bug) — they fail the token check
+// and keep zero clocks. Trip's prone follows the documented persistent-prone standard
+// (cleared only by spending movement), so it stays unclocked too.
+function registerRiderConditionExpiry({ playerStats, campaignName, targetName, option }) {
+    const duration = option.duration || 'until_start_of_next_turn';
+    const startAnchored = duration === 'until_start_of_next_turn';
+    if (!startAnchored && duration !== 'until_end_of_next_turn') return;
+    if (String(option.condition).toLowerCase() === 'prone') return;
+    const effects = [
+        { type: 'remove_target_effect', effectKey: option.effect, source: playerStats.name, option: option.name, target: targetName },
+        { type: 'condition', condition: option.condition },
+    ];
+    if (startAnchored) {
+        addExpiration({ attackerName: playerStats.name, targetName, effects, campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
+    } else {
+        addExpiration({ attackerName: playerStats.name, targetName, effects, campaignName, rounds: 2 });
+    }
+}
+
 async function handleRiderSave(action, playerStats, campaignName, targetName, option) {
     const saveDc = buildSaveDc(option, playerStats);
     const { promise } = createSaveListener(campaignName, {
@@ -694,6 +728,7 @@ async function handleRiderSave(action, playerStats, campaignName, targetName, op
         const filtered = conditions.filter(c => String(c).toLowerCase() !== option.condition.toLowerCase());
         const updatedConditions = [...filtered, option.condition];
         setRuntimeValue(targetName, 'activeConditions', updatedConditions, campaignName);
+        registerRiderConditionExpiry({ playerStats, campaignName, targetName, option });
     }
 
     if (saveResult.success === false && option.effect === 'poisoned' && option.saveType === 'CON') {
