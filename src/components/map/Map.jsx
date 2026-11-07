@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import Subscriber from '../common/Subscriber.jsx';
 import MapToolbar from './MapToolbar.jsx';
 import { useDressMount } from '../../hooks/ui/useDressMount.js';
@@ -156,7 +155,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [renamePopover, setRenamePopover] = useState(null);
-    const [viewingMonster, setViewingMonster] = useSyncedState('campaign', 'map-viewingMonster', null, campaignName);
+    // Stat-block modal open state is per-client presentation (was a synced
+    // campaign key — a GM "View Stats" press SSE-broadcast the open card to
+    // every player tab).
+    const [viewingMonster, setViewingMonster] = useState(null);
     const [monstersLoaded, setMonstersLoaded] = useState([]);
     const [selectedPlayer, setSelectedPlayer] = useState(null);
     const [spellMode, setSpellMode] = useState(null);
@@ -288,7 +290,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         if (monster) {
             setViewingMonster(monster);
         }
-    }, [placedItems, monstersLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [placedItems, monstersLoaded]);
 
     const monsterFound = useMemo(() => {
         if (!selectedItem) return false;

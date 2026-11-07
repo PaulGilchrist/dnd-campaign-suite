@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
 import { cloneDeep } from 'lodash';
-import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import useEncounterManagement from '../../hooks/management/useEncounterManagement.js';
 import EncounterFilterPanel from './EncounterFilterPanel.jsx';
@@ -262,7 +261,9 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
     setToast({ message, isError });
     setTimeout(() => setToast(null), 2500); // toast auto-hide (display only, no game state)
   };
-  const [viewingMonster, setViewingMonster] = useSyncedState('campaign', 'encounter-viewingMonster', null, campaignName);
+  // Stat-block modal open state is per-client presentation (was a synced
+  // campaign key — the GM's open card leaked to every player tab via SSE).
+  const [viewingMonster, setViewingMonster] = useState(null);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
   const [description, setDescription] = useState('');

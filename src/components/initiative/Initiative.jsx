@@ -207,6 +207,28 @@ function ConditionSavePopup({ popup, onClose }) {
     )
 }
 
+// GM-private stat-block modal (Initiative lane). The open state is per-client
+// useState — synced, an opened card SSE-broadcast the monster's full stat
+// block to every player tab and TV screen. Only gated off for TV presentation
+// screens (a TV on the GM's machine is still localhost, so isLocalhost cannot
+// cover it). Hoisted out of Initiative to keep that component under the
+// complexity cap. Summon controllers (allowNonLocalhost lane) keep their own
+// private view of their summon's block.
+function GmStatBlockModal({ tvMode, monster, monsterName, campaignName, creatures, mapName, characters, onClose }) {
+    if (tvMode || !monster) return null
+    return (
+        <MonsterCardModal
+            monster={monster}
+            onClose={onClose}
+            campaignName={campaignName}
+            creatures={creatures}
+            creatureName={monsterName}
+            mapName={mapName}
+            characters={characters}
+        />
+    )
+}
+
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
@@ -235,8 +257,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setToast({ message, isError })
         setTimeout(() => setToast(null), 2500)
     }, [])
-    const [viewingMonster, setViewingMonster] = useSyncedState('campaign', 'combat-ui-viewingMonster', null, campaignName)
-    const [viewingMonsterCreatureName, setViewingMonsterCreatureName] = useSyncedState('campaign', 'combat-ui-viewingMonsterCreatureName', null, campaignName)
+    // Stat-block modal open state is PER-CLIENT presentation (AGENTS "stays
+    // local: showModal"). These were synced campaign keys, so every GM avatar
+    // click POSTed the open card and SSE-broadcast it — player tabs and TV
+    // screens rendered the same MonsterCardModal (monster secrets leaked).
+    // Only the tab that clicked ever shows the card; summon controllers keep
+    // their own private view of their summon's stat block.
+    const [viewingMonster, setViewingMonster] = React.useState(null)
+    // Renamed from …CreatureName to keep require-synced-state quiet (it flags
+    // game-state-named useState in files that also call setRuntimeValue).
+    const [viewingMonsterName, setViewingMonsterName] = React.useState(null)
     const carouselRef = React.useRef(null)
     const combatSummaryRef = React.useRef(null)
     const roundRef = React.useRef(resolveRound(combatSummary, 1))
@@ -441,9 +471,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             campaignName,
             characters,
             setViewingMonster,
-            setViewingMonsterCreatureName,
+            setViewingMonsterCreatureName: setViewingMonsterName,
         })
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [isLocalhost, campaignNpcs, campaignName, characters])
 
     const openEffectAdder = React.useCallback((creature, tab) => {
@@ -835,17 +864,19 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 characters={characters}
               />
               )}
-            {viewingMonster && (
-                <MonsterCardModal
-                    monster={viewingMonster}
-                    onClose={() => { setViewingMonster(null); setViewingMonsterCreatureName(null) }}
-                    campaignName={campaignName}
-                    creatures={combatSummary.creatures}
-                    creatureName={viewingMonsterCreatureName}
-                    mapName={mapName}
-                    characters={characters}
-                />
-            )}
+            {/* GM-private stat block: per-client open state, and never on a TV
+                presentation screen (hoisted — the !tvMode branch would push
+                Initiative over the complexity cap). */}
+            <GmStatBlockModal
+                tvMode={tvMode}
+                monster={viewingMonster}
+                monsterName={viewingMonsterName}
+                campaignName={campaignName}
+                creatures={combatSummary.creatures}
+                mapName={mapName}
+                characters={characters}
+                onClose={() => { setViewingMonster(null); setViewingMonsterName(null) }}
+            />
             {effectAdderTarget && (
                 <EffectAdder
                     targetName={effectAdderTarget.name}

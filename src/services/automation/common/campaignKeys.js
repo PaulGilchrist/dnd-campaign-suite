@@ -13,10 +13,10 @@ export const CAMPAIGN_KEYS = new Set([
     'warCasterReactions',
     'quivering_palm',
     'pendingSaveListenerPrompts',
-    'encounter-viewingMonster',
-    'map-viewingMonster',
-    'combat-ui-viewingMonster',
-    'combat-ui-viewingMonsterCreatureName',
+    // NOTE: the *-viewingMonster modal-open keys were removed 2026-11-07 —
+    // the MonsterCardModal is GM-private per-tab presentation state now
+    // (useState in Initiative/Map/EncounterBuilder). Synced, it broadcast the
+    // GM's opened stat block to every player tab and TV screen.
     'cleavePending',
     'cleaveSecondTargets',
     'pipeline-pause',

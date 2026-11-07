@@ -173,31 +173,32 @@ describe('EncounterBuilder - panel interactions', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Orc' }).checked).toBe(false);
   });
 
-  it('opens the monster card modal from the row and selected panel with the exact viewingMonster payload, and closes it', () => {
+  it('opens the monster card modal from the row and selected panel with the exact bestiary payload, and closes it', () => {
     const { container } = mountBuilder();
     expect(screen.queryByRole('dialog')).toBeNull();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
 
-    // Row details button writes the full bestiary object to the synced store slot.
+    // Row details button opens the modal as PER-CLIENT state — the bestiary
+    // object never touches the synced store (combat-ui/map/encounter
+    // viewingMonster keys retired 2026-11-07: a synced open card broadcast the
+    // monster stat block to every player tab and TV screen).
     const table = within(container.querySelector('.encounter-monster-table-section'));
     fireEvent.click(table.getByRole('button', { name: 'View details for Goblin' }));
     expect(screen.getByRole('dialog', { name: 'Monster card: Goblin' })).toBeInTheDocument();
-    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'encounter-viewingMonster', GOBLIN, CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'encounter-viewingMonster', expect.anything(), CAMPAIGN);
 
     fireEvent.click(screen.getByRole('button', { name: 'Close monster card' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(setRuntimeValue).toHaveBeenLastCalledWith('campaign', 'encounter-viewingMonster', null, CAMPAIGN);
 
-    // Selected-panel View button drives the same store slot but passes the SELECTED
+    // Selected-panel View button drives the same modal but passes the SELECTED
     // entry — same bestiary bytes plus the live qty.
     fireEvent.click(within(container.querySelector('.encounter-selected')).getByRole('button', { name: 'View details for Goblin' }));
     expect(screen.getByRole('dialog', { name: 'Monster card: Goblin' })).toBeInTheDocument();
-    expect(setRuntimeValue).toHaveBeenLastCalledWith('campaign', 'encounter-viewingMonster', { ...GOBLIN, qty: 1 }, CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'encounter-viewingMonster', expect.anything(), CAMPAIGN);
 
     fireEvent.click(screen.getByRole('button', { name: 'Close monster card' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(setRuntimeValue).toHaveBeenLastCalledWith('campaign', 'encounter-viewingMonster', null, CAMPAIGN);
   });
 
   it('starts with an empty description', () => {

@@ -363,7 +363,7 @@ describe('Map container - context-menu wiring', () => {
         expect(container.querySelector('.monster-autocomplete-input')).not.toBeInTheDocument();
     });
 
-    it('View Stats opens the monster card with the bestiary match and closes back through the synced store', async () => {
+    it('View Stats opens the monster card with the bestiary match and closes it as per-client state', async () => {
         mockLoadMonsters.mockImplementation(() => Promise.resolve([{ name: 'Goblin', index: 'goblin' }]));
         mockState.placedItems = [npc('npcA', 'Goblin', 5, 5)];
         const { container } = await act(async () => renderMap());
@@ -371,9 +371,12 @@ describe('Map container - context-menu wiring', () => {
         await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[0]); });
         await act(async () => { fireEvent.click(screen.getByText('View Stats')); });
 
+        // The open card is per-tab useState — the synced map-viewingMonster
+        // key was retired so a GM press never broadcasts the stat block to
+        // player tabs (store stays untouched).
         const modal = screen.getByTestId('monster-card-modal');
         expect(within(modal).getByText('Goblin')).toBeInTheDocument();
-        expect(getRuntimeValue('campaign', 'map-viewingMonster')).toMatchObject({ name: 'Goblin' });
+        expect(getRuntimeValue('campaign', 'map-viewingMonster')).toBeNull();
 
         await act(async () => { fireEvent.click(within(modal).getByText('close')); });
         expect(screen.queryByTestId('monster-card-modal')).not.toBeInTheDocument();

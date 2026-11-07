@@ -11,6 +11,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import Initiative from './Initiative.jsx';
 import * as combatData from '../../services/encounters/combatData.js';
+import * as monsterUtils from '../../services/npcs/monsterUtils.js';
+import * as runtime from '../../hooks/runtime/useRuntimeState.js';
+import storage from '../../services/ui/storage.js';
 import { getTvModeActive } from '../../services/ui/tvModeStore.js';
 
 const syncStateStore = new Map();
@@ -130,9 +133,11 @@ vi.mock('../char-sheet/DiceRollResult.jsx', () => ({ default: ({ name }) => <div
 // container-owned hpEvent wiring (delta + animationend retirement) without
 // re-testing card internals (#848-#853 lanes).
 vi.mock('./CreatureCard.jsx', () => ({
-    default: ({ creature, tvMode, hpEvent, onHpFeedbackDone }) => (
+    default: ({ creature, tvMode, hpEvent, onHpFeedbackDone, onNpcClick }) => (
         <div data-testid={`creature-card-${creature.name}`} className={`creature-card ${creature.type}${tvMode ? ' tv' : ''}`}>
             <span>{creature.name}</span>
+            {/* Avatar-click seam: drives the container's real handleNpcClick. */}
+            <button data-testid={`npc-click-${creature.name}`} onClick={() => onNpcClick(creature)}>avatar</button>
             {hpEvent && (
                 <span
                     data-testid={`floater-${creature.name}`}
@@ -305,5 +310,45 @@ describe('Initiative TV mode', () => {
         expect(screen.getByText('The party fell after 2 rounds.')).toBeInTheDocument();
         expect(screen.getByText('1 foe defeated · 3 drove off')).toBeInTheDocument();
         expect(screen.getByText('0 of 3 heroes standing')).toBeInTheDocument();
+    });
+
+    describe('MonsterCardModal privacy — GM-private stat block', () => {
+        const GOBLIN_CARD = { name: 'Goblin', type: 'monster', actions: [] };
+
+        const mountAndClick = async (overrides = {}) => {
+            vi.mocked(monsterUtils.getMonsterData).mockResolvedValue(cloneDeep(GOBLIN_CARD));
+            await act(async () => { render(<Initiative {...props} {...overrides} />); });
+            await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
+            await act(async () => { fireEvent.click(screen.getByTestId('npc-click-Goblin')); });
+        };
+
+        it('GM tab opens the card locally and authors ZERO synced-store traffic', async () => {
+            await mountAndClick();
+
+            await waitFor(() => { expect(screen.getByTestId('monster-card-modal')).toBeInTheDocument(); });
+            // The old synced lane POSTed combat-ui-viewingMonster(+CreatureName)
+            // and SSE-broadcast the open card to every tab. The keys must not
+            // even be touched now (per-client useState).
+            const viewingWrites = runtime.setRuntimeValue.mock.calls.filter(
+                ([, key]) => String(key).includes('viewingMonster')
+            );
+            expect(viewingWrites).toHaveLength(0);
+            expect(storage.set).not.toHaveBeenCalledWith('campaign', expect.stringContaining('viewingMonster'), expect.anything(), expect.anything());
+            expect(syncStateStore.has('campaign-combat-ui-viewingMonster')).toBe(false);
+            expect(syncStateStore.has('campaign-combat-ui-viewingMonsterCreatureName')).toBe(false);
+        });
+
+        it('TV presentation screen never shows the stat block (even on the GM machine)', async () => {
+            localStorage.setItem('initiative-tv', '1');
+            await mountAndClick();
+
+            expect(screen.queryByTestId('monster-card-modal')).not.toBeInTheDocument();
+        });
+
+        it('player (non-localhost) tab cannot open a monster stat block', async () => {
+            await mountAndClick({ isLocalhost: false });
+
+            expect(screen.queryByTestId('monster-card-modal')).not.toBeInTheDocument();
+        });
     });
 });
