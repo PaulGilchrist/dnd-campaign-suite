@@ -5,7 +5,7 @@
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 9,
+      "baseScore": 10,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
@@ -14,19 +14,19 @@
       "name": "Dexterity",
       "baseScore": 14,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 13,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Intelligence",
-      "baseScore": 11,
+      "baseScore": 10,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
@@ -52,11 +52,11 @@
       "name": "Circle of the Land"
     },
     "divineOrder": "",
-    "primalOrder": "Magician"
+    "primalOrder": "Warden"
   },
   "expertSkills": [],
   "feats": [
-    "Magic Initiate"
+    "Lucky"
   ],
   "fightingStyles": [],
   "race": {
@@ -76,13 +76,15 @@
       "Oil (flask)",
       "Ration",
       "Hempen Rope",
-      "Bedroll"
+      "Bedroll",
+      "Intricate Lantern"
     ],
     "equipped": [
       "Leather",
       "Shield",
       "Quarterstaff",
-      "Sickle"
+      "Longsword",
+      "Longbow"
     ],
     "gold": 10,
     "magicItems": []
@@ -98,11 +100,14 @@
     "History",
     "Insight",
     "Perception",
-    "Animal Handling"
+    "Animal Handling",
+    "Religion",
+    "Stealth"
   ],
   "toolProficiencies": [
     "Calligrapher's Supplies",
-    "Herbalism Kit"
+    "Herbalism Kit",
+    "Thieves' Tools"
   ],
   "specialActions": [],
   "spells": [
@@ -132,7 +137,7 @@
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "background": "Sage",
+  "background": "Wayfarer",
   "imagePath": "images/Actaea.png",
   "featAbilityChoices": {}
 }

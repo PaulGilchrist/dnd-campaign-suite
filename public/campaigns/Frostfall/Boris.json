@@ -7,14 +7,14 @@
       "name": "Strength",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 13,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -78,7 +78,8 @@
     ],
     "equipped": [
       "Handaxe",
-      "Maul"
+      "Maul",
+      "Heavy Crossbow"
     ],
     "gold": 10,
     "magicItems": []
