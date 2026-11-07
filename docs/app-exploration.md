@@ -66,7 +66,7 @@ Live facts (DI, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-07 DI classes.json data smell: Devious Strikes Poison/Daze/Knock-Out options author `saveType:"CON"` alongside `saveAbility:"DEX"` in `public/data/2024/classes.json` — nothing reads `saveAbility` on this lane today (primary save rolls CON correctly), but it's a trap for whoever wires the repeat-save repair; fix the mislabels with the repeat-save bug.
+- RESOLVED 2026-11-07 (repeat-save fix): the `saveAbility:"DEX"` alongside `saveType:"CON"` on Devious Strikes options is NOT a mislabel — `buildSaveDc` reads `saveAbility` as the DC-SOURCE ability and 2024 Cunning Strike DC = 8+PB+DEX by RAW for every option (live DC 15 matches). Do not flip it; the repeat-save repair uses it correctly as the DC source.
 - 2026-11-07 DI chooser button-label inconsistency: rider choosers use `Apply Effects` (DS, plural), `Apply Effect` (Charge/Shield Bash, singular), confirm for VT is `Trip Secondary Target`, decline faces are `Cancel` vs `Skip (do not consume use)` — harmless to humans, a trap for every automation; consider one shared footer API in the `.sp-modal` family.
 
 ## Blocked / Not Verified (fold-gate ledger)
