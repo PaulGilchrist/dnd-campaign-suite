@@ -43,6 +43,7 @@ import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import useCharActionsEventListeners from './useCharActionsEventListeners.js';
 import useCharActionsAutomation from './useCharActionsAutomation.js';
 import useCharActionsCleave from './useCharActionsCleave.js';
+import { getBaseActionTooltip } from './baseActionDescriptions.js';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 import TacticalMasterModal from './modals/TacticalMasterModal.jsx';
 import { applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
@@ -711,16 +712,17 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                 />
                 {(playerStats.actions || []).filter(a => !categories.featuresToIgnore.includes(a.name)).map((action) => renderFeatureActionRow(action, playerStats, handleAutomationAction, setPopupHtml))}
                 <div><b>Base Actions:</b> {actions.map((actionName, idx) => {
+                    const tooltip = getBaseActionTooltip(actionName, playerStats.rules);
                     if (actionName === 'Hide') {
-                        return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-clickable" onClick={handleHideAction}>{actionName}</span></React.Fragment>;
+                        return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-clickable" title={tooltip} onClick={handleHideAction}>{actionName}</span></React.Fragment>;
                     }
                     if (actionName === 'Dodge') {
-                        return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-clickable" onClick={handleDodgeAction}>{actionName}</span></React.Fragment>;
+                        return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-clickable" title={tooltip} onClick={handleDodgeAction}>{actionName}</span></React.Fragment>;
                     }
                     if (actionName === 'Grapple') {
-                        return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-clickable" onClick={handleGrappleAction}>{actionName}</span></React.Fragment>;
+                        return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-clickable" title={tooltip} onClick={handleGrappleAction}>{actionName}</span></React.Fragment>;
                     }
-                    return <React.Fragment key={idx}>{idx > 0 && ', '}{actionName}</React.Fragment>;
+                    return <React.Fragment key={idx}>{idx > 0 && ', '}<span className="base-action-info" title={tooltip}>{actionName}</span></React.Fragment>;
                 })}</div>
             </div>
             <CharBonusActions

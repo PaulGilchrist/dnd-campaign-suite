@@ -105,6 +105,11 @@
     background: rgba(139, 92, 246, 0.12);
 }
 
+.base-action-info {
+    cursor: help;
+    padding: 0 1px;
+}
+
 .stat--buffed {
     color: #16a34a;
     font-weight: 700;

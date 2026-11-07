@@ -4,6 +4,8 @@
 // Strengthened: one test now asserts the full clickable contract — the base-actions row
 // makes Hide, Dodge and Grapple clickable spans and every other action plain text
 // (covers the Grapple-clickable contract that CharActions.grapple.test.jsx defers to this file).
+// Tooltip contract: every rendered base action carries a non-empty description title,
+// with ruleset-aware Dodge copy (registry in baseActionDescriptions.js).
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -190,10 +192,10 @@ const basePlayerStats = {
   abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
 };
 
-function renderWithActions(actions) {
+function renderWithActions(actions, statsOverrides = {}) {
   mockRuntimeValuesForBaseActions();
   globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(actions) });
-  return act(async () => { render(<CharActions playerStats={basePlayerStats} />); });
+  return act(async () => { render(<CharActions playerStats={{ ...basePlayerStats, ...statsOverrides }} />); });
 }
 
 function getBaseActionsRow() {
@@ -230,5 +232,23 @@ describe('CharActions base actions row', () => {
 
     const clickableNames = Array.from(getBaseActionsRow().querySelectorAll('.base-action-clickable')).map((el) => el.textContent);
     expect(clickableNames).toEqual(['Hide', 'Dodge', 'Grapple']);
+  });
+
+  it('gives every base action a non-empty description tooltip on hover', async () => {
+    await renderWithActions(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']);
+
+    const tooltipped = Array.from(getBaseActionsRow().querySelectorAll('span[title]'));
+    expect(tooltipped.map((el) => el.textContent)).toEqual(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']);
+    for (const el of tooltipped) {
+      expect(el.getAttribute('title').length).toBeGreaterThan(0);
+    }
+  });
+
+  it('uses the 2024 Dodge wording (no Dex-save clause) for 2024 characters', async () => {
+    await renderWithActions(['Dodge'], { rules: '2024' });
+
+    const dodge = getBaseActionsRow().querySelector('.base-action-clickable');
+    expect(dodge.getAttribute('title')).toContain('disadvantage');
+    expect(dodge.getAttribute('title')).not.toContain('Dexterity saving throws');
   });
 });
