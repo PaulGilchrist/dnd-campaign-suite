@@ -38,7 +38,10 @@ const EMPTY_DRAFT = {
 // Custom magic item editor: builds the full object the wizard stores directly
 // in inventory.magicItems (rules-magicItems.js passes unknown objects through
 // to the character sheet verbatim, description and all).
-function CustomMagicItemModal({ initialItem, isNameTaken, onSave, onClose }) {
+//
+// getNameConflict(name) returns '' when the name is free, or the specific
+// error copy to show (catalog collision vs. another custom item collision).
+function CustomMagicItemModal({ initialItem, getNameConflict, onSave, onClose }) {
   const [draft, setDraft] = useState(() => ({ ...EMPTY_DRAFT, ...(initialItem || {}) }));
   const [error, setError] = useState('');
 
@@ -55,8 +58,9 @@ function CustomMagicItemModal({ initialItem, isNameTaken, onSave, onClose }) {
       setError('A name is required.');
       return;
     }
-    if (isNameTaken(name)) {
-      setError(`An item named "${name}" already exists.`);
+    const conflict = getNameConflict(name);
+    if (conflict) {
+      setError(conflict);
       return;
     }
     onSave({

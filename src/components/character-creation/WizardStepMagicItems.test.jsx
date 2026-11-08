@@ -410,7 +410,22 @@ describe('WizardStepMagicItems', () => {
 
       fireEvent.change(screen.getByLabelText(/Name \*/), { target: { value: 'bag of holding' } });
       fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
-      expect(screen.getByText(/already exists/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/"Bag of Holding" is an official magic item and already exists in the item catalog/)
+      ).toBeInTheDocument();
+    });
+
+    it('rejects names that collide with another custom item using custom-specific copy', () => {
+      const props = magicItemsProps({ selected: [STORMCALLER] });
+      render(<WizardStepMagicItems {...props} />);
+      fireEvent.click(screen.getByRole('button', { name: /Add Custom Magic Item/ }));
+
+      fireEvent.change(screen.getByLabelText(/Name \*/), { target: { value: 'stormcaller blade' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
+      expect(
+        screen.getByText('A custom item named "stormcaller blade" already exists.')
+      ).toBeInTheDocument();
+      expect(props.onArrayFieldChange).not.toHaveBeenCalled();
     });
 
     it('renders a stored custom object as a selected row with badge and Edit, and unticking removes it', () => {

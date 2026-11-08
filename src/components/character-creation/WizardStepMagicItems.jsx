@@ -121,15 +121,22 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
         setWarnings(warnings);
     }, [formData.inventory?.magicItems, lookupItems, maxAttunement]);
 
-    const isCustomNameTaken = (name, editingItem) => {
+    // Returns '' when the name is free, otherwise the specific error copy:
+    // colliding with an official catalog item is a different situation from
+    // colliding with another of the character's own custom items.
+    const getCustomNameConflict = (name, editingItem) => {
         const lower = name.toLowerCase();
         if (editingItem && (editingItem.name || '').toLowerCase() === lower) {
-            return false;
+            return '';
         }
-        if ((allMagicItems || []).some(i => (i.name || '').toLowerCase() === lower)) {
-            return true;
+        const catalogItem = (allMagicItems || []).find(i => (i.name || '').toLowerCase() === lower);
+        if (catalogItem) {
+            return `"${catalogItem.name}" is an official magic item and already exists in the item catalog — tick it in the list instead of creating a custom copy.`;
         }
-        return customItems.some(i => i !== editingItem && (i.name || '').toLowerCase() === lower);
+        if (customItems.some(i => i !== editingItem && (i.name || '').toLowerCase() === lower)) {
+            return `A custom item named "${name}" already exists.`;
+        }
+        return '';
     };
 
     const handleSaveCustomItem = (draft) => {
@@ -255,7 +262,7 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
             {customModal && (
                 <CustomMagicItemModal
                     initialItem={customModal.editing}
-                    isNameTaken={(name) => isCustomNameTaken(name, customModal.editing)}
+                    getNameConflict={(name) => getCustomNameConflict(name, customModal.editing)}
                     onSave={handleSaveCustomItem}
                     onClose={() => setCustomModal(null)}
                 />
