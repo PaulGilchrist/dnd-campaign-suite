@@ -71,6 +71,13 @@ async function resolveRepeatSave({ csCreature, targetName, attackerName, saveTyp
         saveDc,
         dcSuccess: 'none',
         condition: `${label} (repeat save)`,
+        // Provenance chrome (backlog 2026-11-08 EL): same `sourceName` payload
+        // channel the rider prompts use (shieldBash.js passes a plain action
+        // name; warMagic composes `a — b` with the em-dash), so SavePromptModal's
+        // existing `.sp-source` row renders "Source: <te.source> — <effect>"
+        // and concurrent prompts stay attributable. Deduped when the row's
+        // source already IS the effect name.
+        sourceName: attackerName && attackerName !== label ? `${attackerName} — ${label}` : label,
         suppressOutcomeLog: true,
     });
     const saveResult = await promise;
