@@ -88,7 +88,8 @@
       "Fishing tackle",
       "Grappling hook",
       "Tinderbox",
-      "Waterskin"
+      "Waterskin",
+      "Winter Pack"
     ],
     "equipped": [
       "Half Plate",
@@ -97,7 +98,13 @@
       "Heavy Crossbow"
     ],
     "gold": 10,
-    "magicItems": []
+    "magicItems": [],
+    "itemMeta": {
+      "Winter Pack": {
+        "quantity": 1,
+        "description": "Heavy Cloak, Blanket, Fur Boots, Gloves, Hat, Roll of Socks, Tea, Snow Gogglers"
+      }
+    }
   },
   "languages": [
     "Common"

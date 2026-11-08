@@ -35,14 +35,14 @@
       "name": "Wisdom",
       "baseScore": 11,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 2,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 11,
       "featIncrease": 0,
-      "backgroundIncrease": 1,
+      "backgroundIncrease": 0,
       "miscIncrease": 0
     }
   ],
@@ -80,7 +80,6 @@
       "Caltrops",
       "Case",
       "Clothes",
-      "traveler's",
       "Crossbow bolt*20",
       "Crowbar",
       "Dice Set",
@@ -91,7 +90,10 @@
       "Fishing tackle",
       "Grappling hook",
       "Tinderbox",
-      "Waterskin"
+      "Waterskin",
+      "Winter Pack",
+      "Healing Potion",
+      "Traveler's Clothes"
     ],
     "equipped": [
       "Studded Leather",
@@ -101,7 +103,29 @@
       "Hand Crossbow"
     ],
     "gold": 10,
-    "magicItems": []
+    "magicItems": [
+      {
+        "name": "Leather Belt",
+        "type": "Wondrous Item",
+        "rarity": "common",
+        "requiresAttunement": false,
+        "description": "100' of weightless cord supporting up to 1000 lbs, deployable or retractable into the belt.  Always know direction of true down.",
+        "custom": true
+      }
+    ],
+    "itemMeta": {
+      "Winter Pack": {
+        "quantity": 1,
+        "description": "Heavy Cloak, Blanket, Fur Boots, Gloves, Hat, Roll of Socks, Tea, Snow Gogglers"
+      },
+      "Healing Potion": {
+        "quantity": 1
+      },
+      "Leather Belt": {
+        "quantity": 1,
+        "description": "100' of weightless cord supporting up to 1000 lbs, deployable or retractable into the belt.  Always know direction of true down."
+      }
+    }
   },
   "languages": [
     "Common",

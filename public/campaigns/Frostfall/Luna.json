@@ -28,14 +28,14 @@
       "name": "Intelligence",
       "baseScore": 8,
       "featIncrease": 0,
-      "backgroundIncrease": 0,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 15,
       "featIncrease": 0,
-      "backgroundIncrease": 2,
+      "backgroundIncrease": 1,
       "miscIncrease": 0
     },
     {
@@ -87,16 +87,40 @@
       "Fishing tackle",
       "Grappling hook",
       "Tinderbox",
-      "Waterskin"
+      "Waterskin",
+      "Winter Pack",
+      "Healing Potion"
     ],
     "equipped": [
       "Half Plate",
       "Shield",
-      "Longsword",
-      "Longbow"
+      "Longbow",
+      "+1 Warhammer"
     ],
     "gold": 10,
-    "magicItems": []
+    "magicItems": [
+      {
+        "name": "+1 War Hammer",
+        "type": "Wondrous Item",
+        "rarity": "uncommon",
+        "requiresAttunement": true,
+        "description": "Additional 1d6 Radiant against undead",
+        "custom": true
+      }
+    ],
+    "itemMeta": {
+      "Winter Pack": {
+        "quantity": 1,
+        "description": "Heavy Cloak, Blanket, Fur Boots, Gloves, Hat, Roll of Socks, Tea, Snow Gogglers"
+      },
+      "Healing Potion": {
+        "quantity": 1
+      },
+      "+1 War Hammer": {
+        "quantity": 1,
+        "description": "Additional 1d6 Radiant against undead (needs attunement)"
+      }
+    }
   },
   "languages": [
     "Common",
@@ -122,7 +146,10 @@
     "Guidance",
     "Hold Person",
     "Prayer of Healing",
-    "Silence"
+    "Silence",
+    "Poison Spray",
+    "Ray of Frost",
+    "Shield"
   ],
   "magicInitiateInstances": [
     {

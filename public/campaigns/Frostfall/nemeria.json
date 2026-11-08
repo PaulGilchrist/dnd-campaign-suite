@@ -73,7 +73,8 @@
     "backpack": [
       "Hempen Rope",
       "Tinderbox",
-      "Ration"
+      "Ration",
+      "Winter Pack"
     ],
     "equipped": [
       "Greatsword",
@@ -81,7 +82,13 @@
       "Longbow"
     ],
     "gold": 10,
-    "magicItems": []
+    "magicItems": [],
+    "itemMeta": {
+      "Winter Pack": {
+        "quantity": 1,
+        "description": "Heavy Cloak, Blanket, Fur Boots, Gloves, Hat, Roll of Socks, Tea, Snow Gogglers"
+      }
+    }
   },
   "languages": [
     "Common"

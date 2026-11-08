@@ -77,17 +77,33 @@
       "Ration",
       "Hempen Rope",
       "Bedroll",
-      "Intricate Lantern"
+      "Winter Pack",
+      "Healing Potion"
     ],
     "equipped": [
-      "Leather",
       "Shield",
       "Quarterstaff",
       "Longsword",
-      "Longbow"
+      "Longbow",
+      "Half Plate"
     ],
     "gold": 10,
-    "magicItems": []
+    "magicItems": [
+      "Lantern of Revealing"
+    ],
+    "itemMeta": {
+      "Winter Pack": {
+        "quantity": 1,
+        "description": "Heavy Cloak, Blanket, Fur Boots, Gloves, Hat, Roll of Socks, Tea, Snow Gogglers"
+      },
+      "Healing Potion": {
+        "quantity": 1
+      },
+      "Lantern of Revealing": {
+        "quantity": 1,
+        "description": "Invisible creatures becomes visible while in the light"
+      }
+    }
   },
   "languages": [
     "Common",

@@ -1,29 +1,11 @@
 {
   "currency": {
     "pp": 0,
-    "gp": 767,
-    "sp": 545,
+    "gp": 241,
+    "sp": 3,
     "cp": 0
   },
   "items": [
-    {
-      "id": "a9727f07-e4ee-4e5d-805a-e5517df3d979",
-      "name": "*Broach",
-      "quantity": 1,
-      "description": "Owned by Druid Dirgin - May be magical"
-    },
-    {
-      "id": "bd9dc0e0-cd4e-4ad0-8c11-4f051156ee5b",
-      "name": "*Leather Belt",
-      "quantity": 1,
-      "description": "Dwarf - May be magical (very high quality)"
-    },
-    {
-      "id": "703fb632-7298-43bd-8ecb-e7377d854596",
-      "name": "*War Hammer",
-      "quantity": 1,
-      "description": "May be magical"
-    },
     {
       "id": "a917bd5c-3633-47ae-9f16-f92473ba5759",
       "name": "Black Opals",
@@ -37,10 +19,22 @@
       "description": ""
     },
     {
+      "id": "a9727f07-e4ee-4e5d-805a-e5517df3d979",
+      "name": "Broach",
+      "quantity": 1,
+      "description": "Owned by Druid Dirgin - May be magical"
+    },
+    {
       "id": "0f43b88c-663d-4470-8752-5efc2b6cab00",
       "name": "Compact Pry Bar",
       "quantity": 1,
       "description": ""
+    },
+    {
+      "id": "840d8879-8c2b-4094-b239-eadfff840cec",
+      "name": "Expedition Tent",
+      "quantity": 1,
+      "description": "Sleeps 8"
     },
     {
       "id": "d54f71c0-d03d-4ba3-8f3d-dddbb8e84b39",
@@ -79,15 +73,21 @@
       "description": ""
     },
     {
-      "id": "83d6dcc6-78b6-4295-98b4-24665f0875db",
-      "name": "Healing Potion",
+      "id": "8f912c03-9707-4b01-8fe1-6c7777f23d9f",
+      "name": "Holy Emblem of Dumathoim",
       "quantity": 1,
       "description": ""
     },
     {
-      "id": "8f912c03-9707-4b01-8fe1-6c7777f23d9f",
-      "name": "Holy Emblem of Dumathoim",
-      "quantity": 1,
+      "id": "9c4f571a-a7b9-43a0-a181-75fafaa5aa55",
+      "name": "Ice Cleats",
+      "quantity": 7,
+      "description": ""
+    },
+    {
+      "id": "6ebc5054-ac8b-4c12-ba62-19488f52efa0",
+      "name": "Ice Picks",
+      "quantity": 7,
       "description": ""
     },
     {
@@ -95,6 +95,12 @@
       "name": "Pick Axe",
       "quantity": 2,
       "description": ""
+    },
+    {
+      "id": "12f5d2f0-7b70-461e-8e41-6a26326858c2",
+      "name": "Rations",
+      "quantity": 98,
+      "description": "A ration consists of 1 days dry foods suitable for extended travel, including jerky, dried fruit, hardtack, and nuts."
     },
     {
       "id": "7e18883c-76a5-4f3f-b462-26f760e7c626",
@@ -121,10 +127,22 @@
       "description": ""
     },
     {
+      "id": "02e28b22-765e-4d39-8e8e-65d25826122c",
+      "name": "Snow Shoes",
+      "quantity": 7,
+      "description": ""
+    },
+    {
       "id": "10d5ca60-041c-4712-83cf-4aa0e1f497b7",
       "name": "Stone Prayer Tablets",
       "quantity": 3,
       "description": ""
+    },
+    {
+      "id": "1ced0371-a7c7-4e3e-a19d-f37602018358",
+      "name": "Torches",
+      "quantity": 20,
+      "description": "A torch burns for 1 hour, providing bright light in a 20-foot radius and dim light for an additional 20 feet. If you make a melee attack with a burning torch and hit, it deals 1 fire damage."
     },
     {
       "id": "45250e9e-528e-4f07-b974-62885f4ef78e",

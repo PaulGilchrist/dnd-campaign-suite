@@ -74,7 +74,9 @@
       "Bedroll",
       "Tinderbox",
       "Torch",
-      "Waterskin"
+      "Waterskin",
+      "Winter Pack",
+      "Healing Potion"
     ],
     "equipped": [
       "Handaxe",
@@ -82,7 +84,16 @@
       "Heavy Crossbow"
     ],
     "gold": 10,
-    "magicItems": []
+    "magicItems": [],
+    "itemMeta": {
+      "Winter Pack": {
+        "quantity": 1,
+        "description": "Heavy Cloak, Blanket, Fur Boots, Gloves, Hat, Roll of Socks, Tea, Snow Gogglers"
+      },
+      "Healing Potion": {
+        "quantity": 1
+      }
+    }
   },
   "languages": [
     "Common",
