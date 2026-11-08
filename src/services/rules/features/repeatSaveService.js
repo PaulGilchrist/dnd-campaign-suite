@@ -20,7 +20,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../ui/logService.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
-import { registerTargetEffect } from '../../combat/conditions/targetEffectDefinitions.js';
+import { registerTargetEffect, getEffectDefinition } from '../../combat/conditions/targetEffectDefinitions.js';
 
 function lower(value) {
     return String(value ?? '').toLowerCase();
@@ -56,7 +56,19 @@ function stripCondition(targetName, condition, campaignName) {
 // save_result row (rollType 'save-repeat', provenance copy), so the generic
 // prompt-lane row would double-stamp one roll
 // (bug-save-result-rows-attribute-character-unknown).
+// Source chrome composition (backlog 2026-11-08 EN): "source — effect"
+// em-dash pair printing the REGISTRY label (getEffectDefinition(effectKey)
+// ?.label, the zoneRepeatTurnEndService:92 pattern) with the raw key as
+// fallback (no crash, no blank). The EL dedupe law is preserved: when the
+// te row's source already IS the effect name (raw key or label) the bare
+// label renders alone — never "X — X".
+function composeSourceChrome(attackerName, effectKey, sourceLabel) {
+    if (!attackerName || attackerName === effectKey || attackerName === sourceLabel) return sourceLabel;
+    return `${attackerName} — ${sourceLabel}`;
+}
+
 async function resolveRepeatSave({ csCreature, targetName, attackerName, saveType, saveDc, label, campaignName }) {
+    const sourceLabel = getEffectDefinition(label)?.label || label;
     if (csCreature?.type !== 'player') {
         const bonuses = csCreature?.saveBonuses || {};
         const key = lower(saveType);
@@ -75,9 +87,13 @@ async function resolveRepeatSave({ csCreature, targetName, attackerName, saveTyp
         // channel the rider prompts use (shieldBash.js passes a plain action
         // name; warMagic composes `a — b` with the em-dash), so SavePromptModal's
         // existing `.sp-source` row renders "Source: <te.source> — <effect>"
-        // and concurrent prompts stay attributable. Deduped when the row's
-        // source already IS the effect name.
-        sourceName: attackerName && attackerName !== label ? `${attackerName} — ${label}` : label,
+        // and concurrent prompts stay attributable. Backlog 2026-11-08 EN: the
+        // effect half echoes the REGISTRY label (matches the paired
+        // `condition removed` row and the badge — zoneRepeatTurnEndService:92
+        // pattern), falling back to the raw te.effect key when undefined.
+        // Deduped when the row's source already IS the effect name (raw key or
+        // label), never "X — X".
+        sourceName: composeSourceChrome(attackerName, label, sourceLabel),
         suppressOutcomeLog: true,
     });
     const saveResult = await promise;

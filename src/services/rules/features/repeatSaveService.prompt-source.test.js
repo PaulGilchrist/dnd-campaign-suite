@@ -3,8 +3,11 @@
 // repeat-save PC prompt must carry `sourceName` (the te row's `source` +
 // effect label) so SavePromptModal's existing `.sp-source` "Source:" row
 // renders — the same payload channel Shield Bash riders use
-// (createSaveListener → buildPromptPayload → current.sourceName). This file
-// pins only the dispatch config composition; prompt mechanics/queue lanes are
+// (createSaveListener → buildPromptPayload → current.sourceName). Backlog
+// 2026-11-08 EN: the effect half prints the REGISTRY label
+// (getEffectDefinition(te.effect).label, matching the paired `condition
+// removed` row) with the raw key as fallback. This file pins only the
+// dispatch config composition; prompt mechanics/queue lanes are
 // owned by savePrompt/SavePromptModal tests, the strip/log ledger by
 // repeatSaveService.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -87,5 +90,58 @@ describe('repeat-save prompt sourceName — te.source + effect provenance', () =
         await applyRepeatSaveTurnEnd(CAMPAIGN, PC);
 
         expect(prompts[0].sourceName).toBe('poisoned_cloud');
+    });
+});
+
+// Backlog 2026-11-08 EN: te.effect keys WITH a registry definition print the
+// verbatim registry label (matching the badge and the paired `condition
+// removed` row), not the lower-case raw key. thri_kreen_bite_poison →
+// 'Poisoned' is the canonical face (label ≠ key).
+describe('repeat-save prompt sourceName — registry label face', () => {
+    function biteTe(over = {}) {
+        return {
+            target: PC,
+            effect: 'thri_kreen_bite_poison',
+            source: 'QA Test Effect',
+            dc: 11,
+            saveType: 'CON',
+            repeatSave: { saveType: 'CON', dc: 11, condition: 'poisoned' },
+            ...over,
+        };
+    }
+
+    it('registered effect key: source — registry label (never the raw key)', async () => {
+        store['campaign.targetEffects'] = [biteTe()];
+
+        await applyRepeatSaveTurnEnd(CAMPAIGN, PC);
+
+        expect(prompts[0].sourceName).toBe('QA Test Effect — Poisoned');
+        // condition field stays the raw-key gating lane (advantage matchers),
+        // only the Source chrome got the label.
+        expect(prompts[0].condition).toBe('thri_kreen_bite_poison (repeat save)');
+    });
+
+    it('source IS the raw effect key of a registered effect: bare label alone, never "key — label"', async () => {
+        store['campaign.targetEffects'] = [biteTe({ source: 'thri_kreen_bite_poison' })];
+
+        await applyRepeatSaveTurnEnd(CAMPAIGN, PC);
+
+        expect(prompts[0].sourceName).toBe('Poisoned');
+    });
+
+    it('source IS the registry label: bare label alone, never "Poisoned — Poisoned"', async () => {
+        store['campaign.targetEffects'] = [biteTe({ source: 'Poisoned' })];
+
+        await applyRepeatSaveTurnEnd(CAMPAIGN, PC);
+
+        expect(prompts[0].sourceName).toBe('Poisoned');
+    });
+
+    it('source-less registered te row: label alone still renders the Source row', async () => {
+        store['campaign.targetEffects'] = [biteTe({ source: null })];
+
+        await applyRepeatSaveTurnEnd(CAMPAIGN, PC);
+
+        expect(prompts[0].sourceName).toBe('Poisoned');
     });
 });

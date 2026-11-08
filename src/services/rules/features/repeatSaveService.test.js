@@ -301,7 +301,7 @@ describe('applyRepeatSaveTurnEnd — turn-END seam (whirlwind STR DC 17, disk Dj
             saveDc: 17,
             dcSuccess: 'none',
             condition: 'whirlwind (repeat save)',
-            sourceName: 'Djinni 1 — whirlwind', // backlog 2026-11-08 EL: sp-source provenance
+            sourceName: 'Djinni 1 — Whirlwind (Zone)', // backlog 2026-11-08 EN: registry label (was raw key)
             suppressOutcomeLog: true,
         }]);
         expect(dice).not.toHaveBeenCalled(); // PCs never auto-roll inline
