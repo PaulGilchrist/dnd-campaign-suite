@@ -1384,7 +1384,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
+    /* EN backlog 2026-11-08: right after Initiative "Clear" this scrim can sit
+       over a freshly mounted board and silently swallow its first Next → click.
+       The scrim lets pointer events pass through; only the celebration card
+       below captures clicks (its own click / Continue still dismiss). */
+    pointer-events: none;
     animation: victory-fade 0.4s ease-out;
 }
 
@@ -1396,6 +1400,8 @@
     text-align: center;
     box-shadow: 0 0 48px rgba(255, 204, 0, 0.35);
     max-width: 90vw;
+    pointer-events: auto;
+    cursor: pointer;
     animation: victory-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
 

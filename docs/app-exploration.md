@@ -67,7 +67,6 @@ Live facts (EN, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
 - (EN 2026-11-08) Cross-component CSS-class reuse: the Friendly-Fire confirm mounts inside `maps-manager-modal-overlay`/`maps-manager-modal` and the allies editor mounts as `.sp-overlay`/`.sp-modal` (save-prompt chrome). Both work, but a maps-manager class on a combat modal invites style bleed — factor a neutral shared modal-shell class.
-- (EN 2026-11-08) Right after Initiative "Clear", the victory banner overlays `Next →` and silently intercepts pointer events until click-dismissed (or Continue button) — a fresh walk's first click appears to do nothing; consider `pointer-events:none` outside its buttons or auto-clearing it once a new board mounts.
 - (EN 2026-11-08) Encounter Builder keeps ~500 `input.monster-checkbox` DOM rows unfiltered (full bestiary rendered even behind the search box) — heavy first paint + slow queries; virtualize or render on search.
 
 ## Blocked / Not Verified (fold-gate ledger)
