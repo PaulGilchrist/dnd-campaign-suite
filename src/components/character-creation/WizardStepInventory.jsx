@@ -38,15 +38,6 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ stepNumber
     }
   }, [tempInventory.backpack, tempInventory.equipped, focusedField]);
 
-  const handleManualInputChange = (field, value) => {
-    const items = value.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(item =>
-      item.trim().replace(/^"|"$/g, '')
-    ).filter(item => item.length > 0);
-
-    onTempInventoryChange(field, items);
-    onInventoryChange(field, items);
-  };
-
   const commitRawText = (fieldName) => {
     const raw = rawTexts[fieldName] || '';
     handleManualInputChange(fieldName, raw);
@@ -63,6 +54,65 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ stepNumber
     onInventoryChange('itemMeta', meta);
   };
 
+  // itemMeta is keyed by item NAME, so a rename must move the entry with it —
+  // otherwise the quantity/description is orphaned under the old key and the
+  // renamed item shows no description on the sheet.
+  const metaKeyFor = (meta, name) =>
+    Object.keys(meta).find(k => k.toLowerCase() === name.toLowerCase());
+
+  const migrateMetaKey = (meta, oldName, newName) => {
+    const oldKey = metaKeyFor(meta, oldName);
+    if (!oldKey || oldKey === newName) return null;
+    if (metaKeyFor(meta, newName)) return null; // collision with another entry — never merge blindly
+    const next = { ...meta, [newName]: meta[oldKey] };
+    delete next[oldKey];
+    return next;
+  };
+
+  const handleManualInputChange = (field, value) => {
+    const previous = tempInventory[field] || [];
+    const items = value.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(item =>
+      item.trim().replace(/^"|"$/g, '')
+    ).filter(item => item.length > 0);
+
+    onTempInventoryChange(field, items);
+    onInventoryChange(field, items);
+
+    // Rename detection on textarea commit: same item count and exactly one
+    // name changed at the same position → treat as a rename and carry that
+    // item's quantity/description over to the new name.
+    if (items.length === previous.length) {
+      const changedIndices = [];
+      items.forEach((name, i) => {
+        if (name !== previous[i]) changedIndices.push(i);
+      });
+      if (changedIndices.length === 1) {
+        const i = changedIndices[0];
+        const migrated = migrateMetaKey(itemMeta, previous[i], items[i]);
+        if (migrated) onInventoryChange('itemMeta', migrated);
+      }
+    }
+  };
+
+  // Explicit rename from an Item Details row: migrate the meta entry and the
+  // backpack/equipped array entries together so every consumer sees one name.
+  const handleRenameItem = (oldName, newRaw) => {
+    const newName = newRaw.trim();
+    if (!newName || newName.toLowerCase() === oldName.toLowerCase()) return;
+    const allNames = [...(tempInventory.backpack || []), ...(tempInventory.equipped || [])];
+    if (allNames.some(name => name.toLowerCase() === newName.toLowerCase())) return;
+    ['backpack', 'equipped'].forEach(field => {
+      const current = tempInventory[field] || [];
+      const next = current.map(name => (name === oldName ? newName : name));
+      if (next.some((name, i) => name !== current[i])) {
+        onTempInventoryChange(field, next);
+        onInventoryChange(field, next);
+      }
+    });
+    const migrated = migrateMetaKey(itemMeta, oldName, newName);
+    if (migrated) onInventoryChange('itemMeta', migrated);
+  };
+
   const renderItemDetails = () => {
     const items = [...new Set(tempInventory.backpack || [])];
     if (items.length === 0) return null;
@@ -75,7 +125,17 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ stepNumber
             || {};
           return (
             <div key={itemName} className="wizard-item-meta-row">
-              <span className="wizard-item-meta-name">{itemName}</span>
+              <input
+                type="text"
+                className="wizard-item-meta-name"
+                aria-label={`Rename ${itemName}`}
+                title="Rename item — quantity and description follow the new name"
+                defaultValue={itemName}
+                onBlur={(e) => handleRenameItem(itemName, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
+              />
               <input
                 type="number"
                 min="1"
@@ -95,7 +155,7 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ stepNumber
             </div>
           );
         })}
-        <p className="field-description">Quantities and descriptions are stored alongside the item names — quantities show as ×N on the sheet, descriptions as a popup.</p>
+        <p className="field-description">Quantities and descriptions are stored alongside the item names — quantities show as ×N on the sheet, descriptions as a popup. Renaming an item here (or in the backpack list) keeps its quantity and description.</p>
       </div>
     );
   };

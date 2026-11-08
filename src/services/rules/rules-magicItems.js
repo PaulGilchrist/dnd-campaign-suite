@@ -1,5 +1,12 @@
 import { is2024 } from './rules-helpers.js';
 
+// Wizard-authored custom items are full objects (custom flag or their own
+// description); unknown plain strings are just catalog misses.
+function isCustomEntry(itemNameOrObj) {
+    return Boolean(itemNameOrObj) && typeof itemNameOrObj === 'object'
+        && Boolean(itemNameOrObj.custom || itemNameOrObj.description);
+}
+
 /**
  * Get magic items for a character (handles both rulesets internally).
  */
@@ -24,7 +31,9 @@ export function getMagicItems(allMagicItems, playerSummary, playerStats) {
 
         if (!magicItem) {
             if (is2024(playerStats, playerSummary)) {
-                return null; // 2024 filters out nulls
+                // 2024 drops unknown catalog strings but keeps wizard custom
+                // items — they carry their own type/rarity/description.
+                return isCustomEntry(itemNameOrObj) ? { ...itemNameOrObj } : null;
              }
             return { ...itemNameOrObj }; // 5e keeps the item even if not found
          }

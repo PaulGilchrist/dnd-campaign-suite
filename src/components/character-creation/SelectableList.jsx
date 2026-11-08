@@ -4,6 +4,13 @@ function getNestedValue(obj, path) {
   return path.split('.').reduce((current, key) => current?.[key], obj);
 }
 
+// Selection arrays normally hold plain name strings, but some steps (magic
+// items) also carry fully-described custom entries as objects — match by name
+// so toggling/selecting works for both shapes.
+function entryNameOf(entry) {
+  return typeof entry === 'string' ? entry : entry?.name;
+}
+
 // Stable unique keys per item: prefer id (index), then name, with a
 // collision-free suffix when the same identity repeats across groups.
 function buildUniqueKeys(items) {
@@ -180,8 +187,8 @@ function SelectableList({
 
     // Apply showOnlySelected filter
     if (showOnlySelected) {
-      const selectedNames = getNestedValue(formData, fieldName) || [];
-      results = results.filter(item => selectedNames.includes(item.name));
+      const selectedEntries = getNestedValue(formData, fieldName) || [];
+      results = results.filter(item => selectedEntries.some(entry => entryNameOf(entry) === item.name));
     }
 
     return results.sort((a, b) => a.name.localeCompare(b.name));
@@ -199,8 +206,9 @@ function SelectableList({
       return;
     }
 
-    const newItems = currentItems.includes(itemName)
-      ? currentItems.filter(i => i !== itemName)
+    const isSelected = currentItems.some(entry => entryNameOf(entry) === itemName);
+    const newItems = isSelected
+      ? currentItems.filter(entry => entryNameOf(entry) !== itemName)
       : [...currentItems, itemName];
     onArrayFieldChange(fieldName, newItems);
   };
@@ -215,7 +223,7 @@ function SelectableList({
       return;
     }
 
-    const count = currentItems.filter(i => i === itemName).length;
+    const count = currentItems.filter(entry => entryNameOf(entry) === itemName).length;
     if (isPreSelected && count <= 1) {
       return;
     }
@@ -223,7 +231,7 @@ function SelectableList({
     const lastIndexOf = (arr, name) => {
       let idx = -1;
       for (let i = arr.length - 1; i >= 0; i--) {
-        if (arr[i] === name) {
+        if (entryNameOf(arr[i]) === name) {
           idx = i;
           break;
         }
@@ -243,13 +251,13 @@ function SelectableList({
 
   // Check if item is selected
   const itemIsSelected = (itemName) => {
-    return (getNestedValue(formData, fieldName) || []).includes(itemName);
+    return (getNestedValue(formData, fieldName) || []).some(entry => entryNameOf(entry) === itemName);
   };
 
   // Count how many times an item appears in the selection
   const getItemCount = (itemName) => {
     const currentItems = getNestedValue(formData, fieldName) || [];
-    return currentItems.filter(i => i === itemName).length;
+    return currentItems.filter(entry => entryNameOf(entry) === itemName).length;
   };
 
   // Check if item is pre-selected

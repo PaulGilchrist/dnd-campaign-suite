@@ -468,6 +468,15 @@ describe('rules.js facade glue', () => {
       expect(rules.getMagicItems([ring], summary, { rules: '2024' })).toEqual([ring])
       expect(rules.getMagicItems([ring], summary, { rules: '5e' })).toEqual([ring, ghost])
     })
+
+    it('missing catalog item: 2024 keeps wizard custom objects (custom flag or own description), still drops plain strings', () => {
+      const ring = { name: 'Ring of Protection', description: 'def' }
+      const flagged = { name: 'Stormcaller Blade', custom: true, description: '' }
+      const described = { name: 'Ember Ring', description: 'Warm to the touch.' }
+      const summary = { inventory: { magicItems: [ring.name, flagged, described, 'Ghost Item'] } }
+
+      expect(rules.getMagicItems([ring], summary, { rules: '2024' })).toEqual([ring, flagged, described])
+    })
   })
 
   describe('export surface', () => {

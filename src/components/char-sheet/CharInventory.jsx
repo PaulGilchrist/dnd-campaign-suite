@@ -144,7 +144,7 @@ function CharInventory({ playerStats }) {
                             {magicItem.requiresAttunement && magicItem.attunementRequirements && <span> ({magicItem.attunementRequirements})</span>}
                         </i>
                         :&nbsp;
-                        <span className="magic-item-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(magicItem.description) }}></span>
+                        <span className="magic-item-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(magicItem.description).replace(/\n/g, '<br/>')) }}></span>
                     </div>}
                 )}
             </div>}

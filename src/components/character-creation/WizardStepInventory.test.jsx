@@ -332,5 +332,66 @@ describe('WizardStepInventory', () => {
         Torch: { quantity: 1, description: '' },
       });
     });
+
+    describe('rename preserves itemMeta', () => {
+      const metaProps = () =>
+        createMockProps({
+          formData: {
+            inventory: { gold: 15, itemMeta: { Rope: { quantity: 2, description: '50 ft hempen' } } },
+          },
+        });
+
+      it('renames from an Item Details row, migrating the meta entry and the backpack entry together', () => {
+        const props = metaProps();
+        render(<WizardStepInventory {...props} />);
+        fireEvent.blur(screen.getByLabelText('Rename Rope'), { target: { value: 'Silken Rope' } });
+        expect(props.onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Silken Rope', 'Torch']);
+        expect(props.onInventoryChange).toHaveBeenCalledWith('backpack', ['Silken Rope', 'Torch']);
+        expect(props.onInventoryChange).toHaveBeenCalledWith('itemMeta', {
+          'Silken Rope': { quantity: 2, description: '50 ft hempen' },
+        });
+        // Equipped list has no Rope entry — nothing to rewrite there.
+        expect(props.onInventoryChange).not.toHaveBeenCalledWith('equipped', expect.anything());
+      });
+
+      it('blocks a details-row rename colliding with another item name (case-insensitive)', () => {
+        const props = metaProps();
+        render(<WizardStepInventory {...props} />);
+        fireEvent.blur(screen.getByLabelText('Rename Rope'), { target: { value: ' torch ' } });
+        expect(props.onInventoryChange).not.toHaveBeenCalledWith('backpack', expect.anything());
+        expect(props.onInventoryChange).not.toHaveBeenCalledWith('itemMeta', expect.anything());
+      });
+
+      it('carries quantity/description across a single-name rename committed in the backpack textarea', () => {
+        const props = metaProps();
+        const { container } = render(<WizardStepInventory {...props} />);
+        const textarea = textareaFor(container, 'backpack');
+        fireEvent.change(textarea, { target: { value: 'Silken Rope, Torch' } });
+        fireEvent.blur(textarea);
+        expect(props.onInventoryChange).toHaveBeenCalledWith('backpack', ['Silken Rope', 'Torch']);
+        expect(props.onInventoryChange).toHaveBeenCalledWith('itemMeta', {
+          'Silken Rope': { quantity: 2, description: '50 ft hempen' },
+        });
+      });
+
+      it('does NOT migrate meta when two names change in one textarea commit (not a rename)', () => {
+        const props = metaProps();
+        const { container } = render(<WizardStepInventory {...props} />);
+        const textarea = textareaFor(container, 'backpack');
+        fireEvent.change(textarea, { target: { value: 'Silken Rope, Hempen Torch' } });
+        fireEvent.blur(textarea);
+        expect(props.onInventoryChange).toHaveBeenCalledWith('backpack', ['Silken Rope', 'Hempen Torch']);
+        expect(props.onInventoryChange).not.toHaveBeenCalledWith('itemMeta', expect.anything());
+      });
+
+      it('does NOT migrate meta when the item count changes (add/remove, not a rename)', () => {
+        const props = metaProps();
+        const { container } = render(<WizardStepInventory {...props} />);
+        const textarea = textareaFor(container, 'backpack');
+        fireEvent.change(textarea, { target: { value: 'Silken Rope, Torch, Rations' } });
+        fireEvent.blur(textarea);
+        expect(props.onInventoryChange).not.toHaveBeenCalledWith('itemMeta', expect.anything());
+      });
+    });
   });
 });

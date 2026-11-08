@@ -1,0 +1,36 @@
+/* ============================================
+   CUSTOM MAGIC ITEM MODAL STYLES
+   Modal chrome (overlay/header/body/footer) reuses the shared
+   equipment-search-modal classes from CharacterCreationWizard.css.
+   ============================================ */
+
+.custom-magic-item-modal .form-group textarea {
+    height: auto;
+    resize: vertical;
+}
+
+.custom-magic-item-modal .custom-magic-item-attunement label {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 400;
+}
+
+.custom-magic-item-modal .custom-magic-item-attunement input[type='checkbox'] {
+    width: auto;
+    height: auto;
+}
+
+.custom-magic-item-error {
+    color: var(--color-error-light);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.custom-magic-item-save-btn {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.custom-magic-item-save-btn:hover {
+    filter: brightness(1.1);
+}

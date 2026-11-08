@@ -369,4 +369,105 @@ describe('WizardStepMagicItems', () => {
       expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', expectedPayload);
     });
   });
+
+  describe('custom magic items', () => {
+    const STORMCALLER = {
+      name: 'Stormcaller Blade',
+      type: 'Weapon',
+      rarity: 'rare',
+      requiresAttunement: true,
+      description: 'A sentient longsword that hums before a storm.',
+      custom: true,
+    };
+
+    it('opens the custom item modal from the Add button and writes a full custom object on save', () => {
+      const props = magicItemsProps();
+      render(<WizardStepMagicItems {...props} />);
+      fireEvent.click(screen.getByRole('button', { name: /Add Custom Magic Item/ }));
+
+      fireEvent.change(screen.getByLabelText(/Name \*/), { target: { value: 'Stormcaller Blade' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
+
+      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', [
+        {
+          name: 'Stormcaller Blade',
+          type: 'Wondrous Item',
+          rarity: 'uncommon',
+          requiresAttunement: false,
+          description: '',
+          custom: true,
+        },
+      ]);
+      expect(screen.queryByLabelText(/Name \*/)).not.toBeInTheDocument();
+    });
+
+    it('refuses to save without a name and rejects names that collide with the catalog', () => {
+      render(<WizardStepMagicItems {...magicItemsProps()} />);
+      fireEvent.click(screen.getByRole('button', { name: /Add Custom Magic Item/ }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
+      expect(screen.getByText('A name is required.')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/Name \*/), { target: { value: 'bag of holding' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
+      expect(screen.getByText(/already exists/)).toBeInTheDocument();
+    });
+
+    it('renders a stored custom object as a selected row with badge and Edit, and unticking removes it', () => {
+      const props = magicItemsProps({ selected: [STORMCALLER] });
+      render(<WizardStepMagicItems {...props} />);
+
+      const row = screen.getByText('Stormcaller Blade').closest('.magic-item');
+      expect(row.className).toContain('selected');
+      expect(within(row).getByText('custom')).toBeInTheDocument();
+      expect(within(row).getByText('requires attunement')).toBeInTheDocument();
+
+      fireEvent.click(row.querySelector('.list-item-checkbox-trigger'));
+      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', []);
+    });
+
+    it('Edit reopens the modal prefilled and saving replaces the entry in place', () => {
+      const props = magicItemsProps({ selected: ['Bag of Holding', STORMCALLER], allItems: [BAG_OF_HOLDING] });
+      render(<WizardStepMagicItems {...props} />);
+
+      const row = screen.getByText('Stormcaller Blade').closest('.magic-item');
+      fireEvent.click(within(row).getByRole('button', { name: /Edit/ }));
+      expect(screen.getByLabelText(/Name \*/)).toHaveValue('Stormcaller Blade');
+      expect(screen.getByLabelText(/Description/)).toHaveValue(STORMCALLER.description);
+
+      fireEvent.change(screen.getByLabelText(/Description/), { target: { value: 'Revised text.' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', [
+        'Bag of Holding',
+        { ...STORMCALLER, description: 'Revised text.' },
+      ]);
+    });
+
+    it('counts custom attunement items toward the attunement-limit warning', () => {
+      render(
+        <WizardStepMagicItems
+          {...magicItemsProps({
+            selected: [...names(FOUR_ATTUNED.slice(0, 2)), STORMCALLER],
+            allItems: FOUR_ATTUNED,
+          })}
+        />
+      );
+      // 3 attuned total — under the base limit of 3, silent.
+      expect(screen.queryByText(/requiring attunement, but/)).not.toBeInTheDocument();
+
+      render(
+        <WizardStepMagicItems
+          {...magicItemsProps({
+            selected: [...names(FOUR_ATTUNED), STORMCALLER],
+            allItems: FOUR_ATTUNED,
+          })}
+        />
+      );
+      expect(
+        screen.getByText(
+          'You have selected 5 items requiring attunement, but a character can only attune to a maximum of 3 items.'
+        )
+      ).toBeInTheDocument();
+    });
+  });
 });

@@ -1303,6 +1303,11 @@
 .character-creation-wizard .wizard-item-meta-name {
     flex: 0 0 180px;
     font-weight: bold;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    background-color: var(--background-color-input);
+    color: var(--color-text);
 }
 
 .character-creation-wizard .wizard-item-meta-qty {
