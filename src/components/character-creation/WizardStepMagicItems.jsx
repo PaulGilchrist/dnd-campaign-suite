@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import SelectableList from './SelectableList.jsx';
 import CustomMagicItemModal from './CustomMagicItemModal.jsx';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import './WizardStepMagicItems.css';
@@ -91,6 +92,11 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
     const [warnings, setWarnings] = useState([]);
     // null = closed; { editing: <custom item | null> } = modal open.
     const [customModal, setCustomModal] = useState(null);
+    // Name of a custom row whose untick is awaiting confirm (QA improve
+    // 2026-11-08 EL: fully-authored custom items must not vanish on a bare
+    // checkbox click). Ephemeral UI state — the draft itself is untouched
+    // until the shared DeleteConfirmModal is confirmed.
+    const [pendingCustomDelete, setPendingCustomDelete] = useState(null);
 
     const maxAttunement = useMemo(() => {
         return calculateAttunementLimit(formData, classSubtypes);
@@ -167,6 +173,27 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
         setCustomModal(null);
     };
 
+    // Untick guard (QA improve 2026-11-08 EL): catalog rows deselect instantly;
+    // ticking off a selected custom row arms the shared DeleteConfirmModal so a
+    // fully-authored item can't be destroyed by a stray click. Cancel keeps the
+    // row checked and intact; confirm removes the entry exactly as the ungated
+    // toggle did (SelectableList matches by name for string/object entries).
+    const handleRowToggle = (item, isSelected, onToggle) => {
+        if (isSelected && item.custom) {
+            setPendingCustomDelete(item.name);
+            return;
+        }
+        onToggle();
+    };
+
+    const confirmCustomDelete = () => {
+        const name = pendingCustomDelete;
+        setPendingCustomDelete(null);
+        onArrayFieldChange('inventory.magicItems', selectedEntries.filter(entry => (
+            (typeof entry === 'string' ? entry : entry?.name) !== name
+        )));
+    };
+
     const renderItem = (item, index, { isSelected, isExpanded, onToggle, onToggleExpand }) => {
         const uniqueKey = item.index || index;
 
@@ -192,7 +219,11 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
                         {item.type && <span className="magic-item-type">{item.type}</span>}
                         {item.rarity && <span className="magic-item-rarity">{item.rarity}</span>}
                         {item.requiresAttunement && <span className="magic-item-attunement">requires attunement</span>}
-                        <RowSelectCheckbox item={item} isSelected={isSelected} onToggle={onToggle} />
+                        <RowSelectCheckbox
+                            item={item}
+                            isSelected={isSelected}
+                            onToggle={() => handleRowToggle(item, isSelected, onToggle)}
+                        />
                     </div>
 
                     <div className="list-item-details">
@@ -271,6 +302,17 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
           className="wizard-step-magic-items"
           resultLabel="magic item"
             />
+            {pendingCustomDelete && (
+                <DeleteConfirmModal
+                    titleId="magic-item-custom-delete-title"
+                    title="Remove Custom Magic Item?"
+                    confirmLabel="Yes, Remove"
+                    onCancel={() => setPendingCustomDelete(null)}
+                    onConfirm={confirmCustomDelete}
+                >
+                    {`Remove "${pendingCustomDelete}" from this character? Its custom name, type, rarity and description will be lost — this cannot be undone.`}
+                </DeleteConfirmModal>
+            )}
             {customModal && (
                 <CustomMagicItemModal
                     initialItem={customModal.editing}

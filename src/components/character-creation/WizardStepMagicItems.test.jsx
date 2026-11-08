@@ -428,7 +428,7 @@ describe('WizardStepMagicItems', () => {
       expect(props.onArrayFieldChange).not.toHaveBeenCalled();
     });
 
-    it('renders a stored custom object as a selected row with badge and Edit, and unticking removes it', () => {
+    it('renders a stored custom object as a selected row with badge and Edit, and unticking confirms before removing it', () => {
       const props = magicItemsProps({ selected: [STORMCALLER] });
       render(<WizardStepMagicItems {...props} />);
 
@@ -437,7 +437,9 @@ describe('WizardStepMagicItems', () => {
       expect(within(row).getByText('custom')).toBeInTheDocument();
       expect(within(row).getByText('requires attunement')).toBeInTheDocument();
 
+      // QA improve 2026-11-08 EL: untick arms the DeleteConfirmModal first.
       fireEvent.click(row.querySelector('.list-item-checkbox-trigger'));
+      fireEvent.click(screen.getByRole('button', { name: 'Yes, Remove' }));
       expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', []);
     });
 
@@ -455,21 +457,37 @@ describe('WizardStepMagicItems', () => {
       expect(within(summary).getByRole('button', { name: /Add Custom Magic Item/ })).toBeInTheDocument();
     });
 
-    it.each([
-      ['catalog', 'Bag of Holding', ['Bag of Holding'], []],
-      ['custom', 'Stormcaller Blade', [STORMCALLER], []],
-    ])('selected %s row carries an "Un-tick to remove" title and unticking deselects it', (_kind, name, selected, expectedPayload) => {
-      const props = magicItemsProps({ selected, allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] });
+    // QA improve 2026-11-08 EL split: both row kinds still advertise
+    // "Un-tick to remove"; only catalog rows deselect instantly (custom rows
+    // arm the confirm modal — covered in custom-untick-guard).
+    it('selected catalog row carries an "Un-tick to remove" title and unticking deselects it instantly', () => {
+      const props = magicItemsProps({ selected: ['Bag of Holding'], allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] });
       render(<WizardStepMagicItems {...props} />);
 
       const checkbox = screen
-        .getByText(name)
+        .getByText('Bag of Holding')
         .closest('.magic-item')
         .querySelector('.list-item-checkbox-trigger');
-      expect(checkbox).toHaveAttribute('title', `Un-tick to remove ${name}`);
+      expect(checkbox).toHaveAttribute('title', 'Un-tick to remove Bag of Holding');
 
       fireEvent.click(checkbox);
-      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', expectedPayload);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', []);
+    });
+
+    it('selected custom row advertises "Un-tick to remove" but arms the confirm modal instead of deselecting', () => {
+      const props = magicItemsProps({ selected: [STORMCALLER], allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] });
+      render(<WizardStepMagicItems {...props} />);
+
+      const checkbox = screen
+        .getByText('Stormcaller Blade')
+        .closest('.magic-item')
+        .querySelector('.list-item-checkbox-trigger');
+      expect(checkbox).toHaveAttribute('title', 'Un-tick to remove Stormcaller Blade');
+
+      fireEvent.click(checkbox);
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(props.onArrayFieldChange).not.toHaveBeenCalled();
     });
 
     it('unselected rows advertise selection via the checkbox title', () => {

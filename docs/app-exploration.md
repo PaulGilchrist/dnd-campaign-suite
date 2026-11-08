@@ -66,7 +66,6 @@ Live facts (EL, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-08 EL) **Custom-item untick is an unguarded destroy:** a fully-authored custom item (name/type/rarity/attunement/description via the modal) vanishes from the draft the instant its checkbox is unticked — zero confirm, zero undo, modal prefill lost (re-authoring = full modal re-entry). Catalog rows only lose selection, so the affordance asymmetry compounds the surprise. Suggest: shared DeleteConfirmModal on untick-while-selected for `custom:true` rows (DeleteConfirmModal tier precedent 5bed6e46d) or a one-shot "recreate last custom" affordance in the step. Owner ruling owed (map PT4/Depth-seed note).
 - (2026-11-08 EL) **Repeat-save prompt lacks provenance chrome:** the turn-END repeat CON prompt renders "ElderPaladin must make a CON saving throw / DC 15 / …No damage on successful save" with NO `Source:` line, while ordinary rider prompts (Shield Bash) show `Source: Shield Bash`. The `condition:"poisoned (repeat save)"` string was in the payload but never surfaced — a GM seeing concurrent prompts can't tell which effect the repeat owes. Fix candidate: repeatSaveService.resolveRepeatSave should pass `sourceName: te.source` (+ the effect label) so SavePromptModal's existing Source row renders.
 
 ## Blocked / Not Verified (fold-gate ledger)
