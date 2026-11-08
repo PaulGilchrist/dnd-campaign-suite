@@ -18,6 +18,7 @@ vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => nam
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
     const syncStateStore = new Map();
     return {
+        deleteRuntimeKey: vi.fn(),
         getStore: vi.fn(() => syncStateStore),
         useRuntimeValue: vi.fn(() => null),
         addStorageChangeListener: vi.fn(() => () => {}),

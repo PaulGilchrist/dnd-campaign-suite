@@ -14,6 +14,7 @@ vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => nam
 
 const syncStateStore = new Map();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    deleteRuntimeKey: vi.fn(),
     getStore: vi.fn(() => syncStateStore),
     // L5-001: TurnEconomyStrip subscribes via useRuntimeValue; null ⇒ enforcement off.
     useRuntimeValue: vi.fn(() => null),

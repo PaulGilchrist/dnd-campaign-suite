@@ -3,7 +3,7 @@ import { cloneDeep } from 'lodash'
 import useSSEEqualityGuard from '../../hooks/runtime/useSSEEqualityGuard.js'
 import utils from '../../services/ui/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
+import { useEffectAdderTarget } from './useEffectAdderTarget.js'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
 import { getMonsterImageUrl } from '../../services/npcs/monsterUtils.js'
@@ -284,7 +284,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const [conditionPopup, setConditionPopup] = React.useState(null)
 
-    const [effectAdderTarget, setEffectAdderTarget] = useSyncedState('campaign', 'combat-ui-effectAdderTarget', null, campaignName)
+    // Close = EVICT, never POST null (backlog EP 2026-11-08 orphan fix) — the
+    // delete-on-close + detach-evict doctrine lives in useEffectAdderTarget.js.
+    const [effectAdderTarget, setEffectAdderTarget, closeEffectAdderTarget] = useEffectAdderTarget(campaignName)
     // L5-001: End Turn renders only while enforcement is on (off ⇒ today's view, byte-identical)
     const enforcement = useRuntimeValue('campaign', 'enforcement')
     const enforcementOn = !!enforcement && enforcement.mode === 'on'
@@ -500,11 +502,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             campaignName,
             characters,
             combatSummary,
-            setEffectAdderTarget,
+            setEffectAdderTarget: closeEffectAdderTarget,
             setCombatSummary,
         })
         return handler
-    }, [campaignName, characters, combatSummary, setEffectAdderTarget])
+    }, [campaignName, characters, combatSummary, closeEffectAdderTarget])
 
     const { handleRollConditionSave } = React.useMemo(() => ({
         handleRollConditionSave: createRollConditionSaveHandler({
@@ -901,7 +903,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 <EffectAdder
                     targetName={effectAdderTarget.name}
                     initialTab={effectAdderTab}
-                    onCancel={() => setEffectAdderTarget(null)}
+                    onCancel={() => closeEffectAdderTarget(null)}
                     onApply={handleApplyEffect}
                     creatures={creaturesOrEmpty(combatSummary).filter(isCreaturePresent)}
                 />

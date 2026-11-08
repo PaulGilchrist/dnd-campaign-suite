@@ -64,8 +64,6 @@ Live facts (EP, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 ## Improvement Backlog
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
-
-- **(EP 2026-11-08) `combat-ui-effectAdderTarget` orphans in campaign change-data:** opening then cancelling the GM effect-adder leaves the key `{name…}` persisted for every client + select-rehydration until the next full clear — an OPEN-MODAL flag riding the shared store (AGENTS-sanctioned combat-UI-state, but it should DELETE on close). `Initiative.jsx:287` useSyncedState cleanup.
 - **(EP 2026-11-08) Spell-overlay write authority undocumented/ambiguous:** LAN visitors can ADD and CLEAR-ALL shared table overlays (`POST /spell-overlay` gates only CAMPAIGN_LOCK; no `refuseUnlessGm` unlike every sibling lane), while copy "removes overlays placed by everyone" hints multi-client authoring is intentional. Either document the per-map-lane write matrix (AGENTS + playbook) or gate the route — today it's guesswork. `server/routes/spell-overlay.js`.
 
 ## Blocked / Not Verified (fold-gate ledger)

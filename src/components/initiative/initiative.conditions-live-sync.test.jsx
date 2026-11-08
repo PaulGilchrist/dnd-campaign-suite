@@ -22,6 +22,7 @@ let sseHandler = null;
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    deleteRuntimeKey: vi.fn(),
     getStore: vi.fn(() => syncStateStore),
     useRuntimeValue: vi.fn(() => null),
     // useLootHandlers subscribes to cross-tab loot-draft echoes via addStorageChangeListener.

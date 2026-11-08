@@ -35,6 +35,7 @@ import { clearExpirationEffects } from '../../services/rules/effects/expirations
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    deleteRuntimeKey: vi.fn(),
     getStore: vi.fn(() => new Map()),
     // L5-001: TurnEconomyStrip subscribes via useRuntimeValue; null ⇒ enforcement off.
     useRuntimeValue: vi.fn(() => null),
