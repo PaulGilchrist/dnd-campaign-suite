@@ -465,6 +465,20 @@ function MusicPlayer({ campaignName, visible = true }) {
       setCategoryError('Category name must include letters or numbers');
       return;
     }
+    // Duplicate-label guard (improve 2026-11-08 backlog): makeCategoryKey used
+    // to resolve a twin label SILENTLY to `custom-<slug>-2` — both chips
+    // rendered the identical visible label and the DJ could not tell them
+    // apart. Block in-form instead, mirroring the custom-magic-items lane's
+    // getCustomNameConflict copy style. Trim + case-insensitive, matching
+    // buildMoodList's label normalization; built-in mood labels are out of
+    // scope (the server already forbids shadowing their keys).
+    const lower = label.toLowerCase();
+    if (Object.values(music.customCategories || {}).some(
+      entry => entry && typeof entry.label === 'string' && entry.label.trim().toLowerCase() === lower
+    )) {
+      setCategoryError(`A category named "${label}" already exists.`);
+      return;
+    }
     const customCategories = { ...music.customCategories, [key]: { label, icon: newCategoryIcon } };
     // PATCH { customCategories } only — a new category starts with an empty
     // track list (no overrides entry), so transport fields are untouched.

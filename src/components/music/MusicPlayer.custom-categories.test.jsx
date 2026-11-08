@@ -124,6 +124,73 @@ describe('MusicPlayer campaign-specific categories', () => {
       expect(posts.filter(p => 'customCategories' in p)).toHaveLength(0);
     });
 
+    // Duplicate-label guard (improve 2026-11-08 backlog): a twin label used to
+    // resolve silently to custom-<slug>-2 and render an IDENTICAL chip. The
+    // form now blocks it in place — custom-magic-items lane copy style.
+    describe('duplicate labels blocked in-form', () => {
+      const seed = { customCategories: { 'custom-crypt': { label: 'Crypt', icon: 'fa-skull' } } };
+
+      const expectBlocked = async (typed, named) => {
+        const { posts, server } = mount(seed);
+
+        openCreateForm();
+        fireEvent.change(screen.getByLabelText('Category name'), { target: { value: typed } });
+        fireEvent.click(screen.getByText('Create'));
+
+        expect(await screen.findByText(`A category named "${named}" already exists.`)).toBeInTheDocument();
+        // form stays open with the typed value preserved
+        expect(categoryForm()).not.toBeNull();
+        expect(screen.getByLabelText('Category name').value).toBe(typed);
+        // zero writes: no PATCH, server + store customCategories untouched
+        expect(posts.filter(p => 'customCategories' in p)).toHaveLength(0);
+        expect(server().customCategories).toEqual(seed.customCategories);
+        expect(musicState().customCategories).toEqual(seed.customCategories);
+        // no twin chip rendered
+        expect(screen.queryAllByTitle('Add Crypt tracks')).toHaveLength(1);
+      };
+
+      it('blocks an exact duplicate with inline error and no write', async () => {
+        await expectBlocked('Crypt', 'Crypt');
+      });
+
+      it('blocks case-insensitively and ignores surrounding whitespace', async () => {
+        await expectBlocked('  cRyPt ', 'cRyPt');
+      });
+
+      it('does NOT block a label matching a BUILT-IN mood (out of scope — only custom labels collide)', async () => {
+        const { posts } = mount(seed);
+
+        openCreateForm();
+        fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Town' } });
+        fireEvent.click(screen.getByText('Create'));
+
+        await waitFor(() => expect(categoryForm()).toBeNull());
+        expect(posts.filter(p => 'customCategories' in p)).toHaveLength(1);
+        expect(musicState().customCategories['custom-town']).toEqual({ label: 'Town', icon: 'fa-music' });
+      });
+
+      it('typing after a block clears the error and a distinct label still creates', async () => {
+        mount(seed);
+
+        openCreateForm();
+        fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Crypt' } });
+        fireEvent.click(screen.getByText('Create'));
+        expect(await screen.findByText('A category named "Crypt" already exists.')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Category name'), { target: { value: 'Underdark' } });
+        expect(screen.queryByText('A category named "Crypt" already exists.')).toBeNull();
+        fireEvent.click(screen.getByText('Create'));
+        await waitFor(() => expect(categoryForm()).toBeNull());
+
+        expect(screen.getByTitle('Add Underdark tracks')).toBeInTheDocument();
+        expect(musicState().customCategories['custom-underdark']).toEqual({ label: 'Underdark', icon: 'fa-music' });
+        expect(mockAddEntry).toHaveBeenCalledWith(
+          'test-campaign',
+          expect.objectContaining({ type: 'music', action: 'add_category', mood: 'custom-underdark' })
+        );
+      });
+    });
+
     it('built-in moods gain no delete affordance; custom ones do', () => {
       mount({ customCategories: { 'custom-crypt': { label: 'Crypt', icon: 'fa-skull' } } });
 
