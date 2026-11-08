@@ -127,6 +127,100 @@ describe('campaigns-changedata - POST music intent-split merge', () => {
         expect(res.body.music).toMatchObject({ mood: null, playing: false, volume: 0.6 });
         expect(res.body.music.overrides.town).toHaveLength(1);
     });
+
+    /* Campaign-specific categories (improve 2026-11-07): customCategories
+     * PATCH lane — wholesale map replace, transport fields untouched, key
+     * shape/label/icon validated at the API boundary. */
+    describe('customCategories PATCH', () => {
+        it('create PATCH stores the category map and keeps transport fields', async () => {
+            seedMusic({ mood: 'tavern', playing: true, volume: 0.5, overrides: {} });
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ customCategories: { 'custom-crypt': { label: 'Crypt', icon: 'fa-skull' } } });
+
+            expect(res.status).toBe(200);
+            expect(res.body.music.customCategories).toEqual({ 'custom-crypt': { label: 'Crypt', icon: 'fa-skull' } });
+            // intent-split: the PATCH never touches what it did not send
+            expect(res.body.music.mood).toBe('tavern');
+            expect(res.body.music.playing).toBe(true);
+            expect(characterChangeData.get('test-campaign').music.customCategories).toEqual({ 'custom-crypt': { label: 'Crypt', icon: 'fa-skull' } });
+        });
+
+        it('delete PATCH (map minus entry, overrides minus tracks) removes both atomically', async () => {
+            seedMusic({ mood: null, playing: false, volume: 0.6, overrides: { 'custom-crypt': [{ videoId: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ videoId: 'b', title: 'b' }] }, customCategories: { 'custom-crypt': { label: 'Crypt' }, 'custom-tar': { label: 'Tar' } } });
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({
+                    customCategories: { 'custom-tar': { label: 'Tar' } },
+                    overrides: { tavern: [{ videoId: 'b', title: 'b' }] }
+                });
+
+            expect(res.status).toBe(200);
+            expect(res.body.music.customCategories).toEqual({ 'custom-tar': { label: 'Tar' } });
+            expect(res.body.music.overrides).toEqual({ tavern: [{ videoId: 'b', title: 'b' }] });
+        });
+
+        it('tracks PATCH for a custom key rides the overrides lane (title resolution included)', async () => {
+            seedMusic({ ...STOPPED, customCategories: { 'custom-crypt': { label: 'Crypt' } } });
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ overrides: { 'custom-crypt': [{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }] } });
+
+            expect(res.status).toBe(200);
+            expect(res.body.music.overrides['custom-crypt']).toEqual([{ videoId: 'vyg5jJrZ42s', title: 'vyg5jJrZ42s' }]);
+            expect(res.body.music.customCategories).toEqual({ 'custom-crypt': { label: 'Crypt' } });
+        });
+
+        it('transport write carrying customCategories survives round-trip (full-object overwrite)', async () => {
+            seedMusic({ ...STOPPED, customCategories: { 'custom-crypt': { label: 'Crypt' } } });
+            const full = { mood: 'custom-crypt', playing: true, volume: 0.6, overrides: {}, customCategories: { 'custom-crypt': { label: 'Crypt' } } };
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ value: full });
+
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').music).toEqual(full);
+        });
+
+        it('rejects malformed maps: non-object, built-in-shadowing key, blank/oversized label, bad icon', async () => {
+            seedMusic({ ...STOPPED });
+            const bad = [
+                { customCategories: 'nope' },
+                { customCategories: [] },
+                { customCategories: { town: { label: 'Shadow' } } }, // missing custom- prefix
+                { customCategories: { 'custom-': { label: 'x' } } }, // empty slug still matches? no — see below
+                { customCategories: { 'custom-ok': {} } }, // no label
+                { customCategories: { 'custom-ok': { label: '   ' } } },
+                { customCategories: { 'custom-ok': { label: 'x'.repeat(41) } } },
+                { customCategories: { 'custom-ok': { label: 'ok', icon: 42 } } },
+            ];
+            for (const body of bad) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/music')
+                    .send(body);
+                expect(res.status, JSON.stringify(body)).toBe(400);
+            }
+            expect(characterChangeData.get('test-campaign').music).toEqual({ ...STOPPED });
+        });
+
+        it("accepts slug-shaped edge keys but rejects >20 categories", async () => {
+            seedMusic({ ...STOPPED });
+            // 'custom-c' and even 'custom--' pass /^custom-[a-z0-9-]+$/ —
+            // pinned (the client slugger always emits a non-empty slug).
+            const ok = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ customCategories: { 'custom--': { label: 'Odd' } } });
+            expect(ok.status).toBe(200);
+
+            const many = {};
+            for (let i = 0; i < 21; i += 1) many[`custom-cat-${i}`] = { label: `Cat ${i}` };
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/music')
+                .send({ customCategories: many });
+            expect(res.status).toBe(400);
+            expect(res.body.error).toContain('at most 20');
+        });
+    });
 });
 
 /* Save-time oEmbed title resolution (backlog 2026-10-24 — editor stamps

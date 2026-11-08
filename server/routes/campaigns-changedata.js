@@ -105,6 +105,60 @@ router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     res.json({ [key]: data[key] });
 }));
 
+// Campaign-specific music categories (improve 2026-11-07): the shared 'music'
+// key gains a customCategories map ({ [key]: {label, icon} }) alongside
+// overrides. Keys must carry the `custom-` prefix the client slugger produces
+// — this makes built-in mood shadowing impossible at the API boundary too —
+// and entries need a short label. The map is replaced wholesale on every
+// PATCH that carries it (create = entry added, delete = entry absent).
+const CUSTOM_CATEGORY_KEY = /^custom-[a-z0-9-]+$/;
+const MAX_CUSTOM_CATEGORIES = 20;
+
+function validateCategoryEntry(key, entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        return `music.customCategories.${key} must be an object`;
+    }
+    if (typeof entry.label !== 'string' || entry.label.trim() === '' || entry.label.length > 40) {
+        return `music.customCategories.${key}.label must be a non-empty string (max 40 chars)`;
+    }
+    if ('icon' in entry && (typeof entry.icon !== 'string' || entry.icon.length > 40)) {
+        return `music.customCategories.${key}.icon must be a string (max 40 chars)`;
+    }
+    return null;
+}
+
+function validateCustomCategories(customCategories) {
+    if (!customCategories || typeof customCategories !== 'object' || Array.isArray(customCategories)) {
+        return 'music.customCategories must be an object';
+    }
+    const keys = Object.keys(customCategories);
+    if (keys.length > MAX_CUSTOM_CATEGORIES) {
+        return `music.customCategories supports at most ${MAX_CUSTOM_CATEGORIES} categories`;
+    }
+    for (const key of keys) {
+        if (!CUSTOM_CATEGORY_KEY.test(key)) {
+            return `music.customCategories key "${key}" must match the custom-<slug> shape`;
+        }
+        const entryError = validateCategoryEntry(key, customCategories[key]);
+        if (entryError) return entryError;
+    }
+    return null;
+}
+
+// Whole-payload shape guard for the POST /music route (both PATCH intents).
+function validateMusicPayload(incoming) {
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+        return 'music payload must be an object';
+    }
+    if ('overrides' in incoming && (!incoming.overrides || typeof incoming.overrides !== 'object' || Array.isArray(incoming.overrides))) {
+        return 'music.overrides must be an object';
+    }
+    if ('customCategories' in incoming) {
+        return validateCustomCategories(incoming.customCategories);
+    }
+    return null;
+}
+
 // POST /api/campaigns/:campaign/music - Shared ambience state (GM or delegated
 // player), intent-split merge.
 // Transport writes (play/pause/stop/mood/volume via useSyncedState) POST the full
@@ -124,16 +178,14 @@ router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
 router.post('/api/campaigns/:campaign/music', asyncHandler(async (req, res) => {
     const { campaign } = req.params;
     let incoming = ('value' in req.body ? req.body.value : req.body);
-    if (!incoming || typeof incoming !== 'object') {
-        return res.status(400).json({ error: 'music payload must be an object' });
-    }
-    if ('overrides' in incoming && (!incoming.overrides || typeof incoming.overrides !== 'object' || Array.isArray(incoming.overrides))) {
-        return res.status(400).json({ error: 'music.overrides must be an object' });
+    const payloadError = validateMusicPayload(incoming);
+    if (payloadError) {
+        return res.status(400).json({ error: payloadError });
     }
     const current = characterChangeData.get(campaign)?.music;
     const base = (current && typeof current === 'object' && !Array.isArray(current))
         ? current
-        : { mood: null, playing: false, volume: 0.6, overrides: {} };
+        : { mood: null, playing: false, volume: 0.6, overrides: {}, customCategories: {} };
     if ('overrides' in incoming) {
         incoming = { ...incoming, overrides: await resolveOverrideTitles(incoming.overrides, base.overrides) };
     }

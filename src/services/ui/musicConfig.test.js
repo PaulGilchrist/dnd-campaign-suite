@@ -22,21 +22,26 @@
  * :127-128) is read-only .length/.map — zero persistence-via-mutation abuse,
  * so freeze + copy retire the pollution hole with zero behavior change.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as musicConfig from './musicConfig.js';
-import { MOODS, DEFAULT_VOLUME, getMood, getTracksForMood, extractVideoId } from './musicConfig.js';
+import { MOODS, DEFAULT_VOLUME, getMood, getTracksForMood, extractVideoId, buildMoodList, makeCategoryKey, CATEGORY_ICONS, DEFAULT_CUSTOM_ICON } from './musicConfig.js';
 
 const ID = 'q9yaKpYS9qc'; // real town-track id, also the fixture for URL parsing
 
 describe('musicConfig export surface', () => {
-  it('exports exactly the five live symbols, correct arity, volume default 0.6', () => {
-    // all five consumed by MusicPlayer.jsx — census: zero dead exports
-    expect(Object.keys(musicConfig).sort()).toEqual(
-      ['DEFAULT_VOLUME', 'MOODS', 'extractVideoId', 'getMood', 'getTracksForMood']
-    );
+  it('exports exactly the nine live symbols, correct arity, volume default 0.6', () => {
+    // all consumed by MusicPlayer.jsx / tests — census: zero dead exports
+    // (2026-11-07: +buildMoodList/+makeCategoryKey/+CATEGORY_ICONS/
+    // +DEFAULT_CUSTOM_ICON for campaign-specific categories)
+    expect(Object.keys(musicConfig).sort()).toEqual([
+      'CATEGORY_ICONS', 'DEFAULT_CUSTOM_ICON', 'DEFAULT_VOLUME', 'MOODS',
+      'buildMoodList', 'extractVideoId', 'getMood', 'getTracksForMood', 'makeCategoryKey'
+    ]);
     expect(getMood.length).toBe(1);
     expect(getTracksForMood.length).toBe(2);
     expect(extractVideoId.length).toBe(1);
+    expect(buildMoodList.length).toBe(1);
+    expect(makeCategoryKey.length).toBe(1); // existingKeys default arg → declared arity 1
     // DEFAULT_VOLUME seeds MusicPlayer's DEFAULT_MUSIC.volume and the range
     // slider's initial position — the player test derives it, so pin it here.
     expect(DEFAULT_VOLUME).toBe(0.6);
@@ -261,5 +266,87 @@ describe('extractVideoId — GM paste-editor parser', () => {
     expect(extractVideoId(`https://youtu.be.evil.io/${ID}`)).toBeNull();
     // Reject degrades safely: null is the caller's drop signal —
     // MusicPlayer.parseTrackList .filter(Boolean)s it (no track queued).
+  });
+});
+
+/* Campaign-specific categories (improve 2026-11-07) — merged catalogue
+ * builder and collision-safe key slugger. */
+describe('buildMoodList — merged starter + campaign catalogue', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('icon picker preset is frozen and defaults to its first entry', () => {
+    expect(Object.isFrozen(CATEGORY_ICONS)).toBe(true);
+    expect(CATEGORY_ICONS[0]).toBe(DEFAULT_CUSTOM_ICON);
+    expect(CATEGORY_ICONS.every(i => /^fa-[a-z-]+$/.test(i))).toBe(true);
+  });
+
+  it('no custom categories: the five built-ins, marked custom:false, NEW array', () => {
+    for (const input of [undefined, null, {}, 'junk', 0]) {
+      const list = buildMoodList(input);
+      expect(list).toHaveLength(5);
+      expect(list).not.toBe(MOODS);
+      expect(list.map(m => m.key)).toEqual(MOODS.map(m => m.key));
+      expect(list.every(m => m.custom === false)).toBe(true);
+    }
+  });
+
+  it('appends custom entries with label/icon and custom:true', () => {
+    const list = buildMoodList({ 'custom-crypt': { label: 'Crypt', icon: 'fa-skull' } });
+    expect(list).toHaveLength(6);
+    expect(list[5]).toEqual({ key: 'custom-crypt', label: 'Crypt', icon: 'fa-skull', custom: true });
+  });
+
+  it('missing/blank icon falls back to DEFAULT_CUSTOM_ICON; label is trimmed', () => {
+    const list = buildMoodList({ 'custom-x': { label: '  Underdark  ' } });
+    expect(list[5]).toEqual({ key: 'custom-x', label: 'Underdark', icon: DEFAULT_CUSTOM_ICON, custom: true });
+  });
+
+  it('built-in keys win — a shadowing custom entry is skipped with console.error', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const list = buildMoodList({ town: { label: 'My Town', icon: 'fa-skull' } });
+    expect(list).toHaveLength(5);
+    expect(list.find(m => m.key === 'town').label).toBe('Town');
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('town'));
+  });
+
+  it('corrupt entries (non-object, blank label) are skipped with console.error', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const list = buildMoodList({
+      'custom-a': null,
+      'custom-b': { label: '   ' },
+      'custom-c': 'nope',
+      'custom-ok': { label: 'Keeper' }
+    });
+    expect(list).toHaveLength(6);
+    expect(list[5].key).toBe('custom-ok');
+    expect(consoleError).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('makeCategoryKey — slug + custom- prefix + collision suffixes', () => {
+  it('slugifies the label under a custom- prefix', () => {
+    expect(makeCategoryKey('Crypt Keeper')).toBe('custom-crypt-keeper');
+    expect(makeCategoryKey('  Boss Fight!! ')).toBe('custom-boss-fight');
+    expect(makeCategoryKey('The Under-dar_k')).toBe('custom-the-under-dar-k');
+    expect(makeCategoryKey('café')).toBe('custom-caf'); // accents are non-alnum → separator
+  });
+
+  it('custom- prefix makes built-in collision impossible by construction', () => {
+    expect(makeCategoryKey('Town', [])).toBe('custom-town');
+    expect(makeCategoryKey('Town', ['town', 'custom-town']).startsWith('custom-')).toBe(true);
+    expect(makeCategoryKey('Town', ['town', 'custom-town'])).toBe('custom-town-2');
+  });
+
+  it('collisions with existing keys gain -2/-3/… suffixes', () => {
+    expect(makeCategoryKey('crypt', ['custom-crypt'])).toBe('custom-crypt-2');
+    expect(makeCategoryKey('crypt', ['custom-crypt', 'custom-crypt-2'])).toBe('custom-crypt-3');
+  });
+
+  it('returns null for non-strings and labels that slug to nothing', () => {
+    for (const junk of [null, undefined, 42, {}, []]) {
+      expect(makeCategoryKey(junk)).toBeNull();
+    }
+    expect(makeCategoryKey('   ')).toBeNull();
+    expect(makeCategoryKey('!!!')).toBeNull();
   });
 });

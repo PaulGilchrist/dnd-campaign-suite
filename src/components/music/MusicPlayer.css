@@ -193,6 +193,71 @@
   padding: 2px 0;
 }
 
+/* Campaign-specific categories (improve 2026-11-07): a custom mood chip is
+   the play button plus a small × delete affordance. Built-in moods render
+   the button alone (wrapper is layout-inert — flex row, gap matches the
+   mood grid). */
+.music-mood-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.music-mood-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.75em;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.music-mood-delete:hover {
+  background-color: var(--background-color-error);
+  border-color: var(--color-error-border);
+  color: var(--color-error-light);
+}
+
+.music-add-category {
+  width: 30px;
+}
+
+/* Create-category form — reuses the .music-editor card tokens, adds only
+   the icon-picker row layout. */
+.music-category-form .music-icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.music-category-form .music-icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.music-category-form .music-icon-btn.active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.music-category-form input[type='text'] {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-color-card);
+  color: var(--color-text);
+  font-size: 0.8em;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
 /* Hidden YouTube iframe — kept tiny but rendered so playback works */
 .yt-music-frame {
   position: fixed;

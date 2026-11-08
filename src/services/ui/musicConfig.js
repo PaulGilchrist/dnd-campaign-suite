@@ -57,6 +57,29 @@ export const MOODS = [
 
 export const DEFAULT_VOLUME = 0.6;
 
+// Campaign-specific categories (improve 2026-11-07): DJs (GM or delegated
+// player) can add custom moods per campaign. Only the DEFINITION (label +
+// icon) lives in the shared 'music' key's `customCategories` map — the
+// category's tracks keep living in `overrides[key]`, so the editor save,
+// oEmbed title resolution, and playback lanes are reused untouched. An
+// empty category = entry in customCategories with no overrides row.
+export const DEFAULT_CUSTOM_ICON = 'fa-music';
+
+// Small Font Awesome preset for the create-form icon picker — a curated
+// subset beats a free-text icon field (no class-name injection, no missing
+// glyphs), and fa-* classes are already loaded globally via main.jsx.
+export const CATEGORY_ICONS = Object.freeze([
+  'fa-music',
+  'fa-skull',
+  'fa-fort', // FA7 renamed the castle glyph (fa-castle does not exist in free 7.x)
+  'fa-fire',
+  'fa-water',
+  'fa-moon',
+  'fa-dragon',
+  'fa-ghost',
+  'fa-bell'
+]);
+
 // fix#352(c): the shipped starter catalogue is immutable config — frozen deep
 // (track rows, tracks arrays, mood rows, then the MOODS array) so a consumer
 // mutation throws TypeError in strict ES-module scope instead of polluting the
@@ -76,6 +99,60 @@ Object.freeze(MOODS);
 
 export function getMood(moodKey) {
   return MOODS.find(m => m.key === moodKey) || null;
+}
+
+/**
+ * Merged sidebar list: the frozen starter catalogue (marked custom:false)
+ * plus the campaign's customCategories entries (marked custom:true).
+ * Built-in keys always win — a custom entry attempting to shadow one is
+ * skipped with console.error (no silent fallback). Corrupt entries (missing
+ * label, non-object) are skipped the same way. Returns a NEW array of NEW
+ * rows; the caller may sort/freeze freely.
+ */
+export function buildMoodList(customCategories) {
+  const moods = MOODS.map(({ key, label, icon }) => ({ key, label, icon, custom: false }));
+  if (!customCategories || typeof customCategories !== 'object') return moods;
+  const taken = new Set(moods.map(m => m.key));
+  for (const [key, entry] of Object.entries(customCategories)) {
+    if (taken.has(key)) {
+      console.error(`[musicConfig] customCategories entry "${key}" shadows a built-in mood — ignored`);
+      continue;
+    }
+    if (!entry || typeof entry !== 'object' || typeof entry.label !== 'string' || entry.label.trim() === '') {
+      console.error(`[musicConfig] customCategories entry "${key}" has no label — ignored`);
+      continue;
+    }
+    taken.add(key);
+    moods.push({
+      key,
+      label: entry.label.trim(),
+      icon: typeof entry.icon === 'string' && entry.icon.trim() !== '' ? entry.icon.trim() : DEFAULT_CUSTOM_ICON,
+      custom: true
+    });
+  }
+  return moods;
+}
+
+/**
+ * Slug key for a new category: lowercase, non-alphanumerics collapsed to
+ * '-', prefixed `custom-` so built-in keys can never collide by construction.
+ * Returns null when the label slugs to nothing (pure punctuation/blank).
+ * Collisions with existingKeys gain a -2/-3/… suffix.
+ */
+export function makeCategoryKey(label, existingKeys = []) {
+  if (typeof label !== 'string') return null;
+  const slug = label.trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!slug) return null;
+  const taken = new Set(existingKeys);
+  let key = `custom-${slug}`;
+  let suffix = 2;
+  while (taken.has(key)) {
+    key = `custom-${slug}-${suffix}`;
+    suffix += 1;
+  }
+  return key;
 }
 
 /**

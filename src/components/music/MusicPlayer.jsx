@@ -2,22 +2,15 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 import useLog from '../../hooks/runtime/useLog.js';
-import { MOODS, DEFAULT_VOLUME, getMood, getTracksForMood, extractVideoId } from '../../services/ui/musicConfig.js';
-import { saveMusicOverrides } from '../../services/ui/musicService.js';
+import { MOODS, DEFAULT_VOLUME, getTracksForMood, extractVideoId, buildMoodList, makeCategoryKey, CATEGORY_ICONS, DEFAULT_CUSTOM_ICON } from '../../services/ui/musicConfig.js';
+import { saveMusicOverrides, saveMusicCategories } from '../../services/ui/musicService.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
 import './MusicPlayer.css';
 
 const YT_FRAME_ID = 'yt-music-frame';
 
-const DEFAULT_MUSIC = { mood: null, playing: false, volume: DEFAULT_VOLUME, overrides: {} };
-
-const moodLabel = (moodKey) => (getMood(moodKey) || {}).label || moodKey;
-
-// Sidebar display order: mood labels A–Z. MOODS itself stays in canonical
-// catalogue order (tests pin MOODS[0]='town', MOODS[1]='outdoors'), so we
-// render from a sorted copy.
-const MOODS_ALPHABETICAL = [...MOODS].sort((a, b) => a.label.localeCompare(b.label));
+const DEFAULT_MUSIC = { mood: null, playing: false, volume: DEFAULT_VOLUME, overrides: {}, customCategories: {} };
 
 function parseTrackList(text) {
   return text
@@ -25,6 +18,88 @@ function parseTrackList(text) {
     .map(line => extractVideoId(line))
     .filter(Boolean)
     .map(videoId => ({ videoId, title: videoId }));
+}
+
+// One sidebar mood chip: the play button plus, for custom categories only,
+// a small × delete affordance (built-ins are permanent — improve 2026-11-07).
+// Extracted from MusicPlayer to keep the panel body focused; pure props.
+function MusicMoodChip({ mood, active, trackCount, onSelect, onDelete }) {
+  // Empty custom category: the click opens the editor (see selectMood), so
+  // the tooltip promises that instead of playback.
+  const title = trackCount === 0 && mood.custom
+    ? `Add ${mood.label} tracks`
+    : `Play ${mood.label} ambience`;
+  return (
+    <span className="music-mood-item">
+      <button
+        className={`music-mood-btn${active ? ' active' : ''}`}
+        onClick={() => onSelect(mood.key)}
+        title={title}
+      >
+        <i className={`fa-solid ${mood.icon}`}></i> {mood.label}
+      </button>
+      {mood.custom && (
+        <button
+          className="music-mood-delete"
+          onClick={() => onDelete(mood.key)}
+          title={`Delete ${mood.label} category`}
+          aria-label={`Delete ${mood.label} category`}
+        >
+          <i className="fa-solid fa-xmark"></i>
+        </button>
+      )}
+    </span>
+  );
+}
+
+// Create-category form (improve 2026-11-07): name + preset icon picker.
+// Pure presentational — all state/handlers owned by MusicPlayer.
+function MusicCategoryForm({ label, icon, error, onLabelChange, onIconChange, onSubmit, onCancel }) {
+  return (
+    <div className="music-editor music-category-form">
+      <label htmlFor="music-category-label">Category name</label>
+      <input
+        id="music-category-label"
+        type="text"
+        value={label}
+        maxLength={40}
+        placeholder="e.g. Crypt, Underdark, Boss Fight"
+        onChange={(event) => onLabelChange(event.target.value)}
+        onKeyDown={(event) => { if (event.key === 'Enter') onSubmit(); }}
+      />
+      <label id="music-category-icons-label">Icon</label>
+      <div className="music-icon-picker" role="group" aria-labelledby="music-category-icons-label">
+        {CATEGORY_ICONS.map((choice) => (
+          <button
+            key={choice}
+            type="button"
+            className={`music-btn music-icon-btn${icon === choice ? ' active' : ''}`}
+            onClick={() => onIconChange(choice)}
+            title={choice}
+            aria-label={`Icon ${choice}`}
+          >
+            <i className={`fa-solid ${choice}`}></i>
+          </button>
+        ))}
+      </div>
+      {error && <div className="music-editor-error">{error}</div>}
+      <div className="music-editor-actions">
+        <button className="music-btn" onClick={onSubmit}>Create</button>
+        <button className="music-btn" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// Display-only save/reset confirmation toast — moved out of MusicPlayer's
+// render body (complexity budget, improve 2026-11-07); markup unchanged.
+function MusicToast({ toast }) {
+  if (!toast) return null;
+  return (
+    <div className={`music-toast${toast.isError ? ' music-toast-error' : ''}`} role="status">
+      {toast.message}
+    </div>
+  );
 }
 
 // Ambience duty is delegable: the view is open to players, not GM-only.
@@ -37,6 +112,23 @@ function MusicPlayer({ campaignName, visible = true }) {
   const music = useMemo(
     () => (rawMusic && typeof rawMusic === 'object' ? { ...DEFAULT_MUSIC, ...rawMusic } : DEFAULT_MUSIC),
     [rawMusic]
+  );
+
+  // Merged sidebar catalogue (improve 2026-11-07): frozen starter MOODS plus
+  // this campaign's customCategories. Display order stays A–Z; MOODS itself
+  // keeps canonical catalogue order (tests pin MOODS[0]='town').
+  const moods = useMemo(() => buildMoodList(music.customCategories), [music.customCategories]);
+  const sortedMoods = useMemo(
+    () => [...moods].sort((a, b) => a.label.localeCompare(b.label)),
+    [moods]
+  );
+  const moodLabel = useCallback(
+    (moodKey) => (moods.find(m => m.key === moodKey) || {}).label || moodKey,
+    [moods]
+  );
+  const isCustomMood = useCallback(
+    (moodKey) => !!(moods.find(m => m.key === moodKey) || {}).custom,
+    [moods]
   );
 
   const [volume, setVolume] = useState(music.volume ?? DEFAULT_VOLUME);
@@ -171,23 +263,42 @@ function MusicPlayer({ campaignName, visible = true }) {
     youtubePlayer.setVolume(volume);
   }, [volume]);
 
+  // Shared editor seeding lane (openEditor, mood-select switch, and the
+  // click-an-empty-custom-category shortcut all funnel through here).
+  const seedEditor = useCallback((moodKey) => {
+    setEditMood(moodKey);
+    const tracks = getTracksForMood(moodKey, music.overrides);
+    const text = tracks.map(t => t.videoId).join('\n');
+    setTrackText(text);
+    seedDraft({ trackText: text });
+    setEditorError(null);
+  }, [music.overrides, seedDraft]);
+
   const selectMood = useCallback((moodKey) => {
     const tracks = getTracksForMood(moodKey, music.overrides);
     if (tracks.length === 0) {
+      // A brand-new custom category starts empty: clicking it goes straight
+      // to the editor (seeded on that mood) instead of erroring — the DJ's
+      // next step IS adding tracks. Built-ins reaching this arm is a
+      // catalogue bug, so they keep the honest console.error.
+      if (isCustomMood(moodKey)) {
+        seedEditor(moodKey);
+        setEditing(true);
+        return;
+      }
       console.error(`No tracks configured for mood "${moodKey}"`);
       return;
     }
     setPlayerMounted(true);
     youtubePlayer.playTracks(tracks.map(t => t.videoId));
     commitMusic({ ...music, mood: moodKey, playing: true });
-    const mood = getMood(moodKey);
     addEntry({
       type: 'music',
       action: 'set_ambience',
       mood: moodKey,
-      message: `Set ambience: ${mood ? mood.label : moodKey} — ${tracks[0].title}`
+      message: `Set ambience: ${moodLabel(moodKey)} — ${tracks[0].title}`
     });
-  }, [music, commitMusic, addEntry]);
+  }, [music, commitMusic, addEntry, isCustomMood, seedEditor, moodLabel]);
 
   const togglePlay = useCallback(() => {
     if (!music.mood) return;
@@ -220,7 +331,7 @@ function MusicPlayer({ campaignName, visible = true }) {
         message: `Resumed ${moodLabel(music.mood)} ambience`
       });
     }
-  }, [music, commitMusic, playerMounted, addEntry]);
+  }, [music, commitMusic, playerMounted, addEntry, moodLabel]);
 
   const stopMusic = useCallback(() => {
     youtubePlayer.stop();
@@ -247,7 +358,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     };
     window.addEventListener('music-queue-exhausted', handleQueueExhausted);
     return () => window.removeEventListener('music-queue-exhausted', handleQueueExhausted);
-  }, [music, commitMusic, showToast, addEntry]);
+  }, [music, commitMusic, showToast, addEntry, moodLabel]);
 
   const handleVolume = useCallback((event) => {
     const next = Number(event.target.value) / 100;
@@ -266,15 +377,9 @@ function MusicPlayer({ campaignName, visible = true }) {
   // overrides.town. With no mood active there is no "this mood", so fall back
   // to the last mood selected in the editor's select (starts at MOODS[0]).
   const openEditor = useCallback(() => {
-    const moodKey = music.mood || editMood;
-    setEditMood(moodKey);
-    const tracks = getTracksForMood(moodKey, music.overrides);
-    const text = tracks.map(t => t.videoId).join('\n');
-    setTrackText(text);
-    seedDraft({ trackText: text });
-    setEditorError(null);
+    seedEditor(music.mood || editMood);
     setEditing(true);
-  }, [music.mood, music.overrides, editMood, seedDraft]);
+  }, [music.mood, editMood, seedEditor]);
 
   const changeEditMood = useCallback((event) => {
     const moodKey = event.target.value;
@@ -286,13 +391,8 @@ function MusicPlayer({ campaignName, visible = true }) {
       event.target.value = editMood;
       return;
     }
-    setEditMood(moodKey);
-    const tracks = getTracksForMood(moodKey, music.overrides);
-    const text = tracks.map(t => t.videoId).join('\n');
-    setTrackText(text);
-    seedDraft({ trackText: text });
-    setEditorError(null);
-  }, [editMood, music.overrides, confirmDiscardDraft, seedDraft]);
+    seedEditor(moodKey);
+  }, [editMood, confirmDiscardDraft, seedEditor]);
 
   // Cancel close path (parity with the .ct-* handleRequestClose doctrine): a
   // dirty draft confirms first; a clean draft discards silently as before.
@@ -327,7 +427,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     clearDraft();
     setEditing(false);
     showToast(`${moodLabel(editMood)} tracks saved`);
-  }, [trackText, editMood, music, campaignName, showToast, clearDraft]);
+  }, [trackText, editMood, music, campaignName, showToast, clearDraft, moodLabel]);
 
   const resetMood = useCallback(async () => {
     const overrides = { ...music.overrides };
@@ -347,7 +447,86 @@ function MusicPlayer({ campaignName, visible = true }) {
     seedDraft({ trackText: text });
     setEditorError(null);
     showToast(`${moodLabel(editMood)} overrides reset to defaults`);
-  }, [editMood, music, campaignName, showToast, seedDraft]);
+  }, [editMood, music, campaignName, showToast, seedDraft, moodLabel]);
+
+  // --- Campaign-specific categories (improve 2026-11-07) -------------------
+  // Same permission model as track editing (user decision: ambience duty is
+  // delegable, so DJs — GM or player — may create/delete custom categories).
+  // Built-in moods are permanent; only custom entries get the ×/delete lane.
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState(DEFAULT_CUSTOM_ICON);
+  const [categoryError, setCategoryError] = useState(null);
+
+  const submitNewCategory = useCallback(async () => {
+    const label = newCategoryLabel.trim();
+    const key = makeCategoryKey(label, moods.map(m => m.key));
+    if (!key) {
+      setCategoryError('Category name must include letters or numbers');
+      return;
+    }
+    const customCategories = { ...music.customCategories, [key]: { label, icon: newCategoryIcon } };
+    // PATCH { customCategories } only — a new category starts with an empty
+    // track list (no overrides entry), so transport fields are untouched.
+    const saved = await saveMusicCategories(campaignName, customCategories);
+    if (!saved) {
+      showToast(`Failed to create ${label} category`, true);
+      return;
+    }
+    setRuntimeObject('campaign', { music: saved }, campaignName, true);
+    setAddingCategory(false);
+    setNewCategoryLabel('');
+    setNewCategoryIcon(DEFAULT_CUSTOM_ICON);
+    setCategoryError(null);
+    showToast(`Category ${label} created — add tracks to it`);
+    addEntry({
+      type: 'music',
+      action: 'add_category',
+      mood: key,
+      message: `Added music category ${label}`
+    });
+  }, [newCategoryLabel, newCategoryIcon, moods, music.customCategories, campaignName, showToast, addEntry]);
+
+  const cancelNewCategory = useCallback(() => {
+    setAddingCategory(false);
+    setNewCategoryLabel('');
+    setNewCategoryIcon(DEFAULT_CUSTOM_ICON);
+    setCategoryError(null);
+  }, []);
+
+  const deleteCategory = useCallback(async (moodKey) => {
+    const label = moodLabel(moodKey);
+    if (!window.confirm(`Delete the ${label} category? Its track list will be removed.`)) return;
+    // Deleting the ACTIVE mood silences this tab's player first, then the
+    // transport un-arms the shared mood (stop button's honest state). Other
+    // tabs release theirs via the existing remote-adoption lane.
+    if (music.mood === moodKey) {
+      youtubePlayer.stop();
+      commitMusic({ ...music, mood: null, playing: false });
+    }
+    const customCategories = { ...music.customCategories };
+    delete customCategories[moodKey];
+    const overrides = { ...music.overrides };
+    delete overrides[moodKey];
+    // One PATCH carries both maps so category and tracks go atomically.
+    const saved = await saveMusicCategories(campaignName, customCategories, overrides);
+    if (!saved) {
+      showToast(`Failed to delete ${label} category`, true);
+      return;
+    }
+    setRuntimeObject('campaign', { music: saved }, campaignName, true);
+    if (editing && editMood === moodKey) {
+      clearDraft();
+      setEditing(false);
+    }
+    showToast(`Category ${label} deleted`);
+    addEntry({
+      type: 'music',
+      action: 'delete_category',
+      mood: moodKey,
+      message: `Deleted music category ${label}`
+    });
+  }, [music, moodLabel, commitMusic, campaignName, editing, editMood, clearDraft, showToast, addEntry]);
 
   const playing = music.playing;
 
@@ -360,17 +539,36 @@ function MusicPlayer({ campaignName, visible = true }) {
       </div>
       <div className="music-panel">
         <div className="music-moods">
-        {MOODS_ALPHABETICAL.map((mood) => (
+          {sortedMoods.map((mood) => (
+            <MusicMoodChip
+              key={mood.key}
+              mood={mood}
+              active={playing && music.mood === mood.key}
+              trackCount={getTracksForMood(mood.key, music.overrides).length}
+              onSelect={selectMood}
+              onDelete={deleteCategory}
+            />
+          ))}
           <button
-            key={mood.key}
-            className={`music-mood-btn${playing && music.mood === mood.key ? ' active' : ''}`}
-            onClick={() => selectMood(mood.key)}
-            title={`Play ${mood.label} ambience`}
+            className="music-btn music-add-category"
+            onClick={() => { setAddingCategory((open) => !open); setCategoryError(null); }}
+            title="Add music category"
+            aria-label="Add music category"
           >
-            <i className={`fa-solid ${mood.icon}`}></i> {mood.label}
+            <i className="fa-solid fa-plus"></i>
           </button>
-        ))}
-      </div>
+        </div>
+        {addingCategory && (
+          <MusicCategoryForm
+            label={newCategoryLabel}
+            icon={newCategoryIcon}
+            error={categoryError}
+            onLabelChange={(value) => { setNewCategoryLabel(value); setCategoryError(null); }}
+            onIconChange={setNewCategoryIcon}
+            onSubmit={submitNewCategory}
+            onCancel={cancelNewCategory}
+          />
+        )}
       <div className="music-controls">
         <button className="music-btn" onClick={togglePlay} disabled={!music.mood} title={playing ? 'Pause' : 'Play'}>
           <i className={`fa-solid ${playing ? 'fa-pause' : 'fa-play'}`}></i>
@@ -414,7 +612,7 @@ function MusicPlayer({ campaignName, visible = true }) {
               word "Mood"; the explicit name makes the chooser discoverable to
               screen readers and tests. */}
           <select id="music-editor-mood" aria-label="Tracks mood" value={editMood} onChange={changeEditMood}>
-            {MOODS_ALPHABETICAL.map((mood) => (
+            {sortedMoods.map((mood) => (
               <option key={mood.key} value={mood.key}>{mood.label}</option>
             ))}
           </select>
@@ -446,16 +644,20 @@ function MusicPlayer({ campaignName, visible = true }) {
           {editorError && <div className="music-editor-error">{editorError}</div>}
           <div className="music-editor-actions">
             <button className="music-btn" onClick={saveTracks}>Save</button>
-            <button className="music-btn" onClick={resetMood} title="Restore starter tracks">Reset</button>
+            {isCustomMood(editMood) ? (
+              // Custom categories have no starter defaults to Reset to —
+              // the editor offers Delete (category + tracks) instead.
+              <button className="music-btn" onClick={() => deleteCategory(editMood)} title={`Delete ${moodLabel(editMood)} category`}>
+                Delete category
+              </button>
+            ) : (
+              <button className="music-btn" onClick={resetMood} title="Restore starter tracks">Reset</button>
+            )}
             <button className="music-btn" onClick={cancelEdit}>Cancel</button>
           </div>
         </div>
       )}
-      {toast && (
-        <div className={`music-toast${toast.isError ? ' music-toast-error' : ''}`} role="status">
-          {toast.message}
-        </div>
-      )}
+      <MusicToast toast={toast} />
       </div>
     </div>
   );
