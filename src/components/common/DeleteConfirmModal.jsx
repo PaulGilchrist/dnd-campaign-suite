@@ -5,10 +5,13 @@
 // of a native window.confirm (backlog 2026-11-01 AZ2). Structure preserved:
 // role="dialog" + aria-modal + heading-labelled-by + initial focus on the dialog's
 // first focusable element + two-way Tab trap + Cancel / `.delete-confirm-btn`
-// action row. Reuses the existing `.maps-manager-modal*` CSS chrome (imported here
-// so every consumer renders styled, Vite dedupes the import).
+// action row. Rides the neutral global `.modal-shell-*` confirmation shell
+// (App.css, backlog EN 2026-11-08) — the visuals were copied VERBATIM from
+// the original `.maps-manager-modal*` chrome so every consumer renders
+// byte-equivalent while combat/hostile confirms no longer borrow a
+// maps-manager class name (style-bleed guard); App.css is imported globally
+// by App.jsx, so no per-component CSS import is needed here.
 import { useEffect, useRef } from 'react';
-import '../maps-manager/MapsManager.css';
 
 // Focusable-element probe for the dialog's focus trap (mirrors the semantics
 // AiInstructionModal established for role="dialog" overlays; a shared trap hook
@@ -61,9 +64,9 @@ function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm,
     };
 
     return (
-        <div className="maps-manager-modal-overlay">
+        <div className="modal-shell-overlay">
             <div
-                className="maps-manager-modal"
+                className="modal-shell"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
@@ -90,7 +93,7 @@ function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm,
                 {error && (
                     <p className="delete-confirm-error" role="alert">{error}</p>
                 )}
-                <div className="maps-manager-modal-actions">
+                <div className="modal-shell-actions">
                     <button onClick={onCancel}>Cancel</button>
                     <button className="delete-confirm-btn" onClick={onConfirm}>
                         {confirmLabel}

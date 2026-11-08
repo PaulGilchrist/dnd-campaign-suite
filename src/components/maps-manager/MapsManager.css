@@ -205,7 +205,10 @@
     color: var(--color-error);
 }
 
-/* Delete confirmation modal */
+/* Maps-manager modal chrome (description + Generate modals). The shared
+   confirmation modal moved onto the neutral global `.modal-shell-*` shell
+   (App.css, backlog EN 2026-11-08) — the delete-confirm/typed-confirm
+   rules below were removed there with it. */
 .maps-manager-modal-overlay {
     position: fixed;
     top: 0;
@@ -267,54 +270,6 @@
     border-color: #555;
 }
 
-.maps-manager-modal-actions .delete-confirm-btn {
-    background-color: var(--color-error);
-    border-color: var(--color-error);
-    color: var(--color-text-inverse);
-    font-weight: 600;
-}
-
-.maps-manager-modal-actions .delete-confirm-btn:hover {
-    background-color: var(--color-error-light);
-    border-color: var(--color-error-light);
-}
-
-/* Optional typed-name confirm input + inline error copy inside the shared
-   DeleteConfirmModal (campaign-delete lane, backlog 2026-11-04 CO). Same
-   input tokens as the create/description rows above. */
-.delete-confirm-typed {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: 0 0 16px 0;
-}
-
-.delete-confirm-typed-label {
-    color: var(--color-text);
-    font-size: 14px;
-}
-
-.delete-confirm-typed-input {
-    padding: 8px 12px;
-    font-size: 14px;
-    border: 1px solid var(--border-color-input);
-    border-radius: 4px;
-    background-color: var(--background-color-input);
-    color: var(--color-text);
-    outline: none;
-    transition: border-color 0.15s ease;
-}
-
-.delete-confirm-typed-input:focus {
-    border-color: var(--border-color-focus);
-}
-
-.delete-confirm-error {
-    margin: 0 0 16px 0;
-    color: var(--color-error-light);
-    font-size: 14px;
-}
-
 /* Edit description button */
 .maps-manager-item-actions .edit-desc-btn {
     border-color: var(--border-color);
@@ -373,17 +328,6 @@
     border-color: #aaa;
 }
 
-[data-theme="light"] .maps-manager-modal-actions .delete-confirm-btn {
-    background-color: var(--color-error);
-    border-color: var(--color-error);
-    color: var(--color-text-inverse);
-}
-
-[data-theme="light"] .maps-manager-modal-actions .delete-confirm-btn:hover {
-    background-color: var(--color-error-light);
-    border-color: var(--color-error-light);
-}
-
 [data-theme="light"] .maps-manager-item-actions .edit-desc-btn {
     border-color: #ccc;
     color: #666;
@@ -440,17 +384,6 @@
     body:not([data-theme="dark"]) .maps-manager-modal-actions button:hover {
         background: #d8d8d8;
         border-color: #aaa;
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-actions .delete-confirm-btn {
-        background-color: var(--color-error);
-        border-color: var(--color-error);
-        color: var(--color-text-inverse);
-    }
-
-    body:not([data-theme="dark"]) .maps-manager-modal-actions .delete-confirm-btn:hover {
-        background-color: var(--color-error-light);
-        border-color: var(--color-error-light);
     }
 }
 

@@ -39,9 +39,27 @@ describe('FriendlyFireConfirmModal', () => {
         expect(heading.id).toBe('friendly-fire-confirm-title');
     });
 
+    it('renders the neutral shared modal-shell chrome — no maps-manager-* class anywhere in the subtree', () => {
+        // Backlog EN 2026-11-08: the confirm rides the canonical `.modal-shell-*`
+        // shell (global App.css), not the Maps manager's class family (style-bleed
+        // guard). DeleteConfirmModal.test.jsx covers the shell for the tier itself;
+        // this pins it for the friendly-fire consumer specifically.
+        renderModal(PENDING);
+        const overlay = document.querySelector('.modal-shell-overlay');
+        const panel = document.querySelector('.modal-shell');
+        expect(overlay).toBeInTheDocument();
+        expect(panel).toBeInTheDocument();
+        expect(overlay).toContainElement(panel);
+        expect(panel.querySelector('.modal-shell-actions')).toBeInTheDocument();
+        const offenders = [overlay, ...overlay.querySelectorAll('*')]
+            .flatMap(el => [...el.classList])
+            .filter(cls => cls.startsWith('maps-manager'));
+        expect(offenders).toEqual([]);
+    });
+
     it('renders the retired native-confirm copy VERBATIM plus explicit buttons', () => {
         renderModal(PENDING);
-        const paragraph = document.querySelector('.maps-manager-modal p');
+        const paragraph = document.querySelector('.modal-shell p');
         expect(paragraph.textContent).toBe(
             'Friendly fire: Bob is on Alice\'s ally list. Arm them as the target anyway?'
         );
@@ -60,7 +78,7 @@ describe('FriendlyFireConfirmModal', () => {
 
     it('family dismissal convention: backdrop click and Escape do NOT cancel — it waits indefinitely', () => {
         const { onCancel, onConfirm } = renderModal(PENDING);
-        fireEvent.click(document.querySelector('.maps-manager-modal-overlay'));
+        fireEvent.click(document.querySelector('.modal-shell-overlay'));
         fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
         expect(onCancel).not.toHaveBeenCalled();
         expect(onConfirm).not.toHaveBeenCalled();

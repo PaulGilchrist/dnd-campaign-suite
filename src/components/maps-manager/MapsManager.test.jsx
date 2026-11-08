@@ -544,7 +544,7 @@ describe('MapsManager', () => {
             await renderWithMaps(makeMap({ name: 'Dungeon Level 1' }));
             openDeleteModal();
 
-            fireEvent.click(screen.getByRole('heading', { name: 'Delete Map' }).closest('.maps-manager-modal-overlay'));
+            fireEvent.click(screen.getByRole('heading', { name: 'Delete Map' }).closest('.modal-shell-overlay'));
             expect(screen.getByRole('heading', { name: 'Delete Map' })).toBeInTheDocument();
         });
 

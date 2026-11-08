@@ -578,3 +578,171 @@ button.hidden {
     page-break-inside: auto;
   }
 }
+
+/* ============ Shared confirmation modal shell (modal-shell-*) ============
+   Canonical confirmation-modal chrome for the app-wide DeleteConfirmModal
+   tier (backlog EN 2026-11-08: factor a neutral shell so combat/hostile
+   confirms stop borrowing the maps-manager class names — style-bleed risk).
+   Visuals copied VERBATIM from the working .maps-manager-modal* delete
+   confirm so every consumer renders byte-equivalent; the Maps manager keeps
+   its own classes untouched for its Generate/Description modals. */
+
+.modal-shell-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--background-color-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-shell {
+    background-color: var(--background-color-modal);
+    padding: 24px;
+    border-radius: 12px;
+    min-width: 420px;
+    max-width: 500px;
+    box-shadow: 0 4px 24px var(--shadow-color);
+}
+
+.modal-shell h3 {
+    margin: 0 0 16px 0;
+    color: var(--color-error-light);
+    font-size: 1.3em;
+}
+
+.modal-shell p {
+    margin: 0 0 20px 0;
+    color: var(--color-text);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.modal-shell p strong {
+    color: var(--color-header);
+}
+
+.modal-shell-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.modal-shell-actions button {
+    padding: 8px 18px;
+    font-size: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: #ccc;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-shell-actions button:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.modal-shell-actions .delete-confirm-btn {
+    background-color: var(--color-error);
+    border-color: var(--color-error);
+    color: var(--color-text-inverse);
+    font-weight: 600;
+}
+
+.modal-shell-actions .delete-confirm-btn:hover {
+    background-color: var(--color-error-light);
+    border-color: var(--color-error-light);
+}
+
+/* Optional typed-name confirm input + inline error copy inside the shared
+   DeleteConfirmModal (campaign-delete lane, backlog 2026-11-04 CO). Moved
+   here with the shell (EN 2026-11-08) so consumers no longer depend on
+   MapsManager.css being mounted. Same input tokens as the create rows. */
+.delete-confirm-typed {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0 0 16px 0;
+}
+
+.delete-confirm-typed-label {
+    color: var(--color-text);
+    font-size: 14px;
+}
+
+.delete-confirm-typed-input {
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    background-color: var(--background-color-input);
+    color: var(--color-text);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.delete-confirm-typed-input:focus {
+    border-color: var(--border-color-focus);
+}
+
+.delete-confirm-error {
+    margin: 0 0 16px 0;
+    color: var(--color-error-light);
+    font-size: 14px;
+}
+
+/* ===== Light theme overrides ===== */
+
+[data-theme="light"] .modal-shell-actions button {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .modal-shell-actions button:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .modal-shell-actions .delete-confirm-btn {
+    background-color: var(--color-error);
+    border-color: var(--color-error);
+    color: var(--color-text-inverse);
+}
+
+[data-theme="light"] .modal-shell-actions .delete-confirm-btn:hover {
+    background-color: var(--color-error-light);
+    border-color: var(--color-error-light);
+}
+
+/* ===== System light mode fallback (only when no explicit dark theme is set) ===== */
+
+@media (prefers-color-scheme: light) {
+    body:not([data-theme="dark"]) .modal-shell-actions button {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    body:not([data-theme="dark"]) .modal-shell-actions button:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    body:not([data-theme="dark"]) .modal-shell-actions .delete-confirm-btn {
+        background-color: var(--color-error);
+        border-color: var(--color-error);
+        color: var(--color-text-inverse);
+    }
+
+    body:not([data-theme="dark"]) .modal-shell-actions .delete-confirm-btn:hover {
+        background-color: var(--color-error-light);
+        border-color: var(--color-error-light);
+    }
+}

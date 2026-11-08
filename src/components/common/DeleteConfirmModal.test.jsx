@@ -52,7 +52,7 @@ describe('DeleteConfirmModal', () => {
         fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true });
         expect(confirm).toHaveFocus();
 
-        expect(container.querySelector('.maps-manager-modal-overlay')).toBeInTheDocument();
+        expect(container.querySelector('.modal-shell-overlay')).toBeInTheDocument();
     });
 
     // Sanctioned extension (backlog 2026-11-04 CO, campaign-delete lane):

@@ -62,7 +62,7 @@ describe('MapsManager Delete-map modal accessibility', () => {
         await openDeleteModal();
         const dialogs = document.querySelectorAll('[role="dialog"]');
         expect(dialogs.length).toBeGreaterThanOrEqual(1);
-        expect(dialogs[0].classList).toContain('maps-manager-modal');
+        expect(dialogs[0].classList).toContain('modal-shell');
     });
 
     // Criterion 3 — focus management: entry + two-way Tab wrap.

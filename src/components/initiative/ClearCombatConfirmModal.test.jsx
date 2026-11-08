@@ -40,7 +40,7 @@ describe('ClearCombatConfirmModal', () => {
 
     it('renders the retired native-confirm copy VERBATIM (action, scope, irreversibility) plus explicit buttons', () => {
         renderModal(true);
-        const paragraph = document.querySelector('.maps-manager-modal p');
+        const paragraph = document.querySelector('.modal-shell p');
         expect(paragraph.textContent).toBe(
             'Clear combat status for all creatures? This resets initiative and removes all monsters from the board. This action is irreversible.'
         );
@@ -60,7 +60,7 @@ describe('ClearCombatConfirmModal', () => {
 
     it('family dismissal convention: backdrop click and Escape do NOT cancel — it waits indefinitely', () => {
         const { onCancel, onConfirm } = renderModal(true);
-        fireEvent.click(document.querySelector('.maps-manager-modal-overlay'));
+        fireEvent.click(document.querySelector('.modal-shell-overlay'));
         fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
         expect(onCancel).not.toHaveBeenCalled();
         expect(onConfirm).not.toHaveBeenCalled();

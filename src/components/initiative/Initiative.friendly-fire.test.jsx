@@ -209,7 +209,7 @@ describe('Initiative friendly-fire overlay (container wiring)', () => {
 
         const dialog = screen.getByRole('dialog', { name: 'Friendly Fire' });
         expect(dialog).toHaveAttribute('aria-modal', 'true');
-        expect(document.querySelector('.maps-manager-modal p').textContent).toBe(FRIENDLY_COPY);
+        expect(document.querySelector('.modal-shell p').textContent).toBe(FRIENDLY_COPY);
         expect(confirmSpy).not.toHaveBeenCalled();
         // Fully inert pre-decision: no arm, no friendly log row.
         expect(setTarget).not.toHaveBeenCalled();
@@ -268,13 +268,13 @@ describe('Initiative friendly-fire overlay (container wiring)', () => {
         await mountInitiative();
 
         fireEvent.change(screen.getByTestId('target-select-Grim'), { target: { value: 'Sera' } });
-        expect(document.querySelector('.maps-manager-modal p').textContent).toBe(FRIENDLY_COPY);
+        expect(document.querySelector('.modal-shell p').textContent).toBe(FRIENDLY_COPY);
 
         // Second attacker's ally selection replaces the pair (single dialog).
         fireEvent.change(screen.getByTestId('target-select-Sera'), { target: { value: 'Grim' } });
         const dialogs = screen.getAllByRole('dialog', { name: 'Friendly Fire' });
         expect(dialogs).toHaveLength(1);
-        expect(document.querySelector('.maps-manager-modal p').textContent)
+        expect(document.querySelector('.modal-shell p').textContent)
             .toBe("Friendly fire: Grim is on Sera's ally list. Arm them as the target anyway?");
 
         fireEvent.click(screen.getByRole('button', { name: 'Yes, Arm Target' }));
