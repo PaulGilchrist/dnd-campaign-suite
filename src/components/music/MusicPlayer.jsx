@@ -3,6 +3,7 @@ import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import { setRuntimeObject } from '../../hooks/runtime/useRuntimeState.js';
 import useLog from '../../hooks/runtime/useLog.js';
 import { MOODS, DEFAULT_VOLUME, getTracksForMood, extractVideoId, buildMoodList, makeCategoryKey, CATEGORY_ICONS, DEFAULT_CUSTOM_ICON } from '../../services/ui/musicConfig.js';
+import { DEFAULT_MUSIC, normalizeMusic, pauseCommit, pauseLogEntry, stopCommit, stopLogEntry } from '../../services/ui/musicTransport.js';
 import { saveMusicOverrides, saveMusicCategories } from '../../services/ui/musicService.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
@@ -10,8 +11,6 @@ import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
 import './MusicPlayer.css';
 
 const YT_FRAME_ID = 'yt-music-frame';
-
-const DEFAULT_MUSIC = { mood: null, playing: false, volume: DEFAULT_VOLUME, overrides: {}, customCategories: {} };
 
 function parseTrackList(text) {
   return text
@@ -145,10 +144,7 @@ function MusicToast({ toast }) {
 // Only Pause/Stop (or closing the campaign) ever silences it.
 function MusicPlayer({ campaignName, visible = true }) {
   const [rawMusic, setMusic] = useSyncedState('campaign', 'music', DEFAULT_MUSIC, campaignName);
-  const music = useMemo(
-    () => (rawMusic && typeof rawMusic === 'object' ? { ...DEFAULT_MUSIC, ...rawMusic } : DEFAULT_MUSIC),
-    [rawMusic]
-  );
+  const music = useMemo(() => normalizeMusic(rawMusic), [rawMusic]);
 
   // Merged sidebar catalogue (improve 2026-11-07): frozen starter MOODS plus
   // this campaign's customCategories. Display order stays A–Z; MOODS itself
@@ -293,7 +289,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     const state = leaveViewRef.current;
     if (!state || !state.playerMounted || !state.music.playing) return;
     youtubePlayer.stop();
-    commitMusic({ ...state.music, mood: null, playing: false });
+    commitMusic(stopCommit(state.music));
     addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience (left campaign)' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -343,13 +339,8 @@ function MusicPlayer({ campaignName, visible = true }) {
     if (!music.mood) return;
     if (music.playing) {
       youtubePlayer.pause();
-      commitMusic({ ...music, playing: false });
-      addEntry({
-        type: 'music',
-        action: 'pause',
-        mood: music.mood,
-        message: `Paused ${moodLabel(music.mood)} ambience`
-      });
+      commitMusic(pauseCommit(music));
+      addEntry(pauseLogEntry(music.mood, moodLabel(music.mood)));
     } else {
       if (!playerMounted) {
         setPlayerMounted(true);
@@ -374,8 +365,8 @@ function MusicPlayer({ campaignName, visible = true }) {
 
   const stopMusic = useCallback(() => {
     youtubePlayer.stop();
-    commitMusic({ ...music, mood: null, playing: false });
-    addEntry({ type: 'music', action: 'stop', message: 'Stopped ambience' });
+    commitMusic(stopCommit(music));
+    addEntry(stopLogEntry());
   }, [music, commitMusic, addEntry]);
 
   // Queue exhaustion (youtubePlayer.js handleError): every track failed
@@ -386,7 +377,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     const handleQueueExhausted = (event) => {
       const label = music.mood ? moodLabel(music.mood) : 'this mood';
       const failedIds = (event.detail || {}).videoIds || [];
-      commitMusic({ ...music, mood: null, playing: false });
+      commitMusic(stopCommit(music));
       showToast(`No playable tracks for ${label} ambience`, true);
       addEntry({
         type: 'music',
@@ -605,7 +596,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     // tabs release theirs via the existing remote-adoption lane.
     if (music.mood === moodKey) {
       youtubePlayer.stop();
-      commitMusic({ ...music, mood: null, playing: false });
+      commitMusic(stopCommit(music));
     }
     const customCategories = { ...music.customCategories };
     delete customCategories[moodKey];

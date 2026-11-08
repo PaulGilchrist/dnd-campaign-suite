@@ -40,6 +40,7 @@ import FriendlyFireConfirmModal from './FriendlyFireConfirmModal.jsx'
 import ClearCombatConfirmModal from './ClearCombatConfirmModal.jsx'
 import TvToggleButton from './TvToggleButton.jsx'
 import TvNextUpStrip from './TvNextUpStrip.jsx'
+import TvMusicTransport from './TvMusicTransport.jsx'
 import VictoryBanner from './VictoryBanner.jsx'
 import { createCreatureHandlers } from './createCreatureHandlers.js'
 import { createRollConditionSaveHandler } from './createRollConditionSaveHandler.js'
@@ -751,6 +752,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
              <>
              <div className='combat-header'>
                  <h4>Initiative (round {combatSummary.round})</h4>
+                 {tvMode && <TvMusicTransport campaignName={campaignName} isLocalhost={isLocalhost} />}
                  <TvToggleButton tvMode={tvMode} onToggle={toggleTvMode} />
              </div>
              <TvNextUpStrip creatures={nextUpCreatures} />

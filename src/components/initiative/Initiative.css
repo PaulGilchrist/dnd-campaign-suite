@@ -1473,6 +1473,36 @@
     margin-bottom: 12px;
 }
 
+/* TV-mode music transport (improve 2026-11-08 EM backlog): minimal Pause/Stop
+   row on the full-screen tracker header — the sidebar MusicPlayer is hidden
+   there, so the table needs one-hand ambience control. Buttons reuse the
+   sidebar .music-btn skin (MusicPlayer.css global class), scaled up for
+   across-the-room taps; the visitor chip reuses the .music-remote-note idiom. */
+.initiative--tv .tv-music-transport {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.initiative--tv .tv-music-transport .music-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 1.1em;
+}
+
+.initiative--tv .tv-music-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-secondary);
+    font-size: 1.1em;
+    white-space: nowrap;
+}
+
+.initiative--tv .tv-music-transport .music-remote-note {
+    font-size: 1em;
+}
+
 .initiative--tv .carousel-container {
     gap: 18px;
     /* The spotlight card grows via `zoom` (layout-affecting), so it also sets
