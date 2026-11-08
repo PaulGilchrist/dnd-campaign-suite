@@ -50,6 +50,7 @@ export function createOverlayHandler(campaignName) {
 export function createSseEventHandler({
     campaignName,
     characters,
+    isLocalhost = false,
     combatSummaryRef,
     activeCreatureNameRef,
     lastAppliedTurnStartCreatureRef,
@@ -83,7 +84,17 @@ export function createSseEventHandler({
 
     // Only apply turn-start effects when the active creature actually changes.
     // The dedupe key is round-scoped so effects re-apply each new round.
+    // GM-authority guard: bug-turn-start-automation-double-fires-with-second-client —
+    // the GM's Next click POSTs the new activeCreatureName BEFORE its stamped
+    // combatSummary lands, so every other client's SSE echo passed its own
+    // (stale) round gate and ran the whole turn-start pass — duplicating
+    // non-idempotent effects once per viewing client and letting visitor
+    // devices POST GM-authority keys (__initiative__ gate stamps, character
+    // buckets, log rows). Visitors still mirror the boundary + adopt the
+    // executor's effect writes via the ordinary SSE lanes. Same GM/localhost
+    // ownership guard idiom as createCreatureHandlers/createAutoBreakConditionHandler.
     async function applyTurnStartPass(newActive, gateKey) {
+        if (!isLocalhost) return
         lastAppliedTurnStartCreatureRef.current = gateKey
         setRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature', gateKey, campaignName)
         const cs = combatSummaryRef.current

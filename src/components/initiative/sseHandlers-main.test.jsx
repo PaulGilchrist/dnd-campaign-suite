@@ -85,6 +85,9 @@ describe('createSseEventHandler', () => {
         handler = createSseEventHandler({
             campaignName,
             characters: CHARACTERS,
+            // GM (localhost) client — the turn-start pass is GM-authority (see
+            // sseHandlers.turn-start-gm-ownership.test.jsx for the visitor leg).
+            isLocalhost: true,
             combatSummaryRef: refs.combatSummaryRef,
             activeCreatureNameRef: refs.activeCreatureNameRef,
             lastAppliedTurnStartCreatureRef: refs.lastAppliedTurnStartCreatureRef,
@@ -127,6 +130,7 @@ describe('createSseEventHandler', () => {
             wiredHandler = createSseEventHandler({
                 campaignName,
                 characters: CHARACTERS,
+                isLocalhost: true,
                 combatSummaryRef: refs.combatSummaryRef,
                 activeCreatureNameRef: refs.activeCreatureNameRef,
                 lastAppliedTurnStartCreatureRef: refs.lastAppliedTurnStartCreatureRef,

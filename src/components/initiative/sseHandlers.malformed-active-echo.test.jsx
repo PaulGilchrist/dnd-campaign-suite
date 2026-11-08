@@ -64,6 +64,7 @@ describe('handleActiveCreatureNameChange malformed echo guard', () => {
         handler = createSseEventHandler({
             campaignName,
             characters: CHARACTERS,
+            isLocalhost: true, // GM client (guard legs live in …-gm-ownership.test.jsx)
             combatSummaryRef: refs.combatSummaryRef,
             activeCreatureNameRef: refs.activeCreatureNameRef,
             lastAppliedTurnStartCreatureRef: refs.lastAppliedTurnStartCreatureRef,

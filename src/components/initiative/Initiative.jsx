@@ -358,6 +358,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const handleEvent = React.useCallback(createSseEventHandler({
         campaignName,
         characters,
+        isLocalhost,
         combatSummaryRef,
         activeCreatureNameRef,
         lastAppliedTurnStartCreatureRef,
@@ -367,7 +368,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setRuntimeStateTick,
         setOverlays,
         handleOverlayEvent,
-    }), [campaignName, characters, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG])
+    }), [campaignName, characters, isLocalhost, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG])
 
     const [npcImagesLoaded, setNpcImagesLoaded] = React.useState(false)
     React.useEffect(() => {
