@@ -117,10 +117,15 @@ describe('MusicPlayer live track-count validation', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
 
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // The rejection drops at console.debug (backlog 2026-11-08 EK): pin that
+    // the whole invalid-save attempt stays out of console.error.
+    const errorSpy = vi.spyOn(console, 'error');
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'asdf qwer' } });
     fireEvent.click(screen.getByText('Save'));
-    spy.mockRestore();
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+    debugSpy.mockRestore();
 
     expect(container.querySelector('.music-editor-error'))
       .toHaveTextContent('No valid YouTube URLs or video ids entered');

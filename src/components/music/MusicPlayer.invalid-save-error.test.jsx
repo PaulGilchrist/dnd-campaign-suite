@@ -48,13 +48,20 @@ describe('MusicPlayer invalid-save inline error', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
 
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Invalid user input must NOT hit console.error (backlog 2026-11-08 EK):
+    // the inline error below is the feedback; the drop leaves only a
+    // console.debug trace (spellValidation precedent, 9a82ec4ef).
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'not a youtube thing' } });
     fireEvent.click(screen.getByText('Save'));
 
-    // console.error is kept, but there is now user-visible feedback too
-    expect(spy).toHaveBeenCalledWith(REJECTION);
-    spy.mockRestore();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[MusicPlayer] No valid YouTube URLs or video ids entered'
+    );
+    errorSpy.mockRestore();
+    debugSpy.mockRestore();
 
     const errorEl = container.querySelector('.music-editor-error');
     expect(errorEl).not.toBeNull();
@@ -69,11 +76,11 @@ describe('MusicPlayer invalid-save inline error', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
 
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'junk' } });
     fireEvent.click(screen.getByText('Save'));
     expect(container.querySelector('.music-editor-error')).not.toBeNull();
-    spy.mockRestore();
+    debugSpy.mockRestore();
 
     fireEvent.change(container.querySelector('#music-editor-urls'), { target: { value: 'j' } });
     expect(container.querySelector('.music-editor-error')).toBeNull();
@@ -83,11 +90,11 @@ describe('MusicPlayer invalid-save inline error', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
 
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'junk' } });
     fireEvent.click(screen.getByText('Save'));
     expect(container.querySelector('.music-editor-error')).not.toBeNull();
-    spy.mockRestore();
+    debugSpy.mockRestore();
 
     // Draft is dirty ('junk' ≠ seeded ids): the Cancel close now opens the
     // named-discard role=dialog modal (improve 2026-10-29-AE, migrated off
@@ -114,11 +121,11 @@ describe('MusicPlayer invalid-save inline error', () => {
     const { container } = renderPlayer();
     const textarea = openEditor(container);
 
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.change(textarea, { target: { value: 'junk' } });
     fireEvent.click(screen.getByText('Save'));
     expect(container.querySelector('.music-editor-error')).not.toBeNull();
-    spy.mockRestore();
+    debugSpy.mockRestore();
 
     fireEvent.change(container.querySelector('#music-editor-urls'), {
       target: { value: 'https://youtu.be/aaaaaaaaaaa' }

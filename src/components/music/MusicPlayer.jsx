@@ -472,7 +472,13 @@ function MusicPlayer({ campaignName, visible = true }) {
   const saveTracks = useCallback(async () => {
     const tracks = parseTrackList(trackText);
     if (tracks.length === 0) {
-      console.error('No valid YouTube URLs or video ids entered');
+      // Invalid user input, not an app fault: the inline .music-editor-error
+      // below (plus the live zero-count hint) is the user-facing feedback, so
+      // this only leaves a console.debug trace (spellValidation drop-list
+      // precedent, 9a82ec4ef) instead of mirroring every rejected paste as a
+      // console.error. Genuine save/network faults keep console.error in
+      // musicService.postMusicPatch.
+      console.debug('[MusicPlayer] No valid YouTube URLs or video ids entered');
       setEditorError('No valid YouTube URLs or video ids entered');
       return;
     }

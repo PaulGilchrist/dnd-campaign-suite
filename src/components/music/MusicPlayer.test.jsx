@@ -161,10 +161,18 @@ describe('MusicPlayer', () => {
     renderPlayer();
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
     fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), { target: { value: 'not a url' } });
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Invalid input drops at console.debug (backlog 2026-11-08 EK: user-input
+    // validation is not console-noise); console.error stays reserved for
+    // genuine faults.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     fireEvent.click(screen.getByText('Save'));
-    expect(spy).toHaveBeenCalledWith('No valid YouTube URLs or video ids entered');
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[MusicPlayer] No valid YouTube URLs or video ids entered'
+    );
     expect(musicState()).toBeUndefined();
-    spy.mockRestore();
+    errorSpy.mockRestore();
+    debugSpy.mockRestore();
   });
 });
