@@ -322,6 +322,17 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
     );
   }
   if (mapsView.type === 'map') {
+    const mountedIsActive = isMountedMapActive(activeMapName, mapsView.mapName);
+    // "View the new map" affordance (backlog 2026-11-08): a visitor pinned on
+    // an orphaned board while the campaign HAS a different active map gets an
+    // explicit jump button in the advisory chip. Never-hijack holds — the view
+    // changes ONLY on click, mirroring the blank-view auto-open lane's
+    // { type: 'map', mapName } contract. No active map (deactivation) or the
+    // mounted map being the table's map ⇒ no button. GM (localhost) navigates
+    // through the manager listing and is deliberately left unchanged.
+    const newActiveMap = !isLocalhost && !mountedIsActive && activeMapName != null
+      ? mapSlug(activeMapName)
+      : null;
     return (
       // Per-editor seam: a map-editor render crash degrades to the reload
       // card without taking the maps manager/sidebar down with it.
@@ -337,7 +348,10 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
           // campaign's active map ('__map__' SSE seam) no longer matches the
           // mounted board — the GM deactivated or switched while this view was
           // open. The board itself is never blanked (never-hijack).
-          mapIsActive={isMountedMapActive(activeMapName, mapsView.mapName)}
+          mapIsActive={mountedIsActive}
+          onViewNewMap={newActiveMap
+            ? () => setMapsView({ type: 'map', mapName: newActiveMap })
+            : undefined}
           onBack={onBackFromMap}
           onEncounterCreated={onEncounterCreated}
           onPoiEntered={onEncounterCreated}

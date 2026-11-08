@@ -9,7 +9,7 @@
  * in src/App.map-deactivated-advisory.test.jsx; this file pins only the
  * presentational contract: prop false → hint copy present; true/omitted → absent.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import MapToolbar from './MapToolbar.jsx';
 
@@ -68,5 +68,36 @@ describe('MapToolbar deactivated-map advisory', () => {
         const { container } = renderMapToolbar();
         expect(container.querySelector('.map-deactivated-hint')).toBeNull();
         expect(screen.queryByText(HINT_COPY)).not.toBeInTheDocument();
+    });
+
+    // "View the new map" affordance (backlog 2026-11-08): the jump button
+    // lives INSIDE the advisory chip and only ever renders when the host
+    // (App.jsx MapsAreaView) supplies a handler — i.e. a different map is
+    // table-active while this visitor's board is orphaned.
+
+    it('shows no jump button while no new map is active (deactivation face)', () => {
+        renderMapToolbar({ mapIsActive: false, isLocalhost: false });
+        expect(screen.getByRole('status')).toHaveTextContent(HINT_COPY);
+        expect(screen.queryByRole('button', { name: /View the new map/i })).not.toBeInTheDocument();
+    });
+
+    it('renders the "View the new map" button in the chip and fires the handler on click', () => {
+        const onViewNewMap = vi.fn();
+        renderMapToolbar({ mapIsActive: false, isLocalhost: false, onViewNewMap });
+        // Honest advisory copy survives alongside the button (criterion 1+2).
+        const hint = screen.getByRole('status');
+        expect(hint).toHaveTextContent(HINT_COPY);
+        const button = screen.getByRole('button', { name: /View the new map/i });
+        expect(hint).toContainElement(button);
+        // Never-hijack: nothing happens until the explicit click.
+        expect(onViewNewMap).not.toHaveBeenCalled();
+        fireEvent.click(button);
+        expect(onViewNewMap).toHaveBeenCalledTimes(1);
+    });
+
+    it('an active mounted map never shows the button, handler or not', () => {
+        renderMapToolbar({ mapIsActive: true, onViewNewMap: vi.fn() });
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /View the new map/i })).not.toBeInTheDocument();
     });
 });

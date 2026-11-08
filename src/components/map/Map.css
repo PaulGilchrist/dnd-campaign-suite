@@ -893,6 +893,41 @@
     color: #996600;
 }
 
+/* "View the new map" jump inside the advisory chip (backlog 2026-11-08) —
+   the visitor's opt-in lane to the map the GM just activated (never-hijack:
+   nothing moves until this is clicked). Mirrors the .map .toolbar button
+   tokens, sized down to the chip's 12px scale. */
+.map .map-deactivated-view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.map .map-deactivated-view-btn:hover {
+    background: #3a3a3a;
+    border-color: #ffcc00;
+}
+
+[data-theme="light"] .map .map-deactivated-view-btn {
+    background: #e8e8e8;
+    border-color: #cc9900;
+    color: #333;
+}
+
+[data-theme="light"] .map .map-deactivated-view-btn:hover {
+    background: #d8d8d8;
+    border-color: #996600;
+}
+
 /* Enforcement snap-back toast — display-only visibility for the movement-budget
    clamp (mirrors the .sessions-toast / .encounter-toast / .music-toast tokens;
    amber = enforcement notice, not a success). Fixed + centered so it reads

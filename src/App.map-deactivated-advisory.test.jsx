@@ -10,10 +10,13 @@
  * MockMap's map-is-active testid):
  *  - mounted map == active map (fresh auto-open or click-open) → no advisory;
  *  - GM deactivate (activeMap: null) while the view is open → advisory, board
- *    stays mounted (criterion: never-hijack preserved);
- *  - GM switch to ANOTHER map → advisory on the orphaned view, no hijack, and
- *    the roller context adopts the new active map;
- *  - GM re-activates the SAME mounted map → advisory clears LIVE, no reload.
+ *    stays mounted (criterion: never-hijack preserved), NO jump button;
+ *  - GM switch to ANOTHER map → advisory on the orphaned view, no hijack, the
+ *    roller context adopts the new active map, and the advisory chip gains a
+ *    "View the new map" button (backlog 2026-11-08) whose click is the ONLY
+ *    thing that navigates the visitor's view;
+ *  - GM re-activates the SAME mounted map → advisory clears LIVE, no reload;
+ *  - GM (localhost) never receives the button — behavior unchanged.
  *
  * Hint rendering itself: components/map/MapToolbar.deactivated-hint.test.jsx.
  * Event contract for auto-open/hijack: App.map-activate.test.jsx.
@@ -216,6 +219,26 @@ async function setupPlayerOnOpenMap() {
   });
 }
 
+// GM (localhost) with a map OPEN via the manager listing's Open click.
+async function setupGmOnOpenMap() {
+  const { loadMaps } = await import('./services/maps/mapsService.js');
+  loadMaps.mockResolvedValue({
+    maps: [{ fileName: 'battle-arena.json', isActive: true }],
+  });
+  mockState.characters = [{ name: 'Aragorn', level: 1 }];
+  setHostname('localhost');
+  render(<App />);
+  await selectCampaign();
+  fireEvent.click(screen.getByTestId('maps-btn'));
+  await waitFor(() => {
+    expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByTestId('open-map-btn'));
+  await waitFor(() => {
+    expect(screen.getByTestId('map-name')).toHaveTextContent('dungeon-1');
+  });
+}
+
 const activate = (activeMap) => ({
   key: 'map-activate-test-campaign',
   data: { activeMap },
@@ -302,6 +325,8 @@ describe('App - deactivated-map advisory (mapIsActive derivation)', () => {
     // …and the header hint state flips on (MapToolbar renders the copy —
     // pinned by MapToolbar.deactivated-hint.test.jsx).
     expect(screen.getByTestId('map-is-active')).toHaveTextContent('false');
+    // No active map ⇒ nothing to jump to: the advisory stays button-free.
+    expect(screen.queryByTestId('map-view-new-btn')).not.toBeInTheDocument();
   });
 
   it('re-activating the SAME mounted map clears the advisory live (no reload)', async () => {
@@ -344,5 +369,65 @@ describe('App - deactivated-map advisory (mapIsActive derivation)', () => {
       expect(screen.getByTestId('initiative')).toBeInTheDocument();
     });
     expect(screen.getByTestId('init-map-name').textContent).toBe('test-map');
+  });
+
+  // ---------------------------------------------------------------
+  // "View the new map" affordance (backlog 2026-11-08): the pinned visitor's
+  // ONLY route to the newly activated map is this explicit click — the jump
+  // button appears live via the map-activate SSE (no reload), and nothing
+  // moves the view by itself (never-hijack).
+  // ---------------------------------------------------------------
+
+  it('the switch surfaces the jump button live on the orphaned view — and the view never moves by itself', async () => {
+    await setupPlayerOnOpenMap();
+
+    await dispatch(activate('test-map'));
+
+    // Advisory face present…
+    expect(screen.getByTestId('map-is-active')).toHaveTextContent('false');
+    // …with the button arriving via the SSE dispatch alone (no reload).
+    const button = screen.getByTestId('map-view-new-btn');
+    // Never-hijack: until the click, the visitor keeps the orphaned board.
+    expect(screen.getByTestId('map-view')).toBeInTheDocument();
+    expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
+
+    // Explicit click is the ONLY thing that navigates.
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-name')).toHaveTextContent('test-map');
+    });
+    // The new board IS the table's map: advisory clears, button retires.
+    expect(screen.getByTestId('map-is-active')).toHaveTextContent('true');
+    expect(screen.queryByTestId('map-view-new-btn')).not.toBeInTheDocument();
+    // Zero page reload throughout.
+    expect(window.location.reload).not.toHaveBeenCalled();
+  });
+
+  it('deactivation followed by activation of ANOTHER map flips button-free advisory → button live', async () => {
+    await setupPlayerOnOpenMap();
+
+    // First the GM only deactivates: honest advisory, NO affordance yet.
+    await dispatch(activate(null));
+    expect(screen.getByTestId('map-is-active')).toHaveTextContent('false');
+    expect(screen.queryByTestId('map-view-new-btn')).not.toBeInTheDocument();
+
+    // Then activates a different map: the affordance arrives via the same SSE seam.
+    await dispatch(activate('test-map'));
+    expect(screen.getByTestId('map-view-new-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
+  });
+
+  it('GM (localhost) never gets the jump button — manager-navigated behavior unchanged', async () => {
+    await setupGmOnOpenMap();
+
+    await dispatch(activate('test-map'));
+
+    // The GM's opened board is orphaned like a player's (advisory state
+    // flips)… but the GM navigates through the manager listing: no button.
+    expect(screen.getByTestId('map-is-active')).toHaveTextContent('false');
+    expect(screen.queryByTestId('map-view-new-btn')).not.toBeInTheDocument();
+    // And, as ever, the GM's view is untouched by the activation.
+    expect(screen.getByTestId('map-name')).toHaveTextContent('dungeon-1');
   });
 });

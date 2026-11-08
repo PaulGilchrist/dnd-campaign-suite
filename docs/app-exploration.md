@@ -69,7 +69,6 @@ Live facts (EO, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (EO 2026-11-08) A visitor pinned on a deactivated map view gets the honest "GM deactivated this map" advisory but NO affordance to jump to the map the GM just activated (never-hijack contract leaves them stranded until they think to navigate away/back) — offer a "View the new map" button in the advisory strip (`MapToolbar.jsx` hint + `App.jsx:226` seam).
 - (EO 2026-11-08) Monster-card action chips share one class `.mc-dice-link` for saves, skills AND attacks (indices 0–5 saves, 6 skills, 7+ attacks on the Goblin card) — a wrong-index press opens an unrelated save popup; add `data-kind="attack|save|skill"` (or aria) so automation and keyboard users can anchor safely.
 
 ## Blocked / Not Verified (fold-gate ledger)
