@@ -55,12 +55,12 @@ function ActionDamageLinks({ action, actionDamageFormula, actionDamageTypeLabel,
   return (
     <>
       {rollablePrimary && (
-        <span className="mc-dice-link" onClick={() => onDamage(action.name, actionDamageFormula, actionDamageTypeLabel, action)} role="button" tabIndex={0}>
+        <span className="mc-dice-link" data-kind="damage" onClick={() => onDamage(action.name, actionDamageFormula, actionDamageTypeLabel, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {actionDamageFormula}
         </span>
       )}
       {rollableSecondary && (
-        <span className="mc-dice-link" onClick={() => onDamage(action.name, action.damage_dice_secondary, actionDamageTypeLabel, action)} role="button" tabIndex={0}>
+        <span className="mc-dice-link" data-kind="damage" onClick={() => onDamage(action.name, action.damage_dice_secondary, actionDamageTypeLabel, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {action.damage_dice_secondary}
         </span>
       )}
@@ -95,6 +95,7 @@ function SpellCastLinks({ action, spellUsesUsed, attackerCannotAct, onSpellCast,
           <span
             key={spellName}
             className={`mc-dice-link mc-dice-link-spell${spentClass}`}
+            data-kind="spell"
             onClick={clickable ? () => onSpellCast(action, spellName) : undefined}
             role="button"
             tabIndex={0}
@@ -132,17 +133,17 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, 
     // a sibling clickable span (same handleSaveRoll), no per-row fork.
     return (
       <>
-        <span className={`mc-dice-link${spentClass}`} role="button" tabIndex={0} onClick={handleSaveRoll}>
+        <span className={`mc-dice-link${spentClass}`} data-kind="save" role="button" tabIndex={0} onClick={handleSaveRoll}>
           <i className="fa-solid fa-dice" /> {saveDamageFormula}{usesNote}
         </span>{' '}
-        <span className={`mc-dice-link mc-dice-link-save mc-dice-link-save-clickable${spentClass}`} role="button" tabIndex={0} onClick={handleSaveRoll}>
+        <span className={`mc-dice-link mc-dice-link-save mc-dice-link-save-clickable${spentClass}`} data-kind="save" role="button" tabIndex={0} onClick={handleSaveRoll}>
           DC {action.save_dc} {action.save_type}{usesNote}
         </span>
       </>
     );
   }
   return (
-    <span className={`mc-dice-link ${plan.clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}${spentClass}`} onClick={plan.clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
+    <span className={`mc-dice-link ${plan.clickable ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}${spentClass}`} data-kind="save" onClick={plan.clickable ? handleSaveRoll : undefined} role="button" tabIndex={0}>
       DC {action.save_dc} {action.save_type}{usesNote}
     </span>
   );
@@ -174,6 +175,7 @@ function GatedReactionLink({ def, remaining, attackerCannotAct, onClick }) {
   return (
     <span
       className={`mc-dice-link${remaining === 0 ? ' mc-dice-link-spell-spent' : ''}`}
+      data-kind="reaction"
       onClick={clickable ? onClick : undefined}
       role="button"
       tabIndex={0}
@@ -200,7 +202,7 @@ function LegendaryCheckLink({ action, attackerCannotAct, legendaryGate }) {
   const sign = bonus != null && bonus < 0 ? '−' : '+';
   const modText = bonus != null ? `${sign}${Math.abs(bonus)}` : 'Roll';
   return (
-    <span className={`mc-dice-link mc-dice-link-legendary mc-dice-link-check${attackerCannotAct ? ' mc-dice-link-spell-spent' : ''}`} onClick={attackerCannotAct ? undefined : () => legendaryGate(action)} role="button" tabIndex={0} title={`Expend 1 legendary use — ${label} check d20 ${modText}`}>
+    <span className={`mc-dice-link mc-dice-link-legendary mc-dice-link-check${attackerCannotAct ? ' mc-dice-link-spell-spent' : ''}`} data-kind="legendary" onClick={attackerCannotAct ? undefined : () => legendaryGate(action)} role="button" tabIndex={0} title={`Expend 1 legendary use — ${label} check d20 ${modText}`}>
       <i className="fa-solid fa-eye" /> {label} {modText}
     </span>
   );
@@ -218,7 +220,7 @@ function LegendarySpendLink({ action, attackerCannotAct, legendaryGate }) {
   if (numericAffordance) return null;
   if (legendaryCheckRow(action)) return <LegendaryCheckLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />;
   return (
-    <span className={`mc-dice-link mc-dice-link-legendary${attackerCannotAct ? ' mc-dice-link-spell-spent' : ''}`} onClick={attackerCannotAct ? undefined : () => legendaryGate(action)} role="button" tabIndex={0} title={`Expend 1 legendary use — ${action.name}`}>
+    <span className={`mc-dice-link mc-dice-link-legendary${attackerCannotAct ? ' mc-dice-link-spell-spent' : ''}`} data-kind="legendary" onClick={attackerCannotAct ? undefined : () => legendaryGate(action)} role="button" tabIndex={0} title={`Expend 1 legendary use — ${action.name}`}>
       <i className="fa-solid fa-bolt" /> Expend Legendary
     </span>
   );
@@ -237,7 +239,7 @@ function ZoneAuraLink({ action, spellUsesUsed, attackerCannotAct, onZoneAuraRow 
   const spentClass = gate && gate.remaining === 0 ? ' mc-dice-link-spell-spent' : '';
   const clickable = !attackerCannotAct && !!onZoneAuraRow;
   return (
-    <span className={`mc-dice-link mc-dice-link-aura${spentClass}`} onClick={clickable ? () => onZoneAuraRow(action) : undefined} role="button" tabIndex={0} title={`Self aura — ${action.name}: ${action.zone.effect_key || 'lair_darkness'} on self, radius ${radiusFt} ft, no save`}>
+    <span className={`mc-dice-link mc-dice-link-aura${spentClass}`} data-kind="aura" onClick={clickable ? () => onZoneAuraRow(action) : undefined} role="button" tabIndex={0} title={`Self aura — ${action.name}: ${action.zone.effect_key || 'lair_darkness'} on self, radius ${radiusFt} ft, no save`}>
       <i className="fa-solid fa-moon" /> {radiusFt}-ft Aura{usesNote}
     </span>
   );
@@ -261,7 +263,7 @@ function SummonLink({ action, spellUsesUsed, attackerCannotAct, onSummonRow, rec
   const clickable = !attackerCannotAct && !!onSummonRow;
   const durationText = action.automation.duration_minutes != null ? `${action.automation.duration_minutes} min` : 'GM-adjudicated';
   return (
-    <span className={`mc-dice-link mc-dice-link-summon${spentClass}`} onClick={clickable ? () => onSummonRow(action) : undefined} role="button" tabIndex={0} title={`Summon ${action.automation.options.map(o => `${o.monster}${o.chance != null ? ` (${Math.round(o.chance * 100)}%)` : ''}`).join(' or ')} — ${action.automation.count != null ? `count ${action.automation.count}, ` : ''}${action.automation.range_ft || 60} ft, ${durationText}`}>
+    <span className={`mc-dice-link mc-dice-link-summon${spentClass}`} data-kind="summon" onClick={clickable ? () => onSummonRow(action) : undefined} role="button" tabIndex={0} title={`Summon ${action.automation.options.map(o => `${o.monster}${o.chance != null ? ` (${Math.round(o.chance * 100)}%)` : ''}`).join(' or ')} — ${action.automation.count != null ? `count ${action.automation.count}, ` : ''}${action.automation.range_ft || 60} ft, ${durationText}`}>
       <i className="fa-solid fa-hat-wizard" /> Summon{usesNote}
     </span>
   );
@@ -286,7 +288,7 @@ function SelfBuffLink({ action, spellUsesUsed, attackerCannotAct, onSelfBuffRow,
   const label = action.name || action.automation.effect;
   const icon = action.automation.effect === 'invisible' ? 'fa-eye-slash' : action.automation.effect === 'ethereal' ? 'fa-ghost' : action.automation.effect === 'disguised' ? 'fa-user-secret' : 'fa-up-right-and-down-left-from-center';
   return (
-    <span className={`mc-dice-link mc-dice-link-selfbuff${spentClass}`} onClick={clickable ? () => onSelfBuffRow(action) : undefined} role="button" tabIndex={0} title={`Self buff — ${action.name}: te ${action.automation.effect} on self, ${action.automation.rounds || 10} rounds`}>
+    <span className={`mc-dice-link mc-dice-link-selfbuff${spentClass}`} data-kind="selfbuff" onClick={clickable ? () => onSelfBuffRow(action) : undefined} role="button" tabIndex={0} title={`Self buff — ${action.name}: te ${action.automation.effect} on self, ${action.automation.rounds || 10} rounds`}>
       <i className={`fa-solid ${icon}`} /> {label}{usesNote}
     </span>
   );
@@ -305,7 +307,7 @@ function GrantReactionLink({ action, attackerCannotAct, rechargeState, onGrantRe
   const spentClass = rechargeOut ? ' mc-dice-link-spell-spent' : '';
   const clickable = !attackerCannotAct && !!onGrantReactionRow;
   return (
-    <span className={`mc-dice-link mc-dice-link-grantreaction${spentClass}`} onClick={clickable ? () => onGrantReactionRow(action) : undefined} role="button" tabIndex={0} title={`Grant Reaction — ${action.name}: te ${action.automation.effect} on an armed target within ${action.automation.range_ft || 60} ft, Recharge ${action.recharge || '5-6'} (Rampage prerequisite GM-checked)`}>
+    <span className={`mc-dice-link mc-dice-link-grantreaction${spentClass}`} data-kind="grantreaction" onClick={clickable ? () => onGrantReactionRow(action) : undefined} role="button" tabIndex={0} title={`Grant Reaction — ${action.name}: te ${action.automation.effect} on an armed target within ${action.automation.range_ft || 60} ft, Recharge ${action.recharge || '5-6'} (Rampage prerequisite GM-checked)`}>
       <i className="fa-solid fa-fire" /> Incite
     </span>
   );
@@ -323,7 +325,7 @@ function ShapeShiftLink({ action, attackerCannotAct, onShapeShiftRow }) {
   const clickable = !attackerCannotAct && !!onShapeShiftRow;
   const formsText = action.automation.forms.map(f => f.name).join(' / ');
   return (
-    <span className="mc-dice-link mc-dice-link-shapeshift" onClick={clickable ? () => onShapeShiftRow(action) : undefined} role="button" tabIndex={0} title={`Shape-Shift — ${action.name}: choose ${formsText}; Speed swaps on self, At Will`}>
+    <span className="mc-dice-link mc-dice-link-shapeshift" data-kind="shapeshift" onClick={clickable ? () => onShapeShiftRow(action) : undefined} role="button" tabIndex={0} title={`Shape-Shift — ${action.name}: choose ${formsText}; Speed swaps on self, At Will`}>
       <i className="fa-solid fa-shuffle" /> Shape-Shift
     </span>
   );
@@ -342,7 +344,7 @@ function ZonePickerLink({ action, attackerCannotAct, onZonePickerRow }) {
   const radiusFt = Number(action.zone.radius_ft);
   const clickable = !attackerCannotAct && !!onZonePickerRow;
   return (
-    <span className="mc-dice-link mc-dice-link-zone" onClick={clickable ? () => onZonePickerRow(action) : undefined} role="button" tabIndex={0} title={`Zone grant — ${action.name}: te ${action.zone.effect_key} on creatures in the ${radiusFt}-ft ${action.zone.noun || 'area'}, no save; picker selects targets (selection advisory)`}>
+    <span className="mc-dice-link mc-dice-link-zone" data-kind="zone" onClick={clickable ? () => onZonePickerRow(action) : undefined} role="button" tabIndex={0} title={`Zone grant — ${action.name}: te ${action.zone.effect_key} on creatures in the ${radiusFt}-ft ${action.zone.noun || 'area'}, no save; picker selects targets (selection advisory)`}>
       <i className="fa-solid fa-cloud" /> {radiusFt}-ft Zone
     </span>
   );
@@ -361,7 +363,7 @@ function AdvisoryLink({ action, attackerCannotAct, onAdvisoryRow, legendaryGate 
   if (!isMonsterActionAdvisoryRow(action) || legendaryGate) return null;
   const clickable = !attackerCannotAct && !!onAdvisoryRow;
   return (
-    <span className="mc-dice-link mc-dice-link-advisory" onClick={clickable ? () => onAdvisoryRow(action) : undefined} role="button" tabIndex={0} title={`Advisory — ${action.name}: ${action.advisory_message || 'GM-enforced (no engine consumer)'}`}>
+    <span className="mc-dice-link mc-dice-link-advisory" data-kind="advisory" onClick={clickable ? () => onAdvisoryRow(action) : undefined} role="button" tabIndex={0} title={`Advisory — ${action.name}: ${action.advisory_message || 'GM-enforced (no engine consumer)'}`}>
       <i className="fa-solid fa-wind" /> {action.name}
     </span>
   );
@@ -477,7 +479,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
       <AdvisoryLink action={action} attackerCannotAct={attackerCannotAct} onAdvisoryRow={onAdvisoryRow} legendaryGate={legendaryGate} />
       {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
       {actionHasAttack && !attackerCannotAct && (
-        <span className={attackChipClass(rechargeOut)} onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
+        <span className={attackChipClass(rechargeOut)} data-kind="attack" onClick={() => onAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
         </span>
       )}

@@ -179,7 +179,7 @@ function MonsterCardStats({ monster, creatureTempHp, shieldOfFaithBonus, condEff
             {(() => {
               const initBonus = parseInitiativeBonus(monster.initiative_details);
               return initBonus != null ? (
-                <span className="mc-dice-link" onClick={() => handleInitiative(initBonus)} role="button" tabIndex={0}>
+                <span className="mc-dice-link" data-kind="initiative" onClick={() => handleInitiative(initBonus)} role="button" tabIndex={0}>
                   {monster.initiative_details}
                 </span>
               ) : (
@@ -225,6 +225,7 @@ function MonsterCardAbilities({ monster, handleAbilityCheck, drainedAbilities = 
             <div className={`mc-ability-score${drained ? ' mc-ability-drained' : ''}`} title={drained ? `${ab.toUpperCase()} ${drained.baseScore} \u2212${drained.drained} drained by ${drained.source} \u2014 returns on a long rest` : undefined}>{score}</div>
             <div
               className="mc-ability-mod mc-dice-link"
+              data-kind="ability"
               onClick={() => handleAbilityCheck(ab, mod ?? 0)}
               role="button"
               tabIndex={0}
@@ -321,7 +322,11 @@ function DefenseTextRow({ label, value }) {
   );
 }
 
-function DefenseModifierRow({ label, entries, labelFor, onSelect }) {
+// A11y/automation anchor (EO 2026-11-08 backlog): `kind` stamps data-kind on
+// each clickable chip so `[data-kind="save"]`/`"skill"` queries anchor exactly
+// the right row's chips (the shared .mc-dice-link class made index-presses
+// ambiguous). Purely additive — class and click behavior byte-unchanged.
+function DefenseModifierRow({ label, entries, kind, labelFor, onSelect }) {
   return (
     <div className="mc-defense-row">
       <span className="mc-defense-label">{label}</span>
@@ -329,7 +334,7 @@ function DefenseModifierRow({ label, entries, labelFor, onSelect }) {
         {Object.entries(entries).map(([name, s], idx) => (
           <span key={name}>
             {idx > 0 && ', '}
-            <span className="mc-dice-link" onClick={() => onSelect(name, s.modifier)} role="button" tabIndex={0}>
+            <span className="mc-dice-link" data-kind={kind} onClick={() => onSelect(name, s.modifier)} role="button" tabIndex={0}>
               {labelFor ? labelFor(name) : name} {s.modifier >= 0 ? '+' : ''}{s.modifier}
             </span>
           </span>
@@ -364,8 +369,8 @@ function MonsterCardDefenses({ monster, monsterName, campaignName, handleSaveThr
 
   return (
     <div className="mc-defenses">
-      {hasEntries(saves) && <DefenseModifierRow label="Saving Throws" entries={saves} labelFor={saveAbilityAbbr} onSelect={handleSaveThrow} />}
-      {hasEntries(monster.skills) && <DefenseModifierRow label="Skills" entries={monster.skills} onSelect={handleSkillCheck} />}
+      {hasEntries(saves) && <DefenseModifierRow label="Saving Throws" entries={saves} kind="save" labelFor={saveAbilityAbbr} onSelect={handleSaveThrow} />}
+      {hasEntries(monster.skills) && <DefenseModifierRow label="Skills" entries={monster.skills} kind="skill" onSelect={handleSkillCheck} />}
       {hasSenseEntries(monster.senses) && <DefenseTextRow label="Senses" value={formatSenses(monster.senses)} />}
       {monster.languages && <DefenseTextRow label="Languages" value={formatLanguages(monster.languages)} />}
       <MonsterDamageTraits irv={irv} />
@@ -408,6 +413,7 @@ function MonsterLairAction({ la, attackerCannotAct, handleLairRow }) {
       <strong>{la.name}.</strong>{' '}
       <span
         className={`mc-dice-link mc-dice-link-lair${clickable ? '' : ' mc-dice-link-spell-spent'}`}
+        data-kind="lair"
         onClick={clickable ? () => handleLairRow(la) : undefined}
         role="button"
         tabIndex={0}
