@@ -76,7 +76,6 @@ Live facts (EK, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-08 EK) TV presentation pref is per-browser localStorage — a shared machine's next GM tab lands on the tracker with navigation fully removed (EK wasted a 30s nav timeout before finding the toggle); consider defaulting OFF on cold load or a persistent "exit TV" corner affordance outside the Initiative view. `initiative/useTvPresentation.js` TV_PREF_KEY.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

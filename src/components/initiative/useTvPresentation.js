@@ -9,7 +9,7 @@
 
 import React from 'react'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-import { setTvModeActive } from '../../services/ui/tvModeStore.js'
+import { setTvModeActive, saveTvPref, subscribeTvPref, getTvPref } from '../../services/ui/tvModeStore.js'
 
 const TV_PREF_KEY = 'initiative-tv'
 const VICTORY_DISMISS_KEY = 'initiative-victory-dismissed'
@@ -20,35 +20,44 @@ export function useTvPresentation({ campaignName, displayCreatures, activeCreatu
         try { return localStorage.getItem(TV_PREF_KEY) === '1' } catch { return false }
     })
     const toggleTvMode = React.useCallback(() => {
-        setTvMode(prev => {
-            const next = !prev
-            try { localStorage.setItem(TV_PREF_KEY, next ? '1' : '0') } catch { /* ignore */ }
-            // Piggyback fullscreen on the toggle (user-gesture context). LAN
-            // http:// origins are non-secure, so browsers may reject the API —
-            // say so honestly and keep the big-type presentation anyway.
-            if (next) {
-                const req = document.documentElement.requestFullscreen?.()
-                if (req && req.catch) {
-                    req.catch(() => showToast('TV mode on — browser blocked fullscreen (press F11)'))
-                }
-            } else if (document.fullscreenElement) {
-                const exit = document.exitFullscreen?.()
-                if (exit && exit.catch) exit.catch(() => {})
+        // Side effects (pref persist + store notify, fullscreen) run in the
+        // CLICK phase, never inside a state-updater: an updater executes
+        // during render, and a store notification from there makes React
+        // re-render sibling subscribers (TvExitButton) mid-render.
+        const next = !tvMode
+        saveTvPref(next)
+        setTvMode(next)
+        // Piggyback fullscreen on the toggle (user-gesture context). LAN
+        // http:// origins are non-secure, so browsers may reject the API —
+        // say so honestly and keep the big-type presentation anyway.
+        if (next) {
+            const req = document.documentElement.requestFullscreen?.()
+            if (req && req.catch) {
+                req.catch(() => showToast('TV mode on — browser blocked fullscreen (press F11)'))
             }
-            return next
-        })
-    }, [showToast])
+        } else if (document.fullscreenElement) {
+            const exit = document.exitFullscreen?.()
+            if (exit && exit.catch) exit.catch(() => {})
+        }
+    }, [tvMode, showToast])
     // Escape exits fullscreen natively — mirror that so the toggle never goes stale.
     React.useEffect(() => {
         const onFullscreenChange = () => {
             if (!document.fullscreenElement) {
                 setTvMode(false)
-                try { localStorage.setItem(TV_PREF_KEY, '0') } catch { /* ignore */ }
+                saveTvPref(false)
             }
         }
         document.addEventListener('fullscreenchange', onFullscreenChange)
         return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
     }, [])
+    // The app-level corner "Exit TV mode" button exits through the shared
+    // pref store without touching this hook — observe the pref flip and drop
+    // the presentation here too (sidebar gate, big-type layout, fullscreen).
+    const tvPref = React.useSyncExternalStore(subscribeTvPref, getTvPref)
+    React.useEffect(() => {
+        if (tvMode && !tvPref) setTvMode(false)
+    }, [tvMode, tvPref])
     // Broadcast to the app shell: TV mode hides the left sidebar (nobody reads
     // it from across the room) and reclaims its gutter for the card carousel.
     // The unmount clear keeps every non-tracker view navigable.

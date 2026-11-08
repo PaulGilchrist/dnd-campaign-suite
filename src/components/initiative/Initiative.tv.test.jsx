@@ -15,6 +15,7 @@ import * as monsterUtils from '../../services/npcs/monsterUtils.js';
 import * as runtime from '../../hooks/runtime/useRuntimeState.js';
 import storage from '../../services/ui/storage.js';
 import { getTvModeActive } from '../../services/ui/tvModeStore.js';
+import TvExitButton from '../common/TvExitButton/TvExitButton.jsx';
 
 const syncStateStore = new Map();
 let lastCombatResult = null;
@@ -234,6 +235,38 @@ describe('Initiative TV mode', () => {
 
         fireEvent.click(button);
         expect(getTvModeActive()).toBe(false);
+    });
+
+    it('app-level corner button exits the tracker TV presentation and re-arms on toggle', async () => {
+        // Cold-load replica: pref ON → tracker mounts in TV with the corner
+        // escape visible (QA backlog 2026-11-08: no nav-guessing trap).
+        localStorage.setItem('initiative-tv', '1');
+        render(
+            <>
+                <Initiative {...props} />
+                <TvExitButton />
+            </>
+        );
+        await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
+        expect(document.querySelector('.initiative').className).toContain('initiative--tv');
+        expect(getTvModeActive()).toBe(true);
+        expect(screen.getByRole('button', { name: 'Exit TV mode' })).toBeInTheDocument();
+
+        // Click exits — identical to the in-tracker toggle's OFF face.
+        fireEvent.click(screen.getByRole('button', { name: 'Exit TV mode' }));
+        await waitFor(() => {
+            expect(document.querySelector('.initiative').className).not.toContain('initiative--tv');
+        });
+        expect(getTvModeActive()).toBe(false);
+        expect(localStorage.getItem('initiative-tv')).toBe('0');
+        expect(screen.queryByRole('button', { name: 'Exit TV mode' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'TV' })).toHaveAttribute('aria-pressed', 'false');
+
+        // The in-tracker toggle keeps working both ways and re-arms the corner.
+        fireEvent.click(screen.getByRole('button', { name: 'TV' }));
+        expect(document.querySelector('.initiative').className).toContain('initiative--tv');
+        expect(localStorage.getItem('initiative-tv')).toBe('1');
+        expect(screen.getByRole('button', { name: 'Exit TV mode' })).toBeInTheDocument();
     });
 
     it('up-next strip lists the following creatures in turn order (wraparound), never the active one', async () => {

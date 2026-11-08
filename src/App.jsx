@@ -48,6 +48,7 @@ import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import BardicInspirationReactionModal from './components/common/BardicInspirationReactionModal.jsx';
 import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
+import TvExitButton from './components/common/TvExitButton/TvExitButton.jsx';
 
 function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
   if (event.key.startsWith('character-delete-')) {
@@ -920,6 +921,11 @@ function App() {
             buttons (or leaving the campaign entirely). Mounted OUTSIDE the
             ErrorBoundary so a crash in another view cannot kill playback. */}
         <MusicPlayer campaignName={campaignName} visible={activeView === 'music'} />
+        {/* TV escape hatch: while the per-client TV pref is ON this corner
+            button renders on EVERY view (outside the view outlet), so a cold
+            tab restored into tracker-TV — sidebar fully unmounted by
+            SidebarShell — can always exit with zero nav guessing. */}
+        <TvExitButton />
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allClasses={classes} campaignName={campaignName} existingCharacters={characters} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allClasses={classes} characterData={activeCharacter} isEditing={true} campaignName={campaignName} existingCharacters={characters} />}
