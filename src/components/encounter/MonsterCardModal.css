@@ -307,7 +307,7 @@
   border-left: 3px solid var(--color-header);
   padding-left: 10px;
   font-style: italic;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .mc-combat-strategy .mc-section-title {
