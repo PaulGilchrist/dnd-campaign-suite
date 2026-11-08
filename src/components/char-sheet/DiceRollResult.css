@@ -297,6 +297,19 @@
     margin: 4px 0;
 }
 
+/* Away-initiative "not applied" notice (AwayNotice in DiceRollResult.jsx) —
+   same amber notice family as Reliable Talent above. */
+.dice-roll-away-note {
+    text-align: center;
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #ff9800;
+    background: rgba(255, 152, 0, 0.15);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin: 4px 0;
+}
+
 .dice-roll-gwf {
     text-align: center;
     font-size: 0.85em;

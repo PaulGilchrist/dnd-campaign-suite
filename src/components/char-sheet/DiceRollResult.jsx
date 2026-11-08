@@ -197,6 +197,20 @@ function FloorNotices({ props, state }) {
     );
 }
 
+// bug-away-initiative-roll-no-notice-rendered: an away PC's initiative roll is
+// shown (and logged) but never stamped on the tracker (split-party law in
+// hooks/combat/initiativeProcessing.js). The producer threads awayNote on the
+// popup payload — render it as an amber notice under the total so the table is
+// never left reading a naked total that looks applied.
+function AwayNotice({ props }) {
+    if (!props.awayNote) return null;
+    return (
+        <div className="dice-roll-away-note">
+            <i className="fa-solid fa-person-walking-arrow-right"></i> {props.awayNote}
+        </div>
+    );
+}
+
 function RollAdjustmentNotices({ props, state }) {
     const { rayOfEnfeebleReduction, rayOfEnfeebleRoll, weakeningBreathReduction, weakeningBreathRoll, resistanceReduction, resistanceRoll,
         healingRerollOriginalRolls, healingRerollDisplayRolls, elementalAdeptBonus, rolls,
@@ -1081,6 +1095,7 @@ function DiceRollResult(props) {
             <RollHeader props={props} state={state} />
             <RollSummary props={props} state={state} />
 
+            <AwayNotice props={props} />
             <FloorNotices props={props} state={state} />
             <RollAdjustmentNotices props={props} state={state} />
 
