@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis, consumeArcaneApotheosisWaiver } from '../../../services/rules/spells/metamagicRules.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
+import { isCreaturePresent } from '../../../services/combat/creaturePresence.js';
 import './MetamagicPopup.css';
 
 function getCreatureTargets(campaignName) {
   const cs = getCombatSummary(campaignName);
   if (!cs?.creatures) return [];
-  return cs.creatures.map(c => c.name);
+  return cs.creatures.filter(isCreaturePresent).map(c => c.name);
 }
 
 function NoOptionsView({ onSkip }) {

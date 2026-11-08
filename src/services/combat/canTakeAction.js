@@ -7,6 +7,7 @@
  *
  * Short-circuit order (locked in the L5 plan §6.2):
  *   1. enforcement.mode === 'off' (or missing) → allowed  ← today's behavior
+ *   1b. split-party away gate (combatSummary `away` row)
  *   2. condition gate (existing cannotAct / cannotActActions primitives)
  *   3. turn-lock (whose turn) — reactions/free stay allowed off-turn
  *   4. action economy (per-creature budget in `bucket`)
@@ -40,6 +41,19 @@ export const ENFORCEMENT_DEFAULTS = Object.freeze({
 export function resolveEnforcement(enforcement) {
     if (!enforcement || typeof enforcement !== 'object') return { ...ENFORCEMENT_DEFAULTS };
     return { ...ENFORCEMENT_DEFAULTS, ...enforcement };
+}
+
+/** Enforcement-ON split-party gate: a PC marked away holds no tracker slot and
+ * cannot act into an encounter they are not present for (the away row stays
+ * on combatSummary for sync — this is the enforcement read of that flag).
+ * Checked before the condition gate; enforcement OFF short-circuits earlier,
+ * so Levels 1–4 behavior stays byte-identical. */
+function awayDenial({ isAway, creatureName }) {
+    if (!isAway) return null;
+    return {
+        allowed: false,
+        reason: `${creatureName} is away from the party — the GM must rejoin them to the initiative tracker first.`,
+    };
 }
 
 /** Step 2 — condition gate (existing primitives, unchanged semantics). */
@@ -89,6 +103,7 @@ function economyDenial({ flags, bucket, turnState, creatureName, hasBudget }) {
  * @param {boolean} [ctx.cannotAct]           existing condition-gate result
  * @param {boolean} [ctx.cannotActActions]   existing condition-gate action/bonus-only block
  * @param {string|null} [ctx.cannotActReason] existing condition-gate reason text
+ * @param {boolean} [ctx.isAway]              split-party: creature's combatSummary row is `away`
  * @param {Function} [ctx.hasBudget]          injectable budget check (turnState.hasBudget)
  * @returns {{ allowed: boolean, reason: string|null }}
  */
@@ -102,6 +117,7 @@ export function canTakeAction(ctx = {}) {
         cannotAct = false,
         cannotActActions = false,
         cannotActReason = null,
+        isAway = false,
         hasBudget,
     } = ctx;
 
@@ -110,8 +126,9 @@ export function canTakeAction(ctx = {}) {
     // 1. Master switch — off means byte-identical behavior to Levels 1–4.
     if (flags.mode !== 'on') return { allowed: true, reason: null };
 
-    const gateState = { flags, bucket, creatureName, activeCreatureName, turnState, cannotAct, cannotActActions, cannotActReason, hasBudget };
-    return conditionDenial(gateState)
+    const gateState = { flags, bucket, creatureName, activeCreatureName, turnState, cannotAct, cannotActActions, cannotActReason, isAway, hasBudget };
+    return awayDenial(gateState)
+        || conditionDenial(gateState)
         || turnLockDenial(gateState)
         || economyDenial(gateState)
         || { allowed: true, reason: null };

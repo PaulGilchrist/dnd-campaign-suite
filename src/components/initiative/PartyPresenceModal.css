@@ -1,0 +1,95 @@
+/* Split-party presence chrome (plan initiative-split-party).
+ * Loaded via Initiative.jsx; the modal shells (sp-overlay/sp-modal/sp-body…)
+ * and the creature rows (secondary-target-*/ally-*) are re-used from
+ * AllySelectionModal.css for visual consistency. */
+
+/* Away player card: unmistakably disabled — heavily desaturated AND darkened,
+ * the vibrant green player border muted to grey, avatar fully greyed (mirrors
+ * the unconscious lane's avatar treatment). Distant from both normal (0.9
+ * opacity, saturated) and active (scale 1.3 + gold glow) cards. */
+.initiative .creature-card.creature-away {
+    opacity: 0.35;
+    filter: grayscale(1) brightness(0.7);
+    box-shadow: none;
+}
+
+/* Extra class ⇒ higher specificity than `.creature-card.player`'s green
+ * border, independent of CSS bundle order. */
+.initiative .creature-card.player.creature-away {
+    border-color: #555560;
+}
+
+.initiative .creature-card.creature-away:hover {
+    opacity: 0.5;
+}
+
+.initiative .creature-card.creature-away .creature-avatar {
+    filter: grayscale(1) brightness(0.7);
+}
+
+/* Away/rejoin toggle — mirrors .npc-remove-btn's corner geometry (that button
+ * never renders on player rows, so the corner is free). */
+.initiative .away-toggle-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(155, 89, 182, 0.7);
+    border-radius: 50%;
+    background-color: var(--background-color, #1a1a2e);
+    color: #9b59b6;
+    font-size: 0.7em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    z-index: 5;
+}
+
+.initiative .away-toggle-btn:hover {
+    background-color: rgba(155, 89, 182, 0.3);
+}
+
+.initiative .away-toggle-btn-active {
+    border-color: #9b59b6;
+    background-color: rgba(155, 89, 182, 0.45);
+    color: #ffffff;
+}
+
+/* Toolbar button + away-count chip in the GM control row. */
+.initiative .split-party-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.initiative .split-party-button-active {
+    border-color: #9b59b6;
+    color: #d2b4de;
+}
+
+.initiative .split-party-count {
+    font-size: 0.75em;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background-color: rgba(155, 89, 182, 0.35);
+    color: #d2b4de;
+}
+
+/* Modal row tweaks (component-scoped pieces only). */
+.party-presence-modal {
+    min-width: 320px;
+}
+
+.secondary-target-row.party-presence-row-away {
+    opacity: 0.65;
+}
+
+.party-presence-away-tag {
+    margin-left: 8px;
+    font-size: 0.85em;
+    color: #9b59b6;
+}

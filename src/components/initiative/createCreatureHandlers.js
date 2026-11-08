@@ -6,6 +6,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { clearDeathSavePrompt, sendDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import utils from '../../services/ui/utils.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc, mergeCombatSummaryWithCharacters } from '../../services/encounters/initiativeService.js'
+import { applyPresenceChanges } from '../../services/combat/creaturePresence.js'
 import { loadCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js'
 import { setSessionPhase } from '../../services/combat/sessionService.js'
 import { autoAwardCombatRewards } from '../../services/items/autoRewardService.js'
@@ -437,6 +438,42 @@ export function createCreatureHandlers({
         setCombatSummary(cloneDeep(combatSummary))
     }
 
+    // ── Split-party presence (plan initiative-split-party) ──────────────────
+    // Tracker authorship is GM-only (same gate family as initiative stamping).
+    // `presenceByName` maps player row names → wantAway booleans; unchanged
+    // names are inert. applyPresenceChanges owns the mutation semantics
+    // (split wipes initiative and parks the card at the back; rejoin lands at
+    // the end-of-round slot) — the card toggle and the bulk modal share this
+    // exact write + audit lane.
+    const handlePartyPresenceChange = function handlePartyPresenceChange(presenceByName) {
+        if (!isLocalhost || !combatSummary) return
+        const changes = applyPresenceChanges(combatSummary, presenceByName || {})
+        if (changes.length === 0) return
+        storage.set('combatSummary', combatSummary, campaignName)
+        setCombatSummary(cloneDeep(combatSummary))
+        for (const change of changes) {
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: change.away ? 'party_split' : 'party_rejoined',
+                characterName: change.name,
+                name: change.away ? 'Split Party' : 'Rejoin',
+                description: change.away
+                    ? `${change.name} split from the party — removed from the initiative tracker (their card rests at the back until they rejoin).`
+                    : change.initiative
+                        ? `${change.name} rejoined the party — initiative set to ${change.initiative} (end of the round).`
+                        : `${change.name} rejoined the party — initiative not yet rolled.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[handlePartyPresenceChange] presence log failed:', e) })
+        }
+    }
+
+    const handleToggleAway = function handleToggleAway(creatureName) {
+        if (!combatSummary) return
+        const creature = combatSummary.creatures.find(c => c.type === 'player' && c.name === creatureName)
+        if (!creature) return
+        handlePartyPresenceChange({ [creatureName]: !(creature.away === true) })
+    }
+
     // bug-initiative-concurrent-npc-spawn-lost-update: the board is a FULL-REPLACE
     // store. A read-modify-write of the locally mirrored summary lost the
     // last-writer race silently — two GM tabs clicking +NPC converged on ONE
@@ -511,5 +548,7 @@ export function createCreatureHandlers({
         handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,
+        handlePartyPresenceChange,
+        handleToggleAway,
     }
 }

@@ -17,6 +17,7 @@ import {
     isPreviousDisabled,
     isBareNpcPlaceholder,
 } from '../../services/encounters/initiativeService.js'
+import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
 import Subscriber from '../common/Subscriber.jsx'
 import Popup from '../common/popup.jsx'
@@ -36,6 +37,7 @@ import AiDirectorPanel from './AiDirectorPanel.jsx'
 import { useTvPresentation } from './useTvPresentation.js'
 import { useAllyEditor } from './useAllyEditor.js'
 import AllyEditorModal from './AllyEditorModal.jsx'
+import PartyPresenceButton from './PartyPresenceButton.jsx'
 import FriendlyFireConfirmModal from './FriendlyFireConfirmModal.jsx'
 import ClearCombatConfirmModal from './ClearCombatConfirmModal.jsx'
 import TvToggleButton from './TvToggleButton.jsx'
@@ -444,6 +446,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,
+        handlePartyPresenceChange,
+        handleToggleAway,
     } = React.useMemo(() => createCreatureHandlers({
         combatSummary,
         campaignName,
@@ -827,6 +831,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             onHpFeedbackDone={clearHpFeedback}
                             onControllerChange={handleControllerChange}
                             onEditAllies={openAllyEditor}
+                            onToggleAway={handleToggleAway}
                         />
                     )
                 })}
@@ -841,6 +846,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
               <div className='combat-controls'>
                   <button className='clear-button' onClick={handleClear}>Clear</button>
                   <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats'>+ NPC</button>
+                  <PartyPresenceButton
+                      creatures={combatSummary.creatures}
+                      onConfirm={handlePartyPresenceChange}
+                  />
                   <button onClick={handlePreviousCreature} disabled={isPrevDisabledValue}>← Prev</button>
                   <button onClick={handleNextCreature}>Next →</button>
                   {/* L5-001: End Turn — the enforced-pace affordance (advance + economy reset
@@ -894,7 +903,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     initialTab={effectAdderTab}
                     onCancel={() => setEffectAdderTarget(null)}
                     onApply={handleApplyEffect}
-                    creatures={creaturesOrEmpty(combatSummary)}
+                    creatures={creaturesOrEmpty(combatSummary).filter(isCreaturePresent)}
                 />
             )}
             <AllyEditorModal open={allyEditorOpen} modalProps={modalProps} onConfirm={confirmAllyEditor} onCancel={closeAllyEditor} />

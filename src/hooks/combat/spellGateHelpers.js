@@ -2,6 +2,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getMonsterData } from '../../services/npcs/monsterUtils.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { isStable } from '../../services/combat/conditions/deathSaveRules.js';
+import { isCreaturePresent } from '../../services/combat/creaturePresence.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -12,7 +13,8 @@ export function getCsAndTargets(campaignName, opts = {}) {
     console.error(`Creature targets empty for unknown: cs=${cs ? 'exists' : 'null'}, characters.length=undefined`);
     return { cs, creatureTargets: [] };
   }
-  let creatureTargets = cs.creatures.map(c => c.name);
+  // Split-party law: away PCs hold no slot and are not valid targets.
+  let creatureTargets = cs.creatures.filter(isCreaturePresent).map(c => c.name);
   if (excludeCaster) {
     creatureTargets = creatureTargets.filter(n => n !== casterName);
   }

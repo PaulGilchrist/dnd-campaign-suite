@@ -9,6 +9,7 @@
 
 import React from 'react'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { setTvModeActive, saveTvPref, subscribeTvPref, getTvPref } from '../../services/ui/tvModeStore.js'
 
 const TV_PREF_KEY = 'initiative-tv'
@@ -103,9 +104,10 @@ export function useTvPresentation({ campaignName, displayCreatures, activeCreatu
     }, [])
 
     // ── Up-next strip ── pure derivation from tracker order (Thief's Reflexes
-    // second turns excluded, mirrors TargetSelect).
+    // second turns excluded, mirrors TargetSelect; away PCs skipped — they
+    // hold no slot in the round).
     const nextUpCreatures = React.useMemo(() => {
-        const list = displayCreatures.filter(c => !c.secondTurn)
+        const list = displayCreatures.filter(c => !c.secondTurn && isCreaturePresent(c))
         if (list.length < 2) return []
         const idx = list.findIndex(c => c.name === activeCreatureName)
         const out = []

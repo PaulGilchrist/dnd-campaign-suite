@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js';
 import { clearHuntersMarkConcentration } from '../../services/rules/effects/restRules.js';
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js';
@@ -19,6 +20,36 @@ export async function processInitiativeRoll({ characterName, campaignName, conte
     const omenBonus = cosmicOmenAppliedBonus || 0;
     const totalBonus = bonus + tandemFtBonus + omenBonus;
     const combatSummary = await loadCombatSummary(campaignName);
+    const awayCreature = combatSummary?.creatures?.find(
+        c => c.type === 'player' && c.name === firstName && c.away === true
+    );
+    if (awayCreature) {
+        // Split-party law (plan initiative-split-party): an away PC holds no
+        // tracker slot — the roll is shown (and logged for the table) but
+        // never stamped, no initiative-rolled seam fires, and concentration
+        // upkeep is skipped (they are not in the encounter). Rejoining is
+        // GM-only and lands them at the end-of-round slot.
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'initiative_while_away',
+            characterName: firstName,
+            name: 'Initiative (away)',
+            description: `${firstName} rolled initiative (${effectiveD20Roll + totalBonus}) while marked away — not applied to the tracker; the GM must rejoin them.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[processInitiativeRoll] away-hold log failed:', e) });
+        setPopupHtml({
+            type: 'd20',
+            rollType: 'initiative',
+            name: 'Initiative',
+            rolls: [r1, r2],
+            bonus: totalBonus,
+            bonusDetail: cosmicOmenDetail || undefined,
+            characterName,
+            campaignName,
+            awayNote: 'You are away from the party — this roll was not applied. Ask the GM to rejoin you.',
+        });
+        return;
+    }
     if (combatSummary) {
         const creature = combatSummary.creatures.find(
             c => c.type === 'player' && c.name === firstName

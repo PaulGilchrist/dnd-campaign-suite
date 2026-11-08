@@ -22,6 +22,7 @@ import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakab
 import { sendFleshToStoneResult, sendPrismaticSprayIndigoResult, sendPrismaticSprayVioletResult } from '../../services/combat/conditions/savePromptService.js'
 import { isResilientSphereActive, getResilientSphereSource } from '../../services/combat/automation/automationPassives.js'
 import { getCreatureController } from '../../services/encounters/creatureControl.js'
+import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { cleanupWildShape } from '../../services/automation/handlers/class-druid/wildShapeCreatureBuilder.js'
 import { revertPolymorph } from '../../services/automation/handlers/spells/polymorphService.js'
 import { revertAnimalShapes } from '../../services/automation/handlers/spells/animalShapesService.js'
@@ -73,6 +74,29 @@ function NpcRemoveButton({ creature, isLocalhost, onRemoveNpc }) {
             title="Remove NPC"
         >
             <i className="fa-solid fa-xmark"></i>
+        </button>
+    )
+}
+
+// Split-party toggle (GM-only, player rows): marks the PC away — their card
+// greys out, parks at the back of the board, and vanishes from target lists —
+// or rejoins them at the end-of-round initiative slot. Tracker authorship is
+// localhost-gated like initiative stamping (bug-player-clients-can-hijack-
+// initiative family); the write + audit lane lives in createCreatureHandlers.
+function AwayToggle({ creature, isLocalhost, onToggleAway }) {
+    if (creature.type !== 'player' || !isLocalhost || !onToggleAway) return null
+    const away = creature.away === true
+    return (
+        <button
+            className={`away-toggle-btn${away ? ' away-toggle-btn-active' : ''}`}
+            onClick={() => onToggleAway(creature.name)}
+            type="button"
+            title={away
+                ? `Rejoin ${creature.name} to the encounter (initiative lands at the end of the round)`
+                : `Mark ${creature.name} away from the encounter (split party)`}
+            aria-label={away ? `Rejoin ${creature.name} to initiative` : `Mark ${creature.name} away from initiative`}
+        >
+            <i className={away ? 'fa-solid fa-person-walking-arrow-right' : 'fa-solid fa-person-walking'}></i>
         </button>
     )
 }
@@ -199,7 +223,7 @@ function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, o
             >
                 <option value="">— No Target —</option>
                 {allCreatures
-                    .filter(c => c.name !== creature.name && !c.secondTurn)
+                    .filter(c => c.name !== creature.name && !c.secondTurn && isCreaturePresent(c))
                     .map(c => (
                         <option key={c.name} value={c.name}>{c.name}</option>
                     ))
@@ -680,8 +704,10 @@ function CreatureCard({
     onHpFeedbackDone,
     onControllerChange,
     onEditAllies,
+    onToggleAway,
 }) {
     const isUnconscious = creature.currentHp <= 0
+    const isAway = creature.type === 'player' && creature.away === true
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? [];
     const myTargetEffects = allTargetEffects.filter(te => {
         const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
@@ -698,11 +724,20 @@ function CreatureCard({
     const sanctuaryInfo = findSanctuaryInfo(allCreatures, creature.name, campaignName);
 
     return (
-        <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
+        <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''} ${isAway ? 'creature-away' : ''}`}>
             <HpFeedback creatureName={creature.name} hpEvent={hpEvent} onDone={onHpFeedbackDone} />
             <NpcRemoveButton creature={creature} isLocalhost={isLocalhost} onRemoveNpc={onRemoveNpc} />
+            <AwayToggle creature={creature} isLocalhost={isLocalhost} onToggleAway={onToggleAway} />
             <CardAvatar creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} npcImage={npcImage} campaignName={campaignName} characters={characters} onViewCharacter={onViewCharacter} onNpcClick={onNpcClick} />
             <CardName creature={creature} campaignNpcs={campaignNpcs} onNameChange={onNameChange} isLocalhost={isLocalhost} />
+            {isAway && (
+                <CreatureBadge
+                    icon='fa-person-walking'
+                    label='Away'
+                    cls='effect-neutral'
+                    tooltip='Split from the party — skipped by initiative and hidden from target lists. The GM can rejoin them at the end of the round.'
+                />
+            )}
             {creature.type === 'npc' && /^NPC \d+$/.test(creature.name) && creature.currentHp === 10 && creature.maxHp === 10 && (
                 <div className='npc-statless-hint text-muted'>
                     <i className='fa-solid fa-circle-info'></i> Statless default · 10 HP (AC 10)

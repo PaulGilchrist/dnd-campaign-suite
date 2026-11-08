@@ -3,6 +3,7 @@ import { getMonsterData, getMonsterImageUrl } from '../npcs/monsterUtils.js'
 import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js'
 import { getMonsterSaveBonuses } from './encounterToInitiative.js'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { isCreaturePresent, sortCreaturesForBoard } from '../combat/creaturePresence.js'
 
 function parseInitBonus(monster) {
     const initStr = monster.initiative_details
@@ -77,26 +78,53 @@ function removeNpc(combatSummary, creatureName) {
     combatSummary.creatures = combatSummary.creatures.filter(c => c.name !== creatureName)
 }
 
+// ── Split-party presence ────────────────────────────────────────────────────
+// The `away` flag semantics live in services/combat/creaturePresence.js
+// (own module: component tests partial-mock this service, and consumers of
+// the predicate must always get the real one). Navigation below skips away
+// rows; the mount merge parks them at the back via sortCreaturesForBoard.
+
+// Split-party law: navigation walks only PRESENT creatures. When the active
+// creature itself is away or unknown (GM split mid-its-turn), the seam moves
+// to its nearest present neighbour WITHOUT a round increment — the round was
+// never completed. A fully degenerate board (nobody present) falls back to
+// the legacy full-list walk so the tracker never stalls on `undefined`.
 function getNextCreatureName(combatSummary, activeCreatureName) {
-    const currentIndex = combatSummary.creatures.findIndex(c => c.name === activeCreatureName)
-    const isLast = currentIndex >= combatSummary.creatures.length - 1
-    if (!isLast) {
-        return { newActiveName: combatSummary.creatures[currentIndex + 1].name, roundIncrement: false }
+    const all = combatSummary.creatures
+    const present = all.filter(isCreaturePresent)
+    const list = present.length ? present : all
+    const idx = list.findIndex(c => c.name === activeCreatureName)
+    if (idx === -1) {
+        const allIdx = all.findIndex(c => c.name === activeCreatureName)
+        const neighbour = (allIdx >= 0 ? all.slice(allIdx + 1) : []).find(isCreaturePresent)
+        return { newActiveName: (neighbour || list[0]).name, roundIncrement: false }
     }
-    return { newActiveName: combatSummary.creatures[0].name, roundIncrement: true }
+    if (idx < list.length - 1) {
+        return { newActiveName: list[idx + 1].name, roundIncrement: false }
+    }
+    return { newActiveName: list[0].name, roundIncrement: true }
 }
 
 function getPreviousCreatureName(combatSummary, activeCreatureName) {
-    const currentIndex = combatSummary.creatures.findIndex(c => c.name === activeCreatureName)
-    if (currentIndex > 0) {
-        return { newActiveName: combatSummary.creatures[currentIndex - 1].name, roundDecrement: false }
+    const all = combatSummary.creatures
+    const present = all.filter(isCreaturePresent)
+    const list = present.length ? present : all
+    const idx = list.findIndex(c => c.name === activeCreatureName)
+    if (idx === -1) {
+        const allIdx = all.findIndex(c => c.name === activeCreatureName)
+        const neighbour = (allIdx >= 0 ? all.slice(0, allIdx) : all).filter(isCreaturePresent).pop()
+        return { newActiveName: (neighbour || list[list.length - 1]).name, roundDecrement: false }
     }
-    return { newActiveName: combatSummary.creatures[combatSummary.creatures.length - 1].name, roundDecrement: true }
+    if (idx > 0) {
+        return { newActiveName: list[idx - 1].name, roundDecrement: false }
+    }
+    return { newActiveName: list[list.length - 1].name, roundDecrement: true }
 }
 
 function isPreviousDisabled(combatSummary, activeCreatureName) {
     if (!combatSummary) return false
-    return activeCreatureName === combatSummary.creatures[0]?.name && combatSummary.round === 1
+    const firstPresent = combatSummary.creatures.find(isCreaturePresent)
+    return activeCreatureName === firstPresent?.name && combatSummary.round === 1
 }
 
 function setInitiative(combatSummary, creatureName, value) {
@@ -214,12 +242,7 @@ function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
             concentration: null,
         }))
     mergedCreatures.push(...newPlayerCreatures)
-    mergedCreatures.sort((a, b) => {
-        const aInit = Number(a.initiative) || -1
-        const bInit = Number(b.initiative) || -1
-        if (bInit !== aInit) return bInit - aInit
-        return a.name.localeCompare(b.name)
-    })
+    sortCreaturesForBoard({ creatures: mergedCreatures })
     return { round: initialSummary.round, creatures: mergedCreatures }
 }
 

@@ -4,6 +4,7 @@ import { isDistanceInRange } from '../../../../services/rules/combat/rangeCheck.
 import { isApplyBusy, setApplyBusy } from './areaEffectModalInstances.js';
 import { createOverlay, hitTestOverlay } from '../../../../models/SpellOverlay.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { isCreaturePresent } from '../../../../services/combat/creaturePresence.js';
 
 // CLA-303: Turn Undead target validity — dead creatures are invalid; trust the
 // monsterType joined onto combatSummary first, then fall back to a suffix-strip
@@ -91,6 +92,7 @@ function AreaEffectTargetModalBase({
   const eligibleTargets = useMemo(() => {
     if (!combatSummary?.creatures) return [];
     return combatSummary.creatures.filter(c => {
+      if (!isCreaturePresent(c)) return false;
       if (!includeCaster && c.name === attackerName) return false;
       if (turnUndead && !isTurnUndeadValidTarget(c, monsters)) return false;
       if (attackerName && c.name) {

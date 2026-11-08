@@ -73,6 +73,17 @@ function readActiveCreatureName(enforcementOn) {
         || null;
 }
 
+/** Split-party away read: the acting PC's combatSummary row carries `away`
+ * (plan initiative-split-party). Absent board / NPC names ⇒ not away. Reads
+ * the in-memory mirror (same lane as readActiveCreatureName). */
+function readAwayFlag(creatureName) {
+    const creatures = getStore('combatSummary')?.get?.('creatures');
+    const row = Array.isArray(creatures)
+        ? creatures.find(c => c.type === 'player' && c.name === creatureName)
+        : null;
+    return row?.away === true;
+}
+
 /** Popup + audit log on denial (audit requires campaignName; popup sink optional per call site). */
 function reportDenial(ctx, reason) {
     const { campaignName, creatureName, bucket, source, setPopupHtml } = ctx;
@@ -132,6 +143,7 @@ export function assertCanAct(input) {
         cannotAct: !!blockers.cannotAct,
         cannotActActions: !!ctx.cannotActActions || !!blockers.cannotActActions,
         cannotActReason: ctx.cannotActReason || blockers.cannotActReason || null,
+        isAway: readAwayFlag(ctx.creatureName),
         hasBudget,
     });
 
