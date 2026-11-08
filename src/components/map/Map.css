@@ -79,10 +79,20 @@
     font-size: 14px;
 }
 
-/* Grid SVG */
+/* Grid SVG — the map is the flex-growing, HEIGHT-constrained member of the
+   .map column: the toolbar/overlay panel/description above and the legend
+   below take their space first, and the square svg takes the rest of the
+   viewport (never taller than wide). Panel rows above therefore translate
+   1:1 into lost map size — keep them horizontal. */
 .map .grid-svg {
     display: block;
-    width: 100%;
+    height: auto;
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    align-self: center;
     aspect-ratio: 1;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -636,25 +646,31 @@
     pointer-events: none;
 }
 
-/* Spell overlay controls */
+/* Spell overlay controls — one compact HORIZONTAL bar between the toolbar
+   and the grid (the map square is height-constrained by this column flex,
+   so every stacked vertical row here steals map size). Items flow left →
+   right and wrap only when the viewport is narrow. */
 .spell-overlay-controls {
     background: #2a2a2a;
     border: 1px solid #444;
     border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 10px;
+    padding: 6px 12px;
+    margin-bottom: 8px;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
 }
 
 .spell-overlay-header {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #e0e0e0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    white-space: nowrap;
 }
 
 .spell-overlay-header i {
@@ -718,18 +734,25 @@
     font-style: italic;
 }
 
+/* Active overlays ride the same horizontal bar — a right-aligned cluster
+   of one-line chips instead of a vertically stacking list. */
 .spell-overlay-active {
-    border-top: 1px solid #444;
-    padding-top: 8px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    border-left: 1px solid #444;
+    padding-left: 14px;
+    margin-left: auto;
 }
 
 .spell-overlay-active-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 8px;
     font-size: 12px;
     color: #ccc;
-    margin-bottom: 4px;
+    white-space: nowrap;
 }
 
 .spell-overlay-clear-btn {
@@ -749,11 +772,15 @@
 
 .spell-overlay-item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 6px;
     font-size: 11px;
     color: #aaa;
-    padding: 2px 0;
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 2px 6px;
+    white-space: nowrap;
 }
 
 .spell-overlay-item button {
@@ -790,7 +817,13 @@
 }
 
 [data-theme="light"] .spell-overlay-active {
-    border-top-color: #ccc;
+    border-left-color: #ccc;
+}
+
+[data-theme="light"] .spell-overlay-item {
+    background: #fff;
+    border-color: #ccc;
+    color: #555;
 }
 
 [data-theme="light"] .spell-overlay-active-header {
