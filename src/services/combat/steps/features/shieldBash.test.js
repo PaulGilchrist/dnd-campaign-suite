@@ -267,7 +267,7 @@ describe('shieldBash', () => {
       // FT-082: base attack stashed verbatim BEFORE the save prompt
       expect(setRuntimeValue).toHaveBeenCalledWith('Fighter1', '_shieldBashBaseAttack', lastAttack, CAMPAIGN);
       expect(createSaveListener).toHaveBeenCalledWith(CAMPAIGN, {
-        targetName: target, saveType: 'STR', saveDc: 17, dcSuccess: false, sourceName: 'Shield Bash',
+        targetName: target, attackerName: 'Fighter1', saveType: 'STR', saveDc: 17, dcSuccess: false, sourceName: 'Shield Bash',
       });
       expect(withoutTimestamp(addEntry.mock.calls[0][1])).toEqual({
         type: 'roll', name: 'Shield Bash', characterName: 'Fighter1', rollType: 'save-damage',

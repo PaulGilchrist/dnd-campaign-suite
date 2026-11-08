@@ -898,7 +898,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
     const saveDc = buildSaveDc(auto, playerStats);
     const saveType = auto.reactionSaveType || auto.saveType || 'WIS';
 
-    const { promise } = createSaveListener(campaignName, { targetName, saveType, saveDc });
+    const { promise } = createSaveListener(campaignName, { targetName, attackerName: playerStats.name, saveType, saveDc });
 
     addEntry(campaignName, {
         type: 'ability_use',

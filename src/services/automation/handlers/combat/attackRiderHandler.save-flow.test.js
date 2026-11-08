@@ -159,6 +159,7 @@ describe('attackRiderHandler - Shield Bash save flow', () => {
             expect(result.modalName).toBe('shieldBash');
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
                 targetName: 'Goblin',
+                attackerName: 'TestHero',
                 saveType: 'STR',
                 saveDc: 15,
                 dcSuccess: false,

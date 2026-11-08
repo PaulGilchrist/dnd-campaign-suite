@@ -173,7 +173,14 @@ export function createSaveListener(campaignName, config) {
      });
 
     const saveResultPromise = promise.then(async (detail) => {
-        await logSaveOutcome(campaignName, config, detail);
+        // Lanes that stamp their OWN attributed save_result row (the turn-END
+        // repeat-save family) opt out of the generic row here — one roll, one
+        // save_result row (bug-save-result-rows-attribute-character-unknown:
+        // the generic row + the lane's provenance row used to double-stamp).
+        // Default undefined = every other lane's single-row behavior unchanged.
+        if (config.suppressOutcomeLog !== true) {
+            await logSaveOutcome(campaignName, config, detail);
+        }
         return detail;
     });
 

@@ -118,6 +118,7 @@ export const shieldBash = {
     // Create STR save prompt
     const { promise } = createSaveListener(ctx.campaignName, {
       targetName,
+      attackerName: ctx.playerStats.name,
       saveType: 'STR',
       saveDc,
       dcSuccess: false,

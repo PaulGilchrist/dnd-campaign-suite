@@ -296,10 +296,12 @@ describe('applyRepeatSaveTurnEnd — turn-END seam (whirlwind STR DC 17, disk Dj
 
         expect(prompts).toEqual([{
             targetName: PC,
+            attackerName: DJINNI,
             saveType: 'STR',
             saveDc: 17,
             dcSuccess: 'none',
             condition: 'whirlwind (repeat save)',
+            suppressOutcomeLog: true,
         }]);
         expect(dice).not.toHaveBeenCalled(); // PCs never auto-roll inline
         expect(out).toEqual({ handled: true, results: [{ effect: 'whirlwind', success: true, roll: 12, total: 17 }] });

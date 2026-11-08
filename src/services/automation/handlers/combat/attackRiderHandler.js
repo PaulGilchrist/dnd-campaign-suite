@@ -150,6 +150,7 @@ async function handleShieldBash(action, auto, options, playerStats, campaignName
 
     const { promise } = createSaveListener(campaignName, {
         targetName,
+        attackerName: playerStats.name,
         saveType: 'STR',
         saveDc,
         dcSuccess: false,
@@ -732,6 +733,7 @@ async function handleRiderSave(action, playerStats, campaignName, targetName, op
     const saveDc = buildSaveDc(option, playerStats);
     const { promise } = createSaveListener(campaignName, {
         targetName,
+        attackerName: playerStats.name,
         saveType: option.saveType,
         saveDc,
         dcSuccess: false,

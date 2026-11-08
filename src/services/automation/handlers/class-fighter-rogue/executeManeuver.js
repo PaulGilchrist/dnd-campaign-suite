@@ -279,6 +279,7 @@ async function runManeuverSave(maneuver, auto, targetName, playerStats, campaign
     const saveDc = buildSaveDc(auto, playerStats);
     const { promise } = createSaveListener(campaignName, {
         targetName,
+        attackerName: playerStats.name,
         saveType: maneuver.saveType,
         saveDc,
     });

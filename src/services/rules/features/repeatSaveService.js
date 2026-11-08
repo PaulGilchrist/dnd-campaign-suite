@@ -51,8 +51,12 @@ function stripCondition(targetName, condition, campaignName) {
 // NPC auto-rolls inline (applyFrightfulPresenceTurnEnd shape; full-word
 // cs.saveBonuses key with 3-letter fallback — MA-0303 key-mismatch family).
 // PCs get a queued save-listener prompt (dc_success 'none' — the repeat save
-// gates only the te/condition, never damage).
-async function resolveRepeatSave({ csCreature, targetName, saveType, saveDc, label, campaignName }) {
+// gates only the te/condition, never damage). The listener carries
+// suppressOutcomeLog: resolveOneRepeatSave stamps the lane's OWN attributed
+// save_result row (rollType 'save-repeat', provenance copy), so the generic
+// prompt-lane row would double-stamp one roll
+// (bug-save-result-rows-attribute-character-unknown).
+async function resolveRepeatSave({ csCreature, targetName, attackerName, saveType, saveDc, label, campaignName }) {
     if (csCreature?.type !== 'player') {
         const bonuses = csCreature?.saveBonuses || {};
         const key = lower(saveType);
@@ -62,10 +66,12 @@ async function resolveRepeatSave({ csCreature, targetName, saveType, saveDc, lab
     }
     const { promise } = createSaveListener(campaignName, {
         targetName,
+        attackerName: attackerName || null,
         saveType: String(saveType).toUpperCase().substring(0, 3),
         saveDc,
         dcSuccess: 'none',
         condition: `${label} (repeat save)`,
+        suppressOutcomeLog: true,
     });
     const saveResult = await promise;
     return { roll: saveResult.roll ?? 0, saveBonus: saveResult.saveBonus ?? 0, success: saveResult.success };
@@ -98,7 +104,7 @@ async function resolveOneRepeatSave({ te, targetName, csCreature, campaignName }
         console.error(`[repeatSaveService] repeat_save te "${te.effect}" on ${targetName} carries no dc — skipping.`);
         return null;
     }
-    const { roll, saveBonus, success } = await resolveRepeatSave({ csCreature, targetName, saveType, saveDc, label: te.effect, campaignName });
+    const { roll, saveBonus, success } = await resolveRepeatSave({ csCreature, targetName, attackerName: te.source, saveType, saveDc, label: te.effect, campaignName });
     const total = roll + saveBonus;
     await addEntry(campaignName, {
         type: 'save_result',
