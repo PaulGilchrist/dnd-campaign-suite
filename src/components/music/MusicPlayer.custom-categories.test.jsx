@@ -154,7 +154,20 @@ describe('MusicPlayer campaign-specific categories', () => {
       });
 
       it('blocks case-insensitively and ignores surrounding whitespace', async () => {
-        await expectBlocked('  cRyPt ', 'cRyPt');
+        await expectBlocked('  cRyPt ', 'Crypt');
+      });
+
+      // Canonical-label echo (improve 2026-11-08 EM backlog): the message
+      // quotes the STORED label verbatim, never the normalized query.
+      it('echoes the existing category\u2019s canonical label, not the typed variant', async () => {
+        mount({ customCategories: { 'custom-qa-jazz': { label: 'QA Jazz', icon: 'fa-music' } } });
+
+        openCreateForm();
+        fireEvent.change(screen.getByLabelText('Category name'), { target: { value: '  qa jazz  ' } });
+        fireEvent.click(screen.getByText('Create'));
+
+        expect(await screen.findByText('A category named "QA Jazz" already exists.')).toBeInTheDocument();
+        expect(screen.queryByText('A category named "qa jazz" already exists.')).toBeNull();
       });
 
       it('does NOT block a label matching a BUILT-IN mood (out of scope — only custom labels collide)', async () => {

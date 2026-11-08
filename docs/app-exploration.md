@@ -58,7 +58,6 @@ Live facts (EM, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-08 EM) Duplicate-category in-form error echoes the **normalized query** (`A category named "qa jazz" already exists.` after typing `  qa jazz  `) instead of the existing label `QA Jazz` — read the canonical `customCategories[*].label` in the message (`MusicPlayer.jsx` dupe-check lane).
 - (2026-11-08 EM) TV presentation mode has **no music affordance at all**: ambience plays through the full-screen tracker but Pause/Stop/Stop-Everything are unreachable without exiting TV (`MusicPlayer.jsx` renders inside the hidden view outlet; TV chrome never mounts it). A minimal transport control (or at least Stop) on the TV tracker header would give the table one-hand control; honor read-only visitors (chip-only).
 - (2026-11-08 EM) Music editor `Save` closes the editor on success — for multi-session track curation a "Saved — keep editing" stay-open (or toast Undo) face would reduce open→type→save churn; low priority.
 

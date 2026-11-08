@@ -544,12 +544,16 @@ function MusicPlayer({ campaignName, visible = true }) {
     // apart. Block in-form instead, mirroring the custom-magic-items lane's
     // getCustomNameConflict copy style. Trim + case-insensitive, matching
     // buildMoodList's label normalization; built-in mood labels are out of
-    // scope (the server already forbids shadowing their keys).
+    // scope (the server already forbids shadowing their keys). Echo the
+    // existing entry's CANONICAL label (improve 2026-11-08 EM backlog): a
+    // variant query like "  qa jazz  " must read back `QA Jazz`, not the
+    // normalized input, so the DJ sees which stored category collided.
     const lower = label.toLowerCase();
-    if (Object.values(music.customCategories || {}).some(
+    const existing = Object.values(music.customCategories || {}).find(
       entry => entry && typeof entry.label === 'string' && entry.label.trim().toLowerCase() === lower
-    )) {
-      setCategoryError(`A category named "${label}" already exists.`);
+    );
+    if (existing) {
+      setCategoryError(`A category named "${existing.label}" already exists.`);
       return;
     }
     const customCategories = { ...music.customCategories, [key]: { label, icon: newCategoryIcon } };
