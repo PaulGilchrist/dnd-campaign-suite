@@ -491,7 +491,7 @@ describe('handleAddNpc', () => {
 describe('handleClear / confirmClear', () => {
     // Backlog 2026-11-08 EK: the native window.confirm migrated onto the shared
     // DeleteConfirmModal role="dialog" tier (friendly-fire precedent). The
-    // VERBATIM copy is pinned in ClearCombatConfirmModal.test.jsx; the DOM
+    // honest dialog copy is pinned in ClearCombatConfirmModal.test.jsx; the DOM
     // faces (trigger → dialog → cancel/confirm) in initiative.test.jsx.
     // handleClear only requests the host prompt; confirmClear runs the body
     // the retired native-confirm lane ran inline.

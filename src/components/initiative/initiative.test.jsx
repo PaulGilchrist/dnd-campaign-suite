@@ -206,7 +206,7 @@ describe('Initiative', () => {
         // — confirmClear internals cited in createCreatureHandlers.test.jsx).
         fireEvent.click(screen.getByText('Clear'));
         const dialog = screen.getByRole('dialog', { name: 'Clear Initiative Board' });
-        expect(within(dialog).getByText('Clear combat status for all creatures? This resets initiative and removes all monsters from the board. This action is irreversible.')).toBeInTheDocument();
+        expect(within(dialog).getByText('Clear combat status for all creatures? This resets initiative and removes monsters from the board — bare +NPC placeholder slots are kept and re-seeded. This action is irreversible.')).toBeInTheDocument();
         expect(window.confirm).not.toHaveBeenCalled();
         expect(clearCombat).not.toHaveBeenCalled();
         expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument();
