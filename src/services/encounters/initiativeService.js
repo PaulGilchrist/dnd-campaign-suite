@@ -127,11 +127,18 @@ function isPreviousDisabled(combatSummary, activeCreatureName) {
     return activeCreatureName === firstPresent?.name && combatSummary.round === 1
 }
 
+// Stamp a GM-entered initiative onto the row and re-sort the board. Split-party
+// law (creaturePresence.js): an away row holds no slot, so stamping one is
+// refused outright (the card input is already disabled — this keeps the service
+// honest for any caller, bug-away-card-initiative-input-resurrects-slot), and
+// the re-sort goes through sortCreaturesForBoard (present-first, away-last)
+// instead of the legacy raw initiative sort that could un-park an away row to
+// mid-board (same law as the mount-merge lane below).
 function setInitiative(combatSummary, creatureName, value) {
-    const index = combatSummary.creatures.findIndex(c => c.name === creatureName)
-    if (index === -1) return
-    combatSummary.creatures[index].initiative = value
-    combatSummary.creatures.sort((a, b) => b.initiative - a.initiative)
+    const creature = combatSummary.creatures.find(c => c.name === creatureName)
+    if (!creature || !isCreaturePresent(creature)) return
+    creature.initiative = value
+    sortCreaturesForBoard(combatSummary)
 }
 
 function rollNpcInitiative(combatSummary, creatureName) {
@@ -141,7 +148,7 @@ function rollNpcInitiative(combatSummary, creatureName) {
     const roll = rollD20()
     const total = roll + bonus
     creature.initiative = String(total)
-    combatSummary.creatures.sort((a, b) => b.initiative - a.initiative)
+    sortCreaturesForBoard(combatSummary)
     return { roll, bonus, total }
 }
 

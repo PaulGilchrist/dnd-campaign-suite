@@ -6,7 +6,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { clearDeathSavePrompt, sendDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import utils from '../../services/ui/utils.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc, mergeCombatSummaryWithCharacters } from '../../services/encounters/initiativeService.js'
-import { applyPresenceChanges } from '../../services/combat/creaturePresence.js'
+import { applyPresenceChanges, isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { loadCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js'
 import { setSessionPhase } from '../../services/combat/sessionService.js'
 import { autoAwardCombatRewards } from '../../services/items/autoRewardService.js'
@@ -278,6 +278,17 @@ export function createCreatureHandlers({
         // GM-only: initiative stamping is turn-admin (bug-player-clients-can-hijack-initiative) —
         // the card input is disabled for LAN clients; this guard closes the handler lane too.
         if (!isLocalhost) return
+        // Split-party law (creaturePresence.js): an AWAY row holds NO initiative slot —
+        // its initiative is wiped on split and the card parks at the back. The card's
+        // input is disabled for away rows; this guard closes the handler lane so a stale
+        // blur can never write initiative back onto the wiped row, un-park the card, or
+        // arm Thief's Reflexes for a creature holding no slot (bug-away-card-initiative-
+        // input-resurrects-slot). The GM rejoins the hero first (toggle / Split Party).
+        const creature = combatSummary.creatures.find(c => c.name === creatureName)
+        if (creature && !isCreaturePresent(creature)) {
+            console.error(`[handleInitiativeChange] ${creatureName} is away from the party — initiative slot not claimed (rejoin first)`)
+            return
+        }
         setInitiative(combatSummary, creatureName, value)
         // L5 §10.1: initiative being stamped is the table entering combat —
         // the encounter phase engages here (action-driven; §10.2 makes it

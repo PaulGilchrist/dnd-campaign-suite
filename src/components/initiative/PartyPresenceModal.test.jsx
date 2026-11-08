@@ -50,4 +50,21 @@ describe('PartyPresenceModal', () => {
         expect(screen.getByText(/No players on the initiative board/)).toBeTruthy();
         expect(screen.getByRole('button', { name: /Apply/i }).disabled).toBe(true);
     });
+
+    // bug-away-card-initiative-input-resurrects-slot side-face: an away row holds
+    // no slot — a legacy stale numeric must never render as a "(Init n)" claim.
+    it('annotates (Init n) only for present rows', () => {
+        render(
+            <PartyPresenceModal
+                players={[
+                    { name: 'Ann', type: 'player', initiative: '17' },
+                    { name: 'Bo', type: 'player', initiative: '12', away: true },
+                ]}
+                onConfirm={vi.fn()}
+                onCancel={vi.fn()}
+            />
+        );
+        expect(screen.getByText(/\(Init 17\)/)).toBeTruthy();
+        expect(screen.queryByText(/\(Init 12\)/)).toBeNull();
+    });
 });

@@ -206,6 +206,35 @@ describe('initiativeService', () => {
       expect(combatSummary.creatures.map(c => c.name)).toEqual(['Aldric', 'Brenna', 'Zara']);
       expect(combatSummary.creatures[0].initiative).toBe('9');
     });
+
+    // bug-away-card-initiative-input-resurrects-slot: split-party law — an away
+    // row holds NO initiative slot. The stamp is refused outright, and every
+    // re-sort goes through sortCreaturesForBoard so the away row stays parked
+    // strictly last (the legacy raw initiative sort un-parked it to mid-board).
+    it('refuses to stamp an away player row (value and board order unchanged)', () => {
+      const combatSummary = {
+        creatures: [
+          playerByte('Aldric', { initiative: '20' }),
+          playerByte('Brenna', { initiative: '15' }),
+          playerByte('Zara', { initiative: '', away: true }),
+        ],
+      };
+      setInitiative(combatSummary, 'Zara', '12');
+      expect(combatSummary.creatures.find(c => c.name === 'Zara').initiative).toBe('');
+      expect(combatSummary.creatures.map(c => c.name)).toEqual(['Aldric', 'Brenna', 'Zara']);
+    });
+
+    it('keeps an away row parked last even when a legacy stale numeric shadows it', () => {
+      const combatSummary = {
+        creatures: [
+          playerByte('Aldric', { initiative: '20' }),
+          playerByte('Zara', { initiative: '12', away: true }), // legacy store residue
+          playerByte('Brenna', { initiative: '5' }),
+        ],
+      };
+      setInitiative(combatSummary, 'Brenna', '9');
+      expect(combatSummary.creatures.map(c => c.name)).toEqual(['Aldric', 'Brenna', 'Zara']);
+    });
   });
 
   describe('rollNpcInitiative', () => {
@@ -230,6 +259,19 @@ describe('initiativeService', () => {
       expect(rollNpcInitiative(combatSummary, 'Aldric')).toBeNull();
       expect(rollNpcInitiative(combatSummary, 'NPC 99')).toBeNull();
       expect(rollD20).not.toHaveBeenCalled();
+    });
+
+    it('keeps an away player row parked last when the rolled NPC tops the board', () => {
+      rollD20.mockReturnValueOnce(19);
+      const combatSummary = {
+        creatures: [
+          playerByte('Aldric', { initiative: '15' }),
+          playerByte('Zara', { initiative: '', away: true }),
+          { ...npcDefault(1), initiative: '' },
+        ],
+      };
+      expect(rollNpcInitiative(combatSummary, 'NPC 1')).toEqual({ roll: 19, bonus: 0, total: 19 });
+      expect(combatSummary.creatures.map(c => c.name)).toEqual(['NPC 1', 'Aldric', 'Zara']);
     });
   });
 

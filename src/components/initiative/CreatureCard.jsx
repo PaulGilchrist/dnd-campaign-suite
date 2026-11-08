@@ -173,7 +173,7 @@ function TempHpDisplay({ creature, campaignName }) {
     )
 }
 
-function InitiativeControl({ creature, onInitiativeChange, isLocalhost }) {
+function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway }) {
     return (
         <div className='creature-initiative'>Initiative&nbsp;
             <input
@@ -182,8 +182,15 @@ function InitiativeControl({ creature, onInitiativeChange, isLocalhost }) {
                 // GM-only bookkeeping: blur-stamps initiative into combatSummary and
                 // flips the session phase (bug-player-clients-can-hijack-initiative).
                 // Disabled keeps the read value visible with the card's own styling,
-                // mirroring TargetSelect's disabled gate.
-                disabled={!isLocalhost}
+                // mirroring TargetSelect's disabled gate. Split-party law: an AWAY row
+                // holds NO initiative slot (initiative is wiped on split), so the input
+                // is read-only there too — the GM rejoins the hero first
+                // (bug-away-card-initiative-input-resurrects-slot). The presence-keyed
+                // input remounts on split/rejoin so the uncontrolled defaultValue
+                // re-syncs to the store value instead of lingering on a stale roll.
+                key={isAway ? 'away' : 'present'}
+                disabled={!isLocalhost || isAway}
+                title={isAway ? `${creature.name} is away from the party — rejoin them before setting initiative` : undefined}
                 onBlur={(event) => onInitiativeChange(creature.name, event.target.value)}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter') {
@@ -751,7 +758,7 @@ function CreatureCard({
                 tvMode={tvMode}
             />
             <TempHpDisplay creature={creature} campaignName={campaignName} />
-            <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} isLocalhost={isLocalhost} />
+            <InitiativeControl creature={creature} onInitiativeChange={onInitiativeChange} isLocalhost={isLocalhost} isAway={isAway} />
             <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} allCreatures={allCreatures} overlays={overlays} onTargetChange={onTargetChange} />
             <ControlRow creature={creature} allCreatures={allCreatures} isLocalhost={isLocalhost} controllerName={controllerName} onControllerChange={onControllerChange} />
             <AlliesButton creature={creature} isLocalhost={isLocalhost} onEditAllies={onEditAllies} />

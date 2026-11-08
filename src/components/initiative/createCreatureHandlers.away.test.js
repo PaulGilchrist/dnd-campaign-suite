@@ -3,7 +3,9 @@
 // handlePartyPresenceChange — localhost gate, the single board write, and the
 // per-change party_split / party_rejoined audit rows. Mutation semantics
 // (initiative wipe / end-of-round landing / back-parking) are pinned in
-// creaturePresence.test.js — this file proves the HANDLER wiring only.
+// creaturePresence.test.js — this file proves the HANDLER wiring only, plus
+// the away-refusal of the initiative-stamp lane (bug-away-card-initiative-
+// input-resurrects-slot; the real initiativeService is unmocked here).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -33,6 +35,8 @@ vi.mock('../../hooks/useAllySelection.js', () => ({ getAllyList: vi.fn(() => [])
 import { createCreatureHandlers } from './createCreatureHandlers.js';
 import storage from '../../services/ui/storage.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { setSessionPhase } from '../../services/combat/sessionService.js';
+import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js';
 
 const board = () => ({
     round: 2,
@@ -123,5 +127,36 @@ describe('handleToggleAway', () => {
         handlers.handleToggleAway('Goblin');
         expect(storage.set).not.toHaveBeenCalled();
         expect(combatSummary.creatures).toHaveLength(3);
+    });
+});
+
+// bug-away-card-initiative-input-resurrects-slot: the away card's initiative
+// input is disabled, but the HANDLER lane is the data-integrity law — a typing
+// blur must never resurrect the wiped slot, un-park the card, flip the session
+// phase, or arm the Thief's-Reflexes grant. Real initiativeService in this file
+// (unmocked), so the sort law is exercised end to end.
+describe('initiative stamp on an away row (presence gate)', () => {
+    let errorSpy;
+    beforeEach(() => { errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}); });
+
+    it('away player: refused — no initiative write, no board write, no phase flip', () => {
+        const { handlers, combatSummary, setCombatSummary } = wire();
+        handlers.handleInitiativeChange('Bo', '12');
+        expect(combatSummary.creatures.find(c => c.name === 'Bo')).toMatchObject({ away: true, initiative: '' });
+        expect(combatSummary.creatures.map(c => c.name)).toEqual(['Ann', 'Bo', 'Goblin']);
+        expect(storage.set).not.toHaveBeenCalled();
+        expect(setCombatSummary).not.toHaveBeenCalled();
+        expect(setSessionPhase).not.toHaveBeenCalled();
+        expect(maybeGrantThiefsReflexesSecondTurn).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('away from the party'));
+    });
+
+    it('present player still stamps through the guarded lane (adjacent behavior)', () => {
+        const { handlers, combatSummary } = wire();
+        handlers.handleInitiativeChange('Ann', '4');
+        expect(combatSummary.creatures.find(c => c.name === 'Ann').initiative).toBe('4');
+        // sortCreaturesForBoard: Goblin 6 now outranks Ann 4; away Bo stays parked last.
+        expect(combatSummary.creatures.map(c => c.name)).toEqual(['Goblin', 'Ann', 'Bo']);
+        expect(storage.set).toHaveBeenCalledTimes(1);
     });
 });

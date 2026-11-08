@@ -136,3 +136,43 @@ describe('TargetSelect excludes away creatures', () => {
         expect(options).toEqual(['Goblin']);
     });
 });
+
+// bug-away-card-initiative-input-resurrects-slot: an away row holds NO
+// initiative slot — its card's initiative input is read-only even for the GM,
+// and the presence-keyed input REMOUNTS on presence flips so the uncontrolled
+// defaultValue re-syncs to the store value (wiped '' on split, landed slot on
+// rejoin) instead of displaying a stale roll until a page reload.
+describe('initiative input presence faces', () => {
+    const input = (container) => container.querySelector('[data-testid="initiative-input"]');
+
+    it('away player: disabled for the localhost GM with a rejoin hint', () => {
+        props.creature = base({ away: true, initiative: '' });
+        const { container } = render(<CreatureCard {...props} />);
+        const inp = input(container);
+        expect(inp.disabled).toBe(true);
+        expect(inp.title).toContain('away from the party');
+    });
+
+    it('present player: input stays enabled for the GM', () => {
+        const { container } = render(<CreatureCard {...props} />);
+        expect(input(container).disabled).toBe(false);
+    });
+
+    it('split re-syncs the displayed value to the wiped store value', () => {
+        props.creature = base({ initiative: '10' });
+        const { container, rerender } = render(<CreatureCard {...props} />);
+        expect(input(container).value).toBe('10');
+        props.creature = base({ initiative: '', away: true }); // applyPresenceChanges wiped it
+        rerender(<CreatureCard {...props} />);
+        expect(input(container).value).toBe('');
+    });
+
+    it('rejoin re-syncs the displayed value to the landed end-of-round slot', () => {
+        props.creature = base({ initiative: '10', away: true }); // stale display face
+        const { container, rerender } = render(<CreatureCard {...props} />);
+        props.creature = base({ initiative: '15' });
+        rerender(<CreatureCard {...props} />);
+        expect(input(container).value).toBe('15');
+        expect(input(container).disabled).toBe(false);
+    });
+});

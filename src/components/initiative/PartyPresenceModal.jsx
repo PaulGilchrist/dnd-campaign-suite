@@ -70,7 +70,10 @@ export default function PartyPresenceModal({ players, onConfirm, onCancel }) {
                                     />
                                     <span className="secondary-target-name">
                                         <strong>{player.name}</strong>
-                                        {player.initiative !== '' && player.initiative != null && (
+                                        {/* Split-party law: an away row holds no slot — never
+                                            annotate (Init n) for one (legacy stores can still
+                                            carry a stale numeric on an away row). */}
+                                        {player.away !== true && player.initiative !== '' && player.initiative != null && (
                                             <span className="secondary-target-size"> (Init {player.initiative})</span>
                                         )}
                                         {!isPresent && (
