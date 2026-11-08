@@ -499,6 +499,16 @@
   font-style: italic;
 }
 
+/* Bounded-render affordance under the capped bestiary face ("Showing first N
+ * of M — type to narrow"). Sits below .monster-table-wrapper; global
+ * .text-muted supplies the muted tone, this only lays it out. */
+.encounter-builder .monster-table-cap-notice {
+  text-align: center;
+  padding: 8px;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
 /* ============ Selected Monsters ============ */
 .encounter-builder .encounter-selected {
   background: var(--background-color-card);

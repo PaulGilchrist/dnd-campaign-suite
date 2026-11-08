@@ -132,6 +132,7 @@ function MonsterTableRow({
 
 function EncounterMonsterTable({
   filteredMonsters,
+  hiddenCount = 0,
   selectedMonsters,
   onToggleMonster,
   onIncreaseQty,
@@ -237,6 +238,7 @@ function EncounterMonsterTable({
 
       {/* Monster Table */}
       {filteredMonsters.length > 0 ? (
+        <>
         <div className="monster-table-wrapper">
           <table className="monster-table">
             <thead>
@@ -272,6 +274,12 @@ function EncounterMonsterTable({
             </tbody>
           </table>
         </div>
+        {hiddenCount > 0 && (
+          <div className="monster-table-cap-notice text-muted" data-testid="monster-table-cap-notice">
+            Showing first {filteredMonsters.length} of {filteredMonsters.length + hiddenCount} — type to narrow
+          </div>
+        )}
+        </>
       ) : (
         <div className="empty-state">
           <i className="fa-solid fa-search" style={{ marginRight: 6 }} />

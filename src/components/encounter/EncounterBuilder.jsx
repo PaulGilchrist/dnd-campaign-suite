@@ -20,6 +20,16 @@ import './EncounterBuilder.css';
 
 const difficultyLabels = ['Easy', 'Medium', 'Hard', 'Deadly'];
 
+// Bounded bestiary render (EN backlog 2026-11-08): the full bestiary (~640
+// rows in monsters.json) must never all render behind the search box — heavy
+// first paint + slow DOM queries. With NO narrowing control active (empty
+// search, no environment/type/size/CR filter) only the first BESTIARY_RENDER_CAP
+// rows mount, with a visible "type to narrow" affordance — mirroring the
+// capped-list pattern of useEquipmentSearch (slice(0, 20)). Typing renders the
+// full match set; selected rows are always kept so their checkboxes and qty
+// controls stay reachable.
+const BESTIARY_RENDER_CAP = 50;
+
 function calculateDifficultyIndex(effectiveXP, totalThreshold) {
   if (!totalThreshold) return 0;
   const ratio = effectiveXP / totalThreshold;
@@ -96,6 +106,37 @@ function filterMonsters(monsters, filter = {}) {
     if (!q) return true;
     return matchesSearchQuery(m, q);
   });
+}
+
+// True when any search/filter control actively narrows the bestiary — a
+// narrowed result set is small by definition, so it renders in full.
+function isBestiaryNarrowed(filter = {}) {
+  const hasValue = (v) => v !== '' && v !== null && v !== undefined;
+  return Boolean(
+    (filter.searchQuery && filter.searchQuery.trim())
+    || filter.environment
+    || filter.type
+    || filter.size
+    || hasValue(filter.crMin)
+    || hasValue(filter.crMax)
+  );
+}
+
+// Capped un-narrowed face: first BESTIARY_RENDER_CAP rows in sort order, plus
+// every selected row kept visible (so checked boxes/qty controls never hide
+// behind the cap). Narrowed or short result sets pass through untouched.
+function capBestiaryRows(sortedMonsters, selectedMonsters, narrowed) {
+  if (narrowed || sortedMonsters.length <= BESTIARY_RENDER_CAP) return sortedMonsters;
+  const selected = new Set(selectedMonsters.map((m) => m.index));
+  const kept = [];
+  let budget = BESTIARY_RENDER_CAP;
+  for (const m of sortedMonsters) {
+    if (selected.has(m.index) || budget > 0) {
+      kept.push(m);
+      if (!selected.has(m.index)) budget -= 1;
+    }
+  }
+  return kept;
 }
 
 // --- Immutable state updaters ---
@@ -346,6 +387,22 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
         },
         [monsters, searchQuery, filter.environment, filter.type, filter.size, filter.crMin, filter.crMax, selectedMonsters, sortField, sortDirection]
     );
+
+  // Bounded-render face: un-narrowed, the table mounts only a capped slice of
+  // the sorted bestiary (see BESTIARY_RENDER_CAP); narrowed sets render full.
+  const bestiaryNarrowed = isBestiaryNarrowed({
+    searchQuery,
+    environment: filter.environment,
+    type: filter.type,
+    size: filter.size,
+    crMin: filter.crMin,
+    crMax: filter.crMax,
+  });
+
+  const visibleMonsters = useMemo(
+    () => capBestiaryRows(filteredMonsters, selectedMonsters, bestiaryNarrowed),
+    [filteredMonsters, selectedMonsters, bestiaryNarrowed]
+  );
 
   // --- Handlers ---
   const handleToggleMonster = (monster) => {
@@ -775,7 +832,8 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
 
         {/* Monster Selection Table */}
            <EncounterMonsterTable
-           filteredMonsters={filteredMonsters}
+           filteredMonsters={visibleMonsters}
+           hiddenCount={filteredMonsters.length - visibleMonsters.length}
            selectedMonsters={selectedMonsters}
            onToggleMonster={handleToggleMonster}
            onIncreaseQty={handleIncreaseQty}

@@ -66,8 +66,6 @@ Live facts (EN, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (EN 2026-11-08) Encounter Builder keeps ~500 `input.monster-checkbox` DOM rows unfiltered (full bestiary rendered even behind the search box) — heavy first paint + slow queries; virtualize or render on search.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): effect-level (not just log-level) duplication of NON-idempotent turn-start heals across two clients (only the latch-guarded Dread Ambush carrier was ridden — reasoning in the bug file, control face = 1 row single client); floater fired by a real cross-client visit roll (floater leg used PATCH-driven diffs); audibility of YT playback (headless — state flags only); fog/map LAN-visitor rendering (PT4 next).
