@@ -82,8 +82,30 @@ Read-only inspection only: `git log`, `git show`, `git diff`, `git status`, `git
 - **Route order matters in Express:** `campaigns-changedata.js` must be mounted after `campaigns-character.js` in `server.js` so `.json` character file routes aren't captured by the `:key` wildcard. Same reason `campaigns-starter-seed.js` (GET/PUT `/api/campaigns/:campaign/starter-seed`) and `campaigns-meta.js` (GET/PUT `/api/campaigns/:campaign/meta`) are mounted BEFORE `campaigns-changedata.js` — otherwise the generic `:campaign/:key` wildcard swallows `/starter-seed` or `/meta` as a change-data key.
 - **GM monster execution flow:** the GM clicks a monster's avatar in Initiative → `MonsterCardModal` opens (full stat block) → clicking an action's dice chip (`mc-dice-link`) rolls through the engine (`handleAttack`). **Invariant (owner): `npcs.json` is reserved for CUSTOM NPCs — pre-made monsters NEVER live there; they join via the Encounter Builder and pull real stats from `monsters.json`.** Enforced at the server (npcs CRUD bestiary-name guard, plain-English 400); a same-named placeholder NPC otherwise shadow-blocks the real stat block in the avatar→modal lane (found live 2026-10-13).
 - **Dual ruleset data paths:** 5e data lives in `/data/`, 2024 data in `/data/2024/`. Shared data (equipment, monsters) is only in `/data/`. See `src/services/ui/dataLoader.js` `getDataPath()`.
-- **GM features are localhost-only:** Encounter builder, map editing, quest/faction/NPC management are enabled on localhost; network clients get read-only view.
+- **GM features are localhost-only:** Encounter builder, map editing, quest/faction/NPC management are enabled on localhost; network clients get read-only view. **Exception (owner-ratified 2026-11-08):** the spell-overlay transport is visitor-writable shared-table authoring — see "Map Lane Write Authority" below.
 - **5MB JSON body limit:** Image uploads are base64-encoded; Express JSON body parser is configured for 5MB.
+
+## Map Lane Write Authority
+
+Per-lane matrix of who may WRITE each map-surface lane, verified against the route code (live-proved 2026-11-08 from a LAN-IP origin on `test-campaign`). "GM" = `req.hostname` is `localhost`/`127.0.0.1` (`maps.js:53` `isLocalhost` — it follows the **Host header**, and the Vite proxy keeps the real one via `changeOrigin: false`, so a LAN tab browsing `http://<en0-ip>:5173` is honestly a visitor). "Visitor" = any network client.
+
+| Lane | Endpoint | GM | Visitor | Guard mechanism (verified in code) |
+|---|---|---|---|---|
+| Overlay read | `GET /spell-overlay?campaign=` | read | read | Open to all (`spell-overlay.js:23`) |
+| Overlay add/update/remove/clear | `POST /spell-overlay?campaign=` | **write** | **write — INTENTIONAL** | **CAMPAIGN_LOCK only** — `refuseLockedOffTargetWrite` (`spell-overlay.js:38-45`, enforced `:191`); NO `refuseUnlessGm`/`isLocalhost` anywhere in the file, and all four actions share the one gate (no per-action difference — the gate runs before the `applyOverlayAction` branches at `:152-184`). Malformed rows/actions 400 regardless of origin. |
+| Map create | `POST /api/campaigns/:c/maps` | write | 403 | `refuseUnlessGm` (`maps.js:397`) |
+| Map data PUT (indoor) | `PUT /api/campaigns/:c/maps/:slug` | write | 403 | `refuseUnlessGm` (`maps.js:496`) |
+| Map data PUT (outdoor) | same | write | narrow all-tab lane | Non-GM may PUT party-travel fields (partyPosition/travelState/marchingOrder/zoom/pan/weather); any editor-scope delta (terrain/rivers/roads/pois/gridSize/draft) 403s — `outdoorEditorDelta` (`maps.js:68-79`, enforced `:497-498`) |
+| Map delete | `DELETE /api/campaigns/:c/maps/:slug` | write | 403 | `refuseUnlessGm` (`maps.js:542`) |
+| Map rename | `PUT …/rename` | write | 403 | `refuseUnlessGm` (`maps.js:570`) |
+| Map activate | `PUT …/activate` | write | 403 | `refuseUnlessGm` (`maps.js:633`) |
+| Map deactivate | `PUT …/deactivate` | write | 403 | `refuseUnlessGm` (`maps.js:671`) |
+| Map description | `PUT …/description` | write | 403 | `refuseUnlessGm` (`maps.js:716`) |
+| Ruler / measurement | — (no server lane) | local | local | Purely per-client `useState` in `src/components/map/hooks/useRuler.js` — never sent to the server, never shared |
+| 3D toggle | — (no server lane) | local | local | `viewMode` in `Map.jsx` + labels/torch toggles in `Map3D.jsx` are local `useState` — per-client view state |
+| Runtime/change-data keys | `POST/PATCH/PUT /api/campaigns/:c/:key` | write | write | Shared runtime store by design (Server-First Pattern): players write their own character keys; gate is CAMPAIGN_LOCK path middleware (`server/utils/campaignLock.js`) + key validation, no GM gate. Overlay state deliberately lives OUTSIDE this store (`spellOverlayData` map, `data/spell-overlays.json`). |
+
+**`/spell-overlay` visitor-writability is INTENTIONAL (owner decision 2026-11-08):** shared-table authoring — anyone at the table may place effect zones and Clear-All removes overlays placed by everyone. Do NOT add `refuseUnlessGm` to that route. The sibling 403s above are the contrast: a LAN-origin map create/PUT/activate refused with "Access denied: GM-only feature" while the same origin's overlay add/clear returned 200.
 
 ## Server-First Pattern
 

@@ -20,6 +20,13 @@ const VALID_ACTIONS = new Set(['add', 'update', 'remove', 'clear']);
 // definition), closing both the cross-campaign-mutation hole and the
 // unbounded phantom-entry growth.
 
+// WRITE AUTHORITY (owner-ratified 2026-11-08): visitor-writability is
+// INTENTIONAL shared-table authoring — GM and LAN visitors may all four
+// actions alike; CAMPAIGN_LOCK is the ONLY origin gate here by design. Do
+// NOT add refuseUnlessGm. The per-map-lane write matrix (this route vs the
+// GM-only lanes in maps.js, ruler/3D being client-local) lives in AGENTS.md
+// §"Map Lane Write Authority".
+
 router.get('/spell-overlay', asyncHandler((req, res) => {
     const campaign = req.query.campaign;
     if (!campaign) {
