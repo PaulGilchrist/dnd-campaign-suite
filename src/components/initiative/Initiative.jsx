@@ -37,6 +37,7 @@ import { useTvPresentation } from './useTvPresentation.js'
 import { useAllyEditor } from './useAllyEditor.js'
 import AllyEditorModal from './AllyEditorModal.jsx'
 import FriendlyFireConfirmModal from './FriendlyFireConfirmModal.jsx'
+import ClearCombatConfirmModal from './ClearCombatConfirmModal.jsx'
 import TvToggleButton from './TvToggleButton.jsx'
 import TvNextUpStrip from './TvNextUpStrip.jsx'
 import VictoryBanner from './VictoryBanner.jsx'
@@ -331,10 +332,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     // state — a half-answered confirm, not game state, so it never touches the
     // runtime store. One prompt at a time: a newer ally-target selection
     // replaces the pending pair. No timer resolves/dismisses it (No-Game-Timers).
+    // The factory bridge IS the useState setter (stable identity; the friendly-
+    // fire payload is the pending pair, the Clear payload is `true` = armed) —
+    // Initiative.jsx sits at the max-statements cap, so no pass-through wrapper.
     const [pendingFriendlyFire, setPendingFriendlyFire] = React.useState(null)
-    const requestFriendlyFireConfirm = React.useCallback((pending) => {
-        setPendingFriendlyFire(pending)
-    }, [])
+
+    // Initiative-Clear overlay (backlog 2026-11-08 EK): same doctrine —
+    // UI-local ephemeral flag, waits indefinitely, zero writes until the
+    // explicit confirm button.
+    const [pendingClearConfirm, setPendingClearConfirm] = React.useState(false)
 
     React.useEffect(() => {
         if (!campaignName) return
@@ -428,6 +434,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const {
         handleCreatureHpChange,
         handleClear,
+        confirmClear,
         handleInitiativeChange,
         handleNameChange,
         handleTargetChange,
@@ -449,8 +456,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         numOfNpc: creaturesOrEmpty(combatSummary).filter(isBareNpcPlaceholder).length,
         isLocalhost,
         showToast,
-        requestFriendlyFireConfirm,
-    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters, showToast, requestFriendlyFireConfirm])
+        requestFriendlyFireConfirm: setPendingFriendlyFire,
+        requestClearConfirm: setPendingClearConfirm,
+    }), [combatSummary, campaignName, campaignNpcs, overlays, isLocalhost, characters, showToast, setPendingFriendlyFire, setPendingClearConfirm])
 
     // Overlay-confirm seam: accept arms through the factory (same audit row +
     // board-write bytes the retired native-confirm lane produced); cancel is
@@ -891,6 +899,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 pending={pendingFriendlyFire}
                 onCancel={() => setPendingFriendlyFire(null)}
                 onConfirm={handleFriendlyFireConfirm}
+            />
+            <ClearCombatConfirmModal
+                pending={pendingClearConfirm}
+                onCancel={() => setPendingClearConfirm(false)}
+                onConfirm={() => { setPendingClearConfirm(false); confirmClear() }}
             />
             {conditionPopup && (
                 <ConditionSavePopup

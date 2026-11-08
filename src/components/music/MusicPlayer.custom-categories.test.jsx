@@ -6,7 +6,7 @@
 // lists. Categories PATCH { customCategories } through the same intent-split
 // /music lane as overrides, so a create/delete never touches transport
 // fields. Harness mirrors MusicPlayer.active-mood-editor.test.jsx.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
@@ -237,17 +237,43 @@ describe('MusicPlayer campaign-specific categories', () => {
     });
   });
 
-  describe('delete', () => {
-    it('removes category and tracks in one PATCH after confirm', async () => {
+  describe('delete (role=dialog confirm)', () => {
+    // Backlog 2026-11-08 EK: the chip-× and editor "Delete category" faces both
+    // arm the shared DeleteConfirmModal with the retired native copy VERBATIM;
+    // accept runs the previous window.confirm body (atomic PATCH + log row),
+    // cancel is fully inert.
+    const deleteDialog = () => screen.getByRole('dialog', { name: 'Delete Music Category' });
+    const dialogConfirm = () => within(deleteDialog()).getByRole('button', { name: 'Yes, Delete Category' });
+    const dialogCancel = () => within(deleteDialog()).getByRole('button', { name: 'Cancel' });
+
+    it('chip × opens the role=dialog with the verbatim copy; native confirm never fires; cancel is a no-op', () => {
+      const { posts } = mount({ customCategories: { 'custom-crypt': { label: 'Crypt' } } });
+
+      fireEvent.click(screen.getByLabelText('Delete Crypt category'));
+
+      const dialog = deleteDialog();
+      expect(within(dialog).getByText('Delete the Crypt category? Its track list will be removed.')).toBeInTheDocument();
+      expect(confirmSpy).not.toHaveBeenCalled();
+
+      fireEvent.click(dialogCancel());
+
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByLabelText('Delete Crypt category')).toBeInTheDocument();
+      expect(posts.filter(p => 'customCategories' in p)).toHaveLength(0);
+      expect(mockAddEntry).not.toHaveBeenCalled();
+    });
+
+    it('removes category and tracks in one PATCH after dialog confirm', async () => {
       const { posts, server } = mount({
         overrides: { 'custom-crypt': [{ videoId: 'aAAAAAAAAAA', title: 'a' }], tavern: [{ videoId: 'b', title: 'b' }] },
         customCategories: { 'custom-crypt': { label: 'Crypt' } },
       });
 
       fireEvent.click(screen.getByLabelText('Delete Crypt category'));
-      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Crypt'));
+      fireEvent.click(dialogConfirm());
       await waitFor(() => expect(musicState().customCategories['custom-crypt']).toBeUndefined());
 
+      expect(confirmSpy).not.toHaveBeenCalled();
       const patch = posts[posts.length - 1];
       expect(patch.customCategories).toEqual({});
       expect(patch.overrides).toEqual({ tavern: [{ videoId: 'b', title: 'b' }] });
@@ -259,14 +285,26 @@ describe('MusicPlayer campaign-specific categories', () => {
       );
     });
 
-    it('declined confirm is a no-op', () => {
-      confirmSpy.mockReturnValue(false);
-      const { posts } = mount({ customCategories: { 'custom-crypt': { label: 'Crypt' } } });
+    it('editor "Delete category" face arms the SAME modal and deletes on confirm, closing the editor', async () => {
+      const { server } = mount({
+        customCategories: { 'custom-crypt': { label: 'Crypt' } },
+      });
+      // Empty-category shortcut: the chip click opens the editor on that mood.
+      fireEvent.click(screen.getByTitle('Add Crypt tracks'));
+      fireEvent.click(document.querySelector('.music-editor-actions [title="Delete Crypt category"]'));
 
-      fireEvent.click(screen.getByLabelText('Delete Crypt category'));
+      const dialog = deleteDialog();
+      expect(within(dialog).getByText('Delete the Crypt category? Its track list will be removed.')).toBeInTheDocument();
+      fireEvent.click(dialogConfirm());
 
-      expect(screen.getByLabelText('Delete Crypt category')).toBeInTheDocument();
-      expect(posts.filter(p => 'customCategories' in p)).toHaveLength(0);
+      await waitFor(() => expect(musicState().customCategories['custom-crypt']).toBeUndefined());
+      expect(server().customCategories).toEqual({});
+      // Editor was open on the deleted mood: it closes with the delete.
+      expect(screen.queryByPlaceholderText('One YouTube URL or video ID per line')).toBeNull();
+      expect(mockAddEntry).toHaveBeenCalledWith(
+        'test-campaign',
+        expect.objectContaining({ type: 'music', action: 'delete_category', mood: 'custom-crypt' })
+      );
     });
 
     it('deleting the ACTIVE mood stops playback and un-arms the transport first', async () => {
@@ -277,6 +315,7 @@ describe('MusicPlayer campaign-specific categories', () => {
       });
 
       fireEvent.click(screen.getByLabelText('Delete Crypt category'));
+      fireEvent.click(dialogConfirm());
       await waitFor(() => expect(musicState().mood).toBeNull());
 
       expect(youtubePlayer.stop).toHaveBeenCalled();
@@ -290,8 +329,7 @@ describe('MusicPlayer campaign-specific categories', () => {
     });
   });
 
-  it('editor select offers custom categories and the discard confirm names them', async () => {
-    confirmSpy.mockReturnValue(false); // Cancel dismisses → draft survives
+  it('editor select offers custom categories and the discard modal names them', async () => {
     mount({ customCategories: { 'custom-crypt': { label: 'Crypt' } } });
 
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
@@ -302,8 +340,11 @@ describe('MusicPlayer campaign-specific categories', () => {
     fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), { target: { value: 'dirty draft' } });
     fireEvent.click(screen.getByText('Cancel'));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Crypt'));
+    const dialog = screen.getByRole('dialog', { name: 'Discard Changes?' });
+    expect(within(dialog).getByText('Discard changes to the Crypt track list?')).toBeInTheDocument();
+    expect(confirmSpy).not.toHaveBeenCalled();
     // dismissed → editor stays open with the draft intact
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.getByPlaceholderText('One YouTube URL or video ID per line').value).toBe('dirty draft');
   });
 });

@@ -5,6 +5,7 @@ import useLog from '../../hooks/runtime/useLog.js';
 import { MOODS, DEFAULT_VOLUME, getTracksForMood, extractVideoId, buildMoodList, makeCategoryKey, CATEGORY_ICONS, DEFAULT_CUSTOM_ICON } from '../../services/ui/musicConfig.js';
 import { saveMusicOverrides, saveMusicCategories } from '../../services/ui/musicService.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
 import './MusicPlayer.css';
 
@@ -91,6 +92,41 @@ function MusicCategoryForm({ label, icon, error, onLabelChange, onIconChange, on
   );
 }
 
+// The two role=dialog confirm modals (backlog 2026-11-08 EK migration off
+// native window.confirm): hoisted presentational wrappers over the shared
+// DeleteConfirmModal so the retired copy renders VERBATIM inside the family
+// chrome (null when their trigger is idle, FriendlyFireConfirmModal idiom).
+// Kept out of MusicPlayer's body (complexity cap) — pure props in.
+function MusicDeleteCategoryModal({ moodKey, moodLabel, onCancel, onConfirm }) {
+  if (!moodKey) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="music-delete-category-title"
+      title="Delete Music Category"
+      confirmLabel="Yes, Delete Category"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      {`Delete the ${moodLabel(moodKey)} category? Its track list will be removed.`}
+    </DeleteConfirmModal>
+  );
+}
+
+function MusicDiscardChangesModal({ pending, message, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="music-discard-changes-title"
+      title="Discard Changes?"
+      confirmLabel="Yes, Discard"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      {message}
+    </DeleteConfirmModal>
+  );
+}
+
 // Display-only save/reset confirmation toast — moved out of MusicPlayer's
 // render body (complexity budget, improve 2026-11-07); markup unchanged.
 function MusicToast({ toast }) {
@@ -142,13 +178,16 @@ function MusicPlayer({ campaignName, visible = true }) {
   // the wizard, 4569f2d67): Cancel or a mood-select switch silently discarded
   // a typed-but-unsaved track list. Shares the house useReloadGuard — seed
   // the snapshot wherever the editor (re)seeds the textarea, re-baseline on
-  // Reset (save-lane stays open), clear on close; only a draft that
-  // deep-differs from its seed pays the confirm, naming the mood being LEFT.
+  // Reset (save-lane stays open); only a draft that deep-differs from its
+  // seed pays the discard prompt, naming the mood being LEFT. The prompt
+  // itself migrated off native window.confirm onto the shared
+  // DeleteConfirmModal role="dialog" tier (backlog 2026-11-08 EK, friendly-
+  // fire precedent): the guard supplies the dirty verdict (isDraftDirty),
+  // the pending action waits in UI-local state until an explicit button.
   const editorDraft = useMemo(() => ({ trackText }), [trackText]);
-  const { seedDraft, clearDraft, confirmDiscardDraft } = useReloadGuard({
+  const { seedDraft, clearDraft, isDraftDirty } = useReloadGuard({
     modalOpen: editing,
     formData: editorDraft,
-    confirmMessage: `Discard changes to the ${moodLabel(editMood)} track list?`,
   });
   // Live-validation hint (improve 2026-10-29-AF backlog, parity with the
   // .ct-* lanes' typed-while-live duplicate banners, e.g. Quests.jsx
@@ -381,26 +420,54 @@ function MusicPlayer({ campaignName, visible = true }) {
     setEditing(true);
   }, [music.mood, editMood, seedEditor]);
 
+  // Pending discard (UI-local ephemeral prompt state — a half-answered
+  // confirm, never the runtime store; No-Game-Timers: waits indefinitely for
+  // an explicit button). `nextMood` null = the Cancel close path; a mood key
+  // = the select-switch path (the select DOM value is reverted immediately,
+  // the seed only lands on confirm).
+  const [pendingDiscard, setPendingDiscard] = useState(null);
+
   const changeEditMood = useCallback((event) => {
     const moodKey = event.target.value;
     // Switching moods re-seeds the textarea — an unsaved draft pays the same
-    // NAMED confirm (naming the mood being LEFT). Dismiss keeps the edit on
-    // the original mood and resets the select by hand: editMood state never
-    // changes, so React has no re-render that would restore the DOM value.
-    if (!confirmDiscardDraft()) {
+    // NAMED discard modal (naming the mood being LEFT). Cancel keeps the edit
+    // on the original mood; the select was already reset by hand: editMood
+    // state never changed, so React has no re-render that would restore the
+    // DOM value.
+    if (isDraftDirty()) {
+      setPendingDiscard({ nextMood: moodKey });
       event.target.value = editMood;
       return;
     }
     seedEditor(moodKey);
-  }, [editMood, confirmDiscardDraft, seedEditor]);
+  }, [editMood, isDraftDirty, seedEditor]);
 
   // Cancel close path (parity with the .ct-* handleRequestClose doctrine): a
-  // dirty draft confirms first; a clean draft discards silently as before.
+  // dirty draft opens the discard modal first; a clean draft closes silently
+  // as before.
   const cancelEdit = useCallback(() => {
-    if (!confirmDiscardDraft()) return;
+    if (isDraftDirty()) {
+      setPendingDiscard({ nextMood: null });
+      return;
+    }
     clearDraft();
     setEditing(false);
-  }, [confirmDiscardDraft, clearDraft]);
+  }, [isDraftDirty, clearDraft]);
+
+  // Discard-modal confirm: executes what the retired native-confirm lane ran
+  // inline — switch re-seeds the target mood, close discards + unmounts the
+  // editor. Cancel just clears the pending prompt (everything stays inert).
+  const confirmPendingDiscard = useCallback(() => {
+    const pending = pendingDiscard;
+    setPendingDiscard(null);
+    if (!pending) return;
+    if (pending.nextMood) {
+      seedEditor(pending.nextMood);
+    } else {
+      clearDraft();
+      setEditing(false);
+    }
+  }, [pendingDiscard, seedEditor, clearDraft]);
 
   const saveTracks = useCallback(async () => {
     const tracks = parseTrackList(trackText);
@@ -508,9 +575,21 @@ function MusicPlayer({ campaignName, visible = true }) {
     setCategoryError(null);
   }, []);
 
-  const deleteCategory = useCallback(async (moodKey) => {
+  // Category-delete confirm (backlog 2026-11-08 EK): the native window.confirm
+  // migrated onto the shared DeleteConfirmModal role="dialog" tier. UI-local
+  // ephemeral prompt state — the pending mood key, nothing more; a Cancel
+  // leaves every byte untouched. Both trigger faces (the sidebar chip × and
+  // the editor's "Delete category") funnel through this one request.
+  const [pendingDeleteCategory, setPendingDeleteCategory] = useState(null);
+
+  const requestDeleteCategory = useCallback((moodKey) => {
+    setPendingDeleteCategory(moodKey);
+  }, []);
+
+  // Confirmed body — byte-identical to the retired native lane (stop first,
+  // atomic PATCH, log row); the modal has already gated it.
+  const executeDeleteCategory = useCallback(async (moodKey) => {
     const label = moodLabel(moodKey);
-    if (!window.confirm(`Delete the ${label} category? Its track list will be removed.`)) return;
     // Deleting the ACTIVE mood silences this tab's player first, then the
     // transport un-arms the shared mood (stop button's honest state). Other
     // tabs release theirs via the existing remote-adoption lane.
@@ -542,6 +621,12 @@ function MusicPlayer({ campaignName, visible = true }) {
     });
   }, [music, moodLabel, commitMusic, campaignName, editing, editMood, clearDraft, showToast, addEntry]);
 
+  const confirmDeleteCategory = useCallback(() => {
+    const moodKey = pendingDeleteCategory;
+    setPendingDeleteCategory(null);
+    if (moodKey) executeDeleteCategory(moodKey);
+  }, [pendingDeleteCategory, executeDeleteCategory]);
+
   const playing = music.playing;
 
   const panel = (
@@ -560,7 +645,7 @@ function MusicPlayer({ campaignName, visible = true }) {
               active={playing && music.mood === mood.key}
               trackCount={getTracksForMood(mood.key, music.overrides).length}
               onSelect={selectMood}
-              onDelete={deleteCategory}
+              onDelete={requestDeleteCategory}
             />
           ))}
           <button
@@ -661,7 +746,7 @@ function MusicPlayer({ campaignName, visible = true }) {
             {isCustomMood(editMood) ? (
               // Custom categories have no starter defaults to Reset to —
               // the editor offers Delete (category + tracks) instead.
-              <button className="music-btn" onClick={() => deleteCategory(editMood)} title={`Delete ${moodLabel(editMood)} category`}>
+              <button className="music-btn" onClick={() => requestDeleteCategory(editMood)} title={`Delete ${moodLabel(editMood)} category`}>
                 Delete category
               </button>
             ) : (
@@ -672,6 +757,18 @@ function MusicPlayer({ campaignName, visible = true }) {
         </div>
       )}
       <MusicToast toast={toast} />
+      <MusicDeleteCategoryModal
+        moodKey={pendingDeleteCategory}
+        moodLabel={moodLabel}
+        onCancel={() => setPendingDeleteCategory(null)}
+        onConfirm={confirmDeleteCategory}
+      />
+      <MusicDiscardChangesModal
+        pending={pendingDiscard}
+        message={`Discard changes to the ${moodLabel(editMood)} track list?`}
+        onCancel={() => setPendingDiscard(null)}
+        onConfirm={confirmPendingDiscard}
+      />
       </div>
     </div>
   );

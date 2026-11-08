@@ -2,7 +2,7 @@
 // Regression: saving the track editor with unparseable input must show a visible
 // inline error (previously a console-only silent no-op), and that error must
 // clear on the next keystroke / mood switch / successful save.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
@@ -89,12 +89,14 @@ describe('MusicPlayer invalid-save inline error', () => {
     expect(container.querySelector('.music-editor-error')).not.toBeNull();
     spy.mockRestore();
 
-    // Draft is dirty ('junk' ≠ seeded ids): the Cancel close now pays the
-    // named discard (improve 2026-10-29-AE) — accept it to reach the reopen.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // Draft is dirty ('junk' ≠ seeded ids): the Cancel close now opens the
+    // named-discard role=dialog modal (improve 2026-10-29-AE, migrated off
+    // native window.confirm by backlog 2026-11-08 EK) — accept it to reach the
+    // reopen.
     fireEvent.click(screen.getByText('Cancel'));
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to the Town track list?');
-    confirmSpy.mockRestore();
+    const dialog = screen.getByRole('dialog', { name: 'Discard Changes?' });
+    expect(within(dialog).getByText('Discard changes to the Town track list?')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, Discard' }));
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
     expect(container.querySelector('.music-editor-error')).toBeNull();
   });

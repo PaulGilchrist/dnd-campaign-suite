@@ -47,5 +47,18 @@ export function useReloadGuard({ modalOpen, formData, confirmMessage }) {
     return true;
   }, [modalOpen, formData, confirmMessage]);
 
-  return { seedDraft, clearDraft, confirmDiscardDraft };
+  // The SAME deep-diff verdict confirmDiscardDraft gates on, exposed WITHOUT
+  // the native toll (backlog 2026-11-08 EK): the music editor's Cancel/mood-
+  // switch discard migrated onto the shared DeleteConfirmModal role="dialog"
+  // tier (friendly-fire/Regenerate precedent), so its host asks the modal
+  // whenever this returns true and only consults confirmDiscardDraft's
+  // silent pass-through otherwise. Every other lane keeps the native path.
+  const isDraftDirty = useCallback(() => (
+    !!(modalOpen &&
+      formData &&
+      draftSnapshot.current &&
+      !isEqual(formData, draftSnapshot.current))
+  ), [modalOpen, formData]);
+
+  return { seedDraft, clearDraft, confirmDiscardDraft, isDraftDirty };
 }

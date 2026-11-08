@@ -488,20 +488,48 @@ describe('handleAddNpc', () => {
     });
 });
 
-describe('handleClear', () => {
-    // QA backlog: house NAMED canon (Factions/Notes/character-delete name their
-    // target + irreversibility) — the Clear confirm must state what it does.
-    it('confirm copy names the action, its scope, and irreversibility', () => {
-        const { handlers } = makeHandlers([{ name: 'Alice', type: 'player', currentHp: 20 }]);
+describe('handleClear / confirmClear', () => {
+    // Backlog 2026-11-08 EK: the native window.confirm migrated onto the shared
+    // DeleteConfirmModal role="dialog" tier (friendly-fire precedent). The
+    // VERBATIM copy is pinned in ClearCombatConfirmModal.test.jsx; the DOM
+    // faces (trigger → dialog → cancel/confirm) in initiative.test.jsx.
+    // handleClear only requests the host prompt; confirmClear runs the body
+    // the retired native-confirm lane ran inline.
+    it('handleClear routes to the host confirm modal — NO native dialog, zero writes until resumed', () => {
+        const requestClearConfirm = vi.fn();
+        const { handlers, setCombatSummary, setActiveCreatureName } = makeHandlers(
+            [{ name: 'Alice', type: 'player', currentHp: 20 }],
+            { requestClearConfirm }
+        );
 
         handlers.handleClear();
 
-        expect(window.confirm).toHaveBeenCalledWith(
-            'Clear combat status for all creatures? This resets initiative and removes all monsters from the board. This action is irreversible.'
-        );
+        expect(requestClearConfirm).toHaveBeenCalledTimes(1);
+        expect(requestClearConfirm).toHaveBeenCalledWith(true); // setter-payload bridge
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(clearCombat).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
+        expect(setCombatSummary).not.toHaveBeenCalled();
+        expect(setActiveCreatureName).not.toHaveBeenCalled();
     });
 
-    it('confirmed: fresh summary, active creature, exploration phase, CLA-100 player latches, closing roster rewards', () => {
+    it('fail closed: without a wired confirm host the board is NOT cleared (named console.error, no native dialog)', () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { handlers, setCombatSummary } = makeHandlers([
+            { name: 'Alice', type: 'player', currentHp: 20 },
+        ]);
+
+        handlers.handleClear();
+
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('clear-confirm host not wired'));
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(clearCombat).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
+        expect(setCombatSummary).not.toHaveBeenCalled();
+        errorSpy.mockRestore();
+    });
+
+    it('confirmed (modal accept → confirmClear): fresh summary, active creature, exploration phase, CLA-100 player latches, closing roster rewards', () => {
         const cleared = {
             round: 1,
             creatures: [
@@ -516,8 +544,9 @@ describe('handleClear', () => {
             { name: 'Goblin', type: 'npc', currentHp: 5 },
         ], { numOfNpc: 1 });
 
-        handlers.handleClear();
+        handlers.confirmClear();
 
+        expect(window.confirm).not.toHaveBeenCalled();
         expect(clearCombat).toHaveBeenCalledWith(characters, 1, expect.any(Function));
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cleared, campaignName);
         expect(setCombatSummary).toHaveBeenCalledWith(cleared);
@@ -548,12 +577,14 @@ describe('handleClear', () => {
         }));
     });
 
-    it('declined: nothing is cleared or written', () => {
-        window.confirm = vi.fn(() => false);
-        const { handlers, setCombatSummary, setActiveCreatureName } = makeHandlers([
-            { name: 'Alice', type: 'player', currentHp: 20 },
-        ]);
+    it('declined face: a pending prompt the host never confirms writes nothing (cancel = confirmClear never runs)', () => {
+        const { handlers, setCombatSummary, setActiveCreatureName } = makeHandlers(
+            [{ name: 'Alice', type: 'player', currentHp: 20 }],
+            { requestClearConfirm: vi.fn() }
+        );
 
+        // handleClear only arms the modal; the Cancel face simply never calls
+        // confirmClear — the board stays byte-intact.
         handlers.handleClear();
 
         expect(clearCombat).not.toHaveBeenCalled();
@@ -583,6 +614,7 @@ describe('no-combat guards', () => {
         handlers.handleInitiativeChange('Goblin', '12');
         handlers.handleNameChange('Goblin', 'Kobold');
         handlers.handleTargetChange('Goblin', 'Alice');
+        handlers.confirmClear();
         handlers.handleRemoveNpc('Goblin');
         handlers.handleAddNpc();
         // unknown creature in a live summary is also inert

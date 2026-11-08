@@ -87,14 +87,16 @@ function seedAllies(list) {
         (name === 'Alice' && key === 'selectedAllies') ? list : null);
 }
 
-describe('handleClear', () => {
+describe('confirmClear (post-modal-accept body)', () => {
     it('zero-character roster clears without crashing (Arena/Starter quick play)', async () => {
         const { handlers, setCombatSummary } = makeHandlers()
         // Simulate the join→clear flow in a fresh arena/starter campaign: the
         // clear's newSummary (players-only skeleton) is EMPTY with 0 characters.
+        // 2026-11-08 EK: the confirmed body moved to confirmClear (handleClear
+        // now only arms the host's role=dialog prompt).
         const initiativeService = await import('../../services/encounters/initiativeService.js')
         initiativeService.clearCombat.mockReturnValue({ round: 1, creatures: [] })
-        expect(() => handlers.handleClear()).not.toThrow()
+        expect(() => handlers.confirmClear()).not.toThrow()
         expect(setCombatSummary).toHaveBeenCalledWith({ round: 1, creatures: [] })
     })
 })

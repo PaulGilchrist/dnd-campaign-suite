@@ -9,7 +9,7 @@
 // as before. The mood <select> keeps working as the manual chooser and gains
 // an aria-label for discoverability. Harness mirrors
 // MusicPlayer.close-discard-confirm.test.jsx.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
@@ -125,7 +125,7 @@ describe('MusicPlayer editor opens on the active mood', () => {
     expect(youtubePlayer.playTracks).toHaveBeenCalledWith(['dQw4w9WgXcQ']);
   });
 
-  it('active Tavern: dirty Cancel names Tavern in the discard confirm', () => {
+  it('active Tavern: dirty Cancel names Tavern in the discard modal (role=dialog, no native confirm)', () => {
     stubMusicServer();
     setActiveMood('tavern');
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
@@ -133,8 +133,9 @@ describe('MusicPlayer editor opens on the active mood', () => {
     fireEvent.change(textarea(), { target: { value: 'garbage-not-a-url' } });
     fireEvent.click(screen.getByText('Cancel'));
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to the Tavern track list?');
+    const dialog = screen.getByRole('dialog', { name: 'Discard Changes?' });
+    expect(within(dialog).getByText('Discard changes to the Tavern track list?')).toBeInTheDocument();
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it('no active mood: editor keeps the catalogue-first fallback (Town)', () => {

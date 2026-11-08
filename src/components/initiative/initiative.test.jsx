@@ -4,15 +4,15 @@
 // mandate), GM controls + their contract tooltip, onNpcsChange push to the parent;
 // (2) combat-summary-updated adoption seam (inline listener, owned here — not #863's
 // concentration/death-save pair, not #864's initiative-rolled seam);
-// (3) Clear-button DOM→handler flow through window.confirm (factory internals: cite
-// createCreatureHandlers.test.jsx #837 "handleClear confirmed/declined"; cancelled path
-// folded here per REC #837, shrunk to one click assertion).
+// (3) Clear-button DOM→role=dialog confirm flow (2026-11-08 EK migration off
+// window.confirm; factory internals: cite createCreatureHandlers.test.jsx
+// "handleClear / confirmClear"; the modal copy tier: ClearCombatConfirmModal.test.jsx).
 // CUT (owners cited): handler internals #833-#847, inline concentration/death-save
 // listeners #863, initiative-rolled seam #864, card render/dispatch/prompts #848-#853,
 // EffectAdder #855-#861/#838-#839, HpBar #862, keydown/nav seams → navigationHandlers
 // lanes (queued). Boundary-mocked per REC #837 + zero-network guard #841:
 // sessionService, autoRewardService, zoneDurationClock, spellOverlayService (mount fetch).
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './Initiative.jsx';
 import * as combatData from '../../services/encounters/combatData.js';
@@ -197,21 +197,32 @@ describe('Initiative', () => {
         expect([...cardNames].sort()).toEqual(['Alice', 'Ogre']);
     });
 
-    it('Clear button clears combat only after confirm, resetting the tracker to round 1', async () => {
+    it('Clear button opens the role=dialog confirm; clears only after modal confirm, resetting the tracker to round 1', async () => {
         await act(async () => { render(<Initiative {...props} />); });
         await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
 
-        // Cancelled path (shrunk per REC #837 — factory declined-row internals cited there).
-        window.confirm = vi.fn(() => false);
+        // Trigger face: the click only arms the shared DeleteConfirmModal prompt
+        // — zero native dialogs, zero writes while pending (shrunk per REC #837
+        // — confirmClear internals cited in createCreatureHandlers.test.jsx).
         fireEvent.click(screen.getByText('Clear'));
+        const dialog = screen.getByRole('dialog', { name: 'Clear Initiative Board' });
+        expect(within(dialog).getByText('Clear combat status for all creatures? This resets initiative and removes all monsters from the board. This action is irreversible.')).toBeInTheDocument();
+        expect(window.confirm).not.toHaveBeenCalled();
         expect(clearCombat).not.toHaveBeenCalled();
         expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument();
 
-        // Confirmed path: DOM click reaches the factory handler and the UI round-trips to round 1.
+        // Cancel face: prompt closes, board byte-intact on round 3.
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(clearCombat).not.toHaveBeenCalled();
+        expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument();
+
+        // Confirmed face: DOM click → modal → factory confirmClear, and the UI
+        // round-trips to round 1.
         // The fixture's 'Goblin' has no monsterIndex but is not a bare "NPC N" placeholder either —
         // it is monster-shaped, so Clear counts zero carry-overs (bug-initiative-clear-monsters-become-npc-stubs).
-        window.confirm = vi.fn(() => true);
         await act(async () => { fireEvent.click(screen.getByText('Clear')); });
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Yes, Clear Board' })); });
         expect(clearCombat).toHaveBeenCalledWith(props.characters, 0, expect.any(Function));
         await waitFor(() => { expect(screen.getByText('Initiative (round 1)')).toBeInTheDocument(); });
         const cardNames = screen.getAllByTestId(/^creature-card-/).map((el) => el.getAttribute('data-testid').replace('creature-card-', ''));
@@ -229,8 +240,8 @@ describe('Initiative', () => {
         await act(async () => { render(<Initiative {...props} />); });
         await waitFor(() => { expect(screen.getByText('Initiative (round 2)')).toBeInTheDocument(); });
 
-        window.confirm = vi.fn(() => true);
         await act(async () => { fireEvent.click(screen.getByText('Clear')); });
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Yes, Clear Board' })); });
 
         // Only the bare placeholder is counted — the Goblin is gone for good.
         expect(clearCombat).toHaveBeenCalledWith(props.characters, 1, expect.any(Function));

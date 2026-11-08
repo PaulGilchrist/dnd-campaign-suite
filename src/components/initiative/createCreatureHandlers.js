@@ -139,6 +139,13 @@ export function createCreatureHandlers({
     // native window.confirm on this core combat lane; hosts without the
     // callback fail closed (see handleTargetChange).
     requestFriendlyFireConfirm = null,
+    // Initiative-Clear confirm bridge (backlog 2026-11-08 EK): same seam as
+    // requestFriendlyFireConfirm — the host injects its pending-prompt setter
+    // (both bridges are useState setters: friendly-fire carries the
+    // { creatureName, targetName } pair, clear carries `true` = armed).
+    // Replaces the native window.confirm; hosts without the callback fail
+    // closed (see handleClear).
+    requestClearConfirm = null,
 }) {
     // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
     const writeNpcHp = function writeNpcHp(creature, newValue, oldHp, isMaxEdit, newMaxHp) {
@@ -188,66 +195,81 @@ export function createCreatureHandlers({
         logManualHpOverride({ campaignName, creature, oldHp, newHp: newValue })
     }
 
+    // Clear-confirm (migrated off native window.confirm 2026-11-08 EK, the
+    // friendly-fire precedent): the click only opens the host's role="dialog"
+    // prompt. Nothing writes until the host resumes via confirmClear —
+    // accept runs the retired lane's body byte-for-byte; cancel is inert
+    // because the host simply never calls it.
     const handleClear = function handleClear() {
-        if (window.confirm('Clear combat status for all creatures? This resets initiative and removes all monsters from the board. This action is irreversible.')) {
-            // L5 §10.3: capture the closing roster BEFORE clear wipes it —
-            // auto-rewards (flag-gated, off ⇒ zero writes) need the NPCs
-            // that were on the tracker to compute loot + XP.
-            const closingSummary = cloneDeep(combatSummary)
-            // TV-mode victory banner: stamp the outcome into the runtime store
-            // BEFORE the roster is wiped (combat UI state, AGENTS server-first
-            // allowlist). Every client — including the TV tab — celebrates the
-            // seam until dismissed; "defeated" is kills only (hp ≤ 0), anything
-            // else fled and pays nothing. UI presentation only — no game rule
-            // reads this key.
-            const foeRows = closingSummary.creatures.filter(c => c.type === 'npc')
-            const defeatedFoes = foeRows.filter(c => (c.currentHp ?? 0) <= 0).length
-            const playerRows = closingSummary.creatures.filter(c => c.type === 'player')
-            const survivors = playerRows.filter(c =>
-                (getRuntimeValue(c.name, 'currentHitPoints') ?? c.currentHp ?? 1) > 0
-            ).length
-            setRuntimeValue('campaign', 'lastCombatResult', {
-                stamp: Date.now(),
-                rounds: closingSummary.round ?? 1,
-                foes: foeRows.length,
-                defeated: defeatedFoes,
-                survivors,
-                partySize: playerRows.length,
-                wipe: playerRows.length > 0 && survivors === 0,
-            }, campaignName)
-            const newSummary = clearCombat(characters, numOfNpc, (name) => name)
-            storage.set('combatSummary', newSummary, campaignName)
-            setCombatSummary(newSummary)
-            // L5 §10.1: clearing combat returns the table to exploration.
-            setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'initiative tracker', reason: 'combat cleared' })
-                .catch((e) => { console.error('[createCreatureHandlers] session phase exploration failed:', e) })
-            // Zero-character campaigns (Arena/Starter quick-create — the table
-            // cleared before any hero joined) leave an empty roster: re-arm no
-            // active creature instead of crashing on creatures[0].
-            const firstCreatureName = newSummary.creatures[0]?.name ?? null
-            if (firstCreatureName) {
-                storage.set('activeCreatureName', firstCreatureName, campaignName)
-                setActiveCreatureName(firstCreatureName)
-            }
-            // CLA-100: Clear restarts combat (round back to 1) but preserves per-creature
-            // runtime stores and dispatches no initiative-rolled event — reset the Dread
-            // Ambush Ambusher's Leap once-per-combat latch so round-1 of the new
-            // combat re-grants the speed_boost.
-            for (const creature of newSummary.creatures) {
-                if (creature.type === 'player') {
-                    setRuntimeValue(creature.name, 'dreadAmbushSpeedActive', null, campaignName)
-                }
-            }
-            // no-timers T4: Clear restarts combat — combat-scoped effects of
-            // the old combat end here too (enforcement off ⇒ zero writes).
-            sweepNewCombatClocks(campaignName)
-                .catch((e) => { console.error('[handleClear:new-combat-sweep]', e) })
-            // L5 §10.3: with enforcement.autoRewards on, the closed encounter
-            // awards loot + split XP through normal character management.
-            // Off ⇒ zero writes (the loot panel stays the only lane).
-            autoAwardCombatRewards({ campaignName, combatSummary: closingSummary, characters })
-                .catch((e) => { console.error('[handleClear:auto-rewards]', e) })
+        if (!requestClearConfirm) {
+            // Fail closed: never wipe the board when no confirm UI is wired
+            // (every production host injects one).
+            console.error('[handleClear] clear-confirm host not wired — initiative board not cleared')
+            return
         }
+        // Setter-payload bridge: `true` arms the host's role="dialog" prompt.
+        requestClearConfirm(true)
+    }
+
+    const confirmClear = function confirmClear() {
+        if (!combatSummary) return
+        // L5 §10.3: capture the closing roster BEFORE clear wipes it —
+        // auto-rewards (flag-gated, off ⇒ zero writes) need the NPCs
+        // that were on the tracker to compute loot + XP.
+        const closingSummary = cloneDeep(combatSummary)
+        // TV-mode victory banner: stamp the outcome into the runtime store
+        // BEFORE the roster is wiped (combat UI state, AGENTS server-first
+        // allowlist). Every client — including the TV tab — celebrates the
+        // seam until dismissed; "defeated" is kills only (hp ≤ 0), anything
+        // else fled and pays nothing. UI presentation only — no game rule
+        // reads this key.
+        const foeRows = closingSummary.creatures.filter(c => c.type === 'npc')
+        const defeatedFoes = foeRows.filter(c => (c.currentHp ?? 0) <= 0).length
+        const playerRows = closingSummary.creatures.filter(c => c.type === 'player')
+        const survivors = playerRows.filter(c =>
+            (getRuntimeValue(c.name, 'currentHitPoints') ?? c.currentHp ?? 1) > 0
+        ).length
+        setRuntimeValue('campaign', 'lastCombatResult', {
+            stamp: Date.now(),
+            rounds: closingSummary.round ?? 1,
+            foes: foeRows.length,
+            defeated: defeatedFoes,
+            survivors,
+            partySize: playerRows.length,
+            wipe: playerRows.length > 0 && survivors === 0,
+        }, campaignName)
+        const newSummary = clearCombat(characters, numOfNpc, (name) => name)
+        storage.set('combatSummary', newSummary, campaignName)
+        setCombatSummary(newSummary)
+        // L5 §10.1: clearing combat returns the table to exploration.
+        setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'initiative tracker', reason: 'combat cleared' })
+            .catch((e) => { console.error('[createCreatureHandlers] session phase exploration failed:', e) })
+        // Zero-character campaigns (Arena/Starter quick-create — the table
+        // cleared before any hero joined) leave an empty roster: re-arm no
+        // active creature instead of crashing on creatures[0].
+        const firstCreatureName = newSummary.creatures[0]?.name ?? null
+        if (firstCreatureName) {
+            storage.set('activeCreatureName', firstCreatureName, campaignName)
+            setActiveCreatureName(firstCreatureName)
+        }
+        // CLA-100: Clear restarts combat (round back to 1) but preserves per-creature
+        // runtime stores and dispatches no initiative-rolled event — reset the Dread
+        // Ambush Ambusher's Leap once-per-combat latch so round-1 of the new
+        // combat re-grants the speed_boost.
+        for (const creature of newSummary.creatures) {
+            if (creature.type === 'player') {
+                setRuntimeValue(creature.name, 'dreadAmbushSpeedActive', null, campaignName)
+            }
+        }
+        // no-timers T4: Clear restarts combat — combat-scoped effects of
+        // the old combat end here too (enforcement off ⇒ zero writes).
+        sweepNewCombatClocks(campaignName)
+            .catch((e) => { console.error('[handleClear:new-combat-sweep]', e) })
+        // L5 §10.3: with enforcement.autoRewards on, the closed encounter
+        // awards loot + split XP through normal character management.
+        // Off ⇒ zero writes (the loot panel stays the only lane).
+        autoAwardCombatRewards({ campaignName, combatSummary: closingSummary, characters })
+            .catch((e) => { console.error('[handleClear:auto-rewards]', e) })
     }
 
     const handleInitiativeChange = function handleInitiativeChange(creatureName, value) {
@@ -481,6 +503,7 @@ export function createCreatureHandlers({
     return {
         handleCreatureHpChange,
         handleClear,
+        confirmClear,
         handleInitiativeChange,
         handleNameChange,
         handleTargetChange,
