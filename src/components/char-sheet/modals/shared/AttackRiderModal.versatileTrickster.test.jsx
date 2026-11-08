@@ -38,10 +38,12 @@ const vtTripResult = {
 
 // Simulate a fresh Trip cast whose secondary-target scan found `targets`
 // (applyRiderOption writes these keys at entry, cleared first per CLA-376).
-function mockFreshTripScan(targets) {
+// primarySave: the threaded primary-save outcome (bug-vt-picker-header-claims-trip-after-save-success).
+function mockFreshTripScan(targets, primarySave = null) {
   getRuntimeValue.mockImplementation((charName, key) => {
     if (key === 'versatileTricksterSecondaryTargets') return targets;
     if (key === 'versatileTricksterAction') return { name: 'Trip' };
+    if (key === 'versatileTricksterPrimarySave') return primarySave;
     return null;
   });
 }
@@ -163,5 +165,38 @@ describe('AttackRiderModal - Versatile Trickster', () => {
       expect(screen.getByText('Effect applied successfully.')).toBeInTheDocument();
     });
     expect(screen.queryByText('Versatile Trickster')).not.toBeInTheDocument();
+  });
+
+  // bug-vt-picker-header-claims-trip-after-save-success: the picker header must
+  // not claim a trip was applied when the primary DEX save just succeeded —
+  // mirror the honest 82ded5c1c result-popup copy on that face.
+  it('primary-save SUCCESS face: header says "Trip attempted … succeeded … no trip", never "Trip applied"', async () => {
+    const onClose = vi.fn();
+    mockFreshTripScan([{ name: 'Orc A', size: 'Medium' }], { success: true, saveType: 'DEX', saveDc: 15 });
+
+    render(<AttackRiderModal {...makeProps({ onClose })} />);
+    selectSingleOption('Burning Hands');
+    clickApplySingle();
+
+    await waitFor(() => {
+      expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/but Goblin A succeeded its Dexterity save \(DC 15\) — no trip/)).toBeInTheDocument();
+    expect(screen.queryByText(/Trip applied to/)).not.toBeInTheDocument();
+  });
+
+  it('primary-save FAIL face keeps the applied copy (trip genuinely landed)', async () => {
+    const onClose = vi.fn();
+    mockFreshTripScan([{ name: 'Orc A', size: 'Medium' }], { success: false, saveType: 'DEX', saveDc: 15 });
+
+    render(<AttackRiderModal {...makeProps({ onClose })} />);
+    selectSingleOption('Burning Hands');
+    clickApplySingle();
+
+    await waitFor(() => {
+      expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Trip applied to/)).toBeInTheDocument();
+    expect(screen.queryByText(/no trip/)).not.toBeInTheDocument();
   });
 });

@@ -342,9 +342,13 @@ async function scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive
 }
 
 // If Versatile Trickster found secondary Trip targets, set runtime value for modal to pick up.
-function stampVersatileTricksterTargets(playerStats, campaignName, secondaryTargets, targetName) {
+// primarySave: {success, saveType, saveDc} of the resolved primary Trip leg (null when the
+// option had no save) — the picker header branches its copy on it so a save-SUCCESS face
+// never claims "Trip applied" (bug-vt-picker-header-claims-trip-after-save-success).
+function stampVersatileTricksterTargets(playerStats, campaignName, secondaryTargets, targetName, primarySave) {
     setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', secondaryTargets, campaignName);
     setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', targetName, campaignName);
+    setRuntimeValue(playerStats.name, 'versatileTricksterPrimarySave', primarySave || null, campaignName);
     setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster', casting_time: 'passive' } }, campaignName);
 }
 
@@ -372,6 +376,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     // (stale-key replay re-surfaced the chooser on non-Trip applies).
     setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', null, campaignName);
     setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', null, campaignName);
+    setRuntimeValue(playerStats.name, 'versatileTricksterPrimarySave', null, campaignName);
     setRuntimeValue(playerStats.name, 'versatileTricksterAction', null, campaignName);
 
     // Check oncePerTurn for Charger feat
@@ -416,19 +421,28 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     const results = [];
     let versatileTricksterSecondaryTarget = null;
+    let versatileTricksterPrimarySave = null;
 
     // Check if Versatile Trickster is available (Arcane Trickster level 13+)
     const hasVersatileTricksterPassive = hasVersatileTrickster(playerStats);
 
     for (const chosen of chosenOptions) {
-        const res = await applyRiderEffect({ action, playerStats, campaignName, targetName, option: chosen });
+        const saveOutcome = {};
+        const res = await applyRiderEffect({ action, playerStats, campaignName, targetName, option: chosen, saveOutcome });
         results.push(res);
 
         const secondaryTargets = await scanVersatileSecondaryTarget(chosen, hasVersatileTricksterPassive, playerStats, targetName, campaignName);
-        if (secondaryTargets) versatileTricksterSecondaryTarget = secondaryTargets;
+        if (secondaryTargets) {
+            versatileTricksterSecondaryTarget = secondaryTargets;
+            // Thread the primary Trip save result (same hit-cycle, resolved
+            // above) so the picker header can honestly branch on it.
+            versatileTricksterPrimarySave = saveOutcome.success === undefined
+                ? null
+                : { success: saveOutcome.success, saveType: saveOutcome.saveType, saveDc: saveOutcome.saveDc };
+        }
     }
 
-    await stampRiderSecondaryTargets(playerStats, campaignName, targetName, versatileTricksterSecondaryTarget, chosenOptions);
+    await stampRiderSecondaryTargets({ playerStats, campaignName, targetName, versatileTricksterSecondaryTarget, versatileTricksterPrimarySave, chosenOptions });
 
     if (results.length === 1) {
         return results[0];
@@ -449,9 +463,9 @@ function hasVersatileTrickster(playerStats) {
     );
 }
 
-async function stampRiderSecondaryTargets(playerStats, campaignName, targetName, versatileTricksterSecondaryTarget, chosenOptions) {
+async function stampRiderSecondaryTargets({ playerStats, campaignName, targetName, versatileTricksterSecondaryTarget, versatileTricksterPrimarySave, chosenOptions }) {
     if (versatileTricksterSecondaryTarget) {
-        stampVersatileTricksterTargets(playerStats, campaignName, versatileTricksterSecondaryTarget, targetName);
+        stampVersatileTricksterTargets(playerStats, campaignName, versatileTricksterSecondaryTarget, targetName, versatileTricksterPrimarySave);
     }
 
     // If Sudden Strike or Mass Fear was applied, find secondary targets for the effect
@@ -729,7 +743,7 @@ function registerRiderConditionExpiry({ playerStats, campaignName, targetName, o
     }
 }
 
-async function handleRiderSave(action, playerStats, campaignName, targetName, option) {
+async function handleRiderSave({ action, playerStats, campaignName, targetName, option, saveOutcome }) {
     const saveDc = buildSaveDc(option, playerStats);
     const { promise } = createSaveListener(campaignName, {
         targetName,
@@ -741,6 +755,16 @@ async function handleRiderSave(action, playerStats, campaignName, targetName, op
     });
 
     const saveResult = await promise;
+
+    // VT picker-header honesty (bug-vt-picker-header-claims-trip-after-save-success):
+    // save legs still return null to the modal (CLA-376 contract), so expose the
+    // resolved outcome through this caller-owned holder — applyRiderOption threads
+    // it into the versatileTricksterPrimarySave runtime key alongside the VT stamp.
+    if (saveOutcome) {
+        saveOutcome.success = saveResult.success === true;
+        saveOutcome.saveType = option.saveType;
+        saveOutcome.saveDc = saveDc;
+    }
 
     // Saved legs leave no state: evict this option's descriptor row (fail
     // legs keep it exactly as before — the row + the granted condition stand).
@@ -806,7 +830,7 @@ function buildNoSaveDescription(action, playerStats, campaignName, targetName, o
     return desc;
 }
 
-async function applyRiderEffect({ action, playerStats, campaignName, targetName, option }) {
+async function applyRiderEffect({ action, playerStats, campaignName, targetName, option, saveOutcome }) {
     const auto = action.automation || action;
     if (!targetName) {
         return riderNotice(action.name, auto, `${option.name}: ${option.effect}<br/><br/><i>No target selected — effect noted for manual application.</i>`);
@@ -845,7 +869,7 @@ async function applyRiderEffect({ action, playerStats, campaignName, targetName,
     }
 
     if (option.saveType) {
-        return handleRiderSave(action, playerStats, campaignName, targetName, option);
+        return handleRiderSave({ action, playerStats, campaignName, targetName, option, saveOutcome });
     }
 
     return riderNotice(action.name, auto, buildNoSaveDescription(action, playerStats, campaignName, targetName, option));

@@ -334,6 +334,7 @@ describe('attackRiderHandler', () => {
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'versatileTricksterSecondaryTargets', null, 'campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'versatileTricksterPrimaryTarget', null, 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'versatileTricksterPrimarySave', null, 'campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'versatileTricksterAction', null, 'campaign');
         });
 

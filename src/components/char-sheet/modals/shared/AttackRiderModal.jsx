@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { applyRiderOption } from '../../../../services/automation/handlers/combat/attackRiderHandler.js';
 import { isCunningStrikeFeatureName } from '../../../../services/automation/handlers/combat/cunningStrikeUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import utils from '../../../../services/ui/utils.js';
 import SecondaryTargetModal from './SecondaryTargetModal.jsx';
 import ChooserModalFooter from './ChooserModalFooter.jsx';
 import { CHOOSER_FOOTER_LABELS } from './chooserFooterLabels.js';
@@ -70,7 +71,23 @@ function RiderResultOverlay({ title, description, onClose }) {
     );
 }
 
+function buildVersatileTricksterDescription(primarySave, targetName) {
+    // bug-vt-picker-header-claims-trip-after-save-success: when the primary Trip
+    // leg resolved as a SAVE SUCCESS nothing was applied (evictSavedRiderEffect
+    // removed the descriptor), so the header must not claim "Trip applied" —
+    // mirrors the honest 82ded5c1c result-popup copy. The fail face (and the
+    // save-less/legacy-key-absent face) keeps the original applied copy.
+    if (primarySave && primarySave.success) {
+        const saveLabel = utils.getAbilityLongName(primarySave.saveType) || primarySave.saveType;
+        return `Trip attempted on <b>${targetName}</b> but ${targetName} succeeded its ${saveLabel} save (DC ${primarySave.saveDc}) — no trip. Versatile Trickster still lets you Trip another creature within 5 feet of the spectral hand:`;
+    }
+    return `Trip applied to <b>${targetName}</b>. Versatile Trickster allows you to also Trip another creature within 5 feet of the spectral hand:`;
+}
+
 function VersatileTricksterFlow({ targets, vtApplied, vtResult, targetName, playerStats, campaignName, onClose, setVtResult, setVtApplied }) {
+    // Same read-in-render pattern as StalkersFlurryFlow's stalkersFlurryOptions.
+    const primarySave = getRuntimeValue(playerStats.name, 'versatileTricksterPrimarySave', campaignName);
+
     const handleVtTargetSelected = async (selectedTargetName) => {
         const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
         const vtAction = getRuntimeValue(playerStats.name, 'versatileTricksterAction', campaignName);
@@ -86,7 +103,7 @@ function VersatileTricksterFlow({ targets, vtApplied, vtResult, targetName, play
         <SecondaryTargetModal
             title="Versatile Trickster"
             targets={targets}
-            description={`Trip applied to <b>${targetName}</b>. Versatile Trickster allows you to also Trip another creature within 5 feet of the spectral hand:`}
+            description={buildVersatileTricksterDescription(primarySave, targetName)}
             onTargetSelected={handleVtTargetSelected}
             onSkip={onClose}
             confirmLabel={CHOOSER_FOOTER_LABELS.tripSecondaryTarget}
