@@ -79,9 +79,12 @@ describe('MusicPlayer editor save/reset toasts', () => {
 
     await waitFor(() => expect(toastNode()).toHaveTextContent('Town tracks saved'));
     expect(toastNode()).not.toHaveClass('music-toast-error');
-    // overrides persisted, editor closed
+    // overrides persisted; editor STAYS OPEN with its content intact
+    // (backlog 2026-11-08 EM — stay-open save face)
     expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
-    expect(screen.queryByText('Save')).toBeNull();
+    expect(screen.getByText('Save')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('One YouTube URL or video ID per line').value)
+      .toBe('https://youtu.be/aaaaaaaaaaa');
   });
 
   it('Save while stopped PATCHes overrides only and leaves playing:false server-side', async () => {

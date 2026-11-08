@@ -194,7 +194,8 @@ function MusicPlayer({ campaignName, visible = true }) {
   // leaf-inline rejection.
   const parsedTracks = useMemo(() => parseTrackList(trackText), [trackText]);
   // Display-only save/reset confirmation toast (mirrors .sessions-toast /
-  // .encounter-toast): names the mood so a closed editor still leaves a trace.
+  // .encounter-toast): names the mood so the confirmation lands even while the
+  // stay-open editor keeps focus (and after Reset's re-seed).
   const [toast, setToast] = useState(null);
   const { addEntry } = useLog(campaignName);
 
@@ -488,10 +489,16 @@ function MusicPlayer({ campaignName, visible = true }) {
       youtubePlayer.playTracks(tracks.map(t => t.videoId));
     }
     setEditorError(null);
-    clearDraft();
-    setEditing(false);
-    showToast(`${moodLabel(editMood)} tracks saved`);
-  }, [trackText, editMood, music, campaignName, showToast, clearDraft, moodLabel]);
+    // Stay-open save (backlog 2026-11-08 EM): multi-session track curation
+    // made the old close-on-save an open→type→save churn loop. The editor
+    // stays mounted with the textarea content intact, and the dirty guard
+    // re-baselines on the SAVED text (useReloadGuard doctrine — same lane
+    // resetMood uses — so a Cancel right after Save is a clean, silent close
+    // while further edits still pay the discard prompt). Exiting remains
+    // Cancel's job; Save never discards.
+    seedDraft({ trackText });
+    showToast(`${moodLabel(editMood)} tracks saved — keep editing`);
+  }, [trackText, editMood, music, campaignName, showToast, seedDraft, moodLabel]);
 
   const resetMood = useCallback(async () => {
     const overrides = { ...music.overrides };

@@ -108,7 +108,7 @@ describe('MusicPlayer invalid-save inline error', () => {
     expect(container.querySelector('.music-editor-error')).toBeNull();
   });
 
-  it('successful save after a rejected one closes the editor with no error and persists tracks', async () => {
+  it('successful save after a rejected one keeps the editor open, clears the error and persists tracks', async () => {
     // Editor save PATCHes { overrides } only; stub mirrors the server music route merge.
     let serverMusic = { mood: null, playing: false, volume: 0.6, overrides: {} };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts = {}) => {
@@ -132,7 +132,10 @@ describe('MusicPlayer invalid-save inline error', () => {
     });
     fireEvent.click(screen.getByText('Save'));
 
-    await waitFor(() => expect(container.querySelector('.music-editor')).toBeNull());
+    await waitFor(() => expect(container.querySelector('.music-editor-error')).toBeNull());
+    // Stay-open save (backlog 2026-11-08 EM): editor holds, content persisted.
+    expect(container.querySelector('.music-editor')).not.toBeNull();
+    expect(container.querySelector('#music-editor-urls').value).toBe('https://youtu.be/aaaaaaaaaaa');
     expect(musicState().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
     globalThis.fetch.mockRestore();
   });

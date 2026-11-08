@@ -9,8 +9,8 @@
 // the mood being LEFT, rendered VERBATIM inside the role=dialog. Cancel is
 // fully inert (editor + draft byte-intact, zero network, zero log rows);
 // accept closes / re-seeds. Clean drafts stay silent, and Save/Reset keep
-// their existing lanes (Reset re-baselines so the fresh defaults don't look
-// dirty). Harness mirrors MusicPlayer.toast.test.jsx (server-truth fetch stub
+// their existing lanes — since backlog 2026-11-08 EM BOTH stay open and
+// re-baseline the guard (saved/seeded text never looks dirty). Harness mirrors MusicPlayer.toast.test.jsx (server-truth fetch stub
 // records POSTs so "writes nothing" is provable).
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -197,7 +197,7 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('Save lane unchanged: dirty save closes with NO dialog (internal close)', async () => {
+  it('Save lane stays open: dirty save fires NO dialog, keeps the textarea, and re-baselines the guard', async () => {
     const stub = stubMusicServer();
     render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
     openEditor();
@@ -205,10 +205,57 @@ describe('MusicPlayer dirty-Cancel / mood-switch named discard (role=dialog)', (
 
     fireEvent.click(screen.getByText('Save'));
 
-    await waitFor(() => expect(screen.queryByText('Save')).toBeNull());
+    await waitFor(() => expect(document.querySelector('.music-toast'))
+      .toHaveTextContent('Town tracks saved — keep editing'));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+    // Editor mounted, content persisted (backlog 2026-11-08 EM).
+    expect(textarea()).toBeInTheDocument();
+    expect(textarea().value).toBe('https://youtu.be/aaaaaaaaaaa');
+  });
+
+  it('saved text counts as SAVED: Cancel right after a successful Save closes silently (no discard prompt)', async () => {
+    const stub = stubMusicServer();
+    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    openEditor();
+    typeDraft('https://youtu.be/aaaaaaaaaaa');
+    fireEvent.click(screen.getByText('Save'));
+    await waitFor(() => expect(document.querySelector('.music-toast'))
+      .toHaveTextContent('Town tracks saved'));
+
+    // Guard re-baselined on the saved draft: nothing is dirty, Cancel is clean.
+    fireEvent.click(cancelButton());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('Cancel')).toBeNull();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    // Write landed exactly once; nothing was discarded on close.
+    expect(stub.posts).toHaveLength(1);
+    expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+  });
+
+  it('re-saving the SAME content in the still-open editor succeeds with an idempotent second write', async () => {
+    const stub = stubMusicServer();
+    render(<MusicPlayer campaignName="test-campaign" isLocalhost />);
+    openEditor();
+    typeDraft('aaaaaaaaaaa');
+    fireEvent.click(screen.getByText('Save'));
+    await waitFor(() => expect(document.querySelector('.music-toast'))
+      .toHaveTextContent('Town tracks saved'));
+
+    // Second Save of byte-identical content: no ghost-dirty state, no error,
+    // editor still open, server row unchanged.
+    fireEvent.click(screen.getByText('Save'));
+    await waitFor(() => expect(stub.posts).toHaveLength(2));
+    expect(document.querySelector('.music-editor-error')).toBeNull();
+    expect(textarea()).toBeInTheDocument();
+    expect(textarea().value).toBe('aaaaaaaaaaa');
+    expect(stub.server().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa']);
+
+    // And the re-baseline held through the second save: Cancel stays silent.
+    fireEvent.click(cancelButton());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('Cancel')).toBeNull();
   });
 
   it('Reset lane unchanged and re-baselines: Reset then Cancel is dialog-free', async () => {

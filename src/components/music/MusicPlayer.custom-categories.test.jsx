@@ -237,7 +237,11 @@ describe('MusicPlayer campaign-specific categories', () => {
       const textarea = screen.getByPlaceholderText('One YouTube URL or video ID per line');
       fireEvent.change(textarea, { target: { value: 'https://youtu.be/vyg5jJrZ42s' } });
       fireEvent.click(screen.getByText('Save'));
-      await waitFor(() => expect(screen.queryByPlaceholderText('One YouTube URL or video ID per line')).toBeNull());
+      // Stay-open save (backlog 2026-11-08 EM): the editor holds; the chip
+      // becomes playable while it stays mounted.
+      await waitFor(() => expect(document.querySelector('.music-toast'))
+        .toHaveTextContent('Crypt tracks saved'));
+      expect(screen.getByPlaceholderText('One YouTube URL or video ID per line')).toBeInTheDocument();
 
       // Editor save PATCHes overrides only (title lane untouched by this feature).
       fireEvent.click(screen.getByTitle('Play Crypt ambience'));
