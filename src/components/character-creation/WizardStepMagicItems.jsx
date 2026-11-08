@@ -70,6 +70,23 @@ function CustomItemControls({ item, onEdit }) {
     );
 }
 
+// Untick-to-remove checkbox lifted out alongside CustomItemControls to keep
+// renderItem under the complexity cap (QA improve 2026-11-08).
+function RowSelectCheckbox({ item, isSelected, onToggle }) {
+    return (
+        <div
+            className={`list-item-checkbox ${isSelected ? 'checked' : ''} list-item-checkbox-trigger`}
+            title={isSelected ? `Un-tick to remove ${item.name}` : `Select ${item.name}`}
+            onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+            }}
+        >
+            {isSelected ? '✓' : ''}
+        </div>
+    );
+}
+
 function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtypes, onArrayFieldChange }) {
     const [warnings, setWarnings] = useState([]);
     // null = closed; { editing: <custom item | null> } = modal open.
@@ -175,15 +192,7 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
                         {item.type && <span className="magic-item-type">{item.type}</span>}
                         {item.rarity && <span className="magic-item-rarity">{item.rarity}</span>}
                         {item.requiresAttunement && <span className="magic-item-attunement">requires attunement</span>}
-                        <div
-                            className={`list-item-checkbox ${isSelected ? 'checked' : ''} list-item-checkbox-trigger`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onToggle();
-                            }}
-                        >
-                            {isSelected ? '✓' : ''}
-                        </div>
+                        <RowSelectCheckbox item={item} isSelected={isSelected} onToggle={onToggle} />
                     </div>
 
                     <div className="list-item-details">
@@ -250,7 +259,10 @@ function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtyp
                       <i className="fa-solid fa-plus" /> Add Custom Magic Item
                   </button>
                   <span className="field-description">
-                      Custom items are saved with their own type, rarity and description on the character sheet. Untick one to remove it.
+                      Custom items live on this character only — they are not added to a
+                      campaign-wide item registry. Each saves its own type, rarity and
+                      description on the character sheet. Untick a selected row&apos;s
+                      checkbox to remove it.
                   </span>
               </div>
           )}

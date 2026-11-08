@@ -441,6 +441,48 @@ describe('WizardStepMagicItems', () => {
       expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', []);
     });
 
+    // QA improve 2026-11-08: expectation-setting fieldnote + discoverable
+    // untick-to-remove affordance (both lock the copy rendered adjacent to
+    // the Add button and the title on every row checkbox).
+    it('shows a fieldnote next to the Add button stating custom items live on this character only', () => {
+      render(<WizardStepMagicItems {...magicItemsProps()} />);
+      const summary = document.querySelector('.magic-item-custom-summary');
+      const note = within(summary).getByText(
+        /Custom items live on this character only — they are not added to a campaign-wide item registry\./
+      );
+      expect(note).toHaveClass('field-description');
+      expect(note.textContent).toMatch(/Untick a selected row's checkbox to remove it\./);
+      expect(within(summary).getByRole('button', { name: /Add Custom Magic Item/ })).toBeInTheDocument();
+    });
+
+    it.each([
+      ['catalog', 'Bag of Holding', ['Bag of Holding'], []],
+      ['custom', 'Stormcaller Blade', [STORMCALLER], []],
+    ])('selected %s row carries an "Un-tick to remove" title and unticking deselects it', (_kind, name, selected, expectedPayload) => {
+      const props = magicItemsProps({ selected, allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] });
+      render(<WizardStepMagicItems {...props} />);
+
+      const checkbox = screen
+        .getByText(name)
+        .closest('.magic-item')
+        .querySelector('.list-item-checkbox-trigger');
+      expect(checkbox).toHaveAttribute('title', `Un-tick to remove ${name}`);
+
+      fireEvent.click(checkbox);
+      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', expectedPayload);
+    });
+
+    it('unselected rows advertise selection via the checkbox title', () => {
+      render(
+        <WizardStepMagicItems
+          {...magicItemsProps({ selected: [], allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] })}
+        />
+      );
+      expect(
+        screen.getByText('Bag of Holding').closest('.magic-item').querySelector('.list-item-checkbox-trigger')
+      ).toHaveAttribute('title', 'Select Bag of Holding');
+    });
+
     it('Edit reopens the modal prefilled and saving replaces the entry in place', () => {
       const props = magicItemsProps({ selected: ['Bag of Holding', STORMCALLER], allItems: [BAG_OF_HOLDING] });
       render(<WizardStepMagicItems {...props} />);
