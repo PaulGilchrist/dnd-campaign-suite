@@ -278,7 +278,7 @@ describe('shieldBash', () => {
         type: 'roll', name: 'Shield Bash', characterName: 'Fighter1', rollType: 'save-damage',
         targetName: target, saveDc: 17, saveType: 'STR', saveResult: 'failure',
         total: 8, rolls: [6], bonus: 2, formula: '1d20+2',
-        description: `${target} failed the STR save (DC 17). Shield Bash effect applied.`,
+        description: `${target} failed the STR save (DC 17). Choose an effect.`,
       });
       expect(addEntry).toHaveBeenCalledTimes(2);
       expect(result).toEqual({
@@ -336,7 +336,7 @@ describe('shieldBash', () => {
         targetName: 'Goblin1', saveDc: 15, saveType: 'STR',
         saveResult: saveResult.success ? 'success' : 'failure',
         total: saveResult.total, rolls: [saveResult.roll], bonus: saveResult.saveBonus, formula,
-        description: `Goblin1 ${word} the STR save (DC 15).${saveResult.success ? '' : ' Shield Bash effect applied.'}`,
+        description: `Goblin1 ${word} the STR save (DC 15).${saveResult.success ? '' : ' Choose an effect.'}`,
       });
     });
   });

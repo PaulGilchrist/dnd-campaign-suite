@@ -166,7 +166,7 @@ describe('attackRiderHandler — Trip save-resolution row lifecycle', () => {
         expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
             type: 'ability_use',
             abilityName: 'Cunning Strike',
-            description: 'Trip applied to Goblin — Goblin rolled 18 on DEX save (DC 15), succeeded — no effect',
+            description: 'Trip attempted on Goblin — Goblin rolled 18 on DEX save (DC 15), succeeded — no effect',
         }));
     });
 

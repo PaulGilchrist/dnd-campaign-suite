@@ -106,7 +106,10 @@ function logShieldBashSaveOutcome({ action, playerStats, campaignName, targetNam
         rolls: [saveResult.roll ?? 0],
         bonus: saveBonus,
         formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
-        description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
+        // Outcome-neutral copy: the Push/Prone/Skip chooser resolves AFTER this
+        // row (bug-attack-rider-log-claims-applied-on-declined-or-saved) — the
+        // chooser's own commit/decline rows are the only effect-outcome claims.
+        description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Choose an effect.' : ''}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
 }
@@ -788,7 +791,11 @@ async function handleRiderSave({ action, playerStats, campaignName, targetName, 
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: action.name,
-        description: `${option.name} applied to ${targetName} — ${targetName} rolled ${saveResult.roll} on ${option.saveType} save (DC ${saveDc}), ${saveResult.success ? 'succeeded' : 'failed'} — ${saveResult.success ? 'no effect' : `${option.condition} condition applied`}`,
+        // Success face says "attempted on" — nothing landed (descriptor row
+        // evicted above). Mirrors the honest VT branch (8d818b3bc
+        // buildVersatileTricksterDescription); bug-attack-rider-log-claims-
+        // applied-on-declined-or-saved.
+        description: `${option.name} ${saveResult.success ? 'attempted on' : 'applied to'} ${targetName} — ${targetName} rolled ${saveResult.roll} on ${option.saveType} save (DC ${saveDc}), ${saveResult.success ? 'succeeded' : 'failed'} — ${saveResult.success ? 'no effect' : `${option.condition} condition applied`}`,
     }).catch((e) => { console.error("[attackRiderHandler:log-error]", e); });
 
     // Handle Psychic Veil interaction

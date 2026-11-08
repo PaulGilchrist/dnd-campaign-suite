@@ -127,7 +127,7 @@ describe('attackRiderHandler - Shield Bash save flow', () => {
                 rolls: [5],
                 bonus: 0,
                 formula: '1d20',
-                text: 'Goblin failed the STR save (DC 15). Shield Bash effect applied.',
+                text: 'Goblin failed the STR save (DC 15). Choose an effect.',
             },
         },
         {

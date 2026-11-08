@@ -109,7 +109,10 @@ export async function applyVersatileTrickster(action, playerStats, campaignName,
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: 'Versatile Trickster',
-        description: `Trip applied to ${secondaryTargetName} (secondary target via Versatile Trickster) — ${secondaryTargetName} rolled ${saveResult.roll} on DEX save (DC ${saveDc}), ${saveResult.success ? 'succeeded — no effect' : 'failed — prone condition applied'}`,
+        // Success face says "attempted on" (same branch as the popup copy
+        // below, 8d818b3bc) — the descriptor row was evicted, nothing landed
+        // (bug-attack-rider-log-claims-applied-on-declined-or-saved).
+        description: `Trip ${saveResult.success ? 'attempted on' : 'applied to'} ${secondaryTargetName} (secondary target via Versatile Trickster) — ${secondaryTargetName} rolled ${saveResult.roll} on DEX save (DC ${saveDc}), ${saveResult.success ? 'succeeded — no effect' : 'failed — prone condition applied'}`,
     }).catch((e) => { console.error("[versatileTricksterHandler:log-error]", e); });
 
     return buildTricksterPopup(action, auto, saveFailed

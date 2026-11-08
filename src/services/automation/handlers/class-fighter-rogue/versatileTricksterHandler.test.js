@@ -233,7 +233,7 @@ describe('versatileTricksterHandler', () => {
                             type: 'ability_use',
                             characterName: 'TestRogue',
                             abilityName: 'Versatile Trickster',
-                            description: `Trip applied to ${creature.name} (secondary target via Versatile Trickster) — ${creature.name} rolled 20 on DEX save (DC 16), succeeded — no effect`,
+                            description: `Trip attempted on ${creature.name} (secondary target via Versatile Trickster) — ${creature.name} rolled 20 on DEX save (DC 16), succeeded — no effect`,
                         })
                     );
                 }

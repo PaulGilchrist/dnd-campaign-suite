@@ -62,7 +62,10 @@ function logShieldBashSaveResult(ctx, saveResult, targetName, saveDc, success) {
     rolls: [saveResult.roll ?? 0],
     bonus: saveResult.saveBonus ?? 0,
     formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
-    description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Shield Bash effect applied.' : ''}`,
+    // Outcome-neutral copy: the Push/Prone/Skip chooser resolves AFTER this row
+    // (bug-attack-rider-log-claims-applied-on-declined-or-saved) — the chooser's
+    // own commit/decline rows (applyShieldBashEffect) are the only effect claims.
+    description: `${targetName} ${success ? 'succeeded' : 'failed'} the STR save (DC ${saveDc}).${!success ? ' Choose an effect.' : ''}`,
     timestamp: Date.now(),
   }).catch((e) => { console.error("[shieldBash:log-error]", e); });
 }

@@ -84,3 +84,67 @@ Confident (grep-verified, live-proved):
 Minor UX issue — game state adjudicates correctly on both faces (verified via
 `activeConditions` and te buckets); the defect is dishonest log prose in the same
 family the owner already ruled as bugs twice (82ded5c1c, 8d818b3bc).
+
+## Resolution
+
+FIXED 2026-11-08 (fix subagent, test-campaign live + unit-verified).
+
+**What was actually wrong (vs the original guess).** The guess was directionally
+right but the producer census was incomplete:
+
+- **Face 1 has TWO producers, and the live one was NOT the cited file.** The
+  sheet-attack pipeline auto-fires the feature-rider STEP
+  `src/services/combat/steps/features/shieldBash.js` (`logShieldBashSaveResult`),
+  which byte-duplicates the cited copy at
+  `attackRiderHandler.js:109` (`logShieldBashSaveOutcome`, the feature-row/router
+  lane). The observed live row came from the step lane — fixing only the cited
+  :109 would have left the repro byte-identical. Both now log the outcome-neutral
+  fail-leg copy `"<T> failed the STR save (DC N). Choose an effect."` — the
+  chooser's own commit/decline rows (`applyShieldBashEffect`: "Shield Bash used
+  against X: pushed 5 ft." / "target has Prone condition." / "skipped (no effect,
+  use not consumed).") are the only effect-outcome claims. Success leg copy
+  unchanged (already honest).
+- **Face 2** per the suggested fix: `attackRiderHandler.js` handleRiderSave row
+  lead now branches on `saveResult.success` — `attempted on` vs `applied to`
+  (mirrors the honest 8d818b3bc `buildVersatileTricksterDescription` branch);
+  fail-leg bytes unchanged.
+- **Same-family tail swept (adjacent, found during investigation):**
+  `versatileTricksterHandler.js` secondary-target row had the identical
+  unbranched `Trip applied to X … succeeded — no effect` lead while its OWN
+  popup copy below already branches honestly — same one-line lead branch.
+
+**Files changed**
+- `src/services/automation/handlers/combat/attackRiderHandler.js` (:109 area fail-leg copy; :791-area success lead branch)
+- `src/services/combat/steps/features/shieldBash.js` (step-lane fail-leg copy)
+- `src/services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js` (secondary-row lead branch)
+- Stale copy-pins updated same-pass: `attackRiderHandler.save-flow.test.js`, `attackRiderHandler.save-success-eviction.test.js`, `steps/features/shieldBash.test.js` (×2), `versatileTricksterHandler.test.js`
+- NEW regression test: `src/services/automation/handlers/combat/attackRiderHandler.log-honesty.test.js` (4 tests: bash fail row = exact neutral bytes + no /applied/i claim; bash success row unchanged; Trip SUCCESS row = exact "Trip attempted on Goblin — Goblin rolled 9 on DEX save (DC 15), succeeded — no effect" + not "applied to"; Trip FAIL row keeps "applied to … prone condition applied" bytes)
+
+**Verification**
+- Face 1 re-reproduced BROKEN first, live and exact: EF (Fighter/BM 18, Scimitar) +
+  hand-rolled 3-creature type:player board (EF/EP/DM, EF row targetName armed, POSTed
+  after selection then reload+re-select) + EP `warding_bond −19` dial → Scimitar crit →
+  Done → Charge Cancel → bash STR DC17 prompt (breakdown showed −19, `= −9`) → Roll Save
+  (fail) → chooser → **Skip** → log pair exactly as filed: `roll "ElderPaladin failed the
+  STR save (DC 17). Shield Bash effect applied."` + `ability_use "Shield Bash: skipped
+  (no effect, use not consumed)."`; state honest (`activeConditions:[]`, te `[]`).
+- Face 1 POST-FIX live: same cycle (round-bump re-arm) → row now reads
+  `ElderPaladin failed the STR save (DC 17). Choose an effect.` followed by the skip row —
+  contradiction gone; parked damage still lands (`1d6+3` + hp_change).
+- Face 2 POST-FIX live (sanctioned EF Rogue/AT lv20 disk swap, 4 unique-anchor
+  str.replace; later cp-restored, md5 0df29ff3 byte-exact + sheet re-proof "Fighter
+  (battle master), Level 18"): sneak crit → DS chooser → tick Trip → Apply Effects →
+  DEX DC15 prompt with `+19` dial → save-SUCCESS → `ability_use | Devious Strikes |
+  "Trip attempted on ElderPaladin — ElderPaladin rolled 20 on DEX save (DC 15),
+  succeeded — no effect"` — honest lead, cost-deducted sneak pool still lands
+  (`1d6*2+3 + 9d6*2`), VT picker Skip worked, bash success leg kept honest copy.
+  Adjacent behavior healthy; console errors 0 for the whole session.
+- Tests: new log-honesty file 4/4; the 8 sibling `attackRiderHandler.*` files +
+  `shieldBash.test.js` + `versatileTricksterHandler.test.js` = 113 passed; modal/resume
+  adjacent suites (`ShieldBashChoiceModal`, `shieldBashResume`, `AttackRiderModal` ×2,
+  `ChooserModalFooter.labels`) = 47 passed; FULL three touched folders
+  (`steps/features`, `handlers/class-fighter-rogue`, `handlers/combat`) = 127 files /
+  1506 tests passed. `npm run lint` clean (zero warnings). `no-timers-guard` OK.
+- Exit: change-data `{}` + log `[]` GET-verified two-pass (closed tab); EF disk
+  md5-verified canonical; no other campaigns touched.
+
