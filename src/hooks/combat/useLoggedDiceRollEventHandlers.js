@@ -27,10 +27,25 @@ import { getHpThreshold, assignSecondaryFields, buildDamageBreakdownEntries, res
 import { grantSoulTomeTrap } from '../../services/rules/features/soulTomeTrapService.js';
 import { grantInfernalWound } from '../../services/rules/features/infernalWoundService.js';
 import { setSavePromptBucket } from '../../services/automation/common/savePrompt.js';
+import { isGmHost } from '../../services/ui/gmHost.js';
 
 const SECONDARY_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 
 function syncListenerPromptFilters(detail, pending, campaignName) {
+    // GM-authority guard: bug-visitor-drains-pending-save-listener-bucket —
+    // the resolved-save echo (App.jsx redispatchSaveResult) replays
+    // `save-result` on EVERY tab, so this drain-to-evict prune ran on read-only
+    // LAN visitors too: DELETE /api/campaigns/:c/pendingSaveListenerPrompts
+    // → 403 "Access denied: GM-only feature" (console error per adjudicated
+    // save per visitor device) and, with surviving rows, a stale-mirror
+    // broadcast-POST racing the GM's write. The bucket is a GM-authority key
+    // (the server fail-closes visitor DELETEs via campaigns-character
+    // refuseUnlessGm); only the GM client prunes/evicts it, visitors mirror
+    // the drain via the null echo. Same GM/localhost ownership-guard idiom as
+    // applyTurnStartPass (5049bfad1, sseHandlers.js). isGmHost() follows the
+    // HOSTNAME (per-origin law, not per-tab), so the page-singleton handler
+    // lane reads the correct value on every client without prop threading.
+    if (!isGmHost()) return;
     const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName); // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198 — reader is arity-2 (useRuntimeState.js:63), scope = SSE-mirrored active-campaign store until #1520
     const prompts = Array.isArray(listenerPrompts) ? listenerPrompts : [];
     const filteredPrompts = prompts.filter(id => id !== detail.promptId);
