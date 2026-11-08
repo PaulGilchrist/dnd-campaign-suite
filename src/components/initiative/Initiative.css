@@ -1379,7 +1379,15 @@
 .initiative .victory-banner {
     position: fixed;
     inset: 0;
-    z-index: 1300;
+    /* Ambient celebration tier: above page chrome (max z 100 — sidebar/party
+       inventory) but BELOW every dialog tier so it can never sit over one:
+       popups & sheet sub-modals 200, modal-shell & feature modals 1000,
+       adjudication prompts 2000+ (TvExitButton 1400 is a deliberate always-
+       reachable corner pin, not a dialog). It used to be 1300 — above the
+       1000 modal tier — and an undismissed card silently swallowed a later
+       dialog's centered confirm button (bug-victory-banner-above-confirm-
+       dialogs). Pinned by VictoryBanner.modal-tier.test.jsx. */
+    z-index: 150;
     background: rgba(0, 0, 0, 0.55);
     display: flex;
     align-items: center;
@@ -1387,7 +1395,9 @@
     /* EN backlog 2026-11-08: right after Initiative "Clear" this scrim can sit
        over a freshly mounted board and silently swallow its first Next → click.
        The scrim lets pointer events pass through; only the celebration card
-       below captures clicks (its own click / Continue still dismiss). */
+       below captures clicks (its own click / Continue still dismiss).
+       Scrim click-through only solves the SCRIM — the card must also never
+       outrank a dialog, hence the tier slot above. */
     pointer-events: none;
     animation: victory-fade 0.4s ease-out;
 }
