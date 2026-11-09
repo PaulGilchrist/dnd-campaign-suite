@@ -28,6 +28,7 @@ import { revertPolymorph } from '../../services/automation/handlers/spells/polym
 import { revertAnimalShapes } from '../../services/automation/handlers/spells/animalShapesService.js'
 import { revertShapechange } from '../../services/automation/handlers/spells/shapechangeService.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
+import { resolveSpeedFeet } from '../../services/combat/turnState.js'
 
 const SHAPE_LABELS = {
     sphere: 'Sphere',
@@ -667,8 +668,17 @@ function ConditionsSection({
             })}
             {/* L5-001: enforcement economy readout (renders nothing while enforcement off).
                 CLA-360: ST rows read the holder's turnState key (effectSubjectName, the same
-                remap ConditionEffectBadges below uses); the strip label stays the row's name. */}
-            <TurnEconomyStrip creatureName={creature.name} economyName={effectSubjectName} speedFeet={creature.speed} />
+                remap ConditionEffectBadges below uses); the strip label stays the row's name.
+                Movement-budget parity: the denominator resolves through the same sources the
+                drag engine and the Initiative header strip use — the row's stamped speed
+                (EB-join monsters carry the bestiary walk speed in feet) → the sheet's
+                computedStats.speed via the effectSubjectName (holder-remapped) character
+                lookup → the 30 ft default. */}
+            <TurnEconomyStrip
+                creatureName={creature.name}
+                economyName={effectSubjectName}
+                speedFeet={resolveSpeedFeet({ speed: creature.speed, name: effectSubjectName }, characters)}
+            />
             <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={effectSubjectName} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
             {isLocalhost && (
                 <button

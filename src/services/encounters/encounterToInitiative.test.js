@@ -83,6 +83,7 @@ describe('expandMonstersToCreatures', () => {
       type: 'npc',                 // carrier byte; real type below (#1014/SP-094)
       monsterType: 'humanoid',
       size: 'Small',              // MN-015 size gate byte
+      speed: null,                // movement-budget parity byte (fixture authors no speed)
       initiative: '16',          // string(14 + 2)
       targetName: null,
       ac: 13,
@@ -372,6 +373,7 @@ describe('addMonstersToInitiative', () => {
       type: 'npc',               // carrier byte; real type in monsterType (#1014/SP-094)
       monsterType: 'aberration',
       size: 'Medium',           // MN-015
+      speed: null,                // movement-budget parity byte (fixture authors no speed)
       initiative: '13',         // 12 + 1, and 13 > 5 so it sorts first
       targetName: null,
       ac: 10,                   // missing armor_class honest fallback (#945)

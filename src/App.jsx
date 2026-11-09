@@ -902,7 +902,11 @@ function App() {
         {activeView === 'mapsManager' && (
           <MapsAreaView
             campaignName={campaignName}
-            characters={characters}
+            // The board's movement-budget lane resolves sheet speed through the
+            // SAME characters lane the Initiative header strip uses — the
+            // derived list carries computedStats.speed (feat/mount +10s);
+            // the raw list cannot (bug-movement-budget-caps-all-movers-at-30).
+            characters={computedCharacters}
             npcs={npcs}
             isLocalhost={isLocalhost}
             mapsView={mapsView}

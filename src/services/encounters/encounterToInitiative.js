@@ -6,6 +6,7 @@ import { addEntry } from '../ui/logService.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { loadCombatSummary, setCombatSummaryCache } from './combatData.js';
 import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js';
+import { monsterSpeedToFeet } from '../combat/turnState.js';
 import { sweepNewCombatClocks } from '../rules/effects/zoneDurationClock.js';
 
 export function getMonsterSaveBonuses(monster) {
@@ -130,6 +131,10 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, _c
               // MN-015: size rides onto combatSummary so maneuver size gates
               // (validateSizeLimit) can enforce large_or_smaller etc.
               size: monster.size || null,
+              // Movement-budget parity: the authored walk speed (feet) rides
+              // onto the row so the economy strip denominator and any budget
+              // consumer read the creature's real speed, not the 30 ft default.
+              speed: monsterSpeedToFeet(monster),
              initiative: String(rollResult.total),
              targetName: null,
              ac: typeof monster.armor_class === 'number' ? monster.armor_class : (console.error(`[AC] Monster "${name}" has no armor_class defined. Defaulting to 10.`), 10),
@@ -296,6 +301,9 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
                  // MN-015: size rides onto combatSummary so maneuver size gates
                  // (validateSizeLimit) can enforce large_or_smaller etc.
                  size: monster.size || null,
+                 // Movement-budget parity (see expandMonstersToCreatures): the
+                 // authored walk speed rides onto the joined row.
+                 speed: monsterSpeedToFeet(monster),
                  initiative: String(rollResult.total),
                  targetName: null,
                  ac: typeof monster.armor_class === 'number' ? monster.armor_class : (console.error(`[AC] Monster "${name}" has no armor_class defined. Defaulting to 10.`), 10),

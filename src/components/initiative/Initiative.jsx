@@ -32,6 +32,7 @@ import { createNpcClickHandler } from './createNpcClickHandler.js'
 import { createFleshToStoneHandler, createPrismaticSprayIndigoHandler, createPrismaticSprayVioletHandler } from './saveResultHandlers.js'
 import { useLootHandlers } from './useLootHandlers.js'
 import { createNextCreatureHandler, createPreviousCreatureHandler, economyNameFor } from './navigationHandlers.js'
+import { resolveSpeedFeet } from '../../services/combat/turnState.js'
 import { clearAllPendingOas } from '../../services/combat/pendingOpportunityAttacks.js'
 import TurnEconomyStrip from './TurnEconomyStrip.jsx'
 import AiDirectorPanel from './AiDirectorPanel.jsx'
@@ -796,10 +797,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  // the holder's turnState key (same economyNameFor seam the gate and
                  // every charge writer resolve), so read and meter off the holder.
                  economyName={economyNameFor(combatSummary, activeCreatureName)}
-                 speedFeet={(() => {
-                     const ch = characters.find(c => utils.getName(c.name) === economyNameFor(combatSummary, activeCreatureName))
-                     return ch?.computedStats?.speed ?? ch?.speed
-                 })()}
+                 // Shared resolution (turnState.resolveSpeedFeet): players keep the
+                 // exact same sheet lane (computedStats.speed → authored speed →
+                 // 30 default); EB-joined monsters now resolve through the row's
+                 // join-stamped bestiary speed instead of silently falling to 30
+                 // (bug-movement-budget-caps-all-movers-at-30, monster-active header face).
+                 speedFeet={resolveSpeedFeet(
+                     combatSummary.creatures.find(c => c.name === economyNameFor(combatSummary, activeCreatureName)),
+                     characters
+                 )}
              />
              <div className='carousel-container' ref={carouselRef}>
                   {displayCreatures.map((creature) => {

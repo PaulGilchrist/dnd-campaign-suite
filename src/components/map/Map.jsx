@@ -241,7 +241,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         selectedWallsRef, selectedItemsRef, selectStart, moveStartGrid,
         placedItemsRef, mapDataRef,
         handleSelectPointerDown, handleSelectPointerMove, handleSelectPointerUp,
-    } = useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName, setPopupHtml: showMapNotice });
+    } = useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName, characters, setPopupHtml: showMapNotice });
 
     const {
         rulerMode, setRulerMode,
@@ -314,7 +314,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
 
     const { dragging, snapToast, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
         svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
-        isLocalhost, walls: getWalls(mapData), placedItems, setPopupHtml: showMapNotice,
+        isLocalhost, walls: getWalls(mapData), placedItems, characters, setPopupHtml: showMapNotice,
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({

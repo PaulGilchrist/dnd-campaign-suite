@@ -6,7 +6,7 @@ import { computeMovementObstacles,
     findNearestValid,
 } from '../../../services/maps/reachability.js';
 import { clampMovementDrop, reachableWithinBudget } from '../../../services/combat/movementBudget.js';
-import { DEFAULT_SPEED_FEET, remainingMovement } from '../../../services/combat/turnState.js';
+import { remainingMovement, resolveSpeedFeet } from '../../../services/combat/turnState.js';
 import { chargeMovement } from '../../../services/combat/chargeEconomy.js';
 import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 import { addEntry } from '../../../services/ui/logService.js';
@@ -42,14 +42,14 @@ function findFreeSquare(startX, startY, occupiedSquares, gridSize) {
  * reason and report snapped:true so the board can surface the clamp visually
  * (the "snapped back" toast in Map.jsx) — UI-only fields, never persisted.
  */
-function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName }) {
+function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName, characters }) {
     const enforcement = campaignName ? getRuntimeValue('campaign', 'enforcement') : null;
     const passthrough = { targetX, targetY, moveCostFeet: 0, budgetActive: false, snapped: false, creatureName: null };
     if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget || dragging.unconstrained) {
         return passthrough;
     }
     const creatureName = player.name || player.id;
-    const speedFeet = Number(player.speedFeet) > 0 ? Number(player.speedFeet) : DEFAULT_SPEED_FEET;
+    const speedFeet = resolveSpeedFeet(player, characters);
     const clamped = clampMovementDrop({
         turnState: getRuntimeValue('campaign', 'turnState') || {},
         creatureName,
@@ -119,7 +119,7 @@ function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, 
  * authority (snapToBudget cells are a subset of this same-budget BFS region,
  * so the drop-side clamped write is always inside the pinned region too).
  */
-function pressBudgetRegion({ campaignName, unconstrained, player, obstacles, mapData, gridSize }) {
+function pressBudgetRegion({ campaignName, unconstrained, player, obstacles, mapData, gridSize, characters }) {
     if (unconstrained || !campaignName) return null;
     const enforcement = getRuntimeValue('campaign', 'enforcement');
     if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget) return null;
@@ -131,7 +131,7 @@ function pressBudgetRegion({ campaignName, unconstrained, player, obstacles, map
         budgetFeet: remainingMovement(
             getRuntimeValue('campaign', 'turnState') || {},
             player.name || player.id,
-            Number(player.speedFeet) > 0 ? Number(player.speedFeet) : DEFAULT_SPEED_FEET,
+            resolveSpeedFeet(player, characters),
         ),
     });
 }
@@ -149,6 +149,11 @@ export default function usePlayerDragging({
     isLocalhost,
     walls,
     placedItems,
+    // Movement-budget speed source: the campaign character sheets (same
+    // `characters` lane the Initiative header strip resolves — see
+    // resolveSpeedFeet). Map tokens only carry {id,name,gridX,gridY}; without
+    // this the budget would cap every mover at DEFAULT_SPEED_FEET.
+    characters,
     // §8.4 advisory sink (Map.jsx's .map-toast channel) — threaded into the
     // onTokenMoveLanded ctx so opportunity-attack advisories render on the
     // board, not only in the campaign log.
@@ -193,7 +198,7 @@ export default function usePlayerDragging({
             : computeReachable(player.gridX, player.gridY, obstacles, gridSize);
 
         // L5-002: movement-budget pinned region (null ⇒ enforcement off).
-        const budgetReachable = pressBudgetRegion({ campaignName, unconstrained, player, obstacles, mapData, gridSize });
+        const budgetReachable = pressBudgetRegion({ campaignName, unconstrained, player, obstacles, mapData, gridSize, characters });
 
         // #910: capture only once the drag has verifiably started (house pattern:
         // useRuler.js guards, validates, then captures; mirrors the #883 fix in
@@ -225,7 +230,7 @@ export default function usePlayerDragging({
             startX: player.gridX,
             startY: player.gridY,
         });
-    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize, campaignName]);
+    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize, campaignName, characters]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;
@@ -331,7 +336,7 @@ export default function usePlayerDragging({
 
         // L5-002: clamp the drop to the movement budget (budgetActive:false ⇒
         // passthrough — enforcement off is byte-identical to today).
-        const budget = resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName });
+        const budget = resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName, characters });
         targetX = budget.targetX;
         targetY = budget.targetY;
         // Visual counterpart of the enforcement_denied log: the token lands on
@@ -356,7 +361,7 @@ export default function usePlayerDragging({
         setDragging(null);
 
         finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData, setPopupHtml });
-    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems, showSnapToast, setPopupHtml]);
+    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems, characters, showSnapToast, setPopupHtml]);
 
     const handlePointerLeave = useCallback((e) => {
         if (!dragging) return;

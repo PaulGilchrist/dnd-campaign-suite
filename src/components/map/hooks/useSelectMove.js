@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { TOOL_SELECT } from '../../../config/mapConfig';
 import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { clampSelectionOffset, FEET_PER_CELL } from '../../../services/combat/movementBudget.js';
-import { remainingMovement, DEFAULT_SPEED_FEET } from '../../../services/combat/turnState.js';
+import { remainingMovement, resolveSpeedFeet } from '../../../services/combat/turnState.js';
 import { chargeMovement } from '../../../services/combat/chargeEconomy.js';
 import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 
@@ -46,7 +46,7 @@ function offsetBounds(bounds, dx, dy) {
  * costFeet, budgetActive }. Enforcement off / no players selected ⇒
  * budgetActive:false with the offset unchanged (the L1–4 guarantee).
  */
-function clampSelectOffset(offset, selectedPlayers, campaignName) {
+function clampSelectOffset(offset, selectedPlayers, campaignName, characters) {
     const direct = { dx: offset.dx, dy: offset.dy, costFeet: (Math.abs(offset.dx) + Math.abs(offset.dy)) * FEET_PER_CELL, budgetActive: false };
     const enforcement = campaignName ? getRuntimeValue('campaign', 'enforcement') : null;
     if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget || selectedPlayers.length === 0) {
@@ -54,7 +54,7 @@ function clampSelectOffset(offset, selectedPlayers, campaignName) {
     }
     const ts = getRuntimeValue('campaign', 'turnState') || {};
     const budgets = selectedPlayers.map(it =>
-        remainingMovement(ts, it.name || it.id, Number(it.speedFeet) > 0 ? Number(it.speedFeet) : DEFAULT_SPEED_FEET)
+        remainingMovement(ts, it.name || it.id, resolveSpeedFeet(it, characters))
     );
     const clamped = clampSelectionOffset({ dx: offset.dx, dy: offset.dy, minBudgetFeet: Math.min(...budgets) });
     return { dx: clamped.dx, dy: clamped.dy, costFeet: clamped.costFeet, budgetActive: true };
@@ -87,7 +87,7 @@ function buildMovedWalls(prev, selWalls, dstBounds, offset) {
     return { ...prev, walls: newWalls };
 }
 
-function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName, setPopupHtml }) {
+function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName, characters, setPopupHtml }) {
     const [selectionRect, setSelectionRect] = useState(null);
     const [selectedWalls, setSelectedWalls] = useState(new Set());
     const [selectedItems, setSelectedItems] = useState(new Set());
@@ -183,7 +183,7 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
         const selectedPlayers = (placedItemsRef.current || []).filter(
             it => selectedItemsRef.current.has(it.id) && it.type === 'player'
         );
-        const { dx, dy, costFeet, budgetActive } = clampSelectOffset(offset, selectedPlayers, campaignName);
+        const { dx, dy, costFeet, budgetActive } = clampSelectOffset(offset, selectedPlayers, campaignName, characters);
         if (budgetActive && dx === 0 && dy === 0) return; // nothing fits the budget — group stays put
 
         const curSelWalls = selectedWallsRef.current;
@@ -231,7 +231,7 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
                 setPopupHtml,
             }).catch((e) => { console.error('[useSelectMove:opportunity-trigger]', e); });
         }
-    }, [campaignName, setPopupHtml]);
+    }, [campaignName, characters, setPopupHtml]);
 
     const handleSelectPointerUp = useCallback((e, placedItems, mapData, setMapData, setPlacedItems) => {
         if (!isLocalhost) return;

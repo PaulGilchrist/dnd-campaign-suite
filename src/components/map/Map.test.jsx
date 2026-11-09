@@ -38,6 +38,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Map from './Map.jsx';
 import useMapLoader from './hooks/useMapLoader.js';
 import useFogOfWar from './hooks/useFogOfWar.js';
+import usePlayerDragging from './hooks/usePlayerDragging.js';
+import useSelectMove from './hooks/useSelectMove.js';
 import { clearRuntimeState } from '../../hooks/runtime/useRuntimeState.js';
 
 const mockLoadMonsters = vi.fn(() => Promise.resolve([]));
@@ -476,5 +478,14 @@ describe('Map container — availability & composition', () => {
         // while parentDisplayName keeps carrying the document's own name.
         const hex = container.querySelector('[data-testid="hex-map"]');
         expect(hex).toHaveTextContent('test-campaign|test-map.json|Test Map|Test Map Doc');
+    });
+
+    it('threads the characters lane into both budget-bearing move hooks (bug-movement-budget-caps-all-movers-at-30)', async () => {
+        const chars = [{ name: 'EvasiveFighter', computedStats: { speed: 40 } }];
+        await act(async () => renderMap({ characters: chars }));
+        // The drag lane and the rigid-select lane resolve the movement-budget
+        // ceiling through this list; without it every mover caps at 30 ft.
+        expect(vi.mocked(usePlayerDragging).mock.calls.at(-1)[0]).toMatchObject({ characters: chars });
+        expect(vi.mocked(useSelectMove).mock.calls.at(-1)[0]).toMatchObject({ characters: chars });
     });
 });

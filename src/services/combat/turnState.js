@@ -106,6 +106,49 @@ export function spend(turnState, creatureName, bucket) {
 /** Movement cap fallback when a creature has no known speed (30 ft is the common baseline). */
 export const DEFAULT_SPEED_FEET = 30;
 
+/** Positive finite feet or null (junk/zero/absent all read as unknown). */
+function positiveFeet(value) {
+    const feet = Number(value);
+    return Number.isFinite(feet) && feet > 0 ? feet : null;
+}
+
+/**
+ * Resolve a mover's per-turn movement-budget ceiling in feet. Precedence:
+ *  1. an explicit feet number already carried on the mover (map-token
+ *     `speedFeet`, combatSummary-row `speed` — EB join stamps bestiary speed);
+ *  2. the character-sheet derived speed (`computedStats.speed`, falling back
+ *     to authored `speed`) looked up by name in `characters` — the SAME
+ *     source the Initiative header strip resolves (Initiative.jsx), so the
+ *     drag engine, the card readout and the header can never diverge;
+ *  3. DEFAULT_SPEED_FEET when nothing is known.
+ * `mover` is the map token / cs row / holder-descriptor object; its name is
+ * taken as `name || id` (same identity law as the charge writers).
+ */
+export function resolveSpeedFeet(mover, characters) {
+    const explicit = positiveFeet(mover?.speedFeet ?? mover?.speed);
+    if (explicit) return explicit;
+    const name = mover?.name || mover?.id;
+    const character = name
+        ? (characters || []).find((c) => c.name === name)
+        : null;
+    return positiveFeet(character?.computedStats?.speed ?? character?.speed) ?? DEFAULT_SPEED_FEET;
+}
+
+/**
+ * Ground movement speed in feet from a bestiary stat block, or null when the
+ * block authors none. monsters.json `speed` is a modes dict ({ walk: "40 ft." }),
+ * a plain string ("40 ft."), or a number; walk is the movement-budget mode,
+ * with the other modes as honest fallbacks for creatures that author no walk.
+ */
+export function monsterSpeedToFeet(monster) {
+    const speed = monster?.speed;
+    const raw = speed && typeof speed === 'object'
+        ? (speed.walk || speed.burrow || speed.fly || speed.swim || speed.climb)
+        : speed;
+    const feet = typeof raw === 'number' ? raw : Number(String(raw ?? '').match(/(\d+(?:\.\d+)?)/)?.[1]);
+    return Number.isFinite(feet) && feet > 0 ? feet : null;
+}
+
 /**
  * Un-charge one economy slot (modal-cancel / referee correction seam, L5-002).
  * Mirrors spend(); floors at 0. Returns the new turnState (caller persists).

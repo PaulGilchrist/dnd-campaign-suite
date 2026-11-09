@@ -4,6 +4,7 @@ import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js'
 import { getMonsterSaveBonuses } from './encounterToInitiative.js'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { isCreaturePresent, sortCreaturesForBoard } from '../combat/creaturePresence.js'
+import { monsterSpeedToFeet } from '../combat/turnState.js'
 
 function parseInitBonus(monster) {
     const initStr = monster.initiative_details
@@ -187,6 +188,10 @@ async function applyNpcMonsterData(combatSummary, creatureIndex, monster, campai
     // CLA-303: keep monsterType in sync with monster data so Turn Undead
     // eligibility resolves without a client-side name lookup.
     creature.monsterType = monster.type || creature.monsterType
+    // Movement-budget parity (see encounterToInitiative join): the authored
+    // walk speed (feet) rides onto the row so the card's economy strip shows
+    // the real denominator instead of the 30 ft default.
+    creature.speed = monsterSpeedToFeet(monster) || creature.speed
     const matchedNpc = campaignNpcs.find(n => n.name?.toLowerCase() === creature.name.toLowerCase())
     if (matchedNpc?.imagePath) {
         creature.imagePath = matchedNpc.imagePath
