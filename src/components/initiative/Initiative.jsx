@@ -493,7 +493,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const openEffectAdder = React.useCallback((creature, tab) => {
         if (!isLocalhost) return
-        setEffectAdderTarget(creature)
+        // CLA-360 law (displayCreatureUtils.js:49, Initiative.jsx holderName lane):
+        // structural (Second Turn) rows are synthetic transport — state keyed by the
+        // suffixed name is a phantom bucket (invisible, unrestorable, orphaned at the
+        // round wrap). Route GM intent to the holder's real, visible, removable state,
+        // so conditions/targetEffects/concentration writes AND the audit rows land on
+        // the same creature the row card displays (bug-effectadder-secondturn-phantom-bucket).
+        setEffectAdderTarget(isSecondTurnEntry(creature) && creature.holderName
+            ? { ...creature, name: creature.holderName }
+            : creature)
         setEffectAdderTab(tab)
     }, [isLocalhost, setEffectAdderTarget])
 

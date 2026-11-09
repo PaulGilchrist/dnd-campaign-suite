@@ -41,3 +41,19 @@ Cheapest honest lane: hide the Add button on `secondTurn` rows in `CreatureCard.
 ## Severity
 
 Data integrity risk — false-positive audit plus permanent phantom change-data (invisible, unrecoverable except by full Admin clear); a GM believes they poisoned a creature that was never affected.
+
+## Resolution
+
+FIXED 2026-11-09 (fix run). Root cause matched the bug file's census: `Initiative.jsx` `openEffectAdder` stored the raw creature row into the `combat-ui-effectAdderTarget` flag, and the modal dispatches ALL three tabs through `data.target = targetName = effectAdderTarget.name`, so every write lane (`conditionSaveService.addCondition` runtime keys, root `targetEffects` row, cs `concentration` row) plus `logConditionEvent` keyed off the literal synthetic name. The fix is NOT a new architecture: it applies the lane's own CLA-360 holder-resolution law (`creature.holderName || creature.name`, `displayCreatureUtils.js:49`, mirrored at `Initiative.jsx:776` — the ST row card already resolves holder HP/AC/conditions through it) to the WRITE side. Remapping at the single open chokepoint routes GM intent to the holder's real, visible, removable state (same face as the accepted AWAY-creature applies) and fixes all three tabs + the audit name in one place; hiding the button would have left the unguarded write seam intact for every other opener.
+
+Files changed:
+- `src/components/initiative/Initiative.jsx` — `openEffectAdder` remaps `isSecondTurnEntry(creature)` targets to `{ ...creature, name: creature.holderName }` before writing the flag.
+- `src/components/initiative/Initiative.effectAdder-second-turn.test.jsx` — NEW regression test (mirrors the `Initiative.effectAdder-evict.test.jsx` mock family; `isSecondTurnEntry` mocked with real structural semantics): opening from the ST card writes the flag + modal targetName as the HOLDER (never the synthetic name), Apply writes `targetEffects` under `target: holder` with zero calls keyed by the ST name and still evicts the flag, and the holder-card control leg keeps its own name. 3/3 pass.
+
+Verified live in `test-campaign` (synthetic ST-row twin seeded via full-store `combatSummary` POST — the ER-proven merge law keeps `secondTurn` rows whose `holderName` is a campaign character, no fixture surgery needed):
+- PRE-fix repro (exact bug-file behavior): modal titled `EvasiveFighter (Second Turn)`; Poisoned Apply → phantom bucket `"EvasiveFighter (Second Turn)": {activeConditions:["poisoned"], activeConditionMeta:{poisoned:{ability:"con"}}}`, holder bucket absent, zero badges on either card, `condition applied` audit claims the synthetic name; Effects-tab Apply → zombie te `{target:"EvasiveFighter (Second Turn)", effect:"slasher_enhanced_critical"}` + `target-effect-applied` naming it; Initiative Clear retires the row while phantom bucket + te survive (orphan confirmed).
+- POST-fix re-run of the same steps: NO synthetic-key bucket ever appears; holder bucket carries `activeConditions:["poisoned"]` + meta; `Poisoned` badge renders on BOTH cards (holder card natively, ST card via CLA-360 display resolution) and `Attack Disadv` te targets `EvasiveFighter`; both audit rows name `EvasiveFighter`; modal opened from the ST card is titled `EvasiveFighter`. Adjacent sanity: holder-card badge × evicts (`activeConditions:[]`) + honest `condition broken` audit row.
+- Tests: `npx vitest run src/components/initiative` = 90 files / 684 tests green (incl. the new file); `npm run lint` zero warnings. No timers touched (guard not required).
+
+Residuals noted (not filed): the Effects-tab Source dropdown can still list an ST row as a te `source` (attribution string only, not a state key — cosmetic); the ST card's Add-button `title` still names the suffixed row (it identifies the card you clicked; the modal header names the landing holder — kept so lane locators stay stable).
+
