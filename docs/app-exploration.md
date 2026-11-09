@@ -61,7 +61,6 @@ Live facts (FW, dev pair `npm run dev` :80 + :5173 CAMPAIGN_LOCK='test-campaign,
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(FW 2026-11-09)** After a full-store cs POST onto a settled tab, the DOM cards render the POSTed array order while `Next` walks a differently-ordered mirror (initiative-sorted copy from the mount merge / adoption path) — visibly confusing when the pointer skips a card drawn between two others. Suggest: sort once at adoption and render the same array the walker reads (or annotate the sort in the board header). Files: `initiativeService.js:264`, `Initiative.jsx` displayCreatures.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

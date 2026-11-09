@@ -1,6 +1,7 @@
 import { cloneDeep } from 'lodash'
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getActiveCreatureName, getCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js'
+import { sortCreaturesForBoard } from '../../services/combat/creaturePresence.js'
 import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval } from '../../services/rules/effects/expirations.js'
 import { applyCommanderStrikeTurnEnd } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
@@ -74,6 +75,20 @@ export function createSseEventHandler({
         const prevRound = combatSummaryRef.current?.round ?? 1
         if (merged.round < prevRound) {
             return
+        }
+        // FW 2026-11-09 improve (board-order law): the card row IS the turn
+        // tracker, so an adopted board must render in the order the Next-walk
+        // steps through. Order is decided ONCE here at the adoption seam with the
+        // SAME authoritative sort the mount merge uses (initiativeService
+        // mergeCombatSummaryWithCharacters → sortCreaturesForBoard: present-first,
+        // initiative DESC, blank = −1, ties name-asc). Before this, a full-store
+        // cs POST onto a settled tab stored the POSTed array order while the
+        // mount-merged mirrors walked initiative-DESC — the pointer visibly
+        // skipped a card drawn between two others. View (displayCreatures) and
+        // walker (getNextCreatureName) read this one array, so no second sort
+        // exists to diverge from.
+        if (Array.isArray(merged.creatures)) {
+            sortCreaturesForBoard(merged)
         }
         combatSummaryRef.current = merged
         setCombatSummaryCache(merged, campaignName)
