@@ -105,14 +105,31 @@ export function useTvPresentation({ campaignName, displayCreatures, activeCreatu
 
     // ── Up-next strip ── pure derivation from tracker order (Thief's Reflexes
     // second turns excluded, mirrors TargetSelect; away PCs skipped — they
-    // hold no slot in the round).
+    // hold no slot in the round). Anchor in the FULL tracker array — the same
+    // order the Next-walk steps through (initiativeService.getNextCreatureName)
+    // — before slicing the next-N: a `(Second Turn)` row is never in the
+    // filtered list, so anchoring there (idx < 0) and skipping past its seam
+    // yields the true next step, not the first-of-filtered-list that has
+    // already acted (FT 2026-11-09 backlog).
     const nextUpCreatures = React.useMemo(() => {
-        const list = displayCreatures.filter(c => !c.secondTurn && isCreaturePresent(c))
+        const isEligible = (c) => !c.secondTurn && isCreaturePresent(c)
+        const list = displayCreatures.filter(isEligible)
         if (list.length < 2) return []
-        const idx = list.findIndex(c => c.name === activeCreatureName)
+        const anchor = displayCreatures.findIndex(c => c.name === activeCreatureName)
+        // Unknown active creature: legacy first-of-list face (nothing to skip past).
+        if (anchor === -1) return list.slice(0, Math.min(4, list.length - 1))
+        const anchorRow = displayCreatures[anchor]
+        // Cap: 4 entries; a present active row also never shows itself (was
+        // enforced by the old i < list.length bound — preserve that face).
+        const cap = anchorRow.secondTurn
+            ? Math.min(4, list.length)
+            : Math.min(4, list.length - 1)
         const out = []
-        for (let i = 1; i <= 4 && i < list.length; i++) {
-            out.push(list[((idx < 0 ? -1 : idx) + i + list.length) % list.length])
+        const n = displayCreatures.length
+        for (let step = 1; out.length < cap && step <= n; step++) {
+            const c = displayCreatures[(anchor + step) % n]
+            if (c === anchorRow || !isEligible(c)) continue
+            out.push(c)
         }
         return out
     }, [displayCreatures, activeCreatureName])
