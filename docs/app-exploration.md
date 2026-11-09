@@ -71,8 +71,6 @@ Live facts (FX, dev pair `npm run dev` :80 + :5173 CAMPAIGN_LOCK='test-campaign,
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(FX 2026-11-09)** the Level-5 economy has no GM-visible budget face: denial popups ("No action left this turn.") name the bucket but nothing on the initiative card shows actionsUsed/bonus/movementUsedFeet or lets the GM refund a mis-charge (`refundSlot` seam exists at the modal-cancel/referee layer, UI grep-zero consumer). A compact per-card economy chip (3 pips + movement meter, enforcement-ON only) would make the whole L5 feature inspectable mid-fight. Files: `initiative/CreatureCard.jsx`, `combat/turnState.js` (read-only projection), enforcement-gated render like the HP-inline inputs.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): round-wrap re-prompt face of the repeat-save (once-per-round proven structurally via seam-skip + producer no-latch census, the 10-click wrap walk deliberately skipped — the mount-merge re-adds 10 PCs making wraps expensive; playbook recipe unchanged); movement OA trigger leg (`onTokenMoveLanded`, never ridden app-wide); TV up-next ordering under the new adoption sort; snap-back-toast vs clamp-drop discriminator leg (the toast never fired on any observed leg).
