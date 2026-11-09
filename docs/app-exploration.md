@@ -71,7 +71,6 @@ Live facts (FX, dev pair `npm run dev` :80 + :5173 CAMPAIGN_LOCK='test-campaign,
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(FX 2026-11-09)** movementBudget over-budget token drags CLAMP SILENTLY: the ghost/token stops at the budget edge and lands there with no toast and no remaining-budget readout (the `showSnapToast("<name> snapped back to N ft")` lane exists but wasn't reached on the clamp-drop leg) — the GM can't tell an absorbed 40-ft drag from a 20-ft move without opening devtools and reading turnState. Suggest: fire the snap notice whenever `clampMovementDrop` reduced the requested distance. Files: `src/components/map/hooks/usePlayerDragging.js` (clamp leg + finalizePlayerMove), `services/combat/movementBudget.js`.
 - **(FX 2026-11-09)** the Level-5 economy has no GM-visible budget face: denial popups ("No action left this turn.") name the bucket but nothing on the initiative card shows actionsUsed/bonus/movementUsedFeet or lets the GM refund a mis-charge (`refundSlot` seam exists at the modal-cancel/referee layer, UI grep-zero consumer). A compact per-card economy chip (3 pips + movement meter, enforcement-ON only) would make the whole L5 feature inspectable mid-fight. Files: `initiative/CreatureCard.jsx`, `combat/turnState.js` (read-only projection), enforcement-gated render like the HP-inline inputs.
 
 ## Blocked / Not Verified (fold-gate ledger)
