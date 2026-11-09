@@ -25,7 +25,12 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 vi.mock('../../services/combat/sessionService.js', () => ({ setSessionPhase: vi.fn(async () => ({})) }));
 vi.mock('../../services/items/autoRewardService.js', () => ({ autoAwardCombatRewards: vi.fn(async () => ({})) }));
-vi.mock('../../services/combat/thiefsReflexesService.js', () => ({ maybeGrantThiefsReflexesSecondTurn: vi.fn() }));
+// creaturePresence.js imports the REAL isSecondTurnEntry predicate (second-turn
+// rejoin anchoring) — spread the original module so only the grant stays mocked.
+vi.mock('../../services/combat/thiefsReflexesService.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    maybeGrantThiefsReflexesSecondTurn: vi.fn(),
+}));
 vi.mock('../../services/combat/summons/summonedCreatureService.js', () => ({ vanishSummonAtZeroHp: vi.fn() }));
 vi.mock('../../services/rules/features/hypnoticPatternService.js', () => ({ breakHypnoticPatternOnDamage: vi.fn() }));
 vi.mock('../../services/encounters/creatureControl.js', () => ({ getCreatureController: vi.fn(() => null) }));
@@ -99,6 +104,28 @@ describe('handlePartyPresenceChange', () => {
         });
         handlers.handlePartyPresenceChange({ Bo: false });
         expect(addEntry.mock.calls[0][1].description).toContain('initiative not yet rolled');
+    });
+
+    // FU 2026-11-09: a second-turn twin rejoins at holder−10 and the audit row
+    // must say so honestly — no "(end of the round)" claim on an anchored slot.
+    it('second-turn twin rejoin logs the holder-anchored slot, PC copy unchanged', () => {
+        const { handlers, combatSummary } = wire({
+            combatSummary: { round: 1, creatures: [
+                { name: 'Ann', type: 'player', initiative: '25' },
+                { name: 'Ann (Second Turn)', type: 'player', initiative: '', away: true, secondTurn: true, holderName: 'Ann' },
+                { name: 'Bo', type: 'player', initiative: '', away: true },
+                { name: 'Goblin', type: 'npc', initiative: '6' },
+            ] },
+        });
+        handlers.handlePartyPresenceChange({ 'Ann (Second Turn)': false, Bo: false });
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        const twinRow = addEntry.mock.calls.find(c => c[1].characterName === 'Ann (Second Turn)')[1];
+        expect(twinRow.automationType).toBe('party_rejoined');
+        expect(twinRow.description).toContain("re-anchored to Ann's second-turn slot (initiative 15)");
+        expect(combatSummary.creatures.find(c => c.name === 'Ann (Second Turn)').initiative).toBe('15');
+        // PC row keeps the byte-identical end-of-round copy (Goblin 6 lowest present).
+        const pcRow = addEntry.mock.calls.find(c => c[1].characterName === 'Bo')[1];
+        expect(pcRow.description).toBe('Bo rejoined the party — initiative set to 6 (end of the round).');
     });
 
     it('unchanged/unknown names write nothing', () => {

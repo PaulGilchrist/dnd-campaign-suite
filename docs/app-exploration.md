@@ -61,8 +61,6 @@ Live facts (FU, dev pair `npm run dev` :80 + :5173 no lock, test-campaign header
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FU 2026-11-09) Away→Rejoin on a `(Second Turn)` row re-rolls its initiative (app-wide player-row law; PC control ''→3), silently losing the grant-time holder−10 seam (observed drift 19→10→3). For synthetic rows, consider re-anchoring to holder-init−10 (or preserving the seeded value) instead of re-rolling — `createCreatureHandlers` rejoin/re-sync lane + `navigationHandlers` seam.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): whether the holder's own-attack te (slasher) applies disadvantage during the ST row's active turn (needs a full EF sheet-attack popup-drain rig; expectation also carries mild ambiguity — expected FU PT2 target 2); join-write-failure ROLLBACK live face (can't induce a server write fault black-box); double-ST-row TV seam (target 4); `mc-overlay` full stat block on an ST card still never opened.

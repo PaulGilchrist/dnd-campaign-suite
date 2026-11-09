@@ -470,9 +470,11 @@ export function createCreatureHandlers({
                 name: change.away ? 'Split Party' : 'Rejoin',
                 description: change.away
                     ? `${change.name} split from the party — removed from the initiative tracker (their card rests at the back until they rejoin).`
-                    : change.initiative
-                        ? `${change.name} rejoined the party — initiative set to ${change.initiative} (end of the round).`
-                        : `${change.name} rejoined the party — initiative not yet rolled.`,
+                    : change.holderName
+                        ? `${change.name} rejoined the party — re-anchored to ${change.holderName}'s second-turn slot (initiative ${change.initiative}).`
+                        : change.initiative
+                            ? `${change.name} rejoined the party — initiative set to ${change.initiative} (end of the round).`
+                            : `${change.name} rejoined the party — initiative not yet rolled.`,
                 timestamp: Date.now(),
             }).catch((e) => { console.error('[handlePartyPresenceChange] presence log failed:', e) })
         }

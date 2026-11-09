@@ -110,4 +110,84 @@ describe('applyPresenceChanges', () => {
         expect(applyPresenceChanges(null, { Ann: true })).toEqual([]);
         expect(applyPresenceChanges({ creatures: [] }, {})).toEqual([]);
     });
+
+    // ── Second-turn twin rejoin anchoring (FU 2026-11-09) ──────────────────
+    // The grant law (thiefsReflexesService.js) authors the twin at holder
+    // initiative − 10; Away→Rejoin must re-anchor to that seam instead of
+    // re-rolling to the end-of-round slot (the old 19→10→3 drift).
+    const twin = (holder, extra = {}) => pc(`${holder} (Second Turn)`, { secondTurn: true, holderName: holder, ...extra });
+
+    it('split still wipes a second-turn twin (away law unchanged)', () => {
+        const cs = { creatures: [pc('Ann', { initiative: '25' }), twin('Ann', { initiative: '15' })] };
+        const changes = applyPresenceChanges(cs, { 'Ann (Second Turn)': true });
+        expect(changes).toEqual([{ name: 'Ann (Second Turn)', away: true, initiative: '' }]);
+        const row = cs.creatures.find(c => c.name === 'Ann (Second Turn)');
+        expect(row).toMatchObject({ away: true, initiative: '', secondTurn: true, holderName: 'Ann' });
+        // Away rows park strictly last (holder 25 first).
+        expect(cs.creatures.map(c => c.name)).toEqual(['Ann', 'Ann (Second Turn)']);
+    });
+
+    it('ST rejoin re-anchors to holder initiative − 10 (grant law), not end-of-round', () => {
+        const cs = { creatures: [
+            pc('Ann', { initiative: '25' }),
+            twin('Ann', { initiative: '', away: true }), // split wiped the slot
+            pc('Cy', { initiative: '12' }), // end-of-round would be 12 — anchor wins
+        ] };
+        const changes = applyPresenceChanges(cs, { 'Ann (Second Turn)': false });
+        expect(changes).toEqual([
+            { name: 'Ann (Second Turn)', away: false, initiative: '15', holderName: 'Ann' },
+        ]);
+        expect(cs.creatures.find(c => c.name === 'Ann (Second Turn)').away).toBeUndefined();
+    });
+
+    it('ST rejoin anchors to the holder\'s CURRENT initiative (seam follows edits)', () => {
+        const cs = { creatures: [pc('Ann', { initiative: '8' }), twin('Ann', { initiative: '', away: true })] };
+        const changes = applyPresenceChanges(cs, { 'Ann (Second Turn)': false });
+        // 8 − 10 = −2: the grant arithmetic has no clamp — mirrored exactly.
+        expect(changes[0].initiative).toBe('-2');
+    });
+
+    it('ST rejoin falls back to end-of-round when holder initiative is blank', () => {
+        const cs = { creatures: [
+            pc('Ann', { initiative: '' }), // holder unrolled
+            twin('Ann', { initiative: '', away: true }),
+            pc('Cy', { initiative: '12' }),
+        ] };
+        const changes = applyPresenceChanges(cs, { 'Ann (Second Turn)': false });
+        expect(changes).toEqual([{ name: 'Ann (Second Turn)', away: false, initiative: '12' }]);
+    });
+
+    it('ST rejoin falls back to end-of-round when the holder row is absent', () => {
+        const cs = { creatures: [twin('Ghost', { initiative: '', away: true }), pc('Cy', { initiative: '12' })] };
+        const changes = applyPresenceChanges(cs, { 'Ghost (Second Turn)': false });
+        expect(changes).toEqual([{ name: 'Ghost (Second Turn)', away: false, initiative: '12' }]);
+    });
+
+    it('ST twin without holderName keeps the end-of-round law', () => {
+        const cs = { creatures: [pc('Zed', { initiative: '', away: true, secondTurn: true }), pc('Cy', { initiative: '9' })] };
+        const changes = applyPresenceChanges(cs, { Zed: false });
+        expect(changes).toEqual([{ name: 'Zed', away: false, initiative: '9' }]);
+    });
+
+    it('mixed bulk rejoin: PC lands end-of-round, ST twin anchors holder−10 (own law each)', () => {
+        const cs = { creatures: [
+            pc('Ann', { initiative: '25' }),
+            twin('Ann', { initiative: '', away: true }),
+            pc('Bo', { initiative: '', away: true }),
+            npc('Goblin', { initiative: '6' }),
+        ] };
+        const changes = applyPresenceChanges(cs, { 'Ann (Second Turn)': false, Bo: false });
+        expect(changes).toEqual([
+            { name: 'Ann (Second Turn)', away: false, initiative: '15', holderName: 'Ann' },
+            { name: 'Bo', away: false, initiative: '6' },
+        ]);
+    });
+
+    it('non-ST rows are byte-identical to the old law (PC lands lowest present roll)', () => {
+        // Same fixture as the classic rejoin test — no holderName/secondTurn
+        // anywhere, end-of-round must win exactly as before.
+        const cs = { creatures: [pc('Ann', { initiative: '17' }), pc('Bo', { away: true }), pc('Cy', { initiative: '12' })] };
+        const changes = applyPresenceChanges(cs, { Bo: false });
+        expect(changes).toEqual([{ name: 'Bo', away: false, initiative: '12' }]);
+    });
 });

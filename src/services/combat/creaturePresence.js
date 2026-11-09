@@ -9,7 +9,11 @@
 //
 // This lives in its own module (NOT initiativeService) because many
 // component tests partial-mock initiativeService — consumers must always
-// get the real predicate.
+// get the real predicate. Same caution for the isSecondTurnEntry import
+// below: any test that factory-mocks thiefsReflexesService and exercises a
+// rejoin must spread `await importOriginal()` so the predicate stays real.
+
+import { isSecondTurnEntry } from './thiefsReflexesService.js'
 
 function isCreaturePresent(creature) {
     return !(creature.type === 'player' && creature.away === true)
@@ -25,6 +29,23 @@ function computeEndOfRoundInitiative(creatures) {
         .map(c => (c.initiative === '' || c.initiative == null ? NaN : Number(c.initiative)))
         .filter(n => Number.isFinite(n))
     return values.length ? Math.min(...values) : null
+}
+
+// Thief's-Reflexes twin rejoin anchor (FU 2026-11-09): the grant law in
+// thiefsReflexesService.js authors the twin at holder initiative − 10
+// (`String(init - 10)` — plain arithmetic, no clamp/normalization), so an
+// Away→Rejoin must re-anchor to the holder's CURRENT initiative − 10 instead
+// of re-rolling to the end-of-round slot (that law silently loses the
+// grant-time seam: 19→10→3 drift). Holder row absent, or its initiative
+// blank/non-numeric ⇒ null ⇒ the end-of-round law applies unchanged
+// (mirrors findHolderEntry's guard in the grant service).
+function secondTurnAnchorInitiative(creature, creatures) {
+    if (!isSecondTurnEntry(creature) || !creature.holderName) return null
+    const holder = (creatures || []).find(c => c.type === 'player' && c.name === creature.holderName)
+    if (!holder || holder.initiative === '' || holder.initiative == null) return null
+    const init = Number(holder.initiative)
+    if (!Number.isFinite(init)) return null
+    return String(init - 10)
 }
 
 // Board display order: rolled first (descending), unrolled after (-1),
@@ -52,6 +73,9 @@ function sortCreaturesForBoard(combatSummary) {
  * Rejoin ⇒ flag cleared + initiative auto-set to the board's lowest PRESENT
  * roll (end of the current round); the GM can still edit the input or let the
  * player roll. Nobody rolled ⇒ initiative left blank for the GM.
+ * Second-turn twins (`isSecondTurnEntry` + `holderName`) instead re-anchor to
+ * the holder's current initiative − 10 — the grant law, not a re-roll (FU
+ * 2026-11-09); holder gone/blank ⇒ the end-of-round law as normal.
  * The end-of-round value is computed ONCE against the pre-change present set,
  * so bulk rejoiners land on the same slot.
  */
@@ -65,14 +89,23 @@ function applyPresenceChanges(combatSummary, presenceByName) {
         if (wantAway === undefined) continue
         const wasAway = creature.away === true
         if (wasAway === !!wantAway) continue
+        let anchoredTo = null
         if (wantAway) {
             creature.away = true
             creature.initiative = ''
         } else {
             delete creature.away
-            if (end !== null) creature.initiative = String(end)
+            const anchor = secondTurnAnchorInitiative(creature, combatSummary.creatures)
+            if (anchor !== null) {
+                creature.initiative = anchor
+                anchoredTo = creature.holderName
+            } else if (end !== null) {
+                creature.initiative = String(end)
+            }
         }
-        changes.push({ name: creature.name, away: !!wantAway, initiative: creature.initiative })
+        const change = { name: creature.name, away: !!wantAway, initiative: creature.initiative }
+        if (anchoredTo) change.holderName = anchoredTo
+        changes.push(change)
     }
     if (changes.length) sortCreaturesForBoard(combatSummary)
     return changes
