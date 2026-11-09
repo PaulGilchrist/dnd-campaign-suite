@@ -7,6 +7,7 @@ import { removeMazeEffect } from '../../services/automation/handlers/spells/maze
 import { removeSlowEffectsForTarget } from '../../services/combat/conditions/slowEffects.js'
 import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils.js'
 import { logConditionSave } from '../../services/encounters/combatLoggingService.js'
+import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 import * as logService from '../../services/ui/logService.js'
 
 function logEntry(campaignName, entry) {
@@ -257,7 +258,18 @@ export function createRollConditionSaveHandler({
 }) {
     return async function handleRollConditionSave(creatureName, condition) {
         if (!combatSummary) return
-        const creature = combatSummary.creatures.find(c => c.name === creatureName)
+        const row = combatSummary.creatures.find(c => c.name === creatureName)
+        if (!row) return
+        // CLA-360 law (mirrors handleAutoBreakCondition 583d078ff / openAllyEditor):
+        // a structural (Second Turn) row card DISPLAYS the holder's conditions
+        // (buildDisplayCreature resolves via holderName), so its badge CLICK must
+        // resolve the save as the HOLDER. Rolling on the synthetic row loses the
+        // holder's save bonus (the character lookup matches no file), audits a
+        // creature with no character file, and removeCondition materializes a
+        // phantom {activeConditions:[]} change-data bucket while the holder's
+        // real condition silently survives.
+        const subjectName = isSecondTurnEntry(row) && row.holderName ? row.holderName : creatureName
+        const creature = subjectName === creatureName ? row : combatSummary.creatures.find(c => c.name === subjectName)
         if (!creature) return
 
         const { roll: r1, success, bonus, bonusDetail, rolls, starryDragonFloor } = await rollConditionSave({
@@ -265,10 +277,10 @@ export function createRollConditionSaveHandler({
         })
 
         const conditionKey = String(condition.key).toLowerCase()
-        const ctx = { combatSummary, creatureName, condition, campaignName, r1, bonus }
+        const ctx = { combatSummary, creatureName: subjectName, condition, campaignName, r1, bonus }
 
         if (success) {
-            removeCondition({ combatSummary, creatureName, condition, getRuntimeValue, setRuntimeValue, campaignName })
+            removeCondition({ combatSummary, creatureName: subjectName, condition, getRuntimeValue, setRuntimeValue, campaignName })
             for (const cleanup of SUCCESS_CLEANUPS) {
                 if (cleanup.matches(conditionKey)) await cleanup.run(ctx)
             }
@@ -293,6 +305,6 @@ export function createRollConditionSaveHandler({
         }))
 
         // Pass the full dice array so advantage rolls log both dice + mode 'advantage' (CLA-209)
-        logConditionSave({ campaignName, creatureName, roll: Array.isArray(rolls) && rolls.length > 1 ? rolls : r1, bonus, bonusDetail, conditionLabel: condition.label, abilityLabel: getAbilityLabel(condition.ability), dc: condition.dc, success })
+        logConditionSave({ campaignName, creatureName: subjectName, roll: Array.isArray(rolls) && rolls.length > 1 ? rolls : r1, bonus, bonusDetail, conditionLabel: condition.label, abilityLabel: getAbilityLabel(condition.ability), dc: condition.dc, success })
     }
 }
