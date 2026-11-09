@@ -730,15 +730,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 combatSummaryRef.current = merged
 
                 if (!activeCreatureNameRef.current) {
-                    const activeName = getActiveCreatureName(campaignName)
-                    if (activeName) {
-                        setActiveCreatureName(activeName)
-                        activeCreatureNameRef.current = activeName
-                    } else {
-                        const firstCreature = merged.creatures[0]?.name || null
-                        setActiveCreatureName(firstCreature)
-                        activeCreatureNameRef.current = firstCreature
-                    }
+                    // FW 2026-11-09 improve: prefer the merged summary's own surviving
+                    // activeCreatureName (mergeCombatSummaryWithCharacters keeps it only
+                    // when the named row survived) over the per-client cached fallback —
+                    // a seeded board's pointer must beat a stale localStorage/cache value
+                    // and the server mirror it was POSTed to. Fallback chain unchanged:
+                    // cached getActiveCreatureName() → first creature → null sentinel.
+                    const activeName = merged.activeCreatureName
+                        || getActiveCreatureName(campaignName)
+                        || merged.creatures[0]?.name
+                        || null
+                    setActiveCreatureName(activeName)
+                    activeCreatureNameRef.current = activeName
                 }
             } else {
                 if (cancelled) return

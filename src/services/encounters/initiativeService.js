@@ -262,7 +262,17 @@ function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
         }))
     mergedCreatures.push(...newPlayerCreatures)
     sortCreaturesForBoard({ creatures: mergedCreatures })
-    return { round: initialSummary.round, creatures: mergedCreatures }
+    const merged = { round: initialSummary.round, creatures: mergedCreatures }
+    // FW 2026-11-09 improve: the mount used to return only {round, creatures}, silently
+    // DISCARDING a seeded/baked activeCreatureName — the GM's mount POST then wiped the
+    // pointer from the server mirror and the highlight fell to the per-client fallback.
+    // Preserve it when it names a row that survived this merge (a (Second Turn) twin
+    // counts via its own synthetic name, which the holder filter above already kept);
+    // a pointer naming an evicted row is dropped (the mount falls back by design).
+    if (mergedCreatures.some(c => c.name === initialSummary.activeCreatureName)) {
+        merged.activeCreatureName = initialSummary.activeCreatureName
+    }
+    return merged
 }
 
 export {

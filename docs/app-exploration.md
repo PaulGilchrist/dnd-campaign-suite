@@ -61,7 +61,6 @@ Live facts (FW, dev pair `npm run dev` :80 + :5173 CAMPAIGN_LOCK='test-campaign,
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(FW 2026-11-09)** A fresh campaign-select + Initiative mount silently DISCARDS a seeded `combatSummary.activeCreatureName` (merge drops the field) and then re-highlights the turn pointer from per-client localStorage `activeCreatureName` — the new board's "active" card contradicts both the server mirror and the seeder's intent until someone POSTs the top-level key. Suggest: mount merge prefers the merged cs's own `activeCreatureName` when it names a surviving row; localStorage is only the fallback. Cheap files: `initiativeService.mergeCombatSummaryWithCharacters`, `Initiative.jsx` init state.
 - **(FW 2026-11-09)** After a full-store cs POST onto a settled tab, the DOM cards render the POSTed array order while `Next` walks a differently-ordered mirror (initiative-sorted copy from the mount merge / adoption path) — visibly confusing when the pointer skips a card drawn between two others. Suggest: sort once at adoption and render the same array the walker reads (or annotate the sort in the board header). Files: `initiativeService.js:264`, `Initiative.jsx` displayCreatures.
 
 ## Blocked / Not Verified (fold-gate ledger)
