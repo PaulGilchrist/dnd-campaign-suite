@@ -141,27 +141,45 @@ function runRoundWrapHousekeeping({ updatedSummary, creatures, campaignName, rou
     drainRoundWrapClocks({ campaignName, roundToSet })
 }
 
+// CLA-360 ST-seam law (mirrors assertCanAct.js readActiveCreature, c076dfdf1): a
+// (Second Turn) row IS the holder's extra turn (owner ruling 2026-11-09), so every
+// economy STATE transition resolves the twin row to its holderName before keying
+// turnState — the gate already lets the holder act through the seam, and the writer
+// must re-arm/close the SAME entry the charges land on. A turnState record is NEVER
+// keyed under the synthetic label (phantom-bucket family 583d078ff/930393775/
+// d55d4160a): every charge keys on the acting creature (the holder), so a synthetic
+// record would be un-spendable budget rotting in the shared bucket.
+function economyNameFor(summary, name) {
+    if (!name || !summary || !Array.isArray(summary.creatures)) return name
+    const row = summary.creatures.find(c => c && c.name === name)
+    if (row && isSecondTurnEntry(row) && row.holderName) return row.holderName
+    return name
+}
+
 // L5-001: turn-economy transition pass, riding the existing turn/round-wrap seams.
 // Off ⇒ ZERO writes (L1–4 untouched); on ⇒ close outgoing turn, re-arm reactions at
 // the round wrap, open the new active creature's economy. Orthogonal to the
 // PLAYER_ROUND_LATCH_KEYS idiom above — those stay authoritative for their features.
-function applyTurnStateTransition({ campaignName, outgoingName, newActiveName, roundIncrement }) {
+function applyTurnStateTransition({ campaignName, summary, outgoingName, newActiveName, roundIncrement }) {
     const enforcement = getRuntimeValue('campaign', 'enforcement')
     if (!enforcement || enforcement.mode !== 'on') return
     let ts = cloneDeep(getRuntimeValue('campaign', 'turnState') || {})
-    if (outgoingName) ts = closeTurn(ts, outgoingName)
+    const outgoingEconomyName = economyNameFor(summary, outgoingName)
+    if (outgoingEconomyName) ts = closeTurn(ts, outgoingEconomyName)
     if (roundIncrement) ts = rearmReactions(ts)
-    ts = resetForTurn(ts, newActiveName)
+    // Holder→twin seam: resolves to the holder → the extra turn re-arms the holder's
+    // own budget (RAW: Thief's Reflexes = "take an extra turn"). Twin→X seam closes it.
+    ts = resetForTurn(ts, economyNameFor(summary, newActiveName))
     setRuntimeValue('campaign', 'turnState', ts, campaignName)
 }
 
 // L5-001: enforcement gate (action lane) for the initiative rewind target —
 // re-opens turnActive WITHOUT refunding spent budgets (rewind is not a real
 // turn start; budget rollback belongs to snapshot undo — plan §16).
-function markRewoundTurnActive(campaignName, newActiveName) {
+function markRewoundTurnActive(campaignName, summary, newActiveName) {
     const enforcement = getRuntimeValue('campaign', 'enforcement')
     if (!enforcement || enforcement.mode !== 'on') return
-    const ts = openTurn(cloneDeep(getRuntimeValue('campaign', 'turnState') || {}), newActiveName)
+    const ts = openTurn(cloneDeep(getRuntimeValue('campaign', 'turnState') || {}), economyNameFor(summary, newActiveName))
     setRuntimeValue('campaign', 'turnState', ts, campaignName)
 }
 
@@ -290,11 +308,17 @@ export function createNextCreatureHandler({
         storage.set('activeCreatureName', newActiveName, campaignName)
         setActiveCreatureName(newActiveName)
         // L5-001: reset the new creature's economy at the turn seam (no-op when enforcement off).
-        applyTurnStateTransition({ campaignName, outgoingName: activeCreatureName, newActiveName, roundIncrement })
+        applyTurnStateTransition({ campaignName, summary: cs, outgoingName: activeCreatureName, newActiveName, roundIncrement })
         if (activeCreatureName && !isSecondTurnEntry(activeEntry)) {
             applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters)
         }
-        expireStaleEffects(campaignName, newActiveName)
+        // CLA-360 double-tick guard mirrored on the expiry seam: a twin row never
+        // receives a turn-start pass, so expireStaleEffects must not run under the
+        // synthetic label either — its expireForCreature mirror read would seed a
+        // phantom `<Holder> (Second Turn)` char bucket ({pendingExpirations:[]}).
+        if (!isSecondTurnEntry(newActiveEntry)) {
+            expireStaleEffects(campaignName, newActiveName)
+        }
         // BUG CLA-198: turn-start effects must run for EVERY newly active creature, not just
         // the round-wrap creature at index 0 — owner-centric auras (Inner Radiance) tick on the
         // owner's own turn boundary. The round-scoped gate key keeps this to one application
@@ -374,15 +398,19 @@ export function createPreviousCreatureHandler({
             updatedSummary.round = roundToSet
             setCombatSummary(updatedSummary)
         }
-        expireStaleEffects(campaignName, newActiveName)
+        // CLA-360: structural second-turn entries never receive turn-start effect
+        // passes — hoisted above the expiry seam so it shares the same guard (a twin
+        // rewind must not seed a phantom char bucket under the synthetic label).
+        const secondTurnTarget = isSecondTurnEntry(cs.creatures.find(c => c.name === newActiveName))
+        if (!secondTurnTarget) {
+            expireStaleEffects(campaignName, newActiveName)
+        }
         // BUG CLA-307: no turn-END pass here — rewinding is not a real turn end.
         // The owner's Self-Restoration removal already fired on the forward Next step
         // that passed this boundary; running it again on rewind would double-log.
         // BUG CLA-198: mirror the next-handler — turn-start effects run on every
         // turn step, deduped by the round-scoped gate key.
         const gateKey = turnStartGateKey(roundToSet, newActiveName)
-        // CLA-360: structural second-turn entries never receive turn-start effect passes.
-        const secondTurnTarget = isSecondTurnEntry(cs.creatures.find(c => c.name === newActiveName))
         const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey && !secondTurnTarget
         let finalSummary = updatedSummary
         if (shouldApply) {
@@ -399,7 +427,8 @@ export function createPreviousCreatureHandler({
         storage.set('activeCreatureName', newActiveName, campaignName)
         setActiveCreatureName(newActiveName)
         // L5-001: rewind re-opens turnActive without refunding budgets (CLA-307 philosophy).
-        markRewoundTurnActive(campaignName, newActiveName)
+        // Rewinding INTO a twin row re-opens the HOLDER's economy (never the synthetic label).
+        markRewoundTurnActive(campaignName, cs, newActiveName)
         for (const creature of cs.creatures) {
             if (isSecondTurnEntry(creature)) continue
             clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)

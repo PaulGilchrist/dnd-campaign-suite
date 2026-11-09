@@ -3,6 +3,7 @@ import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getActiveCreatureName, getCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js'
 import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval } from '../../services/rules/effects/expirations.js'
 import { applyCommanderStrikeTurnEnd } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js'
+import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 
 /**
  * SSE overlay event handler - manages spell-overlay events
@@ -115,6 +116,43 @@ export function createSseEventHandler({
         setRuntimeStateTick(t => t + 1)
     }
 
+    // Turn-boundary mirror for the activeCreatureName echo, extracted to keep the
+    // dispatch handler inside the complexity ceiling.
+    // CLA-360 ST-seam law (mirrors the walk gate in navigationHandlers and the
+    // holder resolution in assertCanAct.js readActiveCreature): a (Second Turn)
+    // row never receives turn-start/expiry echo passes — the holder's own passes
+    // fired at the holder seam and resolving the twin here would double-tick.
+    // Without this guard the echo's expireStaleEffects mirror read seeds a
+    // phantom `<Holder> (Second Turn)` char bucket ({pendingExpirations:[]}) on
+    // every mounted client (phantom-bucket family 583d078ff/930393775/d55d4160a)
+    // and a second GM tab can re-stamp the round gate under the synthetic label.
+    async function applyEchoBoundaryPasses(prevActive, newActive, cs) {
+        const echoRow = Array.isArray(cs?.creatures)
+            ? cs.creatures.find(c => c && c.name === newActive)
+            : null
+        const secondTurnEcho = isSecondTurnEntry(echoRow)
+        // BUG CLA-307: mirror the owner turn-END pass for the OUTGOING creature
+        // (Self-Restoration condition_removal). skipSync=true — the GM client already
+        // POSTed the removal; re-POSTing here would SSE-echo-loop.
+        if (prevActive && prevActive !== newActive) {
+            const outgoingChar = characters.find(ch => ch.name === prevActive || ch.name.startsWith(prevActive + ' '))
+            applyTurnEndConditionRemoval(prevActive, outgoingChar?.computedStats || outgoingChar, campaignName, true)
+                .catch((e) => { console.error('[sseHandlers] CLA-307 turn-end removal failed:', e) })
+            // MN-003: mirror the outgoing-creature Commander's Strike lapse clear
+            // (skipSync=true — GM client already POSTed; re-POST would echo-loop).
+            applyCommanderStrikeTurnEnd(campaignName, prevActive, true)
+                .catch((e) => { console.error('[sseHandlers] MN-003 commander strike turn-end lapse failed:', e) })
+        }
+        if (!secondTurnEcho) {
+            expireStaleEffects(campaignName, newActive)
+        }
+        const gateRound = (combatSummaryRef.current || getCombatSummary(campaignName))?.round ?? 1
+        const gateKey = `${gateRound}:${newActive}`
+        if (prevActive !== newActive && !secondTurnEcho && lastAppliedTurnStartCreatureRef.current !== gateKey) {
+            await applyTurnStartPass(newActive, gateKey)
+        }
+    }
+
     async function handleActiveCreatureNameChange(newActive) {
         // bug-zero-creature-initiative-null-name: a malformed object echo (e.g. a
         // legacy {} stored under this key) must never poison the round gate with
@@ -134,26 +172,7 @@ export function createSseEventHandler({
             setCombatSummaryCache(cs, campaignName)
         }
         setActiveCreatureNameG(newActive)
-        // BUG CLA-307: mirror the owner turn-END pass for the OUTGOING creature
-        // (Self-Restoration condition_removal). skipSync=true — the GM client already
-        // POSTed the removal; re-POSTing here would SSE-echo-loop.
-        if (prevActive && prevActive !== newActive) {
-            const outgoingChar = characters.find(ch => ch.name === prevActive || ch.name.startsWith(prevActive + ' '))
-            applyTurnEndConditionRemoval(prevActive, outgoingChar?.computedStats || outgoingChar, campaignName, true)
-                .catch((e) => { console.error('[sseHandlers] CLA-307 turn-end removal failed:', e) })
-            // MN-003: mirror the outgoing-creature Commander's Strike lapse clear
-            // (skipSync=true — GM client already POSTed; re-POST would echo-loop).
-            applyCommanderStrikeTurnEnd(campaignName, prevActive, true)
-                .catch((e) => { console.error('[sseHandlers] MN-003 commander strike turn-end lapse failed:', e) })
-        }
-        expireStaleEffects(campaignName, newActive)
-
-        const gateRound = (combatSummaryRef.current || getCombatSummary(campaignName))?.round ?? 1
-        const gateKey = `${gateRound}:${newActive}`
-        const shouldApply = prevActive !== newActive && lastAppliedTurnStartCreatureRef.current !== gateKey
-        if (shouldApply) {
-            await applyTurnStartPass(newActive, gateKey)
-        }
+        await applyEchoBoundaryPasses(prevActive, newActive, cs)
     }
 
     const noop = async () => {}

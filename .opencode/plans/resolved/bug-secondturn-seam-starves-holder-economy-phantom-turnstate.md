@@ -35,3 +35,22 @@ In `applyTurnStateTransition` (and `markRewoundTurnActive`), look up the outgoin
 
 ## Severity
 Broken feature / data integrity risk — the ratified "holder acts on their own second turn" promise is silently nullified whenever action-economy enforcement is ON (popup + audit only on the denial side), and the shared `turnState` / change-data buckets accumulate synthetic-name records that no lane consumes or cleans.
+
+## Resolution
+**FIXED 2026-11-09.** Diagnosis in the bug file confirmed with one sharpening: the phantom char bucket had a SECOND un-guarded producer the "Likely location" missed — the SSE echo lane `sseHandlers.js handleActiveCreatureNameChange` also called `expireStaleEffects(campaignName, newActive)` (and the turn-start gate) under the twin label on every mounted client's name echo, so guarding only navigationHandlers:297 would still materialize `"<Holder> (Second Turn)": {pendingExpirations:[]}` (its `expireForCreature` mirror-read lane seeds the bucket whenever the name-keyed store is absent).
+
+Changes:
+- `src/components/initiative/navigationHandlers.js` — new `economyNameFor(summary, name)` helper mirrors the `assertCanAct.js readActiveCreature` (c076dfdf1) twin→`holderName` resolution for the economy STATE writer: `applyTurnStateTransition` now closes/re-arms the HOLDER (holder→twin seam resets the holder = fresh extra-turn budget; twin→X seam closes it) and `markRewoundTurnActive` opens the HOLDER on a Prev-step into the twin (no refund — CLA-307 rewind law preserved). `expireStaleEffects` is guarded with the same `!isSecondTurnEntry(newActiveEntry)` condition the CLA-360 turn-start gate uses in BOTH the Next and Prev handlers (skip-on-ST, resolving to the holder could double-tick).
+- `src/components/initiative/sseHandlers.js` — the activeCreatureName echo's boundary passes extracted into `applyEchoBoundaryPasses` (complexity ceiling) and guarded with the same `isSecondTurnEntry` row lookup: twin echoes skip `expireStaleEffects` and the turn-start pass (no phantom bucket on any client, no synthetic `__initiative__` gate re-stamp from a second GM tab). Normal-row echoes byte-unchanged.
+- `turnState.js` untouched (pure math, per bug-file analysis). Ruleset-agnostic lane — no 2024 twin change.
+- New regression ledger: `src/components/initiative/navigationHandlers.second-turn.test.js` (4 tests) — holder re-armed at twin seam with full-bucket byte-pin + zero synthetic keys; twin→X closes holder, arms next; expiry seam skips twin / fires for normal rows; rewind-into-twin opens holder without refund.
+
+Live verification (test-campaign, dev pair `npm run dev:locked`, enforcement `{mode:'on',turnLock:true,actionEconomy:true}`, curl-seeded board EF 20 / twin 19 / EP 15):
+1. Pre-fix repro rode first, exactly as filed: EF spent `actionsUsed:1` → Next into twin materialized phantom `turnState['EvasiveFighter (Second Turn)'] {turnActive:true,actionsUsed:0}` + char bucket `{pendingExpirations:[]}`, holder untouched, sheet attack denied "No action left this turn." + `enforcement_denied` row.
+2. Post-fix re-ride: at the twin seam `turnState` carries ONLY `EvasiveFighter` re-armed (`actionsUsed:0, turnActive:true`), zero synthetic turnState keys / char buckets / any `*Second Turn*` change-data key, gate stamp stays `1:EvasiveFighter`.
+3. Holder sheet attack under twin-active ROLLED — nat 19 → 26 vs AC 19 ✓ HIT popup (matches the bug file's control face), zero denial rows, charge landed on the holder's own entry (`actionsUsed:1, turnActive:true`).
+4. Next past the twin: holder CLOSED (`turnActive:false`, budget kept), ElderPaladin armed fresh, EP `pendingExpirations` seeded + gate stamp `1:ElderPaladin` (normal-lane parity intact).
+5. Prev INTO the twin (sibling face, never ridden app-wide before): holder re-OPENED without refunding (`actionsUsed:1, turnActive:true`), zero synthetic keys.
+6. Exit: closed-browser two-pass clears GET-verified `change-data {}` + `log []`; zero `campaign-lock` denials; production untouched.
+
+Tests: new file 4/4 pass; `src/components/initiative` 97 files / 722 tests pass; `src/components/initiative + src/services/combat` 272 files / 3794 tests pass; `npm run lint` zero warnings; `no-timers-guard` OK.
