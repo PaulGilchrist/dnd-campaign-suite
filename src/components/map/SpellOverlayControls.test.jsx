@@ -129,7 +129,7 @@ describe('SpellOverlayControls', () => {
     const { container } = renderComponent({ overlays });
     expect(screen.getByText('Active (2)')).toBeInTheDocument();
     const labels = Array.from(container.querySelectorAll('.spell-overlay-item span')).map((s) => s.textContent);
-    expect(labels).toEqual(['Cube', 'Cone']);
+    expect(labels).toEqual(['Cube (1,1)', 'Cone (1,1)']);
   });
 
   it('skips malformed rows: no phantom panel row, count reflects only renderable overlays', () => {
@@ -143,7 +143,7 @@ describe('SpellOverlayControls', () => {
     expect(screen.getByText('Active (1)')).toBeInTheDocument();
     const items = container.querySelectorAll('.spell-overlay-item');
     expect(items).toHaveLength(1);
-    expect(items[0].querySelector('span').textContent).toBe('Sphere');
+    expect(items[0].querySelector('span').textContent).toBe('Sphere (1,1)');
   });
 
   it('hides the active section entirely when every row is junk', () => {

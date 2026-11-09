@@ -69,7 +69,6 @@ Live facts (EQ, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-08 EQ: spell-overlay active chips are anonymous — with 2+ zones every chip reads `Sphere ×` (screenshot-proved), so the right-aligned cluster can't tell you WHICH zone its × removes. Suggest composing position or color into the chip label (e.g. `Sphere (12,8) ×`) in `src/components/map/SpellOverlayControls.jsx` `.spell-overlay-item`.
 - 2026-11-08 EQ: a bestiary-joined monster card renders its NAME as an editable `.monster-autocomplete` input while PCs/cards elsewhere use static spans — automation and screen readers census names differently per card type (`.creature-name span` silently misses every monster). If the name isn't meant to be re-typed on an EB-joined card, render it read-only like the PCs; if it is, give the input an `aria-label="<Name> name"` so both lanes share a stable accessible-name probe.
 
 ## Blocked / Not Verified (fold-gate ledger)

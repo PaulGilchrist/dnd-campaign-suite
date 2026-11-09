@@ -60,6 +60,14 @@ const ShapeParamsRow = ({ selectedShape, shapeParams, handleParamChange }) => {
     );
 };
 
+// Active-chip label: shape name + origin cell, e.g. "Sphere (12,8)" — with
+// 2+ zones the bare shape name is anonymous, so the × couldn't say WHICH
+// zone it removes (backlog 2026-11-08 EQ). Same `Name (x,y)` disambiguation
+// shape as placedItemLabel (hooks/usePlacedItems.js). Rows reaching here are
+// pre-screened by isValidOverlay, so the coords are always finite.
+const overlayChipLabel = (overlay) =>
+    `${SHAPE_LABELS[overlay.shape] || overlay.shape} (${overlay.startGridX},${overlay.startGridY})`;
+
 const ActiveOverlays = ({ overlays, onClearAll, onRemoveOverlay }) => (
     <div className="spell-overlay-active">
         <div className="spell-overlay-active-header">
@@ -68,14 +76,20 @@ const ActiveOverlays = ({ overlays, onClearAll, onRemoveOverlay }) => (
                 Clear All
             </button>
         </div>
-        {overlays.map((o) => (
-            <div key={o.id} className="spell-overlay-item">
-                <span>{SHAPE_LABELS[o.shape] || o.shape}</span>
-                <button onClick={() => onRemoveOverlay(o.id)}>
-                    <i className="fa-solid fa-times"></i>
-                </button>
-            </div>
-        ))}
+        {overlays.map((o) => {
+            const label = overlayChipLabel(o);
+            return (
+                <div key={o.id} className="spell-overlay-item" title={label}>
+                    <span>{label}</span>
+                    <button
+                        aria-label={`Remove overlay at (${o.startGridX},${o.startGridY})`}
+                        onClick={() => onRemoveOverlay(o.id)}
+                    >
+                        <i className="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            );
+        })}
     </div>
 );
 
