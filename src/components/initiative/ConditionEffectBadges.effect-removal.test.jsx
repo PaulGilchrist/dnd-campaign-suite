@@ -4,6 +4,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
 import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
+import { logConditionEvent } from '../../services/encounters/combatLoggingService.js';
+
+// The manual badge-× audit row belongs ONLY to the removeAction:'target_effect'
+// arm (pinned in ConditionEffectBadges.target-effect-removal.test.jsx). Every
+// lane asserted here must stay audit-silent — derived/composite removals have
+// their own producers and must not gain double rows.
+vi.mock('../../services/encounters/combatLoggingService.js', () => ({
+    logConditionEvent: vi.fn(),
+}));
 
 // The component imports only these two functions from the runtime store.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -55,6 +64,9 @@ describe('ConditionEffectBadges - Effect Removal Handlers', () => {
         const removeBtn = badge.parentElement.querySelector('.creature-badge-remove');
         expect(removeBtn).toBeInTheDocument();
         fireEvent.click(removeBtn);
+        // Audit-silence contract: these composite/derived lanes evict state
+        // without the target_effect arm, so no condition log row may appear.
+        expect(logConditionEvent).not.toHaveBeenCalled();
     }
 
     describe('removeAction: remove_pfeag (triple-write)', () => {

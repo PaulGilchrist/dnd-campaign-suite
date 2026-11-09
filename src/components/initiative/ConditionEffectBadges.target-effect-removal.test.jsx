@@ -37,6 +37,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
 import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
+import { logConditionEvent } from '../../services/encounters/combatLoggingService.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getStore: vi.fn(() => new Map()),
@@ -53,6 +54,24 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
     computeConditionEffects: vi.fn(),
 }));
+
+// Manual badge-× removal must log exactly one symmetric audit row
+// (action:'target-effect-removed', creature + registry label). Pinned via
+// mock; the fallback leg mocks getEffectDefinition to simulate an
+// unregistered key without touching the real registry.
+vi.mock('../../services/encounters/combatLoggingService.js', () => ({
+    logConditionEvent: vi.fn(),
+}));
+
+const UNREGISTERED_KEY = 'disadvantage_on_next_save';
+vi.mock('../../services/combat/conditions/targetEffectDefinitions.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        getEffectDefinition: (key) =>
+            key === UNREGISTERED_KEY ? undefined : actual.getEffectDefinition(key),
+    };
+});
 
 const CREATURE = 'Alice';
 const CAMPAIGN = 'test-campaign';
@@ -85,17 +104,17 @@ describe('ConditionEffectBadges - generic target_effect removal', () => {
     }
 
     const pathRepresentatives = [
-        { key: 'sanctuary', path: 'findDirect + isLocalhost gating (canonical)' },
-        { key: 'banishment', path: 'findDirect control/debuff family' },
-        { key: 'forcecage', target: ['Alice', 'Bob'], path: 'findResolved array-target resolution' },
-        { key: 'protection_from_poison', target: ['Alice', 'Bob'], path: 'findResolved post-#820 eager-capture fix' },
-        { key: 'pass_without_trace_bonus', path: 'findDirect + live-registry build' },
-        { key: 'slasher_enhanced_critical', compute: { targetAttackDisadvantageCount: 1 }, path: 'compute-guard override, no find' },
+        { key: 'sanctuary', label: 'Sanctuary', path: 'findDirect + isLocalhost gating (canonical)' },
+        { key: 'banishment', label: 'Banishment', path: 'findDirect control/debuff family' },
+        { key: 'forcecage', label: 'Forcecage', target: ['Alice', 'Bob'], path: 'findResolved array-target resolution' },
+        { key: 'protection_from_poison', label: 'Protection from Poison', target: ['Alice', 'Bob'], path: 'findResolved post-#820 eager-capture fix' },
+        { key: 'pass_without_trace_bonus', label: 'Pass Without Trace', path: 'findDirect + live-registry build' },
+        { key: 'slasher_enhanced_critical', label: 'Attack Disadv', compute: { targetAttackDisadvantageCount: 1 }, path: 'compute-guard override, no find' },
     ];
 
     it.each(pathRepresentatives)(
         'removes $key via one byte-exact campaign write — $path',
-        ({ key, target = CREATURE, compute }) => {
+        ({ key, label, target = CREATURE, compute }) => {
             const { wrongTargetDecoy, wrongEffectDecoy } = renderBadgeFace(key, target, compute);
 
             const removeBtns = screen.getAllByTitle('Remove effect');
@@ -110,6 +129,39 @@ describe('ConditionEffectBadges - generic target_effect removal', () => {
                 [wrongTargetDecoy, wrongEffectDecoy],
                 CAMPAIGN
             );
+
+            // Audit symmetry (FT 2026-11-09 backlog): the eviction logs ONE
+            // condition row naming creature + registry label, mirroring the
+            // 'broken'/'removed' sibling end-lanes and the apply lane's
+            // 'target-effect-applied'.
+            expect(logConditionEvent).toHaveBeenCalledTimes(1);
+            expect(logConditionEvent).toHaveBeenCalledWith({
+                campaignName: CAMPAIGN,
+                action: 'target-effect-removed',
+                creatureName: CREATURE,
+                conditionLabel: label,
+            });
         }
     );
+
+    it('falls back to the effect key when the registry has no definition', () => {
+        // The riderSaveDisadvantage compute-guard badge hard-codes
+        // effectType 'disadvantage_on_next_save' without a registry lookup;
+        // the module mock above makes getEffectDefinition miss for that key
+        // so the removal row must name the raw key, never 'undefined'.
+        renderBadgeFace(UNREGISTERED_KEY, CREATURE, { riderSaveDisadvantage: true });
+
+        const removeBtns = screen.getAllByTitle('Remove effect');
+        expect(removeBtns).toHaveLength(1);
+        fireEvent.click(removeBtns[0]);
+
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+        expect(logConditionEvent).toHaveBeenCalledTimes(1);
+        expect(logConditionEvent).toHaveBeenCalledWith({
+            campaignName: CAMPAIGN,
+            action: 'target-effect-removed',
+            creatureName: CREATURE,
+            conditionLabel: UNREGISTERED_KEY,
+        });
+    });
 });

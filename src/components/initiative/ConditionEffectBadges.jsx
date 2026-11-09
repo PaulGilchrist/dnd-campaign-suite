@@ -2,6 +2,7 @@ import { computeConditionEffects } from '../../services/combat/conditions/condit
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
 import { getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js'
+import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 import CreatureBadge from '../common/CreatureBadge.jsx'
 
 function getEffectDescription(label) {
@@ -596,7 +597,23 @@ function buildSpecBadges(ctx) {
 
 const REMOVE_HANDLERS = {
     condition: (badge, ctx) => removeConditionByKey(ctx.creatureName, badge.removeKey, ctx.campaignName),
-    target_effect: (badge, ctx) => removeTargetEffect(ctx.creatureName, badge.effectType, ctx.campaignName),
+    target_effect: (badge, ctx) => {
+        removeTargetEffect(ctx.creatureName, badge.effectType, ctx.campaignName)
+        // Audit symmetry with the sibling end-lanes ('broken' / 'removed' /
+        // "Concentration broken; X ends."): evicting a registry te row via the
+        // manual badge-× logs its end, naming creature + registry label
+        // (falling back to the effect key for unregistered keys). Automation
+        // eviction lanes (remove_target_effect events, expiry clocks,
+        // EffectAdder clears) never route through REMOVE_HANDLERS and stay
+        // single-logged by their own producers.
+        const def = getEffectDefinition(badge.effectType)
+        logConditionEvent({
+            campaignName: ctx.campaignName,
+            action: 'target-effect-removed',
+            creatureName: ctx.creatureName,
+            conditionLabel: def?.label || badge.effectType,
+        })
+    },
     taunting_step: (badge, ctx) => removeTargetEffect(ctx.creatureName, badge.effectType, ctx.campaignName),
     remove_pfeag: (badge, ctx) => {
         removeTargetEffect(ctx.creatureName, 'protection_from_evil_and_good', ctx.campaignName)
