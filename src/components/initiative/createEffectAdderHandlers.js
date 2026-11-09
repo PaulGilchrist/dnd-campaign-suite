@@ -3,6 +3,7 @@ import storage from '../../services/ui/storage.js'
 import { CONDITIONS } from '../../services/combat/conditions/conditionUtils.js'
 import { addCondition } from '../../services/combat/conditions/conditionSaveService.js'
 import { getAuraConditionImmunities } from '../../services/combat/auras/auraConditionImmunity.js'
+import { getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js'
 import { addConcentration } from '../../services/combat/concentration/concentrationService.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 import { produceFallDamage } from '../../services/combat/fallDamage.js'
@@ -53,7 +54,11 @@ function applyEffectTabEntry(campaignName, data, ctx) {
     const existing = getRuntimeValue('campaign', 'targetEffects') || []
     const filtered = existing.filter(te => !(te.target === data.target && te.effect === data.effectKey))
     setRuntimeValue('campaign', 'targetEffects', [...filtered, effectEntry], campaignName)
-    logConditionEvent({ campaignName, action: 'target-effect-applied', creatureName: data.target, conditionLabel: data.effectKey, dc: data.dc, ability: data.ability })
+    // FT 2026-11-09: audit rows name the REGISTRY LABEL (matching the badge-×
+    // 'target-effect-removed' lane), falling back to the raw key for
+    // unregistered effects — apply and removal rows byte-agree with the badge.
+    const def = getEffectDefinition(data.effectKey)
+    logConditionEvent({ campaignName, action: 'target-effect-applied', creatureName: data.target, conditionLabel: def?.label || data.effectKey, dc: data.dc, ability: data.ability })
 }
 
 function isRaging(target, campaignName) {

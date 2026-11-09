@@ -19,9 +19,13 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 const TARGET_EFFECT_DEFINITIONS = [
   // ── Attack ──────────────────────────────────────────────
   {
+    // FT 2026-11-09: distinct picker labels for the three attack-disadvantage
+    // te family — each label names its own discriminator (cause / one-shot
+    // scope / duration) so they never read as near-duplicates. Keys are the
+    // behavioral contract; labels are display-only.
     effect: 'slasher_enhanced_critical',
-    label: 'Attack Disadv',
-    description: 'Target has Disadvantage on attack rolls.',
+    label: 'Slasher Crit: Attacks Disadv',
+    description: 'Target has Disadvantage on its own attack rolls until the start of the source\'s next turn (Slasher feat enhanced critical).',
     icon: 'fa-arrow-down',
     cls: 'effect-disadvantage',
     group: 'Attack',
@@ -29,7 +33,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   },
   {
     effect: 'disadvantage_next_attack',
-    label: 'Disadv Next Attack',
+    label: 'Disadv On Next Attack Roll',
     description: 'Disadvantage on the next attack roll.',
     icon: 'fa-arrow-down',
     cls: 'effect-disadvantage',
@@ -120,7 +124,7 @@ const TARGET_EFFECT_DEFINITIONS = [
     // the cyclops (MA-0030/§38 anchor leg fires at its next turn start —
     // expiry-vs-RAW-end-of-turn is the accepted advisory residual).
     effect: 'disadvantage_attack_rolls',
-    label: 'Attack Disadvantage',
+    label: 'Attacks Disadv Until Source\'s Next Turn',
     description: 'Disadvantage on attack rolls until the end of the source\'s next turn.',
     icon: 'fa-arrow-down',
     cls: 'effect-disadvantage',

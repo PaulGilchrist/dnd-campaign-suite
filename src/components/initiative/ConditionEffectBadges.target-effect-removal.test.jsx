@@ -109,7 +109,7 @@ describe('ConditionEffectBadges - generic target_effect removal', () => {
         { key: 'forcecage', label: 'Forcecage', target: ['Alice', 'Bob'], path: 'findResolved array-target resolution' },
         { key: 'protection_from_poison', label: 'Protection from Poison', target: ['Alice', 'Bob'], path: 'findResolved post-#820 eager-capture fix' },
         { key: 'pass_without_trace_bonus', label: 'Pass Without Trace', path: 'findDirect + live-registry build' },
-        { key: 'slasher_enhanced_critical', label: 'Attack Disadv', compute: { targetAttackDisadvantageCount: 1 }, path: 'compute-guard override, no find' },
+        { key: 'slasher_enhanced_critical', label: 'Slasher Crit: Attacks Disadv', compute: { targetAttackDisadvantageCount: 1 }, path: 'compute-guard override, no find' },
     ];
 
     it.each(pathRepresentatives)(

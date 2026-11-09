@@ -244,8 +244,16 @@ const BADGE_SPECS = [
         build: () => ({ label: 'Disadv vs', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'remove_derived', effectTypes: ['blur', 'foresight', 'escape_the_horde', 'protection', 'multiattack_defense', 'clairvoyant_combatant'] }),
     },
     {
+        // FT 2026-11-09: this channel (conditionEffects :318 slasher_enhanced_critical
+        // → combineAttackModes attackerEffects side) is the BEARER's OWN attack rolls
+        // being disadvantaged — a debuff, not the buff-blue 'Disadv vs' (attacks
+        // against the bearer) specs above. Label flows from the registry so picker
+        // chip, badge face and the audit log rows all agree.
         guard: ctx => ctx.effects.targetAttackDisadvantageCount > 0,
-        build: () => ({ label: 'Attack Disadv', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'target_effect', effectType: 'slasher_enhanced_critical' }),
+        build: ctx => {
+            const te = findResolved(ctx, 'slasher_enhanced_critical')
+            return { label: getEffectDefinition('slasher_enhanced_critical').label, cls: 'effect-debuff', icon: 'fa-arrow-down', removable: true, removeAction: 'target_effect', effectType: 'slasher_enhanced_critical', tooltip: te ? `Disadvantage on this creature's own attack rolls (from ${te.source || 'unknown'}) until the start of the source's next turn` : 'Disadvantage on this creature\'s own attack rolls' }
+        },
     },
     {
         guard: ctx => ctx.effects.attackAdvantageCount > 0,

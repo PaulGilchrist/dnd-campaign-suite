@@ -65,7 +65,6 @@ Live facts (FT, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(FT 2026-11-09) te picker label/colour consistency:** one picker group shows `Attack Disadv` (key `slasher_enhanced_critical`), `Disadv Next Attack` and `Attack Disadvantage` as three near-identical labels, and the applied `Attack Disadv` badge renders on the bearer in buff-BLUE (`effect-buff` hardcoded at `ConditionEffectBadges.jsx:247` + def `cls:'effect-disadvantage'`) while it means attacker-side disadvantage — a tooltip exists but the color/label matrix invites mis-picks (registry comment even says slasher's key is a legacy name).
 
 ## Blocked / Not Verified (fold-gate ledger)
 

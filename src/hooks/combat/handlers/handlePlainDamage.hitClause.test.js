@@ -108,8 +108,8 @@ const TARGET = 'Bandit 1';
 const TE_LABELS = {
     no_healing: "Can't Regain Hit Points",
     no_reactions: 'No Reactions',
-    disadvantage_attack_rolls: 'Attack Disadvantage',
-    disadvantage_next_attack: 'Disadv Next Attack',
+    disadvantage_attack_rolls: 'Attacks Disadv Until Source\'s Next Turn',
+    disadvantage_next_attack: 'Disadv On Next Attack Roll',
     attached: 'Attached',
     speed_reduction: 'Speed Reduced',
     frozen_grip: 'Frozen Grip',

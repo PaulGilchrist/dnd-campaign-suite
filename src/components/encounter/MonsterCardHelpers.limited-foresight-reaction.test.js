@@ -29,7 +29,7 @@ import monsters from '../../../public/data/monsters.json';
 
 vi.mock('../../services/combat/conditions/targetEffectDefinitions.js', () => ({
   registerTargetEffect: vi.fn(),
-  getEffectDefinition: vi.fn(() => ({ label: 'Attack Disadvantage' })),
+  getEffectDefinition: vi.fn(() => ({ label: 'Attacks Disadv Until Source\'s Next Turn' })),
 }));
 vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
   addExpiration: vi.fn(),
@@ -145,7 +145,7 @@ describe('MA-0548 resolveMonsterGatedReaction — both-side te + recharge lifecy
     expect(stamped.foresightTarget).toBe(KNIGHT);
     expect(state[`${SENTRY}._limited_foresight_usedRound`]).toBe(2);
     expect(state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`]).toEqual({ 'Limited Foresight': { recharged: false, threshold: 6 } });
-    expect(logs.some(l => l.type === 'condition' && l.action === 'applied' && l.characterName === KNIGHT && l.condition === 'Attack Disadvantage')).toBe(true);
+    expect(logs.some(l => l.type === 'condition' && l.action === 'applied' && l.characterName === KNIGHT && l.condition === 'Attacks Disadv Until Source\'s Next Turn')).toBe(true);
     expect(logs.some(l => l.type === 'condition' && l.action === 'applied' && l.characterName === SENTRY && l.condition === 'Next Attack Advantage' && /vexTarget/.test(l.reason))).toBe(true);
     expect(logs.some(l => l.type === 'ability_use' && l.abilityName === 'Limited Foresight' && /Recharge 6/.test(l.description))).toBe(true);
     expect(result.popupHtml).toMatch(/Recharge 6 spent/);

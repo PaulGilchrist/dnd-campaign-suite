@@ -20,7 +20,7 @@
 //   filter it.each + 'only matching groups when searching' -> test 2: one row
 //     per searchable face + uppercase query. 'step' hits effect-key alone
 //     (taunting_step; token absent from label/description/group);
-//     'Disadvantage on attack rolls' hits description alone ('Attack Disadv');
+//     'Disadvantage on attack rolls' hits description alone ('Slasher Crit: Attacks Disadv');
 //     'Movement' pins heading survival both legs (present/absent).
 //   'empty message' -> test 3: exact byte `No effects match "q"` (:211) plus
 //     zero-heading/zero-badge census — honest empty pane, not a crash.
@@ -83,7 +83,7 @@ describe('EffectAdder - effects browsing', () => {
     ${'Goad'}                         | ${'Goad'}         | ${'Escape the Horde'} | ${'label'}
     ${'GOAD'}                         | ${'Goad'}         | ${'Escape the Horde'} | ${'uppercase query, mixed-case data'}
     ${'step'}                         | ${'Taunted'}       | ${'Goad'}            | ${'effect key (taunting_step)'}
-    ${'Disadvantage on attack rolls'} | ${'Attack Disadv'} | ${'Goad'}          | ${'description'}
+    ${'Disadvantage on attack rolls'} | ${'Slasher Crit: Attacks Disadv'} | ${'Goad'} | ${'description'}
     ${'Movement'}                     | ${'Movement'}      | ${'Attack'}          | ${'group heading survival'}
   `('filters by $face ("$query"): matching face survives, others are absent', ({ query, shouldContain, shouldNotContain }) => {
     render(<EffectAdder {...props} initialTab='conditions' />);

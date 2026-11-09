@@ -3404,7 +3404,7 @@ function buildLimitedForesightGrantLogs({ monsterName, attackerName }) {
       type: 'condition',
       action: 'applied',
       characterName: attackerName,
-      condition: 'Attack Disadvantage',
+      condition: 'Attacks Disadv Until Source\'s Next Turn',
       reason: `Limited Foresight (${monsterName}) — Disadvantage on attack rolls; the triggering attack re-resolves with disadvantage once the armed target is the attacker`,
       note: `disadvantage_attack_rolls te on ${attackerName} — dismissed pending popup must be re-clicked to re-roll; ${anchorNote}.`,
       timestamp: Date.now(),
@@ -3422,7 +3422,7 @@ function buildLimitedForesightGrantLogs({ monsterName, attackerName }) {
 }
 
 function buildLimitedForesightPopupHtml({ monsterName, attackerName }) {
-  return `<div class="mc-prerequisite-refusal"><h3>Limited Foresight</h3><p>${monsterName} clouds <strong>${attackerName}</strong>'s attack roll — ${attackerName} carries Attack Disadvantage and ${monsterName} gains Advantage on attack rolls against ${attackerName} until the end of its next turn. Dismiss the pending ${attackerName} attack popup WITHOUT Done, then re-click ${attackerName}'s attack chip to re-resolve with disadvantage (parry MA-0341 seam). Seen is GM-enforced (no vision model). Recharge 6 spent.</p></div>`;
+  return `<div class="mc-prerequisite-refusal"><h3>Limited Foresight</h3><p>${monsterName} clouds <strong>${attackerName}</strong>'s attack roll — ${attackerName} carries Attacks Disadv Until Source's Next Turn and ${monsterName} gains Advantage on attack rolls against ${attackerName} until the end of its next turn. Dismiss the pending ${attackerName} attack popup WITHOUT Done, then re-click ${attackerName}'s attack chip to re-resolve with disadvantage (parry MA-0341 seam). Seen is GM-enforced (no vision model). Recharge 6 spent.</p></div>`;
 }
 
 async function refuseLimitedForesight({ monsterName, action, campaignName, log, gate }) {

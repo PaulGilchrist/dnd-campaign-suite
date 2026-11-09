@@ -29,8 +29,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 // Adding/removing an effect MUST update this table (roster test fails otherwise), which
 // is the intended friction of the #820 golden-once mandate.
 const CENSUS = [
-  ['slasher_enhanced_critical', 'Attack Disadv', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
-  ['disadvantage_next_attack', 'Disadv Next Attack', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
+  ['slasher_enhanced_critical', 'Slasher Crit: Attacks Disadv', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
+  ['disadvantage_next_attack', 'Disadv On Next Attack Roll', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
   ['concentration_disadvantage', 'Concentration Disadv', 'fa-arrow-down', 'effect-disadvantage', 'Saves & Checks', ['source']],
   ['goad', 'Goad', 'fa-bullseye', 'effect-disadvantage', 'Attack', ['source']],
   ['next_attack_bonus', 'Next Attack +N Bonus', 'fa-bullseye', 'effect-target-adv', 'Attack', ['source', 'value'], { value: 5 }],
@@ -38,7 +38,7 @@ const CENSUS = [
   ['distracting_strike_advantage', 'Next Attack Adv vs Target', 'fa-arrow-up', 'effect-target-adv', 'Attack', ['source']],
   ['marked_as_prey', 'Marked as Prey', 'fa-crosshairs', 'effect-buff', 'Attack', ['source']],
   ['pesky_swarm', 'Pesky Swarm', 'fa-bug', 'effect-disadvantage', 'Attack', ['source']],
-  ['disadvantage_attack_rolls', 'Attack Disadvantage', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
+  ['disadvantage_attack_rolls', 'Attacks Disadv Until Source\'s Next Turn', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
   ['reckless_attack', 'Reckless Attack', 'fa-shield-halved', 'effect-buff', 'Attack', ['source']],
   ['taunting_step', 'Taunted', 'fa-wand-sparkles', 'effect-disadvantage', 'Attack', ['source']],
   ['thri_kreen_bite_poison', 'Poisoned', 'fa-disease', 'effect-debuff', 'Attack', ['source', 'dc', 'saveType']],

@@ -278,7 +278,7 @@ describe('createEffectAdderHandlers', () => {
                 campaignName: 'test-campaign',
                 action: 'target-effect-applied',
                 creatureName: 'Alice',
-                conditionLabel: 'goad',
+                conditionLabel: 'Goad',
                 dc: data.dc,
                 ability: data.ability,
             });
