@@ -429,6 +429,24 @@ function pickOpportunityAttackRoll(playerStats) {
     return meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
 }
 
+/** An opportunity attack is a FULL melee weapon attack (bug-sheet-oa-hit-deals-
+ *  no-damage): the damage stage in useLoggedDiceRoll is gated on exactly the
+ *  autoDamageFormula trio, so both sheet OA press lanes must forward the chosen
+ *  attack row's damage fields — same derivation as the attack_roll automation
+ *  lane (result.payload `attack.damage || null` / `attack.name` /
+ *  `attack.damageType || 'Slashing'`) and the fields the normal attack-row lane
+ *  transports. A row with no authored damage honestly keeps formula null (no
+ *  damage stage — the pre-fix face for that degenerate row). */
+function buildOpportunityAttackRollOptions(attackRoll) {
+    return {
+        forcedMode: undefined,
+        isOpportunityAttack: true,
+        autoDamageFormula: attackRoll.damage || null,
+        autoDamageName: attackRoll.name,
+        damageType: attackRoll.damageType || 'Slashing',
+    };
+}
+
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters, autoDamageSource: 'char-reactions', autoDamageRoll: async (autoDamage, isCrit) => {
@@ -553,7 +571,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         if (attackRoll) {
             // L5-002: the OA fires here — charge the reaction budget.
             chargeSlot({ creatureName: playerStats.name, bucket: 'reaction', campaignName });
-            rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
+            rollAttack(attackRoll.name, attackRoll.hitBonus, buildOpportunityAttackRollOptions(attackRoll));
         }
     };
 
@@ -605,7 +623,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         addEntry(campaignName, buildOaResolutionLog({ defenderName: playerStats.name, moverName: marker.mover }))
             .catch((e) => { console.error('[CharReactions:OA-resolution-log-error]', e); });
         clearPendingOa(campaignName, playerStats.name);
-        rollAttack(attackRoll.name, attackRoll.hitBonus, { targetName: marker.mover, forcedMode: undefined, isOpportunityAttack: true });
+        rollAttack(attackRoll.name, attackRoll.hitBonus, { ...buildOpportunityAttackRollOptions(attackRoll), targetName: marker.mover });
     };
 
     const handleAutomationReaction = async (reaction) => {

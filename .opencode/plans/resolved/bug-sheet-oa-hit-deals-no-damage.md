@@ -38,3 +38,24 @@ In `pickOpportunityAttackRoll` (or at both `rollAttack` call sites) also pull th
 ## Severity
 
 Broken feature / rules correctness: the entire PC defensive-reaction economy charges a reaction (and enforcement toasts direct GMs to "Resolve the Opportunity Attack on <name>'s sheet"), but resolving it through the sheet lane can never deal damage — a free pass for every mover when the defender is a PC. Monster defenders are unaffected (card lane applies damage). Pre-existing (the legacy lane has the same omission), NOT a regression from the pendingOAs fix — the fix test pins the roll options' target/flag but not damage.
+
+## Resolution
+
+FIXED — diagnosis in the bug file confirmed against the live app and the code.
+
+**What was actually wrong:** exactly as guessed. Both PC sheet OA press lanes in `src/components/char-sheet/CharReactions.jsx` called `rollAttack(name, hitBonus, { forcedMode: undefined, isOpportunityAttack: true })` (marker lane) and `{ targetName: marker.mover, ... }` (legacy lane) WITHOUT the `autoDamageFormula`/`autoDamageName`/`damageType` trio, and the auto-damage stage in `useLoggedDiceRollAttack.js buildAutoDamage` is gated on `context.autoDamageFormula` (`if (!context?.autoDamageFormula) return undefined`), so hits could never reach the damage pipeline. The sibling `attack_roll` automation lane in the same file (`handleAutomationReaction`, ~:633) already forwarded the trio — the two press lanes simply omitted it.
+
+**Files changed:**
+- `src/components/char-sheet/CharReactions.jsx` — added `buildOpportunityAttackRollOptions(attackRoll)` helper mirroring the automation lane's derivation (`attack.damage || null` / `attack.name` / `attack.damageType || 'Slashing'`, same fields `useCharActionsAutomation.js:211-214` transports) and routed BOTH OA press lanes through it, keeping `isOpportunityAttack: true` and the marker lane's `targetName` pin byte-unchanged. Misses stay damageless (the hit-gate is downstream); a damageless melee row honestly forwards `formula: null`.
+- `src/components/char-sheet/CharReactions.opportunityAttackDamage.test.jsx` (NEW) — 5 regression legs: marker-live press forwards the trio with the pinned target + no re-charge + marker consumed; row `damageType` honoured (Piercing not forced to Slashing); damageless row → `autoDamageFormula: null`; legacy free-press lane forwards the trio AND keeps its gate/charge/no-target-pin shape; economy denial still rolls nothing.
+- `docs/test-setup-playbook.md` §49 — recorded the rig-face pitfall discovered on the way (victim bucket without `currentHitPoints` → damage computes then `applyPlayerHpDamage` errors with zero `hp_change`; top up via scoped PATCH).
+
+Dual-ruleset note: fix is rules-agnostic — both 5e and 2024 weapon rows in `playerStats.attacks` carry `damage`/`damageType`, single shared component; no 5e/2024 twin needed. Monster card lane already derived damage (unaffected, matches the bug file's control).
+
+**Live re-verification (test-campaign, dev pair :5173/:80, enforcement `{mode:'on', actionEconomy:true, opportunityAttacks:true}` + sandbox map fix-oa, EP(6,3)/EF(6,4), EF defector selectedAllies):**
+- Pre-fix repro CONFIRMED: trigger drag → `enforcement_triggered` row + pendingOAs marker + reactionsUsed 0→1; marker-lane press (MISS sample) + legacy free-press HIT popup `✓ HIT (18 vs AC 18)` → Done → ZERO stage-2 hosts, campaign-wide `roll(damage)` = 0, `hp_change` = 0, EF HP unchanged — exact bug-file behavior.
+- Post-fix: re-triggered, marker-lane MISS wrote no damage rows; legacy-lane HIT `✓ HIT (18 vs AC 18)` → Done → **stage-2 damage popup mounts**: "Longsword 13 — 1d8+5 [slashing] + 1d8 [radiant]: 6, 2 +5 — 7 damage applied to EvasiveFighter (reduced from 13) — HP: 80 → 73" (OA riders ride the lane honestly); log gained exactly ONE `roll rollType:'damage'` row (total 13, target EvasiveFighter) + exactly ONE `hp_change` row (delta −7, currentHp 73, runtime `currentHitPoints` 73); provenance `automation/opportunity_attack` row unchanged. Mid-chain the Heavy Armor Master reduction row also fired (reduced 13→7), matching the normal-attack control.
+- Exit ritual: fix-oa Deactivate (row button) + DELETE (GET 404, maps back to 4 owner fixtures), browser closed, admin clear-change-data + clear-log both 200, GET-verified `{}` / `[]`, enforcement null; `git status --porcelain public/campaigns/` empty (no fixture surgery anywhere in the session).
+
+**Test/lint:** `npx vitest run CharReactions.opportunityAttackDamage.test.jsx` 5/5 PASS → `npx vitest run src/components/char-sheet/` 567 files / 5440 tests PASS (incl. the untouched `opportunityAttackTriggered`/`opportunityAttack` suites — the shared option shape stayed compatible) → `npm run lint` exit 0, zero warnings.
+
