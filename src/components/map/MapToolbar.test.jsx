@@ -413,9 +413,17 @@ describe('MapToolbar', () => {
             expect(container.querySelector('.spell-overlay-controls')).toBeInTheDocument();
             expect(screen.getByText('Active (2)')).toBeInTheDocument();
             expect(container.querySelectorAll('.spell-overlay-item')).toHaveLength(2);
-            // Manage-only: placement chrome stays hidden, toggle stays disarmed.
+            // Manage-only: placement chrome stays hidden, toggle stays disarmed,
+            // and the whole param section is inert (disabled/dimmed — backlog
+            // 2026-11-09 ER: nothing may imply a map click will place a zone).
             expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
             expect(screen.queryByText(/Click map to place/)).not.toBeInTheDocument();
+            expect(screen.queryByText('Params apply to the next placement only')).not.toBeInTheDocument();
+            // Scope to the panel: the GM toolbar's own grid-size input is a live spinbutton.
+            expect(screen.getByRole('combobox')).toBeDisabled();
+            container
+                .querySelectorAll('.spell-overlay-row input[type="number"]')
+                .forEach((input) => expect(input).toBeDisabled());
             const spellBtn = screen.getByRole('button', { name: 'Spell' });
             expect(spellBtn).toHaveAttribute('aria-pressed', 'false');
             expect(spellBtn).not.toHaveClass('active');

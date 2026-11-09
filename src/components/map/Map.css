@@ -711,6 +711,16 @@
     font-size: 12px;
 }
 
+/* Unarmed manage-only face (backlog 2026-11-09 ER): zones on the board mount
+   the panel, but until the Spell toggle arms, the shape picker and param
+   inputs are disabled — dim them (Initiative select:disabled pattern) so the
+   bar never implies a map click will place a zone. */
+.spell-overlay-row select:disabled,
+.spell-overlay-row input[type="number"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .spell-overlay-cancel-btn {
     background: #5a2a2a;
     border: 1px solid #8a3a3a;

@@ -22,7 +22,7 @@ const PARAM_FIELDS = {
 
 const DRAG_HINT_SHAPES = [OverlayShape.CONE, OverlayShape.LINE, OverlayShape.CUBE];
 
-const ShapeParamField = ({ field, value, onChange }) => (
+const ShapeParamField = ({ field, value, onChange, disabled }) => (
     <label>
         {field.label}&nbsp;
         <input
@@ -32,11 +32,12 @@ const ShapeParamField = ({ field, value, onChange }) => (
             max={field.max}
             value={value || field.fallback}
             onChange={(e) => onChange(field.param, e.target.value)}
+            disabled={disabled}
         />
     </label>
 );
 
-const ShapeParamsRow = ({ selectedShape, shapeParams, handleParamChange }) => {
+const ShapeParamsRow = ({ selectedShape, shapeParams, handleParamChange, isActive }) => {
     const fields = PARAM_FIELDS[selectedShape];
     if (!fields) {
         return null;
@@ -50,12 +51,17 @@ const ShapeParamsRow = ({ selectedShape, shapeParams, handleParamChange }) => {
                         field={field}
                         value={shapeParams[field.param]}
                         onChange={handleParamChange}
+                        disabled={!isActive}
                     />
                 ))}
             </div>
-            <div className="spell-overlay-hint">
-                Params apply to the next placement only
-            </div>
+            {/* Placement-inviting copy: only while armed (backlog 2026-11-09
+                ER) — an unarmed manage-only face must not hint at a placement. */}
+            {isActive && (
+                <div className="spell-overlay-hint">
+                    Params apply to the next placement only
+                </div>
+            )}
         </>
     );
 };
@@ -130,7 +136,11 @@ const SpellOverlayControls = ({
             <div className="spell-overlay-row">
                 <label>
                     Shape&nbsp;
-                    <select value={selectedShape} onChange={handleShapeChange}>
+                    {/* Manage-only face (backlog 2026-11-09 ER): with zones on
+                        the board but the wand UNARMED the whole param section
+                        (shape picker + fields) renders disabled/dimmed — a map
+                        click places nothing until the Spell toggle arms. */}
+                    <select value={selectedShape} onChange={handleShapeChange} disabled={!isActive}>
                         {Object.entries(SHAPE_LABELS).map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>
                         ))}
@@ -147,6 +157,7 @@ const SpellOverlayControls = ({
                 selectedShape={selectedShape}
                 shapeParams={shapeParams}
                 handleParamChange={handleParamChange}
+                isActive={isActive}
             />
 
             {isActive && (

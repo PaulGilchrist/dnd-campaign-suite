@@ -56,7 +56,7 @@ describe('SpellOverlayControls', () => {
   });
 
   it('updates shape and resets params to that shape defaults on shape change', () => {
-    renderComponent();
+    renderComponent({ isActive: true });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: OverlayShape.CONE } });
     expect(setSelectedShape).toHaveBeenCalledWith(OverlayShape.CONE);
     expect(appliedParams()).toEqual(DEFAULTS[OverlayShape.CONE]);
@@ -73,7 +73,7 @@ describe('SpellOverlayControls', () => {
   });
 
   it.each(SHAPE_CASES)('$shape: renders param inputs with fallbacks and updates each param', ({ shape, fields }) => {
-    renderComponent({ selectedShape: shape });
+    renderComponent({ selectedShape: shape, isActive: true });
     const inputs = screen.getAllByRole('spinbutton');
     expect(inputs).toHaveLength(fields.length);
     fields.forEach((field, i) => {
@@ -84,7 +84,7 @@ describe('SpellOverlayControls', () => {
   });
 
   it('treats non-numeric and empty input values as 0', () => {
-    renderComponent({ selectedShape: OverlayShape.SPHERE });
+    renderComponent({ selectedShape: OverlayShape.SPHERE, isActive: true });
     const input = screen.getByRole('spinbutton');
     for (const value of ['not-a-number', '']) {
       fireEvent.change(input, { target: { value } });

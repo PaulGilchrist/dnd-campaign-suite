@@ -207,8 +207,10 @@ const MapToolbar = ({
                 non-empty OverlayShape from its producers, and every downstream
                 consumer tests truthiness, so '' means inactive (#928b). Overlays
                 on the board mount the panel in manage-only mode (isActive=false
-                hides Cancel + the placement hint); placement itself still
-                requires the armed toolbar toggle (Map.jsx pointer gate). */}
+                hides Cancel + both placement hints and disables/dims the shape
+                picker and param inputs — backlog 2026-11-09 ER); placement
+                itself still requires the armed toolbar toggle (Map.jsx pointer
+                gate). */}
             {(spellMode || hasOverlays) && (
                 <SpellOverlayControls
                     selectedShape={selectedShape}
