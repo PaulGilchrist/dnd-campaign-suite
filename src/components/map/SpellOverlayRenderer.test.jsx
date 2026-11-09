@@ -1,5 +1,5 @@
 // @maintained-by-ai: 2026-10-14
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
 import {
@@ -38,8 +38,8 @@ const makeCone = (overrides = {}) =>
 const makeLine = (overrides = {}) =>
     createOverlay(OverlayShape.LINE, 1, 1, 0, { id: 'line-1', distanceFt: 30, ...overrides });
 
-const renderComponent = (overlays = [], pendingOverlay = null) =>
-    render(<SpellOverlayRenderer overlays={overlays} pendingOverlay={pendingOverlay} />);
+const renderComponent = (overlays = [], pendingOverlay = null, onRotateStart = null) =>
+    render(<SpellOverlayRenderer overlays={overlays} pendingOverlay={pendingOverlay} onRotateStart={onRotateStart} />);
 
 const getGroups = (container) => container.querySelectorAll('g.spell-overlay-group');
 const getHandles = (container) => container.querySelectorAll('circle.spell-overlay-handle');
@@ -171,6 +171,73 @@ describe('SpellOverlayRenderer', () => {
         // end handle rotates with the angle: straight down at 90 degrees
         expect(Number(handles[1].getAttribute('cx'))).toBeCloseTo(x);
         expect(Number(handles[1].getAttribute('cy'))).toBeCloseTo(y + dist);
+    });
+
+    // Knob wiring (backlog 2026-11-09 FU): the cone/line TIP knob drives the
+    // hook's rotate lane via onRotateStart; knobs that don't act must not
+    // advertise a grab cursor.
+    describe('rotate knob wiring', () => {
+        const renderWithRotate = (overlays, pendingOverlay = null, onRotateStart = vi.fn()) => ({
+            onRotateStart,
+            ...renderComponent(overlays, pendingOverlay, onRotateStart),
+        });
+
+        it('cone and line tip knobs carry a grab cursor and dispatch pointerdown to onRotateStart with their overlay', () => {
+            const cone = makeCone();
+            const line = makeLine();
+            const { container, onRotateStart } = renderWithRotate([cone, line]);
+            const coneTip = getGroups(container)[0].querySelectorAll('circle.spell-overlay-handle')[1];
+            const lineTip = getGroups(container)[1].querySelectorAll('circle.spell-overlay-handle')[1];
+            expect(coneTip.style.cursor).toBe('grab');
+            expect(lineTip.style.cursor).toBe('grab');
+
+            fireEvent.pointerDown(coneTip, { button: 0, clientX: 300, clientY: 40, pointerId: 3 });
+            expect(onRotateStart).toHaveBeenCalledTimes(1);
+            expect(onRotateStart.mock.calls[0][1]).toBe(cone);
+            expect(onRotateStart.mock.calls[0][0].clientX).toBe(300);
+
+            fireEvent.pointerDown(lineTip, { button: 0, clientX: 90, clientY: 90, pointerId: 3 });
+            expect(onRotateStart).toHaveBeenCalledTimes(2);
+            expect(onRotateStart.mock.calls[1][1]).toBe(line);
+        });
+
+        it('origin move knobs carry no rotate handler (the svg zone-body lane owns moves)', () => {
+            const { container, onRotateStart } = renderWithRotate([makeCone(), makeLine()]);
+            const originKnobs = [...getGroups(container)]
+                .flatMap((g) => [...g.querySelectorAll('circle.spell-overlay-handle')])
+                .filter((k) => k.style.cursor === 'move');
+            expect(originKnobs.length).toBe(2);
+            originKnobs.forEach((knob) => fireEvent.pointerDown(knob, { button: 0 }));
+            expect(onRotateStart).not.toHaveBeenCalled();
+        });
+
+        it('non-rotatable shapes never advertise a grab cursor on their knobs', () => {
+            const { container, onRotateStart } = renderWithRotate([makeSphere(), makeCylinder(), makeCube()]);
+            const handles = getHandles(container);
+            expect(handles.length).toBe(3);
+            handles.forEach((knob) => {
+                expect(knob.style.cursor).toBe('move');
+                fireEvent.pointerDown(knob, { button: 0 });
+            });
+            expect(onRotateStart).not.toHaveBeenCalled();
+        });
+
+        it('the pending placement preview keeps its tip knob decorative: no handler, default cursor', () => {
+            const { container, onRotateStart } = renderWithRotate([], makeCone({ id: 'pending-cone' }));
+            const tip = getGroups(container)[0].querySelectorAll('circle.spell-overlay-handle')[1];
+            expect(tip.style.cursor).toBe('default');
+            fireEvent.pointerDown(tip, { button: 0 });
+            expect(onRotateStart).not.toHaveBeenCalled();
+        });
+
+        it('a host without a rotate handler gets decorative tip knobs instead of dead grab promises', () => {
+            const { container } = renderComponent([makeCone(), makeLine()]);
+            const tips = [...getGroups(container)]
+                .flatMap((g) => [...g.querySelectorAll('circle.spell-overlay-handle')])
+                .filter((k) => k.style.cursor !== 'move');
+            expect(tips.length).toBe(2);
+            tips.forEach((knob) => expect(knob.style.cursor).toBe('default'));
+        });
     });
 
     // Legacy-corrupt board rows (the BD probe stored junk coord keys via the

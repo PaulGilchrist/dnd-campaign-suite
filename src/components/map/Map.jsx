@@ -268,6 +268,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         dragOverlay, rotateOverlay,
         spellDragActiveRef,
         handleSpellPointerDown, handleSpellPointerMove, handleSpellPointerUp,
+        handleSpellRotateStart,
         handleSpellDragMove, handleSpellDragEnd,
     } = useSpellHandlers({
         rulerMode, getGridFromEvent, clientToSVG,
@@ -790,6 +791,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 <SpellOverlayRenderer
                     overlays={overlays}
                     pendingOverlay={buildPendingOverlay(spellDraft, spellMode, shapeParams)}
+                    onRotateStart={handleSpellRotateStart}
                 />
 
                 <RulerOverlay

@@ -5,7 +5,7 @@ const HANDLE_RADIUS = 6;
 
 const overlayStroke = (color) => color.replace(/,\d+(?:\.\d+)?\)$/, `,${OVERLAY_STROKE_ALPHA})`);
 
-const DragHandle = ({ cx, cy, cursor = 'grab' }) => (
+const DragHandle = ({ cx, cy, cursor = 'grab', onPointerDown }) => (
     <circle
         cx={cx}
         cy={cy}
@@ -15,6 +15,7 @@ const DragHandle = ({ cx, cy, cursor = 'grab' }) => (
         strokeWidth={1.5}
         style={{ cursor }}
         className="spell-overlay-handle"
+        onPointerDown={onPointerDown}
     />
 );
 
@@ -59,7 +60,11 @@ const renderCube = (overlay) => {
     );
 };
 
-const renderCone = (overlay) => {
+// The tip knob sits at exactly distanceFt where the boundary hit-test misses,
+// so it needs its own onPointerDown wired into the hook's rotate lane; without
+// a handler (pending draft preview, or a host that passes none) it stays inert
+// and drops the grab cursor so the knob never promises a dead click.
+const renderCone = (overlay, onRotateStart) => {
     const { x: startX, y: startY } = svgOrigin(overlay);
     const dist = toGrid(overlay.distanceFt) * CELL_SIZE;
     const halfSpread = (overlay.coneAngle / 2) * (Math.PI / 180);
@@ -83,12 +88,17 @@ const renderCone = (overlay) => {
                 className="spell-overlay"
             />
             <DragHandle cx={startX} cy={startY} cursor="move" />
-            <DragHandle cx={x2} cy={y2} cursor="grab" />
+            <DragHandle
+                cx={x2}
+                cy={y2}
+                cursor={onRotateStart ? 'grab' : 'default'}
+                onPointerDown={onRotateStart ? (e) => onRotateStart(e, overlay) : undefined}
+            />
         </g>
     );
 };
 
-const renderLine = (overlay) => {
+const renderLine = (overlay, onRotateStart) => {
     const { x: startX, y: startY } = svgOrigin(overlay);
     const dist = toGrid(overlay.distanceFt) * CELL_SIZE;
     const w = toGrid(overlay.widthFt) * CELL_SIZE;
@@ -110,13 +120,18 @@ const renderLine = (overlay) => {
                 />
             </g>
             <DragHandle cx={startX} cy={startY} cursor="move" />
-            <DragHandle cx={endX} cy={endY} cursor="grab" />
+            <DragHandle
+                cx={endX}
+                cy={endY}
+                cursor={onRotateStart ? 'grab' : 'default'}
+                onPointerDown={onRotateStart ? (e) => onRotateStart(e, overlay) : undefined}
+            />
         </g>
     );
 };
 
-const SpellOverlayRenderer = ({ overlays = [], pendingOverlay = null }) => {
-    const renderOverlay = (overlay) => {
+const SpellOverlayRenderer = ({ overlays = [], pendingOverlay = null, onRotateStart = null }) => {
+    const renderOverlay = (overlay, interactive) => {
         // Legacy-corrupt rows (junk coord keys, unknown shapes) render NaN
         // geometry or crash color.replace — skip with one console.error so a
         // bad board doc can never spam the console or lock the view
@@ -133,9 +148,9 @@ const SpellOverlayRenderer = ({ overlays = [], pendingOverlay = null }) => {
             case OverlayShape.CUBE:
                 return renderCube(overlay);
             case OverlayShape.CONE:
-                return renderCone(overlay);
+                return renderCone(overlay, interactive ? onRotateStart : null);
             case OverlayShape.LINE:
-                return renderLine(overlay);
+                return renderLine(overlay, interactive ? onRotateStart : null);
             default:
                 return null;
         }
@@ -143,8 +158,8 @@ const SpellOverlayRenderer = ({ overlays = [], pendingOverlay = null }) => {
 
     return (
         <g className="spell-overlay-layer">
-            {overlays.map(renderOverlay)}
-            {pendingOverlay && renderOverlay(pendingOverlay)}
+            {overlays.map((overlay) => renderOverlay(overlay, true))}
+            {pendingOverlay && renderOverlay(pendingOverlay, false)}
         </g>
     );
 };

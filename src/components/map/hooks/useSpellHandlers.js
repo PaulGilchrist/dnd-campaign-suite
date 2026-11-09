@@ -111,6 +111,32 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
         setSpellDraft(null);
     }, []);
 
+    // Tip-knob rotate grab (backlog 2026-11-09 FU): the cone/line TIP knob sits
+    // at exactly distanceFt where the boundary hit-test misses, so the svg
+    // zone-body lane never sees it. This opens the SAME rotate gesture the
+    // zone-body grab above does (offsetAngle + capture included) — subsequent
+    // pointermove/up keep flowing through handleSpellDragMove/End via the
+    // svg's pointer capture, so no new event or commit lane is introduced.
+    const handleSpellRotateStart = useCallback((e, overlay) => {
+        if (e.button !== 0) return; // #913 same law: only the primary button rotates
+        if (rulerMode) return;
+        e.preventDefault();
+        e.stopPropagation(); // keep the svg placement/manipulate lane off this press
+        const origin = svgOrigin(overlay);
+        const screenPt = clientToSVG(e.clientX, e.clientY);
+        if (!screenPt) return;
+        spellDragActiveRef.current = true;
+        capturePointer(svgRef, e);
+        const initialAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y);
+        setRotateOverlay({
+            overlayId: overlay.id,
+            originX: origin.x,
+            originY: origin.y,
+            startAngle: overlay.angle,
+            offsetAngle: initialAngle - overlay.angle,
+        });
+    }, [rulerMode, clientToSVG, svgRef]);
+
     const handleSpellDragMove = useCallback((e, dragOverlay, rotateOverlay, overlays) => {
         if (dragOverlay) {
             e.preventDefault();
@@ -174,6 +200,7 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
         dragOverlay, rotateOverlay,
         spellDragActiveRef,
         handleSpellPointerDown, handleSpellPointerMove, handleSpellPointerUp,
+        handleSpellRotateStart,
         handleSpellDragMove, handleSpellDragEnd,
     };
 }

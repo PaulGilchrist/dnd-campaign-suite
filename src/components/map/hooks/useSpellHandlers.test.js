@@ -157,6 +157,93 @@ describe('useSpellHandlers', () => {
     });
   });
 
+  describe('tip-knob rotate start (handleSpellRotateStart)', () => {
+    // The cone/line TIP knob sits at exactly distanceFt where the hit-test
+    // boundary misses (backlog 2026-11-09 FU), so it opens the rotate gesture
+    // directly and must drive the SAME drag/end lane as a zone-body rotate grab.
+    const tipEvent = (overrides = {}) => defaultEvent({ clientX: 500, clientY: 20, ...overrides });
+
+    it('pressing the knob opens the same rotate state a zone-body rotate grab builds, capturing the pointer', () => {
+      const cone = createOverlay(OverlayShape.CONE, 0, 0); // svg origin (20,20), tip ray due east
+      const { result, mocks } = getHook();
+      const event = tipEvent();
+      act(() => {
+        result.current.handleSpellRotateStart(event, cone);
+      });
+      expect(result.current.rotateOverlay).toEqual({ overlayId: cone.id, originX: 20, originY: 20, startAngle: 0, offsetAngle: 0 });
+      expect(result.current.dragOverlay).toBeNull();
+      expect(result.current.spellDraft).toBeNull();
+      expect(result.current.spellDragActiveRef.current).toBe(true);
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(event.stopPropagation).toHaveBeenCalled(); // the svg placement/manipulate lane must not see this press
+      expect(mocks.addOverlay).not.toHaveBeenCalled();
+      expect(mocks.updateOverlay).not.toHaveBeenCalled();
+      expect(mocks.svgRef.current.setPointerCapture).toHaveBeenCalledWith(7);
+    });
+
+    it('full knob gesture: press opens the rotate, drag moves updateOverlay, release flushes updateOverlayImmediate', () => {
+      const line = createOverlay(OverlayShape.LINE, 0, 0, 45); // tip on the 45deg ray
+      const { result, mocks } = getHook();
+      act(() => {
+        result.current.handleSpellRotateStart(tipEvent({ clientX: 220, clientY: 220 }), line); // 45deg -> offset 0
+      });
+      const rotate = result.current.rotateOverlay;
+      expect(rotate).toMatchObject({ overlayId: line.id, offsetAngle: 0 });
+
+      // Cursor due south of the origin = 90deg; offset 0 -> new angle 90.
+      mocks.clientToSVG.mockReturnValue({ x: 20, y: 220 });
+      act(() => {
+        result.current.handleSpellDragMove(defaultEvent(), null, rotate, [line]);
+      });
+      expect(mocks.updateOverlay).toHaveBeenCalledTimes(1);
+      expect(mocks.updateOverlay.mock.calls[0][0]).toMatchObject({ id: line.id, shape: 'line', angle: 90 });
+
+      act(() => {
+        result.current.handleSpellDragEnd(defaultEvent(), null, rotate, [line], mocks.svgRef);
+      });
+      expect(mocks.updateOverlayImmediate).toHaveBeenCalledTimes(1);
+      expect(mocks.updateOverlayImmediate.mock.calls[0][0]).toMatchObject({ id: line.id, angle: 90 });
+      expect(result.current.rotateOverlay).toBeNull();
+      expect(result.current.spellDragActiveRef.current).toBe(false);
+    });
+
+    it('knob press keeps the grabbed ray offset: dragging back along the start ray restores the original angle', () => {
+      const cone = createOverlay(OverlayShape.CONE, 0, 0, 30);
+      const { result, mocks } = getHook();
+      // Tip grabbed at 75deg (30 + 45 half-spread) -> offsetAngle 45.
+      act(() => {
+        result.current.handleSpellRotateStart(defaultEvent({ clientX: 20 + 480 * Math.cos(75 * Math.PI / 180), clientY: 20 + 480 * Math.sin(75 * Math.PI / 180) }), cone);
+      });
+      expect(result.current.rotateOverlay.offsetAngle).toBeCloseTo(45, 6);
+      mocks.clientToSVG.mockReturnValue({ x: 20 + 480 * Math.cos(75 * Math.PI / 180), y: 20 + 480 * Math.sin(75 * Math.PI / 180) });
+      act(() => {
+        result.current.handleSpellDragMove(defaultEvent(), null, result.current.rotateOverlay, [cone]);
+      });
+      expect(mocks.updateOverlay.mock.calls[0][0].angle).toBeCloseTo(30, 6);
+    });
+
+    it.each([
+      { scenario: 'a non-primary button is pressed', event: { button: 2 } },
+      { scenario: 'ruler mode is active', rulerMode: true },
+      { scenario: 'clientToSVG fails', screenPt: null },
+    ])('knob press is inert when $scenario: no rotate, no capture, no writes', ({ event, rulerMode, screenPt }) => {
+      const cone = createOverlay(OverlayShape.CONE, 0, 0);
+      const { result, mocks } = getHook({ rulerMode, screenPt });
+      const press = tipEvent(event);
+      act(() => {
+        result.current.handleSpellRotateStart(press, cone);
+      });
+      expect(result.current.rotateOverlay).toBeNull();
+      expect(result.current.spellDragActiveRef.current).toBe(false);
+      expect(mocks.svgRef.current.setPointerCapture).not.toHaveBeenCalled();
+      expect(mocks.updateOverlay).not.toHaveBeenCalled();
+      if (event) { // button guards run before any event consumption
+        expect(press.preventDefault).not.toHaveBeenCalled();
+        expect(press.stopPropagation).not.toHaveBeenCalled();
+      }
+    });
+  });
+
   describe('drag and rotate lifecycles', () => {
     it('drags an overlay: move repositions via updateOverlay, release flushes and ends the capture', () => {
       const sphere = createOverlay(OverlayShape.SPHERE, 4, 6);
