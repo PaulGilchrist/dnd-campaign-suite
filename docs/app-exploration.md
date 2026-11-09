@@ -68,8 +68,6 @@ Live facts (ER, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-09 ER: same-species EB joins can end with plain + suffixed rows mixed on the board (`Kobold` init 20 alongside `Kobold 1` init 5 after the second join) — confusing which is which on cards/log; consider always re-numbering a species series (Goblin 1, Goblin 2) once a second of its kind joins.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): `(Second Turn)` turn-WALK behavior (does Next enter the row + resolve holder state) — moot until the eviction bug is fixed (PT1); EffectAdder Effects-tab + Concentration-tab APPLY legs (conditions leg fully ridden); second-turn TV/up-next face; same-species numbering expected-law (observed, undecided); enforcement-ON away + GM-add interplay.

@@ -100,9 +100,10 @@ describe('addMonstersToInitiative — swallowed network-failure phantom join', (
     const result = await addMonstersToInitiative(
       [{ name: 'Goblin', qty: 1, armor_class: 13 }], [], 'TestCampaign');
 
-    // Existing 'Goblin' on the board → new instance numbers off the series;
-    // creatures sort initiative-desc (Thorin 18, Goblin 12, Goblin 1 = 10).
-    expect(result.creatures.map((c) => c.name)).toEqual(['Thorin', 'Goblin', 'Goblin 1']);
+    // Existing 'Goblin' on the board → series-renumber law (owner 2026-11-09):
+    // the plain row is renamed 'Goblin 1' and the join lands as 'Goblin 2';
+    // creatures sort initiative-desc (Thorin 18, Goblin 1 = 12, Goblin 2 = 10).
+    expect(result.creatures.map((c) => c.name)).toEqual(['Thorin', 'Goblin 1', 'Goblin 2']);
     expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({ round: 3 }), 'TestCampaign');
     expect(setCombatSummaryCache).toHaveBeenCalledWith(
       expect.objectContaining({ creatures: expect.any(Array) }), 'TestCampaign');

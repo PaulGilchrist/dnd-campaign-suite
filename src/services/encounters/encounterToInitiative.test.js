@@ -364,8 +364,11 @@ describe('addMonstersToInitiative', () => {
 
     const result = await addMonstersToInitiative([monster], [], 'TestCampaign');
 
+    // Series-renumber law (owner 2026-11-09): the second of a kind renumbers
+    // the whole series — the pre-existing plain 'Shadow' row became
+    // 'Shadow 1' (initiative preserved) and the join lands as 'Shadow 2'.
     expect(result.creatures[0]).toEqual({
-      name: 'Shadow 1',          // series existed → collision-free numbering
+      name: 'Shadow 2',           // series existed → collision-free numbering
       type: 'npc',               // carrier byte; real type in monsterType (#1014/SP-094)
       monsterType: 'aberration',
       size: 'Medium',           // MN-015
@@ -381,11 +384,16 @@ describe('addMonstersToInitiative', () => {
       saveBonuses: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
       monsterIndex: 'shadow',
     });
+    expect(result.creatures[1]).toEqual({
+      name: 'Shadow 1',          // former plain row, renamed — only `name` changed
+      type: 'npc',
+      initiative: '5',
+    });
     expect(result.round).toBe(2);
     expect(storage.set).toHaveBeenCalledWith(
       'combatSummary',
-      expect.objectContaining({ creatures: expect.arrayContaining([expect.objectContaining({ name: 'Shadow 1', vulnerabilities: ['Radiant'] })]) }),
+      expect.objectContaining({ creatures: expect.arrayContaining([expect.objectContaining({ name: 'Shadow 2', vulnerabilities: ['Radiant'] })]) }),
       'TestCampaign');
-    expect(storage.set).toHaveBeenCalledWith('activeCreatureName', 'Shadow 1', 'TestCampaign');
+    expect(storage.set).toHaveBeenCalledWith('activeCreatureName', 'Shadow 2', 'TestCampaign');
   });
 });

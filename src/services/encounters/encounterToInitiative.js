@@ -202,6 +202,34 @@ export function getNextUniqueMonsterName(baseName, creatures) {
     return `${baseName} ${maxNum + 1}`;
 }
 
+// Series renumbering law (owner decision 2026-11-09): once a SECOND creature of
+// the same species joins, the whole series must be numbered — a plain row may
+// never coexist with suffixed rows after a join ('Kobold' next to 'Kobold 1'
+// made cards/log rows ambiguous about which was which). This renames a legacy
+// plain row to the lowest free number in its series BEFORE new instances draw
+// their names, so the join's getNextUniqueMonsterName calls naturally land on
+// 'Kobold 2', 'Kobold 3', … and a third-or-later join that finds a re-appeared
+// plain row re-normalizes it the same way.
+// Renaming changes ONLY `name`: initiative/HP/AC/controller/away/monsterIndex/
+// size and array position are row-local and survive untouched (the join's
+// existing initiative sort stays the only reorderer). PC rows are never
+// renamed (player rows are skipped), and '+NPC' placeholders are safe: their
+// names are always 'NPC N', never the plain base name a candidate needs.
+export function normalizeMonsterSeries(baseName, creatures) {
+    const plainRow = creatures.find(c => c.type !== 'player' && c.name === baseName);
+    if (!plainRow) return false;
+    const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const seriesNumber = new RegExp(`^${escaped} (\\d+)$`);
+    const used = new Set(creatures
+        .filter(c => c !== plainRow)
+        .map(c => c.name.match(seriesNumber)?.[1])
+        .filter(Boolean));
+    let next = 1;
+    while (used.has(String(next))) next += 1;
+    plainRow.name = `${baseName} ${next}`;
+    return true;
+}
+
 export async function addMonstersToInitiative(selectedMonsters, characters, campaignName) {
     // Strict read (bug-eb-join-swallowed-network-fail-phantom-row): a failed
     // READ must surface as an error, never be conflated with "no combat" —
@@ -248,6 +276,13 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
         // join continues 'Goblin 1, Goblin 2' → 'Goblin 3'). A lone monster
         // joining a tracker where its name is new keeps its plain name.
         const needsNumbering = qty > 1 || hasMonsterVariant(baseName, combatSummary.creatures);
+        // Series-renumber law (owner 2026-11-09): a plain row may never
+        // coexist with suffixed rows after a join, so rename a legacy plain
+        // row ('Kobold' → 'Kobold 1') BEFORE the new instances draw their
+        // names below. Unconditional is equivalent to gating on
+        // needsNumbering: the helper only acts when the plain row exists,
+        // which already forces needsNumbering true.
+        normalizeMonsterSeries(baseName, combatSummary.creatures);
         for (let i = 0; i < qty; i++) {
             const name = needsNumbering
                 ? getNextUniqueMonsterName(baseName, combatSummary.creatures)
