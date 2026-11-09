@@ -61,7 +61,6 @@ Live facts (FU, dev pair `npm run dev` :80 + :5173 no lock, test-campaign header
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FU 2026-11-09) ST-row card display asymmetry: conditions render holder-resolved (CLA-360) but `myTargetEffects` (`CreatureCard.jsx:723` teTarget === creature.name) and the concentration badge filter by the synthetic name — te/concentration applied via the (now correctly remapped) Add modal appear on the holder card but never on the row card the GM clicked. Consider `holderName || name` fallback in the badge derivations for display parity with the c5883e4a4 authority law.
 - (FU 2026-11-09) Away→Rejoin on a `(Second Turn)` row re-rolls its initiative (app-wide player-row law; PC control ''→3), silently losing the grant-time holder−10 seam (observed drift 19→10→3). For synthetic rows, consider re-anchoring to holder-init−10 (or preserving the seeded value) instead of re-rolling — `createCreatureHandlers` rejoin/re-sync lane + `navigationHandlers` seam.
 
 ## Blocked / Not Verified (fold-gate ledger)

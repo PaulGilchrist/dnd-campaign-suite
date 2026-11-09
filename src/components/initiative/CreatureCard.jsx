@@ -27,6 +27,7 @@ import { cleanupWildShape } from '../../services/automation/handlers/class-druid
 import { revertPolymorph } from '../../services/automation/handlers/spells/polymorphService.js'
 import { revertAnimalShapes } from '../../services/automation/handlers/spells/animalShapesService.js'
 import { revertShapechange } from '../../services/automation/handlers/spells/shapechangeService.js'
+import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 
 const SHAPE_LABELS = {
     sphere: 'Sphere',
@@ -605,6 +606,7 @@ function ConditionsSection({
     characters,
     mapName,
     myTargetEffects,
+    effectSubjectName,
     sanctuaryInfo,
     fleshToStoneData,
     prismaticIndigoData,
@@ -623,6 +625,16 @@ function ConditionsSection({
     const animalShapesActive = myTargetEffects.some(te => te.effect === 'animal_shapes')
     const shapechangeActive = myTargetEffects.some(te => te.effect === 'shapechange')
     const recklessAttackActive = myTargetEffects.some(te => te.effect === 'reckless_attack')
+    // CLA-360 display parity: the Add modal writes concentration on the
+    // HOLDER's cs row (ST rows keep theirs null), so a second-turn row shows
+    // the holder's active concentration too — effectSubjectName differs from
+    // creature.name only for ST rows. ×/save-click act on the holder's row
+    // (the handlers look rows up by name), auditing the holder, never the
+    // synthetic bucket (same law as 583d078ff / 930393775).
+    const displayedConcentration = creature.concentration
+        || (effectSubjectName !== creature.name
+            ? (allCreatures?.find(c => c.name === effectSubjectName)?.concentration ?? null)
+            : null)
     return (
         <div className='creature-conditions'>
             {creature.conditions?.map(cond => {
@@ -641,7 +653,7 @@ function ConditionsSection({
             })}
             {/* L5-001: enforcement economy readout (renders nothing while enforcement off). */}
             <TurnEconomyStrip creatureName={creature.name} speedFeet={creature.speed} />
-            <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
+            <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={effectSubjectName} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
             {isLocalhost && (
                 <button
                     className='effect-add-btn'
@@ -653,15 +665,15 @@ function ConditionsSection({
                     <i className='fa-solid fa-wand-magic-sparkles'></i> Add
                 </button>
             )}
-            {creature.concentration ? (
+            {displayedConcentration ? (
                 <CreatureBadge
                     icon='fa-spinner'
-                    label={`${creature.concentration.spell} DC ${creature.concentration.dc}`}
+                    label={`${displayedConcentration.spell} DC ${displayedConcentration.dc}`}
                     cls='effect-neutral'
-                    tooltip={`Concentration: ${creature.concentration.spell} (DC ${creature.concentration.dc} Constitution)`}
-                    onClick={isLocalhost ? () => onRollConcentrationSave(creature.name) : undefined}
+                    tooltip={`Concentration: ${displayedConcentration.spell} (DC ${displayedConcentration.dc} Constitution)`}
+                    onClick={isLocalhost ? () => onRollConcentrationSave(effectSubjectName) : undefined}
                     removable={isLocalhost}
-                    onRemove={() => onBreakConcentration(creature.name)}
+                    onRemove={() => onBreakConcentration(effectSubjectName)}
                 />
             ) : null}
             <SaveTrackingPrompt isLocalhost={isLocalhost} data={fleshToStoneData} campaignName={campaignName} creatureName={creature.name} icon="fa-dungeon" title="Flesh to Stone" counterLabel="Saves" successTitle="Record successful save" failureTitle="Record failed save" sendResult={sendFleshToStoneResult} />
@@ -720,9 +732,18 @@ function CreatureCard({
     const isUnconscious = creature.currentHp <= 0
     const isAway = creature.type === 'player' && creature.away === true
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? [];
+    // CLA-360 display parity (mirrors openEffectAdder Initiative.jsx:502 /
+    // badge × 583d078ff): a structural second-turn row DISPLAYS and REMOVES
+    // te/concentration via the holder's real name — the Add modal writes the
+    // holder's rows, so filtering by the synthetic name left the row card
+    // blind to them. Non-second-turn cards resolve to their own name (bytes
+    // unchanged), and the holder card keeps showing its own badges.
+    const effectSubjectName = isSecondTurnEntry(creature) && creature.holderName
+        ? creature.holderName
+        : creature.name
     const myTargetEffects = allTargetEffects.filter(te => {
         const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-        return teTarget === creature.name;
+        return teTarget === effectSubjectName;
     });
     const saveTrackingKey = FLESH_TO_STONE_PREFIX + creature.name.replace(/\s+/g, '_');
     const fleshToStoneData = useRuntimeValue('campaign', saveTrackingKey, campaignName);
@@ -779,6 +800,7 @@ function CreatureCard({
                 characters={characters}
                 mapName={mapName}
                 myTargetEffects={myTargetEffects}
+                effectSubjectName={effectSubjectName}
                 sanctuaryInfo={sanctuaryInfo}
                 hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage}
                 hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore}
