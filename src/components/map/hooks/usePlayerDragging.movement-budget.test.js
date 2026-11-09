@@ -189,10 +189,14 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
                     setPopupHtml: expect.any(Function),
                 }));
             // ...AND the clamp is now visible on the board: a plain-English
-            // snap-back toast naming the creature + snapped distance.
+            // snap-back toast naming the creature + snapped distance. This
+            // PARTIAL leg (token did move, to the 30 ft edge) keeps the
+            // "snapped back" copy verbatim — the full-block leg below is the
+            // only one that reads "cannot move" (backlog 2026-11-09).
             expect(helpers.result.current.snapToast).toMatchObject({
                 message: 'Player1 snapped back to 30 ft of movement.',
             });
+            expect(helpers.result.current.snapToast.message).not.toContain('cannot move');
         });
 
         it('auto-clears the snap-back toast on a display-only timer (~2.5s)', () => {
@@ -246,10 +250,14 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
             // Zero move ⇒ zero charge, zero stamps, zero trigger:
             expect(campaignStore().get('turnState').Player1.movementUsedFeet).toBe(30);
             expect(mocks.onTokenMoveLanded).not.toHaveBeenCalled();
-            // Visible snap-back naming the creature and the 0 ft:
+            // Zero-cost snap is a FULL BLOCK (token never left its cell): the
+            // toast truthfully says the creature cannot move — nothing was
+            // "snapped back" (backlog 2026-11-09). The log row above stays
+            // byte-identical on this leg; only the toast copy branches.
             expect(helpers.result.current.snapToast).toMatchObject({
-                message: 'Player1 snapped back to 0 ft of movement.',
+                message: 'Player1 cannot move — no movement left this turn.',
             });
+            expect(helpers.result.current.snapToast.message).not.toContain('snapped back');
         });
     });
 

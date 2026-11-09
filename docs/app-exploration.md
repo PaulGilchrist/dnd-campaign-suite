@@ -67,7 +67,6 @@ FY session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FY 2026-11-09) Movement clamp copy edge: a drag that can't start at all (0 ft remaining) toasts "X snapped back to 0 ft of movement." though the token never left its cell — "cannot move — no movement left this turn" would read truer than "snapped back" on the full-block leg (log row "Out of movement — snapped to the remaining budget (0 ft this move)." is already honest).
 
 ## Blocked / Not Verified (fold-gate ledger)
 

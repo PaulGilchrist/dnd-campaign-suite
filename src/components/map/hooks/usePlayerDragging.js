@@ -335,9 +335,15 @@ export default function usePlayerDragging({
         targetX = budget.targetX;
         targetY = budget.targetY;
         // Visual counterpart of the enforcement_denied log: the token lands on
-        // the snapped cell, so say so before it reads as a stuck drag.
+        // the snapped cell, so say so before it reads as a stuck drag. A
+        // zero-cost snap means the token never left its cell (0 ft of budget
+        // left at drop) — nothing "snapped back", so name the full block
+        // truthfully (backlog 2026-11-09). The log row stays byte-identical
+        // on every leg; only this toast copy branches.
         if (budget.snapped) {
-            showSnapToast(`${budget.creatureName} snapped back to ${budget.moveCostFeet} ft of movement.`);
+            showSnapToast(budget.moveCostFeet === 0
+                ? `${budget.creatureName} cannot move — no movement left this turn.`
+                : `${budget.creatureName} snapped back to ${budget.moveCostFeet} ft of movement.`);
         }
 
         setMapData((prev) => ({
