@@ -68,7 +68,6 @@ Live facts (ER, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-09 ER: server `/spell-overlay` supports `action:'update'` but NO client ever sends it (grep-zero callers) — reposition/drag lane unimplemented; either wire a drag-move on live zones or drop the action from the route contract with a comment.
 - 2026-11-09 ER: same-species EB joins can end with plain + suffixed rows mixed on the board (`Kobold` init 20 alongside `Kobold 1` init 5 after the second join) — confusing which is which on cards/log; consider always re-numbering a species series (Goblin 1, Goblin 2) once a second of its kind joins.
 
 ## Blocked / Not Verified (fold-gate ledger)
