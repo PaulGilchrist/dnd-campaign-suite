@@ -26,6 +26,7 @@
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getAllyList, hasExplicitAllyList } from '../../hooks/useAllySelection.js';
 import { chargeSlot } from './chargeEconomy.js';
+import { armPendingOas } from './pendingOpportunityAttacks.js';
 import { addEntry } from '../ui/logService.js';
 import { MELEE_REACH_FEET } from './baseCombatActions.js';
 
@@ -177,6 +178,18 @@ export async function onTokenMoveLanded(ctx) {
     const triggeredNames = defenders
         .filter((defender) => triggerDefender({ defender, campaignName, moverName, targetEffects, economyLive, setPopupHtml }))
         .map((defender) => defender.name);
+
+    // Pending-resolution markers (bug-monster-oa-resolution-auto-missed-by-
+    // melee-range-gate): one per triggering defender, naming this mover —
+    // server-first, SSE-visible, no timers. The marker is the trigger-time
+    // adjacency PROOF the resolution lanes measure their melee range against
+    // (multi-defender: each defender keeps its own marker, independent).
+    // Armed whether or not the economy charged — with actionEconomy off the
+    // trigger is advisory-only but the affordance is still an honest readout
+    // of "this move provoked you".
+    if (triggeredNames.length > 0) {
+        armPendingOas(campaignName, triggeredNames, moverName);
+    }
 
     // One joined sticky advisory AFTER the loop (multi-defender fix, backlog
     // 2026-11-09): names every defender that triggered, so a denial popup

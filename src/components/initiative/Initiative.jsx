@@ -32,6 +32,7 @@ import { createNpcClickHandler } from './createNpcClickHandler.js'
 import { createFleshToStoneHandler, createPrismaticSprayIndigoHandler, createPrismaticSprayVioletHandler } from './saveResultHandlers.js'
 import { useLootHandlers } from './useLootHandlers.js'
 import { createNextCreatureHandler, createPreviousCreatureHandler, economyNameFor } from './navigationHandlers.js'
+import { clearAllPendingOas } from '../../services/combat/pendingOpportunityAttacks.js'
 import TurnEconomyStrip from './TurnEconomyStrip.jsx'
 import AiDirectorPanel from './AiDirectorPanel.jsx'
 import { useTvPresentation } from './useTvPresentation.js'
@@ -628,6 +629,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             // WM-008: re-roll of initiative restarts the round structure — clear the
             // campaign-level weapon-mastery auto-apply latch so Vex can re-arm.
             setRuntimeValue('campaign', '_Vex_appliedTarget', null, campaignName)
+            // Pending-OA drop law: a new initiative roll retires every pending
+            // trigger marker (the old provocation no longer stands; the spent
+            // reaction is NOT refunded). Zero writes when nothing is pending.
+            clearAllPendingOas(campaignName)
             for (const creature of (summary?.creatures || [])) {
                 if (isSecondTurnEntry(creature)) continue
                 if (creature.type === 'player') {

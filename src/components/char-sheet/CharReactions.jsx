@@ -18,6 +18,7 @@ import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
+import { clearPendingOa, findPendingOaFor, isPendingOaLive, buildOaResolutionLog } from '../../services/combat/pendingOpportunityAttacks.js'
 import { hasAutomation, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
@@ -406,11 +407,18 @@ function buildOpportunityAttackRefusal(target, campaignName, playerName) {
     return null;
 }
 
-async function resolveOpportunityAttackRefusal(campaignName, playerName) {
+/** Refusal gate for an OA press, evaluated against the creature being attacked.
+ *  A plain sheet press evaluates the sheet's armed target-select; a pending-
+ *  trigger resolution (bug-monster-oa-resolution-auto-missed-by-melee-range-
+ *  gate) passes the MARKED MOVER as explicit target — the marker pins the roll
+ *  to the provoking mover, so the gate checks that mover, never a stale arming. */
+async function resolveOpportunityAttackRefusal(campaignName, playerName, explicitTargetName = null) {
     try {
         const cs = await getCombatContext(campaignName);
         if (!cs) return null;
-        const target = getTargetFromAttacker(cs, playerName);
+        const target = explicitTargetName
+            ? (cs.creatures || []).find(c => c && c.name === explicitTargetName) || null
+            : getTargetFromAttacker(cs, playerName);
         if (!target) return null;
         return buildOpportunityAttackRefusal(target, campaignName, playerName);
     } catch (_e) { return null; }
@@ -434,6 +442,14 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [modalState, setModalState] = React.useState({});
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
+
+    // Pending-trigger OA marker for THIS defender (bug-monster-oa-resolution-
+    // auto-missed-by-melee-range-gate): armed by the token-move trigger, which
+    // already adjudicated blockers and (economy on) charged the reaction. While
+    // it stands, the sheet's OA row resolves THROUGH the marker — no second
+    // charge, no spent-reaction denial, roll pinned to the marked mover.
+    const pendingOa = findPendingOaFor(useRuntimeValue('campaign', 'pendingOAs', campaignName), playerStats.name);
+    const oaResolvedRef = React.useRef(null);
 
     const pwhStance = useRuntimeValue(playerStats?.name, 'powerWordHealStandPermission', campaignName);
 
@@ -470,6 +486,16 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const handleReactionClick = async (reaction) => {
         if (cannotAct) return;
+        // Pending-trigger OA press (bug-monster-oa-resolution-auto-missed-by-
+        // melee-range-gate): the trigger already paid and adjudicated this
+        // reaction — route through the marker lane BEFORE the economy gate so
+        // the spent-reaction budget the trigger charged can never self-deny
+        // the resolution it was charged for. A press with no marker keeps the
+        // gated lane below byte-identical (free-press convenience preserved).
+        if (reaction.name === OPPORTUNITY_ATTACK.name && pendingOa) {
+            handleTriggeredOpportunityAttack(pendingOa);
+            return;
+        }
         // L5-001/002: enforcement gate (no-op while enforcement off). Reactions are
         // rules-correct off-turn but consume on activation. Charging happens on the
         // concrete lane below (OA / automation / stand) — this dispatch site defers
@@ -504,19 +530,23 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         if (html) setPopupHtml(html);
     };
 
+    const showOpportunityAttackRefusal = (refusal) => {
+        setPopupHtml(refusal.html);
+        if (refusal.log) {
+            addEntry(campaignName, {
+                type: 'automation',
+                creatureName: playerStats.name,
+                name: 'Opportunity Attack',
+                description: refusal.log,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[CharReactions:OA-refusal-log-error]', e); });
+        }
+    };
+
     const handleOpportunityAttack = async () => {
         const refusal = await resolveOpportunityAttackRefusal(campaignName, playerStats.name);
         if (refusal) {
-            setPopupHtml(refusal.html);
-            if (refusal.log) {
-                addEntry(campaignName, {
-                    type: 'automation',
-                    creatureName: playerStats.name,
-                    name: 'Opportunity Attack',
-                    description: refusal.log,
-                    timestamp: Date.now(),
-                }).catch((e) => { console.error('[CharReactions:OA-refusal-log-error]', e); });
-            }
+            showOpportunityAttackRefusal(refusal);
             return;
         }
         const attackRoll = pickOpportunityAttackRoll(playerStats);
@@ -525,6 +555,57 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             chargeSlot({ creatureName: playerStats.name, bucket: 'reaction', campaignName });
             rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
         }
+    };
+
+    /** Pending-trigger OA resolution (bug-monster-oa-resolution-auto-missed-by-
+     *  melee-range-gate, PC face of the same root bug): the pre-fix lane ran
+     *  `assertCanAct(bucket:'reaction')` at dispatch AND `chargeSlot` again at
+     *  fire — after the trigger had already spent the reaction at
+     *  opportunityTrigger.js, so with actionEconomy on the resolution was
+     *  DENIED by the budget it had already paid ("No reaction left this turn"
+     *  enforcement_denied row), and when budget happened to stand it would
+     *  have been double-charged. This lane rolls honestly against the MARKED
+     *  MOVER, charges nothing, and consumes the marker. */
+    const handleTriggeredOpportunityAttack = async (marker) => {
+        if (isSlowed()) { refuseSlowedReaction(`${OPPORTUNITY_ATTACK.name} on ${marker.mover}`); return; }
+        // promptId latch: the consume POST/SSE echo lands a beat later, so a
+        // same-tab double-click can never roll the one charged reaction twice.
+        if (oaResolvedRef.current === marker.promptId) return;
+        oaResolvedRef.current = marker.promptId;
+        let cs = null;
+        try { cs = await getCombatContext(campaignName); } catch (_e) { cs = null; }
+        if (!isPendingOaLive(cs, marker)) {
+            // The mover left the encounter (away/dead/off-board) after the
+            // trigger — drop the marker WITHOUT refunding the spent reaction.
+            clearPendingOa(campaignName, playerStats.name);
+            oaResolvedRef.current = null;
+            setPopupHtml(`<b>Opportunity Attack</b><br/>${marker.mover} is no longer in the encounter — ${playerStats.name}'s opportunity attack is spent with no target.`);
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'opportunity_attack_dropped',
+                creatureName: playerStats.name,
+                name: 'Opportunity Attack',
+                description: `${playerStats.name}'s opportunity attack was dropped — ${marker.mover} left the encounter. Reaction stays spent.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[CharReactions:OA-drop-log-error]', e); });
+            return;
+        }
+        const refusal = await resolveOpportunityAttackRefusal(campaignName, playerStats.name, marker.mover);
+        if (refusal) {
+            // Refused presses consume nothing — release the latch for retry.
+            oaResolvedRef.current = null;
+            showOpportunityAttackRefusal(refusal);
+            return;
+        }
+        const attackRoll = pickOpportunityAttackRoll(playerStats);
+        if (!attackRoll) {
+            oaResolvedRef.current = null;
+            return;
+        }
+        addEntry(campaignName, buildOaResolutionLog({ defenderName: playerStats.name, moverName: marker.mover }))
+            .catch((e) => { console.error('[CharReactions:OA-resolution-log-error]', e); });
+        clearPendingOa(campaignName, playerStats.name);
+        rollAttack(attackRoll.name, attackRoll.hitBonus, { targetName: marker.mover, forcedMode: undefined, isOpportunityAttack: true });
     };
 
     const handleAutomationReaction = async (reaction) => {

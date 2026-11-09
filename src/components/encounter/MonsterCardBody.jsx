@@ -9,6 +9,7 @@ import { legendaryHeaderAction, legendaryUsesRemaining, legendaryCheckRow, legen
 import { isLairRowClickable, lairRowAffordance } from '../../services/encounters/monsterLairActions.js';
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses, legendarySpellCastMaster } from './MonsterCardHelpers.js';
 import { useSpellNameIndex } from '../../hooks/ui/useSpellNameIndex.js';
+import { useMonsterPendingOa } from './useMonsterPendingOa.js';
 
 // MA-1883: legendary child render-stamp (mirrors the MA-0051 checkBonus
 // stamp at the same seam) — a child delegating to a live Spellcasting master
@@ -22,11 +23,17 @@ function stampLegendaryChildRow(monster, action) {
   return spellRow ? { ...row, legendarySpellRow: spellRow } : row;
 }
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {} }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {}, creatures = null }) {
   // MA-1014: spells.json name index for the spell_save_dc-only utility-row
   // chip arm (Ice Devil "Ice Wall") — resolved here so every card gets it
   // without threading state through the modal (§158 resolvable-name guard).
   const spellNameIndex = useSpellNameIndex();
+  // Pending-trigger OA lane (bug-monster-oa-resolution-auto-missed-by-melee-
+  // range-gate): the Reactions-area resolution row naming the mover renders
+  // ONLY while the trigger marker is live (hook owns marker read/liveness/
+  // stale-eviction/single-press latch) and disappears once consumed or dropped.
+  const { pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack } =
+    useMonsterPendingOa({ campaignName, monsterName, monster, creatures, handleAttack });
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -41,12 +48,22 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
       speedyDifficultTerrainIgnore,
     });
 
+    // Pending-trigger OA resolution row (bug-monster-oa-resolution-auto-missed-
+    // by-melee-range-gate): the token-move trigger armed a marker naming the
+    // mover — the ONLY resolution lane a monster had was a generic melee chip
+    // gated on the mover's post-move position (guaranteed auto-miss). This row
+    // renders in the Reactions area while the marker is live and disappears
+    // once consumed or dropped.
+    const pendingOaRow = pendingOaMover ? (
+      <PendingOpportunityAttackRow mover={pendingOaMover} hasMelee={pendingOaHasMelee} blocked={attackerCannotAct} onResolve={onResolveOpportunityAttack} />
+    ) : null;
+
     const actionSections = [
       { key: 'traits', title: null, actions: monster.traits, blocked: attackerActionBlocked },
       { key: 'actions', title: 'Actions', actions: monster.actions, blocked: attackerActionBlocked },
-      { key: 'reactions', title: 'Reactions', actions: monster.reactions, blocked: attackerCannotAct },
+      { key: 'reactions', title: 'Reactions', actions: monster.reactions, blocked: attackerCannotAct, sectionRow: pendingOaRow },
       { key: 'legendary_actions', title: 'Legendary Actions', actions: monster.legendary_actions, blocked: attackerActionBlocked },
-    ].filter(s => s.actions?.length > 0);
+    ].filter(s => s.actions?.length > 0 || s.sectionRow);
 
     const lairActions = getLairActions(monster);
     const regionalEffects = getRegionalEffects(monster);
@@ -79,9 +96,9 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
             s.key === 'legendary_actions' && legendaryHeader ? (
-              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => stampLegendaryChildRow(monster, a))} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} handleSummonRow={handleSummonRow} handleSelfBuffRow={handleSelfBuffRow} handleGrantReactionRow={handleGrantReactionRow} handleShapeShiftRow={handleShapeShiftRow} handleZonePickerRow={handleZonePickerRow} handleAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => stampLegendaryChildRow(monster, a))} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} handleSummonRow={handleSummonRow} handleSelfBuffRow={handleSelfBuffRow} handleGrantReactionRow={handleGrantReactionRow} handleShapeShiftRow={handleShapeShiftRow} handleZonePickerRow={handleZonePickerRow} handleAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} sectionRow={s.sectionRow} />
             ) : (
-              <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} handleSummonRow={handleSummonRow} handleSelfBuffRow={handleSelfBuffRow} handleGrantReactionRow={handleGrantReactionRow} handleShapeShiftRow={handleShapeShiftRow} handleZonePickerRow={handleZonePickerRow} handleAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} />
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} handleSummonRow={handleSummonRow} handleSelfBuffRow={handleSelfBuffRow} handleGrantReactionRow={handleGrantReactionRow} handleShapeShiftRow={handleShapeShiftRow} handleZonePickerRow={handleZonePickerRow} handleAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} sectionRow={s.sectionRow} />
             )
           ))}
           {lairActions && (
@@ -102,7 +119,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack]);
 
   return content;
 }
@@ -239,7 +256,7 @@ function MonsterCardAbilities({ monster, handleAbilityCheck, drainedAbilities = 
   );
 }
 
-function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed, reactionUsesUsed, onGatedReaction, legendaryGate, headerRow, rechargeState = {}, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, spellNameIndex = null }) {
+function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, spellUsesUsed, reactionUsesUsed, onGatedReaction, legendaryGate, headerRow, sectionRow, rechargeState = {}, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, spellNameIndex = null }) {
   const atk = legendaryGate ? (name, bonus, action) => legendaryGate(action) : handleAttack;
   const dmg = legendaryGate ? (_name, _formula, _type, action) => legendaryGate(action) : handleDamage;
   const save = legendaryGate ? (action) => legendaryGate(action) : handleSaveRoll;
@@ -250,11 +267,42 @@ function MonsterActionSection({ title, actions, attackerCannotAct, handleAttack,
       {title && <h5 className="mc-section-title">{title}</h5>}
       <div className="mc-section">
         {headerRow}
+        {sectionRow}
         {actions.map((a, i) => (
           <MonsterAction key={i} action={a} index={i} attackerCannotAct={attackerCannotAct} onAttack={atk} onDamage={dmg} onSaveRoll={save} onSpellCast={cast} spellUsesUsed={spellUsesUsed} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} legendaryGate={legendaryGate} rechargeState={rechargeState} onZoneAuraRow={handleZoneAuraRow} onSummonRow={handleSummonRow} onSelfBuffRow={handleSelfBuffRow} onGrantReactionRow={handleGrantReactionRow} onShapeShiftRow={handleShapeShiftRow} onZonePickerRow={handleZonePickerRow} onAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} />
         ))}
       </div>
     </>
+  );
+}
+
+// Pending-trigger OA resolution row (bug-monster-oa-resolution-auto-missed-by-
+// melee-range-gate). Chip press resolves the melee attack against the MARKED
+// MOVER — the marker proves trigger-time adjacency, so the reaction the
+// trigger charged is never spent on a click-time range auto-miss. A stat block
+// with no melee attack row degrades to an honest advisory note (no automated
+// OA to press); the marker still drops by the trigger drop law.
+function PendingOpportunityAttackRow({ mover, hasMelee, blocked, onResolve }) {
+  const clickable = !blocked && hasMelee && !!onResolve;
+  return (
+    <div className={`mc-action${blocked ? ' mc-action-disabled' : ''}`}>
+      <strong>Opportunity Attack.</strong>{' '}
+      {hasMelee ? (
+        <span
+          className={`mc-dice-link${clickable ? '' : ' mc-dice-link-spell-spent'}`}
+          data-kind="oa"
+          role="button"
+          tabIndex={0}
+          onClick={clickable ? onResolve : undefined}
+          title={`${mover} left your reach — resolve your melee attack against them now (the attack happens at the instant they provoke).`}
+        >
+          <i className="fa-solid fa-bolt" /> Opportunity Attack on {mover}
+        </span>
+      ) : (
+        <span data-kind="oa">Opportunity Attack on {mover}</span>
+      )}{' '}
+      <span>{mover} left your reach — this reaction attack resolves against them the instant they provoke. {hasMelee ? '' : 'This stat block has no melee attack row — adjudicate the attack manually.'}</span>
+    </div>
   );
 }
 

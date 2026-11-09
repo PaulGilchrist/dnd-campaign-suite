@@ -15,6 +15,7 @@ import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCrea
 import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js'
 import { getCreatureController } from '../../services/encounters/creatureControl.js'
 import { sweepNewCombatClocks } from '../../services/rules/effects/zoneDurationClock.js'
+import { clearAllPendingOas, prunePendingOas } from '../../services/combat/pendingOpportunityAttacks.js'
 
 /**
  * Player HP edits live in the runtime store (server-first); a revival across 0
@@ -266,6 +267,10 @@ export function createCreatureHandlers({
         // the old combat end here too (enforcement off ⇒ zero writes).
         sweepNewCombatClocks(campaignName)
             .catch((e) => { console.error('[handleClear:new-combat-sweep]', e) })
+        // Pending-OA drop law: the board is wiped, so every pending trigger
+        // marker retires with it (spent reactions are not refunded). Zero
+        // writes when nothing is pending.
+        clearAllPendingOas(campaignName)
         // L5 §10.3: with enforcement.autoRewards on, the closed encounter
         // awards loot + split XP through normal character management.
         // Off ⇒ zero writes (the loot panel stays the only lane).
@@ -478,6 +483,10 @@ export function createCreatureHandlers({
                 timestamp: Date.now(),
             }).catch((e) => { console.error('[handlePartyPresenceChange] presence log failed:', e) })
         }
+        // Pending-OA drop law: a marker's mover leaving the encounter (away)
+        // evicts that marker — no pending-resolution target exists anymore
+        // (reaction stays spent). Zero writes when nothing is pending/stale.
+        prunePendingOas(campaignName, combatSummary)
     }
 
     const handleToggleAway = function handleToggleAway(creatureName) {

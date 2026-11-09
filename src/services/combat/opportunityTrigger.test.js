@@ -21,6 +21,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
+    // Pending-marker arm (pendingOpportunityAttacks.js, reached via the
+    // trigger seam): writers must exist on the mock even where a leg never
+    // calls them — vitest throws on property access of an undefined export.
+    setRuntimeValue: vi.fn(),
+    deleteRuntimeKey: vi.fn(),
 }));
 vi.mock('./chargeEconomy.js', () => ({
     chargeSlot: vi.fn(() => true),
@@ -30,7 +35,7 @@ vi.mock('../ui/logService.js', () => ({
 }));
 
 import { findOpportunityDefenders, onTokenMoveLanded } from './opportunityTrigger.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { chargeSlot } from './chargeEconomy.js';
 import { addEntry } from '../ui/logService.js';
 
@@ -350,6 +355,82 @@ describe('onTokenMoveLanded', () => {
                 "Goblin 1's reaction is already used — no opportunity attack on Hero.",
                 "Ogre's reaction is already used — no opportunity attack on Hero.",
             ]);
+        });
+    });
+
+    // Pending-resolution markers (bug-monster-oa-resolution-auto-missed-by-
+    // melee-range-gate): the trigger parks one `pendingOAs` entry per
+    // triggering defender naming the mover — the resolution lanes' proof of
+    // trigger-time adjacency. Lifecycle math (clear/prune/evict) is owned by
+    // pendingOpportunityAttacks.test.js; this seam pins ONLY the arm write.
+    describe('pendingOAs marker arm at the trigger seam', () => {
+        const npc = (name, gridX, gridY) => ({ name, gridX, gridY, type: 'npc' });
+        const oaWrites = () => setRuntimeValue.mock.calls.filter(c => c[0] === 'campaign' && c[1] === 'pendingOAs');
+
+        it('triggered defender ⇒ ONE marker {defender, mover, promptId} written to the campaign store', async () => {
+            mockCampaignStore();
+            await onTokenMoveLanded(base);
+            const writes = oaWrites();
+            expect(writes).toHaveLength(1);
+            expect(writes[0][3]).toBe('test-campaign');
+            expect(Object.keys(writes[0][2])).toEqual(['Goblin 1']);
+            expect(writes[0][2]['Goblin 1']).toEqual({
+                defender: 'Goblin 1',
+                mover: 'Hero',
+                promptId: expect.any(String),
+            });
+        });
+
+        it('actionEconomy off (advisory trigger) still arms the marker', async () => {
+            mockCampaignStore({ ...ON, actionEconomy: false });
+            await onTokenMoveLanded(base);
+            expect(oaWrites()).toHaveLength(1);
+            expect(oaWrites()[0][2]['Goblin 1'].mover).toBe('Hero');
+        });
+
+        it.each([
+            ['spent reaction (chargeSlot false)', () => { chargeSlot.mockReturnValue(false); }],
+            ['no_opportunity_attacks blocker', () => {
+                mockCampaignStore(ON, [{ target: 'Goblin 1', effect: 'no_opportunity_attacks', reason: 'Watched.' }]);
+            }],
+        ])('denied defender (%s) ⇒ zero marker writes', async (_desc, setup) => {
+            mockCampaignStore();
+            setup();
+            await onTokenMoveLanded(base);
+            expect(oaWrites()).toHaveLength(0);
+        });
+
+        it('multi-defender ⇒ one independent marker per triggered defender (blocker denial arms only the clean defenders)', async () => {
+            mockCampaignStore(ON, [
+                { target: 'Goblin 1', effect: 'no_opportunity_attacks', reason: 'Watched by a spell.' },
+            ]);
+            await onTokenMoveLanded({
+                ...base,
+                mapData: {
+                    players: [{ name: 'Hero', gridX: 4, gridY: 4 }],
+                    placedItems: [npc('Goblin 1', 5, 4), npc('Ogre', 4, 5), npc('Bugbear', 3, 4)],
+                },
+            });
+            const writes = oaWrites();
+            expect(writes).toHaveLength(1); // single merged bucket write
+            const map = writes[0][2];
+            expect(Object.keys(map).sort()).toEqual(['Bugbear', 'Ogre']);
+            expect(map.Ogre).toEqual({ defender: 'Ogre', mover: 'Hero', promptId: expect.any(String) });
+            expect(map.Bugbear).toEqual({ defender: 'Bugbear', mover: 'Hero', promptId: expect.any(String) });
+            expect(map.Ogre.promptId).not.toBe(map.Bugbear.promptId);
+        });
+
+        it('existing markers for other defenders survive the arm (spread-clone, no in-place mutation)', async () => {
+            mockCampaignStore();
+            getRuntimeValue.mockImplementation((store, key) => {
+                if (store === 'campaign' && key === 'enforcement') return ON;
+                if (store === 'campaign' && key === 'pendingOAs') return { Hobgoblin: { defender: 'Hobgoblin', mover: 'OldMover', promptId: 'p-old' } };
+                return null;
+            });
+            await onTokenMoveLanded(base);
+            const map = oaWrites()[0][2];
+            expect(map.Hobgoblin.promptId).toBe('p-old');
+            expect(map['Goblin 1'].mover).toBe('Hero');
         });
     });
 });

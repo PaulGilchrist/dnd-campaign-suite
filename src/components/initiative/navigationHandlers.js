@@ -20,6 +20,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { resetForTurn, openTurn, closeTurn, rearmReactions } from '../../services/combat/turnState.js'
+import { clearPendingOa, prunePendingOas } from '../../services/combat/pendingOpportunityAttacks.js'
 import { drainRoundWrapClocks } from '../../services/rules/effects/zoneDurationClock.js'
 
 // Turn-start effects must re-apply each round, so the dedupe key is round-scoped.
@@ -186,6 +187,20 @@ function markRewoundTurnActive(campaignName, summary, newActiveName) {
     setRuntimeValue('campaign', 'turnState', ts, campaignName)
 }
 
+// Pending-trigger OA drop law (bug-monster-oa-resolution-auto-missed-by-melee-
+// range-gate): a marker lives only until its defender's next turn is TAKEN or
+// ENDED — passing the turn on without resolving spends the reaction the trigger
+// already charged (no refund). The guard is bucket CONTENT (zero writes when
+// empty), not enforcement flags, so markers armed earlier in the session still
+// drop cleanly if the flags change mid-combat. The prune leg evicts markers
+// whose MOVER left the encounter (away/dead/off-board) since the trigger.
+function dropPendingOasAtTurnSeam({ campaignName, summary, outgoingName, newActiveName }) {
+    const outgoingEconomyName = economyNameFor(summary, outgoingName)
+    if (outgoingEconomyName) clearPendingOa(campaignName, outgoingEconomyName)
+    if (newActiveName) clearPendingOa(campaignName, economyNameFor(summary, newActiveName))
+    prunePendingOas(campaignName, summary)
+}
+
 // Shared turn-start gate: arm the round-scoped gate key, persist it, and run
 // turn-start effects for the newly active creature (BUG CLA-198). Returns the
 // summary to persist — turn-start effects may have cached a damaged copy.
@@ -312,6 +327,9 @@ export function createNextCreatureHandler({
         setActiveCreatureName(newActiveName)
         // L5-001: reset the new creature's economy at the turn seam (no-op when enforcement off).
         applyTurnStateTransition({ campaignName, summary: cs, outgoingName: activeCreatureName, newActiveName, roundIncrement })
+        // Pending-OA drop law: the outgoing turn ENDING and the new turn being
+        // TAKEN both retire that defender's marker (spent reaction stays spent).
+        dropPendingOasAtTurnSeam({ campaignName, summary: cs, outgoingName: activeCreatureName, newActiveName })
         if (activeCreatureName && !isSecondTurnEntry(activeEntry)) {
             applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters)
         }

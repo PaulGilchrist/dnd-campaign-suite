@@ -36,6 +36,7 @@ import { resolveShapeShiftSelection, declineShapeShiftSelection } from '../../se
 import { ShapeShiftModal } from './ShapeShiftModal.jsx';
 import { resolveUtilitySpellCastRow } from '../../services/encounters/monsterUtilitySpellCast.js';
 import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
+import { clearPendingOa, buildOaResolutionLog } from '../../services/combat/pendingOpportunityAttacks.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog, regularActionCooldownRefusal, stampRegularActionCooldown } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
@@ -1066,6 +1067,54 @@ function computeMapRangeState(mapData, target, monsterName, attackRange) {
   return state;
 }
 
+// ── Pending-trigger OA press lanes (bug-monster-oa-resolution-auto-missed-by-
+// melee-range-gate). Extracted module-level so the card component keeps its
+// statement/complexity budget; the marker itself is owned by
+// services/combat/pendingOpportunityAttacks.js and armed at the token-move
+// trigger seam (opportunityTrigger.js).
+
+/** Trigger-time spatial truth for an OA: an opportunity attack is a MELEE
+ *  attack that occurs the INSTANT the target breaks reach — the live marker
+ *  IS the adjacency proof (`wasInReach && nowOutside` is the trigger's own
+ *  precondition), so the melee-range condition is legitimately satisfied and
+ *  no click-time distance may deny it. This is NOT a general range-gate
+ *  escape hatch: oaContext is only ever built by the Reactions-area
+ *  affordance consuming a live marker (useMonsterPendingOa.js), and every
+ *  NORMAL chip press keeps measuring resolution-time positions below. */
+const OA_TRIGGER_SPATIAL_STATE = Object.freeze({
+  isAutoMiss: false, rangeReason: null, rangeForcedMode: null,
+  coverAcBonus: 0, coverLevel: null, coverReason: null,
+});
+
+/** OA explicit-target law: the marker pins the roll to the MARKED MOVER
+ *  regardless of the card's armed target-select; normal presses resolve via
+ *  the card's armed lane untouched. */
+function resolvePressTarget(oaContext, getArmedTarget) {
+  if (!oaContext) return getArmedTarget();
+  const moverRow = (oaContext.sceneCreatures || []).find(c => c && c.name === oaContext.mover);
+  return moverRow || { name: oaContext.mover };
+}
+
+function resolvePressSpatialState({ oaContext, mapData, target, monsterName, attackRange, characters, campaignName }) {
+  if (oaContext) return OA_TRIGGER_SPATIAL_STATE;
+  const range = computeMapRangeState(mapData, target, monsterName, attackRange);
+  return { ...range, ...computeCoverState(range.isAutoMiss, target, characters, mapData, campaignName) };
+}
+
+/** One-charge law: a normal press is a zero-write no-op; a pending-OA press
+ *  logs honest trigger provenance ahead of the roll rows and consumes the
+ *  marker — charging NOTHING (the trigger already spent the reaction via
+ *  opportunityTrigger.js, and the monster card lane carries no economy gate
+ *  to self-deny). `consumed` releases the hook's double-press latch on the
+ *  refused-by-gate paths (nothing was spent, retry stays honest). */
+function consumeOpportunityAttackContext(oaContext, monsterName, campaignName) {
+  if (!oaContext) return;
+  addEntry(campaignName, buildOaResolutionLog({ defenderName: monsterName, moverName: oaContext.mover }))
+    .catch((e) => { console.error('[MonsterCardModal] Error logging opportunity attack resolution:', e); });
+  clearPendingOa(campaignName, monsterName);
+  oaContext.consumed = true;
+}
+
 const NO_COVER = { coverAcBonus: 0, coverLevel: null, coverReason: null };
 
 function computeBulwarkCover(target, characters) {
@@ -1580,6 +1629,11 @@ function buildAttackRollOptions(v) {
     grazeDamage: v.grazeDamage,
     grazeAbilityMod: v.grazeAbilityMod,
     grazeAbilityName: 'STR',
+    // Pending-OA press marker (one-charge law lane): the reaction-lane flag
+    // rides the roll options so the damage pipeline skips own-turn-only
+    // riders (PC CharReactions parity, FT-103 channel). Key ABSENT whenever
+    // this is a normal chip press (v.isOpportunityAttackPress falsy).
+    ...(v.isOpportunityAttackPress ? { isOpportunityAttack: true } : {}),
     // MA-0551: composite fork — the attack chip never arms save adjudication
     // on a row that also has an attack_bonus (fixed damage pays full).
     ...buildAttackChipSaveOptions(v.action),
@@ -2494,7 +2548,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     return types;
   }, []);
 
-  const handleAttack = async (name, bonus, action) => {
+  const handleAttack = async (name, bonus, action, oaContext) => {
     // MA-0294: recharge gate on ATTACK-roll rows (Ape Rock Recharge 6) —
     // mirrors the block-save seam exactly: a spent row refuses with popup +
     // `<action-slug>_refused (not recharged)` log, zero roll zero spend;
@@ -2504,7 +2558,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // synthesized spell-attack actions (no recharge) are byte-inert.
     const recharge = rechargeRefusalOnSpent({ action, spellInfo: null, monsterName, campaignName, setPopupHtml });
     if (recharge.refused) return;
-    const target = getTarget();
+    // OA explicit-target law: a live pending-trigger marker pins the roll to
+    // the MARKED MOVER regardless of the card's armed target-select (the move
+    // that provoked the reaction IS the attack's occasion). Normal chip
+    // presses (oaContext === null) keep resolution-time arming untouched.
+    const target = resolvePressTarget(oaContext, getTarget);
     if (psychicStrikePreconditionFailed(name, target, allTargetEffects)) return;
 
     // CLA-036 lane (a): Bestial Fury double-strike economy — the Fury-stamped
@@ -2551,8 +2609,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const isMelee = attackRange <= 5
     const isAutoCrit = isMelee && targetEffectData.autoCritWithin5ft
 
-    const { isAutoMiss, rangeReason, rangeForcedMode } = computeMapRangeState(mapData, target, monsterName, attackRange);
-    const { coverAcBonus, coverLevel, coverReason } = computeCoverState(isAutoMiss, target, characters, mapData, campaignName);
+    // Spatial measure for the press — resolution-time token positions for
+    // every NORMAL chip (byte-identical law), trigger-moment adjacency for a
+    // pending OA (the marker itself IS the proof; see resolvePressSpatialState).
+    const { isAutoMiss, rangeReason, rangeForcedMode, coverAcBonus, coverLevel, coverReason } =
+      resolvePressSpatialState({ oaContext, mapData, target, monsterName, attackRange, characters, campaignName });
 
     // MA-0294: recharge fire-spend, mirroring the save-path picker-open
     // spend (CLA-384) — same map-write recipe, only for gate rows.
@@ -2591,6 +2652,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const foldedMode = foldAuraDisadvantage(forcedMode, lionAura);
     const lionAuraReason = lionAuraDisadvantageReason({ foldedMode, lionAura, proximityMeasured: lionProximityMeasured });
 
+    // One-charge law: on a normal press this is a zero-write no-op; on a
+    // pending-OA press it logs the trigger provenance and consumes the
+    // marker — charging NOTHING (the trigger already spent the reaction).
+    consumeOpportunityAttackContext(oaContext, monsterName, campaignName);
+
     rollAttack(name, effectiveBonus, buildAttackRollOptions({
       action,
       name,
@@ -2617,6 +2683,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       coverReason,
       grazeDamage,
       grazeAbilityMod,
+      // FT-103 reaction-lane marker (PC OA sheet parity): rides the roll so
+      // the damage pipeline skips own-turn-only riders. Absent key on every
+      // normal press (byte-identical options object).
+      isOpportunityAttackPress: oaContext,
     }));
   };
 
