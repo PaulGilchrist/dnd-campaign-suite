@@ -83,6 +83,19 @@ describe('SpellOverlayControls', () => {
     });
   });
 
+  // Backlog FU 2026-11-09: the cone spread field was labeled `Angle (°)` —
+  // colliding with the placement hint's ORIENTATION meaning. Pin the renamed
+  // label while the param key stays the contract (`coneAngle`).
+  it('labels the cone spread param Cone Spread (°) and writes coneAngle', () => {
+    renderComponent({ selectedShape: OverlayShape.CONE, isActive: true });
+    const input = screen.getByLabelText('Cone Spread (°)');
+    expect(input).toBeInTheDocument();
+    expect(screen.queryByText('Angle (°)')).not.toBeInTheDocument();
+    expect(input).toHaveValue(90);
+    fireEvent.change(input, { target: { value: '45' } });
+    expect(appliedParams()).toEqual(expect.objectContaining({ coneAngle: 45 }));
+  });
+
   it('treats non-numeric and empty input values as 0', () => {
     renderComponent({ selectedShape: OverlayShape.SPHERE, isActive: true });
     const input = screen.getByRole('spinbutton');

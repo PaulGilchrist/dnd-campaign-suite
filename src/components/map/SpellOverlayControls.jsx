@@ -12,7 +12,7 @@ const PARAM_FIELDS = {
     ],
     [OverlayShape.CONE]: [
         { param: 'distanceFt', label: 'Distance (ft)', min: '5', step: '5', fallback: 60 },
-        { param: 'coneAngle', label: 'Angle (°)', min: '1', max: '360', fallback: 90 },
+        { param: 'coneAngle', label: 'Cone Spread (°)', min: '1', max: '360', fallback: 90 },
     ],
     [OverlayShape.LINE]: [
         { param: 'distanceFt', label: 'Distance (ft)', min: '5', step: '5', fallback: 60 },
