@@ -29,3 +29,24 @@ Minor UX issue tipping into data integrity: the visible promise (“No saving th
 
 ## Owner ruling
 2026-11-09 (FV session): fix direction ratified as **gate the click — no DC, no roll** (option a in the bug's suggested fix): blank-DC badges must not offer a save roll; the pinned “No saving throw” copy stands as the promise. Do not pursue the require-DC-at-add-time redesign.
+
+## Resolution
+FIX: FIXED — 2026-11-09 (fix subagent run).
+
+**Root cause (confirmed as diagnosed):** `buildRuntimeConditions` (`displayCreatureUtils.js:16`) coerces a blank-DC add to `dc: 0`, and `ConditionBadgeRow` (`CreatureCard.jsx`) wired `onClick={canRoll ? … : undefined}` ungated by `cond.dc`, so the click reached `handleRollConditionSave` → `buildSaveResult` (`total >= 0` = every d20 succeeds) → guaranteed “SAVE SUCCESSFUL (DC 0)”, condition removal, and an honest-looking `condition-save` audit row. Live repro before any change: EffectAdder blank-DC `Poisoned` on ElderPaladin in test-campaign — badge click popped `SAVE SUCCESSFUL (DC 0)`, emptied `activeConditions`, and logged `{rollType:'condition-save', dc:0, success:true, bonus:10}`.
+
+**Fix (per ruling, gate the click):** `ConditionBadgeRow` now derives `canSaveRoll = canRoll && !!cond.dc` and only passes `onClick` when truthy — the same truthiness branch the label/tooltip props already use. `CreatureBadge`’s established non-interactive face (renders `<span>` when no `onClick`) means the blank-DC badge is an inert span with the bare description tooltip; no disabled-button styling hack (`button.creature-badge:disabled` CSS never applies to the span). `removable={isLocalhost}` is untouched — the × (and consumer lanes) remain the removal paths.
+
+**Deliberately NOT changed:** the `handleRollConditionSave` dc-early-return variant (option b) was rejected — the just-landed `createRollConditionSaveHandler.second-turn.test.js` (d55d4160a) pins the ST holder-remap face using a `dc: 0` condition (the live FV rig shape), so a chokepoint dc-guard would break the sibling’s pin. The gate lives purely in the badge lane; `buildRuntimeConditions` and the handler stay byte-identical. The 2024 ruleset shares this exact component/handler (no twin lane exists), so it is covered by the same fix. `ConditionEffectBadges` spell-escape badges (which pass their own `te.dc`) are the sanctioned consumer lanes per the ruling and were left as-is.
+
+**Files changed:**
+- `src/components/initiative/CreatureCard.jsx` — `ConditionBadgeRow` dc-gated click (`canSaveRoll`).
+- `src/components/initiative/CreatureCard.noDcBadgeClick.test.jsx` — NEW regression suite (6 tests) riding the REAL `createRollConditionSaveHandler` chokepoint: blank-DC badge renders as inert span, click leaves roll/remove/audit/popup/`setRuntimeValue` lanes all uncalled (byte-clean), × still removes; control: DC-bearing badge still renders a button, clicks roll end-to-end (`logConditionSave` with `dc:12`), and the DC-bearing badge on a `(Second Turn)` card still remaps the roll + audit to the HOLDER (d55d4160a interaction), while the blank-DC ST badge is equally inert.
+- `src/components/initiative/CreatureCard.conditions.test.jsx` — saveless-default pin updated for the intentional face change: the dc-0 badge is now `span.creature-badge` (was `button`) and its click asserts `onRollConditionSave` never fires.
+
+**Verification:**
+1. New test: `npx vitest run src/components/initiative/CreatureCard.noDcBadgeClick.test.jsx` → 6/6 pass.
+2. Touched folder: `npx vitest run src/components/initiative` → 96 files / 714 tests pass (incl. the ST click-lane pins).
+3. `npm run lint` → clean, zero warnings.
+4. Live re-run of the repro in test-campaign (localhost, dev pair): blank-DC `Poisoned` badge renders `SPAN` with bare description tooltip; click → zero popup, badge survives, log count unchanged (no new `condition-save` row), change-data still `activeConditions:["poisoned"]`; × still removes it. Control faces: `Prone DC 10` renders `BUTTON` with DC in label/tooltip, click rolled a real save (d20 8 +10 = 18, `SAVE SUCCESSFUL (DC 10)`, honest `dc:10` audit, condition cleared); ST-card `Poisoned DC 12` click rolled as the HOLDER (+11 = holder CON + aura, `SAVE SUCCESSFUL (DC 12)`, audit names `EvasiveFighter`, synthetic bucket GET-absent, holder cleared — d55d4160a face byte-unchanged).
+5. Exit hygiene: tab closed, admin API cleared change-data + log, two-pass GET-verified `{}` / `[]`; overlays `[]`; no other campaign touched.

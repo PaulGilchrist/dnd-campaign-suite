@@ -256,14 +256,22 @@ function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, o
 
 function ConditionBadgeRow({ cond, canRoll, isLocalhost, creatureName, onRollConditionSave, onBreakCondition }) {
     const condCls = cond.key === 'invisible' ? 'effect-buff' : 'effect-condition'
+    // Owner ruling 2026-11-09 (bug-condition-badge-no-dc-auto-success-removal):
+    // the EffectAdder's "No saving throw" copy stands — a condition added with a
+    // blank DC (buildRuntimeConditions coerces it to 0, falsy) must NOT offer a
+    // save roll. Same dc branch as the label/tooltip props below: no DC, no
+    // click lane, the badge renders as an inert span (CreatureBadge's non-
+    // interactive face) and the condition is removable only via × / consumer
+    // lanes. Left ungated, every d20 beat DC 0 → guaranteed removal.
+    const canSaveRoll = canRoll && !!cond.dc
     return (
         <CreatureBadge
             key={cond.id || cond.key}
             label={cond.dc ? `${cond.label} DC ${cond.dc}` : cond.label}
             cls={condCls}
             tooltip={cond.dc ? `${cond.label}\n\n${CONDITION_DESCRIPTIONS[cond.label] || ''}\n\nDC ${cond.dc} ${getAbilityLabel(cond.ability)}` : (CONDITION_DESCRIPTIONS[cond.label] || cond.label)}
-            onClick={canRoll ? () => onRollConditionSave(creatureName, cond) : undefined}
-            disabled={!canRoll}
+            onClick={canSaveRoll ? () => onRollConditionSave(creatureName, cond) : undefined}
+            disabled={!canSaveRoll}
             removable={isLocalhost}
             onRemove={() => onBreakCondition(creatureName, cond)}
         />

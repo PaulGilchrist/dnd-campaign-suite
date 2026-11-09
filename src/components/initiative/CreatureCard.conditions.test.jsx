@@ -140,14 +140,19 @@ describe('CreatureCard - conditions', () => {
         // the " DC n" suffix rides ONLY on a stored dc. EffectAdder dispatches
         // dc: undefined for a saveless condition left at its (empty) default →
         // buildRuntimeConditions lands dc 0 here → bare badge + bare tooltip.
+        // Owner ruling 2026-11-09 (bug-condition-badge-no-dc-auto-success-removal):
+        // the same falsy dc now also gates the CLICK — the badge is an inert span.
         it('omits the DC suffix from badge and tooltip when the stored dc is absent (saveless default)', () => {
             const conditions = [{ id: 'c1', key: 'poisoned', label: 'Poisoned', dc: 0, ability: 'con' }];
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
-            const badge = screen.getByText('Poisoned', { selector: 'button.creature-badge' });
+            const badge = screen.getByText('Poisoned', { selector: 'span.creature-badge' });
             expect(badge).toBeInTheDocument();
             expect(screen.queryByText(/Poisoned DC/)).not.toBeInTheDocument();
             // Tooltip lane: bare CONDITION_DESCRIPTIONS copy — no fabricated save line.
             expect(badge.getAttribute('title')).not.toMatch(/DC/);
+            // Click lane: no DC, no save-roll offer (bug-condition-badge-no-dc-auto-success-removal).
+            fireEvent.click(badge);
+            expect(props.onRollConditionSave).not.toHaveBeenCalled();
         });
 
         it.each([
