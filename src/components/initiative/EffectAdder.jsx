@@ -14,7 +14,7 @@ const ABILITY_OPTIONS = [
   { value: 'cha', label: 'Charisma' },
 ]
 
-function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
+function EffectAdder({ targetName, titleSuffix, initialTab, onCancel, onApply, creatures }) {
   const [activeTab, setActiveTab] = React.useState(initialTab || 'conditions')
 
   // Conditions tab state
@@ -131,7 +131,11 @@ function EffectAdder({ targetName, initialTab, onCancel, onApply, creatures }) {
   return (
     <div className='ea-overlay'>
       <div className='ea-modal'>
-        <h3>{targetName}</h3>
+        {/* titleSuffix: display-only provenance hint (e.g. " (second turn)") set by
+            the container when the modal was opened from a synthetic twin card — the
+            header names the HOLDER (the write subject) while marking WHICH card's
+            modal is open. Absent on holder/normal opens (byte-identical header). */}
+        <h3>{targetName}{titleSuffix}</h3>
 
         {/* ── Tab Bar ── */}
         <div className='ea-tabs'>

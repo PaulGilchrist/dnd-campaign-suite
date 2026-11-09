@@ -24,8 +24,11 @@ export function useAllyEditor({ campaignName, isLocalhost }) {
         // structural (Second Turn) rows are synthetic transport — selectedAllies
         // keyed by the suffixed name is a phantom bucket (invisible, orphaned at
         // the round wrap) and the audit would name a creature with no character
-        // file. Route GM intent to the holder's real, visible state.
-        const subject = isSecondTurnEntry(creature) && creature.holderName
+        // file. Route GM intent to the holder's real, visible state. The
+        // fromSecondTurn flag is display-only provenance for the modal header —
+        // writes and the audit row still name the holder alone.
+        const fromSecondTurn = isSecondTurnEntry(creature) && !!creature.holderName
+        const subject = fromSecondTurn
             ? { ...creature, name: creature.holderName }
             : creature
         const combatSummary = getCombatSummary(campaignName)
@@ -36,7 +39,7 @@ export function useAllyEditor({ campaignName, isLocalhost }) {
         const creatures = (combatSummary?.creatures || [])
             .filter(c => !isSecondTurnEntry(c))
             .map(c => ({ name: c.name, type: c.type, currentHp: c.currentHp, maxHp: c.maxHp }))
-        setTarget({ name: subject.name, creatures })
+        setTarget({ name: subject.name, creatures, fromSecondTurn })
     }, [campaignName, isLocalhost])
 
     const closeAllyEditor = React.useCallback(() => setTarget(null), [])
@@ -57,7 +60,10 @@ export function useAllyEditor({ campaignName, isLocalhost }) {
     const modalProps = target ? {
         creatures: target.creatures,
         currentAllies: getAllyList(target.name),
-        title: `Allies of ${target.name}`,
+        // Header names the HOLDER (the write subject) plus a display-only hint
+        // when opened from the twin's card, so the GM can tell WHICH card's
+        // modal is open (holder/normal opens keep the old byte-exact title).
+        title: `Allies of ${target.name}${target.fromSecondTurn ? ' (second turn)' : ''}`,
         icon: 'fa-handshake',
     } : null
 

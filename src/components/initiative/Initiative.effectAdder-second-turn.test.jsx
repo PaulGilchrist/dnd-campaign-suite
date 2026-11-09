@@ -122,12 +122,14 @@ vi.mock('./CreatureCard.jsx', () => ({
         </div>
     ),
 }));
-// EffectAdder stand-in echoes the targetName it was handed and rides it on Apply
+// EffectAdder stand-in echoes the targetName it was handed (plus the header it
+// renders — targetName + display-only titleSuffix) and rides it on Apply
 // (the real modal dispatches every tab through data.target = targetName).
 vi.mock('./EffectAdder.jsx', () => ({
-    default: ({ targetName, onCancel, onApply }) => (
+    default: ({ targetName, titleSuffix = '', onCancel, onApply }) => (
         <div data-testid="effect-adder">
             <span data-testid="ea-target-name">{targetName}</span>
+            <span data-testid="ea-header">{targetName}{titleSuffix}</span>
             <button data-testid="ea-cancel" onClick={onCancel}>Cancel</button>
             <button data-testid="ea-apply" onClick={() => onApply('effects', { target: targetName, effectKey: 'marked' })}>Apply</button>
         </div>
@@ -172,9 +174,12 @@ describe('Initiative effectAdder target remap for (Second Turn) rows (phantom-bu
         // The write seam EffectAdder/addCondition/audit rows all key off this name:
         // it must be the holder, never the doomed suffixed row.
         expect(keyWrites()).toHaveLength(1);
-        expect(keyWrites()[0]).toEqual(['campaign', KEY, expect.objectContaining({ name: HOLDER }), CAMPAIGN]);
+        expect(keyWrites()[0]).toEqual(['campaign', KEY, expect.objectContaining({ name: HOLDER, openedFromSecondTurn: true }), CAMPAIGN]);
         expect(screen.getByTestId('ea-target-name')).toHaveTextContent(HOLDER);
         expect(screen.getByTestId('ea-target-name')).not.toHaveTextContent(ST_ROW);
+        // Header provenance (FV 2026-11-09 backlog): names the HOLDER but visibly
+        // marks that the modal was opened from the twin's card.
+        expect(screen.getByTestId('ea-header').textContent).toBe(`${HOLDER} (second turn)`);
     });
 
     it('Apply from the (Second Turn)-opened modal writes state under the holder, leaving no row keyed by the synthetic name', async () => {
@@ -200,6 +205,9 @@ describe('Initiative effectAdder target remap for (Second Turn) rows (phantom-bu
         await act(async () => { fireEvent.click(screen.getByTestId(`open-adder-${HOLDER}`)); });
         expect(keyWrites()).toHaveLength(1);
         expect(keyWrites()[0]).toEqual(['campaign', KEY, expect.objectContaining({ name: HOLDER }), CAMPAIGN]);
+        expect(keyWrites()[0][2].openedFromSecondTurn).toBeUndefined();
         expect(screen.getByTestId('ea-target-name')).toHaveTextContent(HOLDER);
+        // AC: holder-opened header stays byte-identical to the pre-hint modal.
+        expect(screen.getByTestId('ea-header').textContent).toBe(HOLDER);
     });
 });

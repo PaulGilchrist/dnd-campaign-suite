@@ -180,6 +180,14 @@ function creaturesOrEmpty(combatSummary) {
     return combatSummary?.creatures || []
 }
 
+// Modal-header provenance hint (FV 2026-11-09 improve): when the effect-adder
+// was opened from a synthetic (Second Turn) twin card, the header names the
+// HOLDER (write subject) plus this suffix so the GM knows WHICH card opened it.
+// Holder/normal targets carry no flag → empty string → byte-identical header.
+function effectAdderTitleSuffix(target) {
+    return target?.openedFromSecondTurn ? ' (second turn)' : ''
+}
+
 // Board-visibility gate (Level 5 SSE-timing guard, Arena-tuned): the legacy
 // rule hides the board until players have arrived; an Arena/Starter quick-join
 // additionally opens it the moment any creature is on the board with zero
@@ -499,8 +507,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         // round wrap). Route GM intent to the holder's real, visible, removable state,
         // so conditions/targetEffects/concentration writes AND the audit rows land on
         // the same creature the row card displays (bug-effectadder-secondturn-phantom-bucket).
+        // The openedFromSecondTurn flag is display-only provenance (modal header hint —
+        // it never feeds a write, audit, or the subject remap itself).
         setEffectAdderTarget(isSecondTurnEntry(creature) && creature.holderName
-            ? { ...creature, name: creature.holderName }
+            ? { ...creature, name: creature.holderName, openedFromSecondTurn: true }
             : creature)
         setEffectAdderTab(tab)
     }, [isLocalhost, setEffectAdderTarget])
@@ -910,6 +920,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             {effectAdderTarget && (
                 <EffectAdder
                     targetName={effectAdderTarget.name}
+                    titleSuffix={effectAdderTitleSuffix(effectAdderTarget)}
                     initialTab={effectAdderTab}
                     onCancel={() => closeEffectAdderTarget(null)}
                     onApply={handleApplyEffect}

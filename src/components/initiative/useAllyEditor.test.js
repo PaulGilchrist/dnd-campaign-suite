@@ -65,7 +65,9 @@ describe('useAllyEditor', () => {
             secondTurn: true,
             holderName: 'Grim',
         }));
-        expect(result.current.modalProps.title).toBe('Allies of Grim');
+        // Header names the HOLDER and marks the twin-card provenance (FV 2026-11-09
+        // backlog) — the write/audit subject below stays the holder alone.
+        expect(result.current.modalProps.title).toBe('Allies of Grim (second turn)');
         expect(result.current.modalProps.currentAllies).toEqual(['Grim']);
         // and confirming lands on the HOLDER bucket, auditing the real character
         act(() => result.current.confirmAllyEditor(['Grim', 'Sera']));

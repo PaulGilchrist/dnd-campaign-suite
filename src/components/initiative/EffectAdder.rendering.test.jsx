@@ -49,6 +49,15 @@ describe('EffectAdder - modal chrome', () => {
     expect(screen.getAllByRole('heading', { level: 3, name: 'Goblin' })).toHaveLength(1);
   });
 
+  // FV 2026-11-09 backlog: a titleSuffix (threaded by Initiative when the modal
+  // was opened from a synthetic (Second Turn) twin card) appends the provenance
+  // hint to the heading. Absent prop = byte-identical heading (test above pins
+  // the holder/normal face).
+  it('appends the titleSuffix provenance hint to the heading', () => {
+    render(<EffectAdder {...props} titleSuffix=" (second turn)" />);
+    expect(screen.getAllByRole('heading', { level: 3, name: 'Goblin (second turn)' })).toHaveLength(1);
+  });
+
   it('renders exactly three tab buttons — Conditions, Effects, Concentration — in that order', () => {
     render(<EffectAdder {...props} />);
     const tabs = within(document.querySelector('.ea-tabs')).getAllByRole('button');

@@ -61,8 +61,6 @@ Live facts (FV, dev pair `npm run dev` :80 + :5173 CAMPAIGN_LOCK='test-campaign,
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FV 2026-11-09) ST-card Add button title names the synthetic row ("Add condition, effect, or concentration to EvasiveFighter (Second Turn)") while the modal it opens titles the HOLDER ("EvasiveFighter") — same for the allies button title. Either thread `effectSubjectName` into the titles or append a "(second turn)" hint to the modal header so the GM can tell WHICH card's modal is open without context-switching. `CreatureCard.jsx` button titles vs `Initiative.jsx openEffectAdder` / `useAllyEditor.js` remap.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): live popup-drain face of FU PT2 (holder slasher te during ST-active sheet attack) — answered by code census (contextBuilder-sync keys `playerName`, never `activeCreatureName`), live face skipped to protect session budget; join-write-failure ROLLBACK live face (can't induce a server write fault black-box); `mc-overlay` full stat block on an ST card still never opened; companion-during-ST-active DENIAL face not ridden live (needs an animated thrall in turnState — the census finding rides in the filed bug as same-seam prediction, fix-verify it with the bug).
