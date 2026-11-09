@@ -148,8 +148,12 @@ function CardName({ creature, campaignNpcs, onNameChange, isLocalhost }) {
                 // handleNameChange → renameNpc + full combatSummary writes (the spawn/
                 // rename half of bug-player-clients-can-hijack-initiative). Read-only
                 // tabs render the plain name, mirroring NpcRemoveButton's strip above.
+                // aria-label "<Name> name" gives the editable lane the same stable
+                // accessible-name probe as the PC/.creature-name span lane
+                // (backlog 2026-11-08: one census resolves every initiative card).
                 <MonsterNameAutocomplete
                     value={creature.name}
+                    ariaLabel={`${creature.name} name`}
                     onChange={(newVal) => onNameChange(creature.name, newVal)}
                     npcs={campaignNpcs}
                     showBadge={campaignNpcs.some(n => n.name?.toLowerCase() === creature.name?.toLowerCase())}

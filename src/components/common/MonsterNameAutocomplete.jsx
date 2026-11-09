@@ -30,7 +30,7 @@ function isTypingIntent(text) {
     return !!text && lastTypedQuery === text && Date.now() - lastTypedAt < TYPING_INTENT_MS;
 }
 
-function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs }) {
+function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs, ariaLabel }) {
     const [monsters, setMonsters] = useState([]);
     const [query, setQuery] = useState(value || '');
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -175,6 +175,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
                  onKeyDown={handleKeyDown}
                  onBlur={handleBlur}
                  className="monster-autocomplete-input"
+                 aria-label={ariaLabel}
                  />
                 {showSuggestions && list.length > 0 && (
                     <ul ref={listRef} className="monster-autocomplete-list">

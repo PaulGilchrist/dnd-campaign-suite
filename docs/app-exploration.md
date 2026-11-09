@@ -69,8 +69,6 @@ Live facts (EQ, dev pair `CAMPAIGN_LOCK='test-campaign,qa-arena,qa-starter' node
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-08 EQ: a bestiary-joined monster card renders its NAME as an editable `.monster-autocomplete` input while PCs/cards elsewhere use static spans — automation and screen readers census names differently per card type (`.creature-name span` silently misses every monster). If the name isn't meant to be re-typed on an EB-joined card, render it read-only like the PCs; if it is, give the input an `aria-label="<Name> name"` so both lanes share a stable accessible-name probe.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): EffectAdder APPLY path (condition actually lands) in the post-75d3df6e4 era; Thief's-Reflexes POSITIVE grant (no THIEF fixture — EQ closed only the away-face by guard placement; PT4 recipe ready); banner-vs-dialog overlap on the new band geometry (PT5); spell-overlay `update`/per-chip-remove lanes; visitor face of the reworked indoor bar; enforcement-OFF away-gate face (byte-identical BY DESIGN).

@@ -298,4 +298,14 @@ describe('MonsterNameAutocomplete', () => {
         });
         expect(suggestionNames()).toBeNull();
     });
+
+    it('renders the ariaLabel prop as the input\'s accessible name (stable "<Name> name" probe)', async () => {
+        await renderAutocomplete({ value: 'Goblin', ariaLabel: 'Goblin name' });
+        expect(screen.getByRole('textbox', { name: 'Goblin name' })).toHaveValue('Goblin');
+    });
+
+    it('omits the aria-label attribute when no ariaLabel is provided (non-card call sites unchanged)', async () => {
+        await renderAutocomplete({ value: 'Goblin' });
+        expect(getInput()).not.toHaveAttribute('aria-label');
+    });
 });
