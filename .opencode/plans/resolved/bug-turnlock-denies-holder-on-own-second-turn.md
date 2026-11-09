@@ -29,3 +29,23 @@ Broken feature (opt-in enforcement): with Turn lock ON, a Thief's-Reflexes rogue
 
 ## Owner ruling
 2026-11-09 (FV session): ruled a HOLE — the holder should act on their own second-turn row (remap at the gate), not intentional law. File this as fixable, not spec.
+
+## Resolution
+FIXED 2026-11-09 (fix subagent). Root cause matched the "Likely location": `turnLockDenial` (canTakeAction.js) compared raw names and `readActiveCreatureName` (assertCanAct.js) handed it the suffixed twin verbatim — the only gate on the lane (single shared service for BOTH rulesets; grep `cannot act now` proves no 2024 sibling gate).
+
+**Files changed**
+- `src/services/combat/assertCanAct.js` — `readActiveCreatureName` → `readActiveCreature`: resolves the ST seam ONCE at the shared read (mirrors the CLA-360 chokepoint precedent — `createRollConditionSaveHandler` d55d4160a / `createAutoBreakConditionHandler` 583d078ff / `useAllyEditor` 930393775). When the active combatSummary row is `isSecondTurnEntry && holderName` (real predicate imported from `thiefsReflexesService.js`), it returns `{ name, holderName }`; `name` stays the acting-row label so denial copy remains truthful, `holderName` is set ONLY on the ST face (null elsewhere ⇒ envelope to `canTakeAction` gains `activeHolderName`).
+- `src/services/combat/canTakeAction.js` — `turnLockDenial` now admits `creatureName === activeHolderName` (action + bonus buckets — both flow through the one ACTION_BUCKETS branch) and extends the §18 D2 companion exception to `companionOf === activeCreatureName || companionOf === activeHolderName`. Master-off fast path, short-circuit order, and all denial strings byte-unchanged.
+
+**Regression tests (new)**
+- `src/services/combat/canTakeAction.second-turn.test.js` — pure matrix: holder allowed twin-active (action + bonus), companion `companionOf=holder` allowed, economy still charges the holder (never resurrects the turn-lock denial), DIFFERENT creature + foreign-owner companion denied with copy naming the twin row, holder denied when a DIFFERENT creature is active, non-ST face byte-unchanged, master-off untouched.
+- `src/services/combat/assertCanAct.second-turn.test.js` — impure store-read seam: both-bucket holder allow with zero audit, companion allow, DIFFERENT-creature denial popup + exact `enforcement_denied` envelope, plain-active name resolves no holder, malformed twin (no `holderName`) invents no pass, enforcement-off fast path (single flag read).
+
+**Results:** `npx vitest run src/services/combat` → 175 files / 3072 tests PASS; full suite (char-sheet sweep) → 565 files / 5427 tests PASS; `npm run lint` clean (zero warnings); `node .opencode/plans/no-timers-guard.mjs` OK.
+
+**Live re-verification (test-campaign, dev pair on :5173, ST board + `enforcement {mode:'on',turnLock:true}` curl-seeded before campaign-select):**
+1. EF sheet Shortbow `+7` with `EvasiveFighter (Second Turn)` active → ROLLED (popup `MISS (12 vs AC 19)` + `roll` row, zero new `enforcement_denied`) — pre-fix this same click produced the denial popup + audit row reproduced first.
+2. ElderPaladin clicking its own attack while the twin is active → still DENIED, copy truthful: `It is EvasiveFighter (Second Turn)'s turn — ElderPaladin cannot act now.`
+3. Holder-active control (`activeCreatureName:'EvasiveFighter'`, twin still on board) → ✓ HIT rolled, byte-identical to pre-fix holder face.
+4. Normal non-ST lock face (plain `ElderPaladin` active, EF off-turn) → denied with the pre-fix byte-identical copy `It is ElderPaladin's turn — EvasiveFighter cannot act now.`
+Exit ritual: browser closed, two-pass admin clears GET-verified `{}` / `[]` with no rehydration; EvasiveFighter.json md5 `0df29ff3…` byte-exact (no fixture surgery).

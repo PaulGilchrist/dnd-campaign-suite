@@ -19,6 +19,7 @@ import { hasBudget } from './turnState.js';
 import { addEntry } from '../ui/logService.js';
 import { classifyBucket, isChargeableBucket } from './automation/classifyBucket.js';
 import { chargeSlot } from './chargeEconomy.js';
+import { isSecondTurnEntry } from './thiefsReflexesService.js';
 
 const ACTION_BUCKETS = new Set(['action', 'bonusAction']);
 
@@ -63,14 +64,32 @@ function resolveBlockerFlags(ctx) {
  *    refreshes on full loads and can go stale mid-session).
  *  - No combat ⇒ campaign key (seeded by the change-data load; CLA-044
  *    precedence preserved outside combat).
- *  Reads the mirror via getStore — getRuntimeValue guards campaign-key/char-key pairs. */
-function readActiveCreatureName(enforcementOn) {
+ *  Reads the mirror via getStore — getRuntimeValue guards campaign-key/char-key pairs.
+ *  CLA-360 ST-seam law (mirrors createRollConditionSaveHandler d55d4160a /
+ *  createAutoBreakConditionHandler 583d078ff / useAllyEditor 930393775): an
+ *  active `(Second Turn)` row is the HOLDER's extra turn (owner ruling
+ *  2026-11-09), so the shared read resolves the twin to its `holderName`
+ *  here — every consumer (turn-lock holder pass + companion exception)
+ *  sees the holder without remapping per-call-site. Returns
+ *  { name, holderName }: holderName is set ONLY while the active row is a
+ *  structural second-turn twin; name stays the acting-row label so denial
+ *  copy remains truthful about which row is active. */
+function readActiveCreature(enforcementOn) {
     const summaryActive = enforcementOn
         ? getStore('combatSummary')?.get?.('activeCreatureName')
         : null;
-    return summaryActive
+    const name = summaryActive
         || getRuntimeValue('campaign', 'activeCreatureName')
         || null;
+    let holderName = null;
+    if (name && enforcementOn) {
+        const creatures = getStore('combatSummary')?.get?.('creatures');
+        const row = Array.isArray(creatures)
+            ? creatures.find(c => c && c.name === name)
+            : null;
+        if (row && isSecondTurnEntry(row) && row.holderName) holderName = row.holderName;
+    }
+    return { name, holderName };
 }
 
 /** Split-party away read: the acting PC's combatSummary row carries `away`
@@ -134,11 +153,13 @@ export function assertCanAct(input) {
     if (!enforcementOn) return { allowed: true, reason: null };
 
     const blockers = resolveBlockerFlags(ctx);
+    const active = readActiveCreature(enforcementOn);
     const result = canTakeAction({
         enforcement,
         creatureName: ctx.creatureName,
         bucket: ctx.bucket,
-        activeCreatureName: readActiveCreatureName(enforcementOn),
+        activeCreatureName: active.name,
+        activeHolderName: active.holderName,
         turnState: getRuntimeValue('campaign', 'turnState'),
         cannotAct: !!blockers.cannotAct,
         cannotActActions: !!ctx.cannotActActions || !!blockers.cannotActActions,

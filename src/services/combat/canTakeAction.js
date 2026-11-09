@@ -70,11 +70,18 @@ function conditionDenial({ bucket, cannotAct, cannotActActions, cannotActReason 
 /** Step 3 — turn-lock: actions/bonus only on own turn; reactions/free off-turn are rules-correct.
  * §18 D2 exception: a registered companion acts on its OWNER's turn — while
  * the owner is active the turn-lock admits it (its own economy still charges
- * its own entry); at any other time the normal off-turn denial stands. */
-function turnLockDenial({ flags, bucket, creatureName, activeCreatureName, turnState }) {
+ * its own entry); at any other time the normal off-turn denial stands.
+ * CLA-360 ST-seam law (owner ruling 2026-11-09, mirrors the d55d4160a /
+ * 583d078ff / 930393775 remaps): an active `(Second Turn)` row IS the
+ * holder's extra turn — the holder passes the lock while their twin is
+ * active, and the companion exception matches the holder too. Denial copy
+ * keeps naming the ACTING-ROW label (activeCreatureName), which stays
+ * truthful while the suffixed twin is the active row. */
+function turnLockDenial({ flags, bucket, creatureName, activeCreatureName, activeHolderName, turnState }) {
     if (flags.turnLock && ACTION_BUCKETS.has(bucket) && creatureName !== activeCreatureName) {
+        if (activeHolderName && creatureName === activeHolderName) return null;
         const companionOf = turnState && turnState[creatureName] && turnState[creatureName].companionOf;
-        if (typeof companionOf === 'string' && companionOf === activeCreatureName) return null;
+        if (typeof companionOf === 'string' && (companionOf === activeCreatureName || companionOf === activeHolderName)) return null;
         return {
             allowed: false,
             reason: `It is ${activeCreatureName || 'another creature'}'s turn — ${creatureName} cannot act now.`,
@@ -99,6 +106,10 @@ function economyDenial({ flags, bucket, turnState, creatureName, hasBudget }) {
  * @param {string} ctx.creatureName           who is attempting the action
  * @param {string} [ctx.bucket]               'action' | 'bonusAction' | 'reaction' | 'free' | …
  * @param {string|null} [ctx.activeCreatureName] combatSummary.activeCreatureName
+ * @param {string|null} [ctx.activeHolderName]  CLA-360: set ONLY while the active
+ *                                             row is a `(Second Turn)` twin — its
+ *                                             holderName (the twin is the holder's
+ *                                             extra turn: holder + companions pass)
  * @param {object|null} [ctx.turnState]       campaign 'turnState' runtime value (or null)
  * @param {boolean} [ctx.cannotAct]           existing condition-gate result
  * @param {boolean} [ctx.cannotActActions]   existing condition-gate action/bonus-only block
@@ -113,6 +124,7 @@ export function canTakeAction(ctx = {}) {
         creatureName,
         bucket = 'action',
         activeCreatureName = null,
+        activeHolderName = null,
         turnState = null,
         cannotAct = false,
         cannotActActions = false,
@@ -126,7 +138,7 @@ export function canTakeAction(ctx = {}) {
     // 1. Master switch — off means byte-identical behavior to Levels 1–4.
     if (flags.mode !== 'on') return { allowed: true, reason: null };
 
-    const gateState = { flags, bucket, creatureName, activeCreatureName, turnState, cannotAct, cannotActActions, cannotActReason, isAway, hasBudget };
+    const gateState = { flags, bucket, creatureName, activeCreatureName, activeHolderName, turnState, cannotAct, cannotActActions, cannotActReason, isAway, hasBudget };
     return awayDenial(gateState)
         || conditionDenial(gateState)
         || turnLockDenial(gateState)
