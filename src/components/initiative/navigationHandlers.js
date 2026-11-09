@@ -149,7 +149,10 @@ function runRoundWrapHousekeeping({ updatedSummary, creatures, campaignName, rou
 // keyed under the synthetic label (phantom-bucket family 583d078ff/930393775/
 // d55d4160a): every charge keys on the acting creature (the holder), so a synthetic
 // record would be un-spendable budget rotting in the shared bucket.
-function economyNameFor(summary, name) {
+// Exported: the TurnEconomyStrip DISPLAY lanes (Initiative header mount) resolve the
+// same seam so the readout mirrors exactly what the gate charges (FY 2026-11-09:
+// twin/header strips read the synthetic name and never moved all second turn).
+export function economyNameFor(summary, name) {
     if (!name || !summary || !Array.isArray(summary.creatures)) return name
     const row = summary.creatures.find(c => c && c.name === name)
     if (row && isSecondTurnEntry(row) && row.holderName) return row.holderName

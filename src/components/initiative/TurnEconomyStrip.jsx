@@ -21,13 +21,20 @@ const ICONS = {
     reaction: 'fa-shield-halved',
 }
 
-export default function TurnEconomyStrip({ creatureName, speedFeet }) {
+export default function TurnEconomyStrip({ creatureName, economyName, speedFeet }) {
     const enforcement = useRuntimeValue('campaign', 'enforcement')
     const turnState = useRuntimeValue('campaign', 'turnState')
     if (!enforcement || enforcement.mode !== 'on' || !creatureName) return null
 
-    const entry = getTurnState(turnState, creatureName)
-    const remaining = remainingMovement(turnState, creatureName, speedFeet)
+    // CLA-360 display parity (economyNameFor law, navigationHandlers.js): a
+    // (Second Turn) row's economy lives on the HOLDER's turnState key — every
+    // charge writer and the gate resolve the seam, so the readout must too, or
+    // the ACTIVE twin's strip shows a stale fresh face all turn. Callers pass
+    // the row's own name as creatureName (display keeps twin provenance) and
+    // the resolved holder via economyName; normal rows omit it (bytes unchanged).
+    const readName = economyName || creatureName
+    const entry = getTurnState(turnState, readName)
+    const remaining = remainingMovement(turnState, readName, speedFeet)
 
     const badges = [
         { key: 'action', label: entry.actionsUsed >= 1 ? 'Action used' : 'Action', spent: entry.actionsUsed >= 1 },

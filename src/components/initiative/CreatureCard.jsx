@@ -665,8 +665,10 @@ function ConditionsSection({
                     />
                 )
             })}
-            {/* L5-001: enforcement economy readout (renders nothing while enforcement off). */}
-            <TurnEconomyStrip creatureName={creature.name} speedFeet={creature.speed} />
+            {/* L5-001: enforcement economy readout (renders nothing while enforcement off).
+                CLA-360: ST rows read the holder's turnState key (effectSubjectName, the same
+                remap ConditionEffectBadges below uses); the strip label stays the row's name. */}
+            <TurnEconomyStrip creatureName={creature.name} economyName={effectSubjectName} speedFeet={creature.speed} />
             <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={effectSubjectName} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
             {isLocalhost && (
                 <button

@@ -40,3 +40,26 @@ Remap at the two mount points (or inside the strip via a `holderName`/`isSecondT
 ## Severity
 
 Minor UX issue — no game-state or gate impact (the enforcement gate and all charge writers resolve the seam correctly); but the shipped readout silently misinforms the GM about the ACTIVE creature's remaining economy for the whole second turn.
+
+## Resolution
+
+**FIXED 2026-11-09** (single-fix run). Root cause confirmed exactly as diagnosed: `TurnEconomyStrip.jsx` read `getTurnState`/`remainingMovement` under the passed name verbatim, and both initiative mount points (`CreatureCard.jsx` per-card strip, `Initiative.jsx` header strip anchored to `activeCreatureName`) fed the unremapped synthetic `(Second Turn)` name, while every charge writer and the gate key `turnState` on the holder (the `economyNameFor` law, 4dc24883b). `CharSummary.jsx` (the third mount) needs no remap — `playerStats.name` is always the holder's real name.
+
+Fix — reuse the established chokepoint, no new abstraction:
+
+- `navigationHandlers.js`: exported the existing `economyNameFor(summary, name)` seam resolver (was module-local).
+- `TurnEconomyStrip.jsx`: new optional `economyName` prop — economy reads (`getTurnState`, `remainingMovement`) resolve under it when present; display name + aria label stay the row's own name (twin provenance preserved per the modal-header hint precedent). Normal rows omit it (byte-identical).
+- `CreatureCard.jsx`: passes `economyName={effectSubjectName}` — the exact prop `ConditionEffectBadges` one line below already uses as the ST-remapped twin of `creature.name`.
+- `Initiative.jsx`: header strip passes `economyName={economyNameFor(combatSummary, activeCreatureName)}` and resolves the `speedFeet` character lookup through the same name (a twin anchor previously missed the `characters` find and fell to the 30 ft default for non-30 holders).
+
+Ruleset check: display seam is ruleset-agnostic (turnState is generic economy); no 2024 twin module involved.
+
+Files changed: `src/components/initiative/navigationHandlers.js`, `TurnEconomyStrip.jsx`, `CreatureCard.jsx`, `Initiative.jsx`; new `TurnEconomyStrip.second-turn.test.jsx` (3 pins: holder-keyed spend displays on the twin row + twin display name kept; normal-row byte parity; a phantom synthetic-keyed record never feeds the twin read).
+
+Verification:
+
+- Live repro first (dev pair :80+:5173, twin active via seeded ST board + Next walk, holder key charged `actionsUsed:1 / movementUsedFeet:15` through the real seam): reproduced the filed face — header + twin strips stuck at `Action / Bonus / Reaction / 0/30 ft` while the holder card read `Action used … 15/30 ft`.
+- Re-verify after fix, live + fresh reload/re-select: header strip and twin card strip both render `EvasiveFighter (Second Turn) → [Action used, Bonus, Reaction, 15/30 ft]` (twin name, holder budget); holder card unchanged; adjacent faces sane — twin→ElderPaladin Next seam closes the holder (`turnActive:false`, spent face) and opens EP fresh with the header strip re-anchoring to EP; enforcement DELETE ⇒ zero strips. Zero synthetic `turnState` keys in change-data throughout.
+- Tests: `npx vitest run src/components/initiative` → 101 files / 736 tests green; `src/components/char-sheet/char-summary` → 51 files / 677 green (strip's third mount); `npm run lint` clean (zero warnings). No pre-existing failures hit.
+- Exit: change-data `{}` + log `[]` GET-verified two-pass (closed tab).
+

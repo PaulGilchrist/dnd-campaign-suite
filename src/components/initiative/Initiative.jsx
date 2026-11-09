@@ -31,7 +31,7 @@ import { createOverlayHandler, createSseEventHandler } from './sseHandlers.js'
 import { createNpcClickHandler } from './createNpcClickHandler.js'
 import { createFleshToStoneHandler, createPrismaticSprayIndigoHandler, createPrismaticSprayVioletHandler } from './saveResultHandlers.js'
 import { useLootHandlers } from './useLootHandlers.js'
-import { createNextCreatureHandler, createPreviousCreatureHandler } from './navigationHandlers.js'
+import { createNextCreatureHandler, createPreviousCreatureHandler, economyNameFor } from './navigationHandlers.js'
 import TurnEconomyStrip from './TurnEconomyStrip.jsx'
 import AiDirectorPanel from './AiDirectorPanel.jsx'
 import { useTvPresentation } from './useTvPresentation.js'
@@ -786,8 +786,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
              <TvNextUpStrip creatures={nextUpCreatures} />
              <TurnEconomyStrip
                  creatureName={activeCreatureName}
+                 // CLA-360 display parity: the header strip is anchored to the ACTIVE
+                 // creature — while a (Second Turn) twin is active its economy lives on
+                 // the holder's turnState key (same economyNameFor seam the gate and
+                 // every charge writer resolve), so read and meter off the holder.
+                 economyName={economyNameFor(combatSummary, activeCreatureName)}
                  speedFeet={(() => {
-                     const ch = characters.find(c => utils.getName(c.name) === activeCreatureName)
+                     const ch = characters.find(c => utils.getName(c.name) === economyNameFor(combatSummary, activeCreatureName))
                      return ch?.computedStats?.speed ?? ch?.speed
                  })()}
              />
