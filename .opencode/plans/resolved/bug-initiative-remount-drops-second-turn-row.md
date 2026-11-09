@@ -47,3 +47,66 @@ plus (optional hygiene) drop a second-turn row whose `holderName` is no longer o
 
 ## Severity
 Data integrity risk — a spent once-per-combat resource is destroyed silently mid-combat; players lose a granted turn and GM never sees why. (Repro'd with a lv20 Thief rig, but every real Thief lv17+ holder is affected.)
+
+## Resolution
+FIXED 2026-11-09 — diagnosis in the bug file confirmed against live code and live repro.
+
+**What was actually wrong:** exactly the suspected ghost-player filter in
+`src/services/encounters/initiativeService.js` `mergeCombatSummaryWithCharacters`
+(formerly line 233). The Initiative mount path (`Initiative.jsx:706`) re-runs the
+merge on every view entry and the GM tab writes the result back, so any
+`type:'player'` row whose name is not a character file — which the suffixed
+`(Second Turn)` transport always is — was silently deleted. A secondary defect the
+bug file did not name: even with a filter exemption alone, the merge's `.map()`
+normalizer sends unmatched `type:'player'` rows down the monster-default leg,
+which would stamp phantom `currentHp:10/maxHp:10/saveBonuses:{}` onto the surviving
+transport row. The display layer (`displayCreatureUtils.buildDisplayCreature`)
+hides that via the `holderName` lookup, but the stored row would be polluted.
+
+**Changes:**
+- `src/services/encounters/initiativeService.js` — `mergeCombatSummaryWithCharacters`:
+  the ghost-player filter now exempts `secondTurn` rows, keeping them while
+  `holderName` matches a campaign character (hygiene face: an orphaned row whose
+  holder is no longer a character is still evicted as a zombie, so it cannot
+  linger); the `.map()` leg treats `secondTurn` rows like matched players
+  (initiative/targetName/concentration normalization only, never the monster
+  HP-10 defaults). This one function is the ONLY ghost filter in the app, and the
+  other production caller (`createCreatureHandlers.spawnNpc`) shares it, so both
+  mount-normalization lanes are fixed together. Ruleset-agnostic seam — the
+  grant automation envelope exists identically in both rulesets' classes.json,
+  no 5e/2024 twin needed. No grant-side code (`thiefsReflexesService`,
+  `handleInitiativeChange`) changed — the grant lane was already correct.
+- `src/services/encounters/initiativeService.second-turn.test.js` (NEW) — 5
+  regression tests locking: row survives the remount merge in its init-desc slot;
+  byte-identical to the granted shape (no phantom HP/saveBonuses); missing
+  characters still append alongside it; orphan-holder rows drop; genuine ghost
+  player rows still evict.
+
+**Verification:**
+- Live repro (pre-fix, Lane B): curl-seeded `(Second Turn)` row present after
+  campaign-select, survived Log, EVICTED by the Initiative remount (board reset
+  to 13 PCs) — bug reproduced exactly as filed.
+- Live re-verify (post-fix): cleared + re-seeded a multi-face board
+  (holder + valid second-turn row + ghost `OldPlayer` + orphan second-turn row +
+  npc). After fresh select → Log → Initiative: second-turn row SURVIVES byte-
+  identical, ghost evicted, orphan (holder not a character) evicted, npc kept,
+  all 12 missing PCs appended, 15 cards render. Survives a second remount
+  (Encounters → Initiative) unchanged.
+- Lane A end-to-end (sanctioned EF Rogue/Thief/20 swap, md5 0df29ff3 backup):
+  card-input initiative `20` + Tab → grant works (row at init 10, `secondTurn`,
+  `holderName`, `thief'sreflexesUses` → 0, one `ability_use` row) AND the row now
+  SURVIVES the Log → Initiative remount with `uses` honestly staying spent (0) —
+  the resource's once-per-combat turn now actually reaches the walk.
+- Tests: new file 5/5 pass; `src/services/encounters` 98 files/1194 pass;
+  `src/components/initiative` 89 files/681 pass; `thiefsReflexesService`+
+  `restoreBalanceState` 20 pass; `npm run lint` clean (zero warnings). No
+  pre-existing failures observed.
+- Exit ritual: change-data `{}` + log `[]` GET-verified; overlays untouched
+  (never seeded); `EvasiveFighter.json` restored byte-exact (md5 0df29ff3, API
+  `.json` GET re-proves Fighter/Battle Master/18/2024); `git status
+  public/campaigns/` clean.
+
+**Still unridden (deferred, matches Priority Target 1):** the round-1 WALK face —
+whether `Next` walks INTO the `(Second Turn)` entry, resolves holder state via
+`holderName`, and retires the row after its turn (`navigationHandlers:385`).
+Previously moot behind this eviction; now reachable by a future descent.

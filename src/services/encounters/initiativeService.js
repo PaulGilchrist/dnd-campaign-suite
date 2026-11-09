@@ -230,11 +230,22 @@ function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
     }
     const creatureNameSet = new Set(initialSummary.creatures.map(c => c.name))
     const mergedCreatures = initialSummary.creatures
-        .filter(c => c.type !== 'player' || characters.some(ch => getName(ch.name) === c.name))
+        .filter(c => {
+            if (c.type !== 'player') return true
+            // CLA-360: Thief's-Reflexes "(Second Turn)" rows are synthetic transport —
+            // their name is suffixed (never a character file), so the ghost-player name
+            // match must not evict them. Keep them while the holder is still a campaign
+            // character; an orphaned row (holder gone) is a zombie and drops.
+            if (c.secondTurn) return characters.some(ch => getName(ch.name) === c.holderName)
+            return characters.some(ch => getName(ch.name) === c.name)
+        })
         .map(c => {
         if (c.type === 'player') {
             const character = characters.find(ch => getName(ch.name) === c.name)
-            if (character) {
+            // Second-turn rows have no character file by design — normalize them like
+            // players (preserve granted shape) so the monster-default leg never stamps
+            // phantom HP 10/10 onto the holder's transport row.
+            if (character || c.secondTurn) {
                 return { ...c, initiative: c.initiative ?? '', targetName: c.targetName ?? null, concentration: c.concentration ?? null }
             }
         }
