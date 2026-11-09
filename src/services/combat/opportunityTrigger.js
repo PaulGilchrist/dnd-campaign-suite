@@ -69,14 +69,39 @@ function defenderBlockedReason(defenderName, targetEffects) {
     return te ? (te.reason || 'A condition prevents opportunity attacks.') : null;
 }
 
+/** Natural-language name join: "A" / "A and B" / "A, B and C". */
+function joinNames(names) {
+    if (names.length <= 2) return names.join(' and ');
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** Trigger advisory copy, shared by the per-defender log row (always a
+ *  one-name list, so the log bytes stay exactly as before) and the single
+ *  joined board toast (multi-defender, backlog 2026-11-09): the `.map-toast`
+ *  is ONE node, so per-defender popups collapsed to the LAST defender's
+ *  copy — instead the loop collects every triggering defender and surfaces
+ *  one sticky advisory naming all of them. */
+function triggerAdvisoryText(defenderNames, moverName, economyLive) {
+    const spendNote = economyLive ? ' Reaction spent;' : '';
+    const plural = defenderNames.length > 1;
+    const resolution = plural
+        ? 'Resolve the Opportunity Attack on their sheets.'
+        : `Resolve the Opportunity Attack on ${defenderNames[0]}'s sheet.`;
+    return `${joinNames(defenderNames)} ${plural ? 'react' : 'reacts'} — ${moverName} left their reach.${spendNote} ${resolution}`;
+}
+
 /** One defender's trigger leg: blocked ⇒ audit deny; spent reaction ⇒ audit
- *  deny; otherwise charge the reaction + advisory popup/log. Every face —
- *  trigger AND both denials — rides the same `setPopupHtml` board channel
- *  (the log reason is the verbatim popup text, byte-identical). Advisory
- *  text is passed with { sticky: true } (backlog 2026-11-03 CN): the OA
+ *  deny; otherwise charge the reaction + log the advisory and report the
+ *  trigger (return true) so the caller joins every triggering defender into
+ *  ONE board toast. Both denials keep their per-defender popup; every face
+ *  rides the same `setPopupHtml` board channel (denial popups stay
+ *  byte-identical to their log reason). Advisory text is passed with
+ *  { sticky: true } (backlog 2026-11-03 CN): the OA
  *  enforcement toast used to auto-hide at 4s while its log row is permanent,
  *  so a GM mid-drag missed WHY a reaction vanished — the sink keeps these
- *  visible until an explicit dismiss instead. */
+ *  visible until an explicit dismiss instead.
+ *  @returns {boolean} true when this defender triggered — the caller
+ *  collects those names for the joined multi-defender toast. */
 function triggerDefender({ defender, campaignName, moverName, targetEffects, economyLive, setPopupHtml }) {
     const blocked = defenderBlockedReason(defender.name, targetEffects);
     if (blocked) {
@@ -90,7 +115,7 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
             source: 'token-move',
             reason,
         }).catch((e) => { console.error('[opportunityTrigger] block log failed:', e); });
-        return;
+        return false;
     }
 
     // Reaction consumption rides the Phase 1 economy; with actionEconomy
@@ -107,12 +132,10 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
             source: 'opportunity-attack-trigger',
             reason,
         }).catch((e) => { console.error('[opportunityTrigger] spent log failed:', e); });
-        return;
+        return false;
     }
 
-    const spendNote = economyLive ? ' Reaction spent;' : '';
-    const advisory = `${defender.name} reacts — ${moverName} left their reach.${spendNote} Resolve the Opportunity Attack on ${defender.name}'s sheet.`;
-    if (typeof setPopupHtml === 'function') setPopupHtml(advisory, { sticky: true });
+    const advisory = triggerAdvisoryText([defender.name], moverName, economyLive);
     addEntry(campaignName, {
         type: 'enforcement_triggered',
         creature: defender.name,
@@ -121,6 +144,7 @@ function triggerDefender({ defender, campaignName, moverName, targetEffects, eco
         source: 'token-move',
         reason: advisory,
     }).catch((e) => { console.error('[opportunityTrigger] trigger log failed:', e); });
+    return true;
 }
 
 /**
@@ -150,7 +174,15 @@ export async function onTokenMoveLanded(ctx) {
     const targetEffects = Array.isArray(tEffects) ? tEffects : [];
     const economyLive = !!enforcement.actionEconomy;
 
-    for (const defender of defenders) {
-        triggerDefender({ defender, campaignName, moverName, targetEffects, economyLive, setPopupHtml });
+    const triggeredNames = defenders
+        .filter((defender) => triggerDefender({ defender, campaignName, moverName, targetEffects, economyLive, setPopupHtml }))
+        .map((defender) => defender.name);
+
+    // One joined sticky advisory AFTER the loop (multi-defender fix, backlog
+    // 2026-11-09): names every defender that triggered, so a denial popup
+    // emitted mid-loop can never shadow a triggering defender's copy and a
+    // single trigger keeps its exact singular text.
+    if (triggeredNames.length > 0 && typeof setPopupHtml === 'function') {
+        setPopupHtml(triggerAdvisoryText(triggeredNames, moverName, economyLive), { sticky: true });
     }
 }

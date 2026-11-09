@@ -15,7 +15,8 @@
 // guards folded + fast-path read census) · no-move→6(it.each, invalid-cell guards folded) ·
 // enforced-charge + actionEconomy-off→7(it.each folded, exact log/popup bytes) · spent-reaction→8
 // (exact bytes, no-advisory asserted) · no_opportunity_attacks→9(it.each incl. default reason) ·
-// NEW: te-other-creature falsifier→10 · NEW: multi-defender loop→11.
+// NEW: te-other-creature falsifier→10 · multi-defender loop + joined toast→11 ·
+// NEW: multi-defender join phrasing (3-name/economy-off/mixed-denials/all-denied)→nested describe.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -239,8 +240,9 @@ describe('onTokenMoveLanded', () => {
         expect(loggedEntries()[0].type).toBe('enforcement_triggered');
     });
 
-    it('two adjacent NPCs left behind ⇒ each charged and logged independently, in map order', async () => {
+    it('two adjacent NPCs left behind ⇒ each charged and logged independently, in map order; ONE joined toast names both', async () => {
         mockCampaignStore();
+        const setPopupHtml = vi.fn();
         const mapData = {
             players: [{ name: 'Hero', gridX: 4, gridY: 4 }],
             placedItems: [
@@ -248,12 +250,107 @@ describe('onTokenMoveLanded', () => {
                 { name: 'Ogre', gridX: 4, gridY: 5, type: 'npc' },
             ],
         };
-        await onTokenMoveLanded({ ...base, mapData });
+        await onTokenMoveLanded({ ...base, mapData, setPopupHtml });
         expect(chargeSlot.mock.calls.map(c => c[0].creatureName)).toEqual(['Goblin 1', 'Ogre']);
         expect(loggedEntries().map(e => e.reason)).toEqual([
             ADV_SPENT,
             "Ogre reacts — Hero left their reach. Reaction spent; Resolve the Opportunity Attack on Ogre's sheet.",
         ]);
+        // Multi-defender join (backlog 2026-11-09): the single .map-toast node
+        // used to show only the LAST defender's copy — now one sticky advisory
+        // names EVERY triggering defender.
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(setPopupHtml).toHaveBeenCalledWith(
+            "Goblin 1 and Ogre react — Hero left their reach. Reaction spent; Resolve the Opportunity Attack on their sheets.",
+            { sticky: true }
+        );
+    });
+
+    // Join-phrasing legs for the multi-defender advisory (trigger-log rows
+    // stay per-defender singular verbatim — pinned above and in #11).
+    describe('multi-defender joined advisory (backlog 2026-11-09)', () => {
+        const npc = (name, gridX, gridY) => ({ name, gridX, gridY, type: 'npc' });
+        const threeDefenderMap = {
+            players: [{ name: 'Hero', gridX: 4, gridY: 4 }],
+            placedItems: [
+                npc('Goblin 1', 5, 4),
+                npc('Ogre', 4, 5),
+                npc('Bugbear', 3, 4),
+            ],
+        };
+
+        it('three defenders ⇒ "A, B and C react" join, one toast, no Oxford comma', async () => {
+            mockCampaignStore();
+            const setPopupHtml = vi.fn();
+            await onTokenMoveLanded({ ...base, mapData: threeDefenderMap, setPopupHtml });
+            expect(setPopupHtml).toHaveBeenCalledTimes(1);
+            expect(setPopupHtml).toHaveBeenCalledWith(
+                "Goblin 1, Ogre and Bugbear react — Hero left their reach. Reaction spent; Resolve the Opportunity Attack on their sheets.",
+                { sticky: true }
+            );
+            expect(loggedEntries()).toHaveLength(3); // one row per defender, unchanged
+        });
+
+        it('actionEconomy off ⇒ joined advisory drops the "Reaction spent" note', async () => {
+            mockCampaignStore({ ...ON, actionEconomy: false });
+            const setPopupHtml = vi.fn();
+            await onTokenMoveLanded({
+                ...base,
+                mapData: {
+                    players: [{ name: 'Hero', gridX: 4, gridY: 4 }],
+                    placedItems: [npc('Goblin 1', 5, 4), npc('Ogre', 4, 5)],
+                },
+                setPopupHtml,
+            });
+            expect(setPopupHtml).toHaveBeenCalledWith(
+                'Goblin 1 and Ogre react — Hero left their reach. Resolve the Opportunity Attack on their sheets.',
+                { sticky: true }
+            );
+        });
+
+        it('mixed faces ⇒ denials keep their per-defender popup; the FINAL toast names every TRIGGERED defender only', async () => {
+            // Goblin 1 blocked (no_opportunity_attacks) · Ogre spent reaction
+            // · Bugbear triggers clean.
+            mockCampaignStore(ON, [
+                { target: 'Goblin 1', effect: 'no_opportunity_attacks', reason: 'Watched by a spell.' },
+            ]);
+            chargeSlot.mockImplementation(({ creatureName }) => creatureName !== 'Ogre');
+            const setPopupHtml = vi.fn();
+            await onTokenMoveLanded({ ...base, mapData: threeDefenderMap, setPopupHtml });
+            // Per-defender denial copies first (existing semantics), then the
+            // single joined trigger advisory last.
+            expect(setPopupHtml.mock.calls.map(c => c[0])).toEqual([
+                "Hero left Goblin 1's reach — Watched by a spell.",
+                "Ogre's reaction is already used — no opportunity attack on Hero.",
+                "Bugbear reacts — Hero left their reach. Reaction spent; Resolve the Opportunity Attack on Bugbear's sheet.",
+            ]);
+            expect(setPopupHtml.mock.calls.map(c => c[1]))
+                .toEqual([{ sticky: true }, { sticky: true }, { sticky: true }]);
+            expect(loggedEntries().map(e => e.type)).toEqual([
+                'enforcement_denied',
+                'enforcement_denied',
+                'enforcement_triggered',
+            ]);
+        });
+
+        it('all defenders denied ⇒ zero joined advisory (denial popups only, as before)', async () => {
+            mockCampaignStore();
+            chargeSlot.mockReturnValue(false);
+            const setPopupHtml = vi.fn();
+            await onTokenMoveLanded({
+                ...base,
+                mapData: {
+                    players: [{ name: 'Hero', gridX: 4, gridY: 4 }],
+                    placedItems: [npc('Goblin 1', 5, 4), npc('Ogre', 4, 5)],
+                },
+                setPopupHtml,
+            });
+            expect(setPopupHtml).toHaveBeenCalledTimes(2); // one per denial, no join
+            expect(setPopupHtml.mock.calls.map(c => c[0])).toEqual([
+                "Goblin 1's reaction is already used — no opportunity attack on Hero.",
+                "Ogre's reaction is already used — no opportunity attack on Hero.",
+            ]);
+        });
     });
 });
 

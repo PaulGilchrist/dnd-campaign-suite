@@ -23,7 +23,7 @@ FY session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 ## Priority Targets (next descent)
 
-1. **Multi-defender OA stack:** two hostiles adjacent to one mover — the trigger loop calls `setPopupHtml` per defender and the LAST advisory wins the single toast node (FY observed in-place replacement); all log rows land but a GM sees one. Confirm/decide stacking vs per-defender toast (pairs with backlog bullet below).
+1. ~~Multi-defender OA stack~~ **CLOSED 2026-11-09 improve (joined copy per owner):** `opportunityTrigger.js` now collects every triggering defender and posts ONE sticky joined advisory ("Goblin and Bugbear react — …") after the loop; per-defender log rows and denial popups byte-unchanged. Live-proved on a two-hostile drag (both names in `.map-toast`, 2 `enforcement_triggered` rows) + 5 new/updated unit legs.
 2. **TurnEconomyStrip twin-header fix re-ride** after the filed bug ships (both mount points + the new strip test).
 3. **movementBudget partial-cell arithmetic:** FY rode whole-cell charges (15/30 exact, full-block 0); a fractional clamp (e.g. 25 used + 15 drag → lands 5 ft, 25→30) and the mid-drag clamp edge have not been witnessed; also Speedy disadvantage note leg (`hasSpeedyOpportunityDisadvantage` in the OA lane).
 4. **TurnEconomyStrip on monster/+NPC rows:** strip mounts for every card type; cs monster rows carry `speed`? never witnessed for `type:'npc'` cards (denominator `used+remaining` when speed is unknown).
@@ -42,7 +42,7 @@ FY session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 | Feature/Flow | Depth | Notes |
 |---|---|---|
-| Opportunity-attack trigger matrix (defender charge/sticky toast/blocker-first order/spent deny/move-in zero-provoke/clamp+toast) | **deep (FY 2026-11-09 — first app-wide ride, all 5 faces PASS + partial-charge legs; multi-defender stack face owed)** | `combat/opportunityTrigger.js`, `map/hooks/usePlayerDragging.js onTokenMoveLanded`, `combat/chargeEconomy.js chargeSlot` |
+| Opportunity-attack trigger matrix (defender charge/sticky toast/blocker-first order/spent deny/move-in zero-provoke/clamp+toast/multi-defender joined toast) | **deep (FY 2026-11-09 first app-wide ride, all 5 faces PASS; multi-defender join CLOSED 2026-11-09 improve — joined copy live-verified 2-defender + single-defender singular unchanged)** | `combat/opportunityTrigger.js`, `map/hooks/usePlayerDragging.js onTokenMoveLanded`, `combat/chargeEconomy.js chargeSlot` |
 | TurnEconomyStrip readout faces (per-card + header + spent flip + enforcement-off) | **deep (FY — first ride; 1 bug FILED synthetic-name no-remap on twin/header strips; gate unaffected; monster/npc rows + partial-cell movement owed)** | `initiative/TurnEconomyStrip.jsx`, `initiative/CreatureCard.jsx:669`, `initiative/Initiative.jsx:787` |
 | Repeat-save full round-cycle (holder/twin/victim seams × round 1+2, re-prompt fresh promptId, save-repeat ledger, rearmReactions at wrap) | **deep (FY PT1+PT2 CLOSED: prompts only at victim seam ×2 rounds, ledger written at Resolution (Done) not Roll Save, fail keeps te+cond, EP reactions 1→0 at wrap)** | `initiative/navigationHandlers.js applyOutgoingTurnEndPasses/rearmReactions`, `rules/features/repeatSaveService.js` |
 | TV up-next × board adoption sort parity | **deep (FY PT4 CLOSED: scrambled POST → DOM DESC AND chips wrap-DESC eligible, twins excluded)** | `initiative/useTvPresentation.js`, `initiative/sseHandlers.js handleCombatSummaryChange`, `combat/creaturePresence.js sortCreaturesForBoard` |
@@ -67,7 +67,6 @@ FY session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FY 2026-11-09) Multi-defender OA advisories collapse to one visible toast: `opportunityTrigger.js triggerDefender` calls `setPopupHtml(reason,{sticky:true})` once per defender into the SINGLE `.map-toast` node — 2+ defenders left simultaneously = every log row lands but only the LAST advisory is on screen (FY: in-place textContent swap, no addedNodes). Consider a stacking toast or a joined "A and B react — …" copy for the multi-defender leg.
 - (FY 2026-11-09) Movement clamp copy edge: a drag that can't start at all (0 ft remaining) toasts "X snapped back to 0 ft of movement." though the token never left its cell — "cannot move — no movement left this turn" would read truer than "snapped back" on the full-block leg (log row "Out of movement — snapped to the remaining budget (0 ft this move)." is already honest).
 
 ## Blocked / Not Verified (fold-gate ledger)
