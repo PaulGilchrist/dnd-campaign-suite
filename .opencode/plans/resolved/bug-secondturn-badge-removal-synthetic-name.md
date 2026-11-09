@@ -44,3 +44,53 @@ Mirror the CLA-360 remap at the remove chokepoint: in `CreatureCard.jsx` compute
 ## Severity
 
 Data integrity risk — small but real: a false-positive audit row in the campaign log claiming a condition broke on a nonexistent creature, plus orphaned change-data bucket pollution (the exact class c5883e4a4 removed from the add lane), while the intended state removal silently does nothing.
+
+## Resolution
+
+**FIXED 2026-11-09.**
+
+What was actually wrong (mechanism corrected vs the original guess): the guess pointed at
+`ConditionEffectBadges.jsx` `REMOVE_HANDLERS.condition` — that branch is **dead code** (grep proves
+zero producers of `badge.removeAction: 'condition'` / `removeKey` anywhere in `src/`). The live
+broken lane is the condition-badge row itself: `CreatureCard.jsx` `ConditionBadgeRow` wires the ×
+to `onBreakCondition(creature.name, cond)` → `handleAutoBreakCondition`
+(`createAutoBreakConditionHandler.js`), which received the **synthetic** row name and, from it:
+1. filtered `conditions` off the synthetic cs row (no display effect — runtime is authoritative),
+2. called `removeCondition` (`conditionSaveService.js`) which read `getRuntimeValue(synthetic,'activeConditions')`
+   (undefined → `[]`), filtered, and `setRuntimeValue(synthetic, 'activeConditions', [])` — **materializing the
+   phantom bucket**, and
+3. `logConditionEvent({action:'broken', creatureName: synthetic})` — the **false-positive audit**.
+The holder's real bucket was never read or written, so the badge stayed on both cards.
+
+Fix (mirrors the established precedent — `openEffectAdder` c5883e4a4 / `useAllyEditor.js`
+`openAllyEditor`: remap `isSecondTurnEntry(row) && row.holderName → holderName` at the chokepoint
+BEFORE any change-data write or audit):
+- `src/components/initiative/createAutoBreakConditionHandler.js` — looks the cs row up by name
+  (already did), derives `subjectName = row && isSecondTurnEntry(row) && row.holderName ? row.holderName : creatureName`,
+  then strips the condition from the **holder's** cs row, routes `removeCondition` AND
+  `logConditionEvent` by `subjectName`. Non-ST and holder-less-`holderName` rows are byte-identical to before.
+- Chosen over the bug file's suggested `CreatureCard.jsx` prop swap because the handler is where the
+  write + audit actually happen (single edit covers both, guards every caller), and passing the holder
+  name into `ConditionEffectBadges` would additionally flip its `activeBuffs`/te display derivations —
+  the recorded backlog asymmetry, out of scope here.
+- Dual-ruleset: this lane is ruleset-agnostic UI code — no 2024 twin to change.
+
+Regression test: `src/components/initiative/createAutoBreakConditionHandler.second-turn.test.js`
+(4 pins: ST-row × remaps BOTH the `removeCondition` subject and the `broken` audit to the holder;
+holder cs row stripped while the synthetic row is untouched; holder-card control keeps its own name;
+`secondTurn` row without `holderName` falls back byte-identically). Mock conventions mirror
+`useAllyEditor.test.js` / `Initiative.effectAdder-second-turn.test.jsx` (structural `isSecondTurnEntry` stub).
+
+Verification:
+- `npx vitest run` new test: 4/4 pass. Touched folder `src/components/initiative`: 93 files / 699 tests pass. `npm run lint`: zero warnings. No initiative-folder test pinned the synthetic-name removal (pinned-bug audit clean).
+- Live repro re-run in `test-campaign` (curl-seeded ST board, header-verified): add Poisoned via the ST card Add modal (holder `["poisoned"]`, synth bucket GET-ABSENT — add lane still good) → **× on the ST card's Poisoned badge** → holder `activeConditions: []`, audit `condition broken` names `EvasiveFighter` (zero synthetic-name condition rows in the log), badge evicted from BOTH cards, synthetic bucket **never materialized** (GET-ABSENT). Holder-card control × equally honest. Console 0 errors / 0 warnings.
+- Exit: browser closed, Admin clear-change-data + clear-log two-pass API, GET-verified `{}` / `[]` (incl. the repro's original phantom bucket), servers untouched.
+
+Follow-up notes (not in this filing's scope):
+- The same badge's **click** (condition-save reroll, `onRollConditionSave(creature.name, …)` →
+  `createRollConditionSaveHandler.js`) still receives the synthetic name on ST rows — a sibling
+  lane of the same class; if ever ridden, it needs the identical chokepoint remap.
+- te/concentration badges still don't render on ST cards (`CreatureCard.jsx` filters by synthetic
+  name — recorded FU backlog asymmetry), so `ConditionEffectBadges` REMOVE_HANDLERS are unreachable
+  from ST rows today.
+
