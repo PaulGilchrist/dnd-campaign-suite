@@ -61,7 +61,6 @@ Live facts (FV, dev pair `npm run dev` :80 + :5173 CAMPAIGN_LOCK='test-campaign,
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FV 2026-11-09) ST-row Rejoin button title still says "(initiative lands at the end of the round)" for second-turn twins — since 09ff6ef97 the law is holder-init−10 re-anchor (audit copy is honest, the tooltip isn't). Make the title conditional on `isSecondTurnEntry` (e.g. "…(initiative re-anchors to <holder>'s second-turn slot)"). `src/components/initiative/` — same card title builder that renders `Rejoin <name> to the encounter`.
 - (FV 2026-11-09) ST-card Add button title names the synthetic row ("Add condition, effect, or concentration to EvasiveFighter (Second Turn)") while the modal it opens titles the HOLDER ("EvasiveFighter") — same for the allies button title. Either thread `effectSubjectName` into the titles or append a "(second turn)" hint to the modal header so the GM can tell WHICH card's modal is open without context-switching. `CreatureCard.jsx` button titles vs `Initiative.jsx openEffectAdder` / `useAllyEditor.js` remap.
 
 ## Blocked / Not Verified (fold-gate ledger)

@@ -137,6 +137,48 @@ describe('TargetSelect excludes away creatures', () => {
     });
 });
 
+describe('rejoin button title faces', () => {
+    // FV 2026-11-09 backlog: since 09ff6ef97 second-turn twins rejoin by
+    // re-anchoring to the holder's second-turn slot (holder initiative − 10,
+    // secondTurnAnchorInitiative in creaturePresence.js), so the Rejoin
+    // tooltip must NOT claim the end-of-round slot for them — matching the
+    // honest audit copy in createCreatureHandlers.js.
+    it('second-turn twin: title names the holder re-anchor, no end-of-round claim', () => {
+        props.creature = base({
+            name: 'EvasiveFighter (Second Turn)',
+            away: true,
+            initiative: '',
+            secondTurn: true,
+            holderName: 'EvasiveFighter',
+        });
+        render(<CreatureCard {...props} />);
+        const btn = screen.getByLabelText('Rejoin EvasiveFighter (Second Turn) to initiative');
+        expect(btn.title).not.toContain('end of the round');
+        expect(btn.title).toBe(
+            "Rejoin EvasiveFighter (Second Turn) to the encounter (initiative re-anchors to EvasiveFighter's second-turn slot)"
+        );
+    });
+
+    it('normal away row: title byte-identical to the end-of-round copy', () => {
+        props.creature = base({ away: true, initiative: '' });
+        render(<CreatureCard {...props} />);
+        expect(screen.getByLabelText('Rejoin Alice to initiative').title)
+            .toBe('Rejoin Alice to the encounter (initiative lands at the end of the round)');
+    });
+
+    it('twin without holderName: anchor unresolvable, end-of-round copy stays', () => {
+        props.creature = base({
+            name: 'Ghost (Second Turn)',
+            away: true,
+            initiative: '',
+            secondTurn: true,
+        });
+        render(<CreatureCard {...props} />);
+        expect(screen.getByLabelText('Rejoin Ghost (Second Turn) to initiative').title)
+            .toBe('Rejoin Ghost (Second Turn) to the encounter (initiative lands at the end of the round)');
+    });
+});
+
 // bug-away-card-initiative-input-resurrects-slot: an away row holds NO
 // initiative slot — its card's initiative input is read-only even for the GM,
 // and the presence-keyed input REMOUNTS on presence flips so the uncontrolled

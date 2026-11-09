@@ -87,14 +87,20 @@ function NpcRemoveButton({ creature, isLocalhost, onRemoveNpc }) {
 function AwayToggle({ creature, isLocalhost, onToggleAway }) {
     if (creature.type !== 'player' || !isLocalhost || !onToggleAway) return null
     const away = creature.away === true
+    // Honest slot copy (FV 2026-11-09 backlog): second-turn twins rejoin by
+    // re-anchoring to the holder's second-turn slot (holder initiative − 10 —
+    // secondTurnAnchorInitiative in creaturePresence.js), NOT the end-of-round
+    // slot. Without a holderName the anchor can't resolve, so the twin falls
+    // through to the end-of-round law and the default copy stays honest.
+    const rejoinTitle = (isSecondTurnEntry(creature) && creature.holderName)
+        ? `Rejoin ${creature.name} to the encounter (initiative re-anchors to ${creature.holderName}'s second-turn slot)`
+        : `Rejoin ${creature.name} to the encounter (initiative lands at the end of the round)`
     return (
         <button
             className={`away-toggle-btn${away ? ' away-toggle-btn-active' : ''}`}
             onClick={() => onToggleAway(creature.name)}
             type="button"
-            title={away
-                ? `Rejoin ${creature.name} to the encounter (initiative lands at the end of the round)`
-                : `Mark ${creature.name} away from the encounter (split party)`}
+            title={away ? rejoinTitle : `Mark ${creature.name} away from the encounter (split party)`}
             aria-label={away ? `Rejoin ${creature.name} to initiative` : `Mark ${creature.name} away from initiative`}
         >
             <i className={away ? 'fa-solid fa-person-walking-arrow-right' : 'fa-solid fa-person-walking'}></i>
