@@ -33,3 +33,22 @@ Apply the c5883e4a4 chokepoint pattern to the allies editor open: remap `{...cre
 ## Severity
 
 Data integrity risk — persists an orphaned bucket + false-attribution audit row for a creature that has no character file and disappears at the round wrap; the GM's intended ally-list edit silently does nothing for the holder (betrayal-flip/friendly-fire automations keyed off the holder's `selectedAllies` never see it).
+
+## Resolution
+
+**Fixed 2026-11-09.** The diagnosis in "Likely location" was correct: the allies-editor chokepoint is `src/components/initiative/useAllyEditor.js` (not `createCreatureHandlers`), and `openAllyEditor` stored the raw row `creature.name` into the modal target (which `confirmAllyEditor` then uses for both `setAllyList` → `selectedAllies` runtime write and the `ability_use` audit `characterName`) and built candidates from the unfiltered `combatSummary.creatures` roster.
+
+Fix (mirrors the c5883e4a4 `openEffectAdder` chokepoint pattern, `Initiative.jsx:494-506`):
+
+- `openAllyEditor` now remaps `isSecondTurnEntry(creature) && creature.holderName` → `{ ...creature, name: creature.holderName }` before setting the modal target, so the title, `currentAllies` read, `selectedAllies` write, and audit row all key the holder. A `secondTurn` row without `holderName` falls back to its own name (same shape as the EffectAdder guard).
+- Candidate list now `.filter(c => !isSecondTurnEntry(c))` — the same exclusion law as the CreatureCard target list (`CreatureCard.jsx:237`) and `useTvPresentation.js:115`.
+- `src/components/initiative/useAllyEditor.test.js`: the roster test that pinned the old "include second-turn entries" face was re-pinned to exclusion; two new regression tests added — ST-row open remaps title/currentAllies and confirm writes `setAllyList('Grim', …)` + audits `characterName: 'Grim'`; and the no-holderName fallback case. Real-module `isSecondTurnEntry` stubbed structurally, mirroring `Initiative.effectAdder-second-turn.test.jsx`.
+
+Verified live in `test-campaign` (dev pair :80/:5173, curl-seeded ST board pre-mount so the merge keeps the twin):
+
+- Repro before fix: modal titled `Allies of EvasiveFighter (Second Turn)`, candidate list included `EvasiveFighter (Second Turn) (Player)`; confirm wrote phantom bucket `'EvasiveFighter (Second Turn)'.selectedAllies:["EvasiveFighter (Second Turn)","AasimarTest"]`, holder bucket absent, `ability_use` named the synthetic row.
+- Re-verify after fix: modal title `Allies of EvasiveFighter`; candidates exclude the ST row (`stListed:false`); after ticking AasimarTest + Confirm — holder bucket `selectedAllies:["EvasiveFighter","AasimarTest"]`, synthetic bucket GET-ABSENT, audit row `characterName:"EvasiveFighter"` / `description:"EvasiveFighter's allies set to: EvasiveFighter, AasimarTest"`.
+- Adjacent sanity: holder-card allies editor control (title + checked boxes reflect the holder's stored list); EffectAdder opened from the ST card still titles the holder (c5883e4a4 law intact).
+- Tests: `npx vitest run src/components/initiative/useAllyEditor.test.js` 7/7 pass; `npx vitest run src/components/initiative/` 92 files / 695 tests pass; `npm run lint` clean (zero warnings).
+- Exit: browser closed, two-pass Admin clears GET-verified change-data `{}` + log `[]`.
+

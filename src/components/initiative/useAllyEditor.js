@@ -11,6 +11,7 @@
 import React from 'react'
 import { getAllyList, setAllyList } from '../../hooks/useAllySelection.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
+import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 import { addEntry } from '../../services/ui/logService.js'
 
 export function useAllyEditor({ campaignName, isLocalhost }) {
@@ -19,12 +20,23 @@ export function useAllyEditor({ campaignName, isLocalhost }) {
 
     const openAllyEditor = React.useCallback((creature) => {
         if (!isLocalhost) return
+        // CLA-360 law (mirrors openEffectAdder in Initiative.jsx, c5883e4a4):
+        // structural (Second Turn) rows are synthetic transport — selectedAllies
+        // keyed by the suffixed name is a phantom bucket (invisible, orphaned at
+        // the round wrap) and the audit would name a creature with no character
+        // file. Route GM intent to the holder's real, visible state.
+        const subject = isSecondTurnEntry(creature) && creature.holderName
+            ? { ...creature, name: creature.holderName }
+            : creature
         const combatSummary = getCombatSummary(campaignName)
         // Mirror the monster-card lane: list ALL creatures INCLUDING self — the
         // modal requires >=1 selection, and self-only is exactly "trusts no one".
+        // Synthetic (Second Turn) rows are never allegiance candidates (the same
+        // exclusion law as the CreatureCard target list / useTvPresentation).
         const creatures = (combatSummary?.creatures || [])
+            .filter(c => !isSecondTurnEntry(c))
             .map(c => ({ name: c.name, type: c.type, currentHp: c.currentHp, maxHp: c.maxHp }))
-        setTarget({ name: creature.name, creatures })
+        setTarget({ name: subject.name, creatures })
     }, [campaignName, isLocalhost])
 
     const closeAllyEditor = React.useCallback(() => setTarget(null), [])
