@@ -36,7 +36,8 @@ import { resolveShapeShiftSelection, declineShapeShiftSelection } from '../../se
 import { ShapeShiftModal } from './ShapeShiftModal.jsx';
 import { resolveUtilitySpellCastRow } from '../../services/encounters/monsterUtilitySpellCast.js';
 import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
-import { clearPendingOa, buildOaResolutionLog } from '../../services/combat/pendingOpportunityAttacks.js';
+import { clearPendingOa, buildOaResolutionLog, buildSpeedyOaDisadvantageReason, buildSpeedyOaDisadvantageLog } from '../../services/combat/pendingOpportunityAttacks.js';
+import { hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationPassives.js';
 import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog, regularActionCooldownRefusal, stampRegularActionCooldown } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
@@ -1032,6 +1033,25 @@ export function applyDodgePenalty(targetEffectData, target, campaignName) {
   }
 }
 
+// bug-speedy-oa-disadvantage-inert: the 2024 Speedy feat (Agile Movement —
+// "Opportunity Attacks have Disadvantage against you") derived, badged and was
+// enforced NOWHERE on this lane — the cs row carries no `automation`, so the
+// marked mover's passive must be consulted through the characters lane
+// (characters[i].computedStats, the applyElusive CLA-119 seam). Sibling
+// defender-passive fold of this buildTargetEffectData chain: +1 target-side
+// disadvantage count ONLY on a pending-trigger OA press (oaContext) — unlike
+// Dodge/Elusive this NEVER touches a normal chip attack (RAW: Speedy bites
+// opportunity attacks only). Carries its attribution string so the press
+// prints a `Disadv (Agile Movement…)` chip instead of a bare fold.
+// eslint-disable-next-line react-refresh/only-export-components
+export function applySpeedyOaPenalty(targetEffectData, target, characters, isOpportunityAttack) {
+  if (!isOpportunityAttack || target?.type !== 'player') return;
+  const playerStats = characters?.find(c => c.name === target.name)?.computedStats || null;
+  if (!playerStats || !hasSpeedyOpportunityDisadvantage(playerStats)) return;
+  targetEffectData.targetDisadvantageCount = (targetEffectData.targetDisadvantageCount || 0) + 1;
+  targetEffectData.speedyOaReason = buildSpeedyOaDisadvantageReason(target.name);
+}
+
 function resolveTargetGridPos(mapData, target, attackerPlaced) {
   const targetPlayer = mapData.players?.find(p => p.name === target.name);
   if (targetPlayer) return { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
@@ -1317,11 +1337,15 @@ export function lionAuraDisadvantageReason({ foldedMode, lionAura, proximityMeas
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura, lionProximityMeasured }) {
+export function buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura, lionProximityMeasured, speedyOaReason = null }) {
   const rangeBandApplies = Boolean(rangeReason) && (isAutoMiss || rangeForcedMode === 'disadvantage');
   return [
     rangeBandApplies ? rangeReason : null,
     lionAuraDisadvantageReason({ foldedMode, lionAura, proximityMeasured: lionProximityMeasured }),
+    // Speedy (Agile Movement) fold attribution — the caller only ever passes
+    // a reason for a press where the fold actually applied (folded-mode gate
+    // upstream), same law as the aura reason above.
+    foldedMode === 'disadvantage' ? speedyOaReason : null,
   ].filter(Boolean);
 }
 
@@ -1341,6 +1365,27 @@ async function resolveAndLogMonsterLionAura({ mapData, monsterName, target, acti
     logLionAuraApplied({ monsterName, actionName, bearerName: aura.source, campaignName, proximityMeasured });
   }
   return { aura, proximityMeasured };
+}
+
+// bug-speedy-oa-disadvantage-inert: the monster-card pending-OA press folded
+// nothing about the MARKED MOVER's passives — an OA against a 2024 Speedy
+// holder (Agile Movement: "Opportunity Attacks have Disadvantage against
+// you") rolled a silent mode:'normal'. applySpeedyOaPenalty already counted
+// the disadvantage into combineAttackModes; this seam turns the applied fold
+// into its attribution face: the chip reason (single-string channel with the
+// lion-aura precedence preserved, reasons-list entry via the caller) and ONE
+// marked ledger row naming monster, action and mover (mirrors the Lion-aura
+// applied row — audit honesty: the ledger never prints a silent roll for a
+// disadvantaged press). Returns null reasons on every non-OA / non-holder
+// press, so the roll options stay byte-identical.
+// eslint-disable-next-line react-refresh/only-export-components
+export function foldSpeedyOaPress({ oaContext, foldedMode, targetEffectData, lionAuraReason, monsterName, target, actionName, campaignName }) {
+  const speedyReason = oaContext && foldedMode === 'disadvantage' ? targetEffectData.speedyOaReason || null : null;
+  if (speedyReason) {
+    addEntry(campaignName, buildSpeedyOaDisadvantageLog({ attackerName: monsterName, moverName: target?.name, actionName }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging Speedy OA disadvantage:', e); });
+  }
+  return { speedyReason, advantageReason: lionAuraReason || speedyReason };
 }
 
 // CLA-036: Bestial Fury rider transport fields — Fury-stamped Beast's Strike
@@ -1674,12 +1719,13 @@ function resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, ca
   return true;
 }
 
-function buildTargetEffectData({ target, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses = null, characters = null }) {
+function buildTargetEffectData({ target, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses = null, characters = null, isOpportunityAttack = false }) {
   const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name);
   const targetEffectData = computeConditionEffects({ conditions: targetConditions, saveModifiers: targetSaveModifiers, targetEffects: targetRiderForTarget, attackerSenses });
   applyElusive(targetEffectData, target, characters, campaignName);
   applyProtectionFromEvilPenalty(targetEffectData, target, campaignName, getAttackerCreature);
   applyDodgePenalty(targetEffectData, target, campaignName);
+  applySpeedyOaPenalty(targetEffectData, target, characters, isOpportunityAttack);
   return targetEffectData;
 }
 
@@ -2600,7 +2646,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerEffects = computeConditionEffects({ conditions: attackerConditions, saveModifiers: targetSaveModifiers, targetEffects: monsterTargetEffects, attackerSenses: monsterSensesArray })
     if (resolveAttackerActionBlock(attackerConditions, monsterTargetEffects, campaignName, monsterName, name)) return;
 
-    const targetEffectData = buildTargetEffectData({ target, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses: monsterSensesArray, characters });
+    const targetEffectData = buildTargetEffectData({ target, targetConditions, targetSaveModifiers, allTargetEffects, campaignName, getAttackerCreature, attackerSenses: monsterSensesArray, characters, isOpportunityAttack: !!oaContext });
 
     const effectiveBonus = bonus + (targetEffectData.riderAttackBonus || 0);
 
@@ -2652,6 +2698,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const foldedMode = foldAuraDisadvantage(forcedMode, lionAura);
     const lionAuraReason = lionAuraDisadvantageReason({ foldedMode, lionAura, proximityMeasured: lionProximityMeasured });
 
+    // bug-speedy-oa-disadvantage-inert: fold the marked mover's Agile Movement
+    // (Speedy) attribution into this press's chip channels and write the
+    // marked ledger row when it applies (hoisted — handleAttack sits at the
+    // complexity ceiling). Byte-inert on every non-OA / non-holder press.
+    const speedyPress = foldSpeedyOaPress({ oaContext, foldedMode, targetEffectData, lionAuraReason, monsterName, target, actionName: name, campaignName });
+
     // One-charge law: on a normal press this is a zero-write no-op; on a
     // pending-OA press it logs the trigger provenance and consumes the
     // marker — charging NOTHING (the trigger already spent the reaction).
@@ -2676,8 +2728,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       // aura press prints `Disadv (Lion rage aura — …)` instead of the
       // generic `Disadv (conditions)`, and the log row stays consistent with
       // the chip. Multi-source presses stack via disadvantageReasons below.
-      advantageReason: lionAuraReason,
-      disadvantageReasons: buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura, lionProximityMeasured }),
+      // Speedy (Agile Movement) presses share the single-string channel (only
+      // one of the two can be the single-source face on an OA; multi-source
+      // presses stack in the list) — lion keeps precedence when both apply.
+      advantageReason: speedyPress.advantageReason,
+      disadvantageReasons: buildDisadvantageReasons({ foldedMode, rangeReason, isAutoMiss, rangeForcedMode, lionAura, lionProximityMeasured, speedyOaReason: speedyPress.speedyReason }),
       coverAcBonus,
       coverLevel,
       coverReason,

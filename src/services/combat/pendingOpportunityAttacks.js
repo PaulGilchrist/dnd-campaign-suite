@@ -52,6 +52,33 @@ export function buildOaResolutionLog({ defenderName, moverName }) {
     };
 }
 
+/** 2024 Speedy feat (Agile Movement): "Opportunity Attacks have Disadvantage
+ *  against you" (bug-speedy-oa-disadvantage-inert). ONE honest attribution
+ *  copy, shared by every resolution lane's forced-mode chip (advantageReason
+ *  / disadvantageReasons channels) so the popup never prints a bare
+ *  `Disadv (conditions)` for this rule. */
+export function buildSpeedyOaDisadvantageReason(targetName) {
+    return `${targetName} has Agile Movement (Speedy) — opportunity attacks against them have Disadvantage`;
+}
+
+/** Ledger row written by a resolution lane WHEN the Speedy fold actually
+ *  applies to the press (mirrors the monster-lane Lion-aura disadvantage row
+ *  shape — type automation + a marked automationType + event details). The
+ *  roll row's `mode:'disadvantage'` stays the machine adv/dis truth; this
+ *  row names the rule and the mover. */
+export function buildSpeedyOaDisadvantageLog({ attackerName, moverName, actionName }) {
+    return {
+        type: 'automation',
+        automationType: 'speedy_opportunity_disadvantage',
+        creatureName: attackerName,
+        characterName: attackerName,
+        name: actionName,
+        targetName: moverName,
+        description: `${attackerName} has Disadvantage on ${actionName}: ${buildSpeedyOaDisadvantageReason(moverName)}.`,
+        timestamp: Date.now(),
+    };
+}
+
 function readPendingOas() {
     const map = getRuntimeValue('campaign', PENDING_OA_KEY);
     return map && typeof map === 'object' && !Array.isArray(map) ? map : {};

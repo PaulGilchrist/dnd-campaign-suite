@@ -18,7 +18,7 @@ import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
-import { clearPendingOa, findPendingOaFor, isPendingOaLive, buildOaResolutionLog } from '../../services/combat/pendingOpportunityAttacks.js'
+import { clearPendingOa, findPendingOaFor, isPendingOaLive, buildOaResolutionLog, buildSpeedyOaDisadvantageReason, buildSpeedyOaDisadvantageLog } from '../../services/combat/pendingOpportunityAttacks.js'
 import { hasAutomation, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
@@ -401,9 +401,11 @@ function buildOpportunityAttackRefusal(target, campaignName, playerName) {
             return { html: `<b>Opportunity Attack</b><br/>${target.name} was granted Maneuvering Attack movement and cannot be targeted by Opportunity Attacks from ${grantSource || playerName} right now.` };
         }
     }
-    if (hasSpeedyOpportunityDisadvantage(target)) {
-        return { html: `<b>Opportunity Attack</b><br/>${target.name} has Agile Movement — opportunity attacks against them have Disadvantage.` };
-    }
+    // Speedy (Agile Movement) is deliberately NOT a refusal branch here: RAW
+    // still allows the opportunity attack — it rolls with Disadvantage — so
+    // withholding the reaction on an advisory popup would be rules-wrong
+    // (bug-speedy-oa-disadvantage-inert). The fold lands on the roll options
+    // instead (buildOpportunityAttackRollOptions).
     return null;
 }
 
@@ -411,17 +413,35 @@ function buildOpportunityAttackRefusal(target, campaignName, playerName) {
  *  A plain sheet press evaluates the sheet's armed target-select; a pending-
  *  trigger resolution (bug-monster-oa-resolution-auto-missed-by-melee-range-
  *  gate) passes the MARKED MOVER as explicit target — the marker pins the roll
- *  to the provoking mover, so the gate checks that mover, never a stale arming. */
+ *  to the provoking mover, so the gate checks that mover, never a stale arming.
+ *  Returns the resolved defender name alongside the refusal so the SAME board
+ *  lookup feeds the Speedy disadvantage fold (one getCombatContext per press). */
 async function resolveOpportunityAttackRefusal(campaignName, playerName, explicitTargetName = null) {
     try {
         const cs = await getCombatContext(campaignName);
-        if (!cs) return null;
+        if (!cs) return { refusal: null, targetName: null };
         const target = explicitTargetName
             ? (cs.creatures || []).find(c => c && c.name === explicitTargetName) || null
             : getTargetFromAttacker(cs, playerName);
-        if (!target) return null;
-        return buildOpportunityAttackRefusal(target, campaignName, playerName);
-    } catch (_e) { return null; }
+        return {
+            refusal: target ? buildOpportunityAttackRefusal(target, campaignName, playerName) : null,
+            targetName: target?.name || null,
+        };
+    } catch (_e) { return { refusal: null, targetName: null }; }
+}
+
+/** 2024 Speedy feat (Agile Movement) consult for the OA press. The combatSummary
+ *  creature row carries NO `automation` key (mount-merge keeps display fields
+ *  only), so a hasPassiveEffect(row) read was permanently false — the pre-fix
+ *  inert advisory. Consult the defender's DERIVED stats through the campaign
+ *  characters list, the exact `character?.computedStats || character` lookup
+ *  behind the Initiative "OA Disadv" badge (Initiative.jsx). A mover with no
+ *  character file (a bestiary monster) has no derived passives to consult. */
+function defenderHasSpeedyOaDisadvantage(targetName, characters) {
+    if (!targetName) return false;
+    const character = (characters || []).find(c => c && c.name === targetName);
+    if (!character) return false;
+    return hasSpeedyOpportunityDisadvantage(character.computedStats || character);
 }
 
 function pickOpportunityAttackRoll(playerStats) {
@@ -436,10 +456,16 @@ function pickOpportunityAttackRoll(playerStats) {
  *  lane (result.payload `attack.damage || null` / `attack.name` /
  *  `attack.damageType || 'Slashing'`) and the fields the normal attack-row lane
  *  transports. A row with no authored damage honestly keeps formula null (no
- *  damage stage — the pre-fix face for that degenerate row). */
-function buildOpportunityAttackRollOptions(attackRoll) {
+ *  damage stage — the pre-fix face for that degenerate row).
+ *  When the defender holds the 2024 Speedy feat (Agile Movement) the press
+ *  rolls with FORCED Disadvantage (bug-speedy-oa-disadvantage-inert) — the
+ *  honest RAW face, visible as `mode:'disadvantage'` on the roll ledger and
+ *  the `Disadv (…)` chip via the advantageReason channel. Without a Speedy
+ *  defender the options object stays byte-identical to the pre-fix shape. */
+function buildOpportunityAttackRollOptions(attackRoll, speedyTargetName = null) {
     return {
-        forcedMode: undefined,
+        forcedMode: speedyTargetName ? 'disadvantage' : undefined,
+        ...(speedyTargetName ? { advantageReason: buildSpeedyOaDisadvantageReason(speedyTargetName) } : {}),
         isOpportunityAttack: true,
         autoDamageFormula: attackRoll.damage || null,
         autoDamageName: attackRoll.name,
@@ -562,16 +588,23 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     };
 
     const handleOpportunityAttack = async () => {
-        const refusal = await resolveOpportunityAttackRefusal(campaignName, playerStats.name);
+        const { refusal, targetName } = await resolveOpportunityAttackRefusal(campaignName, playerStats.name);
         if (refusal) {
             showOpportunityAttackRefusal(refusal);
             return;
         }
         const attackRoll = pickOpportunityAttackRoll(playerStats);
         if (attackRoll) {
+            // Speedy defender (Agile Movement): the OA still fires — RAW it
+            // rolls with Disadvantage; ledger names the rule (audit honesty).
+            const speedy = defenderHasSpeedyOaDisadvantage(targetName, characters);
+            if (speedy) {
+                addEntry(campaignName, buildSpeedyOaDisadvantageLog({ attackerName: playerStats.name, moverName: targetName, actionName: attackRoll.name }))
+                    .catch((e) => { console.error('[CharReactions:Speedy-log-error]', e); });
+            }
             // L5-002: the OA fires here — charge the reaction budget.
             chargeSlot({ creatureName: playerStats.name, bucket: 'reaction', campaignName });
-            rollAttack(attackRoll.name, attackRoll.hitBonus, buildOpportunityAttackRollOptions(attackRoll));
+            rollAttack(attackRoll.name, attackRoll.hitBonus, buildOpportunityAttackRollOptions(attackRoll, speedy ? targetName : null));
         }
     };
 
@@ -608,7 +641,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             }).catch((e) => { console.error('[CharReactions:OA-drop-log-error]', e); });
             return;
         }
-        const refusal = await resolveOpportunityAttackRefusal(campaignName, playerStats.name, marker.mover);
+        const { refusal } = await resolveOpportunityAttackRefusal(campaignName, playerStats.name, marker.mover);
         if (refusal) {
             // Refused presses consume nothing — release the latch for retry.
             oaResolvedRef.current = null;
@@ -620,10 +653,18 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             oaResolvedRef.current = null;
             return;
         }
+        // Speedy mover (Agile Movement): the marked-mover OA rolls with FORCED
+        // Disadvantage — the marker already pinned the defender (bug-speedy-
+        // oa-disadvantage-inert).
+        const speedy = defenderHasSpeedyOaDisadvantage(marker.mover, characters);
+        if (speedy) {
+            addEntry(campaignName, buildSpeedyOaDisadvantageLog({ attackerName: playerStats.name, moverName: marker.mover, actionName: attackRoll.name }))
+                .catch((e) => { console.error('[CharReactions:Speedy-log-error]', e); });
+        }
         addEntry(campaignName, buildOaResolutionLog({ defenderName: playerStats.name, moverName: marker.mover }))
             .catch((e) => { console.error('[CharReactions:OA-resolution-log-error]', e); });
         clearPendingOa(campaignName, playerStats.name);
-        rollAttack(attackRoll.name, attackRoll.hitBonus, { ...buildOpportunityAttackRollOptions(attackRoll), targetName: marker.mover });
+        rollAttack(attackRoll.name, attackRoll.hitBonus, { ...buildOpportunityAttackRollOptions(attackRoll, speedy ? marker.mover : null), targetName: marker.mover });
     };
 
     const handleAutomationReaction = async (reaction) => {

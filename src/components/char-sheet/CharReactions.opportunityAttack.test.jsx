@@ -302,19 +302,39 @@ describe('CharReactions - Opportunity Attack click lane', () => {
         expect(rollAttack).not.toHaveBeenCalled();
     });
 
-    // Agile Movement is an informational popup (disadvantage), not a refusal:
-    // unlike protected-target refusals it never logs.
-    it('shows the Agile Movement popup without rolling or logging when the target has speedy disadvantage', async () => {
+    // bug-speedy-oa-disadvantage-inert (fix): Agile Movement is NOT a refusal —
+    // the pre-fix authored advisory popup blocked the roll and consulted the
+    // passive off the cs row (never present), so live boards rolled silent
+    // mode:'normal'. The press now ROLLS with forced Disadvantage, carrying
+    // the Agile Movement attribution on the roll options + a marked ledger
+    // row, consulting the defender's DERIVED stats through the characters lane
+    // (the Initiative "OA Disadv" badge lookup). Full face matrix →
+    // CharReactions.opportunityAttackSpeedy.test.jsx.
+    it('rolls with forced Disadvantage instead of refusing when the target has speedy disadvantage', async () => {
+        const speedyTarget = { name: 'Enemy1', computedStats: { automation: { passives: [{ type: 'passive_rule', effect: 'opportunity_attacks_disadvantage' }] } } };
         getCombatContext.mockResolvedValue({});
         getTargetFromAttacker.mockReturnValue({ name: 'Enemy1' });
         hasSpeedyOpportunityDisadvantage.mockReturnValue(true);
 
-        render(<CharReactions {...createProps()} />);
+        render(<CharReactions {...createProps({ characters: [speedyTarget] })} />);
         fireEvent.click(screen.getByText('Opportunity Attack:'));
 
-        await waitFor(() => expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Agile Movement')));
-        expect(hasSpeedyOpportunityDisadvantage).toHaveBeenCalledWith({ name: 'Enemy1' });
-        expect(rollAttack).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
+        await waitFor(() => expect(rollAttack).toHaveBeenCalledWith(
+            'Longsword',
+            6,
+            expect.objectContaining({
+                isOpportunityAttack: true,
+                forcedMode: 'disadvantage',
+                advantageReason: expect.stringContaining('Agile Movement'),
+            })
+        ));
+        // The consult resolves the characters-list entry's computedStats, not
+        // the cs row. No advisory-refusal popup; the fold gets its own row.
+        expect(hasSpeedyOpportunityDisadvantage).toHaveBeenCalledWith(speedyTarget.computedStats);
+        expect(setPopupHtml).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            automationType: 'speedy_opportunity_disadvantage',
+            targetName: 'Enemy1',
+        }));
     });
 });
