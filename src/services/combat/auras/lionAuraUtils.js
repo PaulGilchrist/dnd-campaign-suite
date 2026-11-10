@@ -18,9 +18,40 @@ function attackerIsEnemyOfBearer(bearerName, attackerName, partyNames) {
     return !partyNames.has(attackerName);
 }
 
-function lionBuffFor(player, campaignName) {
-    const buffs = getRuntimeValue(player.name, 'activeBuffs', campaignName) || [];
+// Name-keyed Lion-stamp lookup — shared by the bearer scan below and the
+// target-exemption predicate ("another Barbarian who has this option active").
+function lionBuffForName(name, campaignName) {
+    const buffs = getRuntimeValue(name, 'activeBuffs', campaignName) || [];
     return Array.isArray(buffs) ? buffs.find(b => b.optionName === 'Lion') : null;
+}
+
+function lionBuffFor(player, campaignName) {
+    return lionBuffForName(player.name, campaignName);
+}
+
+// Clause's second axis (bug-lion-aura-second-barbarian-exemption-missing):
+// Power of the Wilds (Lion) RAW (2024 classes.json, Path of the Beast) reads
+// "…Disadvantage on attack rolls against targets other than you OR ANOTHER
+// BARBARIAN WHO HAS THIS OPTION ACTIVE" — a target carrying its own Lion
+// stamp is exempt from EVERY bearer's aura, not just the bearer-self skip.
+// The activeBuffs optionName==='Lion' entry is the engine's only runtime
+// proxy for the option (produced solely by the Path of the Beast stance
+// lane, so stamp presence is sufficient — rig doctrine). A null/omitted
+// targetName stays lenient (no exemption), same law as the bearer-self skip.
+// Extracted predicate: getLionDisadvantageAgainst sits at the module's
+// complexity ceiling (bug-file census), mirroring the sibling per-axis
+// predicate extractions (attackerIsEnemyOfBearer above, wolf's
+// targetIsEnemyOfBearer in wolfAuraUtils.js).
+function targetIsExemptFromLionAuras(targetName, campaignName) {
+    return Boolean(targetName) && Boolean(lionBuffForName(targetName, campaignName));
+}
+
+// Buff-declared range in feet: parseInt(buff.range) with NaN/falsy collapse to
+// 5 (garbage strings like 'unlimited' and 0 measure at 5 ft — pinned in
+// lionAuraUtils.test.js 'buff range %o measures at %i ft'). Extracted to keep
+// getLionDisadvantageAgainst at the module's complexity-15 ceiling.
+function lionRangeFeet(lionBuff) {
+    return parseInt(lionBuff.range || '5 ft') || 5;
 }
 
 export async function getLionDisadvantageAgainst({ attackerName, targetName, campaignName, mapData, skipRangeCheck }) {
@@ -43,6 +74,11 @@ export async function getLionDisadvantageAgainst({ attackerName, targetName, cam
     // gets the Disadvantage" doctrine is live on both roller lanes.
     const partyNames = new Set(allCreatures.map(c => c.name));
 
+    // Exempt target (a Lion-option holder itself) — one name-keyed read covers
+    // every bearer, so it runs before the scan (bug-lion-aura-second-barbarian-
+    // exemption-missing closing the orphaned NOTE deferral below).
+    if (targetIsExemptFromLionAuras(targetName, campaignName)) return { disadvantage: false };
+
     for (const player of allCreatures) {
         if (player.name === attackerName) continue;
         // Lion's DEBUFF lands on the attacking creature — only the bearer's
@@ -53,16 +89,16 @@ export async function getLionDisadvantageAgainst({ attackerName, targetName, cam
         // itself is exempt. Same per-bearer skip shape as the attacker check
         // above and the taunting_step gate (conditionEffects.js:869); a null
         // targetName stays lenient (bearers always carry a name — drop-seam
-        // law fix#39 refuses nameless players).
-        // NOTE: the full clause also exempts "another Barbarian who has this
-        // option active"; that second axis needs a scan for other Lion-buff
-        // holders matching the target and is deferred (see bug file).
+        // law fix#39 refuses nameless players). The clause's second axis
+        // ("or another Barbarian who has this option active") is handled by
+        // the target-holder exemption before the loop — the deferral NOTE that
+        // used to sit here is now implemented (bug-lion-aura-second-barbarian-
+        // exemption-missing).
         if (player.name === targetName) continue;
         const lionBuff = lionBuffFor(player, campaignName);
         if (!lionBuff) continue;
 
-        const range = lionBuff.range || '5 ft';
-        const rangeNum = parseInt(range) || 5;
+        const rangeNum = lionRangeFeet(lionBuff);
 
         if (skipRangeCheck) {
             return { disadvantage: true, source: player.name };
