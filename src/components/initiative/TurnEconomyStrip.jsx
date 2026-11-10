@@ -27,12 +27,16 @@ const ICONS = {
  * because GM-driven token moves are free by design (design law:
  * useItemDragging.js header; movementBudget clamps player tokens only),
  * so the movement badge on a non-player row explains why the number
- * never drains while the GM drags the token around the board.
+ * never drains while the GM drags the token around the board. The copy is
+ * title-only on the hover lane, so it is ALSO mirrored into the badge
+ * aria-label (touch + screen-reader parity) and, on the space-rich card
+ * face, shown as a compact visible "(GM-driven)" hint. The header strip
+ * stays compact (aria-label/title coverage only).
  */
 const GM_MOVEMENT_ADVISORY =
     'GM-driven moves are not charged against this budget — monster movement is GM-adjudicated, so the drag clamp is player-token-only by design (these moves still provoke opportunity reactions).'
 
-export default function TurnEconomyStrip({ creatureName, economyName, speedFeet, gmMovement }) {
+export default function TurnEconomyStrip({ creatureName, economyName, speedFeet, gmMovement, showGmHint }) {
     const enforcement = useRuntimeValue('campaign', 'enforcement')
     const turnState = useRuntimeValue('campaign', 'turnState')
     if (!enforcement || enforcement.mode !== 'on' || !creatureName) return null
@@ -53,6 +57,8 @@ export default function TurnEconomyStrip({ creatureName, economyName, speedFeet,
         { key: 'reaction', label: entry.reactionsUsed >= 1 ? 'Reaction used' : 'Reaction', spent: entry.reactionsUsed >= 1 },
     ]
 
+    const movementLabel = formatMovement(entry.movementUsedFeet, remaining)
+
     return (
         <div className='turn-economy-strip' aria-label={`Turn economy for ${creatureName}`}>
             <span className='turn-economy-name'>{creatureName}</span>
@@ -67,9 +73,14 @@ export default function TurnEconomyStrip({ creatureName, economyName, speedFeet,
             ))}
             <CreatureBadge
                 icon='fa-shoe-prints'
-                label={formatMovement(entry.movementUsedFeet, remaining)}
+                label={gmMovement && showGmHint ? (
+                    <>{movementLabel} <span className='turn-economy-gm-hint'>(GM-driven)</span></>
+                ) : movementLabel}
                 cls={remaining <= 0 ? 'effect-debuff' : 'effect-neutral'}
                 tooltip={gmMovement ? GM_MOVEMENT_ADVISORY : `${remaining} ft of movement remaining this turn`}
+                // Advisory mirrors into the accessible name on every GM face
+                // (title is invisible on touch + unreliable for screen readers).
+                ariaLabel={gmMovement ? `${movementLabel} — ${GM_MOVEMENT_ADVISORY}` : undefined}
             />
         </div>
     )

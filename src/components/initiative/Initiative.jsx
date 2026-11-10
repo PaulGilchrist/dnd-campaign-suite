@@ -836,7 +836,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  )}
                  // GM-movement advisory: an ACTIVE monster/NPC row's header
                  // strip carries the same "GM-driven moves are not charged"
-                 // tooltip as its card (design law in useItemDragging.js).
+                 // tooltip + aria-label advisory as its card (design law in
+                 // useItemDragging.js). No visible "(GM-driven)" hint here —
+                 // the header face is space-constrained (showGmHint omitted).
                  gmMovement={isActiveEconomyRowGmDriven(combatSummary, activeCreatureName)}
              />
              <div className='carousel-container' ref={carouselRef}>

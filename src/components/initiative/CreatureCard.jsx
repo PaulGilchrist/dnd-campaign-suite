@@ -683,7 +683,11 @@ function ConditionsSection({
                 // non-player rows (monster/NPC) get the "GM-driven moves are
                 // not charged" tooltip on the movement segment; player rows
                 // keep the honest remaining-ft copy byte-unchanged.
+                // Card face is space-rich: also show the compact visible
+                // "(GM-driven)" hint (the header strip omits it and relies on
+                // the title + aria-label advisory lanes).
                 gmMovement={creature.type !== 'player'}
+                showGmHint
             />
             <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={effectSubjectName} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
             {/* Owner ruling 2026-11-10 (improve gate-away-condition-add): an AWAY

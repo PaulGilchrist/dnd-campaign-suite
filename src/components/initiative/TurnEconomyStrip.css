@@ -10,3 +10,12 @@
     font-weight: 700;
     margin-right: 4px;
 }
+
+/* Compact "(GM-driven)" hint inside a non-player card movement badge
+   (GM-moves-are-free advisory, visible lane). Subdued relative to the
+   badge's own 600-weight face; no !important, component-scoped. */
+.turn-economy-gm-hint {
+    font-weight: 400;
+    opacity: 0.8;
+    white-space: nowrap;
+}

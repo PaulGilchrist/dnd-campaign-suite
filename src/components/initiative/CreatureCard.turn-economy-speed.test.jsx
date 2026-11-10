@@ -114,7 +114,9 @@ describe('CreatureCard — economy-strip movement denominator (sheet-speed parit
         render(<CreatureCard {...baseProps(wolf, { allCreatures: [wolf] })} />);
         const strip = screen.getByLabelText('Turn economy for Wolf');
         const badge = Array.from(strip.querySelectorAll('.creature-badge')).find((b) => /\d+\/\d+ ft/.test(b.textContent));
-        expect(badge.textContent.trim()).toBe('0/40 ft');
+        // Card face carries the visible "(GM-driven)" hint after the honest
+        // used/ft label (accessibility mirror of the title-only advisory).
+        expect(badge.textContent.trim()).toBe('0/40 ft (GM-driven)');
     });
 
     it('(Second Turn) twin: display keeps the twin name, denominator resolves through the HOLDER sheet', () => {
@@ -133,7 +135,7 @@ describe('CreatureCard — economy-strip movement denominator (sheet-speed parit
         render(<CreatureCard {...baseProps(bare, { allCreatures: [bare] })} />);
         const strip = screen.getByLabelText('Turn economy for NPC 1');
         const badge = Array.from(strip.querySelectorAll('.creature-badge')).find((b) => /\d+\/\d+ ft/.test(b.textContent));
-        expect(badge.textContent.trim()).toBe('0/30 ft');
+        expect(badge.textContent.trim()).toBe('0/30 ft (GM-driven)');
     });
 
     // GM-movement advisory wiring (owner decision 2026-11-10, advisory only):
@@ -148,6 +150,14 @@ describe('CreatureCard — economy-strip movement denominator (sheet-speed parit
         expect(badge.getAttribute('title')).toBe(
             'GM-driven moves are not charged against this budget — monster movement is GM-adjudicated, so the drag clamp is player-token-only by design (these moves still provoke opportunity reactions).'
         );
+        // Card face: the advisory is ALSO an accessible name + visible hint
+        // (title is invisible on touch + unreliable for screen readers).
+        expect(badge.getAttribute('aria-label')).toBe(
+            '0/40 ft — GM-driven moves are not charged against this budget — monster movement is GM-adjudicated, so the drag clamp is player-token-only by design (these moves still provoke opportunity reactions).'
+        );
+        const hint = badge.querySelector('.turn-economy-gm-hint');
+        expect(hint).not.toBeNull();
+        expect(hint.textContent).toBe('(GM-driven)');
     });
 
     it('player row: movement badge title keeps the plain remaining-ft copy (byte-unchanged)', () => {
@@ -155,5 +165,8 @@ describe('CreatureCard — economy-strip movement denominator (sheet-speed parit
         const strip = screen.getByLabelText('Turn economy for EvasiveFighter');
         const badge = Array.from(strip.querySelectorAll('.creature-badge')).find((b) => /\d+\/\d+ ft/.test(b.textContent));
         expect(badge.getAttribute('title')).toBe('30 ft of movement remaining this turn');
+        // No advisory aria-label and no visible hint on player faces.
+        expect(badge.getAttribute('aria-label')).toBeNull();
+        expect(badge.querySelector('.turn-economy-gm-hint')).toBeNull();
     });
 });

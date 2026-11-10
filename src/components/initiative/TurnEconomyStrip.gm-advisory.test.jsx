@@ -63,4 +63,45 @@ describe('TurnEconomyStrip — GM-movement advisory tooltip', () => {
         render(<TurnEconomyStrip creatureName="Rakan" speedFeet={30} gmMovement={false} />);
         expect(movementBadge('Rakan').getAttribute('title')).toBe('30 ft of movement remaining this turn');
     });
+
+    // Accessibility mirror (backlog 2026-11-10 GB improvement): the advisory
+    // was title-only, invisible on touch + unreliable for screen readers.
+    // Every GM face now ALSO carries it in the badge aria-label; only the
+    // space-rich card face (showGmHint) additionally renders the visible
+    // "(GM-driven)" hint. Player faces stay byte-unchanged (no aria-label,
+    // no hint).
+    it('gmMovement row: movement badge aria-label mirrors the advisory copy', () => {
+        prime({ Wolf: { movementUsedFeet: 0 } });
+        render(<TurnEconomyStrip creatureName="Wolf" speedFeet={40} gmMovement />);
+        expect(movementBadge('Wolf').getAttribute('aria-label')).toBe(`0/40 ft — ${ADVISORY}`);
+    });
+
+    it('card face (showGmHint): movement badge renders the visible "(GM-driven)" hint', () => {
+        prime({ Wolf: { movementUsedFeet: 0 } });
+        render(<TurnEconomyStrip creatureName="Wolf" speedFeet={40} gmMovement showGmHint />);
+        const badge = movementBadge('Wolf');
+        expect(badge.textContent.trim()).toBe('0/40 ft (GM-driven)');
+        const hint = badge.querySelector('.turn-economy-gm-hint');
+        expect(hint).not.toBeNull();
+        expect(hint.textContent).toBe('(GM-driven)');
+        // aria + title lanes keep the full advisory bytes alongside the hint
+        expect(badge.getAttribute('aria-label')).toBe(`0/40 ft — ${ADVISORY}`);
+        expect(badge.getAttribute('title')).toBe(ADVISORY);
+    });
+
+    it('header face (showGmHint omitted): movement label stays byte-unchanged (compact, aria-only advisory)', () => {
+        prime({ Wolf: { movementUsedFeet: 0 } });
+        render(<TurnEconomyStrip creatureName="Wolf" speedFeet={40} gmMovement />);
+        expect(movementBadge('Wolf').textContent.trim()).toBe('0/40 ft');
+        expect(movementBadge('Wolf').querySelector('.turn-economy-gm-hint')).toBeNull();
+    });
+
+    it('player row: no hint, no advisory aria-label (accessible name stays the honest face)', () => {
+        prime({ Rakan: { movementUsedFeet: 10 } });
+        render(<TurnEconomyStrip creatureName="Rakan" speedFeet={30} showGmHint />);
+        const badge = movementBadge('Rakan');
+        expect(badge.getAttribute('aria-label')).toBeNull();
+        expect(badge.querySelector('.turn-economy-gm-hint')).toBeNull();
+        expect(badge.textContent.trim()).toBe('10/30 ft');
+    });
 });
