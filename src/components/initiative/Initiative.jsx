@@ -56,6 +56,20 @@ import { buildDisplayCreature } from './displayCreatureUtils.js'
 import InitiativeLoot from './InitiativeLoot.jsx'
 import { fetchSpellOverlays } from '../../services/maps/spellOverlayService.js'
 
+// The header strip's ACTIVE row is a monster/NPC row ⇒ GM-movement advisory
+// (TurnEconomyStrip.jsx `gmMovement`; design law in useItemDragging.js:
+// GM-driven token moves are never charged against the movement budget).
+// Resolved through the same holder-remapped economyNameFor seam as the
+// denominator beside it, so a player holder under an (Second Turn) twin row
+// is never flagged. Module scope: the Initiative component sits at the eslint
+// complexity ceiling — this branch lives here instead.
+function isActiveEconomyRowGmDriven(combatSummary, activeCreatureName) {
+    const row = (combatSummary?.creatures || []).find(
+        (c) => c.name === economyNameFor(combatSummary, activeCreatureName)
+    )
+    return row?.type !== 'player'
+}
+
 function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, 'activeBuffs', [], campaignName)
     setRuntimeValue(creatureName, 'invokeDuplicityAdvantageTargets', [], campaignName)
@@ -806,6 +820,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                      combatSummary.creatures.find(c => c.name === economyNameFor(combatSummary, activeCreatureName)),
                      characters
                  )}
+                 // GM-movement advisory: an ACTIVE monster/NPC row's header
+                 // strip carries the same "GM-driven moves are not charged"
+                 // tooltip as its card (design law in useItemDragging.js).
+                 gmMovement={isActiveEconomyRowGmDriven(combatSummary, activeCreatureName)}
              />
              <div className='carousel-container' ref={carouselRef}>
                   {displayCreatures.map((creature) => {

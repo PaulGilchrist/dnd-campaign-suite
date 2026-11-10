@@ -60,7 +60,6 @@ GA session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[GA 2026-11-10] movementBudget is player-token-only:** NPC placedItems tokens drag free across the board (GA witness: Wolf ~30 ft, zero turnState entry, zero clamp) while PC tokens hard-clamp at sheet speed and monsters' OWN economy strips show 0/40 denominators — the enforcement blob's movementBudget does nothing to GM-driven monster movement even though those same moves provoke PC reactions. Consider charging npc-token drops whose name matches a cs monster row (the `speed` stamp now exists), or an explicit "GM moves are free by design" doc/advisory. Likely `map/hooks/useItemDragging.js` sibling of `usePlayerDragging.js onTokenMoveLanded`.
 - **[GA 2026-11-10] same-cell token overlaps make drags ambiguous:** two tokens at one grid coord render stacked and the pointer grabs by render order (GA: a 7-cell cell-stepped sequence alternated between EvasiveFighter and Wolf mid-sequence — silent two-mover provocation). Micro-offset same-cell tokens (map-view stacking like initiative cards) or a grab disambiguation affordance would protect both GM muscle-memory and automation harnesses. Likely `map/PlacedItems.jsx` render order + the drag-grab hit-test.
 
 ## Blocked / Not Verified (fold-gate ledger)

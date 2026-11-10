@@ -678,6 +678,11 @@ function ConditionsSection({
                 creatureName={creature.name}
                 economyName={effectSubjectName}
                 speedFeet={resolveSpeedFeet({ speed: creature.speed, name: effectSubjectName }, characters)}
+                // GM-movement advisory (design law in useItemDragging.js):
+                // non-player rows (monster/NPC) get the "GM-driven moves are
+                // not charged" tooltip on the movement segment; player rows
+                // keep the honest remaining-ft copy byte-unchanged.
+                gmMovement={creature.type !== 'player'}
             />
             <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={effectSubjectName} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
             {isLocalhost && (

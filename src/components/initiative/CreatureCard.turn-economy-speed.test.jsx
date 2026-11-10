@@ -135,4 +135,25 @@ describe('CreatureCard — economy-strip movement denominator (sheet-speed parit
         const badge = Array.from(strip.querySelectorAll('.creature-badge')).find((b) => /\d+\/\d+ ft/.test(b.textContent));
         expect(badge.textContent.trim()).toBe('0/30 ft');
     });
+
+    // GM-movement advisory wiring (owner decision 2026-11-10, advisory only):
+    // non-player rows pass gmMovement so the movement segment explains that
+    // GM-driven token moves are never charged (design law in
+    // useItemDragging.js); player rows keep the plain remaining-ft title.
+    it('monster row: movement badge title carries the GM-moves-are-free advisory', () => {
+        const wolf = { ...efRow, name: 'Wolf', type: 'npc', speed: 40 };
+        render(<CreatureCard {...baseProps(wolf, { allCreatures: [wolf] })} />);
+        const strip = screen.getByLabelText('Turn economy for Wolf');
+        const badge = Array.from(strip.querySelectorAll('.creature-badge')).find((b) => /\d+\/\d+ ft/.test(b.textContent));
+        expect(badge.getAttribute('title')).toBe(
+            'GM-driven moves are not charged against this budget — monster movement is GM-adjudicated, so the drag clamp is player-token-only by design (these moves still provoke opportunity reactions).'
+        );
+    });
+
+    it('player row: movement badge title keeps the plain remaining-ft copy (byte-unchanged)', () => {
+        render(<CreatureCard {...baseProps(efRow)} />);
+        const strip = screen.getByLabelText('Turn economy for EvasiveFighter');
+        const badge = Array.from(strip.querySelectorAll('.creature-badge')).find((b) => /\d+\/\d+ ft/.test(b.textContent));
+        expect(badge.getAttribute('title')).toBe('30 ft of movement remaining this turn');
+    });
 });

@@ -210,6 +210,9 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
         );
 
         // Charge movement once per selected player token, on drop (no-op off).
+        // DESIGN LAW (see useItemDragging.js header): selected NPC/monster
+        // tokens are deliberately NOT charged — GM-driven moves are free by
+        // design; the movementBudget clamp is player-token-only.
         if (budgetActive && costFeet > 0) {
             for (const it of selectedPlayers) {
                 chargeMovement({ creatureName: it.name || it.id, feet: costFeet, campaignName });

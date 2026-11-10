@@ -3,6 +3,33 @@ import { CELL_SIZE } from '../../../config/mapConfig';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 
+/**
+ * DESIGN LAW — "GM moves are free by design" (owner decision 2026-11-10).
+ *
+ * This hook drags GM-placed tokens (placedItems: NPC/monster and player
+ * tokens alike). Token drops whose mover is NOT a player token (item.type
+ * !== 'player') are intentionally NEVER charged against the movement
+ * budget: monster/NPC movement is GM-adjudicated, not self-acted, so the
+ * movementBudget clamp in services/combat/movementBudget.js is
+ * player-token-only BY DESIGN. There is deliberately no clamp/charge lane
+ * here mirroring the player sibling — do not add one without an owner
+ * ruling (the "charge npc-token drops" alternative was explicitly declined).
+ *
+ * Contrasting player lane: usePlayerDragging.js routes its drops through
+ * clampMovementDrop + chargeMovement around its onTokenMoveLanded call —
+ * that clamp/drain applies only to tokens with type === 'player'. The
+ * select-tool group-move in useSelectMove.js obeys the same law
+ * (selectedPlayers filter in applySelectionMove).
+ *
+ * What NPC drops DO still obey: the opportunity-trigger lane below runs
+ * for every mover (moverIsPlayer:false for NPC tokens) — GM-driven monster
+ * moves legitimately provoke PC reactions, and the defending players'
+ * reactions resolve normally. The monster's own TurnEconomyStrip reads a
+ * 0/n ft denominator all combat because nothing charges it; the strip's
+ * movement badge carries the matching advisory tooltip
+ * (TurnEconomyStrip.jsx `gmMovement`, wired from the non-player rows in
+ * CreatureCard.jsx and the Initiative header strip).
+ */
 export default function useItemDragging({
     svgRef,
     placedItems,
