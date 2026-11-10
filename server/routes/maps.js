@@ -345,8 +345,21 @@ export function outdoorRowsShapeError(body) {
   return riversShapeError(body?.rivers) || roadsShapeError(body?.roads);
 }
 
+// Authored label for a freshly created map (FZ backlog 2026-11-09): the list
+// route already prefers `mapContent.displayName` (:126) and the rename lane
+// writes `newName.trim()`, but the create builders used to overwrite any
+// submitted `displayName` with the raw name — harnesses had to guess. An
+// authored non-blank string body.displayName now wins verbatim (trimmed,
+// mirroring the rename lane); absent/blank/non-string falls back to name —
+// exact previous behavior for every existing caller (no client create lane
+// posts displayName today; encounter/staging/seed lanes PUT it afterwards).
+const createDisplayName = (name, body) =>
+  typeof body?.displayName === 'string' && body.displayName.trim() !== ''
+    ? body.displayName.trim()
+    : name.trim();
+
 const buildOutdoorMapData = (name, body) => ({
-  displayName: name.trim(),
+  displayName: createDisplayName(name, body),
   name: toKebabCase(name.trim()),
   type: body.type ?? 'indoor',
   gridSize: clampGridSize(body.gridSize),
@@ -358,7 +371,7 @@ const buildOutdoorMapData = (name, body) => ({
 });
 
 const buildIndoorMapData = (name, body) => ({
-  displayName: name.trim(),
+  displayName: createDisplayName(name, body),
   name: toKebabCase(name.trim()),
   type: body.type ?? 'indoor',
   gridSize: clampGridSize(body.gridSize),
