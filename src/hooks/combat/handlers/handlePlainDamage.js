@@ -311,17 +311,23 @@ async function resolveDeathStrike({ applyResult, context, combatSummary, target,
 }
 
 function applyRamProneCondition(target, campaignName, logEntry) {
+    let wroteProne = false;
     if (target.type === 'player') {
         const conditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
         if (Array.isArray(conditions) && !conditions.some(c => String(c).toLowerCase() === 'prone')) {
             setRuntimeValue(target.name, 'activeConditions', [...conditions, 'Prone'], campaignName);
+            wroteProne = true;
         }
     } else {
         const conditions = getRuntimeValue(target.name, 'activeConditions') || [];
         if (!conditions.some(c => String(c).toLowerCase() === 'prone')) {
             setRuntimeValue(target.name, 'activeConditions', [...conditions, 'Prone'], campaignName);
+            wroteProne = true;
         }
     }
+    // Idempotent ram hits (target already Prone — the write above is skipped)
+    // must stay silent: no false "Prone applied" row, no duplicate badge event.
+    if (!wroteProne) return;
     logEntry({
         type: 'condition',
         action: 'applied',

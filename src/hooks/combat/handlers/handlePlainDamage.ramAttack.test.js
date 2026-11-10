@@ -189,19 +189,27 @@ describe('plain damage ram lane (ramActive → Prone)', () => {
         expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeConditions', expect.anything(), CAMPAIGN);
     });
 
-    // FIXME (source bug, handlePlainDamage.js applyRamProneCondition): the
-    // 'applied' condition log fires even when the activeConditions write was
-    // skipped because the target was ALREADY prone — repeat ram hits log a
-    // false "Prone applied". Fix: move the logEntry/dispatchEvent inside the
-    // branches that actually write (or gate on a wroteProne flag).
-    it.fails('does not log Prone applied when the target was already prone', async () => {
-        await runRam({}, { prevConditions: ['Prone'] });
+    // Regression lock (bug-ram-prone-log-fires-when-already-prone): the
+    // 'applied' condition log and the combat-summary badge dispatch must stay
+    // silent when the activeConditions write is skipped because the target was
+    // ALREADY prone — a repeat ram hit may not log a false "Prone applied".
+    it.each(['Prone', 'prone'])('does not log Prone applied or dispatch a badge event when the target was already prone (%s)', async (prevCondition) => {
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+        try {
+            await runRam({}, { prevConditions: [prevCondition] });
 
-        expect(wroteProne()).toBe(false);
-        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-            type: 'condition',
-            condition: 'Prone',
-            reason: 'Power of the Wilds (Ram)',
-        }));
+            expect(wroteProne()).toBe(false);
+            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
+                type: 'condition',
+                condition: 'Prone',
+                reason: 'Power of the Wilds (Ram)',
+            }));
+            const badgeEvents = dispatchSpy.mock.calls
+                .map(([event]) => event)
+                .filter(e => e && e.type === 'combat-summary-updated');
+            expect(badgeEvents).toHaveLength(0);
+        } finally {
+            dispatchSpy.mockRestore();
+        }
     });
 });
