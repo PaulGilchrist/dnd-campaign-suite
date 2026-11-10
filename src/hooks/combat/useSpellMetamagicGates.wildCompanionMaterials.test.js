@@ -112,7 +112,7 @@ describe('CLA-388 consumed-material waiver (Wild Companion)', () => {
     const { onExecute, setPopupHtml } = await gate(makeDruid([wildCompanionEntry]));
     expect(onExecute).not.toHaveBeenCalled();
     expect(consumeMaterial).not.toHaveBeenCalled();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_required' }));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_refused' }));
   });
 
   it('waives the refusal and the consumption when the wild companion grant is authorized', async () => {
@@ -128,7 +128,7 @@ describe('CLA-388 consumed-material waiver (Wild Companion)', () => {
     const noWaiveEntry = { name: 'Other Free Spell', type: 'free_spell', spell: 'Find Familiar' };
     const { onExecute, setPopupHtml } = await gate(makeDruid([noWaiveEntry]));
     expect(onExecute).not.toHaveBeenCalled();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_required' }));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_refused' }));
   });
 
   it('consumes the carried incense on a non-waived paid cast', async () => {

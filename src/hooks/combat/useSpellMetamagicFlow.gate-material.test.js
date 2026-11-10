@@ -117,32 +117,35 @@ describe('useSpellMetamagicFlow — material component gating', () => {
     {
       spell: { name: 'Greater Restoration', level: 5 },
       itemName: 'Diamond Dust (100 gp)',
-      description: 'Greater Restoration requires diamond dust worth 100+ GP, which the spell consumes.',
+      requirement: 'Greater Restoration requires diamond dust worth 100+ GP, which the spell consumes.',
     },
     {
       spell: { name: 'Forcecage', level: 7 },
       itemName: 'Ruby Dust (1,500 gp)',
-      description: 'Forcecage requires ruby dust worth 1,500+ GP, which the spell consumes.',
+      requirement: 'Forcecage requires ruby dust worth 1,500+ GP, which the spell consumes.',
     },
     {
       spell: { name: 'Revivify', level: 3 },
       itemName: 'Diamond (300 gp)',
-      description: 'Revivify requires a diamond worth 300+ GP, which the spell consumes.',
+      requirement: 'Revivify requires a diamond worth 300+ GP, which the spell consumes.',
     },
-  ])('$name without $itemName in backpack', ({ spell, description }) => {
-    it('shows the material_required popup and blocks the cast', async () => {
+  ])('$name without $itemName in backpack', ({ spell, itemName, requirement }) => {
+    it('shows the material_refused popup and blocks the cast', async () => {
       const { result, setPopupHtml, onExecute } = renderFlow();
 
       await act(async () => {
         await result.current.gateMetamagic(spell);
       });
 
+      // Refusal-must-popup law (2026-11-10 improve): explicit REFUSAL framing
+      // naming spell + item + backpack, with the verbatim RAW sentence kept as
+      // supporting detail — never just the requirement text + a lone Done.
       expect(setPopupHtml).toHaveBeenCalledTimes(1);
       expect(setPopupHtml).toHaveBeenCalledWith({
         type: 'automation_info',
         name: spell.name,
-        automationType: 'material_required',
-        description,
+        automationType: 'material_refused',
+        description: `${spell.name} refused: material component ${itemName} is not in TestSorcerer's backpack. Nothing spent. ${requirement}`,
       });
       expect(consumeMaterial).not.toHaveBeenCalled();
       expect(onExecute).not.toHaveBeenCalled();
@@ -193,7 +196,7 @@ describe('useSpellMetamagicFlow — material component gating', () => {
     });
 
     expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-      automationType: 'material_required',
+      automationType: 'material_refused',
     }));
     expect(result.current.pendingGreaterRestoration).toBeNull();
     expect(result.current.pendingMetamagic).toBeNull();

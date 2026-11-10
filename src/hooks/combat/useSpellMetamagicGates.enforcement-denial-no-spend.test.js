@@ -214,7 +214,7 @@ describe('enforcement denial on the sheet spell lane pays nothing (owner ruling 
     expect(prepareSpellCast).not.toHaveBeenCalled();
     expect(consumeMaterial).not.toHaveBeenCalled();
     expect(onExecute).not.toHaveBeenCalled();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_required' }));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'material_refused' }));
   });
 
   it('control: sorcerer allowed cast still queues the metamagic chooser', async () => {

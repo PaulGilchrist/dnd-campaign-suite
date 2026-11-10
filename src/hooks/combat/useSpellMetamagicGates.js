@@ -299,14 +299,36 @@ async function handleNonSorcererCast(spell, metaCtx, {
   }
 }
 
-function showMaterialRequiredPopup(spell, setPopupHtml) {
-  if (!setPopupHtml) return;
-  setPopupHtml({
-    type: 'automation_info',
-    name: spell.name,
-    automationType: 'material_required',
-    description: getMaterialRequirementMessage(spell),
-  });
+// 2026-11-10 improve (missing-material refuse-must-log-and-popup): a cast refused
+// because its consumed material is NOT in the caster's backpack must frame the
+// refusal in the popup (spell + item + backpack, mirroring the maze_refused /
+// warding_bond_refused / enforcement_denied convention) — never just the verbatim
+// RAW material sentence with a lone Done — and write an audit row to the campaign
+// log. Zero cost: this gate sits BEFORE every payment lane (slot spend,
+// consumeMaterial disk write, chooser queues) and before the enforcement gate, so
+// a refusal never rolls, spends a slot, or touches the backpack.
+function refuseMissingMaterial(spell, consumedMaterial, playerStats, campaignName, setPopupHtml) {
+  const refusal = `${spell.name} refused: material component ${consumedMaterial.itemName} is not in ${playerStats.name}'s backpack. Nothing spent.`;
+  const requirement = getMaterialRequirementMessage(spell);
+  if (setPopupHtml) {
+    setPopupHtml({
+      type: 'automation_info',
+      name: spell.name,
+      automationType: 'material_refused',
+      description: requirement ? `${refusal} ${requirement}` : refusal,
+    });
+  }
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'material_refused',
+    reason: 'material_missing',
+    characterName: playerStats.name,
+    abilityName: spell.name,
+    spellName: spell.name,
+    material: consumedMaterial.itemName,
+    description: refusal,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error("[useSpellMetamagicGates:material_refused]", e); });
 }
 
 function isPowerWordSpell(spell) {
@@ -374,8 +396,11 @@ export async function gateMetamagic(spell, metaCtx, {
   const gateLevel = (spell.isUpcast && spell.upcastLevel) || spell.level;
   const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, gateLevel, playerStats, campaignName);
   const materialsWaived = hasWildCompanionWaiver(playerStats, spell, freeCastAuthorized);
+  // Material gate runs FIRST — before the enforcement gate and every payment
+  // lane: a missing reagent refuses unpaid (refuseMissingMaterial: refusal copy
+  // + material_refused audit row, zero spend).
   if (isBlockedByConsumedMaterial(consumedMaterial, materialsWaived, playerStats, hasMaterial)) {
-    showMaterialRequiredPopup(spell, setPopupHtml);
+    refuseMissingMaterial(spell, consumedMaterial, playerStats, campaignName, setPopupHtml);
     return;
   }
 
