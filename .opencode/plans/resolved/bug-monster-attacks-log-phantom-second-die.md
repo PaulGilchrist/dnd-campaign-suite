@@ -37,3 +37,40 @@ In the monster press lane, derive pool size FROM the netted mode (normal ⇒ 1 d
 ## Severity
 
 Data integrity (audit truth) — every monster attack row in every campaign log is misshapen; no immediate HP math corruption observed (total always took the intended die), but it silently defeats range/adv/dis ledger validation and this season's §82 audit doctrine.
+
+## Resolution
+
+**FIXED 2026-11-10.**
+
+### What was actually wrong (differs from the "Likely location")
+
+Not a monster-lane-only hard-wire: `computeD20Roll` (`src/hooks/combat/d20RollComputation.js`) unconditionally pre-rolls two d20s (`r1`, `r2`) for EVERY roll, and the shared row builder `buildRollLogEntry` (`src/hooks/combat/useLoggedDiceRollAttack.js`) persisted `rolls: [r1, r2]` verbatim regardless of the resolved mode. **The filed sheet-lane contrast was stale against this HEAD** — live repro proved a plain PC-sheet Longsword press ALSO logged `rolls:[20,17] mode:"normal" total:20`. Every row through the shared lane (attack/save/check/skill/initiative, both GM and visitor tabs) carried the phantom die on normal. Second defect of the same species: `rollNpcInitiative` (`src/services/encounters/encounterToInitiative.js`) rolled a phantom second die into its EB-join initiative row, which is hard-wired `mode:'normal'` (live witness pre-fix: Wolf join row `rolls:[5,15] mode:"normal"`).
+
+### Fix
+
+- `useLoggedDiceRollAttack.js`: `buildRollLogEntry` now derives the row's dice FROM the resolved mode via `buildRollLedgerDice(ctx)` — `normal` ⇒ exactly one die (Halfling-Lucky reroll rows record the rerolled value, mirroring the popup); `advantage`/`disadvantage` ⇒ the honest `[r1, r2]` pool, byte-identical to before. The popup payload (`buildPopupData`) KEEPS the full 2-die pool on normal presses: the popup's GM Advantage/Disadvantage toggle resolves via `computeFinalRoll(mode, safeRolls)` and needs the second die (and the roll-time Lucky / Feats-of-Chaos folds consume `r2` before the mode is final) — trimming it there would have broken the toggle. Runtime `lastAttack.d20Rolls` is likewise unchanged (not a ledger surface).
+- `encounterToInitiative.js`: `rollNpcInitiative` rolls ONE d20 and logs `rolls:[r1]` — the join row has no adv/dis source at all.
+
+### Verification
+
+Live re-run of the original repro in test-campaign (post-fix), all rows from `GET /log`:
+
+- EB-join initiative row: `rolls:[5] mode:"normal"` ✅ (was `[5,15]`)
+- Plain Bite chip, zero markers: `rolls:[11] mode:"normal" total:11` ✅ — popup prints only "d20 11 +4"
+- OA chip (curl-seeded `pendingOAs`, mover clean): `rolls:[16] mode:"normal" total:16`, marker drained-to-absent ✅
+- Genuine disadvantage (cs-row `conditions:[{key:'restrained'}]` on the Wolf): `rolls:[2,19] mode:"disadvantage" total:2` + "Disadv (conditions)" chip ✅
+- Genuine advantage (restrained on the ElderPaladin cs-row target): `rolls:[8,17] mode:"advantage" total:17` + "Adv (conditions)" chip ✅
+- PC sheet lane — normal: `rolls:[13] mode:"normal"` ✅; disadvantage (runtime prone): `rolls:[1,11] mode:"disadvantage" total:1` ✅ (adv/dis pools still 2d20 with honest mode on both lanes)
+
+Tests: new regression `src/hooks/combat/useLoggedDiceRollAttack.ledger-dice.test.js` (7 pins: normal one-die, adv/dis pool kept, roll-time Lucky flip, Restore-Balance cancel → one die, Lucky reroll single die, popup pool retained) + updated pins in `useLoggedDiceRollAttack.test.js` (the two tests that had locked the phantom shape) and `encounterToInitiative.test.js` (single-die initiative rows + one rollD20 call per NPC). `npx vitest run` full suite: **3184 files / 34449 passed, 0 failed**; `npm run lint` clean; `no-timers-guard` OK. Exit ritual: closed-tab two-pass admin clears GET-verified `{}`/`[]`.
+
+### Files changed
+
+- `src/hooks/combat/useLoggedDiceRollAttack.js` (fix)
+- `src/services/encounters/encounterToInitiative.js` (join-initiative sibling)
+- `src/hooks/combat/useLoggedDiceRollAttack.ledger-dice.test.js` (new)
+- `src/hooks/combat/useLoggedDiceRollAttack.test.js` (pins updated)
+- `src/services/encounters/encounterToInitiative.test.js` (pins updated)
+
+The NOTES face (prone-adv un-ridden, `attackRange` into `combineAttackModes` on OAs) is untouched by this fix and remains descent PT#4 work.
+

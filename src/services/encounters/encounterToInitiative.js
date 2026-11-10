@@ -42,10 +42,12 @@ function parseInitBonus(monster) {
 
 function rollNpcInitiative(monster) {
     const bonus = parseInitBonus(monster);
+    // §82 ledger law: this row is hard-wired mode:'normal' (no adv/dis source
+    // exists on the join lane), so it must carry exactly one d20 — the old
+    // pre-rolled second die was a phantom that poisoned the ledger shape.
     const r1 = rollD20();
-    const r2 = rollD20();
     const total = r1 + bonus;
-    return { roll: r1, total, rolls: [r1, r2], bonus };
+    return { roll: r1, total, rolls: [r1], bonus };
 }
 
 function logRoll(campaignName, name, rollResult) {

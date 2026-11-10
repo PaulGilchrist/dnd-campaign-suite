@@ -55,7 +55,8 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { loadCombatSummary } from './combatData.js';
 
 // ── Determinism re-arm (#1057) ─────────────────────────────────
-// Every NPC consumes exactly two rollD20 calls (first is the counted die);
+// Every NPC consumes exactly ONE rollD20 call (the §82 ledger law: a
+// normal-mode initiative row carries a single die — no phantom pool);
 // tests override with explicit once-values, everything else lands on 10.
 
 beforeEach(() => {
@@ -70,7 +71,7 @@ beforeEach(() => {
 
 describe('expandMonstersToCreatures', () => {
   it('assembles a lone monster byte-exact onto the initiative entry (#1014 carrier contract)', async () => {
-    rollD20.mockReturnValueOnce(14).mockReturnValueOnce(3);
+    rollD20.mockReturnValueOnce(14);
     const monster = {
       name: 'Goblin', type: 'humanoid', size: 'Small', qty: 1,
       hit_points: 10, armor_class: 13, initiative_details: '+2',
@@ -107,9 +108,9 @@ describe('expandMonstersToCreatures', () => {
 
   it('expands qty 3 into three distinct numbered entries with independent rolls (#948)', async () => {
     rollD20
-      .mockReturnValueOnce(10).mockReturnValueOnce(1)
-      .mockReturnValueOnce(12).mockReturnValueOnce(2)
-      .mockReturnValueOnce(14).mockReturnValueOnce(3);
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce(12)
+      .mockReturnValueOnce(14);
 
     const { creatures } = await expandMonstersToCreatures(
       [{ name: 'Orc', qty: 3, hit_points: 15, armor_class: 13 }], [], 'TestCampaign');
@@ -225,9 +226,9 @@ describe('expandMonstersToCreatures', () => {
 describe('loadEncounterToInitiative', () => {
   it('sorts creatures by initiative descending with distinguishable bytes (#1036)', async () => {
     rollD20
-      .mockReturnValueOnce(8).mockReturnValueOnce(1)    // Dragon +2 → 10
-      .mockReturnValueOnce(20).mockReturnValueOnce(1)    // Goblin    → 20
-      .mockReturnValueOnce(15).mockReturnValueOnce(1);    // Orc       → 15
+      .mockReturnValueOnce(8)    // Dragon +2 → 10
+      .mockReturnValueOnce(20)    // Goblin    → 20
+      .mockReturnValueOnce(15);    // Orc       → 15
 
     const monsters = [
       createInitMonster('Dragon', '+2'),
@@ -271,18 +272,18 @@ describe('loadEncounterToInitiative', () => {
     expect(result.combatSummary.creatures.map((c) => c.name)).toEqual(expectedNames);
     expect(result.firstName).toBe(expectedNames[0]);
     expect(storage.set).toHaveBeenCalledWith('activeCreatureName', expectedNames[0], 'TestCampaign');
-    expect(rollD20).toHaveBeenCalledTimes(monsters.length * 2);
+    expect(rollD20).toHaveBeenCalledTimes(monsters.length);
     expect(addEntry).toHaveBeenCalledTimes(monsters.length);
   });
 
   // Entry byte: total is the raw die and bonus is logged separately (the UI adds
-  // them) — asserted as-is; rolls carries both consumed dice.
+  // them) — asserted as-is; a normal-mode row carries exactly one die (§82 law).
   it.each([
     ['normal roll with bonus', '+5', 14, { total: 14, bonus: 5, isNatural20: false, isNatural1: false }],
     ['natural 20', undefined, 20, { total: 20, bonus: 0, isNatural20: true, isNatural1: false }],
     ['natural 1', undefined, 1, { total: 1, bonus: 0, isNatural20: false, isNatural1: true }],
   ])('logs one initiative roll entry per npc — %s', async (_label, details, die, expectedTail) => {
-    rollD20.mockReturnValueOnce(die).mockReturnValueOnce(7);
+    rollD20.mockReturnValueOnce(die);
     const monster = createInitMonster('Goblin', details);
 
     await loadEncounterToInitiative([monster], [], 'TestCampaign');
@@ -292,7 +293,8 @@ describe('loadEncounterToInitiative', () => {
       characterName: 'Goblin',
       rollType: 'initiative',
       name: 'Initiative',
-      rolls: [die, 7],
+      // The second once-value must NOT surface: no phantom die on a normal row.
+      rolls: [die],
       mode: 'normal',
       ...expectedTail,
     });
@@ -350,7 +352,7 @@ describe('addMonstersToInitiative', () => {
   });
 
   it('joins byte-exact: monsterIndex, carrier type, size, ac fallback, IRV, sorted with existing (#1014/CLA-173)', async () => {
-    rollD20.mockReturnValueOnce(12).mockReturnValueOnce(4);
+    rollD20.mockReturnValueOnce(12);
     loadCombatSummary.mockResolvedValue({
       round: 2,
       creatures: [{ name: 'Shadow', type: 'npc', initiative: '5' }],

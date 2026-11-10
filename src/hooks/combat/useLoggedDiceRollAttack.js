@@ -107,13 +107,25 @@ function buildContextRollFields(context) {
     };
 }
 
+// §82 ledger law: `mode` is the ONLY adv/dis truth — a `normal`-mode roll row
+// must carry exactly one d20; `rolls:[a,b]` means a real 2d20 adv/dis pool.
+// computeD20Roll still pre-rolls the second die (the roll-time Lucky/Feats-of-
+// Chaos folds and the popup's GM adv/dis toggle consume it), but it may no
+// longer leak into the ledger as a phantom die on a normal roll. Halfling
+// Lucky mirrors the popup payload: the rerolled die is the recorded die.
+function buildRollLedgerDice(ctx) {
+    if (ctx.luckyRerolled) return [ctx.luckyRerollValue];
+    const isD20Pool = ctx.forcedMode === 'advantage' || ctx.forcedMode === 'disadvantage';
+    return isD20Pool ? [ctx.r1, ctx.r2] : [ctx.r1];
+}
+
 function buildRollLogEntry({ characterName, rollType, name, ctx, context, target, targetAc }) {
     return {
         type: 'roll',
         characterName,
         rollType,
         name,
-        rolls: [ctx.r1, ctx.r2],
+        rolls: buildRollLedgerDice(ctx),
         mode: ctx.forcedMode || 'normal',
         total: ctx.effectiveD20Roll,
         bonus: ctx.effectiveBonus,

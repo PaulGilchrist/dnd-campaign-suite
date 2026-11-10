@@ -188,7 +188,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
     });
 
     describe('core roll → log → popup', () => {
-        it('rolls two d20s, logs the roll entry, and pops a d20 popup', async () => {
+        it('rolls the d20 pool, logs a normal row with ONE die, and pops a d20 popup', async () => {
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
             expect(rollD20).toHaveBeenCalledTimes(2);
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
@@ -196,8 +196,13 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
                 rollType: 'attack',
                 name: 'Longsword',
                 characterName: defaultCharacterName,
-                rolls: [15, 15],
+                // §82 ledger law: normal mode carries exactly one die — the
+                // pre-rolled second die stays out of the ledger row.
+                rolls: [15],
+                mode: 'normal',
             }));
+            // Popup keeps the full pool so the GM adv/dis toggle can resolve.
+            expect(popupOf(0).rolls).toEqual([15, 15]);
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'd20',
                 rollType: 'attack',
@@ -227,7 +232,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack) — base attack lane', () =
             await fn('Longsword', 9, 'attack', { targetName: 'Goblin', d20Floor10: true });
             // raw 5 + 9 = 14 would miss AC 15; floored 10 + 9 = 19 hits
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                rolls: [5, 15],
+                rolls: [5],
                 total: 10,
                 hit: true,
             }));
