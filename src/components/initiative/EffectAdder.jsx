@@ -1,6 +1,7 @@
 import React from 'react'
 import { CONDITIONS, CONDITION_SAVE_DC, getDefaultAbility, conditionDeclaresSave } from '../../services/combat/conditions/conditionUtils.js'
 import { TARGET_EFFECT_DEFINITIONS } from '../../services/combat/conditions/targetEffectDefinitions.js'
+import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import './EffectAdder.css'
 
 const SOURCE_OTHER = '__other__'
@@ -55,7 +56,12 @@ function EffectAdder({ targetName, titleSuffix, initialTab, onCancel, onApply, c
   const [immunityNotice, setImmunityNotice] = React.useState(null)
 
   const creatureNames = React.useMemo(() => {
-    const names = (creatures || []).map(c => c.name).filter(Boolean)
+    // Owner ruling 2026-11-10 (improve gate-away-condition-add): AWAY creatures
+    // are excluded from every manual-add candidate list — the same presence law
+    // the automated target lanes enforce (§13, isCreaturePresent). The modal's
+    // one candidate list is the effects-tab Source dropdown; filtering here (not
+    // at a call site) keeps the law inside the flow for every future opener.
+    const names = (creatures || []).filter(isCreaturePresent).map(c => c.name).filter(Boolean)
     return [...new Set(names)].sort((a, b) => a.localeCompare(b))
   }, [creatures])
 

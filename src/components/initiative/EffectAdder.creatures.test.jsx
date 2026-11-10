@@ -88,4 +88,26 @@ describe('EffectAdder - creatures populate the source dropdown', () => {
     expect(document.querySelector('.ea-modal')).toBeInTheDocument();
     expect(sourceOptionValues()).toEqual(['', '__other__']);
   });
+
+  // Owner ruling 2026-11-10 (improve gate-away-condition-add): AWAY creatures
+  // are excluded from every GM manual-add candidate list — the modal reuses the
+  // automated lanes' presence predicate (isCreaturePresent, playbook §13 law).
+  // The filter lives in EffectAdder itself, so every opener inherits it.
+  it('drops AWAY player rows from the source candidates (presence law)', () => {
+    render(
+      <EffectAdder
+        {...props}
+        creatures={[
+          { name: 'Alice', type: 'player' },
+          { name: 'Bo', type: 'player', away: false },
+          { name: 'Bob', type: 'player', away: true },
+          { name: 'Bob (Second Turn)', type: 'player', away: true, secondTurn: true, holderName: 'Bob' },
+          { name: 'Goblin', type: 'npc' }, // NPCs are always present (flag is player-only)
+        ]}
+      />
+    );
+    openGoadSourceConfig();
+
+    expect(sourceOptionValues()).toEqual(['', 'Alice', 'Bo', 'Goblin', '__other__']);
+  });
 });

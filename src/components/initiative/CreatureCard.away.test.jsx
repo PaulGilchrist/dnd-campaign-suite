@@ -4,7 +4,7 @@
 // away/rejoin toggle button (absent for LAN clients and NPC cards), and the
 // TargetSelect exclusion of away creatures. Badge census / interactions /
 // removal lanes stay in their sibling files.
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
 
@@ -134,6 +134,48 @@ describe('TargetSelect excludes away creatures', () => {
         const select = screen.getByTestId('target-select');
         const options = Array.from(select.querySelectorAll('option')).map(o => o.value).filter(Boolean);
         expect(options).toEqual(['Goblin']);
+    });
+});
+
+// Owner ruling 2026-11-10 (improve gate-away-condition-add): the manual door
+// closes on AWAY rows — the card-level `Add condition, effect…` affordance is
+// ABSENT (not a disabled stub), re-appears on Rejoin without a reload, while
+// badge-× REMOVAL stays permitted so pre-existing conditions/effects can be
+// cleaned off an away card. (Sibling law: EffectAdder.creatures.test.jsx pins
+// the candidate-list exclusion; Initiative.effectAdder-away-gate.test.jsx the
+// open/apply backstops.)
+describe('manual add door gated on away (owner ruling 2026-11-10)', () => {
+    const addBtnTitle = 'Add condition, effect, or concentration to Alice';
+
+    it('away player: no Add affordance at all (absent, not a disabled stub)', () => {
+        props.creature = base({ away: true, initiative: '' });
+        const { container } = render(<CreatureCard {...props} />);
+        expect(screen.queryByTitle(addBtnTitle)).toBeNull();
+        expect(screen.queryByLabelText(addBtnTitle)).toBeNull();
+        expect(container.querySelector('.effect-add-btn')).toBeNull();
+    });
+
+    it('away→present (Rejoin) re-renders the affordance without a reload', () => {
+        props.creature = base({ away: true, initiative: '' });
+        const { rerender } = render(<CreatureCard {...props} />);
+        expect(screen.queryByTitle(addBtnTitle)).toBeNull();
+        // applyPresenceChanges rejoin face: flag cleared + initiative landed.
+        props.creature = base({ initiative: '12' });
+        rerender(<CreatureCard {...props} />);
+        const btn = screen.getByTitle(addBtnTitle);
+        expect(btn).toBeTruthy();
+        fireEvent.click(btn);
+        expect(props.onOpenEffectAdder).toHaveBeenCalledTimes(1);
+        expect(props.onOpenEffectAdder).toHaveBeenCalledWith(props.creature, 'conditions');
+    });
+
+    it('badge × on an away card still removes (cleanup lane stays open)', () => {
+        const conditions = [{ id: 'c1', label: 'Blinded', dc: 12, ability: 'Wisdom' }];
+        props.creature = base({ away: true, initiative: '', conditions });
+        render(<CreatureCard {...props} />);
+        expect(screen.getByText('Blinded DC 12')).toBeTruthy();
+        fireEvent.click(screen.getByTitle('Remove effect'));
+        expect(props.onBreakCondition).toHaveBeenCalledWith('Alice', conditions[0]);
     });
 });
 

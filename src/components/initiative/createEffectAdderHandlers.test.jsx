@@ -363,4 +363,54 @@ describe('createEffectAdderHandlers', () => {
         });
     });
 
+    // Owner ruling 2026-11-10 (improve gate-away-condition-add): the manual door
+    // never WRITES onto an AWAY row — honest refusal (flag close only) across
+    // every tab, including the stale-modal race (opened present, split away
+    // before Apply). Present/NPC targets keep the lanes above byte-intact.
+    describe('away target refusal (presence gate)', () => {
+        const awaySummary = {
+            round: 1,
+            creatures: [
+                { name: 'Alice', type: 'player', computedStats: { hitPoints: 20 } },
+                { name: 'Bo', type: 'player', away: true },
+                { name: 'Goblin', type: 'npc' },
+            ],
+        };
+        let awayHandlers;
+        beforeEach(() => {
+            awayHandlers = createEffectAdderHandlers({
+                campaignName,
+                characters,
+                combatSummary: cloneDeep(awaySummary),
+                setEffectAdderTarget,
+                setCombatSummary,
+            });
+        });
+
+        it.each([
+            { name: 'conditions', tab: 'conditions', data: { target: 'Bo', conditionKey: 'blinded', dc: 10 } },
+            { name: 'effects', tab: 'effects', data: { target: 'Bo', effectKey: 'marked' } },
+            { name: 'concentration', tab: 'concentration', data: { target: 'Bo', spellName: 'Shield', dc: 13 } },
+        ])('$name tab on an away target: zero writes, zero logs, flag closes', async ({ tab, data }) => {
+            await awayHandlers.handleApplyEffect(tab, data);
+
+            expect(conditionSaveService.addCondition).not.toHaveBeenCalled();
+            expect(concentrationService.addConcentration).not.toHaveBeenCalled();
+            expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(setCombatSummary).not.toHaveBeenCalled();
+            expect(combatLoggingService.logConditionEvent).not.toHaveBeenCalled();
+            expect(setEffectAdderTarget).toHaveBeenCalledWith(null);
+        });
+
+        it('control: the same board applies to the present holder next door', async () => {
+            await awayHandlers.handleApplyEffect('effects', { target: 'Alice', effectKey: 'marked' });
+
+            expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'campaign', 'targetEffects', [{ target: 'Alice', effect: 'marked' }], 'test-campaign',
+            );
+            expect(combatLoggingService.logConditionEvent).toHaveBeenCalled();
+        });
+    });
+
 });

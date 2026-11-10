@@ -616,6 +616,7 @@ function ResilientSphereBadge({ creature, isLocalhost, campaignName }) {
 function ConditionsSection({
     creature,
     isLocalhost,
+    isAway,
     campaignName,
     allCreatures,
     characters,
@@ -685,7 +686,13 @@ function ConditionsSection({
                 gmMovement={creature.type !== 'player'}
             />
             <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={effectSubjectName} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
-            {isLocalhost && (
+            {/* Owner ruling 2026-11-10 (improve gate-away-condition-add): an AWAY
+                row is not a valid manual-add target — the card-level Add door is
+                ABSENT (not a disabled stub), matching the automated lanes that
+                already hide away creatures (§13 presence law). Removal (badge ×)
+                above and below stays permitted so pre-existing conditions and
+                lingering world effects can still be cleaned off an away card. */}
+            {isLocalhost && !isAway && (
                 <button
                     className='effect-add-btn'
                     onClick={() => onOpenEffectAdder(creature, 'conditions')}
@@ -826,6 +833,7 @@ function CreatureCard({
                 prismaticIndigoData={prismaticIndigoData}
                 prismaticVioletData={prismaticVioletData}
                 isLocalhost={isLocalhost}
+                isAway={isAway}
                 campaignName={campaignName}
                 allCreatures={allCreatures}
                 characters={characters}

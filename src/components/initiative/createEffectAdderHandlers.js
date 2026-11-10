@@ -5,6 +5,7 @@ import { addCondition } from '../../services/combat/conditions/conditionSaveServ
 import { getAuraConditionImmunities } from '../../services/combat/auras/auraConditionImmunity.js'
 import { getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js'
 import { addConcentration } from '../../services/combat/concentration/concentrationService.js'
+import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 import { produceFallDamage } from '../../services/combat/fallDamage.js'
 import { cloneDeep } from 'lodash'
@@ -85,6 +86,17 @@ export function createEffectAdderHandlers({
 }) {
     const handleApplyEffect = async function handleApplyEffect(tab, data) {
         if (!combatSummary) return
+
+        // Owner ruling 2026-11-10 (improve gate-away-condition-add): the manual
+        // door never WRITES onto an AWAY row either — honest refusal closing the
+        // stale-modal race (modal opened while present, then Split Party parks
+        // the creature away before Apply). An absent row (e.g. cleared board)
+        // keeps its existing semantics — only an explicitly-away row refuses.
+        const targetRow = (combatSummary.creatures || []).find(c => c.name === data?.target)
+        if (targetRow && !isCreaturePresent(targetRow)) {
+            setEffectAdderTarget(null)
+            return
+        }
 
         if (tab === 'conditions') {
             const outcome = await applyConditionTabEffect({ combatSummary, campaignName, characters, setCombatSummary, data })

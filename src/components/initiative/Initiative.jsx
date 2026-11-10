@@ -517,7 +517,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }), [isLocalhost, campaignNpcs, campaignName, characters])
 
     const openEffectAdder = React.useCallback((creature, tab) => {
-        if (!isLocalhost) return
+        // Owner ruling 2026-11-10 (improve gate-away-condition-add): the manual
+        // door never opens for an AWAY row — backstop for stale/shared synced
+        // target flags (the real card hides the Add affordance outright).
+        if (!isLocalhost || !isCreaturePresent(creature)) return
         // CLA-360 law (displayCreatureUtils.js:49, Initiative.jsx holderName lane):
         // structural (Second Turn) rows are synthetic transport — state keyed by the
         // suffixed name is a phantom bucket (invisible, unrestorable, orphaned at the
@@ -972,7 +975,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     initialTab={effectAdderTab}
                     onCancel={() => closeEffectAdderTarget(null)}
                     onApply={handleApplyEffect}
-                    creatures={creaturesOrEmpty(combatSummary).filter(isCreaturePresent)}
+                    creatures={creaturesOrEmpty(combatSummary)}
                 />
             )}
             <AllyEditorModal open={allyEditorOpen} modalProps={modalProps} onConfirm={confirmAllyEditor} onCancel={closeAllyEditor} />
