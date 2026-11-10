@@ -57,8 +57,6 @@ FZ session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FZ 2026-11-09) Maps-manager row `Activate`/`Open` buttons are only row-scoped-discoverable — nothing marks the currently-active row visually except the flipped button label; a GM (or harness) scanning for "the active map" must read each row. A persistent `Active` chip on the row (the manager DOES know) would also stop harness `.first()` traps (FZ mis-activated battle-arena this way).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): pendingOAs no-melee DEGRADATION face live (only zero-melee block app-wide is Archlich CR30 — join would dominate the board; face is unit-pinned in MonsterCardModal.opportunityAttack.test.jsx); promptId double-press latch race (sub-echo double-click not reliably constructible from tool land; latch is unit-pinned and marker-consumed-then-normal-press honestly denies — witnessed); new-initiative-roll drop face (same `clearAllPendingOas` function the Clear face proves, button not ridden); TurnEconomyStrip on +NPC bare rows (redundant denominator face, native-confirm lane); monster-token drag budget charging (PT1 above).
