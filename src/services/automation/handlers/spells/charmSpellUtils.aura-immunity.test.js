@@ -21,7 +21,7 @@
 //   paths) + foldMagicalAmbush fold + metamagicHeighten disadvantage transport.
 //   It hand-writes a charmMonster-shaped config and calls handleCharmSpell directly.
 // - Out-of-pair seams: PFEG ward block lives in saveProcessing.js
-//   (saveProcessing.pfeg-charm-immunity.test.js — it.fails FIXME lane, do not touch);
+//   (saveProcessing.pfeg-charm-immunity.test.js — green per-condition ward-filter lane, do not touch);
 //   dominateHandler.js:174 / crownOfMadnessHandler.js:182 consume rollNpcSave in their
 //   own lanes; auraConditionImmunity.test.js unit-pins the channel itself.
 //

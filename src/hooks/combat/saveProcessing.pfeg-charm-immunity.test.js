@@ -59,16 +59,19 @@ vi.mock('../../services/automation/handlers/buffs/circleOfPowerHandler.js', () =
     isCircleOfPowerActive: () => false,
 }));
 
-// Mirror automationImmunities.isWardedConditionImmunity (spells.json PFEG
-// wardedCreatureTypes): PFEG buff active AND condition charmed/frightened AND
-// attacker type warded.
+// Mirror automationImmunities.playerIsImmuneToCondition (spells.json PFEG
+// wardedCreatureTypes + staticImmunityMatches): PFEG buff active AND condition
+// charmed/frightened AND attacker type warded, OR a raw playerStats.immunities
+// match.
 const WARDED = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];
 vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: () => false,
     playerIsImmuneToCondition: ({ conditionKey, playerStats, sourceCreatureType }) => {
+        const low = String(conditionKey || '').toLowerCase();
+        if (Array.isArray(playerStats?.immunities) &&
+            playerStats.immunities.some(i => String(i).toLowerCase() === low)) return true;
         const buffs = runtimeStore[`${playerStats?.name}.activeBuffs`] || [];
         if (!buffs.some(b => b.effect === 'protection_from_evil_and_good')) return false;
-        const low = String(conditionKey || '').toLowerCase();
         if (low !== 'charmed' && low !== 'frightened') return false;
         return WARDED.some(t => t.toLowerCase() === String(sourceCreatureType || '').toLowerCase());
     },
@@ -85,7 +88,7 @@ function seedWard() {
     runtimeStore['War_Cleric.protectionFromEvilAndGoodWardedTypes'] = WARDED;
 }
 
-async function resolveFailedSave(attackerName, saveConditions = ['charmed']) {
+async function resolveFailedSave(attackerName, saveConditions = ['charmed'], immunities = []) {
     const promise = processSaveRoll({
         rollType: 'save',
         target: { name: 'War_Cleric', type: 'player' },
@@ -97,7 +100,7 @@ async function resolveFailedSave(attackerName, saveConditions = ['charmed']) {
             autoDamageFormula: null, saveConditions,
             // SP-094: the modal save builder threads _characters so targetStats
             // resolves and immunity can fire on this lane.
-            _characters: [{ name: 'War_Cleric', computedStats: { name: 'War_Cleric', immunities: [] } }],
+            _characters: [{ name: 'War_Cleric', computedStats: { name: 'War_Cleric', immunities } }],
         },
         logEntry: () => {},
         setPopupHtml: vi.fn(),
@@ -132,15 +135,45 @@ describe('SP-094 PFEG charm immunity on monster save-chip lane', () => {
         expect(entries.some(e => e.type === 'automation blocked')).toBe(false);
     });
 
-    // FIXME: applyFailedSaveConditions keys immunity off applicable[0] only, so a
-    // multi-condition save row whose first condition is charmed/frightened (e.g.
-    // hag's Curse: "Charmed and Poisoned", extractConditionsFromSaveEffect order)
-    // suppresses ALL conditions — RAW, the PFEG ward blocks only charmed/frightened
-    // and poisoned should still land.
-    it.fails('multi-condition row: ward blocks only charmed, poisoned still lands', async () => {
+    // Multi-condition row: immunity/ward is PER-CONDITION (mirroring the aura split) —
+    // a warded first condition (hag's Curse: "Charmed and Poisoned", extractConditionsFromSaveEffect
+    // order) must NOT suppress the row's siblings. RAW: the PFEG ward blocks only
+    // charmed/frightened; poisoned still lands with its normal condition log.
+    it('multi-condition row: ward blocks only charmed, poisoned still lands', async () => {
         seedWard();
         await resolveFailedSave('Succubus 1', ['charmed', 'poisoned']);
 
         expect(runtimeStore['War_Cleric.activeConditions']).toEqual(['poisoned']);
+        // The warded condition keeps its single `automation blocked` row…
+        const blocked = entries.filter(e => e.type === 'automation blocked');
+        expect(blocked).toHaveLength(1);
+        expect(blocked[0]).toMatchObject({ characterName: 'War_Cleric', sourceName: 'Succubus 1' });
+        // …and the surviving condition applies + logs like a normal grant.
+        const applied = entries.find(e => e.type === 'condition' && e.action === 'applied');
+        expect(applied).toMatchObject({ characterName: 'War_Cleric', condition: 'Poisoned' });
+    });
+
+    it('multi-condition row, mirrored order: immunity keyed per condition, not by position', async () => {
+        seedWard();
+        await resolveFailedSave('Succubus 1', ['poisoned', 'charmed']);
+
+        expect(runtimeStore['War_Cleric.activeConditions']).toEqual(['poisoned']);
+        const blocked = entries.filter(e => e.type === 'automation blocked');
+        expect(blocked).toHaveLength(1);
+        const applied = entries.find(e => e.type === 'condition' && e.action === 'applied');
+        expect(applied).toMatchObject({ characterName: 'War_Cleric', condition: 'Poisoned' });
+    });
+
+    // Mixed RAW immunity (not the ward): a poisoned-immune, non-warded target failing
+    // a Humanoid's ['charmed','poisoned'] row keeps charmed and silently sheds poisoned —
+    // same per-condition filter, non-ward immunities log no refusal row (pre-existing
+    // single-condition shape preserved).
+    it('mixed raw immunity: poisoned-immune target still gains charmed, no ward row', async () => {
+        await resolveFailedSave('Bandit 1', ['charmed', 'poisoned'], ['poisoned']);
+
+        expect(runtimeStore['War_Cleric.activeConditions']).toEqual(['charmed']);
+        expect(entries.some(e => e.type === 'automation blocked')).toBe(false);
+        const applied = entries.find(e => e.type === 'condition' && e.action === 'applied');
+        expect(applied).toMatchObject({ characterName: 'War_Cleric', condition: 'Charmed' });
     });
 });

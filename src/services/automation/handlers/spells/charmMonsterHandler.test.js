@@ -18,7 +18,7 @@
 //   save_result/condition logs, popup summaries) are NOT re-pinned here.
 // - Charm-immunity seams live downstream, untouched by this shell: Aura of Devotion suppression in
 //   charmSpellUtils (#1884); PFEG ward block in saveProcessing.js
-//   (saveProcessing.pfeg-charm-immunity.test.js — it.fails FIXME lane, do not touch).
+//   (saveProcessing.pfeg-charm-immunity.test.js — green per-condition ward-filter lane, do not touch).
 // - Freed-on-damage lives in applyDamage.js ('removed Charmed — took damage'), concentration latch
 //   rides addExpiration inside the utils. No clock in this handler — turn-based, per no-timers policy.
 //

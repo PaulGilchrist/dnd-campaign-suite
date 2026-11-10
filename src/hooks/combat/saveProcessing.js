@@ -1300,27 +1300,38 @@ async function applyFailedSaveConditions({ saveConditions, saveSuccess, targetCh
     // EB-joined monsters carry type:'npc' with the true type in monsterType; PCs
     // fall through unchanged → byte-inert null for every non-warded attacker.
     const sourceCreatureType = await resolveAttackerCreatureType(attackerName, combatSummary, campaignName);
-    const isImmune = targetStats && playerIsImmuneToCondition({
-        conditionKey: applicable[0],
-        playerStats: targetStats,
-        getRuntimeValue,
-        campaignName,
-        sourceCreatureType,
-    });
-    if (isImmune) {
-        logWardedConditionImmunity({ applyTarget, attackerName, sourceCreatureType, conditionKey: applicable[0], context, campaignName });
-        return false;
+    // SP-094 + multi-condition fix: immunity/ward is a PER-CONDITION property (mirroring
+    // the aura split above), never a whole-row veto — checking only applicable[0] let a
+    // warded first condition (e.g. a hag's Curse "Charmed and Poisoned" under a PFEG
+    // ward) suppress its siblings. Raw/static/feature immunities are skipped silently
+    // (same as the pre-fix single-condition row); ward-blocked conditions keep the
+    // logWardedConditionImmunity `automation blocked` line, one per warded condition.
+    const granted = [];
+    for (const conditionKey of applicable) {
+        const isImmune = targetStats && playerIsImmuneToCondition({
+            conditionKey,
+            playerStats: targetStats,
+            getRuntimeValue,
+            campaignName,
+            sourceCreatureType,
+        });
+        if (isImmune) {
+            logWardedConditionImmunity({ applyTarget, attackerName, sourceCreatureType, conditionKey, context, campaignName });
+            continue;
+        }
+        granted.push(conditionKey);
     }
+    if (granted.length <= 0) return false;
     const currentConditions = getRuntimeValue(applyTarget, 'activeConditions') || [];
     const newConditions = [...currentConditions];
-    for (const cond of applicable) {
+    for (const cond of granted) {
         if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
             newConditions.push(cond);
         }
     }
     setRuntimeValue(applyTarget, 'activeConditions', newConditions, campaignName);
-    stampConditionMetaAndLogClauses({ applyTarget, saveConditions: applicable, attackerName, context, campaignName });
-    const conditionNames = applicable.map(c => c.charAt(0).toUpperCase() + c.slice(1));
+    stampConditionMetaAndLogClauses({ applyTarget, saveConditions: granted, attackerName, context, campaignName });
+    const conditionNames = granted.map(c => c.charAt(0).toUpperCase() + c.slice(1));
     addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
