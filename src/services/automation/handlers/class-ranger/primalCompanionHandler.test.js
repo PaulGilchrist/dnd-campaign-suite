@@ -310,6 +310,29 @@ describe('primalCompanionHandler', () => {
             expect(rollD20).not.toHaveBeenCalled();
         });
 
+        // Owner decision 2026-11-10 (bug-summon-lanes-initiative-rolled-board-refresh):
+        // the summon join is a PURE board refresh — never the new-combat-reset
+        // event whose mount-scoped consumers wipe pendingOAs / round flags /
+        // Hunter's Mark / concentration.
+        it('dispatches combat-summary-updated EXACTLY once and never initiative-rolled', async () => {
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '15', initiativeBonus: 2 }] });
+            loadMonsters.mockResolvedValue(mockMonsters);
+
+            const rolled = vi.fn();
+            const refreshed = vi.fn();
+            window.addEventListener('initiative-rolled', rolled);
+            window.addEventListener('combat-summary-updated', refreshed);
+            try {
+                const result = await confirmPrimalCompanionSummon(makeAction(), mockPlayerStats, mockCampaignName, 'Beast of the Land');
+                expect(result.type).toBe('popup');
+                expect(refreshed).toHaveBeenCalledTimes(1);
+                expect(rolled).not.toHaveBeenCalled();
+            } finally {
+                window.removeEventListener('initiative-rolled', rolled);
+                window.removeEventListener('combat-summary-updated', refreshed);
+            }
+        });
+
         it('rolls the companion initiative through the canonical rollD20 lane when the caster has no initiative (fix#169 seed pin)', async () => {
             getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '', initiativeBonus: 2 }] });
             loadMonsters.mockResolvedValue(mockMonsters);

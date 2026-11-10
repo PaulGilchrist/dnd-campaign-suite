@@ -305,7 +305,11 @@ export async function confirmPrimalCompanionSummon(action, playerStats, campaign
     setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
     await setRuntimeValue(playerName, 'primalCompanionType', selectedType, campaignName);
     await setRuntimeValue(playerName, 'primalCompanionAlive', true, campaignName);
-    window.dispatchEvent(new CustomEvent('initiative-rolled'));
+    // Mid-combat summon = PURE board refresh (owner decision 2026-11-10):
+    // NOT a new-combat seam — `combat-summary-updated` adopts the board
+    // without the mount-scoped initiative-rolled wipes (mirrors
+    // summonedCreatureService.js).
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
     await addEntry(campaignName, {
         type: 'summons',

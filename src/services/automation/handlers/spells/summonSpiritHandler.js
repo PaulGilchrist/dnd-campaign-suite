@@ -468,7 +468,9 @@ async function performSummon(action, playerStats, campaignName, variant) {
     applySummonDuration({ noConcentration, createThrall, casterName, action, auto, playerStats, combatSummary, campaignName });
     await storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
     await setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
-    window.dispatchEvent(new CustomEvent('initiative-rolled'));
+    // Mid-combat summon = PURE board refresh (owner decision 2026-11-10,
+    // see monsterSummon.js): benign adoption event, never `initiative-rolled`.
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
     const summonLabel = auto.typeLabel || variant.name;
     const castLabel = buildSummonCastLabel({ casterName, action, variant, creature, isPhantasmalFreeCast, featureNoConcentration, slotLevel });

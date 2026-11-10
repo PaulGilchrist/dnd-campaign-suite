@@ -5,8 +5,8 @@
 // the chance option, else the first chance-less fallback) → spawn the
 // chosen monster into combatSummary as an ally of the caster, initiative
 // right after the caster (summonSpiritHandler's spawn seam: cs push + sort
-// + storage.set + initiative-rolled dispatch), te "summoned" registered on
-// the spawn, every step logged. Uses economy reuses the MA-0020
+// + storage.set + combat-summary-updated dispatch), te "summoned" registered
+// on the spawn, every step logged. Uses economy reuses the MA-0020
 // monsterSpellUses gate/spend/refusal untouched (numeric uses/maxUses).
 // "Can't summon other demons", dismiss-as-action and the exact 10-minute
 // expiry clock stay §70 advisory residuals on the summon log.
@@ -342,7 +342,14 @@ function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignN
   const setCS = deps.setCombatSummary || ((cs) => storage.set('combatSummary', cloneDeep(cs), campaignName));
   setCS(combatSummary);
   if (!deps.skipDomEvents) {
-    window.dispatchEvent(new CustomEvent('initiative-rolled'));
+    // Mid-combat summon = PURE board refresh (owner decision 2026-11-10,
+    // bug-summon-lanes-initiative-rolled-board-refresh): a summon inherits
+    // the caster's initiative, it is NOT a new-combat seam. Dispatching
+    // `initiative-rolled` here let the mount-scoped new-combat wipes (OA
+    // markers, round flags, Hunter's Mark, Vex latch…) fire only when the
+    // matching view happened to be mounted. `combat-summary-updated` is the
+    // benign adoption event — mirrors summonedCreatureService.js.
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
   }
   return summonedNames;
 }

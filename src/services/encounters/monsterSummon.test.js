@@ -669,3 +669,59 @@ describe('MA-1729 wraith Create Specter', () => {
     expect(setPopupHtml).toHaveBeenCalledWith(expect.not.stringContaining('10 minutes'));
   });
 });
+
+// Owner decision 2026-11-10 (bug-summon-lanes-initiative-rolled-board-refresh):
+// a mid-combat summon inherits the caster's initiative — it is NOT a new-combat
+// seam. The board-refresh signal must be the benign `combat-summary-updated`
+// (adoption-only, mirrors summonedCreatureService.js), never `initiative-rolled`
+// whose mount-scoped consumers wipe pendingOAs / round flags / Hunter's Mark.
+describe('board-refresh event — pure summon refresh', () => {
+  function trackEvents() {
+    const rolled = [];
+    const refreshed = [];
+    const onRolled = () => rolled.push('initiative-rolled');
+    const onRefreshed = () => refreshed.push('combat-summary-updated');
+    window.addEventListener('initiative-rolled', onRolled);
+    window.addEventListener('combat-summary-updated', onRefreshed);
+    return {
+      rolled,
+      refreshed,
+      dispose: () => {
+        window.removeEventListener('initiative-rolled', onRolled);
+        window.removeEventListener('combat-summary-updated', onRefreshed);
+      },
+    };
+  }
+
+  it('spawn press dispatches combat-summary-updated EXACTLY once and never initiative-rolled; summons log still lands', async () => {
+    const events = trackEvents();
+    try {
+      const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Galeb Duhr 1', type: 'npc', monsterIndex: 'galeb-duhr', initiative: '10', currentHp: 95, maxHp: 95 }] } });
+      deps.monsters = [galebDuhr];
+      deps.skipDomEvents = false; // live DOM-event path
+      const { result } = await press(ANIMATE_ROW, 'Galeb Duhr 1', deps);
+      expect(result.resolved).toBe(true);
+      expect(events.refreshed).toEqual(['combat-summary-updated']);
+      expect(events.rolled).toEqual([]);
+      // every lane must still log its summons row (unchanged by the swap)
+      expect(deps.logs.some(e => e.type === 'summons')).toBe(true);
+    } finally {
+      events.dispose();
+    }
+  });
+
+  it('skipDomEvents dep contract preserved: suppressed press dispatches no DOM event at all', async () => {
+    const events = trackEvents();
+    try {
+      const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Galeb Duhr 1', type: 'npc', monsterIndex: 'galeb-duhr', initiative: '10', currentHp: 95, maxHp: 95 }] } });
+      deps.monsters = [galebDuhr];
+      // makeDeps default: skipDomEvents: true
+      const { result } = await press(ANIMATE_ROW, 'Galeb Duhr 1', deps);
+      expect(result.resolved).toBe(true);
+      expect(events.refreshed).toEqual([]);
+      expect(events.rolled).toEqual([]);
+    } finally {
+      events.dispose();
+    }
+  });
+});

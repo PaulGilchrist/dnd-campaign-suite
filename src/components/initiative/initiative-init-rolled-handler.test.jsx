@@ -28,7 +28,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './Initiative.jsx';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../../hooks/runtime/useRuntimeState.js';
 import storage from '../../services/ui/storage.js';
 import { clearExpirationEffects } from '../../services/rules/effects/expirations.js';
 
@@ -285,5 +285,58 @@ describe('Initiative - initiative-rolled seam', () => {
         expect(runtimeAfter).toEqual([]);
         expect(storageAfter).toEqual([]);
         expect(expireAfter).toEqual([]);
+    });
+
+    // Owner decision 2026-11-10 (bug-summon-lanes-initiative-rolled-board-refresh):
+    // summon lanes now dispatch `combat-summary-updated` (adoption-only) instead
+    // of `initiative-rolled`. With the same view mounted and the same seeded
+    // state, the refresh event must wipe NOTHING — while the mounted
+    // initiative-rolled listener keeps its new-roll drop law (b570aa359).
+    it('combat-summary-updated adopts the board with ZERO new-combat clears — seeded OA marker/Vex latch/round flags/Hunter\'s Mark survive; initiative-rolled still evicts (non-vacuous)', async () => {
+        const SEEDED = {
+            round: 1,
+            creatures: [
+                { name: 'Alice', type: 'player', concentration: { spell: "Hunter's Mark", dc: 10 } },
+                { name: 'Bob', type: 'player' },
+                { name: 'Goblin Summon 1', type: 'npc' },
+            ],
+        };
+        vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        // The npc row is ONLY on the event-time board: it renders after adoption.
+        expect(screen.queryByTestId('creature-card-Goblin Summon 1')).not.toBeInTheDocument();
+
+        // Seed the markers the mounted listener would retire: campaign-level
+        // pendingOAs bucket + (writes below are measured per key).
+        vi.mocked(getRuntimeValue).mockImplementation((name, key) =>
+            key === 'pendingOAs'
+                ? { SeedDefender: { defender: 'SeedDefender', mover: 'Alice', promptId: 'seam-survivor' } }
+                : null);
+        vi.mocked(getCombatSummary).mockReturnValue(SEEDED);
+
+        const baseline = {
+            runtime: setRuntimeValue.mock.calls.length,
+            deleteKey: deleteRuntimeKey.mock.calls.length,
+            storage: storage.set.mock.calls.length,
+            expire: clearExpirationEffects.mock.calls.length,
+        };
+
+        await act(async () => { window.dispatchEvent(new Event('combat-summary-updated')); });
+
+        // Zero clears from the refresh event — none of the new-combat writes fire.
+        expect(setRuntimeValue.mock.calls.slice(baseline.runtime)).toEqual([]);
+        expect(deleteRuntimeKey.mock.calls.slice(baseline.deleteKey)).toEqual([]);
+        expect(storage.set.mock.calls.slice(baseline.storage)).toEqual([]);
+        expect(clearExpirationEffects.mock.calls.slice(baseline.expire)).toEqual([]);
+        // Adoption still happened (this is how a summon's new cards land):
+        // the npc row only exists on the event-time board.
+        expect(screen.getByTestId('creature-card-Goblin Summon 1')).toBeInTheDocument();
+
+        // Non-vacuous contrast: the SAME mounted listener DOES evict on a real
+        // new roll (b570aa359 law stays intact).
+        await act(async () => { window.dispatchEvent(new Event('initiative-rolled')); });
+        expect(deleteRuntimeKey).toHaveBeenCalledWith('campaign', 'pendingOAs', 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'test-campaign');
     });
 });

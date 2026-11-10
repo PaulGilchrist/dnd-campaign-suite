@@ -176,7 +176,9 @@ export async function confirmCreateUndead(action, playerStats, campaignName, { g
 
     storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
     setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
-    window.dispatchEvent(new CustomEvent('initiative-rolled'));
+    // Mid-combat summon = PURE board refresh (owner decision 2026-11-10,
+    // see monsterSummon.js): benign adoption event, never `initiative-rolled`.
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
     const plural = count > 1 ? 's' : '';
     const ghoulLabel = `${count} Ghoul${plural}`;

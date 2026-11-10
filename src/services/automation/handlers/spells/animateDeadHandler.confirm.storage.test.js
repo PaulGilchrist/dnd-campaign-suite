@@ -13,7 +13,8 @@
  *    no other lane exercises this branch)
  *  - summons log entry via addEntry (full-string description, exact names) +
  *    matching result.logEntries return contract + rejection containment
- *  - initiative-rolled dispatch (UI refresh only — no game timers)
+ *  - combat-summary-updated dispatch (board refresh only — no game timers;
+ *    a summon is NOT a new-combat seam, so never initiative-rolled)
  *  - action.metadata maxTargets write (received via handoff from details lane):
  *    persists slot-derived maxTargets (lv4 ⇒ 3), merges onto existing metadata
  *
@@ -251,7 +252,7 @@ describe('confirmAnimateDead - storage, runtime writes and campaign log', () => 
         expect(action.metadata).toBeUndefined();
     });
 
-    it('dispatches exactly one bare initiative-rolled event (UI refresh — no detail payload)', async () => {
+    it('dispatches exactly one bare combat-summary-updated event (board refresh only — never initiative-rolled, no detail payload)', async () => {
         const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
         await confirmAnimateDead(
@@ -263,7 +264,10 @@ describe('confirmAnimateDead - storage, runtime writes and campaign log', () => 
 
         expect(dispatchSpy).toHaveBeenCalledTimes(1);
         const evt = dispatchSpy.mock.calls[0][0];
-        expect(evt.type).toBe('initiative-rolled');
+        // Owner decision 2026-11-10 (bug-summon-lanes-initiative-rolled-board-refresh):
+        // a mid-combat summon is a PURE board refresh — the new-combat-reset
+        // event must never fire from this lane.
+        expect(evt.type).toBe('combat-summary-updated');
         // DOM spec: CustomEvent without a detail init lands on null, not undefined.
         expect(evt.detail).toBeNull();
         dispatchSpy.mockRestore();

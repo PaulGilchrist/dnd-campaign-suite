@@ -13,7 +13,8 @@
  *  - THIS LANE (confirm.storage) — confirm-side persistence: storage.set('combatSummary')
  *                                   detached-clone guard, exact-array setRuntimeValue
  *                                   ('campaign', 'targetEffects') pins incl. pre-existing-te
- *                                   preservation, initiative-rolled CustomEvent dispatch,
+ *                                   preservation, combat-summary-updated CustomEvent
+ *                                   dispatch (board refresh — never initiative-rolled),
  *                                   addEntry summons-log full-string composition, returned
  *                                   logEntries mirror, log-rejection resilience, action.metadata
  *                                   maxTargets write + merge, popup description full strings,
@@ -194,7 +195,7 @@ describe('createUndeadHandler - confirmCreateUndead storage/logging', () => {
             ], mockCampaignName);
         });
 
-        it('dispatches a bare initiative-rolled CustomEvent once', async () => {
+        it('dispatches a bare combat-summary-updated CustomEvent once (never initiative-rolled)', async () => {
             const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
             await confirmCreateUndead(
@@ -207,7 +208,10 @@ describe('createUndeadHandler - confirmCreateUndead storage/logging', () => {
             expect(dispatchSpy).toHaveBeenCalledTimes(1);
             const event = dispatchSpy.mock.calls[0][0];
             expect(event).toBeInstanceOf(CustomEvent);
-            expect(event.type).toBe('initiative-rolled');
+            // Owner decision 2026-11-10 (bug-summon-lanes-initiative-rolled-board-refresh):
+            // a mid-combat summon is a PURE board refresh — the new-combat-reset
+            // event must never fire from this lane.
+            expect(event.type).toBe('combat-summary-updated');
             expect(event.detail).toBeNull();
             dispatchSpy.mockRestore();
         });

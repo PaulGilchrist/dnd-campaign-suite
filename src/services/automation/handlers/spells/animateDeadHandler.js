@@ -166,7 +166,9 @@ export async function confirmAnimateDead(action, playerStats, campaignName, { zo
         for (const name of creatureNames) ts = registerCompanion(ts, name, casterName);
         await storage.set('turnState', ts, campaignName);
     }
-    window.dispatchEvent(new CustomEvent('initiative-rolled'));
+    // Mid-combat summon = PURE board refresh (owner decision 2026-11-10,
+    // see monsterSummon.js): benign adoption event, never `initiative-rolled`.
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
     const zombieLabel = pluralCountLabel(zombieCount, 'Zombie');
     const skeletonLabel = pluralCountLabel(skeletonCount, 'Skeleton');

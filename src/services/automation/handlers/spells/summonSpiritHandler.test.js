@@ -276,6 +276,28 @@ describe('summonSpiritHandler', () => {
             expect(result.type).toBe('popup');
         });
 
+        // Owner decision 2026-11-10 (bug-summon-lanes-initiative-rolled-board-refresh):
+        // the summon join is a PURE board refresh — never the new-combat-reset
+        // event whose mount-scoped consumers wipe pendingOAs / round flags /
+        // Hunter's Mark / concentration.
+        it('dispatches combat-summary-updated EXACTLY once and never initiative-rolled', async () => {
+            loadMonsters.mockResolvedValue(mockMonsters);
+
+            const rolled = vi.fn();
+            const refreshed = vi.fn();
+            window.addEventListener('initiative-rolled', rolled);
+            window.addEventListener('combat-summary-updated', refreshed);
+            try {
+                const result = await confirmSummonSpirit(makeAction(), mockPlayerStats, mockCampaignName, 'Bestial Spirit (Air)');
+                expect(result.type).toBe('popup');
+                expect(refreshed).toHaveBeenCalledTimes(1);
+                expect(rolled).not.toHaveBeenCalled();
+            } finally {
+                window.removeEventListener('initiative-rolled', rolled);
+                window.removeEventListener('combat-summary-updated', refreshed);
+            }
+        });
+
         it('scales HP and AC by the slot level used for armor_class_scales_with_slot blocks (SP-015)', async () => {
             loadMonsters.mockResolvedValue(mockMonsters);
             const combatSummary = getCombatSummary(mockCampaignName);
