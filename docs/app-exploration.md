@@ -60,8 +60,6 @@ GA session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[GA 2026-11-10] same-cell token overlaps make drags ambiguous:** two tokens at one grid coord render stacked and the pointer grabs by render order (GA: a 7-cell cell-stepped sequence alternated between EvasiveFighter and Wolf mid-sequence — silent two-mover provocation). Micro-offset same-cell tokens (map-view stacking like initiative cards) or a grab disambiguation affordance would protect both GM muscle-memory and automation harnesses. Likely `map/PlacedItems.jsx` render order + the drag-grab hit-test.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): ONE-OFF pendingOAs eviction — during the Speedy-surgery reload+re-select cycle the legitimately-live Wolf marker (mover on board, hp>0) vanished without an observable seam; 1 clean control cycle (seed→reload→re-select→Initiative mount) did NOT reproduce → not filed; next run ride 2-3 more cycles (PT4). Speedy advantage-cancel net face (unit-pinned only). Partial-clamp mid-burst copy at true-speed edge. Cross-client (LAN-tab) marker press lanes. pendingOAs no-melee Archlich degradation + promptId double-press latch (FZ-era carries unchanged).

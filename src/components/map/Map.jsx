@@ -45,6 +45,7 @@ import SpellOverlayConfirmModal from './SpellOverlayConfirmModal.jsx';
 import MapDescriptionPanel from '../common/MapDescriptionPanel.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
+import { buildTokenStackOffsets } from '../../services/maps/tokenStackOffsets.js';
 import usePlayerDragging from './hooks/usePlayerDragging';
 import useItemDragging from './hooks/useItemDragging';
 import useNpcImageCache from './hooks/useNpcImageCache';
@@ -322,6 +323,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         setPopupHtml: showMapNotice,
     });
 
+    // Same-cell token stacking (GA 2026-11-10 drag-ambiguity fix): deterministic
+    // micro-offsets so overlapping tokens stay visibly distinct and the token
+    // VISIBLE under the pointer is the one the paint-order hit-test grabs.
+    // See services/maps/tokenStackOffsets.js for the paint-order contract.
+    const tokenStackOffsets = useMemo(
+        () => buildTokenStackOffsets({ mapData, placedItems, dragging, itemDragging }),
+        [mapData, placedItems, dragging, itemDragging]
+    );
+
     // Click-select press recorder (see resolveItemClick): the left-button
     // drag hook stopPropagations pointerdown, so a press on a token never
     // routes to the pan/paint lanes — the wrapper records at the target phase
@@ -451,10 +461,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
         setRenamePopover({ id: item.id, name: defaultName || placedItem?.name || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
     };
 
-    useEffect(() => { placedItemsRef.current = placedItems; }, [placedItems, placedItemsRef]);
+    // Mirror latest state into the refs the select-move lane reads mid-gesture.
+    // The two DOCUMENT mirrors are consolidated into ONE effect (idempotent
+    // .current writes — no ordering need) to hold Map at its max-statements cap.
+    useEffect(() => { placedItemsRef.current = placedItems; mapDataRef.current = mapData; }, [placedItems, mapData, placedItemsRef, mapDataRef]);
     useEffect(() => { selectedWallsRef.current = selectedWalls; }, [selectedWalls, selectedWallsRef]);
     useEffect(() => { selectedItemsRef.current = selectedItems; }, [selectedItems, selectedItemsRef]);
-    useEffect(() => { mapDataRef.current = mapData; }, [mapData, mapDataRef]);
 
     const handleToolPanStart = useCallback((e) => {
         if (spellDragActiveRef.current) return;
@@ -696,6 +708,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     selectedPlayer={selectedPlayer}
                     setSelectedPlayer={setSelectedPlayer}
                     campaignName={campaignName}
+                    tokenOffsets={tokenStackOffsets.players}
                 />
 
                 <PlacedItems
@@ -708,6 +721,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     npcImages={npcImages}
                     itemDragging={itemDragging}
                     handleItemPointerDown={handleItemPointerDownTracked}
+                    tokenOffsets={tokenStackOffsets.items}
                 />
 
                 {/* Indoor POIs (labelled points of interest, same lane the

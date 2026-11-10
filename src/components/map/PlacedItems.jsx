@@ -8,6 +8,7 @@ import { itemSpriteHref } from '../../services/maps/itemSprites';
 // Parity note: the outdoor prop lane (tree/boulder/bush on parentHex grids)
 // had the same gap, so the title rides every marker in both lanes.
 import { placedItemLabel } from './hooks/usePlacedItems.js';
+import { tokenStackTransform, isStackedToken } from '../../services/maps/tokenStackOffsets.js';
 const RADIUS = 20;
 const SPRITE = 36;      // single-cell sprite edge (SVG units)
 const WIDE_SPRITE = 72; // two-cell sprite long edge at rotation 0
@@ -40,6 +41,7 @@ function PlacedItems({
     npcImages,
     itemDragging,
     handleItemPointerDown,
+    tokenOffsets,
 }) {
     const isVisible = (item) => {
         // A secret door is never shown as an icon to players: hidden it is a
@@ -211,9 +213,13 @@ function PlacedItems({
         if (!isVisible(item)) return null;
         const npcOpacity = itemOpacity(item);
         const npcImage = npcImages[item.name] || item.imageUrl;
+        // Same-cell stacking offset (GA 2026-11-10): undefined for single
+        // tokens and stack tops (byte-unchanged), a translate for buried ones.
+        const stack = tokenStackTransform(tokenOffsets, item.id);
+        const stacked = isStackedToken(tokenOffsets, item.id);
 
         return (
-            <g key={item.id} className="npc-group" title={placedItemLabel(item)}>
+            <g key={item.id} className="npc-group" title={placedItemLabel(item)} transform={stack}>
                 <defs>
                     <clipPath id={`npc-clip-${item.id}`}>
                         <circle cx={cx} cy={cy} r={20} />
@@ -261,17 +267,33 @@ function PlacedItems({
                 </text>
                 {isLocalhost && (
                     <>
-                        <rect
-                            x={cx - RADIUS}
-                            y={cy - RADIUS}
-                            width={RADIUS * 2}
-                            height={RADIUS * 2}
-                            fill="transparent"
-                            className="placed-hit-area"
-                            onPointerDown={onDown(item)}
-                            onContextMenu={onContext(item)}
-                            style={{ cursor: 'grab' }}
-                        />
+                        {/* Stacked-cell tokens (top AND buried) swap the
+                            40×40 cell rect for a circle matching the token art
+                            itself (the barrel circle-hit precedent): a
+                            shifted/oversized transparent rect would invisibly
+                            steal presses from pixels where another token is
+                            what the user sees. Circle hit = painted hit, so
+                            paint order alone decides the grab — the visually
+                            topmost token under the pointer always wins. */}
+                        {stacked ? (
+                            <circle cx={cx} cy={cy} r={RADIUS} fill="transparent"
+                                className="placed-hit-area"
+                                onPointerDown={onDown(item)}
+                                onContextMenu={onContext(item)}
+                                style={{ cursor: 'grab' }} />
+                        ) : (
+                            <rect
+                                x={cx - RADIUS}
+                                y={cy - RADIUS}
+                                width={RADIUS * 2}
+                                height={RADIUS * 2}
+                                fill="transparent"
+                                className="placed-hit-area"
+                                onPointerDown={onDown(item)}
+                                onContextMenu={onContext(item)}
+                                style={{ cursor: 'grab' }}
+                            />
+                        )}
                         {isDragging(item) && (
                             <circle cx={cx} cy={cy} r={RADIUS + 4} fill="none" className="reposition-highlight" />
                         )}

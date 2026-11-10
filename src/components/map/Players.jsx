@@ -1,7 +1,9 @@
 
+import { tokenStackTransform } from '../../services/maps/tokenStackOffsets.js';
+
 const RADIUS = 20;
 
-const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer, campaignName }) => {
+const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer, campaignName, tokenOffsets }) => {
     const getPlayerImage = (player, characters) => {
         if (!characters || !player) return null;
         const character = characters.find((c) => c.name === player.name);
@@ -30,6 +32,11 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                         key={player.id}
                         onPointerDown={(e) => handlePointerDown(e, player.id)}
                         className="creature-group"
+                        // Same-cell stacking: a token buried under another
+                        // renders visibly offset (its own painted circle is the
+                        // grab surface); stack tops/single tokens get no
+                        // transform attribute at all (byte-unchanged).
+                        transform={tokenStackTransform(tokenOffsets, player.id)}
                         style={{ cursor: 'grab' }}
                     >
                         <defs>
