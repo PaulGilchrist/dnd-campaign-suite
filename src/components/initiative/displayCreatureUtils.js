@@ -2,11 +2,18 @@ import utils from '../../services/ui/utils.js'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 
 export function buildRuntimeConditions(creature, lookupName) {
-    const runtimeConditions = getRuntimeValue(lookupName, 'activeConditions') || []
+    const rawConditions = getRuntimeValue(lookupName, 'activeConditions')
+    // Defensive shape guard (improvement 2026-11-10): one malformed row used to
+    // freeze the ENTIRE Initiative view to zero cards in every tab.
+    const runtimeConditions = Array.isArray(rawConditions) ? rawConditions : []
     const conditionMeta = getRuntimeValue(lookupName, 'activeConditionMeta') || {}
     const csConditions = creature.conditions || []
-    return runtimeConditions.map((key, i) => {
-        const condKey = String(key).toLowerCase()
+    return runtimeConditions.map((rawKey, i) => {
+        // Defensive String() (mirrors the cs.key idiom below, improvement
+        // 2026-11-10): a stray object/number entry renders a sanitized label
+        // instead of throwing key.charAt and killing the whole board render.
+        const key = String(rawKey)
+        const condKey = key.toLowerCase()
         const meta = conditionMeta[condKey]
         const csMatch = csConditions.find(cs => String(cs.key).toLowerCase() === condKey)
         return {

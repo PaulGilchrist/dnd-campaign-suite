@@ -296,7 +296,7 @@ function validateMapContext(value) {
  * persist byte-as-sent (no canonicalization) so every established writer's
  * exact shape keeps round-tripping.
  */
-function describeOverlayValue(value) {
+function describeJsonValue(value) {
     if (value === null) return 'null';
     if (Array.isArray(value)) return 'an array';
     if (typeof value === 'object') return `an object with keys: ${Object.keys(value).join(', ') || 'none'}`;
@@ -307,7 +307,7 @@ function overlayRowsProblem(rows) {
     const badRow = rows.findIndex((row) => !isValidOverlay(row));
     if (badRow === -1) return null;
     return 'every overlay needs a known shape, finite startGridX/startGridY numbers, a positive size for its shape (e.g. radiusFt for a sphere) and a color string — '
-        + `row ${badRow} does not match (${describeOverlayValue(rows[badRow])})`;
+        + `row ${badRow} does not match (${describeJsonValue(rows[badRow])})`;
 }
 
 function validateSpellOverlayKey(value) {
@@ -319,11 +319,41 @@ function validateSpellOverlayKey(value) {
         return {
             ok: false,
             reason: 'Overlay save rejected: the spell-overlay key is reserved for board geometry — '
-                + `expected an array of overlay objects (or [] / null to clear), got ${describeOverlayValue(value)}.`,
+                + `expected an array of overlay objects (or [] / null to clear), got ${describeJsonValue(value)}.`,
         };
     }
     const problem = overlayRowsProblem(rows);
     if (problem) return { ok: false, reason: `Overlay save rejected: ${problem}` };
+    return { ok: true };
+}
+
+/**
+ * Runtime `activeConditions` bucket (improvement 2026-11-10, GB incident): rows
+ * must be BARE condition-key strings — a stray object/number entry used to
+ * crash `key.charAt` in initiative/displayCreatureUtils.js and freeze the
+ * ENTIRE Initiative view to zero cards in every tab. The client now renders a
+ * sanitized label (defensive `String()`), and this guard stops malformed rows
+ * from ever entering the shared store: null/absent is an honest clear;
+ * otherwise the value must be an array whose every entry is a string.
+ * Well-formed string-array writes persist byte-as-sent (no canonicalization).
+ */
+function validateActiveConditionsArray(value, label) {
+    if (value === null || value === undefined) return { ok: true }; // honest clear
+    if (!Array.isArray(value)) {
+        return {
+            ok: false,
+            reason: `${label} must be an array of condition-key strings like ["poisoned","prone"] `
+                + `(or null to clear) — got ${describeJsonValue(value)}.`,
+        };
+    }
+    const badIndex = value.findIndex(entry => typeof entry !== 'string');
+    if (badIndex !== -1) {
+        return {
+            ok: false,
+            reason: `${label} must contain only condition-key strings like "poisoned" — `
+                + `entry ${badIndex} is ${describeJsonValue(value[badIndex])}, not a string.`,
+        };
+    }
     return { ok: true };
 }
 
@@ -347,6 +377,12 @@ function validateMonsterEconomyProps(value) {
     ]) {
         const result = check[0](check[1]);
         if (!result.ok) return result;
+    }
+    // activeConditions rides inside the same creature-store writes (improvement
+    // 2026-11-10): only scanned when present, so stores without the key round-
+    // trip byte-identically.
+    if ('activeConditions' in value) {
+        return validateActiveConditionsArray(value.activeConditions, 'activeConditions');
     }
     return { ok: true };
 }
@@ -387,6 +423,13 @@ export const keyValidators = {
         // byte-identical state (0 change, 200 — guard shape preserved).
         enforcementBlobChanged(v, ctx.current?.enforcement))),
     turnState: validateTurnState,
+    // activeConditions direct top-level write (improvement 2026-11-10): must be
+    // null (clear) or an array of condition-key STRINGS. This gate does NOT add
+    // an authority lane — honest players/GMs write it from any origin — it only
+    // refuses the malformed object/number shapes that crashed the whole
+    // Initiative board client-side (GB 2026-11-10). The nested creature-store
+    // lane is scanned by validateMonsterEconomyProps via the pass-through path.
+    activeConditions: (v) => validateActiveConditionsArray(v, 'activeConditions'),
     // L5 Phase 4 (§10.1): session orchestration truth — shape only, phase
     // enum pinned; unset ⇒ 'exploration' (today's implicit default).
     sessionState: validateSessionState,

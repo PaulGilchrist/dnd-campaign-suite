@@ -69,7 +69,6 @@ GB session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-10 GB) `buildRuntimeConditions` (`initiative/displayCreatureUtils.js:14`) reads `key.charAt` unguarded — one non-string `activeConditions` entry (the server accepted it at the change-data route) froze the ENTIRE Initiative view to zero cards in every tab with no error-boundary message; suggested: `String(key)` on the label path (mirroring the `:10` defensive idiom) and/or reject malformed runtime rows at the write route.
 - (2026-11-10 GB) GM-movement advisory is `title`-attribute-only (invisible on touch + screen readers) while it carries load-bearing adjudication info; consider mirroring it into the badge aria-label or a visible "(GM-driven)" hint on non-player movement badges.
 - (2026-11-10 GB) Stacked-cell grab surfaces spill into neighbours: a 2-step buried token's clickable crescent sits ~28 px beyond its cell border (adjacent cell visually), so a pointer clearly over another cell can pick up the buried token; consider capping `MAX_STACK_OFFSET_STEPS` at 1 or fading buried art opacity to set the expectation.
 
