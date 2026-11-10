@@ -158,8 +158,27 @@ export function deleteRuntimeKey(characterKey, propertyName, campaignName) {
         console.error('deleteRuntimeKey called with undefined campaignName', { characterKey, propertyName, stack: new Error().stack });
         return;
     }
+    // Fail loudly (bug-visitor-oa-resolution-strands-marker-double-resolve,
+    // owner ruling 2026-11-10): a REFUSED eviction (4xx) previously failed
+    // silently — the local mirror evicted while the server kept the shared
+    // marker, which then replayed (the OA double-resolve strand). Network
+    // errors reach the .catch; gate refusals carry an OK transport, so check
+    // res.ok explicitly, console.error, and broadcast for a visible toast
+    // (Initiative.jsx listens) so no future split gate can strand a marker
+    // silently again.
     fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(propertyName)}`, {
         method: 'DELETE',
+    }).then((res) => {
+        if (res.ok) return;
+        console.error(`deleteRuntimeKey: server refused eviction of "${propertyName}" (HTTP ${res.status}) — the shared key survives server-side`, { campaignName });
+        // Visible feedback only for AUTHORITY refusals: a 404 honestly means
+        // the key is already gone (a concurrent tab won the evict) — nothing
+        // is stranded, so no toast.
+        if (res.status === 403) {
+            window.dispatchEvent(new CustomEvent('runtime-evict-failed', {
+                detail: { key: propertyName, campaignName, status: res.status },
+            }));
+        }
     }).catch((e) => { console.error("[useRuntimeState] Error:", e); });
 }
 

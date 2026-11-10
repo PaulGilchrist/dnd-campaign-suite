@@ -265,11 +265,20 @@ router.patch('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => 
 }));
 
 // API endpoint to delete a character file and its associated image
+// Authority split (bug-visitor-oa-resolution-strands-marker-double-resolve):
+// the non-`.json` fall-through to the change-data router MUST run BEFORE the
+// GM gate — a single-segment DELETE here was capturing EVERY visitor-origin
+// change-data eviction (pendingOAs marker clears, savePrompt drain-to-evict)
+// with a 403 while the same press's POST writes landed, stranding shared
+// markers for a second (GM) resolution. Change-data key deletes are shared
+// runtime-store writes (CAMPAIGN_LOCK-gated, POST parity); only real `.json`
+// character-file deletes are GM-only. Same fall-through-first shape as the
+// GET/PUT/PATCH siblings above.
 router.delete('/api/campaigns/:campaign/:file', asyncHandler((req, res, next) => {
-    if (!refuseUnlessGm(req, res)) return;
-
     const { campaign, file } = req.params;
     if (file === 'log' || !file.endsWith('.json')) return next();
+    if (!refuseUnlessGm(req, res)) return;
+
     const dir = campaignDir(campaign);
     const filePath = path.join(dir, file);
 

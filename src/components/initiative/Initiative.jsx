@@ -45,6 +45,7 @@ import ClearCombatConfirmModal from './ClearCombatConfirmModal.jsx'
 import TvToggleButton from './TvToggleButton.jsx'
 import TvNextUpStrip from './TvNextUpStrip.jsx'
 import TvMusicTransport from './TvMusicTransport.jsx'
+import EvictFailureToast from './EvictFailureToast.jsx'
 import VictoryBanner from './VictoryBanner.jsx'
 import { createCreatureHandlers } from './createCreatureHandlers.js'
 import { createRollConditionSaveHandler } from './createRollConditionSaveHandler.js'
@@ -795,6 +796,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     {toast.message}
                 </div>
             )}
+            <EvictFailureToast campaignName={campaignName} />
             <VictoryBanner visible={victoryVisible} onDismiss={dismissVictory} result={lastCombatResult} />
             {combatSummary && combatSummary.creatures && boardHasSubjects(combatSummary, characters) ? (
              <>
