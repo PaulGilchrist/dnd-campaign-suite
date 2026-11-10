@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
   getAllStoreKeys: vi.fn(() => []),
 }));
 
@@ -69,7 +70,7 @@ vi.mock('../../combat/automation/automationExpressions.js', () => ({
 }));
 
 import { clearAllExpirationEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 
 const KEY = 'pendingExpirations';
@@ -92,6 +93,11 @@ function emptyRuntime() {
 
 const writesTo = (name, key) =>
   setRuntimeValue.mock.calls.filter((c) => c[0] === name && c[1] === key);
+
+// The seam's self-store writes ride ONE merged setRuntimeObject (post-strip
+// own-bucket snapshot — §5 MA-0809 resurrection law).
+const objectWritesTo = (name) =>
+  setRuntimeObject.mock.calls.filter((c) => c[0] === name);
 
 // ---------------------------------------------------------------------------
 // clearAllExpirationEffects — expiration-queue lanes (this file's lane).
@@ -125,12 +131,15 @@ describe('clearAllExpirationEffects — expiration queues', () => {
 
     // Both entries dispatched: finite and Infinity/until:"combat" alike —
     // a rest/initiative seam purges combat-scoped entries too.
-    expect(setRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions', ['poisoned'], 'MyCampaign');
+    // Condition strip lands as the merged one-write lane (§5 MA-0809).
+    expect(setRuntimeObject).toHaveBeenCalledWith('Orc', { activeConditions: ['poisoned'] }, 'MyCampaign');
     expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'tashas_laughter_Human_damageTrigger', false, 'MyCampaign');
-    // Queue emptied with exactly one write of the empty array.
+    // Queue emptied exactly once, folded into the seam's merged self write.
     const pendingCalls = writesTo('Goblin', KEY);
-    expect(pendingCalls.length).toBe(1);
-    expect(pendingCalls[0][2]).toEqual([]);
+    expect(pendingCalls.length).toBe(0);
+    const selfWrites = objectWritesTo('Goblin');
+    expect(selfWrites.length).toBe(1);
+    expect(selfWrites[0][1][KEY]).toEqual([]);
   });
 
   it.each([
@@ -145,9 +154,12 @@ describe('clearAllExpirationEffects — expiration queues', () => {
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 
-    const pendingCalls = writesTo('Goblin', KEY);
-    expect(pendingCalls.length).toBe(1);
-    expect(pendingCalls[0][2]).toEqual([]);
+    // The empty stamp rides the merged self write — no stale per-key
+    // full-store snapshot of my own bucket is issued (§5 MA-0809).
+    expect(writesTo('Goblin', KEY).length).toBe(0);
+    const selfWrites = objectWritesTo('Goblin');
+    expect(selfWrites.length).toBe(1);
+    expect(selfWrites[0][1][KEY]).toEqual([]);
   });
 
   it('clears "to me" entries from other stores, preserves foreign entries, ignores non-string stores', () => {
@@ -179,7 +191,7 @@ describe('clearAllExpirationEffects — expiration queues', () => {
     const humanCalls = writesTo('Human', KEY);
     expect(humanCalls.length).toBe(1);
     expect(humanCalls[0][2]).toEqual([]);
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded'], 'MyCampaign');
+    expect(setRuntimeObject).toHaveBeenCalledWith('Goblin', { activeConditions: ['blinded'] }, 'MyCampaign');
     // Non-string store keys never become write targets.
     const junkCalls = setRuntimeValue.mock.calls.filter((c) => typeof c[0] !== 'string');
     expect(junkCalls.length).toBe(0);
@@ -239,17 +251,29 @@ describe('clearAllExpirationEffects — self buffs and flags', () => {
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', [], 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'mantleOfMajestyActive', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'innerRadianceActive', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'unbreakableMajestyActive', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'unbreakableMajestySaveDc', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'smiteOfProtectionActive', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'bulwarkOfForceActive', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'bulwarkOfForceTargets', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'naturesSanctuaryActive', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'naturesSanctuaryCreatures', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'naturesSanctuaryRange', null, 'MyCampaign');
+    // All owned self-store keys land in the seam's ONE merged write
+    // (§5 MA-0809: no per-key full-store siblings to reorder against).
+    const selfWrites = objectWritesTo('Goblin');
+    expect(selfWrites.length).toBe(1);
+    expect(selfWrites[0][1]).toEqual(expect.objectContaining({
+      activeBuffs: [],
+      mantleOfMajestyActive: null,
+      innerRadianceActive: null,
+      unbreakableMajestyActive: null,
+      unbreakableMajestySaveDc: null,
+      smiteOfProtectionActive: null,
+      bulwarkOfForceActive: null,
+      bulwarkOfForceTargets: null,
+      naturesSanctuaryActive: null,
+      naturesSanctuaryCreatures: null,
+      naturesSanctuaryRange: null,
+    }));
+    for (const key of ['activeBuffs', 'mantleOfMajestyActive', 'innerRadianceActive',
+      'unbreakableMajestyActive', 'unbreakableMajestySaveDc', 'smiteOfProtectionActive',
+      'bulwarkOfForceActive', 'bulwarkOfForceTargets', 'naturesSanctuaryActive',
+      'naturesSanctuaryCreatures', 'naturesSanctuaryRange']) {
+      expect(writesTo('Goblin', key).length).toBe(0);
+    }
   });
 
   it.each([
@@ -264,18 +288,20 @@ describe('clearAllExpirationEffects — self buffs and flags', () => {
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 
-    const baitCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Goblin' && ['baitAndSwitchActive', 'baitAndSwitchBonus', 'baitAndSwitchSource'].includes(c[1]),
-    );
+    // The three keys ride the merged self write when armed, and are absent
+    // from it (and from every per-key call) when not.
+    const selfWrites = objectWritesTo('Goblin');
+    expect(selfWrites.length).toBe(1);
+    const baitKeys = ['baitAndSwitchActive', 'baitAndSwitchBonus', 'baitAndSwitchSource'];
     if (expectCleared) {
-      expect(baitCalls).toEqual([
-        ['Goblin', 'baitAndSwitchActive', null, 'MyCampaign'],
-        ['Goblin', 'baitAndSwitchBonus', null, 'MyCampaign'],
-        ['Goblin', 'baitAndSwitchSource', null, 'MyCampaign'],
-      ]);
+      expect(baitKeys.every(k => selfWrites[0][1][k] === null)).toBe(true);
     } else {
-      expect(baitCalls.length).toBe(0);
+      expect(baitKeys.some(k => k in selfWrites[0][1])).toBe(false);
     }
+    const baitCalls = setRuntimeValue.mock.calls.filter(
+      (c) => c[0] === 'Goblin' && baitKeys.includes(c[1]),
+    );
+    expect(baitCalls.length).toBe(0);
   });
 });
 

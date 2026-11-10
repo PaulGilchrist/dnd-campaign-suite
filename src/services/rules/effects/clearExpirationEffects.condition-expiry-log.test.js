@@ -80,7 +80,7 @@ vi.mock('../../automation/handlers/spells/shapechangeService.js', () => ({
 }));
 
 import { clearExpirationEffects } from './clearExpirationEffects.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 
 const CAMPAIGN = 'MyCampaign';
@@ -91,16 +91,23 @@ function resetMocks() {
   vi.clearAllMocks();
   getRuntimeValue.mockReset();
   setRuntimeValue.mockReset();
+  setRuntimeObject.mockReset();
   localStorage.clear();
 }
 
 // Stateful store: each leg READS the previous write, so a second
-// same-condition leg genuinely sees the condition as already gone.
+// same-condition leg genuinely sees the condition as already gone. The
+// condition strip is ONE merged setRuntimeObject write (conditions + meta
+// atomically — §5 MA-0809 same-endpoint reorder law), so that lane is wired
+// into the same store.
 function seedStore(initial = {}) {
   const store = { ...initial };
   getRuntimeValue.mockImplementation((name, key) => store[`${name}::${key}`] ?? null);
   setRuntimeValue.mockImplementation((name, key, value) => {
     store[`${name}::${key}`] = value;
+  });
+  setRuntimeObject.mockImplementation((name, obj) => {
+    for (const [key, value] of Object.entries(obj)) store[`${name}::${key}`] = value;
   });
   return store;
 }
@@ -152,8 +159,9 @@ describe('clock-based condition expiry — campaign-log audit row', () => {
       sourceName: ATTACKER,
       timestamp: expect.any(Number),
     });
-    // State truth unchanged: the condition strip still lands.
-    expect(setRuntimeValue).toHaveBeenCalledWith(TARGET, 'activeConditions', ['poisoned'], CAMPAIGN);
+    // State truth unchanged: the condition strip still lands — as the merged
+    // one-write strip (no meta row seeded here, so conditions only).
+    expect(setRuntimeObject).toHaveBeenCalledWith(TARGET, { activeConditions: ['poisoned'] }, CAMPAIGN);
   });
 
   it('rounds-clock (finite expiryRounds) names the numeric clock in the reason', () => {
@@ -271,7 +279,10 @@ describe('clock-based condition expiry — campaign-log audit row', () => {
       'Poisoned ends (10-round clock expired)',
       'Paralyzed ends (10-round clock expired)',
     ]);
-    expect(setRuntimeValue).toHaveBeenLastCalledWith(TARGET, 'activeConditions', [], CAMPAIGN);
+    // The seam's FINAL victim-bucket write must carry the fully stripped
+    // state in ONE merged snapshot (no second stale full-store write may
+    // follow the strip — §5 MA-0809 resurrection law).
+    expect(setRuntimeObject).toHaveBeenLastCalledWith(TARGET, { activeConditions: [] }, CAMPAIGN);
   });
 
   it('condition stored with different casing still counts as active and is reported once', () => {

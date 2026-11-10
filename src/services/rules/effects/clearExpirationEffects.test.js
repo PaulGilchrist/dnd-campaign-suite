@@ -91,7 +91,7 @@ vi.mock('../../combat/automation/automationExpressions.js', () => ({
 }));
 
 import { clearAllExpirationEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import utils from '../../ui/utils.js';
 
@@ -103,6 +103,7 @@ function resetMocks() {
   // cannot leak into the next.
   getRuntimeValue.mockReset();
   setRuntimeValue.mockReset();
+  setRuntimeObject.mockReset();
   getAllStoreKeys.mockReset();
   getAllStoreKeys.mockReturnValue([]);
   localStorage.clear();
@@ -147,10 +148,10 @@ describe('clearExpirationEffects effect types (via clearAllExpirationEffects)', 
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
+    // Merged one-write strip (§5 MA-0809 same-endpoint reorder law).
+    expect(setRuntimeObject).toHaveBeenCalledWith(
       'Orc',
-      'activeConditions',
-      ['frightened', 'blinded'],
+      { activeConditions: ['frightened', 'blinded'] },
       'MyCampaign',
     );
   });
@@ -453,7 +454,8 @@ describe('clearExpirationEffects effect types (via clearAllExpirationEffects)', 
 
       clearAllExpirationEffects('Goblin', 'MyCampaign');
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'activeConditions', ['poisoned'], 'MyCampaign');
+      // Merged one-write strip (§5 MA-0809 same-endpoint reorder law).
+      expect(setRuntimeObject).toHaveBeenCalledWith('Human', { activeConditions: ['poisoned'] }, 'MyCampaign');
     });
   });
 

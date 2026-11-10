@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
   getAllStoreKeys: vi.fn(() => []),
 }));
 
@@ -94,7 +95,7 @@ vi.mock('../../../hooks/useAllySelection.js', () => ({
 }));
 
 import { clearAllExpirationEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
 import { getCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js';
@@ -508,15 +509,20 @@ describe('clearAllExpirationEffects — activeBuffs preservation', () => {
 
     clearAllExpirationEffects('Wizard', 'MyCampaign');
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
+    // The self-store cleanup rides ONE merged full-store write (the seam's
+    // final own-bucket snapshot — §5 MA-0809), replacing the per-key siblings.
+    expect(setRuntimeObject).toHaveBeenCalledWith(
       'Wizard',
-      'activeBuffs',
-      [
-        { name: 'Mage Armor', effect: 'mage_armor', duration: '8 hours' },
-        { name: 'Death Ward', effect: 'death_ward', duration: '8 hours' },
-      ],
+      expect.objectContaining({
+        activeBuffs: [
+          { name: 'Mage Armor', effect: 'mage_armor', duration: '8 hours' },
+          { name: 'Death Ward', effect: 'death_ward', duration: '8 hours' },
+        ],
+        [KEY]: [],
+      }),
       'MyCampaign',
     );
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Wizard', 'activeBuffs', expect.anything(), 'MyCampaign');
   });
 });
 

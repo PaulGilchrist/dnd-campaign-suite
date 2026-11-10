@@ -30,6 +30,55 @@ function removeConditionEverywhere(targetName, conditionName, campaignName) {
     removeNpcCondition(targetName, conditionName, campaignName);
 }
 
+// Atomic per-target condition strip: ONE setRuntimeObject carrying the
+// filtered activeConditions AND the activeConditionMeta purge for every
+// stripped key (canonical removeCondition hygiene,
+// conditionSaveService.js:102-107). Same-endpoint law (§5 MA-0809 /
+// Aura-of-Life cleanup below): un-awaited per-key setRuntimeValue calls to
+// the /<Name> replace-route snapshot the store at call time and can reorder
+// network-side — a write issued before a sibling mutation lands can arrive
+// last and resurrect the sibling's key. One merged write makes the strip
+// atomic; a meta-only change still rides the same call only when present.
+// Filter is the union of the two historical legs (getName-equality plus
+// case-insensitive string equality), applied in one pass.
+function stripConditionsMerged(targetName, conditionNames, campaignName) {
+    const stored = Array.isArray(getRuntimeValue(targetName, 'activeConditions')) ? getRuntimeValue(targetName, 'activeConditions') : [];
+    const updates = {
+        activeConditions: stored.filter(c => !conditionNames.some(name =>
+            utils.getName(c) === utils.getName(name)
+            || String(c).toLowerCase() === String(name).toLowerCase())),
+    };
+    const existingMeta = getRuntimeValue(targetName, 'activeConditionMeta', campaignName) || {};
+    const remainingMeta = { ...existingMeta };
+    let metaChanged = false;
+    for (const name of conditionNames) {
+        const metaKey = String(name).toLowerCase();
+        if (remainingMeta[metaKey]) {
+            delete remainingMeta[metaKey];
+            metaChanged = true;
+        }
+    }
+    if (metaChanged) updates.activeConditionMeta = remainingMeta;
+    setRuntimeObject(targetName, updates, campaignName);
+}
+
+// Every condition a fired clock entry's logged strip legs will remove
+// (the removeConditionWithExpiryLog-family types only). A save-margin twin
+// grant (Thri-Kreen shape: poisoned + paralyzed in ONE entry) must strip as
+// one snapshot — the per-leg POST issued before the sibling leg mutates the
+// store is itself a stale full-store write in the §5 MA-0809 race family.
+function clockStripConditionNames(clock, conditionName) {
+    const names = [conditionName];
+    if (!clock || !Array.isArray(clock.effects)) return names;
+    for (const e of clock.effects) {
+        const name = e.type === 'condition' ? e.condition
+            : (e.type === 'charmed' || e.type === 'dominated' ? 'charmed'
+                : e.type === 'speed_zero' ? 'speed_zero' : null);
+        if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
+}
+
 // [2026-11-07 clock-expiry audit] The clock lane stripped conditions in total
 // silence — the GM log showed the grant but never the clock-based end, while
 // the repeat-save lane already prints `condition removed` rows with a reason
@@ -67,18 +116,25 @@ function conditionExpiryReason(conditionName, clock) {
 }
 
 function removeConditionWithExpiryLog(targetName, conditionName, attackerName, campaignName, clock) {
-    const wasActive = isConditionActive(targetName, conditionName);
-    removeConditionEverywhere(targetName, conditionName, campaignName);
-    if (!wasActive) return;
-    addEntry(campaignName, {
-        type: 'condition',
-        action: 'removed',
-        characterName: targetName,
-        condition: capitalizeCondition(conditionName),
-        reason: conditionExpiryReason(conditionName, clock),
-        sourceName: attackerName,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error('[clearExpirationEffects:condition-expiry-log-error]', e); });
+    // Atomic per-entry strip: the whole fired entry's condition set is
+    // removed in ONE merged write (see stripConditionsMerged), then exactly
+    // one removed row per condition that was actually active — ledger bytes
+    // unchanged, but no mid-sequence stale snapshot of the target bucket can
+    // reorder last and resurrect a sibling leg's condition (§5 MA-0809).
+    const conditionNames = clockStripConditionNames(clock, conditionName);
+    const wasActive = conditionNames.filter(c => isConditionActive(targetName, c));
+    stripConditionsMerged(targetName, conditionNames, campaignName);
+    for (const stripped of wasActive) {
+        addEntry(campaignName, {
+            type: 'condition',
+            action: 'removed',
+            characterName: targetName,
+            condition: capitalizeCondition(stripped),
+            reason: conditionExpiryReason(stripped, clock),
+            sourceName: attackerName,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[clearExpirationEffects:condition-expiry-log-error]', e); });
+    }
 }
 
 function readBuffs(targetName) {

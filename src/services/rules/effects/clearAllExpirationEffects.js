@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
 import { getCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js';
@@ -9,45 +9,50 @@ import { KEY } from './turnStartEffects.js';
 
 // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
 // Preserve 8-hour duration buffs (Mage Armor, Death Ward) - only ends on long rest
-function clearSelfBuffs(characterName, campaignName) {
+// Computes (does NOT write) the self-store updates: the caller ships them in
+// the seam's ONE merged own-bucket write at the end, so no pre-strip
+// full-store snapshot of this character's bucket is ever issued (§5 MA-0809 —
+// see clearAllExpirationEffects for the ordering law).
+function buildSelfBuffClearUpdates(characterName) {
     const existingBuffs = getRuntimeValue(characterName, 'activeBuffs') || [];
-    const preservedBuffs = Array.isArray(existingBuffs) ? existingBuffs.filter(b => b.name === 'Mage Armor' || b.name === 'Death Ward') : [];
-    setRuntimeValue(characterName, 'activeBuffs', preservedBuffs, campaignName);
-    setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);
-    setRuntimeValue(characterName, 'innerRadianceActive', null, campaignName);
-    setRuntimeValue(characterName, 'unbreakableMajestyActive', null, campaignName);
-    setRuntimeValue(characterName, 'unbreakableMajestySaveDc', null, campaignName);
+    const updates = {
+        activeBuffs: Array.isArray(existingBuffs) ? existingBuffs.filter(b => b.name === 'Mage Armor' || b.name === 'Death Ward') : [],
+        mantleOfMajestyActive: null,
+        innerRadianceActive: null,
+        unbreakableMajestyActive: null,
+        unbreakableMajestySaveDc: null,
+        // Clear Smite of Protection cover
+        smiteOfProtectionActive: null,
+        // Clear Bulwark of Force cover
+        bulwarkOfForceActive: null,
+        bulwarkOfForceTargets: null,
+        // Clear Nature's Sanctuary cover
+        naturesSanctuaryActive: null,
+        naturesSanctuaryCreatures: null,
+        naturesSanctuaryRange: null,
+    };
 
     // Clear Bait and Switch (Evasive Footwork) AC bonus
-    const wasActive = getRuntimeValue(characterName, 'baitAndSwitchActive');
-    if (wasActive) {
-        setRuntimeValue(characterName, 'baitAndSwitchActive', null, campaignName);
-        setRuntimeValue(characterName, 'baitAndSwitchBonus', null, campaignName);
-        setRuntimeValue(characterName, 'baitAndSwitchSource', null, campaignName);
+    if (getRuntimeValue(characterName, 'baitAndSwitchActive')) {
+        updates.baitAndSwitchActive = null;
+        updates.baitAndSwitchBonus = null;
+        updates.baitAndSwitchSource = null;
     }
 
-    // Clear Smite of Protection cover
-    setRuntimeValue(characterName, 'smiteOfProtectionActive', null, campaignName);
-    // Clear Bulwark of Force cover
-    setRuntimeValue(characterName, 'bulwarkOfForceActive', null, campaignName);
-    setRuntimeValue(characterName, 'bulwarkOfForceTargets', null, campaignName);
-    // Clear Nature's Sanctuary cover
-    setRuntimeValue(characterName, 'naturesSanctuaryActive', null, campaignName);
-    setRuntimeValue(characterName, 'naturesSanctuaryCreatures', null, campaignName);
-    setRuntimeValue(characterName, 'naturesSanctuaryRange', null, campaignName);
+    return updates;
 }
 
-// --- "From me": clear all effects I have on other targets ---
+// --- "From me": resolve all effects I have on other targets ---
+// Only dispatches each entry's cleanup legs (which write the TARGET stores);
+// the empty-list stamp for MY queue is folded into the seam's merged own-bucket
+// write so this bucket receives exactly one snapshot — issued AFTER every
+// condition strip.
 function clearMyOutgoingExpirations(characterName, campaignName) {
     const myList = getRuntimeValue(characterName, KEY);
-    if (!Array.isArray(myList)) {
-        setRuntimeValue(characterName, KEY, [], campaignName);
-        return;
-    }
+    if (!Array.isArray(myList)) return;
     for (const entry of myList) {
         clearExpirationEffects(entry.effects, entry.target, characterName, campaignName, entry);
     }
-    setRuntimeValue(characterName, KEY, [], campaignName);
 }
 
 // --- Scan all runtime stores for "to me" entries ---
@@ -209,16 +214,33 @@ function revertObjectTransforms(characterName, campaignName) {
 
 /**
  * Clear all expiration effects for a creature (called on rest / initiative roll).
+ *
+ * Write-order law (§5 / MA-0809, bug-sheet-initiative-seam-resurrects-rider-conditions):
+ * every setRuntimeValue/setRuntimeObject POSTs a full REPLACE snapshot of the
+ * character's change-data bucket, captured AT CALL TIME, and same-endpoint
+ * requests can reorder network-side. The condition strips (incoming clocks
+ * targeting this creature, plus any self-targeted clock in its own queue)
+ * therefore run FIRST, so every snapshot issued of this bucket afterwards
+ * already carries the stripped state — no pre-strip snapshot can win the
+ * last-write race and resurrect purged conditions (the log claimed removal
+ * while the settled bucket kept them). Mirrors the clean Short Rest lane,
+ * where the atomic batch already strips conditions before this seam's writes.
+ * All remaining OWN-bucket changes (8-hour-preserved buffs, cover/majesty/
+ * sanctuary flags, emptied outgoing queue) ride ONE merged setRuntimeObject
+ * as this bucket's FINAL write.
  */
 export function clearAllExpirationEffects(characterName, campaignName) {
     if (!characterName || !campaignName) return;
-
-    clearSelfBuffs(characterName, campaignName);
 
     const charLower = characterName.toLowerCase();
 
     clearMyOutgoingExpirations(characterName, campaignName);
     clearIncomingExpirations(charLower, campaignName);
+
+    setRuntimeObject(characterName, {
+        ...buildSelfBuffClearUpdates(characterName),
+        [KEY]: [],
+    }, campaignName);
 
     // Force cover badge refresh on all clients
     const refreshCount = getRuntimeValue('campaign', 'coverRefresh') || 0;

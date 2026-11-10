@@ -61,6 +61,11 @@ const { store } = vi.hoisted(() => ({ store: {} }));
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((name, key) => store[`${name}.${key}`]),
   setRuntimeValue: vi.fn((name, key, value) => { store[`${name}.${key}`] = value; }),
+  // Merged per-key write lane (§5 MA-0809 strip idiom) — store-faithful so
+  // the domination charmed-strip lands on the same keyed store.
+  setRuntimeObject: vi.fn((name, obj) => {
+    for (const [key, value] of Object.entries(obj)) store[`${name}.${key}`] = value;
+  }),
   deleteRuntimeKey: vi.fn((name, key) => { delete store[`${name}.${key}`]; }),
   getAllStoreKeys: vi.fn(() => []),
   getStore: vi.fn(() => ({ keys: () => [] })),

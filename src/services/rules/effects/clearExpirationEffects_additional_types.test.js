@@ -77,7 +77,7 @@ vi.mock('../../automation/handlers/spells/shapechangeService.js', () => ({
 }));
 
 import { clearExpirationEffects } from './clearExpirationEffects.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import storage from '../../ui/storage.js';
@@ -149,12 +149,19 @@ describe('clearExpirationEffects — charmed and dominated types', () => {
 
       clearExpirationEffects([{ type }], 'Orc', 'Caster', CAMPAIGN);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions', ['poisoned'], CAMPAIGN);
+      // Merged one-write strip (§5 MA-0809): the union filter of the former
+      // activeConditions + NPC-condition legs lands in ONE setRuntimeObject.
+      expect(setRuntimeObject).toHaveBeenCalledWith('Orc', { activeConditions: ['poisoned'] }, CAMPAIGN);
       // No condition write anywhere may still carry 'charmed'
       // (covers both the activeConditions and NPC-condition legs).
       for (const call of setRuntimeValue.mock.calls) {
         if (Array.isArray(call[2])) {
           expect(call[2]).not.toContain('charmed');
+        }
+      }
+      for (const call of setRuntimeObject.mock.calls) {
+        if (Array.isArray(call[1] && call[1].activeConditions)) {
+          expect(call[1].activeConditions).not.toContain('charmed');
         }
       }
     },

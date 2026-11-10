@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
   getAllStoreKeys: vi.fn(() => []),
 }));
 
@@ -49,7 +50,7 @@ vi.mock('../../automation/handlers/spells/stinkingCloudHandler.js', () => ({
 
 import { expireStaleEffects } from './expirations.js';
 import { processStinkingCloudAreaSave } from '../../automation/handlers/spells/stinkingCloudHandler.js';
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import {
   getCurrentCombatRound,
@@ -233,11 +234,11 @@ describe('expireStaleEffects — self-targeted expirations', () => {
 
     await expireStaleEffects('test-campaign');
 
-    // Should have removed the invisible condition from activeConditions
-    expect(setRuntimeValue).toHaveBeenCalledWith(
+    // Should have removed the invisible condition from activeConditions —
+    // via the merged one-write strip lane (§5 MA-0809 law).
+    expect(setRuntimeObject).toHaveBeenCalledWith(
       'RangerGirl',
-      'activeConditions',
-      [],
+      { activeConditions: [] },
       'test-campaign'
     );
     // Should have cleared the expired entry
