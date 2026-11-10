@@ -190,7 +190,7 @@ describe('MA-1584 margin bands via processSaveRoll (rider-only DC chip seam)', (
     expect(addExpiration).not.toHaveBeenCalled();
   });
 
-  it('deep FAIL at the margin-5 boundary (total 6 vs DC 11): Poisoned + Paralyzed with source meta, log, ONE merged rounds:600 clock', async () => {
+  it('deep FAIL at the margin-5 boundary (total 6 vs DC 11): Poisoned + Paralyzed with source meta, log, ONE merged rounds:10 clock (authored 1 minute ×10)', async () => {
     await resolveNpcSave(6);
     expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'paralyzed']);
     const conds = appliedLogs().map(e => e.condition);
@@ -205,7 +205,7 @@ describe('MA-1584 margin bands via processSaveRoll (rider-only DC chip seam)', (
       attackerName: ATTACKER,
       targetName: TARGET,
       campaignName,
-      rounds: 600,
+      rounds: 10,
       effects: [
         { type: 'condition', condition: 'poisoned' },
         { type: 'condition', condition: 'paralyzed' },

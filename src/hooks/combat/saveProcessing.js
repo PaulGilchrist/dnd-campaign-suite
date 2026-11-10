@@ -849,11 +849,18 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
 // margin = saveDc − saveTotal. Grants the canonical condition (no new te
 // key — unconscious is a canonical activeConditions entry, same machinery as
 // the poisoned grant above) with source meta + its own `condition applied`
-// log. ONE addExpiration clock (CLA-334 hours×600) carrying BOTH condition
-// legs in a single merged write (§5 — never two racing clocks;
+// log. ONE addExpiration clock carrying BOTH condition legs in a single
+// merged write (§5 — never two racing clocks;
 // the clock is armed only on save_margin rows, so every legacy condition
-// grant stays byte-identical). The grant log's prose is DATA-DERIVED (bug
-// save-margin-rider-hardcoded-log-prose): it names the structured
+// grant stays byte-identical). The clock's rounds derive from the base
+// clause's AUTHORED duration (owner ruling 2026-11-10: 1 round = 6 seconds,
+// so minutes×10 / hours×600 — the CLA-334 encoding used by the sibling
+// parseBarkskinDurationRounds/summonDurationRounds parsers), NOT a hardcoded
+// ceiling: a "1 minute" row (Thri-Kreen, Homunculus) expires on a rounds:10
+// clock, a "1 hour" row (drow shape) stays byte-identical at 600, and rows
+// that author no duration fall back to 600. The grant log's prose is
+// DATA-DERIVED (bug save-margin-rider-hardcoded-log-prose): it names the
+// structured
 // margin.also condition and the base clause's authored duration
 // (margin.duration from parseSaveMarginClause; fallback = the merged clock's
 // own 600-round/1-hour ceiling), with the release advisory forked on the
@@ -876,6 +883,23 @@ function saveMarginRiderClauseText({ margin, context }) {
     return `${durationText}; ${releaseText}`;
 }
 
+// Authored rider duration → merged-clock rounds (owner ruling 2026-11-10:
+// 1 round = 6 seconds — minutes×10, hours×600, same encoding as the sibling
+// parseBarkskinDurationRounds/summonDurationRounds parsers). margin.duration
+// is parseSaveMarginClause's captured "N rounds/minutes/hours" text; rows
+// that author no duration keep the legacy 600-round (1-hour) ceiling so the
+// drow shape stays byte-identical.
+function saveMarginRiderRounds(duration) {
+    const lower = String(duration || '').toLowerCase();
+    const hourMatch = lower.match(/(\d+)\s*hours?/);
+    if (hourMatch) return parseInt(hourMatch[1], 10) * 600;
+    const minuteMatch = lower.match(/(\d+)\s*minutes?/);
+    if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
+    const roundMatch = lower.match(/(\d+)\s*rounds?/);
+    if (roundMatch) return parseInt(roundMatch[1], 10);
+    return 600;
+}
+
 function applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attackerName, campaignName }) {
     const margin = context?.saveMargin;
     if (!margin || saveDc == null || !Number.isFinite(Number(saveTotal))) return;
@@ -891,7 +915,7 @@ function applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attacke
         attackerName,
         targetName: applyTarget,
         campaignName,
-        rounds: 600,
+        rounds: saveMarginRiderRounds(margin.duration),
         effects: [
             { type: 'condition', condition: 'poisoned' },
             { type: 'condition', condition },

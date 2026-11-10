@@ -251,6 +251,29 @@ describe('clock-based condition expiry — campaign-log audit row', () => {
     expect(addEntry).toHaveBeenCalledTimes(1);
   });
 
+  // Save-margin rider (bug save-margin-rider-clock-ignores-authored-duration,
+  // owner ruling 2026-11-10): the Thri-Kreen-shaped grant writes ONE merged
+  // clock whose rounds derive from the AUTHORED "1 minute" duration
+  // (minutes×10 = 10). At expiry that single clock must evict BOTH the base
+  // and the rider condition — one removed row per leg, store left clean.
+  it('save-margin twin-condition clock at the authored rounds:10 evicts BOTH conditions', () => {
+    seedStore({ [`${TARGET}::activeConditions`]: ['poisoned', 'paralyzed'] });
+
+    clearExpirationEffects(
+      [{ type: 'condition', condition: 'poisoned' }, { type: 'condition', condition: 'paralyzed' }],
+      TARGET, 'Thri-Kreen 1', CAMPAIGN,
+      { target: TARGET, effects: [{ type: 'condition', condition: 'poisoned' }, { type: 'condition', condition: 'paralyzed' }], appliedRound: 1, expiryRounds: 10, expireOnCreatureName: null },
+    );
+
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    expect(addEntry.mock.calls.map(c => c[1].condition)).toEqual(['Poisoned', 'Paralyzed']);
+    expect(addEntry.mock.calls.map(c => c[1].reason)).toEqual([
+      'Poisoned ends (10-round clock expired)',
+      'Paralyzed ends (10-round clock expired)',
+    ]);
+    expect(setRuntimeValue).toHaveBeenLastCalledWith(TARGET, 'activeConditions', [], CAMPAIGN);
+  });
+
   it('condition stored with different casing still counts as active and is reported once', () => {
     seedStore({ [`${TARGET}::activeConditions`]: ['Blinded'] });
 

@@ -7,7 +7,8 @@
 // Shallow fail (margin < 5): POISONED ONLY — the extracted word list carries
 // no unconscious, so the shallow over-grant is suppressed at the source (§214).
 // Deep fail (margin >= 5): applySaveMarginRider adds UNCONSCIOUS with ONE
-// merged rounds:600 clock (§37/§170). Success: zero grants, zero clock.
+// merged clock at the AUTHORED duration (parser duration "1 minute" →
+// rounds:10, owner ruling 2026-11-10 minutes×10). Success: zero grants, zero clock.
 // The save leg pays NO damage (§410/§416): autoDamageFormula null, so no
 // applyDamageToTarget call and no save-damage log on any band.
 // Generic rider mechanics + byte-inert fork: saveProcessing.save-margin-rider.test.js;
@@ -68,6 +69,7 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 
 import { readFileSync } from 'node:fs';
 import { processSaveRoll } from './saveProcessing.js';
+import { parseSaveMarginClause } from '../../components/encounter/MonsterCardHelpers.js';
 
 const campaignName = 'test-campaign';
 const ATTACKER = 'Homunculus 1';
@@ -79,7 +81,10 @@ const biteRow = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'))
     .find(m => m.name === 'Homunculus').actions.find(a => a.name === 'Bite');
 const SAVE_DC = biteRow.save_dc;
 const SAVE_TYPE = biteRow.save_type.slice(0, 3).toUpperCase();
-const MARGIN = { failsBy: biteRow.save_margin.fails_by, also: biteRow.save_margin.also };
+// Real parser (live-lane parity): { failsBy, also, duration } — the composite
+// row authors its "1 minute" deep band in the description, so the merged
+// clock rides the AUTHORED duration (owner ruling 2026-11-10: minutes×10).
+const MARGIN = parseSaveMarginClause(biteRow);
 
 const biteContext = (total) => ({
     saveDc: SAVE_DC,
@@ -121,7 +126,7 @@ describe('MA-1000 Homunculus Bite margin bands', () => {
     it('monsters.json data lock: rider-only row arms DC/CON margin context', () => {
         expect(SAVE_DC).toBe(12);
         expect(SAVE_TYPE).toBe('CON');
-        expect(MARGIN).toEqual({ failsBy: 5, also: 'unconscious' });
+        expect(MARGIN).toEqual({ failsBy: 5, also: 'unconscious', duration: '1 minute' });
         expect(biteRow.save_effect).toMatch(/Poisoned/);
         expect(biteRow).not.toHaveProperty('save_damage_formula');
     });
@@ -146,7 +151,7 @@ describe('MA-1000 Homunculus Bite margin bands', () => {
         expect(uncons.description).toMatch(new RegExp(`failed the save by ${MARGIN.failsBy}`));
     });
 
-    it(`deep fail beyond the band, margin ${SAVE_DC - 2}: ONE merged rounds:600 clock, both legs — NO damage (§37/§170/§410)`, async () => {
+    it(`deep fail beyond the band, margin ${SAVE_DC - 2}: ONE merged rounds:10 clock (authored 1 minute ×10), both legs — NO damage (§410)`, async () => {
         await resolveNpcSave(2);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'unconscious']);
@@ -155,7 +160,7 @@ describe('MA-1000 Homunculus Bite margin bands', () => {
             attackerName: ATTACKER,
             targetName: TARGET,
             campaignName,
-            rounds: 600,
+            rounds: 10,
             effects: [
                 { type: 'condition', condition: 'poisoned' },
                 { type: 'condition', condition: MARGIN.also },

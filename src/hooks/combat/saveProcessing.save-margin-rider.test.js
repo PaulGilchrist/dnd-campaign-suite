@@ -8,8 +8,10 @@
 // rider-only damageless composite (applyDamagelessSaveConditions, MA-0560)
 // and the damage-bearing leg (applySaveDamage, MA-1351). Margin = saveDc −
 // saveTotal (all bane/bless/omen folds already in saveTotal); lands at
-// margin >= failsBy, never below. ONE merged rounds:600 clock carries both
-// legs (§37/CLA-334 hours×600 — never two racing clocks). Byte-inert for
+// margin >= failsBy, never below. ONE merged clock per grant carries both
+// legs, its rounds derived from the base clause's AUTHORED duration (owner
+// ruling 2026-11-10: 1 round = 6 seconds — minutes×10 / hours×600; fallback
+// 600 when a row authors no duration — never two racing clocks). Byte-inert for
 // every clauseless row. Genericity is proved on the Thri-Kreen Bite live row
 // (also: 'paralyzed', DC 11) — threshold AND rider condition come from data,
 // not the drow's 5/'unconscious'.
@@ -198,8 +200,10 @@ describe('save-margin-rider (generic)', () => {
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(conditions);
         expect(addExpiration).toHaveBeenCalledTimes(clock ? 1 : 0);
         if (clock) {
+            // Authored duration is the clock: the Thri-Kreen row's "1 minute"
+            // poison band → minutes×10 = rounds:10 (NOT the drow's 600).
             expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
-                rounds: 600,
+                rounds: 10,
                 effects: [
                     { type: 'condition', condition: 'poisoned' },
                     { type: 'condition', condition: 'paralyzed' },
@@ -214,6 +218,23 @@ describe('save-margin-rider (generic)', () => {
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned']);
         expect(appliedLogs().map(e => e.condition)).toEqual(['Poisoned']);
         expect(addExpiration).not.toHaveBeenCalled();
+    });
+
+    // Owner ruling 2026-11-10: the clock derives from the row's AUTHORED
+    // duration — and a row that authors NO duration keeps the legacy 600-round
+    // (1-hour) ceiling. The drow context above already proves the "1 hour" →
+    // 600 leg; this pins the duration-less fallback on one merged clock.
+    it('margin with no authored duration falls back to the single 600-round clock', async () => {
+        await resolveNpcSave(drowContext(3, { failsBy: 5, also: 'unconscious' }));
+
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+            rounds: 600,
+            effects: [
+                { type: 'condition', condition: 'poisoned' },
+                { type: 'condition', condition: 'unconscious' },
+            ],
+        }));
     });
 
     it('immunity to the base condition blocks the rider too (unconscious WHILE poisoned)', async () => {
