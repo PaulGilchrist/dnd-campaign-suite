@@ -1,6 +1,7 @@
 import { npcHasStatBlock, npcHasAttacks, resolveNPCHitPoints } from '../encounters/npcStatBlockUtils.js';
 import { rollD20 } from '../dice/diceRoller.js';
 import { loadCombatSummary } from '../encounters/combatData.js';
+import { clearAllPendingOas } from '../combat/pendingOpportunityAttacks.js';
 import utils from '../ui/utils.js';
 import storage from '../ui/storage.js';
 
@@ -57,6 +58,14 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
 
   combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
   storage.set('combatSummary', combatSummary, campaignName);
+  // Pending-OA drop law: joining an NPC re-rolls initiative and re-sorts the
+  // board, so every pending trigger marker retires here. Written at the PRODUCER
+  // because this lane dispatches `initiative-rolled` from the NPCs page while the
+  // Initiative view — the event's only listener — is unmounted
+  // (bug-new-initiative-roll-pendingoa-drop-never-fires). It is a shared
+  // runtime-store DELETE, so the null echo evicts the bucket in every tab.
+  // Zero writes when nothing is pending.
+  clearAllPendingOas(campaignName);
   window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
   logInitiativeRoll(campaignName, npc.name, roll, initBonus);

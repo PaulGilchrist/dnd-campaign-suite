@@ -7,6 +7,7 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { loadCombatSummary, setCombatSummaryCache } from './combatData.js';
 import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js';
 import { monsterSpeedToFeet } from '../combat/turnState.js';
+import { clearAllPendingOas } from '../combat/pendingOpportunityAttacks.js';
 import { sweepNewCombatClocks } from '../rules/effects/zoneDurationClock.js';
 
 export function getMonsterSaveBonuses(monster) {
@@ -173,6 +174,17 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
 
     const firstName = creatures[0]?.name;
     storage.set('activeCreatureName', firstName, campaignName);
+
+    // Pending-OA drop law: a new initiative roll retires every pending trigger
+    // marker (the old provocation no longer stands; the spent reaction is NOT
+    // refunded). Written at the PRODUCER because this lane dispatches
+    // `initiative-rolled` from the Encounters page while the Initiative view —
+    // the event's only listener — is unmounted (bug-new-initiative-roll-
+    // pendingoa-drop-never-fires), so the event alone could never reach it. Same
+    // new-combat seam as the sweepNewCombatClocks call above; it is a shared
+    // runtime-store DELETE, so the null echo evicts the bucket in every tab.
+    // Zero writes when nothing is pending.
+    clearAllPendingOas(campaignName);
 
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
@@ -348,6 +360,14 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
 
     const firstName = combatSummary.creatures[0]?.name;
     await storage.set('activeCreatureName', firstName, campaignName);
+
+    // Pending-OA drop law (see loadEncounterToInitiative): the join re-rolls
+    // initiative and re-anchors the active creature, so every pending trigger
+    // marker retires here. Producer-side because the Initiative listener is
+    // unmounted on this lane. Unconditional, matching the dispatch below (the
+    // mounted listener dropped markers on a mid-round join too) — NOT gated on
+    // the new-board branch the clock sweep above uses.
+    clearAllPendingOas(campaignName);
 
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 

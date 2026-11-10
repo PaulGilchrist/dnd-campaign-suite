@@ -21,8 +21,13 @@
  * Drop law (no refunds — the reaction was legitimately spent at trigger):
  *   • consumed by the resolution press;
  *   • the defender's next turn is taken or ended (navigationHandlers seam);
- *   • a new initiative roll (Initiative.jsx initiative-rolled listener) and
- *     Initiative Clear (createCreatureHandlers.confirmClear);
+ *   • a new initiative roll — dropped at the PRODUCERS (encounterToInitiative
+ *     load/join lanes, npcCombatService.addNPCToInitiative), because every one
+ *     of those lanes dispatches `initiative-rolled` while the Initiative view
+ *     is unmounted, so the Initiative.jsx listener alone could never reach it
+ *     (bug-new-initiative-roll-pendingoa-drop-never-fires); the listener keeps
+ *     its own call for in-view dispatches — both are idempotent; and Initiative
+ *     Clear (createCreatureHandlers.confirmClear);
  *   • the marker's mover leaves the encounter — away/dead/off-board
  *     (`prunePendingOas` at the turn + presence seams, plus the stale-marker
  *     eviction in the card lanes that render the affordance).
