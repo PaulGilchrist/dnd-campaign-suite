@@ -395,50 +395,53 @@ describe('applyShortRest', () => {
 
   describe('campaign targetEffects clearing', () => {
     it('runs both clear lanes: the summon-field lane (no skipSync) and the per-key lane (skipSync=true), sparing survivors', async () => {
-      const globe = { effect: 'globe_barrier' }
-      const clairvoyant = { effect: 'clairvoyant_combatant' }
-      const haste = { effect: 'haste' }
-      stubRuntime({ targetEffects: [globe, clairvoyant, haste] })
+      const globe = { effect: 'globe_barrier', target: 'Test Hero', source: 'Test Hero' }
+      const clairvoyant = { effect: 'clairvoyant_combatant', target: 'Test Hero', source: 'Test Hero' }
+      const haste = { effect: 'haste', target: 'Test Hero', source: 'Test Hero' }
+      const foreignGlobe = { effect: 'globe_barrier', target: 'Other', source: 'Other' }
+      stubRuntime({ targetEffects: [globe, clairvoyant, haste, foreignGlobe] })
       await applyShortRest(makeStats(), CAMPAIGN)
 
-      // Summon-field lane (:334) filters globe_barrier out and writes WITHOUT skipSync.
+      // Summon-field lane (:334) filters the resting creature's globe_barrier
+      // out and writes WITHOUT skipSync. Per-creature seam law (owner ruling
+      // 2026-11-10): a globe another creature maintains survives this rest.
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [clairvoyant, haste], CAMPAIGN,
+        'campaign', 'targetEffects', [clairvoyant, haste, foreignGlobe], CAMPAIGN,
       )
-      // Per-key lane (:378) clears clairvoyant_combatant WITH skipSync=true —
-      // re-posting the SSE-echoed row would loop.
+      // Per-key lane (:378) clears the resting creature's clairvoyant_combatant
+      // WITH skipSync=true — re-posting the SSE-echoed row would loop.
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [globe, haste], CAMPAIGN, true,
+        'campaign', 'targetEffects', [globe, haste, foreignGlobe], CAMPAIGN, true,
       )
     })
 
-    it.each(SR_TARGET_EFFECT_KEYS)('clears registered key %s and keeps survivors', async (effectKey) => {
-      const target = { effect: effectKey }
-      const haste = { effect: 'haste' }
-      stubRuntime({ targetEffects: [target, haste] })
+    it.each(SR_TARGET_EFFECT_KEYS)('clears registered key %s involving the resting creature, keeps survivors', async (effectKey) => {
+      const mine = { effect: effectKey, target: 'Test Hero', source: 'Test Hero' }
+      const foreign = { effect: effectKey, target: 'Other', source: 'Other' }
+      const haste = { effect: 'haste', target: 'Test Hero', source: 'Test Hero' }
+      stubRuntime({ targetEffects: [mine, foreign, haste] })
       await applyShortRest(makeStats(), CAMPAIGN)
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [haste], CAMPAIGN, true,
+        'campaign', 'targetEffects', [foreign, haste], CAMPAIGN, true,
       )
     })
   })
 
   describe('regenerateActive clearing', () => {
-    it('clears regenerateActive and restores full HP for every string-keyed regenerator, touching nobody else', async () => {
+    it('clears regenerateActive and restores full HP for the RESTING creature only (per-creature seam law)', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'regenerateActive') return name === 'Char1'
-        if (key === 'hitPoints') return name === 'Char1' ? 50 : 77
+        if (key === 'regenerateActive') return name === 'Test Hero'
+        if (key === 'hitPoints') return name === 'Test Hero' ? 50 : 77
         return undefined
       })
-      vi.mocked(getAllStoreKeys).mockReturnValue([123, 'Char1', 'Char2', null])
       await applyShortRest(makeStats(), CAMPAIGN)
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'regenerateActive', false, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'currentHitPoints', 50, CAMPAIGN)
-      // Numeric keys skipped; only the true-flagged character is written.
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'regenerateActive', false, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'currentHitPoints', 50, CAMPAIGN)
+      // Another regenerator is untouched — their rest is their own seam.
       expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[1] === 'regenerateActive')).toEqual([
-        ['Char1', 'regenerateActive', false, CAMPAIGN],
+        ['Test Hero', 'regenerateActive', false, CAMPAIGN],
       ])
       expect(setRuntimeValue).not.toHaveBeenCalledWith('Char2', 'currentHitPoints', 77, CAMPAIGN)
     })
@@ -516,22 +519,27 @@ describe('applyShortRest', () => {
   })
 
   describe('polymorph/transform cleanup', () => {
-    it('removes True Polymorph summons and reverts object transforms in the stored combat summary', async () => {
-      // Lane 1: summoned creatures drop out of the summary entirely.
+    it('removes the RESTING creature\'s True Polymorph summons and reverts THEIR object transforms in the stored combat summary', async () => {
+      // Lane 1: the resting creature's summons drop out of the summary;
+      // another caster's True Polymorph summon survives (per-creature seam
+      // law, owner ruling 2026-11-10).
       const cs = {
         creatures: [
-          { name: 'Summon1', summonSource: 'true_polymorph', currentHp: 10, maxHp: 20 },
+          { name: 'Summon1', summonSource: 'true_polymorph', summonedBy: 'Test Hero', currentHp: 10, maxHp: 20 },
+          { name: 'ForeignSummon', summonSource: 'true_polymorph', summonedBy: 'Other', currentHp: 5, maxHp: 9 },
           { name: 'Normal1', currentHp: 15, maxHp: 30 },
         ],
       }
       vi.mocked(getCombatSummary).mockReturnValue(cs)
       await applyShortRest(makeStats(), CAMPAIGN)
-      expect(cs.creatures.map(c => c.name)).toEqual(['Normal1'])
+      expect(cs.creatures.map(c => c.name)).toEqual(['ForeignSummon', 'Normal1'])
       expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', cs, CAMPAIGN)
       expect(setCombatSummaryCache).toHaveBeenCalledWith(cs, CAMPAIGN)
 
-      // Lane 2: object transforms revert to their original block, and the
-      // object-only incapacitated condition is stripped from the creature.
+      // Lane 2: the resting caster's object transforms revert to their original
+      // block, and the object-only incapacitated condition is stripped from the
+      // creature. A foreign transform (polymorphSource != resting creature)
+      // is left byte-intact.
       stubRuntime({ activeConditions: ['incapacitated', 'blinded'] })
       const cs2 = {
         creatures: [{
@@ -541,6 +549,14 @@ describe('applyShortRest', () => {
           speed: 30,
           polymorphObject: { maxHp: 10, ac: 15, speed: 30 },
           polymorphOriginal: { maxHp: 50, ac: 13, speed: 30 },
+          polymorphSource: 'Test Hero',
+        }, {
+          name: 'ForeignTransform',
+          maxHp: 8,
+          ac: 12,
+          polymorphObject: { maxHp: 8, ac: 12 },
+          polymorphOriginal: { maxHp: 40, ac: 11 },
+          polymorphSource: 'Other',
         }],
       }
       vi.mocked(getCombatSummary).mockReturnValue(cs2)
@@ -550,6 +566,7 @@ describe('applyShortRest', () => {
       expect(transformed.maxHp).toBe(50)
       expect(transformed.ac).toBe(13)
       expect(transformed).not.toHaveProperty('polymorphObject')
+      expect(cs2.creatures[1]).toHaveProperty('polymorphObject')
       expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', cs2, CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith('Transformed1', 'activeConditions', ['blinded'], CAMPAIGN)
     })

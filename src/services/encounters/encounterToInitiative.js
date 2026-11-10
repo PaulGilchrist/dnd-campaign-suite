@@ -8,7 +8,6 @@ import { loadCombatSummary, setCombatSummaryCache } from './combatData.js';
 import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js';
 import { monsterSpeedToFeet } from '../combat/turnState.js';
 import { clearAllPendingOas } from '../combat/pendingOpportunityAttacks.js';
-import { sweepNewCombatClocks } from '../rules/effects/zoneDurationClock.js';
 
 export function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
@@ -168,12 +167,12 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
 
     storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
 
-    // no-timers plan T4: a new initiative roll IS a new combat — every
-    // combat-scoped effect of the previous combat ends here (enforcement
-    // off ⇒ zero writes).
-    await sweepNewCombatClocks(campaignName)
-        .catch((e) => { console.error('[loadEncounterToInitiative:new-combat-sweep]', e); });
-
+    // Per-creature seam law (owner ruling 2026-11-10): loading/joining an
+    // encounter is NOT a board-wide new-combat seam — the joining monsters
+    // rolled, but every already-present creature (and the seeded party) did
+    // not, so their conditions, expirations and combat-scoped entries must
+    // stay untouched. Joiners are fresh, so there is nothing of theirs to
+    // sweep either; the old sweepNewCombatClocks board wipe is removed.
     const firstName = creatures[0]?.name;
     storage.set('activeCreatureName', firstName, campaignName);
 
@@ -182,10 +181,9 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
     // refunded). Written at the PRODUCER because this lane dispatches
     // `initiative-rolled` from the Encounters page while the Initiative view —
     // the event's only listener — is unmounted (bug-new-initiative-roll-
-    // pendingoa-drop-never-fires), so the event alone could never reach it. Same
-    // new-combat seam as the sweepNewCombatClocks call above; it is a shared
-    // runtime-store DELETE, so the null echo evicts the bucket in every tab.
-    // Zero writes when nothing is pending.
+    // pendingoa-drop-never-fires), so the event alone could never reach it. It
+    // is a shared runtime-store DELETE, so the null echo evicts the bucket in
+    // every tab. Zero writes when nothing is pending.
     clearAllPendingOas(campaignName);
 
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
@@ -262,10 +260,11 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
     // `combatSummary.creatures.some(...)` (TypeError reading 'some').
     if (!combatSummary || !Array.isArray(combatSummary.creatures)) {
         combatSummary = { round: 1, creatures: [] };
-        // no-timers T4: no prior initiative = new combat — sweep stale
-        // combat-scoped clocks any earlier encounter left behind.
-        await sweepNewCombatClocks(campaignName)
-            .catch((e) => { console.error('[addMonstersToInitiative:new-combat-sweep]', e); });
+        // Per-creature seam law (owner ruling 2026-11-10): a fresh join is NOT
+        // a board-wide clear seam either — the joining monsters rolled (and are
+        // fresh, so a self-sweep would be a no-op), while any off-board
+        // creature's conditions/expirations/combat-scoped entries must survive.
+        // The old sweepNewCombatClocks wipe for this branch is removed.
     } else {
         // Join onto a COPY: loadCombatSummary cached the shared object for
         // sync readers (getCombatSummary). Mutating it in place left a
@@ -367,8 +366,7 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
     // initiative and re-anchors the active creature, so every pending trigger
     // marker retires here. Producer-side because the Initiative listener is
     // unmounted on this lane. Unconditional, matching the dispatch below (the
-    // mounted listener dropped markers on a mid-round join too) — NOT gated on
-    // the new-board branch the clock sweep above uses.
+    // mounted listener drops markers on a mid-round join too).
     clearAllPendingOas(campaignName);
 
     window.dispatchEvent(new CustomEvent('initiative-rolled'));

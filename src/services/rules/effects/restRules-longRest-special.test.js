@@ -208,26 +208,28 @@ describe('restRules - long rest special features', () => {
   })
 
   describe('campaign targetEffects rows', () => {
-    it('clears every long-rest row down to only unrelated effects', async () => {
+    it('clears the resting creature\'s long-rest rows down to unrelated and foreign effects', async () => {
       // Stateful campaign store: each row read/filter/write advances the store,
-      // so final residue proves a row was skipped. One entry per source row,
-      // incl. the foresight multi-key row, plus hp_max_reduce without baseMax
-      // (restore skipped honestly — ledger cleared with the row).
+      // so final residue proves a row was skipped. Rows are owned/placed ON
+      // 'Test Hero' (the resting creature) — per-creature seam law (owner
+      // ruling 2026-11-10): the same effect on OTHER creatures survives.
+      const owned = (effect) => ({ effect, target: 'Test Hero', source: 'Test Hero' })
       let tes = [
-        { effect: 'ability_score_drain' },
-        { effect: 'hp_max_reduce' },
-        { effect: 'clairvoyant_combatant' },
-        { effect: 'pass_without_trace_bonus' },
-        { effect: 'blur' },
-        { effect: 'regenerate' },
-        { effect: 'beacon_of_hope' },
-        { effect: 'resistance_damage_reduction' },
-        { effect: 'barkskin' },
-        { effect: 'enhance_ability' },
-        { effect: 'circle_of_power' },
-        { effect: 'foresight' },
-        { effect: 'advantage_attacks' },
-        { effect: 'starry_form' },
+        owned('ability_score_drain'),
+        owned('hp_max_reduce'),
+        owned('clairvoyant_combatant'),
+        owned('pass_without_trace_bonus'),
+        owned('blur'),
+        owned('regenerate'),
+        owned('beacon_of_hope'),
+        owned('resistance_damage_reduction'),
+        owned('barkskin'),
+        owned('enhance_ability'),
+        owned('circle_of_power'),
+        owned('foresight'),
+        owned('advantage_attacks'),
+        owned('starry_form'),
+        { effect: 'blur', target: 'Other', source: 'Other' },
         { effect: 'bless' },
       ]
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => (key === 'targetEffects' ? tes : undefined))
@@ -235,7 +237,7 @@ describe('restRules - long rest special features', () => {
         if (name === 'campaign' && key === 'targetEffects') tes = value
       })
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(tes).toEqual([{ effect: 'bless' }])
+      expect(tes).toEqual([{ effect: 'blur', target: 'Other', source: 'Other' }, { effect: 'bless' }])
     })
 
     it('does not write skipSync targetEffects clears when no campaign effect matches a row', async () => {
@@ -251,16 +253,17 @@ describe('restRules - long rest special features', () => {
   })
 
   describe('True Polymorph summons and object transforms', () => {
-    it('removes true_polymorph summons and restores object transforms in the persisted combat summary', async () => {
+    it('removes the resting caster\'s true_polymorph summons and restores their object transforms', async () => {
       const cs = {
         creatures: [
-          { name: 'Summon1', summonSource: 'true_polymorph' },
+          { name: 'Summon1', summonSource: 'true_polymorph', summonedBy: 'Test Hero' },
           {
             name: 'Transformed1',
             maxHp: 50, ac: 15, speed: 30,
             polymorphObject: { maxHp: 50, ac: 15, speed: 30 },
             polymorphOriginal: { maxHp: 90, ac: 12, speed: 30 },
             objectType: 'chest',
+            polymorphSource: 'Test Hero',
           },
           { name: 'Normal1' },
         ],

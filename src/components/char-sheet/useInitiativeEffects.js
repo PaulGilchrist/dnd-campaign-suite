@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { getRuntimeValue, setRuntimeBatch, setRuntimeValue, getAllStoreKeys } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import utils from '../../services/ui/utils.js'
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
@@ -261,18 +261,21 @@ function clearActiveGreaterInvisibility(playerName, campaignName) {
     }
 }
 
-// Set all regenerate targets to full HP on initiative roll
-function restoreRegenerateTargets(campaignName) {
-    const allKeys = getAllStoreKeys();
-    for (const key of allKeys) {
-        if (typeof key !== 'string') continue;
-        const regenActive = getRuntimeValue(key, 'regenerateActive', campaignName);
-        if (!regenActive) continue;
-        setRuntimeValue(key, 'regenerateActive', false, campaignName);
-        const storedMaxHp = getRuntimeValue(key, 'hitPoints', campaignName);
-        if (storedMaxHp != null) {
-            setRuntimeValue(key, 'currentHitPoints', storedMaxHp, campaignName);
-        }
+// True when a campaign targetEffects row was cast by, or placed on, this
+// creature — the boundary of what its own seams may clear (per-creature law).
+function effectInvolves(te, name) {
+    const mine = utils.getName(name);
+    return utils.getName(te?.target) === mine || utils.getName(te?.source) === mine;
+}
+
+// Restore THIS creature's regenerate state on its own initiative roll
+// (per-creature seam law, owner ruling 2026-11-10: other stores untouched).
+function restoreRegenerateTarget(name, campaignName) {
+    if (!getRuntimeValue(name, 'regenerateActive', campaignName)) return;
+    setRuntimeValue(name, 'regenerateActive', false, campaignName);
+    const storedMaxHp = getRuntimeValue(name, 'hitPoints', campaignName);
+    if (storedMaxHp != null) {
+        setRuntimeValue(name, 'currentHitPoints', storedMaxHp, campaignName);
     }
 }
 
@@ -381,13 +384,18 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             }
 
             // Clear Pass Without Trace, Blur, Globe of Invulnerability, Forcecage,
-            // Antimagic Field, Regenerate and Beacon of Hope on initiative roll (new combat)
+            // Antimagic Field, Regenerate and Beacon of Hope on initiative roll
+            // (new combat) — per-creature seam law (owner ruling 2026-11-10):
+            // only rows INVOLVING the roller (cast by them or placed on them)
+            // end; the same effect on another creature survives this roll.
             for (const effectKey of INITIATIVE_CLEARED_EFFECT_KEYS) {
-                clearCampaignEffectsWith(te => te.effect !== effectKey, campaignName);
+                clearCampaignEffectsWith(te =>
+                    te.effect !== effectKey || !effectInvolves(te, playerStats.name), campaignName);
             }
 
-            // Set all regenerate targets to full HP on initiative roll
-            restoreRegenerateTargets(campaignName);
+            // Restore this creature's Regenerate state on own initiative roll
+            // (per-creature seam law: other regenerators are untouched).
+            restoreRegenerateTarget(playerStats.name, campaignName);
 
             // Clear Trance of Order on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'tranceOfOrderActive', null, campaignName);

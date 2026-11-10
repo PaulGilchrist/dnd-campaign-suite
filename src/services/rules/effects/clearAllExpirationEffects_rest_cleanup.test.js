@@ -315,12 +315,13 @@ describe('clearAllExpirationEffects — Sanctuary cleanup', () => {
     emptyRuntime();
   });
 
-  it('removes every sanctuary targetEffect on rest, from any source or target', () => {
+  it('removes only sanctuary rows INVOLVING the actor (owner ruling 2026-11-10: per-creature seam law)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === KEY) return [];
       if (name === 'campaign' && key === 'targetEffects') return [
         { effect: 'sanctuary', source: 'Cleric', target: 'Orc' },
         { effect: 'sanctuary', source: 'Other', target: 'Goblin' },
+        { effect: 'sanctuary', source: 'Monk', target: 'Cleric' },
         { effect: 'slow', target: 'Orc' },
       ];
       return null;
@@ -328,11 +329,15 @@ describe('clearAllExpirationEffects — Sanctuary cleanup', () => {
 
     clearAllExpirationEffects('Cleric', 'MyCampaign');
 
-    // One exact write; even a foreign caster's sanctuary on an unrelated
-    // target is purged (rest clears sanctuary app-wide), slow survives.
+    // One exact write. The actor's own sanctuary cast (source) and the
+    // sanctuary ON the actor (target) are purged; a foreign caster's
+    // sanctuary on an unrelated target survives this actor's seam.
     const effectWrites = writesTo('campaign', 'targetEffects');
     expect(effectWrites.length).toBe(1);
-    expect(effectWrites[0][2]).toEqual([{ effect: 'slow', target: 'Orc' }]);
+    expect(effectWrites[0][2]).toEqual([
+      { effect: 'sanctuary', source: 'Other', target: 'Goblin' },
+      { effect: 'slow', target: 'Orc' },
+    ]);
   });
 });
 

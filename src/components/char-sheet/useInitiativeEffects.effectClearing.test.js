@@ -88,17 +88,22 @@ describe('useInitiativeEffects - wholesale campaign targetEffects sweep', () => 
     };
 
     // One entry per swept key, in INITIATIVE_CLEARED_EFFECT_KEYS table order
-    // (:33-41). The duplicate pass_without_trace entries carry different
-    // owners/shapes: the sweep is source-agnostic, so both must fall.
+    // (:33-41). Per-creature seam law (owner ruling 2026-11-10): the sweep
+    // clears ONLY rows INVOLVING the roller (source OR target) — every cleared
+    // row below carries 'TestMonk' on one side. FOREIGN twins share swept keys
+    // but involve nobody else — they must survive byte-identical (the old
+    // source-agnostic board wipe is retired).
     const SURVIVOR = { effect: 'other_effect', source: 'Ally' };
     const PWT_MONK = { effect: 'pass_without_trace_bonus', source: 'TestMonk' };
-    const PWT_ALLY = { effect: 'pass_without_trace_bonus', target: 'Ally2' };
-    const BLUR = { effect: 'blur', target: 'Enemy' };
-    const GLOBE = { effect: 'globe_barrier', target: 'Ally' };
-    const CAGE = { effect: 'forcecage', target: 'Enemy' };
-    const ANTI = { effect: 'antimagic_field', target: 'Area' };
-    const REGEN = { effect: 'regenerate', target: 'Enemy' };
-    const BEACON = { effect: 'beacon_of_hope', target: 'Party' };
+    const PWT_ON_MONK = { effect: 'pass_without_trace_bonus', target: 'TestMonk' };
+    const BLUR = { effect: 'blur', target: 'TestMonk' };
+    const GLOBE = { effect: 'globe_barrier', source: 'TestMonk' };
+    const CAGE = { effect: 'forcecage', target: 'TestMonk' };
+    const ANTI = { effect: 'antimagic_field', source: 'TestMonk' };
+    const REGEN = { effect: 'regenerate', target: 'TestMonk' };
+    const BEACON = { effect: 'beacon_of_hope', source: 'TestMonk' };
+    const FOREIGN_PWT = { effect: 'pass_without_trace_bonus', target: 'Ally2', source: 'Ally3' };
+    const FOREIGN_BLUR = { effect: 'blur', target: 'Enemy', source: 'EnemyCaster' };
 
     // Production-faithful fake store (#348/#350 pattern): setRuntimeValue updates
     // the value the NEXT getRuntimeValue sees, so the sequential per-key re-read
@@ -128,8 +133,8 @@ describe('useInitiativeEffects - wholesale campaign targetEffects sweep', () => 
     const teWrites = () =>
         setRuntimeValue.mock.calls.filter(([name, key]) => name === 'campaign' && key === TE);
 
-    it('clears all 7 swept keys source-agnostically, re-reading the store per sweep', () => {
-        store.set(`campaign|${TE}`, [PWT_MONK, SURVIVOR, PWT_ALLY, BLUR, GLOBE, CAGE, ANTI, REGEN, BEACON]);
+    it('clears every swept-key row involving the roller, re-reading the store per sweep; foreign rows survive', () => {
+        store.set(`campaign|${TE}`, [PWT_MONK, SURVIVOR, FOREIGN_PWT, PWT_ON_MONK, FOREIGN_BLUR, BLUR, GLOBE, CAGE, ANTI, REGEN, BEACON]);
 
         renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
         rollInitiative();
@@ -138,15 +143,31 @@ describe('useInitiativeEffects - wholesale campaign targetEffects sweep', () => 
         // call pins campaign scoping with the exact 4-arg store signature
         // (useRuntimeState.js:78) — a 5th arg is ignored by the callee and must
         // never reappear; these clears originate locally and must POST/broadcast.
+        // Foreign rows (never source/target TestMonk) ride every payload.
         expect(teWrites()).toEqual([
-            ['campaign', TE, [SURVIVOR, BLUR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName],
-            ['campaign', TE, [SURVIVOR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName],
-            ['campaign', TE, [SURVIVOR, CAGE, ANTI, REGEN, BEACON], campaignName],
-            ['campaign', TE, [SURVIVOR, ANTI, REGEN, BEACON], campaignName],
-            ['campaign', TE, [SURVIVOR, REGEN, BEACON], campaignName],
-            ['campaign', TE, [SURVIVOR, BEACON], campaignName],
-            ['campaign', TE, [SURVIVOR], campaignName],
+            ['campaign', TE, [SURVIVOR, FOREIGN_PWT, FOREIGN_BLUR, BLUR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, FOREIGN_PWT, FOREIGN_BLUR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, FOREIGN_PWT, FOREIGN_BLUR, CAGE, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, FOREIGN_PWT, FOREIGN_BLUR, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, FOREIGN_PWT, FOREIGN_BLUR, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, FOREIGN_PWT, FOREIGN_BLUR, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, FOREIGN_PWT, FOREIGN_BLUR], campaignName],
         ]);
+    });
+
+    it('restores ONLY the roller\'s regenerate state (other regenerators untouched)', () => {
+        store.set('TestMonk|regenerateActive', true);
+        store.set('TestMonk|hitPoints', 90);
+        store.set('Ally4|regenerateActive', true);
+        store.set('Ally4|hitPoints', 33);
+
+        renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+        rollInitiative();
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'regenerateActive', false, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'currentHitPoints', 90, campaignName);
+        // Another creature's Regenerate flag + HP are never written by this roll.
+        expect(setRuntimeValue.mock.calls.filter(([name]) => name === 'Ally4')).toEqual([]);
     });
 
     it.each([

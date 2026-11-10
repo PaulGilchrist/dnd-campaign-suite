@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeBatch, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 
 import * as storageService from '../../../services/ui/storage.js'
@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getShortRestResources, computeShortRestHpNewCurrent, spellSlotLevels } from './restRules-constants.js'
+import utils from '../../../services/ui/utils.js'
 import { sweepRestClocks } from './zoneDurationClock.js'
 import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
 import { computeSuperiorityDiceMax } from '../trackedResources.js'
@@ -339,23 +340,28 @@ function applyShortRestBuffClears(name, updates) {
 
 // Clear Globe of Invulnerability target effects and remove True Polymorph
 // summoned creatures / object transforms on short rest.
-function clearShortRestSummonEffects(campaignName) {
+function clearShortRestSummonEffects(campaignName, name) {
+  // Per-creature seam law (owner ruling 2026-11-10): ONE character's rest ends
+  // that character's summons/transforms/effect zones — rows cast BY or placed
+  // ON the resting creature. Effects other creatures maintain survive.
+  const mine = utils.getName(name);
+  const involvesResting = te => te.target === mine || te.source === mine;
   const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
   if (Array.isArray(storedEffects)) {
-    setRuntimeValue('campaign', 'targetEffects', storedEffects.filter(te => te.effect !== 'globe_barrier' && te.effect !== 'antimagic_field' && te.effect !== 'protection_from_evil_and_good' && te.effect !== 'forcecage' && te.effect !== 'starry_form' && te.effect !== 'polymorph' && te.effect !== 'animal_shapes' && te.effect !== 'true_polymorph' && te.effect !== 'object_transform' && te.effect !== 'shapechange'), campaignName);
+    setRuntimeValue('campaign', 'targetEffects', storedEffects.filter(te => !(involvesResting(te) && (te.effect === 'globe_barrier' || te.effect === 'antimagic_field' || te.effect === 'protection_from_evil_and_good' || te.effect === 'forcecage' || te.effect === 'starry_form' || te.effect === 'polymorph' || te.effect === 'animal_shapes' || te.effect === 'true_polymorph' || te.effect === 'object_transform' || te.effect === 'shapechange'))), campaignName);
   }
 
-  // Remove True Polymorph summoned creatures on short rest
+  // Remove True Polymorph summoned creatures cast by the resting creature
   const shortRestCs = getCombatSummary(campaignName);
   if (!shortRestCs?.creatures) return
 
-  const summonedToRemove = shortRestCs.creatures.filter(c => c.summonSource === 'true_polymorph');
+  const summonedToRemove = shortRestCs.creatures.filter(c => c.summonSource === 'true_polymorph' && utils.getName(c.summonedBy) === mine);
   if (summonedToRemove.length > 0) {
-    shortRestCs.creatures = shortRestCs.creatures.filter(c => c.summonSource !== 'true_polymorph');
+    shortRestCs.creatures = shortRestCs.creatures.filter(c => !(c.summonSource === 'true_polymorph' && utils.getName(c.summonedBy) === mine));
     storageService.default.set('combatSummary', shortRestCs, campaignName);
     setCombatSummaryCache(shortRestCs, campaignName);
   }
-  const objectTransforms = shortRestCs.creatures.filter(c => c.polymorphObject);
+  const objectTransforms = shortRestCs.creatures.filter(c => c.polymorphObject && utils.getName(c.polymorphSource) === mine);
   if (objectTransforms.length > 0) {
     for (const creature of objectTransforms) {
       const original = creature.polymorphOriginal || {};
@@ -381,28 +387,29 @@ function addShortRestFlagResets(updates) {
   }
 }
 
-function clearShortRestCampaignTargetEffects(campaignName) {
+function clearShortRestCampaignTargetEffects(campaignName, name) {
+  // Per-creature seam law (owner ruling 2026-11-10): rest clears only rows
+  // cast BY or placed ON the resting creature — identical-effect rows other
+  // creatures maintain survive this rest.
+  const mine = utils.getName(name);
   for (const effectKeys of SHORT_REST_TARGET_EFFECT_CLEAR_KEYS) {
     const effects = getRuntimeValue('campaign', 'targetEffects') || []
-    const filtered = effects.filter(e => !effectKeys.includes(e.effect))
+    const filtered = effects.filter(e => !effectKeys.includes(e.effect) || (e.target !== mine && e.source !== mine))
     if (filtered.length !== effects.length) {
       setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true)
     }
   }
 }
 
-// Clear regenerateActive flag from all targets and set them to full HP on short rest
-function clearRegenerateActiveFlags(campaignName) {
-  for (const key of getAllStoreKeys()) {
-    if (typeof key !== 'string') continue;
-    const regenActive = getRuntimeValue(key, 'regenerateActive', campaignName);
-    if (regenActive) {
-      setRuntimeValue(key, 'regenerateActive', false, campaignName);
-      const storedMaxHp = getRuntimeValue(key, 'hitPoints', campaignName);
-      if (storedMaxHp != null) {
-        setRuntimeValue(key, 'currentHitPoints', storedMaxHp, campaignName);
-      }
-    }
+// Clear the RESTING creature's regenerateActive flag and set them to full HP
+// on short rest (per-creature seam law: other regenerators are untouched).
+function clearRegenerateActiveFlags(name, campaignName) {
+  const regenActive = getRuntimeValue(name, 'regenerateActive', campaignName);
+  if (!regenActive) return;
+  setRuntimeValue(name, 'regenerateActive', false, campaignName);
+  const storedMaxHp = getRuntimeValue(name, 'hitPoints', campaignName);
+  if (storedMaxHp != null) {
+    setRuntimeValue(name, 'currentHitPoints', storedMaxHp, campaignName);
   }
 }
 
@@ -436,9 +443,10 @@ function endInvisibilityEffects(name, campaignName) {
 export async function applyShortRest(playerStats, campaignName, options = {}) {
   const { skipAutoRecovery = false } = options;
   const name = playerStats.name
-  // no-timers plan T4: a rest is one of the three boundaries where
-  // combat-scoped effects end (new initiative roll / short rest / long rest).
-  await sweepRestClocks(campaignName, 'short')
+  // no-timers plan T4 + per-creature seam law (owner ruling 2026-11-10): a
+  // rest is one of the three combat-scoped boundaries — but it ends ONLY the
+  // RESTING character's clocks, never another creature's.
+  await sweepRestClocks(campaignName, 'short', name)
     .catch((e) => { console.error('[applyShortRest:combat-scoped-sweep]', e); });
   const storedHp = getRuntimeValue(name, 'currentHitPoints')
   const currentHp = computeShortRestHpNewCurrent(storedHp, playerStats.hitPoints, 0)
@@ -504,14 +512,14 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
 
   const shapeShiftBuffsForShortRest = applyShortRestBuffClears(name, updates)
 
-  clearShortRestSummonEffects(campaignName)
+  clearShortRestSummonEffects(campaignName, name)
 
   addShortRestFlagResets(updates)
 
   setRuntimeBatch(name, updates, campaignName)
 
-  clearShortRestCampaignTargetEffects(campaignName)
-  clearRegenerateActiveFlags(campaignName)
+  clearShortRestCampaignTargetEffects(campaignName, name)
+  clearRegenerateActiveFlags(name, campaignName)
 
   setRuntimeValue(name, 'resistanceUsedThisTurn', null, campaignName)
   clearAllExpirationEffects(name, campaignName)

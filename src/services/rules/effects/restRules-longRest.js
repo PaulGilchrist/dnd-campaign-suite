@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeBatch, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import * as storageService from '../../../services/ui/storage.js'
@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getLongRestResources, spellSlotLevels, getLevelAfterLongRest } from './restRules-constants.js'
+import utils from '../../../services/ui/utils.js'
 import { sweepRestClocks } from './zoneDurationClock.js'
 import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
 
@@ -84,25 +85,29 @@ function buildLongRestCharData(playerStats) {
   return charData
 }
 
-// Clear Globe of Invulnerability target effects and remove True Polymorph
-// summoned creatures / object transforms on long rest.
-function clearLongRestSummonEffects(campaignName) {
+// Clear the RESTING creature's Globe of Invulnerability target effects and
+// remove THEIR True Polymorph summoned creatures / object transforms on long
+// rest (per-creature seam law, owner ruling 2026-11-10: rows cast by / placed
+// on the resting character only — other creatures' summons survive).
+function clearLongRestSummonEffects(campaignName, name) {
+  const mine = utils.getName(name)
+  const involvesResting = te => te.target === mine || te.source === mine
   const storedEffects = getRuntimeValue('campaign', 'targetEffects') || []
   if (Array.isArray(storedEffects)) {
-    setRuntimeValue('campaign', 'targetEffects', storedEffects.filter(te => te.effect !== 'globe_barrier' && te.effect !== 'antimagic_field' && te.effect !== 'protection_from_evil_and_good' && te.effect !== 'forcecage' && te.effect !== 'polymorph' && te.effect !== 'animal_shapes' && te.effect !== 'true_polymorph' && te.effect !== 'object_transform' && te.effect !== 'shapechange'), campaignName)
+    setRuntimeValue('campaign', 'targetEffects', storedEffects.filter(te => !(involvesResting(te) && (te.effect === 'globe_barrier' || te.effect === 'antimagic_field' || te.effect === 'protection_from_evil_and_good' || te.effect === 'forcecage' || te.effect === 'polymorph' || te.effect === 'animal_shapes' || te.effect === 'true_polymorph' || te.effect === 'object_transform' || te.effect === 'shapechange'))), campaignName)
   }
 
   const longRestCs = getCombatSummary(campaignName)
   if (!longRestCs?.creatures) return
 
-  const summonedToRemove = longRestCs.creatures.filter(c => c.summonSource === 'true_polymorph')
+  const summonedToRemove = longRestCs.creatures.filter(c => c.summonSource === 'true_polymorph' && utils.getName(c.summonedBy) === mine)
   if (summonedToRemove.length > 0) {
-    longRestCs.creatures = longRestCs.creatures.filter(c => c.summonSource !== 'true_polymorph')
+    longRestCs.creatures = longRestCs.creatures.filter(c => !(c.summonSource === 'true_polymorph' && utils.getName(c.summonedBy) === mine))
     storageService.default.set('combatSummary', longRestCs, campaignName)
     setCombatSummaryCache(longRestCs, campaignName)
   }
 
-  const objectTransforms = longRestCs.creatures.filter(c => c.polymorphObject)
+  const objectTransforms = longRestCs.creatures.filter(c => c.polymorphObject && utils.getName(c.polymorphSource) === mine)
   if (objectTransforms.length > 0) {
     for (const creature of objectTransforms) {
       const original = creature.polymorphOriginal || {}
@@ -232,10 +237,13 @@ async function resetSpellThiefTracking(name, playerStats, charData, campaignName
   }
 }
 
-function clearLongRestCampaignTargetEffects(campaignName) {
+function clearLongRestCampaignTargetEffects(campaignName, name) {
+  // Per-creature seam law (owner ruling 2026-11-10): rest clears only rows
+  // cast BY or placed ON the resting creature.
+  const mine = utils.getName(name)
   for (const effectKeys of LONG_REST_TARGET_EFFECT_CLEAR_KEYS) {
     const effects = getRuntimeValue('campaign', 'targetEffects') || []
-    const filtered = effects.filter(e => !effectKeys.includes(e.effect))
+    const filtered = effects.filter(e => !effectKeys.includes(e.effect) || (e.target !== mine && e.source !== mine))
     if (filtered.length !== effects.length) {
       setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true)
     }
@@ -252,8 +260,11 @@ function clearLongRestCampaignTargetEffects(campaignName) {
 // hitPoints + hpMaxReduction pair greaterRestorationHandler consumes —
 // restore is byte-symmetric (hitPoints = baseMax, hpMaxReduction = 0).
 // The ledger tes themselves are cleared by clearLongRestCampaignTargetEffects.
-function restoreHpMaxDrainsOnLongRest(campaignName) {
-  const drains = (getRuntimeValue('campaign', 'targetEffects') || []).filter(te => te.effect === 'hp_max_reduce')
+function restoreHpMaxDrainsOnLongRest(campaignName, name) {
+  // Per-creature seam law (owner ruling 2026-11-10): only drains ON the
+  // resting character reverse; another creature's hp_max_reduce survives.
+  const mine = utils.getName(name)
+  const drains = (getRuntimeValue('campaign', 'targetEffects') || []).filter(te => te.effect === 'hp_max_reduce' && te.target === mine)
   if (drains.length === 0) return
   const cs = getCombatSummary(campaignName)
   let csChanged = false
@@ -280,9 +291,12 @@ function restoreHpMaxDrainsOnLongRest(campaignName) {
   }
 }
 
-function endWildShapesOnLongRest(campaignName) {
+function endWildShapesOnLongRest(campaignName, name) {
+  // Per-creature seam law (owner ruling 2026-11-10): only the RESTING
+  // character's own Wild Shape ends here — another druid's form survives.
+  const mine = utils.getName(name)
   const wildShapeEffects = getRuntimeValue('campaign', 'targetEffects') || []
-  const wildShapeTargets = wildShapeEffects.filter(te => te.effect === 'wild_shape').map(te => te.source)
+  const wildShapeTargets = wildShapeEffects.filter(te => te.effect === 'wild_shape' && utils.getName(te.source) === mine).map(te => te.source)
   for (const wsSource of wildShapeTargets) {
     const cs = getCombatSummary(campaignName)
     if (cs) {
@@ -311,18 +325,16 @@ function endWildShapesOnLongRest(campaignName) {
   }
 }
 
-// Clear regenerateActive flag from all targets and set them to full HP on long rest
-function clearRegenerateActiveFlags(campaignName) {
-  for (const key of getAllStoreKeys()) {
-    if (typeof key !== 'string') continue
-    const regenActive = getRuntimeValue(key, 'regenerateActive', campaignName)
-    if (regenActive) {
-      setRuntimeValue(key, 'regenerateActive', false, campaignName)
-      const storedMaxHp = getRuntimeValue(key, 'hitPoints', campaignName)
-      if (storedMaxHp != null) {
-        setRuntimeValue(key, 'currentHitPoints', storedMaxHp, campaignName)
-      }
-    }
+// Clear the RESTING creature's regenerateActive flag and set them to full HP
+// on long rest (per-creature seam law, owner ruling 2026-11-10: only their own
+// store is touched — other regenerators survive this rest).
+function clearRegenerateActiveFlags(name, campaignName) {
+  const regenActive = getRuntimeValue(name, 'regenerateActive', campaignName)
+  if (!regenActive) return
+  setRuntimeValue(name, 'regenerateActive', false, campaignName)
+  const storedMaxHp = getRuntimeValue(name, 'hitPoints', campaignName)
+  if (storedMaxHp != null) {
+    setRuntimeValue(name, 'currentHitPoints', storedMaxHp, campaignName)
   }
 }
 
@@ -606,14 +618,14 @@ function resetPerSpellFreeCastCounters(name, playerStats, campaignName) {
 export async function applyLongRest(playerStats, campaignName) {
   const name = playerStats.name
 
-  // no-timers plan T4: long rest ends every combat-scoped effect (§: rests
-  // are explicit player actions — one of the three turn-based boundaries).
-  await sweepRestClocks(campaignName, 'long')
+  // no-timers plan T4 + per-creature seam law (owner ruling 2026-11-10): a
+  // long rest ends ONLY the resting character's combat-scoped clocks.
+  await sweepRestClocks(campaignName, 'long', name)
     .catch((e) => { console.error('[applyLongRest:combat-scoped-sweep]', e); });
 
   const charData = buildLongRestCharData(playerStats)
 
-  clearLongRestSummonEffects(campaignName)
+  clearLongRestSummonEffects(campaignName, name)
 
   clearLongRestCharacterFlags(charData)
 
@@ -639,14 +651,14 @@ export async function applyLongRest(playerStats, campaignName) {
   // BEFORE the clear filter below wipes them (ledger-first discipline — the
   // clear without the restore would leave the reduction wrongly persisting
   // past the long rest; RAW row states no end, te convention = LR restore).
-  restoreHpMaxDrainsOnLongRest(campaignName)
+  restoreHpMaxDrainsOnLongRest(campaignName, name)
 
-  clearLongRestCampaignTargetEffects(campaignName)
+  clearLongRestCampaignTargetEffects(campaignName, name)
 
-  // End Wild Shape on long rest
-  endWildShapesOnLongRest(campaignName)
+  // End the resting character's Wild Shape on long rest
+  endWildShapesOnLongRest(campaignName, name)
 
-  clearRegenerateActiveFlags(campaignName)
+  clearRegenerateActiveFlags(name, campaignName)
 
   setRuntimeValue(name, 'resistanceUsedThisTurn', null, campaignName)
 

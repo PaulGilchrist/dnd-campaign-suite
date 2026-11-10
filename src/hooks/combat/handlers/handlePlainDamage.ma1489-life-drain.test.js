@@ -280,8 +280,10 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
         const src = readFileSync('src/services/rules/effects/restRules-longRest.js', 'utf8');
         const clearArray = src.match(/const LONG_REST_TARGET_EFFECT_CLEAR_KEYS = \[[\s\S]*?\n\]/)[0];
         expect(clearArray).toContain("'hp_max_reduce'");
-        const restoreCall = src.search(/\n {2}restoreHpMaxDrainsOnLongRest\(campaignName\)/);
-        const clearCall = src.search(/\n {2}clearLongRestCampaignTargetEffects\(campaignName\)/);
+        // Both lanes are scoped to the resting character (per-creature seam
+        // law, owner ruling 2026-11-10): calls carry (campaignName, name).
+        const restoreCall = src.search(/\n {2}restoreHpMaxDrainsOnLongRest\(campaignName, name\)/);
+        const clearCall = src.search(/\n {2}clearLongRestCampaignTargetEffects\(campaignName, name\)/);
         expect(restoreCall).toBeGreaterThan(-1);
         expect(clearCall).toBeGreaterThan(-1);
         expect(restoreCall).toBeLessThan(clearCall);

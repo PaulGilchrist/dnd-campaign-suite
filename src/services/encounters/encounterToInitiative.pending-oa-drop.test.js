@@ -7,9 +7,10 @@
 // listener ever ran: a curl-seeded marker byte-survived a real Wolf+Goblin Join
 // Encounter (live-proved 2026-11-10) and mounted live OA resolution affordances in
 // the brand-new combat where no provocation happened. Fix: the drop runs at the
-// PRODUCER (clearAllPendingOas) next to the existing sweepNewCombatClocks new-combat
-// seam — a shared runtime-store key DELETE whose null echo evicts the bucket in
-// every tab, mounted or not.
+// PRODUCER (clearAllPendingOas) at the join seam itself — a shared runtime-store
+// key DELETE whose null echo evicts the bucket in every tab, mounted or not.
+// (The per-creature ruling 2026-11-10 later removed the clock sweep that used to
+// sit beside it; the OA drop law stays owner-ratified.)
 //
 // Mock setup mirrors sibling encounterToInitiative.test.js /
 // encounterToInitiative.join-write-failure.test.js. The pendingOAs module rides the

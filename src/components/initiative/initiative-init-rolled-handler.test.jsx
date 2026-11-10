@@ -1,15 +1,21 @@
 // @maintained-by-ai
-// Lane: Initiative.jsx 'initiative-rolled' window-event listener (Initiative.jsx:497-523) —
-// the GM-side new-initiative seam. Owned contract:
+// Lane: Initiative.jsx 'initiative-rolled' window-event listener (Initiative.jsx) —
+// the GM-side initiative seam. Owned contract (per-creature seam law, owner
+// ruling 2026-11-10 — a roll signals new combat ONLY for the creature that
+// rolled; detail-less join dispatches clear nobody):
 //   1. null-summary guard → zero store/log/expiry writes
-//   2. WM-008 campaign latch '_Vex_appliedTarget' cleared once per event
-//   3. player per-round latch resets (exact bytes); NPCs and thief's-reflex
-//      second-turn entries get ZERO writes
-//   4. Hunter's Mark concentration cleared + persisted byte-exactly; other
-//      concentrations (other spells, null/absent) preserved untouched
+//   2. WM-008 campaign latch '_Vex_appliedTarget' + pendingOAs drop clear once
+//      per event (campaign-level seam laws, unconditional)
+//   3. ONLY the ROLLER's per-round latch resets (exact bytes); every other
+//      creature, NPCs and thief's-reflex second-turn entries get ZERO writes;
+//      a detail-less dispatch (EB Join / Add-to-Initiative join seam) and a
+//      roller absent from the board both clear nobody
+//   4. Hunter's Mark concentration cleared + persisted byte-exactly ONLY for the
+//      roller; other concentrations (other spells, other creatures) preserved
 //   5. dominated pendingExpirations cleared via clearExpirationEffects with exact
-//      args; non-dominated entries survive in the filtered write; empty list → no-op;
-//      non-empty all-non-dominated list → zero rewrite (#864 only-if-changed guard)
+//      args ONLY in the roller's queue; non-dominated entries survive in the
+//      filtered write; empty list → no-op; non-empty all-non-dominated list →
+//      zero rewrite (#864 only-if-changed guard)
 // Delegated (do NOT duplicate here):
 //   - concentration-result (pinned ABSENT on the view — single adjudicator is the
 //     useLoggedDiceRollEventHandlers page-singleton) / death-save-result inline
@@ -146,7 +152,9 @@ describe('Initiative - initiative-rolled seam', () => {
 
     // Fresh mount → cards live → freeze post-mount call baselines so every
     // assertion below measures ONLY what the initiative-rolled event wrote.
-    async function mountAndBaseline(eventSummary, mountSummary = eventSummary) {
+    // The dispatch carries the ROLLER's detail (the per-creature seam key);
+    // pass rollerName = null to exercise a detail-less JOIN dispatch.
+    async function mountAndBaseline(eventSummary, mountSummary = eventSummary, rollerName = 'Alice') {
         vi.mocked(loadCombatSummary).mockResolvedValue(mountSummary);
         await act(async () => { render(<Initiative {...props} />); });
         await waitFor(() => { expect(screen.getByTestId('creature-card-Alice')).toBeInTheDocument(); });
@@ -156,7 +164,9 @@ describe('Initiative - initiative-rolled seam', () => {
             expire: clearExpirationEffects.mock.calls.length,
         };
         vi.mocked(getCombatSummary).mockReturnValue(eventSummary);
-        await act(async () => { window.dispatchEvent(new Event('initiative-rolled')); });
+        await act(async () => { window.dispatchEvent(new CustomEvent('initiative-rolled', {
+            detail: rollerName ? { characterName: rollerName, roll: 12 } : undefined,
+        })); });
         return {
             runtimeAfter: setRuntimeValue.mock.calls.slice(baseline.runtime),
             storageAfter: storage.set.mock.calls.slice(baseline.storage),
@@ -164,7 +174,7 @@ describe('Initiative - initiative-rolled seam', () => {
         };
     }
 
-    it('resets every players per-round latches but touches NPCs and second-turn entries not at all', async () => {
+    it('resets the ROLLING player\'s per-round latches only — other players, NPCs and second-turn entries untouched (per-creature seam law)', async () => {
         const { runtimeAfter, storageAfter } = await mountAndBaseline({
             round: 1,
             creatures: [
@@ -175,11 +185,11 @@ describe('Initiative - initiative-rolled seam', () => {
             ],
         });
 
-        // Exact bytes across latch categories: []-reset, null-latch reset, and the
-        // CLA-100 Dread Ambush once-per-combat re-arm (regression-pinned key).
+        // Exact bytes across latch categories for the ROLLER only: []-reset,
+        // null-latch reset, and the CLA-100 Dread Ambush once-per-combat
+        // re-arm (regression-pinned key).
         expect(runtimeAfter).toEqual(expect.arrayContaining([
             ['Alice', 'activeBuffs', [], 'test-campaign'],
-            ['Bob', 'activeBuffs', [], 'test-campaign'],
             ['Alice', '_Nick_UsedRound', null, 'test-campaign'],
             ['Alice', '_assassinate_usedRound', null, 'test-campaign'],
             ['Alice', 'actionSurgeUsedThisRound', null, 'test-campaign'],
@@ -189,11 +199,42 @@ describe('Initiative - initiative-rolled seam', () => {
         expect(runtimeAfter.filter(c => c[1] === '_Vex_appliedTarget')).toEqual([
             ['campaign', '_Vex_appliedTarget', null, 'test-campaign'],
         ]);
-        // Zero-write negatives: NPCs never get player resets; thief's-reflex
+        // Zero-write negatives: a NON-rolling player (Bob) is never reset —
+        // owner ruling 2026-11-10; NPCs never get player resets; thief's-reflex
         // duplicate entries are skipped entirely; no concentration persisted here.
+        expect(runtimeAfter.filter(c => c[0] === 'Bob')).toEqual([]);
         expect(runtimeAfter.filter(c => c[0] === 'Goblin')).toEqual([]);
         expect(runtimeAfter.filter(c => c[0] === 'Alice (Second Turn)')).toEqual([]);
         expect(storageAfter).toEqual([]);
+    });
+
+    it('a detail-less JOIN dispatch (EB Join / Add-to-Initiative) clears NO creature — joiners fresh, present creatures untouched', async () => {
+        const { runtimeAfter, storageAfter, expireAfter } = await mountAndBaseline({
+            round: 1,
+            creatures: [
+                { name: 'Alice', type: 'player', concentration: { spell: "Hunter's Mark", dc: 10 } },
+                { name: 'Bob', type: 'player' },
+            ],
+        }, undefined, null);
+
+        // Campaign-level seam laws still fire (pendingOAs drop + Vex latch),
+        // but NO per-creature clear rides a join seam.
+        expect(runtimeAfter).toEqual([['campaign', '_Vex_appliedTarget', null, 'test-campaign']]);
+        expect(storageAfter).toEqual([]);
+        expect(expireAfter).toEqual([]);
+    });
+
+    it('a roll by a creature absent from the board clears nobody', async () => {
+        const { runtimeAfter, storageAfter, expireAfter } = await mountAndBaseline({
+            round: 1,
+            creatures: [
+                { name: 'Alice', type: 'player', concentration: { spell: "Hunter's Mark", dc: 10 } },
+            ],
+        }, undefined, ' Stranger ');
+
+        expect(runtimeAfter).toEqual([['campaign', '_Vex_appliedTarget', null, 'test-campaign']]);
+        expect(storageAfter).toEqual([]);
+        expect(expireAfter).toEqual([]);
     });
 
     it('clears Hunter\'s Mark concentration and persists the summary byte-exactly, preserving other concentrations', async () => {
@@ -234,11 +275,15 @@ describe('Initiative - initiative-rolled seam', () => {
                 { target: 'Enemy1', effects: [{ type: 'dominated', effect: 'dominated', duration: '1 round' }] },
                 { target: 'Enemy2', effects: [{ type: 'charmed', effect: 'charmed', duration: '1 turn' }] },
             ];
-            return []; // Bob: empty list → early return, no writes
+            // Bob is NOT the roller: even his dominated queue must survive
+            // Alice's roll untouched (per-creature seam law, owner 2026-11-10).
+            return [
+                { target: 'Enemy3', effects: [{ type: 'dominated', effect: 'dominated', duration: '1 round' }] },
+            ];
         });
         vi.mocked(getCombatSummary).mockReturnValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }, { name: 'Bob', type: 'player' }] });
         const expireBefore = clearExpirationEffects.mock.calls.length;
-        await act(async () => { window.dispatchEvent(new Event('initiative-rolled')); });
+        await act(async () => { window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: 'Alice', roll: 12 } })); });
 
         expect(clearExpirationEffects.mock.calls.slice(expireBefore)).toEqual([
             // The owning queue entry rides along as the 5th arg (clock
@@ -250,7 +295,8 @@ describe('Initiative - initiative-rolled seam', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'pendingExpirations', [
             { target: 'Enemy2', effects: [{ type: 'charmed', effect: 'charmed', duration: '1 turn' }] },
         ], 'test-campaign');
-        // Empty-list creature: no expiry call (count above is exactly 1) and no write.
+        // Non-rolling creature holding a dominated queue: no expiry call
+        // (count above is exactly 1) and no rewrite of Bob's store.
         expect(setRuntimeValue.mock.calls.filter(c => c[0] === 'Bob' && c[1] === 'pendingExpirations')).toEqual([]);
     });
 
@@ -269,7 +315,7 @@ describe('Initiative - initiative-rolled seam', () => {
         vi.mocked(getRuntimeValue).mockImplementation((key, prop) => (prop === 'pendingExpirations' ? unchangedList : null));
         vi.mocked(getCombatSummary).mockReturnValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
         const runtimeBefore = setRuntimeValue.mock.calls.length;
-        await act(async () => { window.dispatchEvent(new Event('initiative-rolled')); });
+        await act(async () => { window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: 'Alice', roll: 12 } })); });
 
         // Nothing dominated: no expiry clears AND no identical-array rewrite.
         expect(clearExpirationEffects).not.toHaveBeenCalled();

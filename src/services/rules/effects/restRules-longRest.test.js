@@ -75,7 +75,7 @@ vi.mock('../../../services/ui/storage.js', () => ({
 }))
 
 // Import mocked functions for per-test customization
-import { getRuntimeValue, setRuntimeBatch, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import { addEntry } from '../../../services/ui/logService.js'
@@ -568,21 +568,27 @@ describe('applyLongRest', () => {
   })
 
   describe('campaign targetEffects survivors', () => {
-    it('drops every summon and long-rest row down to only unrelated effects', async () => {
+    it('drops the resting creature\'s summon and long-rest rows, sparing foreign rows', async () => {
       // Stateful campaign store (longRest-special precedent): each read/filter/write
-      // advances the store, so final residue proves BOTH the unconditional
-      // summon-row filter (:90-93, unique to this lane) and the row-clear loop.
+      // advances the store, so final residue proves BOTH the summon-row filter
+      // (:90-93, unique to this lane) and the row-clear loop — scoped to rows
+      // cast BY or placed ON the resting creature (per-creature seam law,
+      // owner ruling 2026-11-10): foreign rows survive byte-identical.
+      const owned = (effect) => ({ effect, target: 'Test Hero', source: 'Test Hero' })
+      const foreign = (effect) => ({ effect, target: 'Other', source: 'Other' })
       let tes = [
-        { effect: 'globe_barrier' },
-        { effect: 'antimagic_field' },
-        { effect: 'protection_from_evil_and_good' },
-        { effect: 'forcecage' },
-        { effect: 'polymorph' },
-        { effect: 'animal_shapes' },
-        { effect: 'true_polymorph' },
-        { effect: 'object_transform' },
-        { effect: 'shapechange' },
-        { effect: 'clairvoyant_combatant' },
+        owned('globe_barrier'),
+        owned('antimagic_field'),
+        owned('protection_from_evil_and_good'),
+        owned('forcecage'),
+        owned('polymorph'),
+        owned('animal_shapes'),
+        owned('true_polymorph'),
+        owned('object_transform'),
+        owned('shapechange'),
+        owned('clairvoyant_combatant'),
+        foreign('globe_barrier'),
+        foreign('clairvoyant_combatant'),
         { effect: 'bless' },
       ]
       vi.mocked(getRuntimeValue).mockImplementation((name, key) =>
@@ -591,16 +597,21 @@ describe('applyLongRest', () => {
         if (name === 'campaign' && key === 'targetEffects') tes = value
       })
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(tes).toEqual([{ effect: 'bless' }])
+      expect(tes).toEqual([foreign('globe_barrier'), foreign('clairvoyant_combatant'), { effect: 'bless' }])
     })
   })
 
   describe('Wild Shape cleanup', () => {
-    it('de-transforms the druid, keeps unrelated creatures, and re-arms its latches with exact payloads', async () => {
-      let tes = [{ effect: 'wild_shape', source: 'Druid1' }]
+    it('de-transforms the RESTING druid, keeps another druid\'s form, and re-arms latches with exact payloads', async () => {
+      // Per-creature seam law (owner ruling 2026-11-10): only the resting
+      // character's own Wild Shape ends — OtherDruid's row/form survive.
+      let tes = [
+        { effect: 'wild_shape', source: 'Test Hero', target: 'Test Hero' },
+        { effect: 'wild_shape', source: 'OtherDruid', target: 'OtherDruid' },
+      ]
       const cs = {
         creatures: [
-          { name: 'Druid1', type: 'player', wildShapeSource: 'Druid1', beastIndex: 2, beastName: 'Bear' },
+          { name: 'Test Hero', type: 'player', wildShapeSource: 'Test Hero', beastIndex: 2, beastName: 'Bear' },
           { name: 'Normal1', type: 'npc' },
           // bait: another druid's beast form must survive this rest
           { name: 'OtherBear', type: 'npc', wildShapeSource: 'OtherDruid' },
@@ -608,7 +619,7 @@ describe('applyLongRest', () => {
       }
       vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
         if (name === 'campaign' && key === 'targetEffects') return tes
-        if (name === 'Druid1' && key === 'activeBuffs') return [{ effect: 'shape_shift' }, { effect: 'bless' }]
+        if (name === 'Test Hero' && key === 'activeBuffs') return [{ effect: 'shape_shift' }, { effect: 'bless' }]
         return undefined
       })
       vi.mocked(setRuntimeValue).mockImplementation((name, key, value) => {
@@ -618,43 +629,43 @@ describe('applyLongRest', () => {
       // Cleanup is driven by the campaign wild_shape rows, not the resting hero's class
       await applyLongRest(makeStats(), CAMPAIGN)
 
-      // Exact persisted combat summary: druid flags stripped, own beasts removed,
-      // unrelated creatures (and another druid's bear) untouched
+      // Exact persisted combat summary: resting druid flags stripped, own beasts
+      // removed, unrelated creatures (and another druid's bear) untouched
       expect(storageService.default.set).toHaveBeenCalledWith(
         'combatSummary',
         { creatures: [
-          { name: 'Druid1', type: 'player' },
+          { name: 'Test Hero', type: 'player' },
           { name: 'Normal1', type: 'npc' },
           { name: 'OtherBear', type: 'npc', wildShapeSource: 'OtherDruid' },
         ] },
         CAMPAIGN,
       )
-      expect(tes).toEqual([])
-      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], CAMPAIGN, true)
+      expect(tes).toEqual([{ effect: 'wild_shape', source: 'OtherDruid', target: 'OtherDruid' }])
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'campaign', 'targetEffects', [{ effect: 'wild_shape', source: 'OtherDruid', target: 'OtherDruid' }], CAMPAIGN, true)
       // shape_shift stripped, unrelated bless buff preserved
-      expect(setRuntimeValue).toHaveBeenCalledWith('Druid1', 'activeBuffs', [{ effect: 'bless' }], CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Druid1', 'circleFormsAC', null, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Druid1', 'tempHp', 0, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'activeBuffs', [{ effect: 'bless' }], CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'circleFormsAC', null, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'tempHp', 0, CAMPAIGN)
+      // Another druid's stores are never touched by this rest
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'OtherDruid')).toHaveLength(0)
     })
   })
 
   describe('regenerateActive clearing (cited by restRules-longRest-special.test.js)', () => {
-    it('clears regen and refills HP only for regenerating string-keyed stores', async () => {
-      vi.mocked(getAllStoreKeys).mockReturnValue(['Char1', 'Char2', 'Char3', 42])
+    it('clears regen and refills HP ONLY for the resting creature (per-creature seam law)', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (name === 'Char1' && key === 'regenerateActive') return true
-        if (name === 'Char1' && key === 'hitPoints') return 60
+        if (name === 'Test Hero' && key === 'regenerateActive') return true
+        if (name === 'Test Hero' && key === 'hitPoints') return 60
         if (name === 'Char3' && key === 'regenerateActive') return true
         return undefined
       })
       await applyLongRest(makeStats(), CAMPAIGN)
-      // Char1: regen off + HP refilled to stored max
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'regenerateActive', false, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'currentHitPoints', 60, CAMPAIGN)
-      // Char3: regen cleared but no HP write without a stored maximum
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char3', 'regenerateActive', false, CAMPAIGN)
-      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Char3' && c[1] === 'currentHitPoints')).toHaveLength(0)
-      // Char2 (not regenerating) is never written
+      // Resting creature: regen off + HP refilled to stored max
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'regenerateActive', false, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'currentHitPoints', 60, CAMPAIGN)
+      // Another regenerator is left byte-intact — their rest is their own seam.
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('Char3', 'regenerateActive', false, CAMPAIGN)
       expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Char2')).toHaveLength(0)
     })
   })

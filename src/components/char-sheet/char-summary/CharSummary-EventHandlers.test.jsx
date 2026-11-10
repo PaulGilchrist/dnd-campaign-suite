@@ -152,7 +152,9 @@ describe('CharSummary - Initiative Rolled Event', () => {
         expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
 
         act(() => {
-            window.dispatchEvent(new Event('initiative-rolled'));
+            // Per-creature seam law (owner ruling 2026-11-10): the surge clears
+            // only on THIS character's own roll — the detail names the roller.
+            window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: 'Thorin', roll: 12 } }));
         });
 
         // Real DOM effect: the badge is gone, not just the setter nudged.
@@ -161,6 +163,23 @@ describe('CharSummary - Initiative Rolled Event', () => {
         expect(harness.syncedCalls).toEqual([{ key: 'wildMagicSurgeEffects', value: null }]);
         // The two window events stay independently wired.
         expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
+    });
+
+    it('does NOT clear the surge badge on another creature\'s roll or a detail-less join seam', () => {
+        harness.seed.wildMagicSurgeEffects = [{ timestamp: 1000, roll: 5, effect: 'Fireball' }];
+        renderSummary();
+        expect(screen.getByText(/Surge Effects:/)).toBeInTheDocument();
+
+        act(() => {
+            window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: 'SomeOtherCreature', roll: 9 } }));
+        });
+        act(() => {
+            window.dispatchEvent(new CustomEvent('initiative-rolled')); // EB Join / NPC-add join seam
+        });
+
+        // A foreign creature's roll and a join seam both leave this sheet's surges intact.
+        expect(screen.getByText(/Surge Effects:/)).toBeInTheDocument();
+        expect(harness.syncedCalls).toHaveLength(0);
     });
 
     it('detaches the initiative-rolled listener on unmount', () => {

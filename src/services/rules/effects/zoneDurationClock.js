@@ -108,9 +108,12 @@ export function armDurationClockIfEnforced(ctx) {
 /**
  * no-timers plan T4 seams — combat-scoped sweeps.
  *
- * NEW COMBAT (a fresh initiative roll): every combat-scoped clock across ALL
- * stores ends — the previous combat is over. Enforcement off / zones off ⇒
- * ZERO writes (byte-identical L1–4).
+ * BOARD CLEAR ONLY: Initiative's explicit "Clear" board reset ends every
+ * combat-scoped clock across ALL stores — the GM ended the table's combat by
+ * name. NOTE (owner ruling 2026-11-10): individual initiative rolls and EB
+ * Joins are NOT board-wide seams anymore and must never call this; per-actor
+ * expiry boundaries go through clearAllExpirationEffects / sweepRestClocks.
+ * Enforcement off / zones off ⇒ ZERO writes (byte-identical L1–4).
  */
 export async function sweepNewCombatClocks(campaignName) {
     if (!campaignName || !zonesClockEnforcementLive(campaignName)) return 0;
@@ -120,7 +123,7 @@ export async function sweepNewCombatClocks(campaignName) {
             type: 'automation',
             automationType: 'enforcement_clock_expired',
             characterName: 'Campaign',
-            description: `New initiative roll: ${swept} combat-scoped effect${swept === 1 ? '' : 's'} ended (enforcement: zones).`,
+            description: `Combat board cleared: ${swept} combat-scoped effect${swept === 1 ? '' : 's'} ended (enforcement: zones).`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[zoneDurationClock:new-combat-sweep-log]', e); });
     }
@@ -128,21 +131,25 @@ export async function sweepNewCombatClocks(campaignName) {
 }
 
 /**
- * REST seams (short & long): the resting creature's combat-scoped clocks end
+ * REST seams (short & long): the RESTING CREATURE's combat-scoped clocks end
  * — rests are explicit player actions, one of the three boundaries the
- * turn-based principle names. Unconditional by design: combat-scoped entries
- * are only ever written while enforcement is armed, so enforcement-off play
- * has nothing to sweep and stays byte-identical.
+ * turn-based principle names. Per-creature seam law (owner ruling
+ * 2026-11-10): a rest signals old-combat-ends/new-combat-begins for the
+ * resting character ONLY — the sweep is scoped to that creature's own store
+ * (combat-scoped clocks targeting them from other stores are drained by
+ * clearAllExpirationEffects on the same lane). Unconditional by design:
+ * combat-scoped entries are only ever written while enforcement is armed, so
+ * enforcement-off play has nothing to sweep and stays byte-identical.
  */
-export async function sweepRestClocks(campaignName, restKind) {
-    if (!campaignName) return 0;
-    const swept = sweepCombatScopedExpirations({ campaignName });
+export async function sweepRestClocks(campaignName, restKind, restCharacterName) {
+    if (!campaignName || !restCharacterName) return 0;
+    const swept = sweepCombatScopedExpirations({ campaignName, ownerName: restCharacterName });
     if (swept > 0) {
         await addEntry(campaignName, {
             type: 'automation',
             automationType: 'enforcement_clock_expired',
-            characterName: 'Campaign',
-            description: `${restKind === 'long' ? 'Long' : 'Short'} rest: ${swept} combat-scoped effect${swept === 1 ? '' : 's'} ended (enforcement: zones).`,
+            characterName: restCharacterName,
+            description: `${restKind === 'long' ? 'Long' : 'Short'} rest: ${restCharacterName}'s ${swept} combat-scoped effect${swept === 1 ? '' : 's'} ended (enforcement: zones).`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[zoneDurationClock:rest-sweep-log]', e); });
     }

@@ -638,7 +638,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     // initiative-rolled listener
     React.useEffect(() => {
-        const handler = () => {
+        const handler = (e) => {
             const summary = getCombatSummary(campaignName)
             if (!summary) return
             let clearedHuntersMark = false
@@ -649,18 +649,27 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             // trigger marker (the old provocation no longer stands; the spent
             // reaction is NOT refunded). Zero writes when nothing is pending.
             clearAllPendingOas(campaignName)
-            for (const creature of (summary?.creatures || [])) {
-                if (isSecondTurnEntry(creature)) continue
-                if (creature.type === 'player') {
-                    clearPlayerRoundFlags(creature.name, campaignName)
-                }
-                if (creature.concentration?.spell === "Hunter's Mark") {
-                    creature.concentration = null
-                    storage.set('combatSummary', summary, campaignName)
-                    clearedHuntersMark = true
-                }
-                clearDominatedExpirations(creature, campaignName)
+            // Per-creature seam law (owner ruling 2026-11-10): an initiative roll
+            // signals old-combat-ends/new-combat-begins ONLY for the creature that
+            // rolled. The per-creature clears below (round flags/self-buffs,
+            // Hunter's Mark concentration, dominated clocks) run against the
+            // roller's row alone. Detail-less dispatches (EB Join, Add-to-
+            // Initiative) are join seams, not clear seams — joiners are fresh and
+            // already-present creatures must be untouched — so they clear nobody.
+            const rollerName = e?.detail?.characterName ? utils.getName(e.detail.characterName) : null
+            if (!rollerName) return
+            const roller = summary.creatures.find(c =>
+                !isSecondTurnEntry(c) && utils.getName(c.name) === rollerName)
+            if (!roller) return
+            if (roller.type === 'player') {
+                clearPlayerRoundFlags(roller.name, campaignName)
             }
+            if (roller.concentration?.spell === "Hunter's Mark") {
+                roller.concentration = null
+                storage.set('combatSummary', summary, campaignName)
+                clearedHuntersMark = true
+            }
+            clearDominatedExpirations(roller, campaignName)
             if (clearedHuntersMark) {
                 setCombatSummaryG(cloneDeep(summary))
             }

@@ -138,10 +138,10 @@ describe('useInitiativeEffects - invisibility clearing and regenerate restoratio
     });
 
     describe('regenerate restoration', () => {
-        it('restores every regen creature to max HP, skipping non-regen and non-string keys', () => {
-            // Mixed sweep: regen twins carry HP-distinct maxes, Zombie pins the
-            // !regenActive skip, and 123/null are pre-seeded as '123'/'null' so
-            // removing the typeof guard (:247) would write under stringified keys.
+        it('restores ONLY the roller to max HP — other regen creatures are never swept (per-creature seam law)', () => {
+            // Owner ruling 2026-11-10: another creature's Regenerate survives
+            // THIS roll; Goblin pins the negative (regen-ready, left intact),
+            // Zombie the !regenActive skip.
             getAllStoreKeys.mockReturnValue(['TestMonk', 'Goblin', 'Zombie', 123, null]);
             store.set('TestMonk|regenerateActive', true);
             store.set('TestMonk|hitPoints', 20);
@@ -149,21 +149,22 @@ describe('useInitiativeEffects - invisibility clearing and regenerate restoratio
             store.set('Goblin|hitPoints', 15);
             store.set('Zombie|regenerateActive', false);
             store.set('Zombie|hitPoints', 30);
-            store.set('123|regenerateActive', true);
-            store.set('null|regenerateActive', true);
             rollInitiative();
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'regenerateActive', false, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'currentHitPoints', 20, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'regenerateActive', false, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 15, campaignName);
+            expect(regenWrites('Goblin')).toHaveLength(0);
+            expect(
+                setRuntimeValue.mock.calls.filter(([name, key]) => name === 'Goblin' && key === 'currentHitPoints')
+            ).toHaveLength(0);
             expect(regenWrites('Zombie')).toHaveLength(0);
             expect(
                 setRuntimeValue.mock.calls.filter(([name]) => typeof name !== 'string')
             ).toHaveLength(0);
             // Final-state canon
             expect(getRuntimeValue('TestMonk', 'currentHitPoints')).toBe(20);
-            expect(getRuntimeValue('Goblin', 'currentHitPoints')).toBe(15);
+            expect(getRuntimeValue('Goblin', 'regenerateActive')).toBe(true);
+            expect(getRuntimeValue('Goblin', 'currentHitPoints')).toBeNull();
             expect(getRuntimeValue('Zombie', 'regenerateActive')).toBe(false);
             expect(getRuntimeValue('Zombie', 'hitPoints')).toBe(30);
         });
@@ -188,15 +189,23 @@ describe('useInitiativeEffects - invisibility clearing and regenerate restoratio
             }
         });
 
-        it('drives the sweep from getAllStoreKeys, not the store contents', () => {
-            // Regen-ready data sits in the store; an empty key list must keep it
-            // untouched (pins getAllStoreKeys as the loop source, :245).
+        it('is driven by the ROLLER name, never a getAllStoreKeys sweep', () => {
+            // Per-creature seam law: the lane reads ONLY the rolling character's
+            // store. Even with every regen-ready creature enumerated by
+            // getAllStoreKeys, nobody but the roller is touched (the old
+            // store-list-driven board sweep is retired).
+            getAllStoreKeys.mockReturnValue([]);
             store.set('TestMonk|regenerateActive', true);
             store.set('TestMonk|hitPoints', 20);
+            store.set('Goblin|regenerateActive', true);
+            store.set('Goblin|hitPoints', 15);
             rollInitiative();
 
-            expect(regenWrites('TestMonk')).toHaveLength(0);
-            expect(getRuntimeValue('TestMonk', 'regenerateActive')).toBe(true);
+            // Empty key list no longer disables the roller's own restore…
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'regenerateActive', false, campaignName);
+            // …while enumerated-or-not foreign stores stay byte-untouched.
+            expect(regenWrites('Goblin')).toHaveLength(0);
+            expect(getRuntimeValue('Goblin', 'regenerateActive')).toBe(true);
         });
     });
 });

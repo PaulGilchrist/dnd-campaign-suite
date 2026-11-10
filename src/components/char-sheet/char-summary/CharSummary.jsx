@@ -38,6 +38,7 @@ import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc } from '../../.
 import { endDraconicFlightBuff } from '../../../services/rules/features/draconicFlightService.js';
 import { endDragonWingsBuff } from '../../../services/rules/features/dragonWingsService.js';
 import { computeCharSummaryContext } from './charSummaryCalc.js';
+import utils from '../../../services/ui/utils.js';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
@@ -523,7 +524,14 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [surgeEffects, setSurgeEffects] = useSyncedState(playerStats.name, 'wildMagicSurgeEffects', null, campaignName);
     const currentAllies = resolveCurrentAllies(storedAllies, playerStats.name);
     React.useEffect(() => {
-        const handleInitiative = () => {
+        const handleInitiative = (e) => {
+            // Per-creature seam law (owner ruling 2026-11-10): a roll ends THIS
+            // character's wild-magic surges only when THIS character is the one
+            // that rolled. Detail-less dispatches (EB Join / Add-to-Initiative
+            // join seams) clear nothing; another creature's roll must leave this
+            // sheet's surges untouched.
+            const rollerName = e?.detail?.characterName ? utils.getName(e.detail.characterName) : null
+            if (!rollerName || rollerName !== utils.getName(playerStats.name)) return
             setSurgeEffects(null);
         };
         window.addEventListener('initiative-rolled', handleInitiative);

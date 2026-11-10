@@ -255,8 +255,15 @@ export function clearAllExpirationEffects(characterName, campaignName) {
         !(te.effect === 'ottos_irresistible_dance' && (te.source === characterName || te.target === characterName))
     );
 
-    // Clean up Sanctuary on any creature on short/long rest or initiative roll
-    removeTargetEffectsIfChanged(campaignName, te => te.effect !== 'sanctuary');
+    // Clean up Sanctuary involving this creature (cast by them or placed on
+    // them) on short/long rest or initiative roll. Per-creature seam law
+    // (owner ruling 2026-11-10): another creature's Sanctuary survives this
+    // actor's seam — the old predicate wiped the effect board-wide.
+    removeTargetEffectsIfChanged(campaignName, te =>
+        !(te.effect === 'sanctuary'
+            && (utils.getName(te.target).toLowerCase() === charLower
+                || utils.getName(te.source).toLowerCase() === charLower))
+    );
 
     // Remove spell-summoned creatures on short/long rest or initiative roll
     removeSummonedCreatures(characterName, campaignName);

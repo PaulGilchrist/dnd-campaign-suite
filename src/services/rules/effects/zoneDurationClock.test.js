@@ -280,7 +280,7 @@ describe('no-timers T4 — combat-scoped sweeps (new initiative roll / rests)', 
         expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('new initiative roll: gates live, delegates the ALL-stores sweep, logs the swept count', async () => {
+    it('board clear: gates live, delegates the ALL-stores sweep, logs the swept count', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (name === 'campaign' && key === 'enforcement') return ZONES_ON;
             if (name === 'Dragon' && key === 'pendingExpirations') return [legacyEntry(), combatEntry()];
@@ -294,27 +294,39 @@ describe('no-timers T4 — combat-scoped sweeps (new initiative roll / rests)', 
         expect(sweepCombatScopedExpirations).toHaveBeenCalledWith({ campaignName: 'test-campaign' });
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             automationType: 'enforcement_clock_expired',
-            description: expect.stringContaining('New initiative roll: 1 combat-scoped effect ended'),
+            description: expect.stringContaining('Combat board cleared: 1 combat-scoped effect ended'),
         }));
     });
 
-    it('rests sweep short AND long with their own wording (unconditional by design — combat-scoped entries only exist while armed)', async () => {
+    it('rests sweep short AND long, scoped to the RESTING creature only (owner ruling 2026-11-10 — per-creature clear)', async () => {
         for (const [restKind, wording] of [
-            ['short', 'Short rest: 1 combat-scoped effect ended'],
-            ['long', 'Long rest: 1 combat-scoped effect ended'],
+            ['short', 'Short rest: Hero1'],
+            ['long', 'Long rest: Hero1'],
         ]) {
             vi.clearAllMocks();
             getRuntimeValue.mockImplementation((name, key) =>
-                (name === 'Dragon' && key === 'pendingExpirations' ? [combatEntry()] : null));
-            getAllStoreKeys.mockReturnValue(['Dragon']);
-            expect(await sweepRestClocks('test-campaign', restKind)).toBe(1);
-            expect(sweepCombatScopedExpirations).toHaveBeenCalledWith({ campaignName: 'test-campaign' });
+                (name === 'Hero1' && key === 'pendingExpirations' ? [combatEntry()] : null));
+            getAllStoreKeys.mockReturnValue(['Hero1', 'Hero2']);
+            expect(await sweepRestClocks('test-campaign', restKind, 'Hero1')).toBe(1);
+            // delegation WITH ownerName = just the resting creature's store,
+            // never the board-wide sweep (per-creature seam law).
+            expect(sweepCombatScopedExpirations).toHaveBeenCalledWith({ campaignName: 'test-campaign', ownerName: 'Hero1' });
             expect(addEntry).toHaveBeenCalledTimes(1);
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 automationType: 'enforcement_clock_expired',
+                characterName: 'Hero1',
                 description: expect.stringContaining(wording),
             }));
         }
+    });
+
+    it('a rest with no resting-creature name sweeps nobody (defensive guard)', async () => {
+        getRuntimeValue.mockImplementation((name, key) =>
+            (name === 'Dragon' && key === 'pendingExpirations' ? [combatEntry()] : null));
+        getAllStoreKeys.mockReturnValue(['Dragon']);
+        expect(await sweepRestClocks('test-campaign', 'short')).toBe(0);
+        expect(sweepCombatScopedExpirations).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
     it('nothing armed ⇒ zero writes, zero log at every sweep seam', async () => {
@@ -325,8 +337,8 @@ describe('no-timers T4 — combat-scoped sweeps (new initiative roll / rests)', 
         });
         getAllStoreKeys.mockReturnValue(['Dragon']);
         expect(await sweepNewCombatClocks('test-campaign')).toBe(0);
-        expect(await sweepRestClocks('test-campaign', 'short')).toBe(0);
-        expect(await sweepRestClocks('test-campaign', 'long')).toBe(0);
+        expect(await sweepRestClocks('test-campaign', 'short', 'Dragon')).toBe(0);
+        expect(await sweepRestClocks('test-campaign', 'long', 'Dragon')).toBe(0);
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
     });
