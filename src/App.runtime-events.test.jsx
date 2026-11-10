@@ -643,6 +643,53 @@ describe('App - Runtime Events & State Management', () => {
       expect(writesFor('travel-pendingEvent')).toHaveLength(0);
     });
 
+    // bug-pending-oas-key-not-registered-echo-misroutes: the OA trigger seam
+    // arms markers campaign-level (pendingOpportunityAttacks.js PENDING_OA_KEY)
+    // and both readers (sheet Reactions lane, monster-card lane) subscribe
+    // campaign-level. Unregistered in CAMPAIGN_KEYS, this exact OBJECT echo
+    // fell through to replaceRuntimeObject('pendingOAs', …) — a ghost
+    // CHARACTER store — so a cross-client/curl marker write never live-updated
+    // a mounted tab (legacy free-press lane silently charged the reaction;
+    // the monster-card affordance only appeared after a reload hydrated via
+    // the unfiltered seed pass).
+    it('mirrors the pendingOAs marker-object echo into the campaign store, never a ghost character store', async () => {
+      const stores = new Map();
+      getStore.mockImplementation((name) => {
+        if (!stores.has(name)) stores.set(name, new Map());
+        return stores.get(name);
+      });
+
+      const markers = {
+        Goblin: { defender: 'Goblin', mover: 'EvasiveFighter', promptId: 'probe-1' },
+      };
+      await dispatch({ key: 'change-test-campaign-pendingOAs', data: markers });
+
+      // Reader side: useRuntimeValue('campaign','pendingOAs') now sees it.
+      expect(stores.get('campaign').get('pendingOAs')).toEqual(markers);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      // Ghost-store side: zero writes to a store named after the key.
+      expect(writesFor('pendingOAs')).toHaveLength(0);
+      expect(replaceRuntimeObject).not.toHaveBeenCalledWith('pendingOAs', markers);
+      expect(stores.has('pendingOAs')).toBe(false);
+    });
+
+    // Drain-to-evict companion (writePendingOas deletes the last row with a
+    // key DELETE, publishing null): the null echo must REMOVE the marker map
+    // from every mounted tab's campaign store — never a stored null — so a
+    // consumed marker can never linger on a settled tab until reload.
+    it('removes pendingOAs from the campaign store on the drain-to-evict null echo', async () => {
+      const campaignStore = new Map([[
+        'pendingOAs', { Goblin: { defender: 'Goblin', mover: 'EvasiveFighter', promptId: 'probe-1' } },
+      ]]);
+      getStore.mockImplementation(() => campaignStore);
+
+      await dispatch({ key: 'change-test-campaign-pendingOAs', data: null });
+
+      expect(campaignStore.has('pendingOAs')).toBe(false);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      expect(writesFor('pendingOAs')).toHaveLength(0);
+    });
+
     // bug-hex-arrival-null-echo-blank-screen: arrival's per-key DELETEs echo
     // null for the typed COMPLETED_TRIP_KEYS; raw null in the store crashed
     // useTravelManagement's render (path.length). Mirror them as removals so

@@ -80,6 +80,23 @@ export const CAMPAIGN_KEYS = new Set([
     // lingering.
     // bug-victory-stamp-not-sse-adopted-missing-campaign-key (sibling verdict).
     'pendingStarryChaliceHeal',
+    // Pending Opportunity-Attack trigger markers (bug-pending-oas-key-not-
+    // registered-echo-misroutes — same misroute family as the two above):
+    // the trigger seam writes campaign-level (pendingOpportunityAttacks.js
+    // PENDING_OA_KEY via setRuntimeValue('campaign', …)) and both readers
+    // subscribe campaign-level (CharReactions.jsx, useMonsterPendingOa.js).
+    // Unregistered, the `change-<c>-pendingOAs` OBJECT echo failed
+    // isCampaignKey in applyStoreUpdate and was dispatched to a ghost
+    // CHARACTER store named "pendingOAs" no consumer reads — cross-client/
+    // curl marker writes never live-updated a mounted tab (sheet press fell
+    // to the legacy free-press lane; monster-card affordance never appeared
+    // until a reload hydrated via the unfiltered seed pass), and the drain-
+    // to-evict null DELETE echo was dropped too, so evictions never cleared
+    // a settled tab's mirror either. Live-witnessed 2026-11-09: curl-seeded
+    // marker stayed invisible on a settled Initiative tab (server GET showed
+    // the row) and only a reload mounted the "Opportunity Attack on <mover>"
+    // affordance.
+    'pendingOAs',
 ]);
 
 /**
