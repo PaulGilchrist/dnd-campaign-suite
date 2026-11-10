@@ -219,7 +219,10 @@ function PlacedItems({
         const stacked = isStackedToken(tokenOffsets, item.id);
 
         return (
-            <g key={item.id} className="npc-group" title={placedItemLabel(item)} transform={stack}>
+            <g key={item.id}
+                className={stack ? 'npc-group token-buried' : 'npc-group'}
+                title={placedItemLabel(item)}
+                transform={stack}>
                 <defs>
                     <clipPath id={`npc-clip-${item.id}`}>
                         <circle cx={cx} cy={cy} r={20} />

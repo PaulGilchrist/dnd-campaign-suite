@@ -24,6 +24,11 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                 const cy = gridCenterY(player.gridY);
                 const img = getPlayerImage(player, characters);
                 const isSelected = selectedPlayer?.id === player.id;
+                // Same-cell stacking: a non-zero offset (buried token) rides a
+                // transform AND the .token-buried fade class; stack tops and
+                // single tokens keep no transform attribute and the plain
+                // class (byte-unchanged). Map.css owns the fade value.
+                const stack = tokenStackTransform(tokenOffsets, player.id);
                 // Hide creature from players if cell is fogged
                 if (!isLocalhost && fog?.has(`${player.gridX},${player.gridY}`)) return null;
 
@@ -31,12 +36,8 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                     <g
                         key={player.id}
                         onPointerDown={(e) => handlePointerDown(e, player.id)}
-                        className="creature-group"
-                        // Same-cell stacking: a token buried under another
-                        // renders visibly offset (its own painted circle is the
-                        // grab surface); stack tops/single tokens get no
-                        // transform attribute at all (byte-unchanged).
-                        transform={tokenStackTransform(tokenOffsets, player.id)}
+                        className={stack ? 'creature-group token-buried' : 'creature-group'}
+                        transform={stack}
                         style={{ cursor: 'grab' }}
                     >
                         <defs>

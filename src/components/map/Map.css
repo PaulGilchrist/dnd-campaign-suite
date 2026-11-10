@@ -600,6 +600,19 @@
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }
 
+/* Buried stacked-token fade (backlog 2026-11-10): a token with a non-zero
+   stack offset fans up to 2 steps (~28px) past its cell border, so its
+   visible crescent can sit over a neighbour cell. Fading the whole buried
+   group (0.55 — mid-range of the agreed 0.5–0.65 band) marks that overlap as
+   SHARED grab territory instead of fully-owned art. Class is applied only
+   where the transform is applied (Players.jsx / PlacedItems.jsx derive it
+   from the live offset, so a re-stacked token fades back in); stack tops and
+   single tokens never carry it and keep full opacity. Covers BOTH stacking
+   lanes: .creature-group (players) and .npc-group (creatures). */
+.map .token-buried {
+    opacity: 0.55;
+}
+
 /* Fog of war cells — the GM sees through a translucent veil; the player sees
    an opaque grey covering (grey, not black, so it reads as "covered" rather
    than blending into the dark floor) */

@@ -66,6 +66,7 @@ describe('PlacedItems token stacking', () => {
         );
         const group = container.querySelector('g.npc-group');
         expect(group).toHaveAttribute('transform', 'translate(-10, -10)');
+        expect(group).toHaveClass('token-buried');
         expect(group.querySelector('rect.placed-hit-area')).toBeNull();
         const hit = group.querySelector('circle.placed-hit-area');
         expect(hit).toBeInTheDocument();
@@ -99,5 +100,35 @@ describe('PlacedItems token stacking', () => {
         expect(groups[0]).toBe(goblin); // monster pass paints first (lower)
         expect(goblin).toHaveAttribute('transform', 'translate(-10, -10)');
         expect(thug.hasAttribute('transform')).toBe(false);
+        // Fade follows the same seam: buried art fades, centred top does not.
+        expect(goblin).toHaveClass('token-buried');
+        expect(thug).not.toHaveClass('token-buried');
+        // Byte-unchanged faces: crowd-top and single keep the bare class.
+        expect(thug.getAttribute('class')).toBe('npc-group');
+    });
+
+    it('single and crowd-top tokens never carry the fade class (full-opacity faces)', () => {
+        const { container } = renderItems(
+            [makeItem({ id: 'lone', name: 'Wolf', gridX: 9, gridY: 9 })],
+            new Map()
+        );
+        const lone = container.querySelector('g.npc-group');
+        expect(lone).not.toHaveClass('token-buried');
+        expect(lone.getAttribute('class')).toBe('npc-group');
+    });
+
+    it('re-stack face: the fade class follows the LIVE offset, not a cached flag', () => {
+        const items = [makeItem({ id: 'a', name: 'Wolf' }), makeItem({ id: 'b', name: 'Thug' })];
+        const { container, rerender } = renderItems(
+            items,
+            new Map([['a', { dx: -10, dy: -10 }], ['b', { dx: 0, dy: 0 }]])
+        );
+        expect(container.querySelector('g[title="Wolf"]')).toHaveClass('token-buried');
+        expect(container.querySelector('g[title="Thug"]')).not.toHaveClass('token-buried');
+        // The crowd lifts: both tokens re-stack to singles — full opacity again.
+        rerender(<PlacedItems {...baseProps} placedItems={items} tokenOffsets={new Map()} />);
+        expect(container.querySelector('g[title="Wolf"]')).not.toHaveClass('token-buried');
+        expect(container.querySelector('g[title="Wolf"]').getAttribute('class')).toBe('npc-group');
+        expect(container.querySelector('g[title="Thug"]').getAttribute('class')).toBe('npc-group');
     });
 });

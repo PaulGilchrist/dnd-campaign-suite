@@ -69,8 +69,6 @@ GB session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-10 GB) Stacked-cell grab surfaces spill into neighbours: a 2-step buried token's clickable crescent sits ~28 px beyond its cell border (adjacent cell visually), so a pointer clearly over another cell can pick up the buried token; consider capping `MAX_STACK_OFFSET_STEPS` at 1 or fading buried art opacity to set the expectation.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - NOT VERIFIED this run (honest scope): PT2 true cancel face un-ridden — but NOT owner-blocked anymore (GB code census, see bug NOTES): `getNetAttackMode` already nets equal adv/dis to `'normal'` (RAW-correct, unit pin stands); my "disadvantage-WINS" face was adv=0 because the monster lane's target-condition feed is the CS ROW (`extractConditionKeys(target)`), not the runtime bucket my rig stamped. Next ride: cs-row condition on the mover (or check what `attackRange` value reaches `combineAttackModes` on the OA path — `OA_TRIGGER_SPATIAL_STATE` freezes range inputs; an undefined range could silently drop within-5ft adv folds on OAs — worth one look during the phantom-die fix).
