@@ -44,3 +44,23 @@ The turn-lock denial is an out-of-world permission gate: a denied spell cast pay
 ## Severity
 
 Data integrity risk — every accidental off-turn cast attempt silently burns a spell slot and (for consumed-component spells) permanently rewrites the character file; the audit rows make it look intentional, so it can persist unnoticed across sessions.
+
+## Resolution (FIXED — 2026-11-10 fix run, owner-ruling Option A implemented)
+
+**What was actually wrong:** the "Likely location" guess #1 was correct and #2 was not. The sheet spell lane's single entry point, `gateMetamagic` (`src/hooks/combat/useSpellMetamagicGates.js`), reaches `handleNonSorcererCast` → `prepareSpellCast` (slot spend) + `consumeMaterial` (backpack disk write) and only THEN calls `onExecute` — which routes to `useSpellCastExecutor runCast`, where the `assertCanAct` gate sat. So the denial popup printed from the executor gate AFTER the payment lanes had already run; `executeSpellCast` never ran (the cast itself never fired). The attack lane was clean because `runAttackClick` gates BEFORE anything executes — the fix mirrors that placement rather than refunding.
+
+**Fix:** added an `assertCanAct({campaignName, creatureName: playerStats.name, bucket: classifyBucket(spell), setPopupHtml, source:'useSpellMetamagicGates'})` early gate in `gateMetamagic`, positioned immediately after the missing-material check (preserving the recorded material-gate-precedence law and the existing unpaid missing-material face) and before every payment/queue lane below it (generic `prepareSpellCast`, Power-Word pay-at-confirm, sorcery/multi-target/chooser queues, deferred-payment short-circuits). `charge` stays false at this site — the executor hold-point keeps the single actionEconomy tap (no double-charge); the `runCast` gate remains as the execute-chokepoint backstop. The lane is ruleset-shared, so one gate covers both 5e and 2024 rows. No refunds, no new events, no new abstractions.
+
+**Files changed:**
+- `src/hooks/combat/useSpellMetamagicGates.js` — early enforcement gate + imports (`assertCanAct`, `classifyBucket`).
+- `src/services/combat/actionGateSites.test.js` — `useSpellMetamagicGates.js` added to the `GATED_ENTRY_FILES` wiring registry (its payment lanes precede the executor, so it needs its own gate, unlike pure delegators).
+- `src/hooks/combat/useSpellMetamagicGates.enforcement-denial-no-spend.test.js` — NEW regression test (no-spend family harness, mirroring sp079/sp080/sp125): denial ⇒ `prepareSpellCast`/`consumeMaterial`/`addEntry`/`onExecute`/`cfSetPending`/`tryGateSpell` ALL zero; gate called once with bucket `action` + source `useSpellMetamagicGates` and NO charge flag; sorcerer denial queues no chooser; controls pin the paid lane (slot + material consumed on allow) and the missing-material precedence (no assertCanAct call).
+
+**Live re-verification (test-campaign, localhost, fresh repro run — Wolf+Goblin EB-joined, enforcement `{mode:'on',turnLock:true}`, cs active=Goblin):**
+- BEFORE fix (repro confirmed byte-faithful): Animate Dead denial ⇒ `spell_slots_level_3` 3→2 + reagent removed from `DivinationWizard.json` ON DISK + `material_consumed` row + `enforcement_denied` row; Dispel Magic denial ⇒ 2→1 + denial row; attack-chip control ⇒ 1 row, 0 deltas (the recorded clean witness).
+- AFTER fix, same rig: Animate Dead denial (reagent present) ⇒ popup "It is Goblin's turn — DivinationWizard cannot act now." + ONLY 1 `enforcement_denied` row (source `useSpellMetamagicGates`), slot held at 1, backpack intact on disk, zero `material_consumed`. Dispel Magic denial ⇒ same zero-cost shape. Attack-lane denial ⇒ unchanged clean (source `useCharActionsAttackHandlers`).
+- Legit-cast control (walked active→DivinationWizard, correct turn, material present): cast proceeds — chooser modal opens, slot 1→0 spent, reagent consumed to disk, `material_consumed` + `spell` rows written — byte-identical to the pre-fix success lane.
+- Exit ritual: DW disk file byte-exact restore (md5 `e754d3e7` re-proved — the server's own consumption write re-canonicalized it), change-data `{}` + log `[]` + overlays `[]` via two-pass headless admin clears GET-verified, zero campaign-lock denials in the server log.
+
+**Test/lint results:** new test 7/7 PASS; touched-area run `src/hooks/combat` + action-gate/assertCanAct suites: 238 files / 1999 tests PASS (3 expected-fail, pre-existing); `npm run lint` clean (zero warnings); `no-timers-guard` OK (42 sites, all pre-existing benign UI).
+

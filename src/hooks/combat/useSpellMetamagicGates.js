@@ -1,4 +1,6 @@
 import { addEntry } from '../../services/ui/logService.js';
+import { assertCanAct } from '../../services/combat/assertCanAct.js';
+import { classifyBucket } from '../../services/combat/automation/classifyBucket.js';
 import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 import { getConsumedMaterial, getMaterialRequirementMessage } from '../../services/rules/spells/materialComponents.js';
 import { isFreeCastAuthorized } from '../../services/rules/spells/spellPreparationService.js';
@@ -376,6 +378,26 @@ export async function gateMetamagic(spell, metaCtx, {
     showMaterialRequiredPopup(spell, setPopupHtml);
     return;
   }
+
+  // Owner ruling 2026-11-10 (bug-turnlock-spell-denial-pays-slot-and-material): an
+  // enforcement turn-lock denial is an out-of-world permission gate — it must cost
+  // NOTHING (no slot, no material disk write, no concentration stamp). Mirrors the
+  // attack lane's proven-clean gate placement (useCharActionsAttackHandlers
+  // runAttackClick gates BEFORE any execution side effects; FV2 clean-denial witness
+  // law: denial faces write ONLY the enforcement_denied row). Every payment lane
+  // below (prepareSpellCast slot spend, consumeMaterial, chooser queues that pay on
+  // confirm) sits behind this gate, so a denial never reaches them. The
+  // useSpellCastExecutor runCast gate stays as the execute-chokepoint backstop and
+  // holds the charge:true economy tap — do NOT charge here or actionEconomy would
+  // double-charge. CLA pay-early (CLA-389/391) still governs IN-WORLD failures
+  // (out-of-range, fizzled) which pay normally; it never covers this seam.
+  if (!assertCanAct({
+    campaignName,
+    creatureName: playerStats.name,
+    bucket: classifyBucket(spell),
+    setPopupHtml,
+    source: 'useSpellMetamagicGates',
+  }).allowed) return;
 
   const handled = tryGateSpell(spell.name, campaignName, cfSetPending, {
     spell,

@@ -36,6 +36,10 @@ const GATED_ENTRY_FILES = [
     'src/components/char-sheet/char-spells/CharSpells.jsx',       // spell attack header
     'src/hooks/combat/useActionSpellMetamagic.js',                 // spell attack + metamagic casts
     'src/hooks/combat/useSpellCastExecutor.js',                    // confirmed spell-cast chokepoint
+    // The sheet spell lane PAYS (slot/material) inside gateMetamagic's branches
+    // before delegating to the executor, so it gates early at its own entry —
+    // enforcement denials must cost nothing (owner ruling 2026-11-10).
+    'src/hooks/combat/useSpellMetamagicGates.js',                  // spell-row pre-payment enforcement gate
 ];
 
 describe('action gate coverage (L5-001)', () => {
