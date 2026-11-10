@@ -81,7 +81,7 @@ describe('MA-1000 disk lock + rider forward through the modal seams', () => {
     expect(homunculusBite().dc_success).toBe('none');
     expect(Object.keys(homunculusBite()).indexOf('dc_success')).toBe(Object.keys(homunculusBite()).indexOf('save_type') + 1);
     expect(opts.saveConditions).toEqual(['poisoned']);
-    expect(opts.saveMargin).toEqual({ failsBy: 5, also: 'unconscious' });
+    expect(opts.saveMargin).toEqual({ failsBy: 5, also: 'unconscious', duration: '1 minute' });
     expect(opts.autoDamageSecondaryFormula).toBeNull(); // no secondary-damage decoys on the rider leg
     expect(opts.autoDamageSecondaryDamageType).toBeNull();
   });

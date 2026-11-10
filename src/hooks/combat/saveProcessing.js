@@ -849,13 +849,33 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
 // margin = saveDc − saveTotal. Grants the canonical condition (no new te
 // key — unconscious is a canonical activeConditions entry, same machinery as
 // the poisoned grant above) with source meta + its own `condition applied`
-// log. ONE addExpiration clock (CLA-334 hours×600 = 1 hour, matching the
-// save_effect "for 1 hour" the rider is bound to — "unconscious WHILE
-// poisoned") carrying BOTH condition legs in a single merged write (§5 —
-// never two racing clocks; the clock is armed only on save_margin rows, so
-// every legacy condition grant stays byte-identical). Waking early on damage
+// log. ONE addExpiration clock (CLA-334 hours×600) carrying BOTH condition
+// legs in a single merged write (§5 — never two racing clocks;
+// the clock is armed only on save_margin rows, so every legacy condition
+// grant stays byte-identical). The grant log's prose is DATA-DERIVED (bug
+// save-margin-rider-hardcoded-log-prose): it names the structured
+// margin.also condition and the base clause's authored duration
+// (margin.duration from parseSaveMarginClause; fallback = the merged clock's
+// own 600-round/1-hour ceiling), with the release advisory forked on the
+// row's structured repeat_save key (Thri-Kreen repeats the save at turn end)
+// vs the drow-shape wake-on-damage/shake clause. Waking early on damage
 // / a shake-awake action has no consumer app-wide (§70 "shake awake"
 // advisory residual — GM-enforced, documented not built).
+
+// Rider grant-clause copy builder (complexity-cap hoist out of
+// applySaveMarginRider, §45): names the base clause's authored duration
+// (margin.duration; fallback = the merged clock's own rounds:600 ceiling) and
+// forks the release advisory on the row's structured repeat_save key —
+// turn-END repeat-save rows (Thri-Kreen) vs the drow wake-on-damage/shake
+// shape. No hardcoded rider condition: margin.also is named by the caller.
+function saveMarginRiderClauseText({ margin, context }) {
+    const durationText = margin.duration || '1 hour';
+    const releaseText = context?.repeatSave
+        ? 'the poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success'
+        : 'waking on damage/shake is GM-enforced';
+    return `${durationText}; ${releaseText}`;
+}
+
 function applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attackerName, campaignName }) {
     const margin = context?.saveMargin;
     if (!margin || saveDc == null || !Number.isFinite(Number(saveTotal))) return;
@@ -877,6 +897,7 @@ function applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attacke
             { type: 'condition', condition },
         ],
     });
+    const clauseText = saveMarginRiderClauseText({ margin, context });
     addEntry(campaignName, {
         type: 'condition',
         action: 'applied',
@@ -884,7 +905,7 @@ function applySaveMarginRider({ context, saveDc, saveTotal, applyTarget, attacke
         condition: condition.charAt(0).toUpperCase() + condition.slice(1),
         sourceName: attackerName,
         sourceAbility: context?.actionName || context?.name,
-        description: `${applyTarget} failed the save by ${saveDc - saveTotal} (DC ${saveDc}, total ${saveTotal}) — also unconscious while poisoned (1 hour; waking on damage/shake is GM-enforced).`,
+        description: `${applyTarget} failed the save by ${saveDc - saveTotal} (DC ${saveDc}, total ${saveTotal}) — also ${condition} while poisoned (${clauseText}).`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:save-margin-rider]', e); });
 }

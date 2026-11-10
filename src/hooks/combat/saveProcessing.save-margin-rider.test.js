@@ -72,6 +72,7 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 
 import { readFileSync } from 'node:fs';
 import { processSaveRoll } from './saveProcessing.js';
+import { parseSaveMarginClause } from '../../components/encounter/MonsterCardHelpers.js';
 
 const campaignName = 'test-campaign';
 const DROW = 'Drow 1';
@@ -85,7 +86,9 @@ const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const rowOf = (monster, action) => monsters.find(m => m.name === monster).actions.find(a => a.name === action);
 const DROW_ROW = rowOf('Drow', 'Hand Crossbow');
 const TK_ROW = rowOf('Thri-Kreen', 'Bite');
-const marginOf = row => ({ failsBy: row.save_margin.fails_by, also: row.save_margin.also });
+// Real parser (live-lane parity): { failsBy, also } + the base clause's
+// authored duration ("1 hour" / "1 minute") used by the grant-log prose.
+const marginOf = row => parseSaveMarginClause(row);
 
 // Rider-only save-chip context: shallow-band saveConditions carry the base
 // condition; the deep-band rider rides the structured saveMargin key.
@@ -105,10 +108,15 @@ const saveChipContext = (total, { saveDc, attackerName, actionName, saveMargin }
 const drowContext = (total, saveMargin = marginOf(DROW_ROW)) =>
     saveChipContext(total, { saveDc: DROW_ROW.save_dc, attackerName: DROW, actionName: DROW_ROW.name, saveMargin });
 
-// Thri-Kreen context omits the row's repeat_save clause — the repeat-save leg
-// is repeatSaveService's own lane; here only the margin rider is adjudicated.
-const thriKreenContext = (total) =>
-    saveChipContext(total, { saveDc: TK_ROW.save_dc, attackerName: THRI_KREEN, actionName: TK_ROW.name, saveMargin: marginOf(TK_ROW) });
+// Thri-Kreen context carries the row's structured repeat_save exactly as the
+// live disk-row transport does — its repeat-save leg lands as an `automation`
+// row (repeatSaveService) outside the applied-condition pins, and its
+// presence forks the rider grant-log's release advisory onto the honest
+// turn-END repeat-save copy (vs the drow wake-on-damage/shake shape).
+const thriKreenContext = (total) => ({
+    ...saveChipContext(total, { saveDc: TK_ROW.save_dc, attackerName: THRI_KREEN, actionName: TK_ROW.name, saveMargin: marginOf(TK_ROW) }),
+    repeatSave: TK_ROW.repeat_save,
+});
 
 async function resolveNpcSave(context) {
     await processSaveRoll({
@@ -134,13 +142,13 @@ beforeEach(() => {
 });
 
 describe('save-margin-rider (generic)', () => {
-    it('monsters.json data lock: margin rows arm live DC/failsBy/also', () => {
+    it('monsters.json data lock: margin rows arm live DC/failsBy/also/duration', () => {
         expect(DROW_ROW.save_dc).toBe(13);
-        expect(marginOf(DROW_ROW)).toEqual({ failsBy: 5, also: 'unconscious' });
+        expect(marginOf(DROW_ROW)).toEqual({ failsBy: 5, also: 'unconscious', duration: '1 hour' });
         // The genericity witness: a live row whose rider is NOT the drow's
-        // unconscious — threshold and rider condition must come from data.
+        // unconscious — threshold, rider condition AND duration come from data.
         expect(TK_ROW.save_dc).toBe(11);
-        expect(marginOf(TK_ROW)).toEqual({ failsBy: 5, also: 'paralyzed' });
+        expect(marginOf(TK_ROW)).toEqual({ failsBy: 5, also: 'paralyzed', duration: '1 minute' });
     });
 
     it.each([
@@ -164,6 +172,9 @@ describe('save-margin-rider (generic)', () => {
         expect(uncons.sourceName).toBe(DROW);
         expect(uncons.sourceAbility).toBe('Hand Crossbow');
         expect(uncons.description).toMatch(/failed the save by 10/);
+        // Parity pin: the drow-shaped grant-log copy is byte-locked — the
+        // data-driven template must keep emitting the canonical drow prose.
+        expect(uncons.description).toBe('Bandit 1 failed the save by 10 (DC 13, total 3) — also unconscious while poisoned (1 hour; waking on damage/shake is GM-enforced).');
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
             attackerName: DROW,
@@ -223,16 +234,19 @@ describe('save-margin-rider (generic)', () => {
         expect(addExpiration).toHaveBeenCalledTimes(1);
     });
 
-    // FIXME: applySaveMarginRider hardcodes "also unconscious while poisoned
-    // (1 hour...)" log prose, so any rider whose `also` is NOT unconscious
-    // (live Thri-Kreen Bite row, also:'paralyzed') logs a FALSE game fact to
-    // the campaign log even though the granted condition itself is correct.
-    // The description should name margin.also (and honour the base clause's
-    // own duration — Thri-Kreen poisoned is 1 minute, not 1 hour).
-    it.fails('generic rider log prose names the granted condition (Thri-Kreen paralyzed)', async () => {
+    // Genericity pin (bug save-margin-rider-hardcoded-log-prose, was a
+    // deliberate it.fails FIXME): the grant-log prose is derived from the
+    // structured margin data — it names margin.also (Paralyzed), honours the
+    // base clause's authored duration (Thri-Kreen poisoned 1 minute), and
+    // carries the row's own release advisory (turn-END repeat save from the
+    // structured repeat_save key) — never the drow-specific facts.
+    it('generic rider log prose names the granted condition (Thri-Kreen paralyzed)', async () => {
         await resolveNpcSave(thriKreenContext(TK_ROW.save_dc - 5));
 
         const log = appliedLogs().find(e => e.condition === 'Paralyzed');
         expect(log.description).toMatch(/paralyzed/i);
+        expect(log.description).toBe('Bandit 1 failed the save by 5 (DC 11, total 6) — also paralyzed while poisoned (1 minute; the poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success).');
+        expect(log.description).not.toMatch(/unconscious/i);
+        expect(log.description).not.toMatch(/1 hour/i);
     });
 });

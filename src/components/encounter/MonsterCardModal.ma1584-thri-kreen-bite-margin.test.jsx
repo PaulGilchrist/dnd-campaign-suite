@@ -121,7 +121,7 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
     // live parser forward pinned here, truth table owned by save-margin.test.js
     expect(row.save_margin).toEqual({ fails_by: 5, also: 'paralyzed' });
     expect(row.save_margin.failsBy).toBeUndefined();
-    expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'paralyzed' });
+    expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'paralyzed', duration: '1 minute' });
     // first-in-repo row-level repeat_save WITH effect key — the `effect`
     // fork separates it from the frightened-hardcoded FP legacy shape
     expect(row.repeat_save).toEqual({
@@ -154,7 +154,7 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
   it('modal seams forward the row: save transport threads conditions + margin + repeatSave, save chip stays a clickable condition rider', () => {
     const opts = buildSaveOptions(BITE());
     expect(opts.saveConditions).toEqual(['poisoned']);
-    expect(opts.saveMargin).toEqual({ failsBy: 5, also: 'paralyzed' });
+    expect(opts.saveMargin).toEqual({ failsBy: 5, also: 'paralyzed', duration: '1 minute' });
     expect(opts.repeatSave).toEqual(BITE().repeat_save);
     expect(saveChipPlan(BITE(), false)).toEqual({ riderOnly: true, formula: null, rollable: false, clickable: true });
   });

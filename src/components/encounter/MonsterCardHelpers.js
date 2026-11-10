@@ -372,13 +372,23 @@ export function parseInfernalWoundClause(action) {
 // prose-parsed; null for every row without the save_margin dict, so no other
 // monster's wording can double-arm. { fails_by, also } forwards on the save
 // options/context to the failed-save consumer in saveProcessing.
+// Bug-fix (save-margin-rider log prose): the rider binds "while poisoned IN
+// THIS WAY", so it also forwards the base clause's authored poison duration
+// as `duration` ("1 hour" / "1 minute") from the structured save_effect band,
+// falling back to the row description only for composite rows that author the
+// deep band there (Homunculus "for 1 minute"). Omitted (undefined) when no
+// "for N minute(s)/hour(s)/round(s)" text exists — never invented.
 export function parseSaveMarginClause(action) {
   const margin = action?.save_margin;
   if (!margin || typeof margin !== 'object') return null;
   const failsBy = Number(margin.fails_by);
   const also = typeof margin.also === 'string' ? margin.also.toLowerCase() : null;
   if (!Number.isFinite(failsBy) || !also) return null;
-  return { failsBy, also };
+  const DURATION_RE = /\bfor\s+(\d+\s+(?:rounds?|minutes?|hours?))\b/i;
+  const duration = String(action?.save_effect || '').match(DURATION_RE) || String(action?.description || '').match(DURATION_RE);
+  const clause = { failsBy, also };
+  if (duration) clause.duration = duration[1];
+  return clause;
 }
 
 export function extractConditionsFromSaveEffect(saveEffect) {

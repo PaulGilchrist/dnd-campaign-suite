@@ -57,6 +57,6 @@ describe('MA-0639 parseSaveMarginClause', () => {
         const keys = Object.keys(row);
         expect(keys.indexOf('dc_success')).toBe(keys.indexOf('save_type') + 1);
         expect(row.description).toContain('If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way.');
-        expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'unconscious' });
+        expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'unconscious', duration: '1 hour' });
     });
 });
