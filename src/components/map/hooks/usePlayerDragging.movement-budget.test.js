@@ -189,13 +189,35 @@ describe('usePlayerDragging — movement budget enforcement (L5-002)', () => {
                     setPopupHtml: expect.any(Function),
                 }));
             // ...AND the clamp is now visible on the board: a plain-English
-            // snap-back toast naming the creature + snapped distance. This
-            // PARTIAL leg (token did move, to the 30 ft edge) keeps the
-            // "snapped back" copy verbatim — the full-block leg below is the
-            // only one that reads "cannot move" (backlog 2026-11-09).
+            // toast. This move charged the WHOLE 30 ft budget from a fresh
+            // turn, so the copy names the total-at-cap ("movement used up at
+            // 30 ft") — never a bare number that reads as remaining
+            // movement (backlog 2026-11-09 reword). The log row above stays
+            // byte-identical; only the toast copy branches.
             expect(helpers.result.current.snapToast).toMatchObject({
-                message: 'Player1 snapped back to 30 ft of movement.',
+                message: "Player1's movement used up at 30 ft.",
             });
+            expect(helpers.result.current.snapToast.message).not.toContain('cannot move');
+            expect(helpers.result.current.snapToast.message).not.toContain('snapped back');
+        });
+
+        it('partial clamp: names feet moved this move of the feet requested', () => {
+            // 25 ft already used ⇒ 5 ft left; 3-cell drop wants 15 ft ⇒ the
+            // drop snaps one cell out at 5 ft (backlog 2026-11-09 reword).
+            enforce({ Player1: { movementUsedFeet: 25 } });
+            const helpers = press();
+            dropAt(helpers, 180, 80); // raw (4,2) — 15 ft over a 5 ft budget
+            expect(cellOf(mapDataHolder.current, 'p1')).toEqual({ gridX: 2, gridY: 2 });
+            expect(campaignStore().get('turnState').Player1.movementUsedFeet).toBe(30);
+            // Log row stays byte-identical to the old frame (already unambiguous):
+            expect(mocks.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                reason: 'Out of movement — snapped to the remaining budget (5 ft this move).',
+            }));
+            // Toast names BOTH quantities and never the old ambiguous frame:
+            expect(helpers.result.current.snapToast).toMatchObject({
+                message: 'Player1 moved only 5 ft of 15 requested.',
+            });
+            expect(helpers.result.current.snapToast.message).not.toContain('snapped back');
             expect(helpers.result.current.snapToast.message).not.toContain('cannot move');
         });
 

@@ -130,18 +130,18 @@ describe('clampMovementDrop (L5-002)', () => {
         });
 
         // Fits: passthrough with exact cost, not snapped.
-        expect(drop({ gridX: 2, gridY: 0 })).toEqual({ target: { gridX: 2, gridY: 0 }, costFeet: 10, snapped: false });
+        expect(drop({ gridX: 2, gridY: 0 })).toEqual({ target: { gridX: 2, gridY: 0 }, costFeet: 10, snapped: false, requestedFeet: 10, budgetFeet: 30 });
         // Boundary leg: remaining == cost (25 used → 5 ft left; 1 cell = exactly 5 ft) → passthrough.
-        expect(drop({ gridX: 1, gridY: 0 }, { movementUsedFeet: 25 })).toEqual({ target: { gridX: 1, gridY: 0 }, costFeet: 5, snapped: false });
+        expect(drop({ gridX: 1, gridY: 0 }, { movementUsedFeet: 25 })).toEqual({ target: { gridX: 1, gridY: 0 }, costFeet: 5, snapped: false, requestedFeet: 5, budgetFeet: 5 });
         // Over-spend: 20 used → 10 ft left vs 30 ft wanted → snap to 2 cells, 10 ft.
-        expect(drop({ gridX: 6, gridY: 0 }, { movementUsedFeet: 20 })).toEqual({ target: { gridX: 2, gridY: 0 }, costFeet: 10, snapped: true });
+        expect(drop({ gridX: 6, gridY: 0 }, { movementUsedFeet: 20 })).toEqual({ target: { gridX: 2, gridY: 0 }, costFeet: 10, snapped: true, requestedFeet: 30, budgetFeet: 10 });
         // Fully spent: token stays put, nothing charged.
-        expect(drop({ gridX: 3, gridY: 0 }, { movementUsedFeet: 30 })).toEqual({ target: { gridX: 0, gridY: 0 }, costFeet: 0, snapped: true });
+        expect(drop({ gridX: 3, gridY: 0 }, { movementUsedFeet: 30 })).toEqual({ target: { gridX: 0, gridY: 0 }, costFeet: 0, snapped: true, requestedFeet: 15, budgetFeet: 0 });
         // Unreachable target: stays at origin, flagged (callers route the deny log off this).
         expect(clampMovementDrop({
             turnState: ts('Rakan', {}), creatureName: 'Rakan', speedFeet: 30,
             from: { gridX: 0, gridY: 0 }, to: { gridX: 5, gridY: 5 }, obstacles: new Set(['1,0', '0,1']), terrain: {}, gridSize: GRID,
-        })).toEqual({ target: { gridX: 0, gridY: 0 }, costFeet: 0, snapped: true, unreachable: true });
+        })).toEqual({ target: { gridX: 0, gridY: 0 }, costFeet: 0, snapped: true, unreachable: true, requestedFeet: Infinity, budgetFeet: 30 });
 
         // Pure math: the store-shaped input must survive byte-identical (writes belong to chargeEconomy).
         expect(state).toEqual(ts('Rakan', { movementUsedFeet: 0 }));

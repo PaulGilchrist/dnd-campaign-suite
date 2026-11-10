@@ -36,15 +36,16 @@ function findFreeSquare(startX, startY, occupiedSquares, gridSize) {
 
 /**
  * L5-002 (§7.3): clamp a drop to the creature's remaining movement budget.
- * Returns { targetX, targetY, moveCostFeet, budgetActive, snapped, creatureName }.
+ * Returns { targetX, targetY, moveCostFeet, requestedFeet, speedFeet,
+ * budgetActive, snapped, creatureName }.
  * Enforcement off, no campaign, or GM Shift unconstrained ⇒ budgetActive:false and
  * the drop passes through untouched (the L1–4 guarantee). Snapped drops log a
  * reason and report snapped:true so the board can surface the clamp visually
- * (the "snapped back" toast in Map.jsx) — UI-only fields, never persisted.
+ * (the clamp toast in Map.jsx) — UI-only fields, never persisted.
  */
 function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName, characters }) {
     const enforcement = campaignName ? getRuntimeValue('campaign', 'enforcement') : null;
-    const passthrough = { targetX, targetY, moveCostFeet: 0, budgetActive: false, snapped: false, creatureName: null };
+    const passthrough = { targetX, targetY, moveCostFeet: 0, requestedFeet: 0, speedFeet: 0, budgetActive: false, snapped: false, creatureName: null };
     if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget || dragging.unconstrained) {
         return passthrough;
     }
@@ -75,7 +76,7 @@ function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData
         outX = clamped.target.gridX;
         outY = clamped.target.gridY;
     }
-    return { targetX: outX, targetY: outY, moveCostFeet: clamped.costFeet, budgetActive: true, snapped, creatureName };
+    return { targetX: outX, targetY: outY, moveCostFeet: clamped.costFeet, requestedFeet: clamped.requestedFeet, speedFeet, budgetActive: true, snapped, creatureName };
 }
 
 /**
@@ -342,13 +343,23 @@ export default function usePlayerDragging({
         // Visual counterpart of the enforcement_denied log: the token lands on
         // the snapped cell, so say so before it reads as a stuck drag. A
         // zero-cost snap means the token never left its cell (0 ft of budget
-        // left at drop) — nothing "snapped back", so name the full block
-        // truthfully (backlog 2026-11-09). The log row stays byte-identical
-        // on every leg; only this toast copy branches.
+        // left at drop) — nothing was clamped back, so name the full block
+        // truthfully. Otherwise the copy names BOTH quantities (feet moved
+        // this move vs feet requested) or the whole-turn cap, so no bare
+        // number ever reads as "remaining movement" (backlog 2026-11-09).
+        // The log row stays byte-identical on every leg; only this toast copy
+        // branches.
         if (budget.snapped) {
-            showSnapToast(budget.moveCostFeet === 0
-                ? `${budget.creatureName} cannot move — no movement left this turn.`
-                : `${budget.creatureName} snapped back to ${budget.moveCostFeet} ft of movement.`);
+            if (budget.moveCostFeet === 0) {
+                showSnapToast(`${budget.creatureName} cannot move — no movement left this turn.`);
+            } else if (budget.moveCostFeet >= budget.speedFeet) {
+                // This move charged the creature's entire per-turn budget
+                // (e.g. 30 ft off a fresh 30): the number is the total-at-cap,
+                // never a remaining figure.
+                showSnapToast(`${budget.creatureName}'s movement used up at ${budget.speedFeet} ft.`);
+            } else {
+                showSnapToast(`${budget.creatureName} moved only ${budget.moveCostFeet} ft of ${budget.requestedFeet} requested.`);
+            }
         }
 
         setMapData((prev) => ({

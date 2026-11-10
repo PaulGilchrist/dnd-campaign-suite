@@ -114,16 +114,20 @@ export function reachableWithinBudget({ from, obstacles, terrain, gridSize, budg
 
 /**
  * Clamp a drag drop to the creature's remaining movement budget.
- * Returns { target: { gridX, gridY }, costFeet, snapped }.
+ * Returns { target: { gridX, gridY }, costFeet, snapped, requestedFeet, budgetFeet }.
+ * `requestedFeet` (raw path cost of the un-clamped drop; Infinity when
+ * unreachable) and `budgetFeet` (remaining before this move) are UI-facing
+ * context so the snap toast can name BOTH what moved and what was asked for
+ * instead of a bare number that reads as "remaining" (backlog 2026-11-09).
  */
 export function clampMovementDrop({ turnState, creatureName, speedFeet, from, to, obstacles, terrain, gridSize }) {
     const budget = remainingMovement(turnState, creatureName, speedFeet)
     const cost = computePathCost({ from, to, obstacles, terrain, gridSize })
-    if (cost === Infinity) return { target: from, costFeet: 0, snapped: true, unreachable: true }
-    if (cost <= budget) return { target: to, costFeet: cost, snapped: false }
-    if (budget <= 0) return { target: from, costFeet: 0, snapped: true }
+    if (cost === Infinity) return { target: from, costFeet: 0, snapped: true, unreachable: true, requestedFeet: Infinity, budgetFeet: budget }
+    if (cost <= budget) return { target: to, costFeet: cost, snapped: false, requestedFeet: cost, budgetFeet: budget }
+    if (budget <= 0) return { target: from, costFeet: 0, snapped: true, requestedFeet: cost, budgetFeet: budget }
     const snapped = snapToBudget({ from, to, budgetFeet: budget, obstacles, terrain, gridSize })
-    return { target: { gridX: snapped.x, gridY: snapped.y }, costFeet: snapped.costFeet, snapped: true }
+    return { target: { gridX: snapped.x, gridY: snapped.y }, costFeet: snapped.costFeet, snapped: true, requestedFeet: cost, budgetFeet: budget }
 }
 
 /**

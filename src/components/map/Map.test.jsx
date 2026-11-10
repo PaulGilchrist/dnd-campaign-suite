@@ -453,7 +453,7 @@ describe('Map container — availability & composition', () => {
         // it is announced but never blocks pointer input — CSS pins
         // pointer-events:none).
         await act(async () => {
-            mockState.snapToast = { id: 1, message: 'EvasiveFighter snapped back to 30 ft of movement.' };
+            mockState.snapToast = { id: 1, message: 'EvasiveFighter moved only 10 ft of 20 requested.' };
             rerender(<Map campaignName="test-campaign" characters={[]} isLocalhost
                 mapName="test-map.json" onBack={vi.fn()} onEncounterCreated={vi.fn()}
                 onPoiEntered={vi.fn()} />);
@@ -461,7 +461,7 @@ describe('Map container — availability & composition', () => {
         const toast = container.querySelector('.map-toast');
         expect(toast).toBeTruthy();
         expect(toast).toHaveAttribute('role', 'status');
-        expect(toast).toHaveTextContent('EvasiveFighter snapped back to 30 ft of movement.');
+        expect(toast).toHaveTextContent('EvasiveFighter moved only 10 ft of 20 requested.');
     });
 
     it('T10: threads the mapDisplayName prop into the loader options and down to HexMap (backlog map-load-notice-slug-naming)', async () => {

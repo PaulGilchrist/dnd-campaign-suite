@@ -57,7 +57,6 @@ FZ session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (FZ 2026-11-09) Clamp-toast number reads ambiguously: "snapped back to 5 ft of movement" uses feet-charged-THIS-MOVE while the full-budget case reads "snapped back to 30 ft" (total-at-cap) — one of the two frames should change ("moved only 5 ft of 15 requested" / "movement used up at 30 ft") so GMs don't read "5 ft" as remaining. Copy lives `usePlayerDragging.js:339ff`; log row already unambiguous.
 - (FZ 2026-11-09) Maps-manager row `Activate`/`Open` buttons are only row-scoped-discoverable — nothing marks the currently-active row visually except the flipped button label; a GM (or harness) scanning for "the active map" must read each row. A persistent `Active` chip on the row (the manager DOES know) would also stop harness `.first()` traps (FZ mis-activated battle-arena this way).
 
 ## Blocked / Not Verified (fold-gate ledger)
