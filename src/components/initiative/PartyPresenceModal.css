@@ -1,6 +1,6 @@
 /* Split-party presence chrome (plan initiative-split-party).
  * Loaded via Initiative.jsx; the modal shells (sp-overlay/sp-modal/sp-body…)
- * and the creature rows (secondary-target-*/ally-*) are re-used from
+ * and the creature rows (secondary-target / ally rows) are re-used from
  * AllySelectionModal.css for visual consistency. */
 
 /* Away player card: unmistakably disabled — heavily desaturated AND darkened,
