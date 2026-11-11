@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/campaign/travelService.js';
-import { EVENT_FREQUENCIES } from '../../services/campaign/randomEventService.js';
+import { EVENT_FREQUENCIES, eventChanceBreakdown } from '../../services/campaign/randomEventService.js';
 
 // Exhausted-banner question gate (backlog 2026-10-30-AN): at party-max
 // exhaustion the Forced March button is natively disabled, so the two-choice
@@ -116,8 +116,32 @@ const FM_MAX_EXHAUSTION_TITLE = 'Cannot forced march — a party member has reac
 // Active-frequency readout (backlog 2026-10-26-D): the chip row's `.active`
 // styling is too subtle to predict interruption rate, so the Events row mirrors
 // the Weather row — label + bold active value + chance description.
+// Effective-chance law (bug-event-chance-label-ignores-mods): shouldTriggerEvent
+// rolls freq + terrain + weather mods, so the active row reads the SAME
+// breakdown (shared eventChanceBreakdown — display and roll can never diverge)
+// and attributes every non-zero modifier. With no route planned yet the roll's
+// terrain is undetermined, and a non-numeric encounterMod poisons the total
+// (the roll fail-closes), so both cases fall back to the honest base label.
+// Chip tooltips keep the per-frequency BASE — terrain changes per hex, so the
+// stable per-frequency number belongs there.
 const frequencyChance = (f) => `${Math.round((f ? f.chance : 0) * 100)}% chance per hex`;
 const lookupFrequency = (key) => EVENT_FREQUENCIES[key] || EVENT_FREQUENCIES.none;
+const modPart = (value, label) =>
+  `${value > 0 ? '+' : '-'}${Math.abs(Math.round(value * 100))} ${label}`;
+const activeFrequencyChance = (frequencyKey, terrainType, weather) => {
+  const baseLabel = frequencyChance(lookupFrequency(frequencyKey));
+  if (!terrainType) return baseLabel;
+  const { base, terrainMod, weatherMod, total } =
+    eventChanceBreakdown(terrainType, weather, frequencyKey);
+  if (!Number.isFinite(total)) return baseLabel;
+  if (terrainMod === 0 && weatherMod === 0) return baseLabel;
+  // Negative totals (fog on Sparse) never fire the roll — read them honestly as 0%.
+  const shown = Math.max(0, Math.round(total * 100));
+  const mods = [];
+  if (terrainMod !== 0) mods.push(modPart(terrainMod, terrainType));
+  if (weatherMod !== 0) mods.push(modPart(weatherMod, (weather?.label || 'weather').toLowerCase()));
+  return `${shown}% chance per hex (base ${Math.round(base * 100)}%${mods.length ? ', ' + mods.join(', ') : ''})`;
+};
 
 // Advance-button label + disabled tooltip (backlog 2026-10-26-E): a fresh tool
 // mount has an EMPTY path, and `pathIndex >= path.length` is vacuously true —
@@ -366,7 +390,7 @@ function TravelPanel({
       <div className="travel-panel-frequency">
         <span className="travel-panel-label">Events:</span>
         <span className="travel-frequency-active">{activeFrequency.label}</span>
-        <span className="travel-frequency-desc">{frequencyChance(activeFrequency)}</span>
+        <span className="travel-frequency-desc">{activeFrequencyChance(eventFrequency, currentTerrain, weather)}</span>
         <div className="travel-frequency-buttons">
           {Object.entries(EVENT_FREQUENCIES).map(([key, f]) => (
             <button

@@ -5,19 +5,39 @@ export const EVENT_FREQUENCIES = {
   frequent: { label: 'Frequent', chance: 0.25 },
 };
 
+// Per-terrain encounter modifiers, hoisted from shouldTriggerEvent's body so
+// the roll AND the TravelPanel readout share ONE formula (bug
+// bug-event-chance-label-ignores-mods: the panel printed the raw frequency
+// table while the live roll added terrain + weather mods).
+const TERRAIN_EVENT_MODS = {
+  plains: 0, forest: 0.05, hills: 0.02, mountains: 0.05,
+  swamp: 0.08, desert: 0.03, tundra: 0.03, beach: 0,
+};
+
+// The single source of truth for the per-hex event chance. Breakdown fields
+// let the display attribute the total ( "+10 rain" ), roll reads .total.
+// Invalid/zero frequency returns an all-zero breakdown — no roll, no mods.
+// Non-numeric encounterMod keeps the original NaN-poisoning semantics (the
+// roll fail-closes; the display detects it and falls back to the base label).
+export function eventChanceBreakdown(terrainType, weather, frequencyKey) {
+  const freq = EVENT_FREQUENCIES[frequencyKey];
+  const base = freq ? freq.chance : 0;
+  if (!base) return { base: 0, terrainMod: 0, weatherMod: 0, total: 0 };
+
+  const terrainMod = TERRAIN_EVENT_MODS[terrainType] || 0;
+  const weatherMod = (weather?.encounterMod || 0) / 100;
+  return { base, terrainMod, weatherMod, total: base + terrainMod + weatherMod };
+}
+
+export function effectiveEventChance(terrainType, weather, frequencyKey) {
+  return eventChanceBreakdown(terrainType, weather, frequencyKey).total;
+}
+
 export function shouldTriggerEvent(terrainType, weather, frequencyKey) {
   const freq = EVENT_FREQUENCIES[frequencyKey];
   if (!freq || freq.chance === 0) return false;
 
-  const terrainMod = {
-    plains: 0, forest: 0.05, hills: 0.02, mountains: 0.05,
-    swamp: 0.08, desert: 0.03, tundra: 0.03, beach: 0,
-  }[terrainType] || 0;
-
-  const weatherMod = (weather?.encounterMod || 0) / 100;
-  const totalChance = freq.chance + terrainMod + weatherMod;
-
-  return Math.random() < totalChance;
+  return Math.random() < effectiveEventChance(terrainType, weather, frequencyKey);
 }
 
 function pickWeighted(entries) {
