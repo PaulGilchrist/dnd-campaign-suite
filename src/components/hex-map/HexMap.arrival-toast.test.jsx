@@ -89,6 +89,7 @@ import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import useLog from '../../hooks/runtime/useLog.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
+import { TRIP_ARRIVAL_MESSAGE } from '../../services/maps/travelSession.js';
 import HexMap from './HexMap.jsx';
 
 function makeMapLoader(overrides = {}) {
@@ -135,8 +136,8 @@ function makeTravelMgmt(overrides = {}) {
 }
 
 /** Renders HexMap with an active travel session whose advanceOneHex returns `result`. */
-function renderWithAdvance(result) {
-    const tm = makeTravelMgmt({ advanceOneHex: vi.fn(() => result) });
+function renderWithAdvance(result, mgmtOverrides = {}) {
+    const tm = makeTravelMgmt({ advanceOneHex: vi.fn(() => result), ...mgmtOverrides });
     useTravelManagement.mockReturnValue(tm);
     useMapLoader.mockReturnValue(makeMapLoader());
     useZoomPan.mockReturnValue({ svgWidth: 1039, svgHeight: 519, zoomIn: vi.fn(), zoomOut: vi.fn(), resetView: vi.fn(), clampPan: vi.fn((z, x, y) => ({ x, y })), centerView: vi.fn(() => ({ x: 0, y: 0 })), panning: false, handlePanStart: vi.fn(), handlePanMove: vi.fn(), handlePanEnd: vi.fn(), handleWheel: vi.fn() });
@@ -148,8 +149,8 @@ function renderWithAdvance(result) {
     useMonstersData.mockReturnValue({ monsters: [], loading: false, error: null });
     const addEntry = vi.fn();
     useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
-    render(<HexMap campaignName="test" mapName="test-map" />);
-    return { tm, addEntry };
+    const utils = render(<HexMap campaignName="test" mapName="test-map" />);
+    return { tm, addEntry, ...utils };
 }
 
 const toastNode = () => document.querySelector('.travel-toast');
@@ -211,6 +212,73 @@ describe('HexMap arrival toast', () => {
         fireEvent.click(screen.getByTestId('btn-advance'));
         expect(toastNode()).toBeNull();
         act(() => { vi.advanceTimersByTime(3000); });
+        expect(toastNode()).toBeNull();
+    });
+
+    // ── Shared-adoption arrival notice (backlog JT 2026-11-11) ──
+    // The observer lane: a WATCHING tab never presses Advance — the other
+    // client's arrival reaches it only as echo-adoption of the synced
+    // travel-mode + travel-lastMessage values (useArrivalEchoNotice.js).
+    const arrivedMgmt = () => makeTravelMgmt({
+        travelMode: 'inactive', isTravelActive: false,
+        destination: null, path: [], pathIndex: 0,
+        lastMessage: TRIP_ARRIVAL_MESSAGE,
+        advanceOneHex: vi.fn(() => ({ moved: false })),
+    });
+
+    it('notices a WATCHING tab when the shared trip arrives via echo (no local press)', () => {
+        const { addEntry, rerender } = renderWithAdvance({ moved: false });
+        expect(toastNode()).toBeNull(); // nothing while the trip is still live
+
+        // The other tab's completing advance echoes in: mode flips inactive,
+        // arrival sentence lands in lastMessage (order-independent — HexMap
+        // adopts both synced values before this commit settles).
+        useTravelManagement.mockReturnValue(arrivedMgmt());
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+
+        expect(toastNode()).toBeTruthy();
+        expect(toastNode()).toHaveAttribute('role', 'status');
+        expect(toastNode()).toHaveTextContent('Arrived at destination — travel complete');
+        // The watcher writes NOTHING: no log row, no game state, no re-POST.
+        expect(addEntry).not.toHaveBeenCalled();
+        // Bounded auto-dismiss — 2.5s parity with the presser toast.
+        act(() => { vi.advanceTimersByTime(2600); });
+        expect(toastNode()).toBeNull();
+    });
+
+    it('fires the echo notice exactly once per trip (later renders stay quiet)', () => {
+        const { rerender } = renderWithAdvance({ moved: false });
+        useTravelManagement.mockReturnValue(arrivedMgmt());
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+        expect(toastNode()).toBeTruthy();
+        act(() => { vi.advanceTimersByTime(2600); });
+        expect(toastNode()).toBeNull();
+        // An unrelated store churn (same arrived bytes re-rendered) must not
+        // re-surface the notice within the trip.
+        useTravelManagement.mockReturnValue(arrivedMgmt());
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+        expect(toastNode()).toBeNull();
+    });
+
+    it('stays silent when mounting AFTER the trip already arrived (stale echo bytes)', () => {
+        // travel-lastMessage survives arrival by design — a fresh mount must
+        // NOT re-surface the notice (per-client one-shot, never persisted).
+        const { addEntry } = renderWithAdvance({ moved: false }, arrivedMgmt());
+        expect(toastNode()).toBeNull();
+        act(() => { vi.advanceTimersByTime(3000); });
+        expect(toastNode()).toBeNull();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('stays silent when the shared trip is CANCELLED remotely (no arrival sentence)', () => {
+        const { rerender } = renderWithAdvance({ moved: false });
+        useTravelManagement.mockReturnValue(makeTravelMgmt({
+            travelMode: 'inactive', isTravelActive: false,
+            destination: null, path: [], pathIndex: 0,
+            lastMessage: null, // cancelTravel nulls the message
+            advanceOneHex: vi.fn(() => ({ moved: false })),
+        }));
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
         expect(toastNode()).toBeNull();
     });
 });

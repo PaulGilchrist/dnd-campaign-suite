@@ -47,6 +47,8 @@ import useTerrainPainting from './hooks/useTerrainPainting.js';
 import usePoiManagement from './hooks/usePoiManagement.js';
 import useMapLoader from './hooks/useMapLoader.js';
 import useTravelToolSync from './hooks/useTravelToolSync.js';
+import useArrivalEchoNotice from './hooks/useArrivalEchoNotice.js';
+import { TRIP_ARRIVAL_TOAST_MESSAGE } from '../../services/maps/travelSession.js';
 import useEncounterGeneration from './hooks/useEncounterGeneration.js';
 import './HexMap.css';
 
@@ -234,6 +236,24 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         campaignName,
     });
 
+    // Shared-adoption arrival notice (backlog JT 2026-11-11): a tab that only
+    // WATCHES the shared trip gets the same arrival toast when the echo lane
+    // flips travel-mode inactive with the arrival sentence — per-client
+    // one-shot, display-only (see hooks/useArrivalEchoNotice.js). The ref
+    // marks a LOCAL completing press so the presser keeps the single
+    // synchronous toast of handleAdvance untouched.
+    const localArrivalRef = useRef(false);
+    const showArrivalNotice = useCallback(
+        () => showMapToast(TRIP_ARRIVAL_TOAST_MESSAGE),
+        [showMapToast],
+    );
+    useArrivalEchoNotice({
+        isTripVisible: travelMgmt.isTravelActive,
+        lastMessage: travelMgmt.lastMessage,
+        localArrivalRef,
+        onArrival: showArrivalNotice,
+    });
+
     // ── POI management ──
     const poiMgmt = usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHexFromEvent, tool });
     const {
@@ -327,8 +347,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             logTravel(action, nextHex, tileTerrain, weather, { evt: result.event });
             if (result.arrived) {
                 // The panel just auto-closed (mode → inactive) — surface the
-                // completion where it stays visible (display only, no game state).
-                showMapToast('Arrived at destination — travel complete');
+                // completion where it stays visible (display only, no game
+                // state). localArrivalRef tells the echo-notice hook this
+                // commit's active→inactive flip is OUR press, already toasted.
+                localArrivalRef.current = true;
+                showMapToast(TRIP_ARRIVAL_TOAST_MESSAGE);
             }
         } else if (travelMgmt.dayExhausted) {
             logTravel('day_exhausted', null, null, weather);

@@ -42,3 +42,15 @@ export function releaseTripOwner(campaignName) {
     if (!campaignName) return;
     setRuntimeValue('campaign', TRIP_OWNER_KEY, null, campaignName);
 }
+
+/**
+ * Arrival copy (improve 2026-11-11 arrival-echo-notice). Pinned here because
+ * the PRODUCER (useTravelManagement's final advance writes TRIP_ARRIVAL_MESSAGE
+ * into travel-lastMessage) and the CONSUMERS (the arrival toast copy shared by
+ * the presser's handleAdvance trigger and the observer's echo notice) must
+ * byte-match — the echo detection compares travel-lastMessage against
+ * TRIP_ARRIVAL_MESSAGE, and that key survives arrival by design while the
+ * panel that used to render it unmounts.
+ */
+export const TRIP_ARRIVAL_MESSAGE = 'The party has arrived at their destination.';
+export const TRIP_ARRIVAL_TOAST_MESSAGE = 'Arrived at destination — travel complete';

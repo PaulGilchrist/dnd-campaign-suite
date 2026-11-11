@@ -20,7 +20,7 @@ import { getRuntimeValue, setRuntimeValue, hasRuntimeValue, setRuntimeObject } f
 import { hexNeighbors } from '../../services/maps/hexMapUtils.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
 import { setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js';
-import { claimTripOwner, releaseTripOwner } from '../../services/maps/travelSession.js';
+import { claimTripOwner, releaseTripOwner, TRIP_ARRIVAL_MESSAGE } from '../../services/maps/travelSession.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -547,7 +547,7 @@ export default function useTravelManagement({
       // Single lastMessage write (no prior null): two POSTs to the same
       // endpoint in one tick can reorder and strand the arrival prose.
       setTravelMode(MODES.INACTIVE);
-      setLastMessage('The party has arrived at their destination.');
+      setLastMessage(TRIP_ARRIVAL_MESSAGE);
       clearCompletedTripKeys();
       return { moved: true, arrived: true };
     }
