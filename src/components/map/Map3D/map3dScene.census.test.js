@@ -5,9 +5,11 @@
 // sibling overlays-test posture: REAL three.js objects, headless scene (no
 // WebGLRenderer). Pins: every mesh lane tags itself exactly once, registered
 // prop types census individually, unregistered ("ghost") types land in the
-// single `fallback` bucket, tokens/overlays/fog count live, and the census
-// re-reads the scene graph on every call (an overlay add/clear shows through
-// with NO rebuild — the handle is a traversal, not a mount snapshot).
+// single `fallback` bucket, tokens/overlays/fog count live, token-nested
+// avatar discs are counted with a textured subset (no buildMap capture), and
+// the census re-reads the scene graph on every call (an overlay add/clear
+// shows through with NO rebuild — the handle is a traversal, not a mount
+// snapshot).
 import * as THREE from 'three';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Map3DScene } from './map3dScene.js';
@@ -97,12 +99,56 @@ describe('Map3DScene.getCensus (dev handle, backlog 2026-11-10 HD)', () => {
             players: 2,
             npcs: 1,
             monsters: 1,
+            avatars: 0, // no avatar maps passed → no token-nested discs
+            textured: 0,
             fallback: 1, // ghostProp → _fallbackBox lane, bucketed not named
             torchLights: 1,
             fogCells: 4, // merged fog mesh reports its cell count
             overlays: 0,
             items: { barrel: 2, bed: 1 },
         });
+    });
+
+    // Art-presence lane (backlog 2026-11-11 IE): _makeAvatar discs are token
+    // CHILDREN, invisible to a top-level-only pass. The census must answer
+    // "how many discs are in the scene" AND "how many carry a resolved
+    // texture" without any Map3DScene.prototype.buildMap wrap capture.
+    it('counts token-nested avatar discs and the textured subset (art landed), no prototype capture needed', async () => {
+        const scene = builtScene();
+        // Stub the network lane only: urls containing "missing" resolve null
+        // (the disc is never added); the rest resolve a texture carrying an
+        // image, exactly what _loadTexture yields after a successful load.
+        scene._loadTexture = (url) => {
+            if (url.includes('missing')) return Promise.resolve(null);
+            const tex = new THREE.Texture();
+            tex.image = { src: url };
+            return Promise.resolve(tex);
+        };
+        scene._buildPlayers([
+            { id: 'p1', name: 'Aria', gridX: 1, gridY: 1 },
+            { id: 'p2', name: 'Bram', gridX: 1, gridY: 2 },
+        ], new Set(), true, { p1: 'aria.png', p2: 'bram.png' }, scene.buildGen);
+        scene._buildNpcs([
+            { id: 'n1', type: 'monster', name: 'Goblin', gridX: 5, gridY: 1, visible: true },
+            { id: 'n2', type: 'npc', name: 'Nobody', gridX: 5, gridY: 2, visible: true },
+        ], new Set(), true, { Goblin: 'dnd-tools/images/goblin.jpg', Nobody: 'missing.png' }, scene.buildGen);
+        await new Promise((resolve) => setTimeout(resolve, 0)); // let the async disc-add land
+
+        const withArt = scene.getCensus();
+        expect(withArt.players).toBe(2);
+        expect(withArt.monsters).toBe(1);
+        expect(withArt.npcs).toBe(1);
+        expect(withArt.avatars).toBe(3); // 2 player discs + textured Goblin; null-texture token has no disc
+        expect(withArt.textured).toBe(3);
+
+        // A tagged disc whose material has no resolved image counts as an
+        // avatar but NOT as textured — the two fields answer different
+        // questions (are discs there? did the art land?).
+        const goblinToken = scene.mapGroup.children.find((o) => o.userData.census?.kind === 'monsters');
+        goblinToken.add(scene._makeAvatar(null));
+        const split = scene.getCensus();
+        expect(split.avatars).toBe(4);
+        expect(split.textured).toBe(3);
     });
 
     it('is LIVE: spell-overlay add/clear repaints census.overlays with no rebuild of the map lanes', async () => {
@@ -127,7 +173,7 @@ describe('Map3DScene.getCensus (dev handle, backlog 2026-11-10 HD)', () => {
         scene.clearMap();
         const afterClear = scene.getCensus();
         expect(afterClear).toEqual(expect.objectContaining({
-            gridSize: 10, walls: 0, floor: 0, players: 0, fallback: 0, items: {}, overlays: 0,
+            gridSize: 10, walls: 0, floor: 0, players: 0, avatars: 0, textured: 0, fallback: 0, items: {}, overlays: 0,
         }));
         // mapGroup identity changed; the old census numbers never leak back.
         expect(before.walls).toBe(3);

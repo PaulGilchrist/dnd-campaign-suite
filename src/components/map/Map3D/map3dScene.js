@@ -415,8 +415,9 @@ export class Map3DScene {
 
     // Dev-only automation handle (backlog 2026-11-10 HD): a machine-readable
     // census of the LIVE scene graph — every mesh-bearing lane tags its
-    // top-level object with userData.census at build time, so this read is a
-    // traversal, never a parallel bookkeeping mirror that could go stale.
+    // object with userData.census at build time (token-nested avatar discs
+    // included, backlog 2026-11-11 IE), so this read is a traversal of the
+    // whole graph, never a parallel bookkeeping mirror that could go stale.
     // Map3D.jsx exposes it as globalThis.__map3d behind import.meta.env.DEV.
     getCensus() {
         const census = {
@@ -427,6 +428,8 @@ export class Map3DScene {
             players: 0,
             npcs: 0,
             monsters: 0,
+            avatars: 0,
+            textured: 0,
             fallback: 0,
             torchLights: 0,
             fogCells: 0,
@@ -435,12 +438,25 @@ export class Map3DScene {
         };
         const visit = (obj) => {
             const tag = obj.userData.census;
-            if (!tag) return;
-            if (tag.kind === 'item') {
-                census.items[tag.type] = (census.items[tag.type] || 0) + 1;
-            } else {
-                census[tag.kind] += tag.count ?? (obj.isInstancedMesh ? obj.count : 1);
+            if (tag) {
+                if (tag.kind === 'item') {
+                    census.items[tag.type] = (census.items[tag.type] || 0) + 1;
+                } else if (tag.kind === 'avatar') {
+                    // Art-presence lane (backlog 2026-11-11 IE): read the live
+                    // material, not a build-time flag — a disc counts as
+                    // textured only when its map carries a resolved image.
+                    census.avatars += 1;
+                    const map = obj.material && obj.material.map;
+                    if (map && map.image) census.textured += 1;
+                } else {
+                    census[tag.kind] += tag.count ?? (obj.isInstancedMesh ? obj.count : 1);
+                }
             }
+            // _makeAvatar discs are token CHILDREN (added async once the
+            // texture resolves), so a top-level pass can never see them —
+            // recurse into every branch (the graph is small; this stays a
+            // traversal, never a parallel bookkeeping mirror).
+            for (const child of obj.children) visit(child);
         };
         if (this.mapGroup) this.mapGroup.children.forEach(visit);
         if (this.overlayGroup) this.overlayGroup.children.forEach(visit);
@@ -698,6 +714,7 @@ export class Map3DScene {
             new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
         disc.rotation.x = -Math.PI / 2;
         disc.position.y = 48.5;
+        disc.userData.census = { kind: 'avatar' };
         return disc;
     }
 
