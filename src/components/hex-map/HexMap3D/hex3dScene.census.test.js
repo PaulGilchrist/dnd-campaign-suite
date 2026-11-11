@@ -78,6 +78,8 @@ describe('Hex3DScene.getCensus (dev handle, backlog 2026-11-10 HD)', () => {
             pois: { tower: 1, camp: 1, 'void-gate': 1 }, // counts per placement
             party: 0,
             travelPath: 0,
+            travelPathSegments: 0,
+            travelPathTravelled: 0,
             weather: null,
         });
     });
@@ -92,13 +94,49 @@ describe('Hex3DScene.getCensus (dev handle, backlog 2026-11-10 HD)', () => {
         scene.updateTravelPath([{ q: 0, r: 0 }, { q: 1, r: 1 }], 0);
         scene.setWeather({ icon: 'cloud-rain' });
         expect(scene.getCensus()).toEqual(
-            expect.objectContaining({ party: 1, travelPath: 1, weather: 'rain' }));
+            expect.objectContaining({
+                party: 1, travelPath: 1, weather: 'rain',
+                travelPathSegments: 1, travelPathTravelled: 0,
+            }));
 
         scene.updateParty(null);
         scene.updateTravelPath([], 0);
         scene.setWeather(null);
         expect(scene.getCensus()).toEqual(
-            expect.objectContaining({ party: 0, travelPath: 0, weather: null }));
+            expect.objectContaining({
+                party: 0, travelPath: 0, weather: null,
+                travelPathSegments: 0, travelPathTravelled: 0,
+            }));
+        expect(buildSpy).not.toHaveBeenCalled();
+    });
+
+    // Backlog 2026-11-11 improve hex3d-census-travel-segments: harnesses need
+    // per-segment progress, not just the 0/1 presence flag — an N+1-point
+    // axial path renders N segments; travel-pathIndex counts the ones already
+    // travelled. The stamp re-derives on every patch tick (echo lane, NO
+    // rebuild) and clears to 0/0 on arrival/cancel beside travelPath:0.
+    it('travel-path reports segment counts and travelled progress live across patch ticks', async () => {
+        const scene = await builtScene();
+        const buildSpy = vi.spyOn(scene, 'buildMap');
+        const trip = [
+            { q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 2, r: 1 }, { q: 3, r: 1 },
+        ]; // 5 points → 4 segments
+
+        const progress = (idx) => {
+            scene.updateTravelPath(trip, idx);
+            const { travelPath, travelPathSegments, travelPathTravelled } = scene.getCensus();
+            return { travelPath, travelPathSegments, travelPathTravelled };
+        };
+        expect(progress(1)).toEqual({ travelPath: 1, travelPathSegments: 4, travelPathTravelled: 1 });
+        // Cross-client advance echo: same mounted scene, index climbs.
+        expect(progress(3)).toEqual({ travelPath: 1, travelPathSegments: 4, travelPathTravelled: 3 });
+        // Oversized/stale index clamps to the drawn tube; junk never NaNs.
+        expect(progress(99)).toEqual({ travelPath: 1, travelPathSegments: 4, travelPathTravelled: 4 });
+        expect(progress(undefined)).toEqual({ travelPath: 1, travelPathSegments: 4, travelPathTravelled: 0 });
+        // Arrival/cancel: presence and both counts drop together.
+        scene.updateTravelPath([], 4);
+        expect(scene.getCensus()).toEqual(expect.objectContaining(
+            { travelPath: 0, travelPathSegments: 0, travelPathTravelled: 0 }));
         expect(buildSpy).not.toHaveBeenCalled();
     });
 
@@ -134,6 +172,9 @@ describe('Hex3DScene.getCensus (dev handle, backlog 2026-11-10 HD)', () => {
         const fresh = new Hex3DScene({ clientWidth: 1, clientHeight: 1 });
         expect(() => fresh.getCensus()).not.toThrow();
         expect(fresh.getCensus()).toEqual(
-            expect.objectContaining({ hexes: 0, terrain: 0, pois: {}, weather: null }));
+            expect.objectContaining({
+                hexes: 0, terrain: 0, pois: {}, weather: null,
+                travelPathSegments: 0, travelPathTravelled: 0,
+            }));
     });
 });

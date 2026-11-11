@@ -60,8 +60,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-11 JU: 3D hex view has no travel console** — panel + every day-state control are 2D-only; the 3D tube renders passively with no travelled/untravelled colouring (`hex3dScene.js:1097` reserves `pathIndex` for "v2") and census answers travelPath presence only (0/1). A GM riding 3D cannot advance/wait/camp without dropping to 2D. Consider a 3D-side compact console (advance + budget bar) or at least census segment counts for harnesses.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Enforcement-ON auto-encounter leg of combat-event accept (`autoStartEncounterFromEvent` → initiative roll + session phase `encounter`) — enforcement never armed this run; off-face proven zero-writes.

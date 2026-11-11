@@ -589,6 +589,10 @@ export class Hex3DScene {
             pois: {},
             party: this.partyGroup && this.partyGroup.children.length > 0 ? 1 : 0,
             travelPath: this.pathGroup && this.pathGroup.children.length > 0 ? 1 : 0,
+            // Harness progress detail beside the presence flag (backlog
+            // 2026-11-11): travelPathSegments / travelPathTravelled, derived
+            // in _travelProgressCensus from the live pathGroup stamp.
+            ...this._travelProgressCensus(),
             // Verbatim doc condition when the weather object carries one
             // ("clear", "storm"); otherwise the visual bucket (icon-derived
             // rain/snow/fog or null) — see setWeather.
@@ -605,6 +609,21 @@ export class Hex3DScene {
         };
         if (this.mapGroup) this.mapGroup.children.forEach(visit);
         return census;
+    }
+
+    // Travel-progress derivation for getCensus: updateTravelPath stamps the
+    // live pathGroup's userData the way avatar discs carry userData.census,
+    // so patch-lane travel ticks read through with no remount. An N+1 axial-
+    // point trip builds N hex-to-hex path segments; the stamp's `travelled`
+    // is the travel-pathIndex clamped into [0, segments]. A cleared path
+    // (arrival/cancel) leaves no stamp — both counts honestly answer 0
+    // beside travelPath:0.
+    _travelProgressCensus() {
+        const stamp = this.pathGroup && this.pathGroup.userData.travelPath;
+        return {
+            travelPathSegments: stamp ? stamp.segments : 0,
+            travelPathTravelled: stamp ? stamp.travelled : 0,
+        };
     }
 
     _buildBackdrop() {
@@ -1076,6 +1095,9 @@ export class Hex3DScene {
     updateTravelPath(path, pathIndex) {
         if (!this.renderer) return;
         this._clearGroup(this.pathGroup);
+        // Census stamp (backlog 2026-11-11): re-derived on every patch tick;
+        // cleared up-front so a removed/short path leaves 0/0 in getCensus().
+        this.pathGroup.userData.travelPath = null;
         if (!path || path.length < 2) return;
         const THREE = this.THREE;
         const pts = path.map(({ q, r }) => {
@@ -1094,7 +1116,17 @@ export class Hex3DScene {
             new THREE.MeshStandardMaterial({ color: PATH_COLOR, emissive: 0x554400, emissiveIntensity: 0.5 }));
         pin.position.set(dest.x, dest.y + 6, dest.z);
         this.pathGroup.add(pin);
-        void pathIndex; // reserved for travelled/untravelled colouring (v2)
+        // Progress stamp for the dev census (travelled-vs-remaining SPLIT
+        // COLOURING stays reserved for v2): a path of pts.length axial points
+        // is pts.length-1 hex-to-hex segments; pathIndex (travel-pathIndex)
+        // counts the segments already travelled, clamped into [0, segments]
+        // so a stale/oversized index never reports more than the drawn tube.
+        const segments = pts.length - 1;
+        const idx = Number.isFinite(pathIndex) ? Math.floor(pathIndex) : 0;
+        this.pathGroup.userData.travelPath = {
+            segments,
+            travelled: Math.min(Math.max(idx, 0), segments),
+        };
     }
 
     setWeather(weather) {
