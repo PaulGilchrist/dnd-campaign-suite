@@ -69,6 +69,12 @@ function TravelExtremeWeatherBanner({ weather, travelBlocked, onForceCamp }) {
   );
 }
 
+// Forced-march penalty lands on the DAILY BUDGET only (JU-ratified: per-hex
+// cost and "Next hex" time stay base; the budget shrinks floor(base×budgetMod×
+// (5/6)^stacks)). The percent comes from getExhaustionMultiplierPercent — the
+// same (5/6)^stacks math the budget uses — so this row and `travel-dailyBudget`
+// tell one story. Never phrase it as a speed cut (retired per-hex helper
+// backlog 2026-11-11 JU).
 function TravelForcedMarchStatus({ forcedMarchHours, exhaustionMultiplier }) {
   if (!(forcedMarchHours > 0)) return null;
   return (
@@ -77,8 +83,8 @@ function TravelForcedMarchStatus({ forcedMarchHours, exhaustionMultiplier }) {
         <i className="fa-solid fa-heart-pulse"></i> Forced March
       </span>
       <span className="travel-exhaustion-value">{forcedMarchHours} / 6 stacks</span>
-      <span className="travel-exhaustion-speed">
-        <i className="fa-solid fa-gauge"></i> Speed: {exhaustionMultiplier}%
+      <span className="travel-exhaustion-budget">
+        <i className="fa-solid fa-hourglass-half"></i> Daily budget: {exhaustionMultiplier}%
       </span>
     </div>
   );

@@ -535,7 +535,7 @@ describe('useTravelManagement', () => {
     // success copy even after the party hits max EX — while the FM button is
     // natively disabled. The hook's returned lastMessage swaps ONLY that copy
     // (prefix-matched) while maxed; every other message passes through.
-    const SUCCESS_COPY = 'Forced march — 1 exhaustion added to all party members. Speed reduced to 33%.';
+    const SUCCESS_COPY = 'Forced march — 1 exhaustion added to all party members. Daily budget reduced to 33%.';
     const REFUSAL_COPY = 'Cannot forced march — a party member has reached maximum exhaustion.';
     const seedMessage = (text) => getStore('campaign').set('travel-lastMessage', text);
     const seedLevel = (level) =>

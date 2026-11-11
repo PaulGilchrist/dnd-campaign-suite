@@ -7,7 +7,6 @@ import {
   HORSEBACK_SPEED_MULTIPLIER,
   EXHAUSTION_SPEED_MULTIPLIER,
   EXHAUSTION_LEVELS,
-  applyExhaustionSpeedPenalty,
   applyExhaustionSpeedPenaltyToBudget,
   getExhaustionMultiplierPercent,
   getHexTravelTime,
@@ -63,20 +62,6 @@ describe('travelService', () => {
       for (const pace of TRAVEL_PACES) {
         expect(1 / pace.hexesPerHour).toBeCloseTo(pace.hoursPerHex, 10);
       }
-    });
-  });
-
-  describe('applyExhaustionSpeedPenalty', () => {
-    it('should return base cost for non-positive exhaustion or zero base', () => {
-      expect(applyExhaustionSpeedPenalty(10, 0)).toBe(10);
-      expect(applyExhaustionSpeedPenalty(10, -1)).toBe(10);
-      expect(applyExhaustionSpeedPenalty(0, 5)).toBe(0);
-    });
-
-    it('should inflate cost by (6/5)^stacks as exhaustion grows', () => {
-      // 10 / (5/6) = 12 exactly; 10 / (5/6)^3 = 10 * 1.728 = 17.28
-      expect(applyExhaustionSpeedPenalty(10, 1)).toBe(12);
-      expect(applyExhaustionSpeedPenalty(10, 3)).toBeCloseTo(17.28, 6);
     });
   });
 

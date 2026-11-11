@@ -622,7 +622,7 @@ export default function useTravelManagement({
     setDayExhausted(false);
     setAccruedCost(0);
     setDailyBudget(effectiveBudgetForPace(travelPace, weather, nextHours));
-    setLastMessage(`Forced march — 1 exhaustion added to all party members. Speed reduced to ${getExhaustionMultiplierPercent(nextHours)}%.`);
+    setLastMessage(`Forced march — 1 exhaustion added to all party members. Daily budget reduced to ${getExhaustionMultiplierPercent(nextHours)}%.`);
     return true;
   }, [partyHasMaxExhaustion, addExhaustionToAll, effectiveBudgetForPace, travelPace, weather, forcedMarchHours]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -117,7 +117,7 @@ describe('useTravelManagement forced-march budget math (stale-closure regression
     expect(returned).toBe(true);
     expect(result.current.forcedMarchHours).toBe(1);
     expect(result.current.dailyBudget).toBe(3); // floor(4 × 5/6), NOT 4
-    expect(result.current.lastMessage).toContain('Speed reduced to 83%');
+    expect(result.current.lastMessage).toContain('Daily budget reduced to 83%');
   });
 
   it('second Forced March stacks the penalty (hours 1 → 2, budget floor(4×(5/6)²)=2)', () => {
@@ -131,7 +131,7 @@ describe('useTravelManagement forced-march budget math (stale-closure regression
 
     expect(result.current.forcedMarchHours).toBe(2);
     expect(result.current.dailyBudget).toBe(2); // floor(4 × 25/36) = 2
-    expect(result.current.lastMessage).toContain('Speed reduced to 69%');
+    expect(result.current.lastMessage).toContain('Daily budget reduced to 69%');
   });
 
   it('Camp from hours=1 clears the penalty on the fresh day (budget → un-penalized 4)', () => {

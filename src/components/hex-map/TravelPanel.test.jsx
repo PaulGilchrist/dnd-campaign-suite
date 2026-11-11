@@ -212,10 +212,13 @@ describe('TravelPanel', () => {
         disabled: ['Select a destination'],
       },
       {
-        label: 'forced march status shows stacks and speed bytes',
-        // 3 stacks → 58% is the real multiplier ((5/6)^3, travelService).
+        label: 'forced march status shows stacks and daily-budget bytes (never speed)',
+        // 3 stacks → 58% is the real budget multiplier ((5/6)^3, travelService
+        // getExhaustionMultiplierPercent — same math the budget-shrink helper
+        // uses). Backlog 2026-11-11 JU: copy is budget-framed.
         props: { forcedMarchHours: 3, exhaustionMultiplier: 58 },
-        visible: ['3 / 6 stacks', 'Speed: 58%'],
+        visible: ['3 / 6 stacks', 'Daily budget: 58%'],
+        absentText: ['Speed: 58%'],
       },
     ])('$label', ({ props, visible = [], enabled = [], disabled = [], absentText = [], absentButtons = [] }) => {
       renderPanel(props);
