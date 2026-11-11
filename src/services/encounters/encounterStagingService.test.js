@@ -24,7 +24,13 @@ import {
 
 vi.mock('../maps/mapsService.js', async () => {
     const actual = await vi.importActual('../maps/mapsService.js');
-    return { ...actual, loadMaps: vi.fn(), createMap: vi.fn(), saveMapData: vi.fn() };
+    return {
+        ...actual,
+        loadMaps: vi.fn(),
+        createMap: vi.fn(),
+        saveMapData: vi.fn(),
+        activateMap: vi.fn(),
+    };
 });
 
 const CN = 'test-campaign';
@@ -74,6 +80,7 @@ beforeEach(() => {
     mapsService.loadMaps.mockResolvedValue({ maps: BASELINE_MAPS });
     mapsService.createMap.mockResolvedValue({ message: 'Map created successfully' });
     mapsService.saveMapData.mockResolvedValue({ message: 'Map saved successfully' });
+    mapsService.activateMap.mockResolvedValue({ message: 'Map activated successfully', activeMap: STAGING_MAP_SLUG });
 });
 
 describe('staging map identity', () => {

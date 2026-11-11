@@ -15,6 +15,13 @@
  *                    each fight gets different 1/2, 3/4 and full-cover
  *                    options around the combatant spawn zone.
  *
+ * Both legs END on the `/activate` lane (backlog 2026-11-11): the same
+ * client path the Maps-manager Activate button rides, so the server-owned
+ * `activeMaps` + `__map__` (stampActiveMapContext) and the map-activate /
+ * maps-list SSE broadcasts move the ACTIVE chip to the stage exactly when
+ * the caller navigates the GM's board there — one source of truth instead
+ * of two surfaces claiming "active" differently.
+ *
  * Cover tiers are what `rules/combat/coverService.js` `computeCover`
  * actually reads off `placedItems` (decorative tree/boulder/bush types are
  * NOT cover in this engine):
@@ -221,5 +228,13 @@ export async function stageEventEncounterMap({
         });
     }
     await mapsService.saveMapData(campaignName, STAGING_MAP_NAME, mapDocument);
+    // Ride the activate lane (backlog 2026-11-11: active-map split-brain) —
+    // the same client path the Maps-manager Activate button takes, so the
+    // server's `activeMaps` + `stampActiveMapContext` + map-activate/maps-list
+    // SSE broadcasts all say "stage" at the same moment the caller navigates
+    // the GM's board there. A failed activation is a FAILED staging: the
+    // caller's catch logs the event without a battleMap label rather than
+    // letting the two "active" surfaces silently diverge again.
+    await mapsService.activateMap(campaignName, STAGING_MAP_NAME);
     return { label: STAGING_MAP_NAME, reused };
 }
