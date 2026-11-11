@@ -12,6 +12,7 @@ import MonsterCardModal from './MonsterCardModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import AiRefineButton from '../common/AiRefineButton.jsx';
 import { formatEncounterName } from '../../services/encounters/encountersService.js';
+import { consumePendingEncounterLoad, subscribeToEncounterLoad } from '../../services/ui/encounterLoadSignal.js';
 import { addMonstersToInitiative } from '../../services/encounters/encounterToInitiative.js';
 import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounters/encounterGenerator.js';
 import { ENCOUNTER_CONFIG } from '../../config/encounterConfig.js';
@@ -292,6 +293,24 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
     deleteEncounterAction,
     renameEncounterAction,
   } = useEncounterManagement(campaignName);
+
+  // Starter-checklist "Join <wave>" deep link (backlog 2026-11-11 KW): the
+  // promise names the wave, so a pending request opens the EXISTING Load
+  // modal (saved-wave list) automatically — no manual Load click. The mount
+  // read honours requests made while this view was unmounted (the checklist
+  // navigates, then this component mounts); the subscription covers clicks
+  // while it is already mounted. Consumption is single-shot, so a plain
+  // sidebar visit never re-opens a stale request and every checklist click
+  // re-arms. The row-click load lane is untouched; per-client UI only.
+  useEffect(() => {
+    const honorLoadRequest = () => {
+      if (consumePendingEncounterLoad()) {
+        openLoadModal();
+      }
+    };
+    honorLoadRequest();
+    return subscribeToEncounterLoad(honorLoadRequest);
+  }, [openLoadModal]);
 
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);

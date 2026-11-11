@@ -34,7 +34,7 @@
 - **Insert-picker law:** buttons render only while `notInOrder.length > 0`; picker = `.marching-order-insert-list` above the armed row (`.marching-order-insert-active` marks it); splice = name takes slot i+1; synchronous DOM reads right after evaluate-clicks race React — settle ~0.5 s between action and read (KW's own false negatives twice).
 - **POI-enter rig law (carried JV, re-lived KW):** linkedMap + `hexDistance(party,poi)===1` + native mouse click at `rect.placed-hit-area` centre; enter pushes map HISTORY → back button names the popped map; `__map__` untouched.
 - **Cross-client marching law:** panel open in both tabs; any tab's edit doc-autosaves (~2 s) and the OTHER tab's mounted panel adopts live (GM↔visitor both proven); visitor-origin marchingOrder PUT passes the outdoor all-tab guard (party-travel scope).
-- **Throwaway-seeded law:** quick-create date-stamped defaults; starter checklist deep-links target whole VIEWS; saved waves hide behind builder `Load` (`.encounter-modal-load`); regenerate replaces the dungeon file outright with `entities.pastTitles` history; typed-name delete gate lives in the handler (inline mismatch copy), NOT in `button.disabled`.
+- **Throwaway-seeded law:** quick-create date-stamped defaults; starter checklist deep-links target whole VIEWS; the wave step carries `intent:'load'` which fires the `services/ui/encounterLoadSignal.js` one-shot bus (pending flag + sync window event) so the Encounter Builder auto-opens its Load modal on arrival, saved waves surface via builder `Load` (`.encounter-modal-load` container; rows are `.encounter-list-item` with `Load "<name>"` aria buttons); regenerate replaces the dungeon file outright with `entities.pastTitles` history; typed-name delete gate lives in the handler (inline mismatch copy), NOT in `button.disabled`.
 - **Carried seeds (unchanged):** travel console laws (playbook §18), LAN tab recipe, census handles recipe, popup-family, PFEG rig, long-rest, AoE-picker, sheet-switch eviction, event farm `.event-btn-reroll`.
 
 ## Coverage
@@ -67,7 +67,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-11 KW: **starter checklist "Join Dungeon Wave 1" deep-links the Encounter Builder, not the wave** — the seeded waves are reachable only via the extra `Load` click (builder body shows nothing wave-related). The step could open the Load modal directly (or deep-select the wave) so first-session guidance lands where the promise reads.
 - 2026-11-11 KW: **typed-name delete affordance inconsistent with the app's own gated-button pattern** — `CampaignAdmin.jsx:219` disables destructive confirms until inputs are ready, but the delete-campaign confirm stays ENABLED on a mismatched typed name and only surfaces inline copy after the click (by design per the CO-era comment, but a click-then-scold on the most destructive button in the app reads as friction; a `disabled={typed !== name}` would match the sibling lane).
 
 ## Blocked / Not Verified (fold-gate ledger)

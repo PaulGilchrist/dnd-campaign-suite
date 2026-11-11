@@ -14,6 +14,7 @@ import MapUnavailable from './components/map/MapUnavailable.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
 import { loadCombatSummary, setCombatSummaryCache } from './services/encounters/combatData.js';
 import storage from './services/ui/storage.js';
+import { requestEncounterLoad } from './services/ui/encounterLoadSignal.js';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/maps/mapsService.js';
 import { characterFileName } from './services/campaign/characterFileName.js';
@@ -370,6 +371,17 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
     return <MapUnavailable onRetry={onRetryActiveMap} />;
   }
   return null;
+}
+
+// Starter-checklist deep links (backlog 2026-11-11 KW): plain steps just
+// switch views exactly like the sidebar handlers; the "Join <wave>" step
+// additionally fires the EncounterBuilder Load-modal signal so the saved-wave
+// list opens automatically (per-client UI intent, never synced).
+function handleChecklistNavigate(view, intent, setActiveView) {
+  if (view === 'encounter' && intent === 'load') {
+    requestEncounterLoad();
+  }
+  setActiveView(view);
 }
 
 function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme, toggleTheme, onRenameCampaign, onDeleteCampaign, setActiveView, restoredSnapshot }) {
@@ -884,7 +896,10 @@ function App() {
           campaignType={campaignType}
            />
         <ErrorBoundary resetKey={`${campaignName}|${activeView}`}>
-        <FirstSessionChecklist campaignName={campaignName} onNavigate={setActiveView} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />
+        {/* onNavigate forwards the step's optional intent (see the wave step
+            in FirstSessionChecklist) — 'load' auto-opens the builder's
+            saved-wave list; every other step navigates as before. */}
+        <FirstSessionChecklist campaignName={campaignName} onNavigate={(view, intent) => handleChecklistNavigate(view, intent, setActiveView)} onBuildHeroes={handleAddCharacter} isLocalhost={isLocalhost} />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
              allAbilityScores={abilityScores}

@@ -63,6 +63,12 @@ describe('FirstSessionChecklist', () => {
     expect(onNavigate).toHaveBeenCalledWith('settlements');
     fireEvent.click(screen.getByText(/the portal of Crypt of X through the fog/));
     expect(onNavigate).toHaveBeenCalledWith('mapsManager');
+    // backlog 2026-11-11 KW: the wave step carries the 'load' intent so App
+    // auto-opens the builder's Load modal; sibling steps stay single-arg
+    // (the exact-argument assertions above would fail on a (view, undefined)
+    // call, pinning their byte-unchanged behavior).
+    fireEvent.click(screen.getByText(/Join Dungeon Wave 1/));
+    expect(onNavigate).toHaveBeenCalledWith('encounter', 'load');
     fireEvent.click(screen.getByText(/campaign log/));
     expect(onNavigate).toHaveBeenCalledWith('campaignLog');
   });

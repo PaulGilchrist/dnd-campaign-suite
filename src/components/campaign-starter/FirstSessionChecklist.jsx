@@ -56,7 +56,11 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
     { icon: 'fa-house', label: `Meet the folk of ${settlement}`, view: 'settlements' },
     { icon: 'fa-map', label: `Lead your tokens from ${settlement} to the portal of ${dungeonTitle} through the fog`, view: 'mapsManager' },
     { icon: 'fa-scroll', label: `Review the starter quests (${quests.length} seeded)`, view: 'quests' },
-    { icon: 'fa-dragon', label: `Join ${encounters[0]} when the party is ready`, view: 'encounter' },
+    // backlog 2026-11-11 KW: the promise reads "Join <wave>", but saved waves
+    // hide behind the builder's Load modal — the intent makes the deep link
+    // open that wave list automatically (App wires it to a one-shot request
+    // token consumed by EncounterBuilder).
+    { icon: 'fa-dragon', label: `Join ${encounters[0]} when the party is ready`, view: 'encounter', intent: 'load' },
     { icon: 'fa-list-ol', label: 'Roll initiative — hit TV for the living-room screen', view: 'initiative' },
     { icon: 'fa-heart-pulse', label: 'Patch up with a short rest between waves', view: 'charSheet' },
     { icon: 'fa-book-open', label: 'Read the story as it happens in the campaign log', view: 'campaignLog' },
@@ -79,7 +83,12 @@ function FirstSessionChecklist({ campaignName, onNavigate, onBuildHeroes, isLoca
     );
   }
 
-  const go = (step) => step.action ? step.action() : onNavigate?.(step.view);
+  // Steps without an intent call onNavigate(view) exactly as before; only the
+  // wave step adds the second argument (keeps every sibling deep-link lane
+  // byte-unchanged).
+  const go = (step) => step.action
+    ? step.action()
+    : (step.intent ? onNavigate?.(step.view, step.intent) : onNavigate?.(step.view));
 
   return (
     <div className="campaign-starter-checklist" role="complementary" aria-label="First-session checklist">
