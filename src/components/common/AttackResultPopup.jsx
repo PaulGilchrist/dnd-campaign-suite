@@ -117,6 +117,29 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
 
   const showsOwnDone = typeof popupHtml === 'object' && !!popupHtml?.autoDamage && !popupHtml?.isAutoMiss && (missToHitApplied || !!popupHtml?.hit);
 
+  // Staged-damage guard (2026-11-11 improve hit-popup-backdrop-void-guard):
+  // while a HIT popup stages Done-gated damage, the shared Popup backdrop is
+  // inert (no click handler since 57d68ff80) and the footer Done is suppressed,
+  // so Done (apply) and this Cancel (honest attack_cancelled log row, zero
+  // damage) are the ONLY exits — a stray click can never silently void the
+  // staged damage. Cancel closes without dispatching dice-roll-done.
+  const handleCancelStagedDamage = useCallback(() => {
+    const autoDamage = popupHtml?.autoDamage;
+    const attackName = autoDamage?.name || popupHtml?.name || 'attack';
+    const targetNote = autoDamage?.targetName ? ` against ${autoDamage.targetName}` : '';
+    const attacker = attackerName || autoDamage?.source || 'The attacker';
+    logService.addEntry(campaignName, {
+      type: 'automation',
+      automationType: 'attack_cancelled',
+      reason: 'staged_damage_cancelled',
+      characterName: attacker,
+      abilityName: attackName,
+      description: `${attacker} cancelled ${attackName}${targetNote} after the hit roll — staged damage voided, no damage applied.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[AttackResultPopup] attack_cancelled log failed:', e); });
+    if (onClose) onClose();
+  }, [popupHtml, campaignName, attackerName, onClose]);
+
   return (
     <Popup onClickOrKeyDown={onClose} showCloseButton={!showsOwnDone}>
       {typeof popupHtml === 'string' ? (
@@ -132,6 +155,11 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
           onBardicInspirationDefense={handleBardicInspirationDefense}
           {...callbacks}
         />
+      )}
+      {showsOwnDone && (
+        <div className="popup-close-row">
+          <button type="button" className="popup-close-btn" onClick={handleCancelStagedDamage}>Cancel attack</button>
+        </div>
       )}
     </Popup>
   );

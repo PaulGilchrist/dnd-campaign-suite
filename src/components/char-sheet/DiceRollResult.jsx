@@ -1162,7 +1162,12 @@ function DiceRollResult(props) {
 
             <HolyAuraSaveNotice props={props} />
 
-            <div className="dice-roll-hint">click to dismiss</div>
+            {/* Staged (Done-gated) hits are NOT backdrop-dismissable — the
+                overlay has no click handler — so the dismiss hint would lie
+                there; Done or the popup's Cancel attack row are the exits. */}
+            {!(autoDamage && state.computedHit) && (
+              <div className="dice-roll-hint">click to dismiss</div>
+            )}
         </div>
     );
 }
