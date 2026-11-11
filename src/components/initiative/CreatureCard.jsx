@@ -186,6 +186,25 @@ function TempHpDisplay({ creature, campaignName }) {
 }
 
 function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway }) {
+    // Read-only visitors can NEVER write initiative (GM-only bookkeeping —
+    // bug-player-clients-can-hijack-initiative), so don't mount an
+    // editable-looking box that is permanently disabled: render the plain
+    // text value instead, mirroring CardName's visitor plain span
+    // (backlog 2026-11-11 LZ). An unrolled initiative shows the same
+    // em-dash placeholder face the component uses for empty values
+    // ("— No Target —" in TargetSelect). Away rows keep the disabled-input
+    // face with its rejoin-hint tooltip on every tab
+    // (bug-away-card-initiative-input-resurrects-slot) — untouched here.
+    // Being a rendered (not defaultValue) value, the span also adopts GM
+    // initiative edits live via the combatSummary SSE echo.
+    if (!isLocalhost && !isAway) {
+        const initiative = creature.initiative ?? ''
+        return (
+            <div className='creature-initiative'>Initiative&nbsp;
+                <span data-testid="initiative-value">{initiative === '' ? '—' : initiative}</span>
+            </div>
+        )
+    }
     return (
         <div className='creature-initiative'>Initiative&nbsp;
             <input
