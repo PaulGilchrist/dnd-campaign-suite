@@ -631,7 +631,12 @@ export class Map3DScene {
             if (!isItemVisible(item, fog, isLocalhost)) continue;
             const isMonster = item.type === 'monster';
             // Monster tokens ride the same cylinder+ring machinery, purple
-            // (parity with the 2D .monster-circle ring) — 2D/3D read alike.
+            // (parity with the 2D .monster-circle ring). Art parity law with
+            // 2D PlacedItems.jsx — npcImages[item.name] (the name-keyed
+            // bestiary lane, which useNpcImageCache only prefetches for
+            // type:'npc') wins; an inline item.imageUrl (off-catalog art,
+            // e.g. AI-Dress monsters the npc-only filter never hydrates) is
+            // the fallback; neither → plain disc.
             const token = this._makeToken(item.name || 'NPC',
                 isMonster ? COLORS.monster : COLORS.npc,
                 isMonster ? COLORS.monsterStroke : COLORS.npcStroke);
@@ -639,7 +644,7 @@ export class Map3DScene {
             token.position.set(this.cellX(item.gridX), 0, this.cellZ(item.gridY));
             if (isLocalhost && item.visible === false) this._setDimmed(token);
             this.mapGroup.add(token);
-            const url = npcImages ? npcImages[item.name] : null;
+            const url = (npcImages && npcImages[item.name]) || item.imageUrl || null;
             if (url) {
                 this._loadTexture(url).then((tex) => {
                     if (!tex || gen !== this.buildGen || this.disposed) return;
