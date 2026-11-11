@@ -5,7 +5,9 @@
 // outside reach by the trigger's own precondition — so the reaction the
 // trigger charged was spent on a guaranteed auto-miss. These legs pin:
 //   • the Reactions-area affordance renders ONLY while the marker is live and
-//     names the mover;
+//     names the mover — and its raw textContent is byte-exact
+//     'Opportunity Attack on <mover>' (GC 2026-11-10: no leading space from
+//     the icon-adjacent JSX text node, both chip and advisory branches);
 //   • pressing it resolves vs the MARKED MOVER (explicit target regardless of
 //     armed target-select) with NO isAutoMiss/range denial even though
 //     computeRangeEffect says 'miss' for the click-time distance;
@@ -213,7 +215,14 @@ describe('Pending-OA affordance in the Reactions area (criterion: visible only w
     await flush(); // map load
     const chip = document.querySelector('[data-kind="oa"]');
     expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('Opportunity Attack on Player A');
+    // GC 2026-11-10 byte-shape pin: the label is ONE expression child, so the
+    // raw textContent carries NO leading space (a JSX text node after the icon
+    // reintroduced would fail this exact-match — §67 leading-space family).
+    expect(chip.textContent).toBe('Opportunity Attack on Player A');
+    // Icon still renders before the text (visual parity — the gap is CSS-owned).
+    const icon = chip.querySelector('i.fa-solid.fa-bolt');
+    expect(icon).toBeTruthy();
+    expect(chip.firstChild).toBe(icon);
     // The monster has reactions:[] — the section exists SOLELY because the
     // marker is live, i.e. this is the dedicated trigger affordance, not a
     // bestiary row.
@@ -260,7 +269,9 @@ describe('Pending-OA affordance in the Reactions area (criterion: visible only w
     await flush();
     const note = document.querySelector('[data-kind="oa"]');
     expect(note).toBeTruthy();
-    expect(note.textContent).toContain('Opportunity Attack on Player A');
+    // Advisory branch carries the same byte-exact law (no leading/trailing
+    // whitespace round the label).
+    expect(note.textContent).toBe('Opportunity Attack on Player A');
     expect(note.parentElement.textContent).toContain('no melee attack row');
     expect(note.className).not.toContain('mc-dice-link');
   });

@@ -72,7 +72,6 @@ GC session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-10 GC — OA chip label carries a leading space:** raw `textContent` of `.mc-overlay [data-kind="oa"]` renders `" Opportunity Attack on <mover>"` (leading space, same family as the spell-chip leading-space law in playbook §67) — exact-text locators must trim; normalize the label at source (`useMonsterPendingOa.js` chip builder) so strict-text harnesses stop tripping. Files: `src/components/encounter/useMonsterPendingOa.js` (or `MonsterCardModal.jsx` chip render).
 - **2026-11-10 GC — server-validator denials share the `enforcement_denied` log type with lane denials:** rejected writes log `{type:'enforcement_denied', origin:'server-validator', key, reason}` while gameplay denials log `{type:'enforcement_denied', creature, bucket, source, reason}` — a log-viewer filter on the type mixes rules-denials with API validation noise; consider a distinct `automationType`/subtype (e.g. `write_rejected`) or a visible-group split in the Log view. Not a correctness bug (test-pinned shape); purely audit legibility. Files: `server/routes/campaigns-changedata.js:319-330`, Log view renderer.
 
 ## Blocked / Not Verified (fold-gate ledger)

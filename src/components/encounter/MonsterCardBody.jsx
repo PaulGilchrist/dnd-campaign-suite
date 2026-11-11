@@ -296,7 +296,12 @@ function PendingOpportunityAttackRow({ mover, hasMelee, blocked, onResolve }) {
           onClick={clickable ? onResolve : undefined}
           title={`${mover} left your reach — resolve your melee attack against them now (the attack happens at the instant they provoke).`}
         >
-          <i className="fa-solid fa-bolt" /> Opportunity Attack on {mover}
+          {/* GC 2026-11-10: label is ONE expression child — a JSX text node
+              after the icon carried a leading space into textContent
+              (" Opportunity Attack on …"), tripping strict-text harnesses
+              (§67 leading-space family). Icon gap stays CSS-owned
+              (.mc-dice-link i margin-right), so the raw text is byte-exact. */}
+          <i className="fa-solid fa-bolt" />{`Opportunity Attack on ${mover}`}
         </span>
       ) : (
         <span data-kind="oa">Opportunity Attack on {mover}</span>
