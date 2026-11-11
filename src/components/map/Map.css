@@ -630,6 +630,20 @@
     fill: #3a3a42;
 }
 
+/* GM-only explicit-hidden tier (backlog 2026-11-11): a dashed amber ring marks
+   hidden (visible === false) markers so "the GM hid this" reads differently
+   from a fogged-but-visible item (full-opacity art under the translucent
+   .fog-cell veil). Static — unlike the pulsing blue .reposition-highlight —
+   and pointer-transparent so hit areas are unchanged. The hidden dim itself
+   stays the shared HIDDEN_MARKER_OPACITY (3D/hex lanes untouched). */
+.map .hidden-item-ring {
+    fill: none;
+    stroke: #f39c12;
+    stroke-width: 2;
+    stroke-dasharray: 6 3;
+    pointer-events: none;
+}
+
 /* Selection group overlay styles */
 .map .selection-preview {
     fill: rgba(74, 144, 217, 0.15);

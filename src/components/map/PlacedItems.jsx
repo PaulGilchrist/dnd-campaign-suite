@@ -53,6 +53,21 @@ function PlacedItems({
 
     const itemOpacity = (item) => (isLocalhost ? (item.visible ? 1 : HIDDEN_MARKER_OPACITY) : 1);
 
+    // GM-only explicit-hidden tier (backlog 2026-11-11): a visible:false item
+    // dimmed to HIDDEN_MARKER_OPACITY read the same as a fogged-but-visible
+    // item sitting under the translucent .fog-cell veil — the GM could not
+    // tell "I hid this" from "nobody has seen this". A dashed amber ring now
+    // marks the hidden tier on every lane (props, doors, creature tokens);
+    // fogged-visible items keep full opacity and never get the ring. The dim
+    // value stays the shared HIDDEN_MARKER_OPACITY (3D/hex/POI law intact).
+    // The ring is GM-only chrome — LAN clients never render hidden items at
+    // all (isVisible above), so nothing new leaks to visitors.
+    const isHidden = (item) => isLocalhost && !item.visible;
+
+    const hiddenRing = (cx, cy, w, h, circle) => (circle
+        ? <circle cx={cx} cy={cy} r={Math.max(w, h) / 2} className="hidden-item-ring" />
+        : <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} className="hidden-item-ring" />);
+
     const isDragging = (item) => itemDragging?.itemId === item.id;
 
     const onDown = (item) => (e) => handleItemPointerDown(e, item.id);
@@ -129,6 +144,7 @@ function PlacedItems({
         return (
             <g key={item.id} className="placed-item" title={placedItemLabel(item)}>
                 {visual}
+                {isHidden(item) && hiddenRing(g.cx, g.cy, g.boxW + 8, g.boxH + 8, opts.circle || opts.circleHl)}
                 {isLocalhost && dragChrome}
             </g>
         );
@@ -190,6 +206,7 @@ function PlacedItems({
                         )}
                     </>
                 )}
+                {isHidden(item) && hiddenRing(cx, cy, 44, 44)}
                 {isLocalhost && (
                     <>
                         {rectHitArea(item, cx - 18, cy - 18, 36, 36)}
@@ -268,6 +285,7 @@ function PlacedItems({
                 >
                     {item.name}
                 </text>
+                {isHidden(item) && hiddenRing(cx, cy, 48, 48, true)}
                 {isLocalhost && (
                     <>
                         {/* Stacked-cell tokens (top AND buried) swap the
