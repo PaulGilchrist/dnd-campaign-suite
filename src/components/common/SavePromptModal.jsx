@@ -863,7 +863,12 @@ function SavePromptDialog({
   const queueCount = prompts.length;
   return (
     <div className={`sp-overlay${dimmed ? ' sp-overlay--dimmed' : ''}`}>
-      <div className="sp-modal">
+      {/* Stable probe anchor (backlog 2026-11-11 IE): after an AoE picker confirm the
+          dispatched picker keeps its own `.sp-modal` mounted DISABLED ahead of this
+          prompt in DOM order, so a first-match `.sp-modal` probe reads dead buttons.
+          The testid lives on the ACTIVE prompt's modal only — both stages (Roll Save
+          → Done) render through this one element — and never on picker overlays. */}
+      <div className="sp-modal" data-testid="active-save-prompt">
         <div className="sp-header">
           <i className="fa-solid fa-shield-halved"></i> Saving Throw Required
           {queueCount > 1 && (
