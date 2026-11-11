@@ -103,4 +103,24 @@ describe('DeleteConfirmModal', () => {
         expect(confirmSpy).not.toHaveBeenCalled();
         confirmSpy.mockRestore();
     });
+
+    // Optional confirmDisabled (owner decision 2026-11-11, campaign-delete
+    // lane flip): hosts gate the destructive button themselves; the dialog
+    // renders it natively disabled and the focus trap routes around it.
+    // Consumers that omit the prop keep the enabled face pinned above.
+    it('renders the confirm disabled when confirmDisabled is set, and the Tab trap skips it', () => {
+        const onConfirm = vi.fn();
+        renderModal({ confirmDisabled: true, onConfirm });
+        const cancel = screen.getByRole('button', { name: 'Cancel' });
+        const confirm = screen.getByRole('button', { name: 'Yes, Delete' });
+
+        expect(confirm).toBeDisabled();
+        expect(cancel).toHaveFocus(); // initial focus skips the disabled button
+
+        fireEvent.keyDown(cancel, { key: 'Tab' });
+        expect(cancel).toHaveFocus(); // only one focusable element — trap wraps
+
+        fireEvent.click(confirm); // React suppresses onClick while disabled
+        expect(onConfirm).not.toHaveBeenCalled();
+    });
 });

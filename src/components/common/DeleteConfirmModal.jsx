@@ -30,7 +30,11 @@ function getModalFocusable(modalEl) {
 // WITHOUT closing the dialog — the destructive lanes that used to ride a raw
 // window.prompt for the typed gate. Consumers that omit both props render
 // byte-identical to the original tier (pinned by DeleteConfirmModal.test.jsx).
-function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm, children, typedConfirm, error }) {
+// Optional `confirmDisabled` (owner decision 2026-11-11): hosts whose typed-name
+// gate must live IN the button pass it true until the input matches — mirroring
+// the app's gated-button pattern (e.g. the rename modal's disabled Confirm).
+// Omitted (falsy) consumers keep the button always enabled as before.
+function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm, children, typedConfirm, error, confirmDisabled = false }) {
     const modalRef = useRef(null);
 
     // Move focus into the dialog when it opens so keyboard and screen-reader
@@ -95,7 +99,7 @@ function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm,
                 )}
                 <div className="modal-shell-actions">
                     <button onClick={onCancel}>Cancel</button>
-                    <button className="delete-confirm-btn" onClick={onConfirm}>
+                    <button className="delete-confirm-btn" onClick={onConfirm} disabled={confirmDisabled}>
                         {confirmLabel}
                     </button>
                 </div>

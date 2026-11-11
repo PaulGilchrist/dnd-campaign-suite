@@ -67,7 +67,7 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-11 KW: **typed-name delete affordance inconsistent with the app's own gated-button pattern** — `CampaignAdmin.jsx:219` disables destructive confirms until inputs are ready, but the delete-campaign confirm stays ENABLED on a mismatched typed name and only surfaces inline copy after the click (by design per the CO-era comment, but a click-then-scold on the most destructive button in the app reads as friction; a `disabled={typed !== name}` would match the sibling lane).
+
 
 ## Blocked / Not Verified (fold-gate ledger)
 

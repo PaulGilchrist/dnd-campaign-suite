@@ -4,9 +4,11 @@
  *
  * Lane migrated off the native prompt→confirm→confirm→alert chain to the
  * shared DeleteConfirmModal role="dialog" tier (backlog 2026-11-04 CO):
- * the typed-name gate lives INSIDE the dialog, there is ONE confirm button,
- * and mismatch/failure copy is inline (role="alert") — never a native
- * prompt/confirm/alert. OWNED here: arm → type → gate → DELETE semantics;
+ * the typed-name gate lives INSIDE the dialog, there is ONE confirm button
+ * that renders DISABLED until the exact name is typed (owner decision
+ * 2026-11-11 — flipped from the old enabled-until-click gate), and failure
+ * copy is inline (role="alert") — never a native prompt/confirm/alert.
+ * OWNED here: arm → type → disabled-gate → DELETE semantics;
  * the dialog chrome/focus trap itself stays pinned by
  * common/DeleteConfirmModal.test.jsx.
  *
@@ -20,7 +22,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
 const CAMPAIGN = 'test-campaign';
-const MISMATCH_COPY = 'Campaign name did not match. Deletion cancelled.';
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
@@ -158,15 +159,55 @@ describe('CampaignAdmin - Delete Campaign', () => {
     });
 
     describe('exact-name gate', () => {
+        // Owner decision 2026-11-11: the gate lives IN the button — the
+        // confirm renders disabled until the typed name EXACTLY matches
+        // (raw ===, no trim, case-sensitive; the sibling rename gate only
+        // trims for its empty check, while delete demands an exact match).
+        // The old click-then-scold inline mismatch copy is retired as the
+        // primary gate; the handler guard stays as a fallback that a real
+        // click can no longer reach.
+        const confirmButton = (name = CAMPAIGN) =>
+            screen.getByRole('button', { name: `Delete "${name}"` });
+
+        const type = (typed) =>
+            fireEvent.change(typedInput(), { target: { value: typed } });
+
+        it('renders the confirm disabled on open (empty input)', () => {
+            openDeleteModal();
+            expect(confirmButton()).toBeDisabled();
+        });
+
         it.each([
             { typed: '', label: 'left empty' },
             { typed: 'Test-Campaign', label: 'typed with different casing' },
             { typed: ` ${CAMPAIGN} `, label: 'padded with spaces' },
-        ])('shows inline copy and keeps the dialog open when the name is $label', ({ typed }) => {
+            { typed: CAMPAIGN.slice(0, -1), label: 'missing the final character' },
+        ])('keeps the confirm disabled while the name is $label', ({ typed }) => {
             openDeleteModal();
-            typeAndConfirm(typed);
+            type(typed);
+            expect(confirmButton()).toBeDisabled();
+            expect(deleteRequests()).toHaveLength(0);
+            expect(window.location.reload).not.toHaveBeenCalled();
+            expectNoNativeDialogs();
+        });
 
-            expect(screen.getByRole('alert')).toHaveTextContent(MISMATCH_COPY);
+        it('enables the confirm only on an exact match and re-disables on an edit back to a mismatch', () => {
+            openDeleteModal();
+            type(CAMPAIGN.toUpperCase());
+            expect(confirmButton()).toBeDisabled();
+            type(CAMPAIGN);
+            expect(confirmButton()).toBeEnabled();
+            type(`${CAMPAIGN} `);
+            expect(confirmButton()).toBeDisabled();
+            type('');
+            expect(confirmButton()).toBeDisabled();
+        });
+
+        it('ignores confirm clicks attempted while disabled: no DELETE, no reload, no notice', () => {
+            openDeleteModal();
+            type('wrong-name');
+            clickConfirm(); // React suppresses onClick on a disabled button
+            expect(confirmButton()).toBeDisabled();
             expect(screen.getByRole('dialog', { name: 'Delete Campaign' })).toBeInTheDocument();
             expect(deleteRequests()).toHaveLength(0);
             expect(window.location.reload).not.toHaveBeenCalled();
@@ -174,12 +215,14 @@ describe('CampaignAdmin - Delete Campaign', () => {
             expectNoNativeDialogs();
         });
 
-        it('recovers: a mismatch followed by the exact name deletes', async () => {
+        it('recovers: an enabled confirm fires after a mismatch is corrected to the exact name', async () => {
             openDeleteModal();
-            typeAndConfirm('wrong-name');
-            expect(screen.getByRole('alert')).toHaveTextContent(MISMATCH_COPY);
+            type('wrong-name');
+            expect(confirmButton()).toBeDisabled();
 
-            typeAndConfirm(CAMPAIGN);
+            type(CAMPAIGN);
+            expect(confirmButton()).toBeEnabled();
+            clickConfirm();
             await waitForDeletion();
         });
     });
