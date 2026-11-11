@@ -280,6 +280,33 @@ describe('campaignLock - allowlist set (qa throwaways)', () => {
         }
     });
 
+    // Backlog 2026-11-11 LZ: the create denial must be plain English NAMING
+    // the refused campaign — the quick-create modal renders this body inline
+    // (typed name preserved) instead of a full-page dead end.
+    it('refuses a non-member create with a plain-English body naming the attempted name', async () => {
+        const res = await request(createTestApp(LIST))
+            .post('/api/campaigns')
+            .set('Content-Type', 'application/json')
+            .send({ campaignName: 'Starter-20261111' });
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain('Campaign locked to "test-campaign,qa-arena,qa-starter"');
+        expect(res.body.error).toContain('named "Starter-20261111" cannot be created while locked');
+        expect(res.body.error).toContain('Only these campaign names are allowed: test-campaign, qa-arena, qa-starter');
+        expect(errorSpy).toHaveBeenCalledWith(
+            '[campaign-lock] BLOCKED POST /api/campaigns (locked to "test-campaign,qa-arena,qa-starter")'
+        );
+    });
+
+    it('names nothing but the refusal when the create body carries no usable name', async () => {
+        const res = await request(createTestApp(LOCK))
+            .post('/api/campaigns')
+            .set('Content-Type', 'application/json')
+            .send({});
+        expect(res.status).toBe(403);
+        expect(res.body.error).toContain('a new campaign cannot be created while locked');
+        expect(res.body.error).not.toContain('named ""');
+    });
+
     it('a single-name lock cannot create anything (its only member already exists)', async () => {
         const res = await request(createTestApp(LOCK))
             .post('/api/campaigns')

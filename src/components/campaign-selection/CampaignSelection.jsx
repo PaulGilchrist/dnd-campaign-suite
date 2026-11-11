@@ -4,7 +4,7 @@ import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/
 import { createSeededCampaign, localDateStamp } from '../../services/campaign/seededCampaign.js';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import useEphemeralToast from '../map/hooks/useEphemeralToast.js';
-import SeededCampaignModal from './SeededCampaignModal.jsx';
+import SeededCampaignModal, { ModalError } from './SeededCampaignModal.jsx';
 import './CampaignSelection.css';
 
 // Quick-create presets (arena-starter plan §2.3/§3.4): localhost-only buttons
@@ -108,6 +108,12 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   // buttons and SSE live-refresh stay mounted while the user recovers the
   // list in place with Retry (MapUnavailable "Check Again" pattern).
   const [foldersError, setFoldersError] = useState(null);
+  // Quick-create denial lane (backlog 2026-11-11 LZ): a refused CREATE (e.g.
+  // the CAMPAIGN_LOCK 403 for an off-allowlist name) is the form's own error
+  // — it renders INLINE in the open modal with the typed name preserved. It
+  // never routes through `error`, whose full-page screen stays reserved for
+  // genuine load/select failures (campaign data that cannot be read at all).
+  const [createError, setCreateError] = useState(null);
 
   // Post-delete carry-over (backlog CP 2026-11-04): CampaignAdmin's typed-name
   // delete stores a one-shot sessionStorage notice before its full page
@@ -225,7 +231,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
 
   const handleCreateCampaign = async () => {
     if (!newCampaignName.trim()) {
-      setError('Please enter a campaign name');
+      setCreateError('Please enter a campaign name');
       return;
     }
 
@@ -250,14 +256,17 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
       // Close modal and clear input
       setShowNewCampaignModal(false);
       setNewCampaignName('');
-      setError(null);
+      setCreateError(null);
       
       // Reload the page to show the new campaign
       setTimeout(() => {
         window.location.reload();
        }, 2000);
       } catch (err) {
-      setError(err.message);
+      // Denial stays IN the modal (typed name preserved) — the full-page
+      // `error` screen is for load/select failures, never for a refused
+      // create (lock 403 etc., backlog 2026-11-11 LZ).
+      setCreateError(err.message);
     } finally {
       setLoading(false);
       }
@@ -269,12 +278,12 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
       // (a stacked .modal-overlay silently intercepts every click).
       if (modalOpen) return;
       setShowNewCampaignModal(true);
-      setError(null);
+      setCreateError(null);
   };
 
   const closeModal = () => {
     setShowNewCampaignModal(false);
-    setError(null);
+    setCreateError(null);
     setNewCampaignName('');
   };
 
@@ -282,13 +291,13 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
     if (modalOpen) return; // see openNewCampaignModal — no stacked overlays
     setSeedPreset(presetKey);
     setNewCampaignName(seededDefaultName(SEEDED_PRESETS[presetKey].prefix));
-    setError(null);
+    setCreateError(null);
   };
 
   const closeSeedModal = () => {
     setSeedPreset(null);
     setNewCampaignName('');
-    setError(null);
+    setCreateError(null);
   };
 
   // Seeded quick-create (arena/starter): create folder + run the preset's
@@ -297,7 +306,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
   const handleCreateSeededCampaign = async () => {
     const name = newCampaignName.trim();
     if (!name) {
-      setError('Please enter a campaign name');
+      setCreateError('Please enter a campaign name');
       return;
     }
     setSeeding(true);
@@ -305,11 +314,15 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
       const result = await createSeededCampaign(seedPreset, { name });
       setSeedPreset(null);
       setNewCampaignName('');
+      setCreateError(null);
       await handleCampaignSelect(result.name);
       // If the parent kept us mounted, surface the fresh row (and its badge).
       await refreshCampaigns();
     } catch (err) {
-      setError(err.message);
+      // Same inline-denial lane as the standard modal: the seed modal stays
+      // open with the typed name preserved (createSeededCampaign surfaces the
+      // server's lock refusal verbatim).
+      setCreateError(err.message);
     } finally {
       setSeeding(false);
     }
@@ -331,6 +344,10 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
        );
      }
 
+  // Hard-fail screen: only load/select failures route here (never a refused
+  // create — quick-create denials render inline in the open modal via
+  // `createError`, backlog 2026-11-11 LZ). An off-target campaign load under
+  // CAMPAIGN_LOCK still lands here with the server's lock message.
   if (error) {
     return (
         <div className="campaign-selection error">
@@ -384,6 +401,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
                className="modal-input"
                autoFocus
                />
+               <ModalError message={createError} />
                <div className="modal-buttons">
                  <button className="modal-btn-primary" onClick={handleCreateCampaign} disabled={loading}>
                 Create
@@ -404,6 +422,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
              seeding={seeding}
              onCreate={handleCreateSeededCampaign}
              onCancel={closeSeedModal}
+             error={createError}
            />
          )}
        </div>

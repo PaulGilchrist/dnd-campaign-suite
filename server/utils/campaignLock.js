@@ -79,9 +79,13 @@ export function activeCampaignLockAllows(campaign) {
 
 // Canonical refusal shared by every lock enforcement point: one stderr
 // audit line + the 403 JSON shape clients already see from /api/campaigns.
-export function blockRequest(req, res, campaignLock) {
+// `errorMessage` optionally replaces the generic body with a lane-specific
+// plain-English message (the create guard names the refused campaign so the
+// quick-create modal can explain the denial inline); the audit line is
+// identical either way.
+export function blockRequest(req, res, campaignLock, errorMessage) {
     console.error(`[campaign-lock] BLOCKED ${req.method} ${req.path} (locked to "${campaignLock}")`);
-    return res.status(403).json({ error: `Campaign locked to "${campaignLock}" — ${req.method} ${req.path} denied` });
+    return res.status(403).json({ error: errorMessage || `Campaign locked to "${campaignLock}" — ${req.method} ${req.path} denied` });
 }
 
 // Describe a campaign-scoped request path the same way for both phases:
@@ -136,7 +140,19 @@ export function createCampaignCreateGuard(campaignLock) {
             ? req.body.campaignName.trim()
             : null;
         if (campaignName && names.includes(campaignName)) return next();
-        return blockRequest(req, res, campaignLock);
+        // Plain-English body naming the refused campaign: the quick-create
+        // modal renders this inline (message + preserved input) instead of
+        // the client replacing the app with a full-page error (backlog
+        // 2026-11-11 LZ). Same 403 + [campaign-lock] audit line as every
+        // other enforcement point.
+        const attempted = campaignName ? ` named "${campaignName}"` : '';
+        return blockRequest(
+            req,
+            res,
+            campaignLock,
+            `Campaign locked to "${campaignLock}" — a new campaign${attempted} cannot be created `
+            + `while locked. Only these campaign names are allowed: ${names.join(', ')}.`
+        );
     };
 }
 

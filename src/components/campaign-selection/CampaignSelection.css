@@ -156,6 +156,21 @@
   border-color: #4a90d9;
 }
 
+/* Inline quick-create denial (backlog 2026-11-11 LZ): a refused create (e.g.
+   the CAMPAIGN_LOCK 403) renders inside the open modal instead of replacing
+   the app with the full-page error screen. Strip styling mirrors the
+   MapsManager .maps-manager-error reference (same error tokens). */
+.campaign-selection .modal-error {
+  padding: 8px 12px;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--color-error-border);
+  border-radius: 4px;
+  background-color: var(--background-color-error);
+  color: var(--color-error-light);
+  font-size: 13px;
+  text-align: left;
+}
+
 .campaign-selection .modal-buttons {
   display: flex;
   gap: 1rem;

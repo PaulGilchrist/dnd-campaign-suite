@@ -7,8 +7,24 @@
  * and screen readers reach the seed modal like every other dialog in the app.
  * Only one seed modal is ever mounted (parent singleton guard), so deriving a
  * per-preset heading id here can never collide.
+ * `error` is the inline denial lane (backlog 2026-11-11 LZ): a refused create
+ * (e.g. the CAMPAIGN_LOCK 403) renders here with the typed name preserved —
+ * the app never drops to the full-page error screen for it.
  */
-function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, onCancel }) {
+/**
+ * Inline denial strip shared by both quick-create modals (backlog 2026-11-11
+ * LZ): a refused create (e.g. the CAMPAIGN_LOCK 403) renders inside the open
+ * modal with the typed name preserved — the app never drops to the full-page
+ * error screen for it. Hoisted (complexity ceiling, mirroring the DeleteNotice
+ * sink in CampaignSelection.jsx); styling is .modal-error in
+ * CampaignSelection.css.
+ */
+export function ModalError({ message }) {
+  if (!message) return null;
+  return <div className="modal-error" role="alert">{message}</div>;
+}
+
+function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, onCancel, error }) {
   const titleId = `seeded-campaign-title-${preset.prefix.toLowerCase()}`;
   return (
     <div className="modal-overlay">
@@ -23,6 +39,7 @@ function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, on
           className="modal-input"
           autoFocus
         />
+        <ModalError message={error} />
         <div className="modal-buttons">
           <button className="modal-btn-primary" onClick={onCreate} disabled={seeding}>
             {seeding ? 'Creating…' : 'Create'}
