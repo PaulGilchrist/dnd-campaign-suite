@@ -37,3 +37,23 @@ Find the mount path that POSTs the character's FULL-STORE bucket (grep `seedCamp
 ## Severity
 
 Data-integrity risk — routine user flow (reload, open your sheet) can silently destroy persisted adjudicated state (conditions, buffs) for the reopened character; flaky but 2/2 on the prior-session-grant face, and a 2024 Lamia curse is explicitly indefinite. Not "broken feature" because the lane mostly works — it works until the race lands.
+
+## Resolution
+
+**FIXED 2026-11-10 (fix run).**
+
+### What was actually wrong
+
+The "Likely location" guesses (`seedCampaignRuntimeData` / `CharSummary` mount seed) were both wrong. Stack-trace instrumentation of a fresh-load ride named the producer exactly: the persistence effect in **`CharConditions.jsx`** (the SP-109-era effect that saves `activeConditions` on mount/dep-change). `CharSheet` survives a sidebar character switch, so when the user switched INTO the victim character the effect re-ran with the PREVIOUS character's stale component state (typically `[]`) while the store mirror was ALREADY hydrated with the victim's server-granted `['cursed','poisoned']` (SSE connect replay adopted ~70 ms after campaign select — long before the write). The old SP-109 guard only skipped the UN-hydrated face (`!Array.isArray(raw) && empty state`), so the hydrated-but-stale face fell straight through to `setRuntimeValue(name, 'activeConditions', <stale>)`, and every `setRuntimeValue` POSTs the FULL store bucket as a server-side REPLACE — evicting the curse in total silence. The follow-on full-store POSTs (CharSheet `fanaticalFocusUsed`/`hitPoints` mount writes) then merely carried the already-emptied store. Live rides showed the eviction landing 31–9532 ms after the sheet click depending on component warmth — the "2–8 s after mount" figure was this same write, not a slower producer. Both suspect lanes from the bug file (App `seedCampaignRuntimeData`, CharSheet mount `hitPoints` re-bake) are local-only-seeded or superset-carrying and were exonerated by the trace: with the mirror hydrated, their snapshots keep `activeConditions` intact.
+
+### Fix (minimal)
+
+`src/components/char-sheet/char-summary/CharConditions.jsx`: the persist effect now echoes **the store's own content** instead of component state — `raw = getRuntimeValue(name,'activeConditions'); if (!Array.isArray(raw)) return; saveConditions(name, campaign, raw)`. Every genuine user edit already persists at its own handler (`handleConditionSave` calls `saveConditions` directly), so this lane is adoption-only: in production the echo is a `valuesEqual` no-op (same array reference → `setRuntimeValue` skips the POST entirely) and a foreign/stale list can no longer leave this lane. The SP-109 un-hydrated guard semantics are preserved (un-hydrated store ⇒ zero writes) and the hydrated-empty benign write-through is unchanged. No 2024 twin needed — CharConditions is ruleset-agnostic.
+
+### Verification
+
+- **Repro before fix (live, isolated Playwright contexts):** prior-session-grant face reproduced — real Lamia Corrupting Touch lane granted `['cursed','poisoned']` (GET + `condition applied` row), then fresh load → select → open WSD sheet → server `activeConditions: []` + `hitPoints` re-baked to 143, zero log rows, and the STORE-MUTATION TRAPPER caught the exact producer stack (`setRuntimeValue ← saveConditions ← CharConditions mount effect`, 31 ms post-click, 2/2 rides incl. a third via the poisoned-instrumentation first ride).
+- **Re-verify after fix:** 3 fresh load→select→open rides (one preceded by a full real-grant session, one including a WSD→ElderPaladin→WSD switch re-ride of the exact producer lane): `activeConditions` stayed `['cursed','poisoned']` at 5 s and 9 s post-mount, badges rendered "Cursed, Poisoned", and the instrumented POST log shows **zero** `activeConditions:[]` bucket replaces against the victim. Same-session control stays green (re-grant through the lane: conds dedup-stable, PFEG `automation blocked` + `condition applied` rows intact); zero console errors.
+- **Regression test:** `src/components/char-sheet/char-summary/CharConditions.staleSwitch.test.jsx` (4 tests) pins switch-with-hydrated-bucket, switch-from-empty-state, un-hydrated-switch-writes-nothing + post-switch hydration echo, and the handler-persistence lane. `npx vitest run src/components/char-sheet` → 569 files / 5452 tests passed (incl. all CharConditions sibling suites). `npm run lint` → clean (zero warnings). `node .opencode/plans/no-timers-guard.mjs` → OK.
+- **Exit hygiene:** all Playwright rig tabs closed/blanked; admin API two-pass clears GET-verified `change-data {}` + `log []`; overlays `[]`; combat board swept with change-data; zero character-file writes.
+

@@ -91,9 +91,22 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     // SP-109: never POST a stale empty list while the runtime store is still
     // un-hydrated (reports no activeConditions key) — a fresh sheet mount must
     // not wipe server-side conditions.
+    // bug-sheet-open-rebake-evicts-prior-session-conditions: the same family
+    // also fired with the store ALREADY hydrated — CharSheet survives a
+    // character switch, so this effect re-ran on the name flip with the
+    // PREVIOUS character's stale component state, and setRuntimeValue POSTs
+    // the FULL store bucket as a REPLACE — silently evicting the newly
+    // selected character's server-granted conditions (GET-proved curse
+    // erased by simply opening the sheet). This channel must therefore never
+    // persist component state: every user edit already persists at its own
+    // handler (handleConditionSave's saveConditions above), so this effect
+    // only ever runs on mount/adoption — echo exactly what the store holds.
+    // In production the echo is a valuesEqual no-op (same array reference →
+    // setRuntimeValue skips the POST entirely); a genuine server bucket can
+    // no longer leave this lane.
     const raw = getRuntimeValue(playerStats.name, STORAGE_KEY)
-    if (!Array.isArray(raw) && activeConditions.length === 0) return
-    saveConditions(playerStats.name, campaignName, activeConditions)
+    if (!Array.isArray(raw)) return
+    saveConditions(playerStats.name, campaignName, raw)
   }, [activeConditions, playerStats.name, campaignName])
 
   React.useEffect(() => {
