@@ -454,7 +454,23 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     // pays (unregistered keys keep today's passive property scan).
     const validation = validateRuntimeWrite(key, merged, { req, campaign, current: data });
     if (!validation.ok) {
+        // Mirror the POST wildcard refusal branch above (cf8c33d7c): every
+        // validator refusal on EVERY write lane leaves a named server-log line
+        // beside its denied-* SSE moment and persistent write_rejected audit
+        // row — denials are PERSISTENT audit, not console-only. 400 body and
+        // log payload stay byte-identical to the POST lane.
         console.log(`[${key}] BLOCKED PATCH ${campaign} — ${validation.reason}`);
+        // Broadcast the rejection so every client can surface the denied write.
+        publish(`denied-${campaign}-${key}`, { key, reason: validation.reason }, campaign);
+        // §10.4: denials are PERSISTENT audit — the audit ledger must show
+        // what the server refused even after the SSE moment has passed.
+        addLogEntry(campaign, {
+            type: 'write_rejected',
+            origin: 'server-validator',
+            key,
+            reason: validation.reason,
+            description: `Server rejected write to ${key}: ${validation.reason}`,
+        });
         return res.status(400).json({ error: validation.reason });
     }
     const storedValue = 'value' in validation ? validation.value : merged;

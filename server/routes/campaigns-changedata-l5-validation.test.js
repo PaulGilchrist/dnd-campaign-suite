@@ -541,6 +541,85 @@ describe('P4-d denial persistence (§10.4)', () => {
     });
 });
 
+// bug-write-rejected-audit-missing-on-patch-lane: the scoped PATCH lane pays
+// the SAME validateRuntimeWrite chokepoint (on merged truth) as the wildcard
+// POST, so its refusal branch must leave the identical audit trail — denied-*
+// SSE moment + persistent write_rejected ledger row — never console-only.
+describe('P4-d denial persistence — scoped PATCH lane (§10.4)', () => {
+    // Same logCache evict ritual as the POST suite above: the debounced
+    // server flush must never touch the real campaign log from a test.
+    let realLog;
+    beforeEach(async () => {
+        const { logCache } = await import('./log.js');
+        realLog = logCache.get('test-campaign');
+    });
+    afterEach(async () => {
+        const { logCache } = await import('./log.js');
+        if (realLog) logCache.set('test-campaign', realLog); else logCache.delete('test-campaign');
+    });
+
+    it('a refused PATCH (live repro payload) broadcasts denied-* SSE AND logs a write_rejected row, merged truth never stored', async () => {
+        const { logCache } = await import('./log.js');
+        logCache.set('test-campaign', []);
+        const app = createTestApp();
+        characterChangeData.get('test-campaign').FeyRanger = { hitPoints: 20 };
+        const res = await request(app)
+            .patch('/api/campaigns/test-campaign/FeyRanger')
+            .send({ value: { activeConditions: [{ key: 'poisoned', name: 'Poisoned' }] } });
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ error: expect.stringContaining('must contain only condition-key strings') });
+        // The refused merge never reaches the store — prior truth stands.
+        expect(characterChangeData.get('test-campaign').FeyRanger).toEqual({ hitPoints: 20 });
+        expect(publish).toHaveBeenCalledWith(
+            'denied-test-campaign-FeyRanger',
+            expect.objectContaining({ key: 'FeyRanger', reason: expect.stringContaining('condition-key strings') }),
+            'test-campaign',
+        );
+        const entry = (logCache.get('test-campaign') || []).find(e => e.origin === 'server-validator');
+        expect(entry).toBeTruthy();
+        expect(entry).toMatchObject({ type: 'write_rejected', key: 'FeyRanger' });
+        expect(entry.description).toContain('Server rejected write to FeyRanger');
+        // Split law preserved: never the gameplay type, and no change-* echo.
+        expect(entry.type).not.toBe('enforcement_denied');
+        expect(publish).not.toHaveBeenCalledWith(
+            'change-test-campaign-FeyRanger', expect.anything(), 'test-campaign',
+        );
+    });
+
+    it('PATCH denial audit payload is byte-identical to the POST lane (400 body + row fields)', async () => {
+        const { logCache } = await import('./log.js');
+        logCache.set('test-campaign', []);
+        const app = createTestApp();
+        characterChangeData.get('test-campaign').sessionState = { phase: 'exploration' };
+        const res = await request(app)
+            .patch('/api/campaigns/test-campaign/sessionState')
+            .send({ value: { phase: 'chaos-mode' } });
+        expect(res.status).toBe(400);
+        const entry = (logCache.get('test-campaign') || []).find(e => e.origin === 'server-validator');
+        expect(entry).toMatchObject({
+            type: 'write_rejected',
+            origin: 'server-validator',
+            key: 'sessionState',
+            reason: res.body.error,
+        });
+        expect(entry.description).toBe(`Server rejected write to sessionState: ${res.body.error}`);
+        expect(characterChangeData.get('test-campaign').sessionState.phase).toBe('exploration');
+    });
+
+    it('an accepted PATCH does NOT log a denial (happy lane stays silent)', async () => {
+        const { logCache } = await import('./log.js');
+        logCache.set('test-campaign', []);
+        const app = createTestApp();
+        characterChangeData.get('test-campaign').sessionState = { phase: 'exploration' };
+        const res = await request(app)
+            .patch('/api/campaigns/test-campaign/sessionState')
+            .send({ value: { phase: 'encounter' } });
+        expect(res.status).toBe(200);
+        expect((logCache.get('test-campaign') || []).some(e => e.origin === 'server-validator')).toBe(false);
+        expect(characterChangeData.get('test-campaign').sessionState.phase).toBe('encounter');
+    });
+});
+
 // §18 D1/D2: reaction caps and companion links at the chokepoint.
 describe('D1/D2 turnState extensions (§18)', () => {
     const post = (entry) => request(createTestApp())
