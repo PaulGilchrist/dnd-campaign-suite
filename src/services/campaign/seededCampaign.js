@@ -19,7 +19,9 @@
  * `regenerateAdventure(campaignName)` (starter only) re-rolls the dungeon /
  * monsters / treasure layer: a brand-new dungeon map file, re-pointed hex
  * portal POI + main-quest link, and rewritten Wave 1-3 monster rows — while
- * settlement, party, and log stay untouched (§3.2).
+ * settlement and party stay untouched (§3.2). One `adventure_regenerated`
+ * audit row names old → new titles in the campaign log (backlog 2026-11-11:
+ * the destructive op used to log nothing).
  */
 
 import { mulberry32 } from '../maps/rng.js';
@@ -33,6 +35,7 @@ import { saveQuests, loadQuests } from './questsService.js';
 import { loadStarterSeed, saveStarterSeed } from './starterSeedService.js';
 import { saveCampaignType } from './campaignMetaService.js';
 import { loadMonsters } from '../ui/dataLoader.js';
+import { addEntry as addLogEntry } from '../ui/logService.js';
 
 // ---------------------------------------------------------------------------
 // Low-CR classics (arena-starter §1) — exact bestiary names so the Encounter
@@ -579,6 +582,23 @@ export async function regenerateAdventure(campaignName) {
     },
   };
   await saveStarterSeed(campaignName, nextDoc);
+
+  // 6. Audit the destructive op in the shared campaign log (backlog 2026-11-11:
+  //    the replace/re-point used to land with zero rows). One row naming the
+  //    retired title(s) → the new one, riding the same POST /log lane the
+  //    server's addEntry backs. First-generation seeds carry no previous
+  //    title — say so honestly instead of logging an empty old-title.
+  const oldTitlesDisplay = [...new Set(
+    [oldTitle, ...(seedDoc.entities.pastTitles || [])].filter(t => typeof t === 'string' && t)
+  )];
+  const description = oldTitlesDisplay.length
+    ? `Adventure regenerated: ${oldTitlesDisplay.join(', ')} → ${dungeon.name} (adventure layer ${nextDoc.layer})`
+    : `Adventure regenerated: initial generation — ${dungeon.name} (adventure layer ${nextDoc.layer})`;
+  try {
+    await addLogEntry(campaignName, { type: 'adventure_regenerated', description });
+  } catch (err) {
+    console.error('[regenerateAdventure] adventure_regenerated audit row failed:', err);
+  }
 
   return {
     seed: newSeed,

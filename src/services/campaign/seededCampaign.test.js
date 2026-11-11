@@ -382,7 +382,7 @@ describe('regenerateAdventure', () => {
     expect(side.description).toContain(result.dungeonTitle);
     expect(side.description).not.toContain('Elder Tomb');
 
-    // Seed rewritten: new roll + title, settlement preserved, log lane never touched.
+    // Seed rewritten: new roll + title, settlement preserved.
     const doc = saveStarterSeed.mock.calls[0][1];
     expect(doc.seed).not.toBe(99);
     expect(doc.layer).toBe(3); // 2 → 3 (§4.1 layer bump)
@@ -397,5 +397,37 @@ describe('regenerateAdventure', () => {
     expect(savedSettlement.rumors[0]).toContain(result.dungeonTitle);
     expect(savedSettlement.rumors[0]).not.toContain('Old Keep');
     expect(savedSettlement.rumors[1]).toBe('Good ale at the inn.');
+  });
+
+  // Backlog 2026-11-11: the destructive regenerate used to leave the campaign
+  // log silent — exactly ONE adventure_regenerated row must name the retired
+  // title(s) → the new one via the shared POST /log lane (server addEntry).
+  it('writes exactly one adventure_regenerated audit row naming old → new titles', async () => {
+    const result = await regenerateAdventure('qa-starter');
+    const logPosts = fetchMock.mock.calls.filter(([url]) => url === '/api/campaigns/qa-starter/log');
+    expect(logPosts).toHaveLength(1);
+    const entry = JSON.parse(logPosts[0][1].body);
+    expect(entry.type).toBe('adventure_regenerated');
+    // Current title first, then the layer-1 history, then the fresh roll.
+    expect(entry.description).toContain('Old Keep, Elder Tomb');
+    expect(entry.description).toContain(`→ ${result.dungeonTitle}`);
+    expect(entry.description).toContain('layer 3');
+  });
+
+  it('logs an honest initial-generation row when the seed doc has no previous title', async () => {
+    loadStarterSeed.mockResolvedValueOnce({
+      ...seedDoc,
+      entities: { ...seedDoc.entities, dungeonTitle: null, pastTitles: undefined },
+    });
+    const result = await regenerateAdventure('qa-starter');
+    const logPosts = fetchMock.mock.calls.filter(([url]) => url === '/api/campaigns/qa-starter/log');
+    expect(logPosts).toHaveLength(1);
+    const entry = JSON.parse(logPosts[0][1].body);
+    expect(entry.type).toBe('adventure_regenerated');
+    expect(entry.description).toContain('initial generation');
+    expect(entry.description).toContain(result.dungeonTitle);
+    // Never a misleading empty old-title ("… → New" with nothing before the arrow).
+    expect(entry.description).not.toMatch(/^Adventure regenerated: ,/);
+    expect(entry.description).not.toContain('Old Keep');
   });
 });

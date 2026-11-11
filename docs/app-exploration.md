@@ -67,7 +67,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-11 KW: **Admin → Regenerate adventure leaves the campaign log silent** — the destructive op replaces a dungeon, re-points quests/rumours and bumps the layer with ZERO audit row (log verified empty after the ride). Every other admin-adjacent lane logs honestly; an `adventure_regenerated` row naming old→new titles (pastTitles is already in `starter-seed.json`) would make the story log self-explanatory. Cheap: one `addEntry` in the regenerate route.
 - 2026-11-11 KW: **starter checklist "Join Dungeon Wave 1" deep-links the Encounter Builder, not the wave** — the seeded waves are reachable only via the extra `Load` click (builder body shows nothing wave-related). The step could open the Load modal directly (or deep-select the wave) so first-session guidance lands where the promise reads.
 - 2026-11-11 KW: **typed-name delete affordance inconsistent with the app's own gated-button pattern** — `CampaignAdmin.jsx:219` disables destructive confirms until inputs are ready, but the delete-campaign confirm stays ENABLED on a mismatched typed name and only surfaces inline copy after the click (by design per the CO-era comment, but a click-then-scold on the most destructive button in the app reads as friction; a `disabled={typed !== name}` would match the sibling lane).
 

@@ -475,8 +475,10 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     // window.confirm gate now opens the shared RegenerateAdventureModal
     // (role=dialog tier, backlog 2026-11-04 CS); the mutation runs
     // UNCHANGED from the modal's Confirm — Re-rolls dungeon/monsters/
-    // treasure through the shared orchestrator; settlement, party, and log
-    // untouched. Cancel is fully inert: no status, no request.
+    // treasure through the shared orchestrator; settlement and party stay
+    // untouched, and the orchestrator appends one adventure_regenerated
+    // audit row to the campaign log. Cancel is fully inert: no status, no
+    // request.
     const confirmRegenerateAdventure = async () => {
         setRegenModalOpen(false);
         setStatus('regenerating-adventure');
