@@ -225,6 +225,8 @@ function TravelPanel({
   terrain,
   eventFrequency,
   showOwnHexHint,
+  awaitingDestination = false,
+  onNoDestinationClick,
   onChangePace,
   onAdvance,
   onCancel,
@@ -242,11 +244,32 @@ function TravelPanel({
   const panelRef = useRef(null);
   // eslint-disable-next-line server-first/no-local-game-state
   const dragState = useRef(null);
+  // True between a real header DRAG (panel move) and the pointerup that ends
+  // it — the panel follows the cursor under it, so a moved pointer must not
+  // read as a dead destination click (see handlePanelPointerUp).
+  const draggedRef = useRef(false);
   const carriedCost = useCarriedTripCost(path, pathIndex, accruedCost);
+
+  // Planning-mode chrome-click feedback (backlog 2026-11-11 JU): the panel's
+  // lower-left slot overlaps the grid and absorbs destination clicks — a dead
+  // click on non-control chrome while awaiting a destination routes to the
+  // HexMap .travel-toast lane instead of no-op'ing silently. Interactive
+  // controls (every <button>: close/pace/camp/march/horseback/frequency/
+  // advance/reroll) keep their own action and stay silent; a header drag is a
+  // panel move, not a click; traveling/paused (awaitingDestination false)
+  // stays silent. pointerup (not click) because the header's pointerdown
+  // preventDefault governs the drag gesture. Pure display — no game state.
+  const handlePanelPointerUp = (e) => {
+    if (draggedRef.current) return;
+    if (e.button !== 0) return;
+    if (!awaitingDestination || e.target.closest('button')) return;
+    if (onNoDestinationClick) onNoDestinationClick();
+  };
 
   const handleHeaderPointerDown = (e) => {
     if (e.target.closest('button')) return;
     e.preventDefault();
+    draggedRef.current = false;
     const panel = panelRef.current;
     if (!panel) return;
     dragState.current = {
@@ -261,6 +284,7 @@ function TravelPanel({
       if (!dragState.current) return;
       const dx = ev.clientX - dragState.current.startX;
       const dy = ev.clientY - dragState.current.startY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) draggedRef.current = true;
       panel.style.left = `${dragState.current.origLeft + dx}px`;
       panel.style.top = `${dragState.current.origTop + dy}px`;
       panel.style.bottom = 'auto';
@@ -269,6 +293,9 @@ function TravelPanel({
 
     const handleUp = () => {
       dragState.current = null;
+      // Cleared only AFTER the panel's own pointerup handler has read it
+      // (document listeners run after the React root's bubble phase).
+      draggedRef.current = false;
       if (panel) panel.style.cursor = '';
       document.removeEventListener('pointermove', handleMove);
       document.removeEventListener('pointerup', handleUp);
@@ -292,7 +319,7 @@ function TravelPanel({
   const activeFrequency = lookupFrequency(eventFrequency);
 
   return (
-    <div className="travel-panel" ref={panelRef}>
+    <div className="travel-panel" ref={panelRef} onPointerUp={handlePanelPointerUp}>
       <div className="travel-panel-header" onPointerDown={handleHeaderPointerDown}>
         <span className="travel-panel-title">
           <i className="fa-solid fa-route"></i> Travel Mode

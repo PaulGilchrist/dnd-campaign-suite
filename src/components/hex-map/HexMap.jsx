@@ -130,6 +130,20 @@ function committedTravelFace(syncReturn, travelMgmt) {
         : travelMgmt.isTravelActive;
 }
 
+// Panel chrome-click feedback copy (backlog 2026-11-11 JU). Echoes the
+// advance-button tooltip (NO_DESTINATION_TITLE in TravelPanel) — a dead click
+// on the panel while it awaits a destination now says so on the .travel-toast
+// lane instead of no-op'ing silently.
+const AWAITING_DESTINATION_TOAST_MESSAGE = 'Select a destination hex on the map';
+
+// The panel awaits a destination when the committed travel face is open, the
+// mode is PLANNING, and no hex is armed yet — the only face whose absorbed
+// grid clicks are dead (traveling/paused chrome stays feedback-free). Mode is
+// compared on the literal like the PartyMarkerLayer 'inactive' gate. Hoisted
+// to keep the HexMap body inside the statement/complexity ceilings.
+const travelAwaitingDestination = (panelOpen, travelMode, destination) =>
+    panelOpen && travelMode === 'planning' && !destination;
+
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName, mapDisplayName }) {
     const svgRef = useRef(null);
 
@@ -888,6 +902,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     terrain={terrain}
                     eventFrequency={travelMgmt.eventFrequency}
                     showOwnHexHint={ownHexHint}
+                    // Chrome-click feedback (backlog 2026-11-11 JU): dead panel
+                    // clicks while awaiting a destination ride the shared
+                    // .travel-toast lane (guards live in TravelPanel).
+                    awaitingDestination={travelAwaitingDestination(travelPanelOpen, travelMgmt.travelMode, travelMgmt.destination)}
+                    onNoDestinationClick={() => showMapToast(AWAITING_DESTINATION_TOAST_MESSAGE)}
                     onChangePace={travelMgmt.changePace}
                     onAdvance={handleAdvance}
                     onCancel={travelMgmt.cancelTravel}
