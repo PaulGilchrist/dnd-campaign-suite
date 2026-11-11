@@ -81,6 +81,10 @@ function HexMapToolbar({
     marchingOrderOpen,
     setMarchingOrderOpen,
     marchingOrder,
+    // Committed travel-open face (see the travel button block): mirrors the
+    // TravelPanel mount one-for-one. Hosts without the prop (legacy renders)
+    // get a never-pressed face.
+    travelActive = false,
     dressButton,
     onEnter3D,
     isLocalhost = false,
@@ -110,11 +114,21 @@ function HexMapToolbar({
                 />
             )}
 
-            {/* Travel tool — binary toggle: aria-pressed mirrors the .active
-                class (SessionSection.jsx pattern) so SRs announce on/off. */}
+            {/* Travel tool — COMMITTED-FACE button (improve JT 2026-11-11
+                parity): .active AND aria-pressed both read `travelActive`,
+                the ONE committed boolean the host also mounts TravelPanel
+                on (useTravelToolSync's return — same value, same commit),
+                so panel-open ⇔ aria-pressed=true holds at every sample
+                point. `tool` stays the press-intent/canvas-arming channel:
+                the click still toggles the tool, and useTravelToolSync's
+                branches turn that intent into the committed travel-mode
+                byte (activate / deliberate-exit / mirror / hold). A press
+                whose activation did not land (flaky fresh-mount absorb)
+                leaves travel inactive — both faces stay false together, an
+                honest, probeable "not open" instead of a ghost .active. */}
             <button
-                className={tool === TOOL_TRAVEL ? 'active no-print' : 'no-print'}
-                aria-pressed={tool === TOOL_TRAVEL}
+                className={travelActive ? 'active no-print' : 'no-print'}
+                aria-pressed={travelActive}
                 onClick={() => setTool(tool === TOOL_TRAVEL ? TOOL_NONE : TOOL_TRAVEL)}
                 title="Travel mode — plan and execute overland travel"
                 aria-label="Travel mode — plan and execute overland travel"

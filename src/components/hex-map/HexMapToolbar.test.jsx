@@ -154,7 +154,10 @@ describe('HexMapToolbar', () => {
             expect(props.setTool).toHaveBeenCalledWith(tool);
 
             props.setTool.mockClear();
-            renderToolbar({ tool });
+            // The travel button's .active face is the COMMITTED travel-open
+            // boolean (travelActive), not the tool byte — feed it for the
+            // armed re-render (improve JT 2026-11-11 parity law).
+            renderToolbar({ tool, travelActive: tool === TOOL_TRAVEL });
             expect(screen.getByTitle(title)).toHaveClass('active');
             for (const [otherTool, otherTitle] of Object.entries(TOOL_TITLES)) {
                 if (otherTool !== tool) {
@@ -177,30 +180,41 @@ describe('HexMapToolbar', () => {
     );
 
     // Run F (2026-10-27): binary view toggle must announce on/off to screen
-    // readers. aria-pressed mirrors the .active class — both driven by the
-    // same `tool` prop (SessionSection.jsx aria-pressed={boolean} pattern) —
-    // and renders for the false state too (never null/absent).
-    it('travel button exposes pressed state via aria-pressed across arm/disarm', () => {
+    // readers. IMPROVE JT 2026-11-11 (tool/panel parity): the pressed face is
+    // no longer the `tool` byte — .active AND aria-pressed both mirror the
+    // `travelActive` prop, the ONE committed boolean the host mounts the
+    // TravelPanel on (useTravelToolSync's travelPanelOpen). Panel open ⇔
+    // aria-pressed=true holds by construction; `tool` stays the click-intent
+    // channel (arm/disarm payloads unchanged).
+    it('travel button mirrors the COMMITTED travelActive face, never the raw tool byte', () => {
         const travelName = TOOL_TITLES[TOOL_TRAVEL];
 
         // Inactive: attribute present and false.
-        renderToolbar({ tool: TOOL_NONE });
+        renderToolbar({ tool: TOOL_NONE, travelActive: false });
         const idle = screen.getByRole('button', { name: travelName });
         expect(idle).toHaveAttribute('aria-pressed', 'false');
         expect(idle).not.toHaveClass('active');
 
-        // Arm: click requests TOOL_TRAVEL; parent re-render makes it pressed.
+        // Press intent: click requests TOOL_TRAVEL — but the face lags the
+        // COMMIT, not the click. While travel has not landed (travelActive
+        // false, e.g. the fresh-mount absorbed press) the button stays
+        // honestly unpressed: no ghost .active without a panel.
         fireEvent.click(idle);
         expect(props.setTool).toHaveBeenCalledWith(TOOL_TRAVEL);
-        renderToolbar({ tool: TOOL_TRAVEL });
+        renderToolbar({ tool: TOOL_TRAVEL, travelActive: false });
+        expect(screen.getByRole('button', { name: travelName })).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: travelName })).not.toHaveClass('active');
+
+        // Activation landed: BOTH faces flip on the same committed boolean.
+        renderToolbar({ tool: TOOL_TRAVEL, travelActive: true });
         const armed = screen.getByRole('button', { name: travelName });
         expect(armed).toHaveAttribute('aria-pressed', 'true');
         expect(armed).toHaveClass('active');
 
-        // Disarm (panel Cancel flips the tool via useTravelToolSync): false again.
+        // Arrival/cancel settle: face clears even mid-churn of the tool byte.
         fireEvent.click(armed);
         expect(props.setTool).toHaveBeenLastCalledWith(TOOL_NONE);
-        renderToolbar({ tool: TOOL_NONE });
+        renderToolbar({ tool: TOOL_NONE, travelActive: false });
         expect(screen.getByRole('button', { name: travelName })).toHaveAttribute('aria-pressed', 'false');
     });
 

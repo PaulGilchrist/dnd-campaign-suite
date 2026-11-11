@@ -4,16 +4,21 @@
 // the TravelPanel while the toolbar toggle used to stay inactive /
 // aria-pressed=false. Contract pinned end-to-end with the REAL HexMapToolbar
 // and the REAL useTravelToolSync (the hook's branches are unit-owned by
-// hooks/useTravelToolSync.test.js; here we prove the container wires them so
-// `tool === TOOL_TRAVEL` is the SINGLE source of truth for .active/aria-pressed):
+// hooks/useTravelToolSync.test.js).
+// IMPROVE JT 2026-11-11 (tool/panel parity): the single source of truth moved
+// from the `tool` byte to the hook's COMMITTED face — `travelPanelOpen`
+// (= the synced travel-active value) feeds the button's .active/aria-pressed
+// AND the panel mount in one render commit, so every sampled commit satisfies
+// panel-present ⇔ aria-pressed=true by construction:
 //   1. adopted live trip ⇒ panel mounted AND toolbar button .active +
-//      aria-pressed="true" (mirror lands on the post-adoption passes, exactly
-//      like the real async lane: the mount pass is guarded, the adoption echo
-//      churns re-run the sync effect);
-//   2. Cancel (mode → inactive) ⇒ the force-off branch clears the auto-press —
-//      toggle back to inactive / aria-pressed="false", no stale pressed state;
-//   3. manual lane unchanged: press arms (active + pressed), re-press clears
-//      (18f43185c — no regression).
+//      aria-pressed="true" (the face lands even earlier than the mirror-branch
+//      churn now — the mount commit itself reads the committed boolean);
+//   2. Cancel (mode → inactive) ⇒ the same commit clears the panel AND the
+//      press — toggle back to inactive / aria-pressed="false", no stale face;
+//   3. manual lane: the press DISPATCHES startPlanning; the faces flip only
+//      when the activation COMMITS (echo lands) — both together. While the
+//      activation has not landed (the fresh-mount absorbed-press law) the
+//      button stays honestly unpressed next to an absent panel.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -220,26 +225,42 @@ describe('HexMap travel-toggle sync', () => {
         expect(toggle).toHaveAttribute('aria-pressed', 'false');
     });
 
-    it('manual lane unchanged: press arms active + pressed, re-press clears both', () => {
-        // No file trip (resumedTripRef false): the classic 18f43185c toggle,
-        // driven by HexMap's real `tool` state through the real toolbar.
+    it('manual lane: press dispatches the activation; BOTH faces flip on the echo commit together', () => {
+        // No file trip (resumedTripRef false). JT 2026-11-11 parity law: the
+        // click sends the press intent through the tool channel (startPlanning
+        // is the activation write); the visible faces — .active/aria-pressed
+        // AND the panel mount — flip ONLY when the synced activation lands,
+        // and they flip in the SAME render, so no sampled commit can show
+        // pressed-without-panel (the old absorbed-press ghost).
         const { tm } = setup();
-        render(<HexMap campaignName="test" mapName="test-map" />);
+        const { rerender } = render(<HexMap campaignName="test" mapName="test-map" />);
 
         const toggle = TRAVEL_TOGGLE();
         expect(toggle).not.toHaveClass('active');
         expect(toggle).toHaveAttribute('aria-pressed', 'false');
 
         fireEvent.click(toggle);
-        expect(TRAVEL_TOGGLE()).toHaveClass('active');
-        expect(TRAVEL_TOGGLE()).toHaveAttribute('aria-pressed', 'true');
         expect(tm.startPlanning).toHaveBeenCalledTimes(1);
-
-        // Re-press: the toolbar's own toggle sends the tool back to NONE and
-        // the button unpresses — with an idle trip nothing else fires.
-        fireEvent.click(TRAVEL_TOGGLE());
+        // Activation NOT yet committed (mock travelMgmt stays idle): the
+        // button is honestly unpressed next to an absent panel — the face
+        // now HONORS the absorbed/unlanded-press law instead of lying.
         expect(TRAVEL_TOGGLE()).not.toHaveClass('active');
         expect(TRAVEL_TOGGLE()).toHaveAttribute('aria-pressed', 'false');
-        expect(tm.cancelTravel).not.toHaveBeenCalled();
+        expect(screen.queryByTestId('travel-panel')).not.toBeInTheDocument();
+
+        // The activation echo commits travel-live: one render, both faces.
+        setup({}, { isTravelActive: true, travelMode: 'planning' });
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+        expect(TRAVEL_TOGGLE()).toHaveClass('active');
+        expect(TRAVEL_TOGGLE()).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByTestId('travel-panel')).toBeInTheDocument();
+
+        // Arrival/cancel commit: the SAME boolean clears both faces together
+        // (the parity invariant never saw a desynced sample).
+        setup({}, { isTravelActive: false, travelMode: 'inactive' });
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+        expect(TRAVEL_TOGGLE()).not.toHaveClass('active');
+        expect(TRAVEL_TOGGLE()).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.queryByTestId('travel-panel')).not.toBeInTheDocument();
     });
 });

@@ -78,6 +78,30 @@ function adoptLogMessage(foreignTrip, tripLive) {
 // (the loaded map file carried a live trip — this session is resume-aware:
 // no-press churns of the trip never cancel it, only leaving the tool does).
 // campaignName wires the shared-trip authority lane above.
+//
+// RETURNS THE COMMITTED FACE (improve JT 2026-11-11 tool/panel parity):
+// `{ travelPanelOpen }` — ONE boolean that drives BOTH the toolbar Travel
+// button's `.active`/`aria-pressed` AND the TravelPanel mount. Both faces
+// read the same SYNCED value (travelMgmt.isTravelActive, the same channel
+// as the 0cceb2c36 sync-value pattern in useTravelManagement — read at
+// render, never through a stale ref backfill) in the SAME React commit, so
+// a desynced face (pressed without panel, panel without pressed) is
+// structurally impossible at ANY sample point, not merely after settle.
+//
+// THE CHOSEN LAW (replaces the JT-era press→probe→press re-entry dance):
+//   • A press whose activation LANDED flips travel-mode to planning; the
+//     echo commits pressed=true and panel-mounted together — one press,
+//     one coherent open face, no second press needed.
+//   • A press whose activation did NOT land (the flaky fresh-mount
+//     absorbed-first-press: boot-seed/SSE writeback racing the just-claimed
+//     trip back to 'inactive') leaves BOTH faces false — the absorb is now
+//     aria-pressed-honest: probe reads pressed=false and no panel, i.e. a
+//     provably coherent "not open" state instead of a lying .active ghost.
+//   • Arrival/cancel flip the synced mode inactive; pressed and panel
+//     clear atomically in that one commit. The tool state itself is still
+//     force-toggled off (branch 2) so the NEXT press toggles toward
+//     TOOL_TRAVEL — tool remains the press-intent/canvas-arming channel,
+//     the synced mode is the face.
 function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, { hasPersistedWeather = false, hasLoadedTrip = false, campaignName = '' } = {}) {
     const toolInitRef = useRef(true);
     const prevToolRef = useRef(tool);
@@ -202,6 +226,12 @@ function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, { h
     // time — the effect already re-runs on every value churn it depends on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tool, handleGenerateWeather, travelMgmt, setTool, hasPersistedWeather, hasLoadedTrip, campaignName]);
+
+    // The committed face (see the law block at the hook head): re-computed on
+    // every render straight from the SYNCED channel, never from a ref — so
+    // echo-adopted advances/arrivals move the face exactly when the panel
+    // mounts/unmounts, one boolean, one commit.
+    return { travelPanelOpen: travelMgmt.isTravelActive };
 }
 
 export default useTravelToolSync;

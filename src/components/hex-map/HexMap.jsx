@@ -115,6 +115,21 @@ function HexMapStage({
     );
 }
 
+// Resolve the ONE committed travel-open face (improve JT 2026-11-11 parity):
+// useTravelToolSync RETURNS `travelPanelOpen` (its synced isTravelActive read)
+// and HexMap feeds it to BOTH the toolbar .active/aria-pressed AND the
+// TravelPanel mount, so the two faces can never be sampled desynced. The
+// sync-value default applies when the hook lane answers nothing (hook-mocked
+// container harnesses whose vi.fn() returns undefined): the default is the
+// EXACT same synced value the panel mount read directly pre-improve, not a
+// fallback game value. Hoisted out of HexMap's render (rejectedNoticeName
+// precedent) to keep the component under the complexity ceiling.
+function committedTravelFace(syncReturn, travelMgmt) {
+    return syncReturn && syncReturn.travelPanelOpen !== undefined
+        ? syncReturn.travelPanelOpen
+        : travelMgmt.isTravelActive;
+}
+
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName, mapDisplayName }) {
     const svgRef = useRef(null);
 
@@ -226,7 +241,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // hasPersistedWeather (backlog 2026-10-26-C): a map file that already
     // carries weather keeps it across tool presses — the hook only auto-rolls
     // on activation when weather is absent (first travel).
-    useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, {
+    // travelPanelOpen (improve JT 2026-11-11 parity): the ONE committed
+    // boolean feeding BOTH the toolbar button face (.active/aria-pressed)
+    // and the TravelPanel mount — same value, same render commit, desynced
+    // faces structurally impossible. Resolution in committedTravelFace.
+    const travelPanelOpen = committedTravelFace(useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool, {
         hasPersistedWeather: weather != null,
         hasLoadedTrip: mapLoader.resumedTripRef?.current === true,
         // Shared-trip authority (bug-hex-trip-clobbered-by-second-client):
@@ -234,7 +253,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         // travel-mode store so a second client's press adopts a live trip
         // instead of resetting or cancelling the session that owns it.
         campaignName,
-    });
+    }), travelMgmt);
 
     // Shared-adoption arrival notice (backlog JT 2026-11-11): a tab that only
     // WATCHES the shared trip gets the same arrival toast when the echo lane
@@ -652,6 +671,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 gridSize={gridSize} setGridSize={setGridSize}
                 marchingOrderOpen={marchingOpen} setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
+                travelActive={travelPanelOpen}
                 onEnter3D={() => setViewMode('3d')}
                 isLocalhost={isLocalhost}
                 // AI Dress in the hex toolbar (GM-only, POI/q,r lane) — the
@@ -860,7 +880,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     lastMessage={travelMgmt.lastMessage}
                     paceInfo={travelMgmt.paceInfo}
                     hexesRemaining={travelMgmt.hexesRemaining}
-                    isTravelActive={travelMgmt.isTravelActive}
+                    // One committed state (improve JT 2026-11-11 parity): the
+                    // panel mounts on the SAME boolean the toolbar button's
+                    // pressed face reads.
+                    isTravelActive={travelPanelOpen}
                     pendingEvent={travelMgmt.pendingEvent}
                     terrain={terrain}
                     eventFrequency={travelMgmt.eventFrequency}
