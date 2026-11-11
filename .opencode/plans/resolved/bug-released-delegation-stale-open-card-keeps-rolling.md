@@ -64,3 +64,60 @@ pin: released-mid-open → chip click produces zero roll rows.
 Data integrity risk — the release audit explicitly promises the device "can run its
 card … until released", yet damage/rolls keep landing after release; GMs cannot trust
 the picker as a kill-switch for an open tab.
+
+## Resolution
+**FIXED 2026-11-11** — diagnosis in the filed bug confirmed exactly; the suggested
+fix site was adopted with one refinement.
+
+**What was actually wrong:** the visitor's open-gate (`CreatureCard.jsx` `CardAvatar`
+⇒ `getCreatureController(creature, allCreatures, myTargetEffects) !== null`, LAN-trust
+D2) is evaluated only at avatar-CLICK time, while the mounted `mc-overlay` lives in
+per-client `useState` (`viewingMonster`/`viewingMonsterName` in `Initiative.jsx`) and
+was rendered by `GmStatBlockModal` with NO re-validation against the live
+`combatSummary` — so the release echo (cs-field delete + `control_released` audit)
+dropped the avatar gate and the `YourTurnCue`, but the stale-open card stayed fully
+live: pre-fix repro logged 3 attack rolls + damage roll + an `hp_change` applying real
+damage to AasimarTest (runtime 143 → 137) entirely AFTER the release row.
+
+**Fix:** `GmStatBlockModal` in `src/components/initiative/Initiative.jsx` now re-checks
+the SAME predicate on every render for non-localhost clients: look up the open
+creature's LIVE `combatSummary` row by `monsterName`, filter the reactive
+`targetEffects` mirror the same way `CreatureCard` does, and unmount when
+`getCreatureController(...) === null`. Chose unmount over chip-disabling — identical
+zero-trust face to the inert avatar click, and it also takes any staged damage popup
+down with it (Done can never fire post-release). Because the gate is exactly the
+open-time predicate, every lane that could OPEN also survives KEEPING: explicit
+controller, summoned-te (release falls back to the summoner), wild-shape/shapechange
+forms; GM (localhost) renders are untouched, and re-assigning control re-mounts the
+card (per-client open state is preserved). No server change: change-data buckets are
+visitor-writable by delegation design, the client gate is the revocation surface.
+Dual-ruleset N/A (UI gate, not rules logic). `Map.jsx`'s own `MonsterCardModal` render
+is the GM-only map-token lane — out of scope.
+
+**Files changed:**
+- `src/components/initiative/Initiative.jsx` — live-control gate in `GmStatBlockModal`
+  (+1 import, gate hook moved inside the modal component to stay under the
+  complexity ratchet).
+- `src/components/initiative/Initiative.statblock-release-gate.test.jsx` — NEW
+  regression suite (5 tests, mirrors `Initiative.tv.test.jsx` harness): delegated-open
+  survives an unrelated echo; RELEASE mid-open unmounts (the exact broken behavior);
+  derived summoned lane survives release; GM lane unchanged; row-removal unmounts.
+
+**Verification:**
+- Pre-fix live repro (test-campaign, GM localhost:5173 + isolated LAN context via
+  en0 IP): Goblin EB-joined → delegated to AasimarTest → visitor opened the card +
+  armed AasimarTest → GM released (cs controller ABSENT + "Goblin returned to the
+  GM." audit) → stale overlay survived and rolled: rows `roll(hit:false)×2`,
+  `roll(hit:true)` + damage roll + `hp_change` (143→137) ALL after the release row;
+  control probe: close+re-click = inert. Bug confirmed.
+- Post-fix live re-run (fresh reload of both tabs): release → visitor's overlay
+  UNMOUNTS within ~0.4–4 s of the echo (0 chips residue), avatar re-click inert, and
+  ZERO log rows land between release and re-delegation. Adjacent sanity: re-delegate
+  → card re-mounts live on the untouched visitor tab → arm + Scimitar press → honest
+  hit/damage/`hp_change` trio. Console 0 errors.
+- Tests: new file 5/5; anti-vacuity proved (gate stubbed → exactly the 2 unmount pins
+  fail); `src/components/initiative` 107 files / 783 tests green; `App.map-activate` +
+  `encounter/MonsterCardModal.attack-logic` + `services/encounters` 106 files / 1257
+  tests green; `npm run lint` 0 errors 0 warnings; `no-timers-guard` OK.
+- Exit: test-campaign change-data `{}` + log `[]` two-pass GET-verified via the
+  Admin clear routes; no monsters left on the board.

@@ -18,6 +18,7 @@ import {
     isBareNpcPlaceholder,
 } from '../../services/encounters/initiativeService.js'
 import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
+import { getCreatureController } from '../../services/encounters/creatureControl.js'
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
 import Subscriber from '../common/Subscriber.jsx'
 import Popup from '../common/popup.jsx'
@@ -243,8 +244,30 @@ function ConditionSavePopup({ popup, onClose }) {
 // cover it). Hoisted out of Initiative to keep that component under the
 // complexity cap. Summon controllers (allowNonLocalhost lane) keep their own
 // private view of their summon's block.
-function GmStatBlockModal({ tvMode, monster, monsterName, campaignName, creatures, mapName, characters, onClose }) {
+//
+// Live-control gate (bug-released-delegation-stale-open-card-keeps-rolling):
+// a LAN tab's open gate is the avatar click (CreatureCard CardAvatar ⇒
+// getCreatureController !== null, LAN-trust D2 accepts any device), which is
+// only evaluated at OPEN time — so a card opened mid-delegation survived the
+// GM's release and kept rolling real damage. Non-localhost renders re-check
+// the SAME predicate against the LIVE combatSummary row on every SSE echo:
+// when the controller disappears (released, and no derived lane re-asserts),
+// the overlay unmounts — the same zero-trust face as the inert avatar click
+// after release. Re-assigning control re-mounts the card (open state kept).
+function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignName, creatures, mapName, characters, onClose }) {
+    // Reactive targetEffects mirror for the summoned lane — read unconditionally
+    // (hook order) and only consulted by the LAN gate below.
+    const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? []
     if (tvMode || !monster) return null
+    if (!isLocalhost) {
+        const liveRow = (creatures || []).find(c => c.name === monsterName)
+        // Same subject filter as CreatureCard's myTargetEffects (summoned lane).
+        const subjectEffects = (allTargetEffects || []).filter(te => {
+            const teTarget = Array.isArray(te.target) ? te.target[0] : te.target
+            return teTarget === monsterName
+        })
+        if (getCreatureController(liveRow, creatures, subjectEffects) === null) return null
+    }
     return (
         <MonsterCardModal
             monster={monster}
@@ -959,9 +982,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
               )}
             {/* GM-private stat block: per-client open state, and never on a TV
                 presentation screen (hoisted — the !tvMode branch would push
-                Initiative over the complexity cap). */}
+                Initiative over the complexity cap). LAN tabs additionally
+                re-gate on the live controller each render (release revokes an
+                already-open card — see GmStatBlockModal). */}
             <GmStatBlockModal
                 tvMode={tvMode}
+                isLocalhost={isLocalhost}
                 monster={viewingMonster}
                 monsterName={viewingMonsterName}
                 campaignName={campaignName}
