@@ -72,9 +72,9 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-10 HD) The rest-modal family (`ShortRestModal` `.short-rest-overlay/.short-rest-modal`, long-rest twin if any) sits OUTSIDE the shared `role=dialog` tier every other confirm uses — no `aria-modal`/labelledby, `[role=dialog]` harness probes false-negative on it; migrate to the shared DeleteConfirmModal-class chrome or at minimum add the dialog semantics to the existing shell.
 - (2026-11-10 HD) Map3D/HexMap3D expose NO automation handle — per-mesh/geometry proofs require screenshot diffs and network-URL greps; export a dev-only scene census (e.g. `data-testid="map3d-scene"` element carrying item-type→mesh-count on a dataset, or `globalThis.__map3d` in dev builds) so exploration/tests can assert meshes without pixels.
-- (2026-11-10 HD) The Log view gained the `WriteRejectedEntry` renderer but still shows no per-type FILTER affordance — the cf8c33d7c "keep the enforcement_denied filter rules-only" intent has no user-visible filter to exercise; a type-filter chip row would complete the legibility arc (non-blocking, likely `log/Log.jsx` header).
+- (2026-11-10 improve run, follow-on from rest-modal-dialog-semantics) `HealingPoolModal.jsx` and `HandOfHealingModal.jsx` borrow the `.short-rest-overlay/.short-rest-modal` classes for NON-rest flows and still lack the dialog semantics ShortRestModal now carries — a `[role=dialog]`-by-class probe on those lanes false-negates; give those shells the same role/aria-modal/labelledby tier (or move them onto the shared chrome) and stop class-borrowing if cheap.
+
 
 ## Blocked / Not Verified (fold-gate ledger)
 

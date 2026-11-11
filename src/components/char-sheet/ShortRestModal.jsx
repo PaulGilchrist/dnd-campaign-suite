@@ -874,8 +874,17 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
     return (
         <div className="short-rest-overlay no-print">
-            <div className="short-rest-modal">
-                <h3><i className="fa-solid fa-bed"></i> Short Rest</h3>
+            {/* Dialog semantics per the shared DeleteConfirmModal-class tier
+                (backlog 2026-11-10 HD): role="dialog" + aria-modal + heading-
+                labelled-by on the EXISTING shell — the minimal-change path, no
+                chrome migration. Escape-to-close already rides the effect above. */}
+            <div
+                className="short-rest-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="short-rest-modal-title"
+            >
+                <h3 id="short-rest-modal-title"><i className="fa-solid fa-bed"></i> Short Rest</h3>
 
                 <div className="short-rest-section">
                     <h4>Hit Dice</h4>
