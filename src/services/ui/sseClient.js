@@ -10,6 +10,23 @@
 
 const sources = new Map();
 
+// Benign-error severity policy (console must stay a clean error signal):
+// EventSource auto-reconnects natively, so a page reload / tab-close / brief dev
+// restart fires the error handler while readyState is still CONNECTING. Those
+// transient rows log at console.debug; only after this many CONSECUTIVE
+// reconnecting errors (API persistently unreachable under a live tab — native
+// retries keep failing) does the lane escalate to console.error. A CLOSED
+// source never retries, so its error is always loud. Any open/message resets
+// the streak. No timers: counting is driven purely by native EventSource events.
+const RECONNECT_ERROR_ESCALATION = 3;
+
+// Browser-driven teardown flag: during unload (reload/tab-close) EventSource
+// fires a final benign error row — keep it at debug no matter the streak.
+let pageUnloading = false;
+window.addEventListener('pagehide', () => {
+    pageUnloading = true;
+});
+
 export const subscribeToSSE = (campaignName, handler) => {
     const key = campaignName || '';
     let entry = sources.get(key);
@@ -20,7 +37,10 @@ export const subscribeToSSE = (campaignName, handler) => {
         }
         const url = `http://${window.location.hostname}/subscribe?${urlParams.toString()}`;
         const eventSource = new EventSource(url);
-        entry = { eventSource, handlers: new Set() };
+        entry = { eventSource, handlers: new Set(), consecutiveErrors: 0 };
+        entry.eventSource.onopen = () => {
+            entry.consecutiveErrors = 0;
+        };
         entry.eventSource.onmessage = (e) => {
             let event;
             try {
@@ -28,6 +48,7 @@ export const subscribeToSSE = (campaignName, handler) => {
             } catch (_parseErr) {
                 return;
             }
+            entry.consecutiveErrors = 0;
             entry.handlers.forEach(handler => {
                 try {
                     handler(event);
@@ -36,7 +57,19 @@ export const subscribeToSSE = (campaignName, handler) => {
                 }
             });
         };
-        entry.eventSource.onerror = (err) => console.error('[SSE] connection error', err);
+        entry.eventSource.onerror = (err) => {
+            const reconnecting = eventSource.readyState === EventSource.CONNECTING;
+            if (reconnecting) {
+                entry.consecutiveErrors += 1;
+            }
+            const benign = reconnecting
+                && (pageUnloading || entry.consecutiveErrors < RECONNECT_ERROR_ESCALATION);
+            if (benign) {
+                console.debug('[SSE] connection error — reconnecting', err);
+            } else {
+                console.error('[SSE] connection error', err);
+            }
+        };
         sources.set(key, entry);
     }
     entry.handlers.add(handler);

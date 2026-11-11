@@ -73,7 +73,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-11 IE — `[SSE] connection error` console.error fires on benign reloads/teardowns:** every `page.goto`/tab-close logs the error handler row; consider severity-downgrade when `EventSource.readyState===CONNECTING` (reconnect in flight) to keep the console a clean error signal for harnesses.
 - **2026-11-11 IE — save-prompt results reuse `.sp-modal` chrome behind the dispatched AoE picker:** the disabled picker overlay keeps `.sp-modal` as FIRST DOM match, so first-match harnesses read dead buttons (cost IE two land-then-throw retries); worth a stable `data-testid` on the ACTIVE prompt overlay (e.g. `[data-testid="active-save-prompt"]`) rather than class-order archaeology.
 
 ## Blocked / Not Verified (fold-gate ledger)
