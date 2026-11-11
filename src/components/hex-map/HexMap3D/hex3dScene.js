@@ -314,6 +314,7 @@ export class Hex3DScene {
         this._resizeObserver = null;
         this._framedFor = null;
         this._weatherKind = null;
+        this._weatherCondition = null;
         this._weatherPoints = null;
         this._mapSpan = 0;
         this._hexCols = 0;
@@ -588,7 +589,10 @@ export class Hex3DScene {
             pois: {},
             party: this.partyGroup && this.partyGroup.children.length > 0 ? 1 : 0,
             travelPath: this.pathGroup && this.pathGroup.children.length > 0 ? 1 : 0,
-            weather: this._weatherKind,
+            // Verbatim doc condition when the weather object carries one
+            // ("clear", "storm"); otherwise the visual bucket (icon-derived
+            // rain/snow/fog or null) — see setWeather.
+            weather: this._weatherCondition || this._weatherKind,
         };
         const visit = (obj) => {
             const tag = obj.userData.census;
@@ -1098,6 +1102,11 @@ export class Hex3DScene {
         this._clearGroup(this.weatherGroup);
         this._weatherPoints = null;
         this._weatherKind = weatherParticlesFor(weather);
+        // Census stamp (backlog JT 2026-11-11): the doc's verbatim condition
+        // string, so `clear` weather reads "clear" instead of the null the
+        // visual bucket gives — null (no weather) vs "clear" distinguishable.
+        this._weatherCondition =
+            typeof weather?.condition === 'string' && weather.condition ? weather.condition : null;
         this._applySceneFog();
         if (this._weatherKind !== 'rain' && this._weatherKind !== 'snow') {
             this.weatherGroup.visible = this.showWeather;

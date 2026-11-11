@@ -102,6 +102,34 @@ describe('Hex3DScene.getCensus (dev handle, backlog 2026-11-10 HD)', () => {
         expect(buildSpy).not.toHaveBeenCalled();
     });
 
+    // Backlog JT 2026-11-11: the weather bucket must answer the DOC's
+    // condition verbatim so "no weather" (null) is distinguishable from
+    // "clear weather" ("clear") without a DOM/weather-row probe.
+    it('weather stamps the doc condition verbatim; the visual bucket is the honest fallback', async () => {
+        const scene = await builtScene();
+        const weather = (w) => {
+            scene.setWeather(w);
+            return scene.getCensus().weather;
+        };
+
+        // Condition wins verbatim — even where the particle lane differs
+        // (storm's bolt icon buckets as 'rain' visually).
+        expect(weather({ condition: 'storm', label: 'Storm', icon: 'bolt' })).toBe('storm');
+        // Clear weather has NO visual bucket (sun → null particles) — the
+        // condition still reads out instead of the old null.
+        expect(weather({ condition: 'clear', label: 'Clear', icon: 'sun' })).toBe('clear');
+        // No weather object at all → stays null (the AC: null vs "clear").
+        expect(weather(null)).toBeNull();
+        // Weather object WITHOUT a condition string → pinned fallback to the
+        // pre-existing visual bucket, never a crash…
+        expect(weather({ icon: 'cloud-rain' })).toBe('rain');
+        // …and with no visual lane either, the honest null.
+        expect(weather({ label: 'Mystery' })).toBeNull();
+        // Non-string condition: treated as absent, getter never throws.
+        expect(weather({ condition: 42, icon: 'snowflake' })).toBe('snow');
+        expect(weather({ condition: 42 })).toBeNull();
+    });
+
     it('is safe to read before any build (empty census, no throw)', () => {
         const fresh = new Hex3DScene({ clientWidth: 1, clientHeight: 1 });
         expect(() => fresh.getCensus()).not.toThrow();
