@@ -129,7 +129,13 @@ function rollDamageFormula(formula, overchannelActive) {
 // computeDamageAfterEvasion (MA-0427 save-path recipe, floors each leg),
 // applies its own damage type, and logs its own save-damage entry.
 // Byte-inert null for every row without a secondaryDamage prop.
-function applySecondaryNpcDamageLeg({ ctx, success, saveBonus, saveRoll, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, resistances, immunities, evasionActive, carefulSpellProtected }) {
+// BUG FIX (beguiling-song-own-damage-strips-its-charm): the apply call is
+// AWAITED — the strip lane inside applyDamageToTarget reads activeConditions
+// after several internal awaits, so an un-awaited call raced the synchronous
+// failed-save grant below and stripped the condition the same row had just
+// granted. Mirrors saveProcessing.applySaveDamage (damage fully resolves
+// BEFORE applyFailedSaveConditions).
+async function applySecondaryNpcDamageLeg({ ctx, success, saveBonus, saveRoll, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, resistances, immunities, evasionActive, carefulSpellProtected }) {
     if (!ctx.secondaryDamage) return null;
     const damageType = ctx.secondaryDamageType || null;
     if (!damageType) console.error(`[SaveAttackAoeModal] MA-0563 secondary formula "${ctx.secondaryDamage}" has no authored damage_type_secondary — applying typeless.`);
@@ -139,7 +145,7 @@ function applySecondaryNpcDamageLeg({ ctx, success, saveBonus, saveRoll, saveRol
     const resResult = computeDamageAfterResistancesWithDetails({ rawDamage: damageAfterSave, damageTypes: [damageType], resistances, immunities, ignoreResistance: false });
     const finalDamage = carefulSpellProtected ? 0 : resResult.finalDamage;
     if (finalDamage > 0) {
-        applyDamageToTarget(ctx.combatSummary, ctx.targetName, finalDamage, [damageType], { campaignName: ctx.campaignName, characters: ctx.characters, ignoreResistance: true, attackerName: ctx.playerStats.name, suppressHpLog: false });
+        await applyDamageToTarget(ctx.combatSummary, ctx.targetName, finalDamage, [damageType], { campaignName: ctx.campaignName, characters: ctx.characters, ignoreResistance: true, attackerName: ctx.playerStats.name, suppressHpLog: false });
         addEntry(ctx.campaignName, buildNpcSaveLogEntry({ action: ctx.action, playerStats: ctx.playerStats, targetDamageFormula: ctx.secondaryDamage, damageRoll, rawDamage, damageType, targetName: ctx.targetName, saveType: ctx.saveType, saveDc: ctx.saveDc, dcSuccess: ctx.dcSuccess, success, saveRoll, saveBonus, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, finalDamage })).catch((e) => { console.error('[SaveAttackAoeModal] Error logging secondary save damage:', e); });
     }
     return { rawDamage, finalDamage, damageType };
@@ -166,7 +172,13 @@ function npcSaveBonus(target, saveType) {
 }
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
-function resolveNpcTarget(ctx) {
+// BUG FIX (beguiling-song-own-damage-strips-its-charm): async + damage legs
+// AWAITED before resolveSaveFailGrant — same-row damage used to run its
+// condition strip (after applyDamageToTarget's internal awaits) while the
+// grant had already landed synchronously, self-cannibalizing "damage AND
+// charmed" rows (Performer Maestro's Beguiling Song). Sequenced to match
+// saveProcessing.applySaveDamage: primary → secondary → grant.
+async function resolveNpcTarget(ctx) {
     const { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, pushFeet, slowedClauses, bothOutcomesClause } = ctx;
     const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
     const isSoulstitchProtected = hasSoulstitchProtection(targetName, playerStats.name, campaignName);
@@ -221,7 +233,7 @@ function resolveNpcTarget(ctx) {
     }
 
         if (finalDamage > 0) {
-            applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
+            await applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: true, attackerName: playerStats.name, suppressHpLog: false });
             // CLA-120: the cast-stamped INT roll has landed — consume the stamp.
             consumeEmpoweredEvocationStamp(playerStats, campaignName, isEmpoweredEvocationTarget);
             if (isRadiantSoulTarget) {
@@ -242,9 +254,6 @@ function resolveNpcTarget(ctx) {
         // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
         registerTargetEffect(campaignName, targetName, pullMarkerEffect, action.name, { duration: 'instant' });
     }
-    // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
-    // when neither flag authored).
-    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, stagedPetrify: ctx.stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, speedReduceClause: ctx.speedReduceClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote, saveVariant: ctx.saveVariant });
     if (success && logSaveSuccess) {
         addEntry(campaignName, {
             type: 'roll',
@@ -266,7 +275,13 @@ function resolveNpcTarget(ctx) {
         const updatedEffects = targetEffects.filter(te => !(te.target === targetName && te.effect === 'disadvantage_on_next_save'));
         setRuntimeValue('campaign', 'targetEffects', updatedEffects, campaignName);
     }
-    const secondary = applySecondaryNpcDamageLeg({ ctx, success, saveBonus, saveRoll, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, resistances, immunities, evasionActive, carefulSpellProtected });
+    const secondary = await applySecondaryNpcDamageLeg({ ctx, success, saveBonus, saveRoll, saveRollRaw1, saveRollRaw2, hasSaveDisadvantage, resistances, immunities, evasionActive, carefulSpellProtected });
+    // MA-0068 staged sleep / MA-0063 one-shot grant dispatch (byte-inert
+    // when neither flag authored). Runs AFTER both damage legs have fully
+    // resolved (bug beguiling-song-own-damage-strips-its-charm): the row's
+    // own damage strip must never see the condition this same resolution
+    // grants — mirrors saveProcessing.applySaveDamage ordering.
+    resolveSaveFailGrant({ sleepStaging, stagedParalysis: ctx.stagedParalysis, stagedPetrify: ctx.stagedPetrify, success, saveDc, saveType, targetName, playerStats, action, saveRoll, saveBonus, saveConditions, campaignName, pushFeet, slowedClauses, weakeningBreath: ctx.weakeningBreath, acPenaltyClause: ctx.acPenaltyClause, speedZeroClause: ctx.speedZeroClause, speedReduceClause: ctx.speedReduceClause, bothOutcomesClause, tempHpGrant: ctx.tempHpGrant, conditionDurationNote: ctx.conditionDurationNote, saveVariant: ctx.saveVariant });
     addTargetResult(campaignName, { targetName, saveResult: success ? 'success' : 'failure', roll: saveRoll, total: saveTotal, conditions: [], appliedDamage: appliedDamageTotal(finalDamage, secondary) });
     return withSecondaryFields({ targetName, success, roll: saveRoll, total: saveTotal, saveBonus, rawDamage, finalDamage }, secondary);
 }
@@ -364,12 +379,17 @@ function buildPromptSecondary(ctx, formula, overchannelActive) {
 // Returns null when no secondary rides the prompt (single-damage byte-identical).
 // MA-0563 soulstitch gate for the prompt secondary leg (zeroes it alongside
 // the primary; complexity hoist out of handleSaveResult).
-function resolvePromptSecondaryOutcome(args) {
+// BUG FIX (beguiling-song-own-damage-strips-its-charm): awaited through the
+// chain — handleSaveResult only dispatches resolveSaveFailGrant after every
+// same-row damage leg has fully resolved (the applyDamage strip lane reads
+// activeConditions after its internal awaits; racing it stripped the fresh
+// grant — mirrors saveProcessing.applySaveDamage damage→grant ordering).
+async function resolvePromptSecondaryOutcome(args) {
     if (args.isSoulstitchProtected) return null;
-    return applySecondaryPromptDamage(args);
+    return await applySecondaryPromptDamage(args);
 }
 
-function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary, evasion, characters }) {
+async function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary, evasion, characters }) {
     if (!secondary) return null;
     // SP-023: Circle of Power zeroes every half-damage leg of the same save;
     // CLA-124/125: so does evasion on a success (floor-half on a fail).
@@ -379,7 +399,7 @@ function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, 
     // characters (threaded from the modal prop), not the CLA-119 combatSummary
     // player stubs — same applyDamageToTarget seam as the primary leg.
     if (!characters?.length) console.error(`[SaveAttackAoeModal] CLA-237 no full-stat characters provided for the ${targetName} secondary save-damage lane — passive resistances may be missed.`);
-    applyDamageToTarget(combatSummary, targetName, finalDamage, [secondary.damageType], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
+    await applyDamageToTarget(combatSummary, targetName, finalDamage, [secondary.damageType], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
     addEntry(campaignName, {
         type: 'roll',
         rollType: 'save-damage',
@@ -1687,7 +1707,7 @@ function SaveAttackAoeModal({
             const ctx = { action, targetName, target, combatSummary, characters, resolvedDamage, damageType, secondaryDamage, secondaryDamageType, saveType, saveDc, dcSuccess, radiantSoulChaMod, radiantSoulTarget, radiantSoulFlagKey, empoweredEvocationIntMod, empoweredEvocationTarget, overchannelActive, heightenTarget, coronaDisadvantage, isCarefulSpell, isCarefulAlly, pullMarkerEffect, logSaveSuccess, playerStats, campaignName, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, pushFeet, slowedClauses, weakeningBreath, acPenaltyClause, speedZeroClause, speedReduceClause, bothOutcomesClause, tempHpGrant, conditionDurationNote, saveVariant };
 
             if (isNpc) {
-                results.push(resolveNpcTarget(ctx));
+                results.push(await resolveNpcTarget(ctx));
                 continue;
             }
 
@@ -1737,7 +1757,12 @@ function SaveAttackAoeModal({
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
     }
 
-    function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason, characters }) {
+    // BUG FIX (beguiling-song-own-damage-strips-its-charm): async — the
+    // applyDamageToTarget below is AWAITED so handleSaveResult's grant
+    // dispatch cannot race this row's own condition strip (the strip reads
+    // activeConditions after several internal awaits and was deleting the
+    // Charmed the same failed save had just granted).
+    async function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason, characters }) {
         const saveResult = success ? 'success' : 'failure';
         const detailRoll = detail.roll ?? 0;
         // SP-023: adopt SavePromptModal's dispatch fidelity — distinct raw dice
@@ -1774,7 +1799,7 @@ function SaveAttackAoeModal({
             // charactersRef.current). HP writes still ride the cs creature entry
             // inside applyDamageToTarget — unchanged.
             if (!characters?.length) console.error(`[SaveAttackAoeModal] CLA-237 no full-stat characters provided for the ${targetName} save-damage lane — passive resistances may be missed.`);
-            applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
+            await applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
 
             if (isRadiantSoulTarget) {
                 logRadiantSoulOncePerTurn({ campaignName, playerStats, damageType, targetName, radiantSoulChaMod, radiantSoulFlagKey });
@@ -1832,12 +1857,15 @@ function SaveAttackAoeModal({
         consumeEmpoweredEvocationStamp(playerStats, campaignName, isEmpoweredEvocationTarget);
 
         if (finalDamage > 0 || zeroReason) {
-            applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason, characters });
+            // BUG FIX (beguiling-song-own-damage-strips-its-charm): awaited —
+            // the failed-save grant below must only run once this row's own
+            // damage has fully resolved (see applyPlayerSaveDamage note).
+            await applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason, characters });
         }
 
         // MA-0563: secondary pool pays its own adjudicated leg (soulstitch
         // protection zeroes it); null when no secondary rides the prompt.
-        const secondary = resolvePromptSecondaryOutcome({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, isSoulstitchProtected, secondary: pendingPrompts[pendingIndex].secondary, evasion, characters });
+        const secondary = await resolvePromptSecondaryOutcome({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, isSoulstitchProtected, secondary: pendingPrompts[pendingIndex].secondary, evasion, characters });
 
         if (!success && pullMarkerEffect) {
             // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).

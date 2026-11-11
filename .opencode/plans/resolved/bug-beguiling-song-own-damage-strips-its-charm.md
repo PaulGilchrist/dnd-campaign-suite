@@ -37,3 +37,42 @@ First read how the AoE save-result lane sequences grants vs damage (grep `applyF
 ## Severity
 
 Broken feature — a shared-bestiary monster's signature save effect can never apply its authored condition (any tab, any campaign using Performer Maestro or any damage+charm row); plus minor data-integrity residue (orphan meta rows). Not merely UX: the ability's non-damage clause is inert.
+
+## Resolution
+
+**FIXED 2026-11-11 (fix subagent).**
+
+### What was actually wrong (root cause — differs from the file's guess)
+
+The "Likely location" guessed at `saveProcessing.js` running the grant BEFORE the row's damage — the real code there is already correctly sequenced (`applySaveDamage` AWAITs `applyDamageToTarget` and only then calls `applyFailedSaveConditions`). The actual offender is the **monster AoE-picker lane** in `src/components/char-sheet/modals/shared/SaveAttackAoeModal.jsx`, which matches the observed log fingerprint (applied→removed→hp_change-last, ~3 ms delta):
+
+- `handleSaveResult` (PC-prompt resolution) and `resolveNpcTarget` (NPC auto-resolve) call the ASYNC `applyDamageToTarget` **un-awaited**, then run the synchronous failed-save grant (`resolveSaveFailGrant` → `applySaveFailConditions`) in the same tick.
+- Inside `applyDamageToTarget` there are several awaits (`resolveCreatureDefenses`, `consumeElementalAbsorptionOnApply`, `revertPolymorphIfBufferDepleted`, …) BEFORE `removeCombatConditionsOnDamage` reads `activeConditions`. So the strip lane's read happens AFTER the same resolution's grant has already landed → the row's own damage deletes the Charmed it just granted. Deterministic race, not a missing exemption rule.
+- Secondary confirmation: the `hp_change` row landing AFTER `condition applied` is only possible with this un-awaited ordering.
+
+### The fix (2 source files)
+
+1. `src/components/char-sheet/modals/shared/SaveAttackAoeModal.jsx` — sequence the grant AFTER the row's damage legs fully resolve, mirroring the established `saveProcessing.applySaveDamage` pattern (damage → secondary damage → grant):
+   - `applyPlayerSaveDamage` made async; its `applyDamageToTarget` awaited; `handleSaveResult` awaits it before `resolveSaveFailGrant`.
+   - `resolvePromptSecondaryOutcome` / `applySecondaryPromptDamage` async + awaited (PC prompt secondary leg).
+   - `resolveNpcTarget` made async; primary `applyDamageToTarget` awaited; `resolveSaveFailGrant` moved below the now-awaited `applySecondaryNpcDamageLeg`; the dispatch loop `results.push(await resolveNpcTarget(ctx))`.
+   - Zero-damage calls (soulstitch/careful `applyDamageToTarget(0)`) left un-awaited — the strip only fires on `wardDamage > 0`.
+   - No same-source marker needed: the "grant sequenced after the damage clause" option from the Suggested fix is the established-pattern option; the engine-wide Charmed-ends-on-damage law stays untouched (it simply no longer runs its read while a same-resolution grant is in flight).
+2. `src/services/rules/combat/applyDamage.js` — `removeCombatConditionsOnDamage`: when the strip removes a condition whose `activeConditionMeta` row exists, the filtered list AND the purged meta now ride ONE merged `setRuntimeObject` write (mirrors `stripConditionsMerged` in `clearExpirationEffects.js` / canonical `removeCondition` in `conditionSaveService.js`; same-endpoint law §5 MA-0809 — never two racing per-key POSTs). No meta rows → legacy single-key `setRuntimeValue` write byte-identical. Orphan `activeConditionMeta.charmed` rows after any charm-break are gone.
+
+Dual-ruleset: both touched lanes are shared 5e/2024 (no 2024 twin of applyDamage/AoE modal) — one fix covers both.
+
+### Regression tests (new files)
+
+- `src/services/rules/combat/applyDamage.charm-strip-meta.test.js` (4 tests) — merged strip+meta-purge write (PC 'took damage (Friends)' + NPC 'took damage'), bystander-meta preservation, byte-inert legacy write when no meta, zero-damage strip nothing.
+- `src/components/char-sheet/modals/shared/SaveAttackAoeModal.beguiling-song-charm-grant.test.jsx` (3 tests) — NPC + PC lanes with a race-faithful mocked `applyDamageToTarget` (yields, THEN strips charmed — pre-fix this kills the fresh grant): grant strictly after `damage-resolved`, charmed survives, zero removed rows; plus the law-preserved leg (a pre-existing charm IS stripped mid-resolution).
+
+### Verification
+
+- `npx vitest run` new files: 7/7 pass. Folder runs: `src/services/rules/combat` **50 files / 473 tests green**; `src/components/char-sheet/modals/shared` **98 files / 563 tests green**. `npm run lint` exit 0, zero warnings.
+- Live re-verify in `test-campaign` (GM tab, pre-select PFEG/-30-dial seed, Maestro board, single-target Beguiling Song press, forced save failure):
+  - Log now: `roll save failure` → `hp_change −17` → `roll save-damage fd:17` → `condition applied Charmed` — **NO `condition removed` row**.
+  - Change-data: `activeConditions: ['cursed','poisoned','charmed']`; `activeConditionMeta.charmed {dc:15, wis, Performer Maestro}`; WSD sheet badges show **`Charmed DC 15`** mounted (was never mounting pre-fix).
+  - Law preserved: subsequent Maestro Rapier hit → `condition removed Charmed, reason "took damage (Friends)"` and final `activeConditionMeta: {}` — meta row purged WITH the strip, **no orphan residue** (the pre-fix lane left one).
+- Cleanup: Admin → Clear Change Data + Clear Campaign Log (native confirms handled); GET-verified `change-data {}` + `log []` at exit.
+

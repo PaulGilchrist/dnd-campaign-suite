@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue, getStore } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject, getStore } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../ui/storage.js';
 import { rollD20 } from '../../dice/diceRoller.js';
 import utils from '../../ui/utils.js';
@@ -544,7 +544,8 @@ function recordProjectedWardDamage({ creature, actualDamageTaken, isSecondary, a
 
 // Strip one condition key (case-insensitive) from the working list and log the
 // removal as its own fact. Writes NOTHING — the caller owns the single merged
-// activeConditions write (#1207, fix#27 §39 canon); logs stay per-condition.
+// activeConditions (+meta purge) write (#1207, fix#27 §39 canon); logs stay
+// per-condition.
 function removeConditionFromList({ creature, conditions, conditionKey, displayName, reason, campaignName }) {
   if (!conditions.some(c => String(c).toLowerCase() === conditionKey)) return conditions;
   const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey);
@@ -563,7 +564,8 @@ function removeConditionFromList({ creature, conditions, conditionKey, displayNa
 // dominated (dominated targets get a repeat save instead — see handleDominateRepeatSave).
 // fix#27 §39 canon (mirrors useInitiativeEffects.js:178-184 / concentrationService.js:221-227):
 // both removals accumulate against the SINGLE snapshot read below and land in ONE
-// merged activeConditions write. The old per-condition filter-AND-write pair shared
+// merged write (filtered activeConditions plus, when present, the activeConditionMeta
+// purge for the stripped keys). The old per-condition filter-AND-write pair shared
 // that one stale read, so with frightened+charmed coexisting the later charmed-write
 // re-added the Frightened the frightened-write had just removed (last-writer-wins
 // resurrection, #1207). Per-condition removal LOGS stay separate entries (distinct
@@ -582,7 +584,32 @@ function removeCombatConditionsOnDamage(creature, domination, isPlayer, campaign
     remaining = removeConditionFromList({ creature, conditions: remaining, conditionKey: 'charmed', displayName: 'Charmed', reason, campaignName });
   }
   if (remaining !== conditions) {
-    setRuntimeValue(creature.name, 'activeConditions', remaining, campaignName);
+    // A stripped condition never orphans its activeConditionMeta row (bug
+    // beguiling-song-own-damage-strips-its-charm data-hygiene leg — mirrors
+    // conditionSaveService.js removeCondition + the stripConditionsMerged
+    // merged-write idiom in clearExpirationEffects.js): when meta rows for
+    // the stripped keys exist, the filtered list AND the purged meta ride
+    // ONE setRuntimeObject call (same-endpoint law §5 MA-0809 — two
+    // un-awaited per-key POSTs share the full-store replace route and can
+    // reorder network-side, resurrecting the purged row). No meta rows →
+    // the legacy single-key write stays byte-identical.
+    const strippedKeys = conditions
+      .filter(c => !remaining.some(r => String(r).toLowerCase() === String(c).toLowerCase()))
+      .map(c => String(c).toLowerCase());
+    const existingMeta = getRuntimeValue(creature.name, 'activeConditionMeta', campaignName) || {};
+    const remainingMeta = { ...existingMeta };
+    let metaChanged = false;
+    for (const key of strippedKeys) {
+      if (remainingMeta[key]) {
+        delete remainingMeta[key];
+        metaChanged = true;
+      }
+    }
+    if (metaChanged) {
+      setRuntimeObject(creature.name, { activeConditions: remaining, activeConditionMeta: remainingMeta }, campaignName);
+    } else {
+      setRuntimeValue(creature.name, 'activeConditions', remaining, campaignName);
+    }
   }
 }
 
