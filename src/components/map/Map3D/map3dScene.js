@@ -265,7 +265,8 @@ export class Map3DScene {
 
     // The cached prototype is never disposed; each placed item gets its own
     // geometry/material copies so per-build disposal never breaks the cache.
-    _cloneAsset(proto) {
+    // Each lane tags its own census entry so _buildPlacedItems stays branch-free.
+    _cloneAsset(proto, type) {
         const clone = proto.clone(true);
         clone.traverse((o) => {
             if (!o.isMesh) return;
@@ -276,6 +277,7 @@ export class Map3DScene {
                 o.material = o.material.clone();
             }
         });
+        clone.userData.census = { kind: 'item', type };
         return clone;
     }
 
@@ -287,6 +289,7 @@ export class Map3DScene {
             new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 }));
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        mesh.userData.census = { kind: 'fallback' };
         return mesh;
     }
 
@@ -410,6 +413,40 @@ export class Map3DScene {
         this._frameCamera(gridSize);
     }
 
+    // Dev-only automation handle (backlog 2026-11-10 HD): a machine-readable
+    // census of the LIVE scene graph — every mesh-bearing lane tags its
+    // top-level object with userData.census at build time, so this read is a
+    // traversal, never a parallel bookkeeping mirror that could go stale.
+    // Map3D.jsx exposes it as globalThis.__map3d behind import.meta.env.DEV.
+    getCensus() {
+        const census = {
+            gridSize: this.gridSize ?? 0,
+            walls: 0,
+            floor: 0,
+            grid: 0,
+            players: 0,
+            npcs: 0,
+            monsters: 0,
+            fallback: 0,
+            torchLights: 0,
+            fogCells: 0,
+            overlays: 0,
+            items: {},
+        };
+        const visit = (obj) => {
+            const tag = obj.userData.census;
+            if (!tag) return;
+            if (tag.kind === 'item') {
+                census.items[tag.type] = (census.items[tag.type] || 0) + 1;
+            } else {
+                census[tag.kind] += tag.count ?? (obj.isInstancedMesh ? obj.count : 1);
+            }
+        };
+        if (this.mapGroup) this.mapGroup.children.forEach(visit);
+        if (this.overlayGroup) this.overlayGroup.children.forEach(visit);
+        return census;
+    }
+
     // Additive sub-layer patch: disposes and rebuilds ONLY the spell-overlay
     // volumes in overlayGroup (never mapGroup, never the camera). Safe to call
     // on every SSE overlay tick. No-op until the first buildMap has sized the
@@ -422,7 +459,10 @@ export class Map3DScene {
         }
         for (const overlay of overlays || []) {
             const group = createOverlayGroup(this.THREE, overlay, this.cellX(overlay.startGridX), this.cellZ(overlay.startGridY));
-            if (group) this.overlayGroup.add(group);
+            if (group) {
+                group.userData.census = { kind: 'overlays' };
+                this.overlayGroup.add(group);
+            }
         }
     }
 
@@ -434,9 +474,11 @@ export class Map3DScene {
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ color: bg, roughness: 1 }));
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
+        floor.userData.census = { kind: 'floor' };
         this.mapGroup.add(floor);
         const grid = new THREE.GridHelper(size, gridSize, 0x3d3d3d, 0x2b2b2b);
         grid.position.y = 0.4;
+        grid.userData.census = { kind: 'grid' };
         this.mapGroup.add(grid);
     }
 
@@ -458,6 +500,7 @@ export class Map3DScene {
         });
         inst.castShadow = true;
         inst.receiveShadow = true;
+        inst.userData.census = { kind: 'walls' };
         this.mapGroup.add(inst);
     }
 
@@ -495,7 +538,10 @@ export class Map3DScene {
             if (!isItemVisible(item, fog, isLocalhost)) continue;
             const proto = await this._loadAsset(item.type);
             if (this.disposed) return;
-            const mesh = proto ? this._cloneAsset(proto) : this._fallbackBox(item.type);
+            // Registered GLB types census under their own name (_cloneAsset
+            // tags); unregistered types land in the single `fallback` bucket
+            // (_fallbackBox tags) — the HD proof lane for ghost props.
+            const mesh = proto ? this._cloneAsset(proto, item.type) : this._fallbackBox(item.type);
             if ((item.type === 'door' || item.type === 'secretDoor') && this.wallMat) {
                 mesh.traverse((o) => {
                     if (o.isMesh && o.material && o.material.name === 'wallmatch') o.material = this.wallMat;
@@ -550,6 +596,7 @@ export class Map3DScene {
         for (const p of players || []) {
             if (!isPlayerVisible(p, fog, isLocalhost)) continue;
             const token = this._makeToken(p.name, COLORS.player, COLORS.playerStroke);
+            token.userData.census = { kind: 'players' };
             token.position.set(this.cellX(p.gridX), 0, this.cellZ(p.gridY));
             this.mapGroup.add(token);
             const url = playerAvatars ? playerAvatars[p.id] : null;
@@ -572,6 +619,7 @@ export class Map3DScene {
             const token = this._makeToken(item.name || 'NPC',
                 isMonster ? COLORS.monster : COLORS.npc,
                 isMonster ? COLORS.monsterStroke : COLORS.npcStroke);
+            token.userData.census = { kind: isMonster ? 'monsters' : 'npcs' };
             token.position.set(this.cellX(item.gridX), 0, this.cellZ(item.gridY));
             if (isLocalhost && item.visible === false) this._setDimmed(token);
             this.mapGroup.add(token);
@@ -595,6 +643,7 @@ export class Map3DScene {
                 // Always built; setToggles flips .visible (invisible lights
                 // are skipped by the renderer), so toggling needs no rebuild.
                 l.userData.isTorchLight = true;
+                l.userData.census = { kind: 'torchLights' };
                 l.visible = this.showTorch;
                 this.mapGroup.add(l);
                 count += 1;
@@ -637,6 +686,7 @@ export class Map3DScene {
                 side: THREE.DoubleSide,
             }));
         mesh.renderOrder = 1000;
+        mesh.userData.census = { kind: 'fogCells', count: fog.size };
         this.mapGroup.add(mesh);
     }
 

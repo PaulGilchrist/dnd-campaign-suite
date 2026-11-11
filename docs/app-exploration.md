@@ -72,7 +72,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-10 HD) Map3D/HexMap3D expose NO automation handle — per-mesh/geometry proofs require screenshot diffs and network-URL greps; export a dev-only scene census (e.g. `data-testid="map3d-scene"` element carrying item-type→mesh-count on a dataset, or `globalThis.__map3d` in dev builds) so exploration/tests can assert meshes without pixels.
 - (2026-11-10 improve run, follow-on from rest-modal-dialog-semantics) `HealingPoolModal.jsx` and `HandOfHealingModal.jsx` borrow the `.short-rest-overlay/.short-rest-modal` classes for NON-rest flows and still lack the dialog semantics ShortRestModal now carries — a `[role=dialog]`-by-class probe on those lanes false-negates; give those shells the same role/aria-modal/labelledby tier (or move them onto the shared chrome) and stop class-borrowing if cheap.
 
 

@@ -96,6 +96,21 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
         scene.updateSpellOverlays(overlays || []);
     }, [ready, mapData, overlays]);
 
+    // Dev-only automation handle (backlog 2026-11-10 HD): exposes the scene's
+    // LIVE census (Map3DScene.getCensus traverses the scene graph on every
+    // read, so overlay adds/clears and rebuilds show through with no remount).
+    // Behind import.meta.env.DEV so production builds never ship the handle.
+    useEffect(() => {
+        if (!import.meta.env.DEV || !ready) return undefined;
+        globalThis.__map3d = {
+            get census() {
+                const scene = sceneRef.current;
+                return scene ? scene.getCensus() : null;
+            },
+        };
+        return () => { delete globalThis.__map3d; };
+    }, [ready]);
+
     const handleTopDown = useCallback(() => {
         sceneRef.current?.topDown();
     }, []);

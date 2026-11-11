@@ -93,6 +93,21 @@ function HexMap3D({
         scene.setWeather(weather || null);
     }, [ready, weather]);
 
+    // Dev-only automation handle (backlog 2026-11-10 HD): exposes the scene's
+    // LIVE census (Hex3DScene.getCensus traverses the scene graph on every
+    // read, so patch-lane writes show through with no remount). Behind
+    // import.meta.env.DEV so production builds never ship the handle.
+    useEffect(() => {
+        if (!import.meta.env.DEV || !ready) return undefined;
+        globalThis.__hexmap3d = {
+            get census() {
+                const scene = sceneRef.current;
+                return scene ? scene.getCensus() : null;
+            },
+        };
+        return () => { delete globalThis.__hexmap3d; };
+    }, [ready]);
+
     const handleTopDown = useCallback(() => {
         sceneRef.current?.topDown();
     }, []);

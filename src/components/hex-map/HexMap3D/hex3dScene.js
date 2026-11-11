@@ -319,6 +319,8 @@ export class Hex3DScene {
         this._hexCols = 0;
         this._hexRows = 0;
         this._terrain = {};
+        this._relief = null;
+        this._riverHexes = 0;
         this._tintScratch = null;
     }
 
@@ -566,6 +568,41 @@ export class Hex3DScene {
         this._frameCamera(`${hexCols}x${hexRows}`);
     }
 
+    // Dev-only automation handle (backlog 2026-11-10 HD), twin of
+    // Map3DScene.getCensus: reads the LIVE scene graph every call (patch
+    // lanes — party/travel path/weather — and rebuilds show through with no
+    // remount). Hex3DScene.jsx exposes it as globalThis.__hexmap3d behind
+    // import.meta.env.DEV. `hexes` counts the relief mesh's per-hex centers;
+    // `pois` is a POI-type→placement map; tree/peak lanes are instanced meshes
+    // whose census is the instance count.
+    getCensus() {
+        const census = {
+            hexes: this._relief ? this._relief.centers.size : 0,
+            ground: 0,
+            terrain: 0,
+            trees: 0,
+            peaks: 0,
+            rivers: 0,
+            riverHexes: this._riverHexes,
+            roads: 0,
+            pois: {},
+            party: this.partyGroup && this.partyGroup.children.length > 0 ? 1 : 0,
+            travelPath: this.pathGroup && this.pathGroup.children.length > 0 ? 1 : 0,
+            weather: this._weatherKind,
+        };
+        const visit = (obj) => {
+            const tag = obj.userData.census;
+            if (!tag) return;
+            if (tag.kind === 'poi') {
+                census.pois[tag.type] = (census.pois[tag.type] || 0) + 1;
+            } else {
+                census[tag.kind] += obj.isInstancedMesh ? obj.count : 1;
+            }
+        };
+        if (this.mapGroup) this.mapGroup.children.forEach(visit);
+        return census;
+    }
+
     _buildBackdrop() {
         const THREE = this.THREE;
         const size = this._mapSpan * 2.2;
@@ -575,6 +612,7 @@ export class Hex3DScene {
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -2;
         ground.receiveShadow = true;
+        ground.userData.census = { kind: 'ground' };
         this.mapGroup.add(ground);
     }
 
@@ -670,6 +708,7 @@ export class Hex3DScene {
         }));
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        mesh.userData.census = { kind: 'terrain' };
         this.mapGroup.add(mesh);
     }
 
@@ -681,7 +720,7 @@ export class Hex3DScene {
     _buildDecorations() {
         const THREE = this.THREE;
         const place = (geo, colorHex, items, rough = 0.9, vertexColors = false) => {
-            if (items.length === 0) return;
+            if (items.length === 0) return null;
             const mat = new THREE.MeshStandardMaterial({
                 color: vertexColors ? 0xffffff : colorHex,
                 roughness: rough,
@@ -696,6 +735,7 @@ export class Hex3DScene {
             inst.receiveShadow = true;
             inst.instanceMatrix.needsUpdate = true;
             this.mapGroup.add(inst);
+            return inst;
         };
         const trees = [];
         const peaks = [];
@@ -716,8 +756,10 @@ export class Hex3DScene {
                 peaks.push({ x, y: h, z, s, qy: yaw });
             }
         }
-        place(this._jitteredCone(1, 9, 17, 7), 0x2D5E37, trees);
-        place(this._mountainGeometry(), 0xA8A89C, peaks, 0.95, true);
+        const treeLane = place(this._jitteredCone(1, 9, 17, 7), 0x2D5E37, trees);
+        if (treeLane) treeLane.userData.census = { kind: 'trees' };
+        const peakLane = place(this._mountainGeometry(), 0xA8A89C, peaks, 0.95, true);
+        if (peakLane) peakLane.userData.census = { kind: 'peaks' };
     }
 
     _instanceMatrix(it) {
@@ -813,6 +855,7 @@ export class Hex3DScene {
     _buildRivers(rivers) {
         const THREE = this.THREE;
         const chains = chainRiverHexes(rivers, this._hexCols, this._hexRows);
+        this._riverHexes = chains.reduce((n, chain) => n + chain.length, 0);
         for (const chain of chains) {
             if (chain.length === 1) {
                 const { x, z } = this._world(chain[0].q, chain[0].r);
@@ -821,6 +864,7 @@ export class Hex3DScene {
                     new THREE.MeshStandardMaterial({ color: RIVER_COLOR, roughness: 0.2, metalness: 0.2 }));
                 pool.position.set(x, this._surface(chain[0].q, chain[0].r) + 1.5, z);
                 pool.scale.y = 0.5;
+                pool.userData.census = { kind: 'rivers' };
                 this.mapGroup.add(pool);
                 continue;
             }
@@ -834,6 +878,7 @@ export class Hex3DScene {
                 new THREE.TubeGeometry(curve, pts.length * 6, 3.5, 6, false),
                 new THREE.MeshStandardMaterial({ color: RIVER_COLOR, roughness: 0.2, metalness: 0.15 }));
             tube.receiveShadow = true;
+            tube.userData.census = { kind: 'rivers' };
             this.mapGroup.add(tube);
         }
     }
@@ -856,6 +901,7 @@ export class Hex3DScene {
                 new THREE.TubeGeometry(curve, pts.length * 6, 1.8, 5, false),
                 new THREE.MeshStandardMaterial({ color: ROAD_COLOR, roughness: 1 }));
             tube.receiveShadow = true;
+            tube.userData.census = { kind: 'roads' };
             this.mapGroup.add(tube);
         }
     }
@@ -869,6 +915,7 @@ export class Hex3DScene {
         for (const poi of pois || []) {
             if (!isLocalhost && poi.visible === false) continue;
             const { group, label } = this._buildPoiPlaceholder(poi, isLocalhost);
+            group.userData.census = { kind: 'poi', type: poi.type };
             this.mapGroup.add(group);
             if (poiModelHref(poi.type)) {
                 placed.push({ type: poi.type, group, label, dimmed: isLocalhost && poi.visible === false });
