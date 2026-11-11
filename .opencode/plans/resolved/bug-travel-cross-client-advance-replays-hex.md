@@ -28,3 +28,27 @@ Add an adoption-only backfill: `useEffect(() => { pathRef.current = safePath; pa
 
 ## Severity
 Data integrity risk — the shared daily travel budget is a game-state resource; a phantom charge per cross-client seam can falsely lock the party into dayExhausted/camp, and the campaign log gains dishonest duplicate rows.
+
+## Resolution
+FIXED 2026-11-11 (fix run). The "Likely location" diagnosis was correct: `advanceOneHex` drives off `pathRef`/`pathIndexRef`, which were only backfilled at mount (`useRef(path)` seed), file-resume adoption, arrival-clear, new-destination and LOCAL advance. An external SSE echo (the other tab advancing the shared trip) updated only the SYNCED `travel-path`/`travel-pathIndex` state — so the adopting tab's display (tube/panel read the synced STATE) moved while its press math stayed a step behind, re-walking the traversed hex.
+
+**Fix** — `src/hooks/management/useTravelManagement.js`: one adoption-only backfill effect added next to the null-proof render guards, mirroring the synced values into the refs through the same `safePath`/`safePathIndex` coercions:
+
+```js
+useEffect(() => {
+  pathRef.current = safePath;
+  pathIndexRef.current = safePathIndex;
+}, [path, pathIndex]);
+```
+
+Idempotent on every existing ref write (local advance sets the ref first, the echo then writes the same bytes through the store; arrival-clear and new-destination likewise). It also self-heals two adjacent stale-ref faces the old lane silently shared: `startPlanning`/`cancelTravel` wrote synced `path:[]` without touching `pathRef`, and a null-echoed path now zeroes the ref instead of leaving stale bytes. The local-advance ref writes were KEPT (they keep same-tick double presses correct before the echo lands — the §87/§93 harness laws confirmed only `advanceOneHex` consumes these refs). No 2024 sibling needs the same change — the travel hook is ruleset-agnostic.
+
+**Regression test** — `src/hooks/management/useTravelManagement.cross-client-advance.test.js` (4 tests): external pathIndex echo → next advance walks the NEXT hex once (one charge, idx 1→2, no replay); echo at penultimate hex → next press ARRIVES with the completed-trip key clears; external path REPLACEMENT adopted (walks the new route); local advance stays idempotent through its own echo. Pre-fix fingerprint: 3/4 tests fail with the fix temporarily removed; all pass with it.
+
+**Verification**
+- `npx vitest run src/hooks/management/useTravelManagement.cross-client-advance.test.js` → 4/4 PASS.
+- `npx vitest run src/hooks/management/` → 20 files / 177 tests PASS. `npx vitest run src/components/hex-map/` → 48 files / 530 tests PASS (no pre-existing failures found). `npm run lint` → clean (zero warnings).
+- **Live re-ride (test-campaign, sandbox `fix-travel` 40×20, party-centred, weather clear 0.75/hex, budget 12, eventFrequency none):** GM tab arms a 3-pt route → LAN-origin tab (`http://192.168.0.44:5173`) auto-ADOPTS and advances (server idx 0→1, accrued +0.75) → GM tab's tube live-mirrors behind/ahead `1/2` split → GM presses Advance ONCE: **arrives directly** — one budget charge (GET-verified 6.0→6.75), trip keys REMOVED, `travel-started-by` null-released, mode inactive, party writeback to the destination, exactly one `travel advance` + one `travel arrived` row for the trip, arrival toast on the presser. Expected behavior now occurs exactly.
+- Adjacent sanity: solo (single-client) control trip 2 hexes = 2 charges + arrival honest; tube behind/ahead split renders and live-updates from the echo; both tabs 0 console errors; day-state keys survive arrival unchanged.
+- Cleanup: sandbox map deactivated→DELETED (row buttons; the LAN tab's mounted board re-stamped it active once — MapContextSync law — so the tab was moved off the board view first), Maps-manager back to 4 owner fixtures (battle-arena md5 94fcd0bf byte-exact), change-data + campaign log cleared through the Admin-panel lane (`/admin/clear-change-data` + `/admin/clear-log`) with BOTH tabs closed (open-tab re-seed law), closed-tab two-pass GET-verified change-data `{}` + log `[]`, `git status --porcelain public/campaigns/` empty, servers stopped by PID.
+

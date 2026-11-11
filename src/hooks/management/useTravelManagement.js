@@ -164,6 +164,24 @@ export default function useTravelManagement({
   const safePath = Array.isArray(path) ? path : [];
   const safePathIndex = typeof pathIndex === 'number' ? pathIndex : 0;
 
+  // Cross-client adoption backfill (bug-travel-cross-client-advance-replays-hex):
+  // advanceOneHex drives off the REFS, but an external SSE echo (the other tab
+  // advancing/cancelling the shared trip) only moves the SYNCED values above —
+  // without this mirror the adopting tab's next press re-walks the already-
+  // traversed hex: phantom daily-budget charge + duplicate `travel advance`
+  // log row + pathIndex stuck (the display reads the synced STATE while the
+  // press math runs a step behind). The mount/resume/arrival/new-destination/
+  // local-advance writes stay; this effect makes them redundant on the echo
+  // lane and is idempotent there (a local advance sets the ref first, the
+  // echo then writes the same bytes back through the store). Coercions mirror
+  // the null-proof render guards so a cleared-key null echo can never feed
+  // stale bytes into the refs either. Event-driven (synced-value deps), no
+  // game timers.
+  useEffect(() => {
+    pathRef.current = safePath;
+    pathIndexRef.current = safePathIndex;
+  }, [path, pathIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Improve 2026-10-26 (run-E backlog): the mode an event interrupted. Events
   // only fire on advance, so mid-route the party was MODES.TRAVELING (set by
   // prior advances); an event on the FIRST advance interrupts MODES.PLANNING.
