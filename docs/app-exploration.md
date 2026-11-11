@@ -54,7 +54,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (JT 2026-11-11) Outdoor map create POST stores no `partyPosition`/`marchingOrder` (client editor-open seeds them), so an API-only rig must PUT them — the docs/§490 "auto-centres party" claim reads as a create-lane promise. Consider stamping a centre `partyPosition` server-side at outdoor create for API-first lanes. `server/routes/maps.js` create + `hex-map/hooks/useMapLoader.js`.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

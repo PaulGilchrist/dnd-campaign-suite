@@ -5,6 +5,10 @@ import lodash from 'lodash';
 import { publish, activeMaps, characterChangeData, markDirty, warnIfNewTopLevelKey } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignMapsDir, normalizeMapFile } from '../utils/campaignPaths.js';
+// Shared with the client hex editor (hex-map/hooks/useMapLoader.js seeds the
+// same centre when a stored document carries no partyPosition) so the create
+// stamp and the editor fallback can never drift (backlog JT 2026-11-11).
+import { GRID_COLS_MULTIPLIER } from '../../src/config/outdoorConfig.js';
 
 const { isEqual } = lodash;
 
@@ -358,17 +362,35 @@ const createDisplayName = (name, body) =>
     ? body.displayName.trim()
     : name.trim();
 
-const buildOutdoorMapData = (name, body) => ({
-  displayName: createDisplayName(name, body),
-  name: toKebabCase(name.trim()),
-  type: body.type ?? 'indoor',
-  gridSize: clampGridSize(body.gridSize),
-  terrain: body.terrain ?? {},
-  pois: body.pois ?? [],
-  zoom: 1,
-  panX: 0,
-  panY: 0,
+// Outdoor create-stamp (JT backlog 2026-11-11): an API-first create used to
+// store NO partyPosition, so an API-only rig had to follow the POST with a
+// whole-doc PUT just to place the party (the client only seeds this at
+// editor-open). Stamp the documented centre of the hexCols×hexRows grid the
+// create derives (cols = gridSize × GRID_COLS_MULTIPLIER, rows = gridSize —
+// e.g. gridSize 20 → 40×20 → {q:20,r:10}), so the party pin and the travel
+// panel have a valid origin straight from the POST. An explicit
+// body.partyPosition still wins verbatim (never overwritten); marchingOrder
+// is trip data and stays client/trip-lane — deliberately not stamped.
+const centrePartyPosition = (gridSize) => ({
+  q: Math.floor((gridSize * GRID_COLS_MULTIPLIER) / 2),
+  r: Math.floor(gridSize / 2),
 });
+
+const buildOutdoorMapData = (name, body) => {
+  const gridSize = clampGridSize(body.gridSize);
+  return {
+    displayName: createDisplayName(name, body),
+    name: toKebabCase(name.trim()),
+    type: body.type ?? 'indoor',
+    gridSize,
+    terrain: body.terrain ?? {},
+    pois: body.pois ?? [],
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    partyPosition: body.partyPosition ?? centrePartyPosition(gridSize),
+  };
+};
 
 const buildIndoorMapData = (name, body) => ({
   displayName: createDisplayName(name, body),
