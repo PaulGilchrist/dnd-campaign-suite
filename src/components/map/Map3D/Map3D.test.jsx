@@ -92,12 +92,43 @@ describe('Map3D', () => {
     it('renders toolbar name, exact counts, and fires onExit from the 2D button, falling back to "3D Map"', () => {
         const { props } = renderMap3D();
         expect(screen.getByText('Test Map')).toBeInTheDocument();
-        expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs')).toBeInTheDocument();
+        expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs · 0 monsters')).toBeInTheDocument();
         fireEvent.click(screen.getByTitle('Back to 2D map'));
         expect(props.onExit).toHaveBeenCalledTimes(1);
 
         renderMap3D({ mapData: createMapData({ displayName: undefined }) });
         expect(screen.getByText('3D Map')).toBeInTheDocument();
+    });
+
+    it('chip counts mirror the getCensus buckets: npc/monster tokens split, ghost props counted as items', () => {
+        // Backlog 2026-11-11 IF: the old chip read `2 npcs` for a 1-npc/
+        // 1-monster board because isToken merged the buckets. The census splits
+        // { kind: 'npcs' | 'monsters' } (map3dScene _buildNpcs) and counts
+        // unregistered ghost types in `fallback` while registered props land in
+        // `items` — the chip's `items` figure covers BOTH (every non-token
+        // prop), so chip items === Σ census.items + census.fallback and
+        // chip npcs + monsters === census.npcs + census.monsters.
+        const { container } = renderMap3D({
+            placedItems: [
+                { id: 't1', type: 'npc', name: 'Goblin', gridX: 1, gridY: 2, visible: true },
+                { id: 't2', type: 'monster', name: 'Wolf', gridX: 2, gridY: 2, visible: true },
+                { id: 'p1', type: 'torch', name: 'Torch', gridX: 3, gridY: 1, visible: true },
+                { id: 'p2', type: 'Zzznotamonster', name: 'Ghost', gridX: 4, gridY: 1, visible: true },
+            ],
+        });
+        const chip = container.querySelector('.map3d-counts');
+        expect(chip.textContent).toBe('2 walls · 2 items · 1 players · 1 npcs · 1 monsters');
+        // The exact merge the backlog flagged must never render.
+        expect(chip.textContent).not.toMatch(/2 npcs/);
+
+        // Monster-only face: creature count stays census-consistent (0 + 2).
+        renderMap3D({
+            placedItems: [
+                { id: 'm1', type: 'monster', name: 'Wolf', gridX: 1, gridY: 1, visible: true },
+                { id: 'm2', type: 'monster', name: 'Bear', gridX: 2, gridY: 1, visible: true },
+            ],
+        });
+        expect(screen.getByText('2 walls · 0 items · 1 players · 0 npcs · 2 monsters')).toBeInTheDocument();
     });
 
     it('renders the camera-control hint in the toolbar chrome with the exact copy, alongside the intact controls', () => {
@@ -115,7 +146,7 @@ describe('Map3D', () => {
         expect(toggles).toHaveLength(2);
         expect(screen.getByRole('checkbox', { name: 'Labels' })).toBeChecked();
         expect(screen.getByRole('checkbox', { name: 'Torch light' })).toBeChecked();
-        expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs')).toBeInTheDocument();
+        expect(screen.getByText('2 walls · 1 items · 1 players · 1 npcs · 0 monsters')).toBeInTheDocument();
     });
 
     it('exit and top-down buttons are discoverable by accessible name (aria-label parity)', () => {

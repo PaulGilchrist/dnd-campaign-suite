@@ -119,11 +119,18 @@ function Map3D({ campaignName, mapData, placedItems, characters, isLocalhost, fo
         const wallCount = walls ? computeEffectiveWalls(walls, placedItems).size : 0;
         // Creature tokens (npc + dress monsters) share the token render lane —
         // mirror map3dScene's _buildNpcs/_buildPlacedItems dispatch in the counts.
+        // The copy mirrors getCensus() buckets (backlog 2026-11-11 IF): npc and
+        // monster tokens are counted SEPARATELY (kind 'npcs' vs 'monsters'),
+        // and props — registered types (census `items`) plus unregistered ghost
+        // types (census `fallback`) — share the one `items` figure, matching
+        // _buildPlacedItems which renders every non-token prop.
         const isToken = (i) => i.type === 'npc' || i.type === 'monster';
         const items = (placedItems || []).filter((i) => !isToken(i)).length;
-        const npcs = (placedItems || []).filter(isToken).length;
+        const tokens = (placedItems || []).filter(isToken);
+        const npcs = tokens.filter((i) => i.type === 'npc').length;
+        const monsters = tokens.filter((i) => i.type === 'monster').length;
         const playerCount = (players || []).length;
-        return `${wallCount} walls · ${items} items · ${playerCount} players · ${npcs} npcs`;
+        return `${wallCount} walls · ${items} items · ${playerCount} players · ${npcs} npcs · ${monsters} monsters`;
     }, [walls, placedItems, players]);
 
     return (

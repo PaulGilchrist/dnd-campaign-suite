@@ -94,7 +94,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (IF 2026-11-11) 3D header chip collapses buckets: `${npcs} npcs` counts `isToken` (npc+monster merged) and `items` excludes ghosts — reads `2 npcs` for a 1-npc/1-monster board while the census splits them; split the chip copy (or label it `tokens`) to match `getCensus` naming. `src/components/map/Map3D/Map3D.jsx:124-126`.
 - (IF 2026-11-11) A monster-card hit popup's `click to dismiss` backdrop SILENTLY VOIDs the staged damage — the attack roll keeps its `hit:true` log row but no damage/hp_change row ever lands and nothing is logged about the cancellation (2 real faces this run). UX trap: a stray backdrop click mid-turn quietly eats a monster's damage. Consider: stage damage on HIT-CONFIRMED at roll time and keep the popup purely informational, OR guard the backdrop dismissal while a Done-gated damage stage is pending, OR log an honest `attack_cancelled` row. `encounters/MonsterCardModal.jsx` popup chrome.
 
 ## Blocked / Not Verified (fold-gate ledger)
