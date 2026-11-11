@@ -27,3 +27,18 @@ Fastest honest close: delete `encounterMod`/`perception`/`stealthAdvantage` from
 
 ## Severity
 Minor UX issue with a rules-correctness sting: displayed table text promises mechanics that don't exist (the odds half is one added term away from true; the perception/stealth halves have no home yet).
+
+## Resolution
+**FIXED (de-advertise half — the suggested "fastest honest close").** The bug diagnosis was confirmed exactly: the pace rows' `encounterMod`/`perception`/`stealthAdvantage` had zero consumers repo-wide (`shouldTriggerEvent`/`eventChanceBreakdown` read terrain + weather + frequency only; every `encounterMod` hit is the *weather* row's field, `stealthAdvantageApplies` in `useCharActionsBaseActions.js` is a condition-effect lane, `skillBonuses.perception` is NPC skills — all unrelated). The perception/stealth halves have no consumer to home, so implementing them would mean inventing new mechanics — out of bug-fix scope. The odds half COULD have been implemented by threading pace into `eventChanceBreakdown` like the sibling `bug-event-chance-label-ignores-mods` fix, but that would leave the tooltips still half-lying, so de-advertising both halves together is the honest close and does not regress the sibling fix (its shared breakdown/`+2 hills` attribution live re-verified intact).
+
+**Changes:**
+- `src/services/campaign/travelService.js` — deleted `encounterMod`/`perception`/`stealthAdvantage` from all three `TRAVEL_PACES` rows; rewrote the tooltips to what pace actually does: Slow → "Cautious movement — slowest travel, smallest daily hex budget", Fast → "Rapid travel — fastest movement, largest daily hex budget" (Normal unchanged). Comment pins the rule: re-add the fields only WITH their consumer.
+- `src/services/campaign/travelService.test.js` — the old pin "full perception and encounter modifiers" actively asserted the dead fields; replaced with a pin of time-data-only rows + `not.toHaveProperty` on each dead field.
+- `src/components/hex-map/TravelPanel.pace-tooltips.test.jsx` (NEW) — locks the three byte-exact honest chip tooltips, forbids any `/hidden|stealth|spot|percept|notice|threat|encounter|chance/i` advertising, re-pins the field-free rows, and locks the effective-chance row as pace-independent (hills + Normal = "14% chance per hex (base 12%, +2 hills)" identically at slow/normal/fast).
+
+**Live verification (test-campaign, poi-showcase outdoor board):**
+- PRE-fix repro: chips carried the verbatim advertised titles; route via hills read "14% chance per hex (base 12%, +2 hills)" identically at Slow/Normal/Fast while time/budget honestly moved (next-hex 3h/2h/1h 30m, budget 2.0/4.0/5.0) — zero odds delta attributable to pace, exactly as filed.
+- POST-fix re-run of the same steps: chip titles byte-exact to the new honest copy, no pace tooltip matches the stealth/perception word set; pace press still moves only NEXT HEX time and BUDGET; odds row + sibling-fix terrain-mod attribution unchanged; `.travel-pace-btn` guard behavior (button click doesn't fire the destination toast) intact.
+- Cleanup: trip cancelled, Admin "Clear Change Data" + "Clear Campaign Log" (change-data `{}`, log `[]` GET-verified), poi-showcase back to inactive (all 4 owner fixtures inactive, none created/deleted), `git status --porcelain public/campaigns/` empty.
+
+**Tests/lint:** `TravelPanel.pace-tooltips.test.jsx` 4/4 pass; touched folders green — `src/services/campaign` 20 files/288 tests, `src/components/hex-map` 54 files/576 tests, `src/hooks/management` 20 files/177 tests; `npm run lint` zero warnings; `no-timers-guard` OK. Full `npm run test:run`: 3218 files / 34680 tests passed (174 s), zero failures.

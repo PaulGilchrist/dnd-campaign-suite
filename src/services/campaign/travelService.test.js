@@ -48,14 +48,24 @@ describe('travelService', () => {
       expect(EXHAUSTION_SPEED_MULTIPLIER).toBeCloseTo(5 / 6, 10);
     });
 
-    it('should define slow/normal/fast paces with full perception and encounter modifiers', () => {
+    // bug-travel-pace-odds-fields-inert: the paces used to carry
+    // perception/stealthAdvantage/encounterMod while NOTHING read them (the
+    // event roll is terrain + weather + frequency only) and the TravelPanel
+    // tooltips advertised those mechanics. The dead fields are gone — a pace
+    // row is exactly its time/budget data plus honest description text.
+    it('should define slow/normal/fast paces with time data only — no inert modifiers', () => {
       expect(TRAVEL_PACES).toHaveLength(3);
       const byId = Object.fromEntries(TRAVEL_PACES.map(p => [p.id, p]));
       expect(byId).toMatchObject({
-        slow: { hexesPerHour: 1 / 3, hoursPerHex: 3, perception: 5, stealthAdvantage: true, encounterMod: -2 },
-        normal: { hexesPerHour: 1 / 2, hoursPerHex: 2, perception: 0, stealthAdvantage: false, encounterMod: 0 },
-        fast: { hexesPerHour: 2 / 3, hoursPerHex: 1.5, perception: -5, stealthAdvantage: false, encounterMod: 2 },
+        slow: { hexesPerHour: 1 / 3, hoursPerHex: 3 },
+        normal: { hexesPerHour: 1 / 2, hoursPerHex: 2 },
+        fast: { hexesPerHour: 2 / 3, hoursPerHex: 1.5 },
       });
+      for (const pace of TRAVEL_PACES) {
+        expect(pace).not.toHaveProperty('perception');
+        expect(pace).not.toHaveProperty('stealthAdvantage');
+        expect(pace).not.toHaveProperty('encounterMod');
+      }
     });
 
     it('should keep each pace internally consistent (hexesPerHour is the inverse of hoursPerHex)', () => {

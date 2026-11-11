@@ -13,25 +13,25 @@ export const TERRAIN_MOVE_COST = {
   water: 4,
 };
 
+// Pace rows carry ONLY the fields the app actually applies: per-hex time and
+// the daily hex budget derived from it (bug-travel-pace-odds-fields-inert:
+// encounterMod/perception/stealthAdvantage had zero consumers — the event roll
+// reads terrain + weather + frequency only — so the old tooltips advertised
+// stealth/perception mechanics nothing applied). If a future lane consumes
+// those mechanics, re-add the fields WITH the consumer, never without.
 export const TRAVEL_PACES = [
   {
     id: 'slow',
     name: 'Slow',
     hexesPerHour: 1 / 3,
     hoursPerHex: 3,
-    perception: 5,
-    stealthAdvantage: true,
-    encounterMod: -2,
-    description: 'Cautious movement, easy to spot threats and stay hidden',
+    description: 'Cautious movement — slowest travel, smallest daily hex budget',
   },
   {
     id: 'normal',
     name: 'Normal',
     hexesPerHour: 1 / 2,
     hoursPerHex: 2,
-    perception: 0,
-    stealthAdvantage: false,
-    encounterMod: 0,
     description: 'Standard adventuring pace',
   },
   {
@@ -39,10 +39,7 @@ export const TRAVEL_PACES = [
     name: 'Fast',
     hexesPerHour: 2 / 3,
     hoursPerHex: 1.5,
-    perception: -5,
-    stealthAdvantage: false,
-    encounterMod: 2,
-    description: 'Rapid travel, harder to notice threats or stay hidden',
+    description: 'Rapid travel — fastest movement, largest daily hex budget',
   },
 ];
 
