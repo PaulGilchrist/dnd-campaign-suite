@@ -31,23 +31,26 @@ const TERRAIN_BIOME = {
   beach: 'coastal',
 };
 
-// VERBATIM WEATHER_EFFECTS from weatherService.js L20-102. These exact
-// fields are the travel contract consumed downstream:
+// VERBATIM WEATHER_EFFECTS from weatherService.js. These exact fields are the
+// travel contract consumed downstream:
 // - budgetMod → useTravelManagement.js L104 (`w?.budgetMod ?? 1`, floored)
 // - moveCostMod → useTravelManagement.js L112-113 (null = impassable hex)
 //   and L193 (`weather?.moveCostMod === null` → halt message)
 // - encounterMod → randomEventService.js L17 (`(weather?.encounterMod || 0) / 100`)
 // - label/icon/description → TravelPanel.jsx TravelWeatherSection (L39-46)
+// There is deliberately NO `visibility` field: it had zero consumers, so the
+// rows no longer advertise a visibility mechanic (bug-weather-visibility-
+// advertised-never-enforced — pinned below; re-add only WITH a consumer).
 const WEATHER_EFFECTS = {
-  clear: { label: 'Clear', icon: 'sun', visibility: null, moveCostMod: 1.0, budgetMod: 1.0, encounterMod: 0, description: 'Clear skies — no effect on travel' },
-  cloudy: { label: 'Cloudy', icon: 'cloud', visibility: null, moveCostMod: 1.0, budgetMod: 1.0, encounterMod: 0, description: 'Overcast — no effect on travel' },
-  rain: { label: 'Rain', icon: 'cloud-rain', visibility: null, moveCostMod: 1.25, budgetMod: 1.0, encounterMod: 10, description: 'Heavy rain — terrain costs +25%' },
-  storm: { label: 'Storm', icon: 'bolt', visibility: 3, moveCostMod: 1.5, budgetMod: 0.75, encounterMod: 20, description: 'Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%' },
-  fog: { label: 'Fog', icon: 'smog', visibility: 1, moveCostMod: 1.0, budgetMod: 1.0, encounterMod: -10, description: 'Thick fog — visibility limited to adjacent hexes' },
-  wind: { label: 'High Wind', icon: 'wind', visibility: null, moveCostMod: 1.0, budgetMod: 0.8, encounterMod: 5, description: 'Strong winds — daily budget -20%' },
-  snow: { label: 'Snow', icon: 'snowflake', visibility: null, moveCostMod: 1.5, budgetMod: 1.0, encounterMod: 10, description: 'Snowfall — terrain costs +50%' },
-  mist: { label: 'Mist', icon: 'smog', visibility: 2, moveCostMod: 1.0, budgetMod: 1.0, encounterMod: -5, description: 'Heavy mist — visibility reduced' },
-  extreme: { label: 'Extreme', icon: 'triangle-exclamation', visibility: 0, moveCostMod: null, budgetMod: 0, encounterMod: 30, description: 'Blizzard or sandstorm — travel impossible, forced camp' },
+  clear: { label: 'Clear', icon: 'sun', moveCostMod: 1.0, budgetMod: 1.0, encounterMod: 0, description: 'Clear skies — no effect on travel' },
+  cloudy: { label: 'Cloudy', icon: 'cloud', moveCostMod: 1.0, budgetMod: 1.0, encounterMod: 0, description: 'Overcast — no effect on travel' },
+  rain: { label: 'Rain', icon: 'cloud-rain', moveCostMod: 1.25, budgetMod: 1.0, encounterMod: 10, description: 'Heavy rain — terrain costs +25%' },
+  storm: { label: 'Storm', icon: 'bolt', moveCostMod: 1.5, budgetMod: 0.75, encounterMod: 20, description: 'Thunderstorm — terrain costs +50%, daily budget -25%' },
+  fog: { label: 'Fog', icon: 'smog', moveCostMod: 1.0, budgetMod: 1.0, encounterMod: -10, description: 'Thick fog — encounter chance -10%' },
+  wind: { label: 'High Wind', icon: 'wind', moveCostMod: 1.0, budgetMod: 0.8, encounterMod: 5, description: 'Strong winds — daily budget -20%' },
+  snow: { label: 'Snow', icon: 'snowflake', moveCostMod: 1.5, budgetMod: 1.0, encounterMod: 10, description: 'Snowfall — terrain costs +50%' },
+  mist: { label: 'Mist', icon: 'smog', moveCostMod: 1.0, budgetMod: 1.0, encounterMod: -5, description: 'Heavy mist — encounter chance -5%' },
+  extreme: { label: 'Extreme', icon: 'triangle-exclamation', moveCostMod: null, budgetMod: 0, encounterMod: 30, description: 'Blizzard or sandstorm — travel impossible, forced camp' },
 };
 
 // Full expected record for a condition: { condition, ...effect }.
@@ -147,6 +150,28 @@ describe('weatherService', () => {
       const storm = generateWeather('plains');
       expect(Math.floor(4 * storm.budgetMod)).toBe(3); // -25% daily budget, truncated
       expect(storm.moveCostMod).toBe(1.5); // +50% terrain cost, still passable
+    });
+
+    it('no row carries a visibility field or advertises one it cannot enforce', () => {
+      // bug-weather-visibility-advertised-never-enforced regression pin: fog
+      // ("visibility limited to adjacent hexes"), mist and storm shipped a
+      // write-only `visibility` field with ZERO consumers — no rendering,
+      // LOS or destination planning consulted it. Every table slot of every
+      // biome must stay field-free and copy-free of that promise; a future
+      // visibility mechanic must re-add the field WITH its consumer.
+      const seen = new Set();
+      for (const [biome, table] of Object.entries(BIOME_TABLES)) {
+        for (let i = 0; i < table.length; i++) {
+          rigIndex(table, i);
+          const rec = generateWeather(BIOME_TERRAIN[biome]);
+          expect(rec, `${biome}[${i}] ${rec.condition}`).not.toHaveProperty('visibility');
+          expect(rec.description, `${rec.condition} description`).not.toMatch(/visib/i);
+          seen.add(rec.condition);
+        }
+      }
+      // fog/mist/storm are the once-lying rows — prove they were all rolled.
+      expect([...seen].sort()).toEqual(
+        ['clear', 'cloudy', 'extreme', 'fog', 'mist', 'rain', 'snow', 'storm', 'wind']);
     });
   });
 });

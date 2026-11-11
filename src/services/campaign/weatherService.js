@@ -17,11 +17,18 @@ const TERRAIN_BIOME = {
   beach: 'coastal',
 };
 
+// Weather rows carry ONLY the fields the app actually applies: moveCostMod
+// (per-hex travel cost), budgetMod (daily hex budget) and encounterMod
+// (event-roll odds, surfaced by the panel's effective-chance row) — plus the
+// label/icon/description the TravelPanel prints (bug-weather-visibility-
+// advertised-never-enforced: `visibility` had zero consumers — fog/mist/storm
+// copy promised restricted line-of-sight or planning nothing rendered or
+// gated, so the field and the claims are gone). If a future LOS/visibility
+// lane is built, re-add the field WITH the consumer, never without.
 const WEATHER_EFFECTS = {
   clear: {
     label: 'Clear',
     icon: 'sun',
-    visibility: null,
     moveCostMod: 1.0,
     budgetMod: 1.0,
     encounterMod: 0,
@@ -30,7 +37,6 @@ const WEATHER_EFFECTS = {
   cloudy: {
     label: 'Cloudy',
     icon: 'cloud',
-    visibility: null,
     moveCostMod: 1.0,
     budgetMod: 1.0,
     encounterMod: 0,
@@ -39,7 +45,6 @@ const WEATHER_EFFECTS = {
   rain: {
     label: 'Rain',
     icon: 'cloud-rain',
-    visibility: null,
     moveCostMod: 1.25,
     budgetMod: 1.0,
     encounterMod: 10,
@@ -48,25 +53,22 @@ const WEATHER_EFFECTS = {
   storm: {
     label: 'Storm',
     icon: 'bolt',
-    visibility: 3,
     moveCostMod: 1.5,
     budgetMod: 0.75,
     encounterMod: 20,
-    description: 'Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%',
+    description: 'Thunderstorm — terrain costs +50%, daily budget -25%',
   },
   fog: {
     label: 'Fog',
     icon: 'smog',
-    visibility: 1,
     moveCostMod: 1.0,
     budgetMod: 1.0,
     encounterMod: -10,
-    description: 'Thick fog — visibility limited to adjacent hexes',
+    description: 'Thick fog — encounter chance -10%',
   },
   wind: {
     label: 'High Wind',
     icon: 'wind',
-    visibility: null,
     moveCostMod: 1.0,
     budgetMod: 0.8,
     encounterMod: 5,
@@ -75,7 +77,6 @@ const WEATHER_EFFECTS = {
   snow: {
     label: 'Snow',
     icon: 'snowflake',
-    visibility: null,
     moveCostMod: 1.5,
     budgetMod: 1.0,
     encounterMod: 10,
@@ -84,16 +85,14 @@ const WEATHER_EFFECTS = {
   mist: {
     label: 'Mist',
     icon: 'smog',
-    visibility: 2,
     moveCostMod: 1.0,
     budgetMod: 1.0,
     encounterMod: -5,
-    description: 'Heavy mist — visibility reduced',
+    description: 'Heavy mist — encounter chance -5%',
   },
   extreme: {
     label: 'Extreme',
     icon: 'triangle-exclamation',
-    visibility: 0,
     moveCostMod: null,
     budgetMod: 0,
     encounterMod: 30,

@@ -115,7 +115,7 @@ import HexMap from './HexMap.jsx';
 const PARTY = { q: 15, r: 8 };
 
 // weatherService.js production "extreme" row (label/icon verbatim).
-const EXTREME = { condition: 'extreme', label: 'Extreme', icon: 'triangle-exclamation', visibility: 0, moveCostMod: null, budgetMod: 0, encounterMod: 30 };
+const EXTREME = { condition: 'extreme', label: 'Extreme', icon: 'triangle-exclamation', moveCostMod: null, budgetMod: 0, encounterMod: 30 };
 
 function makeMapLoader(overrides = {}) {
     return {

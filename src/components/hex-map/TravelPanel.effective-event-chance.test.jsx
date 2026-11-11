@@ -19,8 +19,8 @@ const PATH = [
 ];
 
 // Real rain/weatherService row shapes (encounterMod is the live roll input).
-const RAIN = { condition: 'rain', label: 'Rain', icon: 'cloud-rain', visibility: null, moveCostMod: 1.25, budgetMod: 1, encounterMod: 10, description: 'Heavy rain — terrain costs +25%' };
-const FOG = { condition: 'fog', label: 'Fog', icon: 'smog', visibility: 1, moveCostMod: 1, budgetMod: 1, encounterMod: -10, description: 'Thick fog — visibility limited to adjacent hexes' };
+const RAIN = { condition: 'rain', label: 'Rain', icon: 'cloud-rain', moveCostMod: 1.25, budgetMod: 1, encounterMod: 10, description: 'Heavy rain — terrain costs +25%' };
+const FOG = { condition: 'fog', label: 'Fog', icon: 'smog', moveCostMod: 1, budgetMod: 1, encounterMod: -10, description: 'Thick fog — encounter chance -10%' };
 
 const makeProps = (overrides = {}) => ({
   travelPace: 'normal',

@@ -37,7 +37,6 @@ const EXTREME = {
   condition: 'extreme',
   label: 'Extreme',
   icon: 'triangle-exclamation',
-  visibility: 0,
   moveCostMod: null,
   budgetMod: 0,
   encounterMod: 30,
