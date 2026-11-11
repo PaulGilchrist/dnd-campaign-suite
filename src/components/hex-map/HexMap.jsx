@@ -144,7 +144,7 @@ const AWAITING_DESTINATION_TOAST_MESSAGE = 'Select a destination hex on the map'
 const travelAwaitingDestination = (panelOpen, travelMode, destination) =>
     panelOpen && travelMode === 'planning' && !destination;
 
-function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName, mapDisplayName }) {
+function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName, mapDisplayName }) {
     const svgRef = useRef(null);
 
     // ── Display-only map toast (arrival + POI-enter refusal + rejected-load
@@ -674,6 +674,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             >
             <HexMapToolbar
                 onBack={onBack}
+                backMapTarget={backMapTarget}
                 mapName={mapsService.formatMapName(mapName)}
                 displayName={mapLoader.mapData?.displayName}
                 tool={tool} setTool={setTool}

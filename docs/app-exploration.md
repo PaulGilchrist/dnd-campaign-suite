@@ -65,7 +65,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-11 JV) The board toolbar button titled/aria'd "Back to maps" POPS the map-history stack when it's non-empty (Enter a linked map → the button takes you to the PREVIOUS map, not the manager) — navigation surprise; suggest relabelling dynamically ("Back to <previous map>") while history is armed, or only pushing history for POI enters. `src/App.jsx` `handleBackFromMap` (:553) + board toolbar buttons.
 - (2026-11-11 JV) Open/ settled INDOOR board does not live-adopt a whole-doc `players[]` PUT (tokens appear only after remount) while hex boards adopt per-field via `useHexMapSSESync` — if confirmed by the PT2 re-verify, extend the indoor echo lane to adopt token fields (removes the remount dance from every token rig). `src/components/map/Map.jsx` + its SSE sync hook.
 - (2026-11-11 JV) MarchingOrderPanel `+ <name>` always APPENDS to the tail — building an ordered roster then inserting one 2nd-in-line costs N "Move up" presses; suggest an insert-into-slot affordance (or a "move to top" shortcut) on the add button. `src/components/hex-map/MarchingOrderPanel.jsx`.
 

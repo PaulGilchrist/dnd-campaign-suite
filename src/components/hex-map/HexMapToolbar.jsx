@@ -1,4 +1,5 @@
 import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_TRAVEL, TOOL_ROAD } from '../../config/outdoorConfig';
+import { backToMapLabel } from '../../services/maps/backToMapLabel.js';
 
 // One open/closed copy pair feeds title AND aria-label (a0211afcb pattern:
 // icon-only buttons mirror their title into the accessible name).
@@ -65,6 +66,11 @@ function EditorTools({ tool, setTool, selectedTerrain, setSelectedTerrain, terra
 
 function HexMapToolbar({
     onBack,
+    // Current map-history top ({ mapName, mapDisplayName } | null) — while
+    // non-null the back button names the map its press pops open instead of
+    // the static "Back to maps" (backlog 2026-11-11 JV, label only — the
+    // press behaviour is App.handleBackFromMap, unchanged).
+    backMapTarget,
     mapName,
     displayName,
     tool,
@@ -91,9 +97,12 @@ function HexMapToolbar({
 }) {
     const poiLabel = toggleLabel(poiPanelOpen, 'Open POI panel', 'Close POI panel');
     const marchingLabel = toggleLabel(marchingOrderOpen, 'Manage marching order', 'Close marching order');
+    // Empty stack (or legacy hosts passing no target) → byte-identical
+    // "Back to maps"; armed stack → names the popped map (JV label fix).
+    const backLabel = backToMapLabel(backMapTarget);
     return (
         <div className="hex-map-toolbar">
-            <button onClick={onBack} title="Back to maps" aria-label="Back to maps" className="no-print">
+            <button onClick={onBack} title={backLabel} aria-label={backLabel} className="no-print">
                 <i className="fa-solid fa-arrow-left"></i>
             </button>
             <span className="hex-map-title">{displayName || mapName}</span>

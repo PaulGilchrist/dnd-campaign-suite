@@ -120,6 +120,31 @@ describe('HexMapToolbar', () => {
         expect(screen.queryByText('Northern Wilds')).not.toBeInTheDocument();
     });
 
+    // Dynamic back label (backlog 2026-11-11 JV): with the map-history stack
+    // armed, the button names the map its press pops — title AND aria-label.
+    // The static face is pinned byte-for-byte by the BUTTON_TITLE_ORDER census
+    // above (no backMapTarget passed → 'Back to maps').
+    it('names the popped map in title + aria-label when backMapTarget is armed', () => {
+        renderToolbar({ backMapTarget: { mapName: 'jv-travel', mapDisplayName: 'JV Travel' } });
+        const button = screen.getByRole('button', { name: 'Back to JV Travel' });
+        expect(button).toHaveAttribute('title', 'Back to JV Travel');
+        expect(screen.queryByTitle('Back to maps')).not.toBeInTheDocument();
+        // Press routing unchanged — still a bare onBack click.
+        fireEvent.click(button);
+        expect(props.onBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('title-cases a slug-only entry and reverts to the static label on null', () => {
+        renderToolbar({ backMapTarget: { mapName: 'jv-travel' } });
+        expect(screen.getByTitle('Back to Jv Travel'))
+            .toHaveAttribute('aria-label', 'Back to Jv Travel');
+        // Final pop empties the stack → the SAME mounted toolbar reverts to the
+        // byte-identical "Back to maps" (no remount).
+        renderToolbar({ backMapTarget: null });
+        expect(screen.getByTitle('Back to maps'))
+            .toHaveAttribute('aria-label', 'Back to maps');
+    });
+
     // Simple fire-and-forget buttons: click routes to exactly the right prop, once.
     // (Container seam proves the handlers do something — HexMap.test.jsx #793; here we own the button wiring.)
     it.each([

@@ -21,6 +21,7 @@ import useCampaignType from './hooks/management/useCampaignType.js';
 import useAppData from './hooks/runtime/useAppData.js';
 import useCharacterManagement from './hooks/management/useCharacterManagement.js';
 import useCampaignManagement from './hooks/management/useCampaignManagement.js';
+import useMapHistory from './hooks/management/useMapHistory.js';
 import { useCharacterWizard } from './hooks/wizard/useCharacterWizard.js';
 import rulesFactory from './services/rules/rulesFactory.js';
 import Subscriber from './components/common/Subscriber.jsx';
@@ -307,7 +308,7 @@ function seedCampaignRuntimeData(serverData) {
   }
 }
 
-function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, activeMapName, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
+function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, activeMapName, onBackFromMap, backMapTarget, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
   if (mapsView.type === 'manager') {
     return (
       <MapsManager
@@ -353,6 +354,9 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
             ? () => setMapsView({ type: 'map', mapName: newActiveMap })
             : undefined}
           onBack={onBackFromMap}
+          // Dynamic Back-label source (backlog 2026-11-11 JV): the current
+          // stack top the pop branch will open, or null for the static label.
+          backMapTarget={backMapTarget}
           onEncounterCreated={onEncounterCreated}
           onPoiEntered={onEncounterCreated}
         />
@@ -415,8 +419,12 @@ function App() {
   // and mapDisplayName (optional) the manager row's display name — threads to the
   // rejected-load notice (backlog map-load-notice-slug-naming). POI-entered maps
   // carry no display name; the notice falls back to the slug there.
-  // Navigation stack for indoor map entry (POI, encounter) — push on enter, pop on back
-  const mapHistoryRef = useRef([]);
+  // Navigation stack for indoor map entry (POI, encounter) — push on enter, pop
+  // on back. Entries carry { mapName, mapDisplayName } so the board toolbar's
+  // dynamic "Back to <map>" label (backlog 2026-11-11 JV, useMapHistory) can
+  // name the popped map the way its row/header was named; the pop still drives
+  // mapsView by slug only.
+  const mapHistory = useMapHistory();
 
   // Post-rollback carry-over: re-select the campaign, land on the Admin view,
   // and show the "restored" banner after the rollback's full page reload.
@@ -512,9 +520,8 @@ function App() {
     const seededCampaignRef = useRef('');
     useEffect(() => {
       if (!computedCharacters.length || !campaignName) return;
-      const campaign = campaignName;
-      if (seededCampaignRef.current === campaign && computedCharacters.length > 0) return;
-      seededCampaignRef.current = campaign;
+      if (seededCampaignRef.current === campaignName && computedCharacters.length > 0) return;
+      seededCampaignRef.current = campaignName;
       (async () => {
         const serverData = await fetchCampaignChangeData(campaignName);
         // Also seed arbitrary runtime keys (weapon mastery choices, etc.) from server data,
@@ -533,11 +540,13 @@ function App() {
 
   const handleEnterMap = useCallback((mapName) => {
     if (mapsView.type === 'map' && mapsView.mapName) {
-      mapHistoryRef.current.push(mapsView.mapName);
+      mapHistory.push({ mapName: mapsView.mapName, mapDisplayName: mapsView.mapDisplayName });
     }
     setMapsView({ type: 'map', mapName });
     setActiveMapName(mapName);
-  }, [mapsView]);
+    // mapHistory only ever mutates its ref + setState mirror (no render-order
+    // coupling), so re-creating this callback is behaviour-neutral.
+  }, [mapsView, mapHistory]);
 
   // Self-heal the player's Back transition (backlog 2026-11-05 CV): Back with
   // an empty stack reset mapsView to 'none' even while an active map existed,
@@ -551,8 +560,8 @@ function App() {
   // no-map case unchanged) and this branch runs solely while LEAVING a map
   // view, so an open view is never hijacked or re-switched.
   const handleBackFromMap = () => {
-    if (mapHistoryRef.current.length > 0) {
-      const prevMap = mapHistoryRef.current.pop();
+    if (mapHistory.armed()) {
+      const prevMap = mapHistory.pop().mapName;
       setMapsView({ type: 'map', mapName: prevMap });
     } else if (isLocalhost) {
       setMapsView({ type: 'manager' });
@@ -651,7 +660,7 @@ function App() {
         // "Maps exits an open map back to the manager listing" contract.
         setActiveView('mapsManager');
         setMapsView({ type: 'manager' });
-        mapHistoryRef.current = []; // clear history when going back to manager
+        mapHistory.clear(); // clear history + dynamic Back-label mirror when going back to manager
       } else if (activeView !== 'mapsManager') {
         // Regression (bug-lan-map-nav-noop-mid-session): a player who navigated
         // to another view (Log, sheet…) unmounts MapsAreaView while mapsView
@@ -912,6 +921,7 @@ function App() {
             mapsView={mapsView}
             activeMapName={activeMapName}
             onBackFromMap={handleBackFromMap}
+            backMapTarget={mapHistory.top}
             onEncounterCreated={handleEnterMap}
             setMapsView={setMapsView}
             setActiveMapName={setActiveMapName}

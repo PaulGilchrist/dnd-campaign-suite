@@ -320,12 +320,18 @@ describe('App - Map Navigation & View Management', () => {
       fireEvent.click(screen.getByTestId('map-enter-poi-btn'));
       await expectMapShowing('inner-cave');
       expect(screen.getByTestId('map-display-name').textContent).toBe('');
+      // The pushed history entry carries the row display name so the armed
+      // back button can honestly read "Back to Dungeon 1" (JV label fix).
+      expect(screen.getByTestId('map-back-target').textContent).toBe('Dungeon 1');
 
-      // Popping the stack restores the map, but the history stack stores only
-      // slugs — the popped entry keeps the slug-fallback contract.
+      // Popping the stack restores the map, but the popped mapsView still
+      // drops the display name — the board keeps the slug-fallback contract;
+      // history entries carry the name ONLY for the dynamic Back label.
       backFromMap();
       await expectMapShowing('dungeon-1');
       expect(screen.getByTestId('map-display-name').textContent).toBe('');
+      // Stack drained: the label mirror reverts without a remount.
+      expect(screen.getByTestId('map-back-target').textContent).toBe('');
     });
 
     // Regression (2026-10-28 improve run, QA 2026-10-27 run F): the Maps pane
@@ -400,12 +406,31 @@ describe('App - Map Navigation & View Management', () => {
       // Entering a POI opens the inner map with the original on the stack
       fireEvent.click(screen.getByTestId('map-enter-poi-btn'));
       await expectMapShowing('inner-cave');
+      // Label mirror armed with the stack top (the row display name wins).
+      expect(screen.getByTestId('map-back-target').textContent).toBe('Dungeon 1');
 
-      // First back pops the stack: original map, not the manager
+      // A second POI enter pushes inner-cave (no display name — slug-only
+      // entry): the mirror tracks the NEW top, proving ref-mutation shadowing
+      // re-renders (backlog 2026-11-11 JV criterion 4).
+      fireEvent.click(screen.getByTestId('map-enter-poi-btn'));
+      await expectMapShowing('inner-cave');
+      expect(screen.getByTestId('map-back-target').textContent).toBe('inner-cave');
+
+      // First back pops the inner-cave entry — the board stays on inner-cave
+      // (the popped entry IS the map it was entered from) and the mirror
+      // drops to the entry below, not to empty.
+      backFromMap();
+      await expectMapShowing('inner-cave');
+      expect(screen.getByTestId('map-back-target').textContent).toBe('Dungeon 1');
+
+      // Second back pops dungeon-1: the original map, not the manager, and
+      // the stack is now empty.
       backFromMap();
       await expectMapShowing('dungeon-1');
+      expect(screen.getByTestId('map-back-target').textContent).toBe('');
 
-      // Stack is now empty: back exits to the manager listing
+      // Stack is empty: back exits to the manager listing — the label
+      // reverted to static without a remount.
       backFromMap();
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
@@ -472,6 +497,8 @@ describe('App - Map Navigation & View Management', () => {
       // (if 'inner-cave' had survived on the stack, back would show it)
       openMapFromManager();
       await expectMapShowing('dungeon-1');
+      // The manager-exit clear also reset the dynamic Back-label mirror.
+      expect(screen.getByTestId('map-back-target').textContent).toBe('');
       backFromMap();
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();

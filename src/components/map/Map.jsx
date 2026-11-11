@@ -147,7 +147,7 @@ function mergeNewlyRevealed(visible, revealed) {
     return Array.from(current);
 }
 
-function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, mapIsActive, onViewNewMap, onBack, onEncounterCreated, onPoiEntered }) {
+function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, mapIsActive, onViewNewMap, onBack, backMapTarget, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const svgRef = useRef(null);
@@ -558,6 +558,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 parentDisplayName={mapData.displayName}
                 mapDisplayName={mapDisplayName}
                 onBack={onBack}
+                backMapTarget={backMapTarget}
                 characters={characters}
                 onEncounterCreated={onEncounterCreated}
                 isLocalhost={isLocalhost}
@@ -614,6 +615,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 resetView={resetView}
                 resetFog={resetFog}
                 onBack={onBack}
+                backMapTarget={backMapTarget}
                 rulerMode={rulerMode}
                 setRulerMode={handleSetRulerMode}
                 onEnter3D={() => setViewMode('3d')}

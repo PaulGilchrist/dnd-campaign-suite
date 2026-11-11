@@ -109,6 +109,35 @@ describe('MapToolbar', () => {
             expect(screen.queryByTitle('Back to maps')).not.toBeInTheDocument();
         });
 
+        // Dynamic back label (backlog 2026-11-11 JV): while the App map-history
+        // stack is armed the button names the map its press pops — title AND
+        // aria-label — instead of lying about landing on the manager. Press
+        // routing itself is unchanged (still a bare onBack click).
+        it('names the popped map in title + aria-label when backMapTarget is armed', () => {
+            const onBack = vi.fn();
+            renderMapToolbar({ onBack, backMapTarget: { mapName: 'dungeon-1', mapDisplayName: 'Dungeon 1' } });
+            const button = screen.getByRole('button', { name: 'Back to Dungeon 1' });
+            expect(button).toHaveAttribute('title', 'Back to Dungeon 1');
+            expect(screen.queryByTitle('Back to maps')).not.toBeInTheDocument();
+            fireEvent.click(button);
+            expect(onBack).toHaveBeenCalledTimes(1);
+        });
+
+        it('title-cases a slug-only history entry for the armed label', () => {
+            renderMapToolbar({ backMapTarget: { mapName: 'inner-cave' } });
+            expect(screen.getByTitle('Back to Inner Cave'))
+                .toHaveAttribute('aria-label', 'Back to Inner Cave');
+        });
+
+        it('null/absent backMapTarget keeps the byte-identical "Back to maps" face', () => {
+            const { unmount } = renderMapToolbar({ backMapTarget: null });
+            expect(screen.getByTitle('Back to maps')).toHaveAttribute('aria-label', 'Back to maps');
+            unmount();
+            // Legacy host: prop never passed at all — same static chrome.
+            renderMapToolbar();
+            expect(screen.getByTitle('Back to maps')).toHaveAttribute('aria-label', 'Back to maps');
+        });
+
         it('renders the 3D button only when onEnter3D is provided and invokes it once', () => {
             const { unmount } = renderMapToolbar();
             expect(screen.queryByTitle('View map in 3D')).not.toBeInTheDocument();

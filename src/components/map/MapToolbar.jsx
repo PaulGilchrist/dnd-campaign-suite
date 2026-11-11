@@ -1,4 +1,5 @@
 import * as mapsService from '../../services/maps/mapsService.js';
+import { backToMapLabel } from '../../services/maps/backToMapLabel.js';
 import SpellOverlayControls from './SpellOverlayControls.jsx';
 import { OverlayShape } from '../../models/SpellOverlay.js';
 
@@ -59,6 +60,11 @@ const MapToolbar = ({
     resetView,
     resetFog,
     onBack,
+    // Current map-history top ({ mapName, mapDisplayName } | null) — while
+    // non-null the back button names the map its press pops open instead of
+    // the static "Back to maps" (backlog 2026-11-11 JV, label only — the
+    // press behaviour is App.handleBackFromMap, unchanged).
+    backMapTarget,
     rulerMode,
     setRulerMode,
     onEnter3D,
@@ -81,6 +87,10 @@ const MapToolbar = ({
     // enough to mount the controls panel — a GM can remove/clear a stale
     // overlay WITHOUT ever arming placement mode.
     const hasOverlays = hasActiveOverlays(overlays);
+
+    // Empty stack (or legacy hosts passing no target) → byte-identical
+    // "Back to maps"; armed stack → names the popped map (JV label fix).
+    const backLabel = backToMapLabel(backMapTarget);
 
     const toggleSpellMode = () => {
         // Defensive-only: the sole production producer (Map.jsx) always passes a
@@ -109,7 +119,7 @@ const MapToolbar = ({
         <>
             <div className="toolbar-row">
                 {onBack && (
-                    <button onClick={onBack} title="Back to maps" aria-label="Back to maps" className="toolbar-back-btn no-print">
+                    <button onClick={onBack} title={backLabel} aria-label={backLabel} className="toolbar-back-btn no-print">
                         <i className="fa-solid fa-arrow-left"></i>
                     </button>
                 )}

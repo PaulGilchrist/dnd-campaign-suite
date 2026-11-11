@@ -134,10 +134,14 @@ export const MockMapsManager = vi.fn(({ campaignName, onOpenMap, onMapDeleted })
   </div>
 ));
 
-export const MockMap = vi.fn(({ mapName, mapDisplayName, campaignName, characters, npcs, isLocalhost, mapIsActive = true, onViewNewMap, onBack, onPoiEntered }) => (
+export const MockMap = vi.fn(({ mapName, mapDisplayName, campaignName, characters, npcs, isLocalhost, mapIsActive = true, onViewNewMap, onBack, backMapTarget, onPoiEntered }) => (
   <div data-testid="map-view">
     <span data-testid="map-name">{mapName}</span>
     <span data-testid="map-display-name">{mapDisplayName || ''}</span>
+    {/* Seam pinning App→Map threading of the dynamic Back-label target:
+        mirrors backToMapLabel's name choice without importing the service
+        (App tests mock mapsService with loadMaps only). */}
+    <span data-testid="map-back-target">{backMapTarget ? (backMapTarget.mapDisplayName || backMapTarget.mapName) : ''}</span>
     <span data-testid="map-campaign">{campaignName}</span>
     <span data-testid="map-char-count">{characters?.length || 0}</span>
     <span data-testid="map-npc-count">{npcs?.length || 0}</span>
