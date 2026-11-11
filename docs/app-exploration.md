@@ -65,8 +65,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-11 JV) MarchingOrderPanel `+ <name>` always APPENDS to the tail — building an ordered roster then inserting one 2nd-in-line costs N "Move up" presses; suggest an insert-into-slot affordance (or a "move to top" shortcut) on the add button. `src/components/hex-map/MarchingOrderPanel.jsx`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - POI `enter_refused refusal:'missing'` CLICK face — the delete-SSE retires the Enter chip before any harness click can race the live-list re-check; the self-heal branch is unit-pinned (`HexMap.poi-enter-stale-link.test.jsx`). Everything else about the lane re-derived live.

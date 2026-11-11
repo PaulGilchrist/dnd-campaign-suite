@@ -463,7 +463,8 @@
     margin-bottom: 6px;
 }
 
-.marching-order-add-btn {
+.marching-order-add-btn,
+.marching-order-insert-btn {
     display: block;
     width: 100%;
     background: #383838;
@@ -477,8 +478,19 @@
     margin-bottom: 3px;
 }
 
-.marching-order-add-btn:hover {
+.marching-order-add-btn:hover,
+.marching-order-insert-btn:hover {
     background: #444;
+    border-color: #777;
+    color: #fff;
+}
+
+.marching-order-insert-list {
+    padding: 2px 8px 4px 26px;
+}
+
+.marching-order-controls .marching-order-insert-active {
+    background: #555;
     border-color: #777;
     color: #fff;
 }
