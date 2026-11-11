@@ -185,8 +185,18 @@ function HealingLogSection({ log }) {
 
 function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, accumulatedTotal, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, log, handleClose, featureName }) {
     return (
-        <div className="short-rest-modal">
-            <h3><i className="fas fa-hands-helping"></i> {featureName}</h3>
+        // Dialog semantics per the shared DeleteConfirmModal-class tier
+        // (backlog 2026-11-10 HD, ShortRestModal bc409413d pattern): the existing
+        // borrowed .short-rest-modal shell IS the dialog root — role + aria-modal
+        // + aria-labelledby → its visible <h3> heading. The .short-rest-overlay
+        // backdrop above it stays role-free, mirroring ShortRestModal.
+        <div
+            className="short-rest-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="healing-pool-modal-title"
+        >
+            <h3 id="healing-pool-modal-title"><i className="fas fa-hands-helping"></i> {featureName}</h3>
 
             {loading && (
                 <div className="short-rest-section" style={{ textAlign: 'center', padding: '1em' }}>
@@ -572,9 +582,15 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     if (showTargetSelection) {
         return (
             <div className="short-rest-overlay no-print">
-                <div className="short-rest-modal">
+                <div
+                    className="short-rest-modal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="healing-pool-target-modal-title"
+                >
                     <SecondaryTargetModal
                         title={`Choose target for ${featureName}`}
+                        titleId="healing-pool-target-modal-title"
                         targets={creatureTargets}
                         onTargetSelected={handleTargetSelected}
                         onSkip={handleTargetSkip}

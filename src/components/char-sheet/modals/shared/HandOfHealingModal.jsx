@@ -46,12 +46,21 @@ function getTargetConditions(targetName, campaignName) {
 
 // CLA-159: pending picker stage — mirrors the verified Healing Light target-modal
 // seam (CLA-163): SecondaryTargetModal inside .short-rest-modal, confirmLabel Heal.
+// Dialog tier (backlog 2026-11-10 HD, ShortRestModal bc409413d pattern): the
+// borrowed .short-rest-modal shell IS the dialog root — role + aria-modal +
+// aria-labelledby → SecondaryTargetModal's visible .sp-header title (via titleId).
 function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip }) {
     return (
         <div className="short-rest-overlay no-print">
-            <div className="short-rest-modal">
+            <div
+                className="short-rest-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="hand-of-healing-target-modal-title"
+            >
                 <SecondaryTargetModal
                     title={`Choose target for ${healName}`}
+                    titleId="hand-of-healing-target-modal-title"
                     targets={creatureTargets}
                     onTargetSelected={onPick}
                     onSkip={onSkip}
@@ -133,9 +142,16 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
 function HandOfHealingResultStage({ healName, result, monkName, campaignName, hasPhysiciansTouch, onClose }) {
     const rollValues = Array.isArray(result.rolls) ? result.rolls : [];
     return (
+        // Dialog tier per bc409413d (see picker-stage note): shell = dialog root,
+        // labelled by its visible <h3>.
         <div className="short-rest-overlay no-print">
-            <div className="short-rest-modal">
-                <h3><i className="fas fa-hand-sparkles"></i> {healName}</h3>
+            <div
+                className="short-rest-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="hand-of-healing-modal-title"
+            >
+                <h3 id="hand-of-healing-modal-title"><i className="fas fa-hand-sparkles"></i> {healName}</h3>
 
                 <div className="short-rest-section">
                     <h4>Healing{'\u2014'}{result.targetName} ({result.targetCurrentHp} / {result.targetMaxHp} HP)</h4>
@@ -194,9 +210,16 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
     if (pending && !result) {
         if (healError) {
             return (
+                // Dialog tier per bc409413d; mutually exclusive with the picker
+                // and result stages, so the id below never co-mounts.
                 <div className="short-rest-overlay no-print">
-                    <div className="short-rest-modal">
-                        <h3><i className="fas fa-hand-sparkles"></i> {healName}</h3>
+                    <div
+                        className="short-rest-modal"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="hand-of-healing-modal-title"
+                    >
+                        <h3 id="hand-of-healing-modal-title"><i className="fas fa-hand-sparkles"></i> {healName}</h3>
                         <div className="short-rest-section">{healError}</div>
                         <div className="short-rest-actions">
                             <button className="char-btn" onClick={onClose}>

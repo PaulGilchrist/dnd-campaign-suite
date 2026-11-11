@@ -72,7 +72,7 @@ function SecondaryTargetRow({ target, selected, showHp, showSize, handleSelect, 
     );
 }
 
-function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt }) {
+function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt }) {
     const [selected, setSelected] = useState(null);
     const [mapStatuses, setMapStatuses] = useState(null);
 
@@ -102,7 +102,10 @@ function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featur
     return (
         <div className="sp-overlay">
             <div className="sp-modal">
-                <div className="sp-header">
+                {/* titleId: optional anchor for a wrapping shell's aria-labelledby
+                    (backlog 2026-11-10 HD dialog tier). Undefined = no attribute,
+                    zero DOM change for every other consumer. */}
+                <div className="sp-header" id={titleId}>
                     <i className={`fa-solid ${iconClass}`}></i> {title}
                 </div>
                 <div className="sp-body">
