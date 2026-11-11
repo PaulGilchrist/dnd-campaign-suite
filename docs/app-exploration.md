@@ -72,8 +72,6 @@ GC session health: dev pair :80+:5173 CAMPAIGN_LOCK='test-campaign,qa-arena,qa-s
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-10 GC — server-validator denials share the `enforcement_denied` log type with lane denials:** rejected writes log `{type:'enforcement_denied', origin:'server-validator', key, reason}` while gameplay denials log `{type:'enforcement_denied', creature, bucket, source, reason}` — a log-viewer filter on the type mixes rules-denials with API validation noise; consider a distinct `automationType`/subtype (e.g. `write_rejected`) or a visible-group split in the Log view. Not a correctness bug (test-pinned shape); purely audit legibility. Files: `server/routes/campaigns-changedata.js:319-330`, Log view renderer.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - GC un-ridden (honest scope, all non-blocking): Lion measured-grid exempt face (needs a token map — folded into next descent's map cycle, unit-pinned since 2efb336f4); PFEG multi-condition live re-ride (same-day fix-run canonical faces §74, event-fresh); short-rest per-creature seam live face (join + own-reroll legs closed); economy-bucket turnlock denial live face (code-census: assertCanAct denies before any charge + fix no-spend family pinned); disk-seed malformed-activeConditions render face (route bypass needed — API 400 lanes closed, sanitized render unit-pinned).

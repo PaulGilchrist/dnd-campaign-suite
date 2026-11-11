@@ -1,7 +1,7 @@
 import { formatTimestamp, formatEntryTypeLabel } from './log-utils.js';
 
 // Generic fallback for entry types missing from Log.jsx's ENTRY_COMPONENTS
-// registry (e.g. server-produced 'enforcement_denied' / 'ai_director' /
+// registry (e.g. gameplay-lane 'enforcement_denied' / 'ai_director' /
 // 'ai_ruling' audit rows, or entries POSTed straight to the log API).
 // Keeps the shared audit trail honest: nothing is stored-but-invisible.
 export function GenericEntry({ entry }) {

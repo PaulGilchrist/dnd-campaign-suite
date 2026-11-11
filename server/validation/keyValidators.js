@@ -448,7 +448,7 @@ export const keyValidators = {
     // End-Turn lane — no honest player tab ever posts these keys (the card lanes
     // ride combatSummary target writes instead). Server backstop of
     // bug-player-clients-can-hijack-initiative: a LAN client forging a turn
-    // turnover is refused with the standard 400 + enforcement_denied audit log.
+    // turnover is refused with the standard 400 + write_rejected audit log.
     'activeCreatureName': (v, ctx) => validateAuthority('activeCreatureName', ctx, true),
     'lastAppliedTurnStartCreature': (v, ctx) => validateAuthority('lastAppliedTurnStartCreature', ctx, true),
     // Reserved overlay key (backlog 2026-11-02 BE): shape-only guard — the

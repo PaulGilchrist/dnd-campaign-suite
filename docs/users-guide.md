@@ -333,13 +333,14 @@ The **Log** is the campaign's shared memory, synced live: initiative, attacks (r
 
 On top of that, the enforced and AI features write an **audit trail**:
 
-- `enforcement_denied` — what was refused and why (*"It is AasimarTest's turn — FeyRanger cannot act now."*, *"No action left this turn."*, *"behind a wall at (12,9) — no line of sight."*)
+- `enforcement_denied` — what the rules refused at the table and why (*"It is AasimarTest's turn — FeyRanger cannot act now."*, *"No action left this turn."*, *"behind a wall at (12,9) — no line of sight."*)
+- `write_rejected` — a change-data write the **server** itself refused (bad key shape, forged authority): which key was rejected and why (*"Server rejected write to sessionState: phase must be one of …"*). These are API-validation noise, kept in their own type so the gameplay `enforcement_denied` filter stays rules-only.
 - `enforcement_triggered` / `enforcement_cover` / `enforcement_clock_expired` — opportunity attacks provoked, cover applied, zone durations ending.
 - `auto_encounter_started`, `loot_awarded {auto}`, `auto_rewards_awarded` — automatic lanes and exactly what they paid.
 - `ai_ruling`, `ai_director`, `ai_director_applied` — every AI proposal, confirmation, override, and honest *needs_human*.
 - `manual_takeover` — when a human flipped the machine off.
 
-Server-side refusals are persisted too, so even rejected writes leave a trace. The Session panel shows a rolling enforcement/AI ledger; the Log view has it all, timestamped.
+Server-side refusals are persisted too, so even rejected writes leave a trace (`write_rejected`). The Session panel shows a rolling enforcement/AI ledger; the Log view has it all, timestamped.
 
 ---
 

@@ -23,6 +23,9 @@ const PHASE_LABELS = {
 const AUDIT_TYPES = [
     'enforcement_denied', 'enforcement_triggered', 'enforcement_clock_expired',
     'enforcement_cover', 'ai_ruling', 'ai_director', 'ai_world', 'session_phase',
+    // Server-validator write refusals ride their own type since the GC
+    // improve 2026-11-10 split (they used to hide inside enforcement_denied).
+    'write_rejected',
 ]
 
 // The campaign log lives at its own route (not change-data) — read on mount,

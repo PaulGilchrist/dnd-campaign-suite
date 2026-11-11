@@ -89,4 +89,4 @@
 }
 
 .session-section .session-audit-row.manual_takeover,
-.session-section .session-audit-row.origin-server-validator { border-left-color: #d35400; }
+.session-section .session-audit-row.write_rejected { border-left-color: #d35400; }

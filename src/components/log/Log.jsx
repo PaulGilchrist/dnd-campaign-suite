@@ -23,6 +23,7 @@ import { BuffEntry } from './LogBuffEntry.jsx';
 import { MusicEntry } from './LogMusicEntry.jsx';
 import { GenericEntry } from './LogGenericEntry.jsx';
 import { AiAuditEntry } from './LogAiAuditEntry.jsx';
+import { WriteRejectedEntry } from './LogWriteRejectedEntry.jsx';
 
 const ENTRY_COMPONENTS = {
   roll: RollEntry,
@@ -56,7 +57,10 @@ const ENTRY_COMPONENTS = {
   ai_world: AiAuditEntry,
   ai_world_applied: AiAuditEntry,
   ai_authoring: AiAuditEntry,
-  ai_dress: AiAuditEntry
+  ai_dress: AiAuditEntry,
+  // Server-validator write refusals get their own row (GC improve 2026-11-10)
+  // so they never share the enforcement_denied filter with gameplay denials.
+  write_rejected: WriteRejectedEntry
 };
 
 function LogEntryRenderer({ entry }) {

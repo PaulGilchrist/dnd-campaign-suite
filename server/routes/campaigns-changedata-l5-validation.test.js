@@ -499,6 +499,8 @@ describe('P4-c enforcement.autoRewards flag (§10.3)', () => {
 
 // P4-d (§10.4): server-validator denials are PERSISTENT audit, not just
 // an SSE moment — the audit ledger must be able to show refusals later.
+// GC improve 2026-11-10: refusals log their OWN type 'write_rejected' so
+// the gameplay-lane 'enforcement_denied' filter stays rules-only.
 describe('P4-d denial persistence (§10.4)', () => {
     // The debounced server flush must never touch the real campaign log from
     // a test process — evict the cache key when done (flush loops cache keys).
@@ -512,7 +514,7 @@ describe('P4-d denial persistence (§10.4)', () => {
         if (realLog) logCache.set('test-campaign', realLog); else logCache.delete('test-campaign');
     });
 
-    it('a refused write lands in the campaign log as server-validator origin', async () => {
+    it('a refused write lands in the campaign log as a write_rejected server-validator row', async () => {
         const { logCache } = await import('./log.js');
         logCache.set('test-campaign', []);
         const res = await request(createTestApp())
@@ -521,8 +523,11 @@ describe('P4-d denial persistence (§10.4)', () => {
         expect(res.status).toBe(400);
         const entry = (logCache.get('test-campaign') || []).find(e => e.origin === 'server-validator');
         expect(entry).toBeTruthy();
-        expect(entry).toMatchObject({ type: 'enforcement_denied', key: 'sessionState' });
+        expect(entry).toMatchObject({ type: 'write_rejected', key: 'sessionState' });
         expect(entry.description).toContain('phase must be one of');
+        // Split law: never the gameplay type again, and the SSE/400 lanes stay.
+        expect(entry.type).not.toBe('enforcement_denied');
+        expect(res.body).toEqual({ error: expect.stringContaining('phase must be one of') });
     });
 
     it('an accepted write does NOT log a denial', async () => {

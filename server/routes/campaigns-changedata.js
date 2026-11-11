@@ -316,14 +316,18 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     if (!validation.ok) {
         // Mirror the [maps] BLOCKED write-seam pattern (d3e1658c9): every
         // wildcard refusal leaves a named server-log line beside its
-        // enforcement_denied audit entry.
+        // write_rejected audit entry.
         console.log(`[${key}] BLOCKED POST ${campaign} — ${validation.reason}`);
         // Broadcast the rejection so every client can surface the denied write.
         publish(`denied-${campaign}-${key}`, { key, reason: validation.reason }, campaign);
         // §10.4: denials are PERSISTENT audit — the audit ledger must show
         // what the server refused even after the SSE moment has passed.
+        // GC improve 2026-11-10: API-validation refusals get their OWN type
+        // (write_rejected) so a log-view filter on the gameplay-lane
+        // enforcement_denied rows (creature/bucket/source) never mixes in
+        // server-validator noise. 400 body and denied-* SSE stay byte-identical.
         addLogEntry(campaign, {
-            type: 'enforcement_denied',
+            type: 'write_rejected',
             origin: 'server-validator',
             key,
             reason: validation.reason,
