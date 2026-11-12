@@ -64,8 +64,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-12 QR] `[SSE] connection error` logs at console.error on benign disconnects.** Every tab unload (4/4 matched QR's closes) relays a client `console.error` through the vite proxy — a network blip mid-session will look like an app fault in console-hygiene checks. Suggest warn-tier (or silent while EventSource auto-reconnect succeeds) in `src/services/ui/sseClient.js`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - ~~Full Regenerate-Adventure success-set cycle not re-ridden~~ — CLOSED by QR 2026-11-12 (all five re-point legs + layer/pastTitles + one audit row, live in qa-starter).
