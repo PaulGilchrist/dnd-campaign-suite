@@ -456,7 +456,7 @@ router.post('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
   const filePath = path.join(mapsDir, fileName);
 
   if (fs.existsSync(filePath)) {
-    return res.status(400).json({ error: 'A map with this name already exists' });
+    return res.status(400).json({ error: 'A map with that name already exists' });
   }
 
   // Same row-shape guard as the PUT (backlog 2026-11-02 BD): the builder
@@ -626,7 +626,7 @@ router.put('/api/campaigns/:campaign/maps/:mapname/rename', asyncHandler((req, r
   }
 
   if (fs.existsSync(newFilePath) && oldFileName !== newFileName) {
-    return res.status(400).json({ error: 'A map with this name already exists' });
+    return res.status(400).json({ error: 'A map with that name already exists' });
   }
 
   // Read existing data and update name

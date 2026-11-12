@@ -62,7 +62,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears, dis
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-12 RS: duplicate-map-name copy drifts between the client gate (`MapsManager.jsx` `handleRenameSave`: "A map with **that** name already exists") and the server rename/create lanes (`server/routes/maps.js`: "A map with **this** name already exists") — unify to one string so harnesses and users see a single canonical message. (cosmetic)
 - 2026-11-12 RS: the Maps-manager error banner survives a rename CANCEL (Escape or empty-blur) and only clears on the next successful action — after a dup-rename error, pressing Escape leaves the stale "already exists" message hovering over an untouched row; clear `error` in `handleStartRename` (and/or the Escape/empty branches). (minor UX)
 
 ## Blocked / Not Verified (fold-gate ledger)

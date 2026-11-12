@@ -532,7 +532,7 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
             .send({ name: 'Dungeon Level 1', type: 'indoor' });
 
         expect(res.status).toBe(400);
-        expect(res.body).toHaveProperty('error', 'A map with this name already exists');
+        expect(res.body).toHaveProperty('error', 'A map with that name already exists');
     });
 
     it('should sanitize map name for filename (spaces to hyphens)', async () => {

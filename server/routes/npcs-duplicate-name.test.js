@@ -1,6 +1,6 @@
 // Regression tests for duplicate-name overwrite: PUT must reject renames
 // that collide case-insensitively with another existing NPC's name,
-// mirroring the maps rename guard ("A map with this name already exists").
+// mirroring the maps rename guard ("A map with that name already exists").
 import express from 'express';
 import { request } from '../test-utils/localhostSupertest.js';
 

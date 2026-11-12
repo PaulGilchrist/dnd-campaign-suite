@@ -86,13 +86,13 @@ describe('mapsService — empty-kebab lane segments (bug-map-name-empty-kebab)',
       // '??' while '!!!' exists: both sanitize to the same file handle, the
       // client display-name dup-check misses it, the server answers 400 —
       // the message must survive for the UI to show it.
-      global.fetch.mockResolvedValueOnce(http(400, { error: 'A map with this name already exists' }));
+      global.fetch.mockResolvedValueOnce(http(400, { error: 'A map with that name already exists' }));
 
       await expect(createMap('testCampaign', '??')).resolves.toEqual({
         name: '??',
         fileName: '.json',
         alreadyExists: true,
-        error: 'A map with this name already exists',
+        error: 'A map with that name already exists',
       });
     });
   });

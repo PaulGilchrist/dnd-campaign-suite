@@ -25,7 +25,7 @@
 //   7× per-fn success        → one transport-table it.each ×9 (bytes were unpinned before)
 //   createMap default POST   → transport table row (body bytes exact)
 //   createMap options passthrough → kept standalone (body-merge behavior)
-//   createMap 409 conflict   → conflict table on REAL server 400 'A map with this name
+//   createMap 409 conflict   → conflict table on REAL server 400 'A map with that name
 //                              already exists' (maps.js:121 — old 409 fixture was fiction)
 //   per-fn non-ok throw ×7   → server-message + generic-fallback tables ×9 (fallback
 //                              constants were previously unpinned for 7 of 8 lanes)
@@ -147,11 +147,11 @@ describe('mapsService', () => {
       ['Dungeon', 'dungeon.json'],
       ['My Map', 'my-map.json'],
     ])('%s → alreadyExists object with sanitized fileName', async (name, fileName) => {
-      global.fetch.mockResolvedValueOnce(http(400, { error: 'A map with this name already exists' }));
+      global.fetch.mockResolvedValueOnce(http(400, { error: 'A map with that name already exists' }));
 
       // error rides along so UI lanes surface the collision instead of
       // swallowing it (bug-map-name-empty-kebab); encounter lane ignores it.
-      await expect(createMap('testCampaign', name)).resolves.toEqual({ name, fileName, alreadyExists: true, error: 'A map with this name already exists' });
+      await expect(createMap('testCampaign', name)).resolves.toEqual({ name, fileName, alreadyExists: true, error: 'A map with that name already exists' });
       expect(fetch).toHaveBeenCalledTimes(1);
     });
 

@@ -67,7 +67,7 @@ describe('MapsManager — empty-kebab create/rename gate', () => {
             name: 'Caf',
             fileName: 'caf.json',
             alreadyExists: true,
-            error: 'A map with this name already exists',
+            error: 'A map with that name already exists',
         });
         render(<MapsManager {...props} />);
         await waitFor(() => expect(screen.getByText('Café')).toBeInTheDocument());
@@ -76,7 +76,7 @@ describe('MapsManager — empty-kebab create/rename gate', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create Map' }));
 
         await waitFor(() => {
-            expect(screen.getByText('A map with this name already exists')).toBeInTheDocument();
+            expect(screen.getByText('A map with that name already exists')).toBeInTheDocument();
         });
         // The typed name is NOT silently evaporated — input keeps it for editing.
         expect(createInput()).toHaveValue('Caf');

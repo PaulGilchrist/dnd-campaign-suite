@@ -140,7 +140,7 @@ describe('maps POST /api/campaigns/:campaign/maps — localhost guard', () => {
                 .set('Host', 'localhost')
                 .send({ name: 'Dupe Me' });
             expect(dupe.status).toBe(400);
-            expect(dupe.body.error).toBe('A map with this name already exists');
+            expect(dupe.body.error).toBe('A map with that name already exists');
         });
     });
 });

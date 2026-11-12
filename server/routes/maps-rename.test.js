@@ -160,7 +160,7 @@ describe('maps - PUT /api/campaigns/:campaign/maps/:mapname/rename', () => {
             .send({ newName: 'New Map' });
 
         expect(res.status).toBe(400);
-        expect(res.body).toHaveProperty('error', 'A map with this name already exists');
+        expect(res.body).toHaveProperty('error', 'A map with that name already exists');
     });
 
     it('should rename the map file successfully', async () => {
