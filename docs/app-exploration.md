@@ -59,7 +59,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears, zer
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-12 OP] `.loading-overlay` has no CSS anywhere in the repo** (grep of all `*.css` = zero hits; only App.jsx renders it 3×): the "Loading party stats…" band is an unstyled in-flow div that neither dims nor blocks the sidebar — the async-enrichment window is fully clickable and fed OP's mount-merge clobber (bug-initiative-mount-merge-empty-roster-clobbers-board). Give it a real blocking treatment (`position:fixed` backdrop + `aria-busy`/inert on the nav) or gate the Initiative affordance until `computedCharacters` settles; likely files `src/App.jsx`, a co-located CSS block in `App.css`.
 - **[2026-11-12 OP] "Search notes" can't find the row title it displays** (`NOTE_SEARCH_FIELDS=['description']`, Notes.jsx:38): rows are titled (aria-label + delete confirm) by `partyLocation`, but typing that location into the filter matches 0 rows — feels like a lost write when the note vanishes under its own name. Consider searching `partyLocation` (+ `content`) alongside description; if fields grow, remember the post-save auto-clear law shares the same field list.
 
 ## Blocked / Not Verified (fold-gate ledger)

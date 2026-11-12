@@ -855,8 +855,8 @@ function App() {
   };
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} autoSelectCampaign={autoSelectCampaign} isLocalhost={isLocalhost} />;
-  if (appData.isLoading) return <div className="loading-overlay"><div className="loading-spinner">Loading rules data...</div></div>;
-  if (!combatSummaryLoaded) return <div className="loading-overlay"><div className="loading-spinner">Loading campaign...</div></div>;
+  if (appData.isLoading) return <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading rules data...</div></div>;
+  if (!combatSummaryLoaded) return <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading campaign...</div></div>;
 
   return (
     <div className="app">
@@ -980,7 +980,11 @@ function App() {
         <Subscriber campaignName={campaignName} handleEvent={handleRuntimeEvent} />
         <CampaignReloadNotice campaignName={campaignName} />
         <MapContextSync campaignName={campaignName} activeMapName={activeMapName} isLocalhost={isLocalhost} />
-        {processingCharacters && <div className="loading-overlay"><div className="loading-spinner">Loading party stats...</div></div>}
+        {/* Blocking busy layer while the roster is being enriched (App.css
+            .loading-overlay: fixed full-viewport backdrop, so the sidebar
+            and views cannot be clicked against an empty computedCharacters
+            roster — 2026-11-12 OP backlog). */}
+        {processingCharacters && <div className="loading-overlay" role="status" aria-busy="true"><div className="loading-spinner">Loading party stats...</div></div>}
       </div>
     </div>
   );

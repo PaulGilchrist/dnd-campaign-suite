@@ -225,6 +225,59 @@ describe('App.css', () => {
     });
   });
 
+  describe('loading overlay', () => {
+    // Contract for the blocking busy layer App.jsx renders on its three
+    // loading faces (rules data / campaign / party-stats enrichment).
+    // Backlog 2026-11-12 OP: the class had zero CSS, so the enrichment
+    // band never dimmed or blocked the shell and the sidebar stayed
+    // clickable over an empty roster.
+    it('covers the whole viewport above every interactive surface', () => {
+      expectStyles('.loading-overlay', {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        right: '0',
+        bottom: '0',
+        display: 'flex',
+        'align-items': 'center',
+        'justify-content': 'center',
+        cursor: 'progress',
+      });
+      const overlay = styleFor('.loading-overlay');
+      expect(
+        overlay['background-color'],
+        'overlay must dim (and pointer-block) the page behind it'
+      ).not.toMatch(/^(none|transparent)$/);
+      const sidebar = styleFor('.sidebar', parseRules(sidebarCss));
+      expect(
+        parseInt(overlay['z-index'], 10),
+        'overlay must outrank the fixed sidebar so nav clicks cannot land'
+      ).toBeGreaterThan(parseInt(sidebar['z-index'], 10));
+      expect(
+        parseInt(overlay['z-index'], 10),
+        'overlay must outrank the 1000-tier modals while busy'
+      ).toBeGreaterThanOrEqual(1100);
+    });
+
+    it('shows a centered spinner card with an animated ring', () => {
+      expectStyles('.loading-spinner', {
+        display: 'flex',
+        'align-items': 'center',
+      });
+      const ring = styleFor('.loading-spinner::before');
+      expect(ring, 'a ::before ring gives the band a visible spinner').not.toBeNull();
+      expect(ring['border-radius'], 'ring should be circular').toBe('50%');
+      expect(
+        ring.animation,
+        'ring animation should reference a declared keyframes block'
+      ).toContain('loading-spin');
+      expect(
+        topRules.some((rule) => rule.selector === '@keyframes loading-spin'),
+        '@keyframes loading-spin must be declared'
+      ).toBe(true);
+    });
+  });
+
   describe('character summary buttons', () => {
     it('lays out compact, clickable character buttons that brighten on hover', () => {
       expectStyles('.char-btn-group', { display: 'flex', 'align-items': 'center' });

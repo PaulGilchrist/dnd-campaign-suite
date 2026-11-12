@@ -23,6 +23,62 @@
   line-height: 0.5em; /* optional: aligns content if any */
 }
 
+/* ============ Loading overlay (backlog 2026-11-12 OP) ============
+   App.jsx renders .loading-overlay on three faces: two full-page early
+   returns (rules data, campaign) and the in-tree party-stats enrichment
+   band. Before this block it had ZERO CSS anywhere in the repo, so the
+   enrichment band was an unstyled in-flow div and the sidebar stayed
+   fully clickable while the character roster was still empty. Backdrop
+   and centering mirror the working .modal-shell-overlay further down;
+   z-index uses the above-modal tier (1100, the .ai-instruction-overlay
+   tier) so the busy layer outranks the 1000-tier modals while staying
+   under the TV escape hatch (1400). The overlay carries role="status"
+   and aria-busy="true" for assistive tech. */
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--background-color-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    cursor: progress;
+}
+
+.loading-spinner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    background-color: var(--background-color-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--color-text);
+    box-shadow: 0 4px 20px var(--shadow-color);
+}
+
+/* Spinner ring: a bordered circle with one accent edge, spun by keyframes. */
+.loading-spinner::before {
+    content: "";
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .icon-button {
     color: darkred;
     margin-left: 8px;
