@@ -24,7 +24,7 @@
 
 ## Priority Targets (next descent)
 
-1. **Cross-controller re-arm inherit — LIVE-CONFIRMED face, needs OWNER ruling or a small improve:** a DIRECT control-swap (A→B without an intermediate release, one `selectOption` gesture) leaves controller B's card opening already ARMED on A's target (MB-2 live: controller flips, `targetName` survives, silent audits — two `control_assigned` rows, no `control_released`). Release-clears-arm is owner law; if the same no-inherit intent holds for swaps, mirror the delete in the assign branch of `handleControllerChange` (`createCreatureHandlers.js`).
+1. **Cross-controller re-arm inherit — CLOSED (owner ruled 2026-11-11, shipped `a97b47863`):** a direct A→B control-swap now DELETES `targetName` on the same combatSummary write that stamps `controller` (mirrors the release law cd3dc2361) and logs one `control_arm_cleared` audit row only when a clear actually happened; first-time assign and same-controller re-stamp keep the arm silently. Next descent: re-verify the swap face live (B's card opens `value:''`, audit trio assigned-A → arm-cleared → assigned-B), do not re-litigate the design question.
 2. **Natural-RNG weatherChange dialog** — still skip unless free (synthetically ridden JU). Camp-while-PAUSED leg — reconsider only with a fresh idea.
 3. **Delegated-controller × music stand-down interplay** — control delegated to a player identity that ALSO commits music: does stand-down order ever strand anything? Low-value; pick only if free.
 4. **SSE same-bucket write RACE:** two tabs PATCHing the SAME bucket's DIFFERENT fields within the 2 s debounce window (per-key LWW vs merge) — MB-2's swap ride was sequential; a genuine two-tab race leg is unridden.
@@ -67,7 +67,7 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 ## Blocked / Not Verified (fold-gate ledger)
 
-- Whether the swap-lane arm-inherit is INTENDED (owner ruling outstanding — the live face is confirmed, the design question is not; Priority Target 1 / backlog bullet).
+- ~~Whether the swap-lane arm-inherit is INTENDED~~ — RESOLVED 2026-11-11: owner ruled NO-INHERIT extends to swaps; shipped + live-verified in `a97b47863` (swap clears `targetName` on the same write, `control_arm_cleared` audit row). No longer a design question.
 - Same-bucket two-tab write RACE within the 2 s debounce window (per-key LWW vs merge) — MB-2 rides were sequential; Priority Target 4.
 - Natural-RNG weatherChange dialog (carried — synthetically ridden JU).
 - Camp-while-PAUSED leg (carried — structurally hard to co-instantiate).
