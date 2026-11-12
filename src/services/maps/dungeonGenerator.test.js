@@ -14,6 +14,9 @@ import { generateAdjacentDungeon } from './adjacentDungeonGenerator.js';
 // order → door types → torch shuffles → furniture rolls → trap picks → NPC picks → entrance
 // shuffle → name → description, in that order. Any change to draw order, carve recipe, or
 // furnishing tables breaks the ASCII maps, rosters, or name/description bytes below (#815).
+// The torch/chair/junction shuffles are seeded Fisher-Yates (rng.js shuffle), so the draw
+// count per shuffle is engine-independent — the random-comparator form let V8 sort internals
+// decide it and diverged node (32 items) vs Chromium (28) at g20/seed42 (2026-11-12 bug).
 // No wall-clock anywhere — output is a pure function of inputs (§ No Game Timers, MANDATORY).
 // Zero mocks; nothing to restore (#1161). Dead-mock purge transitive (#1094/#1132): none left.
 // Range-only "different seeds differ" and same-seed self-compares are banned (#1160/#1076):
@@ -67,8 +70,8 @@ describe('dungeonGenerator', () => {
   it('byte-exact flagship g20 seed 42: envelope, wall ASCII, and full placed-item roster', () => {
     const map = generateDungeon({ gridSize: 20, seed: 42 });
     expect(map).toEqual({
-      name: 'The Sunken Vault of Despair',
-      description: "The air is thick with dust and the smell of decay. Collapsed passages hint at the dungeon's age. The undead are said to wander these halls.",
+      name: 'The Crystal Caverns of the Dark Lord',
+      description: 'A long-forgotten dungeon complex deep underground. Rooms branch off in multiple directions, each more foreboding than the last. Something stirs in the darkness ahead.',
       gridSize: 20,
       seed: 42,
       walls: expect.any(Array),
@@ -107,32 +110,34 @@ describe('dungeonGenerator', () => {
     // npc-1 is genuinely absent: the entrance stairs landed on its room-center cell (5,16)
     // after placement, and position dedupe keeps the LAST placed item — the stairs win.
     expect(map.placedItems.map(itemBytes)).toEqual([
-      'torch-0-7-5:torch@7,5:270',
       'torch-0-5-5:torch@5,5:270',
-      'torch-0-5-2:torch@5,2:90',
+      'torch-0-4-4:torch@4,4:0',
+      'torch-0-7-2:torch@7,2:90',
       'table-0:table@5,4:0',
-      'chair-0:chair@6,3:0',
-      'torch-1-4-8:torch@4,8:90',
+      'trap-0-6-3:trap@6,3::hidden',
       'torch-1-4-11:torch@4,11:270',
-      'torch-1-6-11:torch@6,11:270',
-      'chest-1:chest@6,9:90',
+      'torch-1-4-8:torch@4,8:90',
+      'torch-1-7-10:torch@7,10:180',
+      'table-1:table@4,10:0',
+      'chair-1:chair@5,9:0',
+      'torch-2-7-16:torch@7,16:180',
+      'torch-2-6-17:torch@6,17:270',
       'torch-2-6-14:torch@6,14:90',
-      'table-2:table@4,16:0',
-      'chair-2:chair@5,15:0',
-      'table-3:table@10,4:0',
-      'chair-3:chair@11,3:0',
+      'chest-2:chest@3,15:270',
+      'chest-3:chest@11,4:90',
+      'torch-4-14-9:torch@14,9:180',
       'torch-4-11-9:torch@11,9:0',
       'statue-4:statue@13,9:0',
-      'table-5:table@10,14:0',
-      'chair-5:chair@11,13:0',
-      'torch-6-16-11:torch@16,11:90',
-      'torch-6-17-13:torch@17,13:180',
-      'statue-6:statue@15,13:0',
-      'npc-0:npc@5,10:180:Skeleton:hidden',
-      'npc-2:npc@11,4:0:Orc:hidden',
-      'npc-3:npc@12,9:0:Goblin:hidden',
-      'npc-4:npc@11,14:0:Zombie:hidden',
-      'npc-5:npc@14,13:90:Zombie:hidden',
+      'statue-5:statue@11,14:0',
+      'torch-6-14-15:torch@14,15:270',
+      'torch-6-16-15:torch@16,15:270',
+      'torch-6-15-15:torch@15,15:270',
+      'trap-6-16-14:trap@16,14::hidden',
+      'npc-0:npc@5,10:0:Zombie:hidden',
+      'npc-2:npc@10,4:90:Skeleton:hidden',
+      'npc-3:npc@12,9:90:Orc:hidden',
+      'npc-4:npc@10,14:90:Spider:hidden',
+      'npc-5:npc@15,13:270:Orc:hidden',
       'entrance-stairs:stairs@5,16:',
       'door-0:door@6,6:90',
       'door-1:door@5,12:90',
@@ -235,11 +240,14 @@ describe('dungeonGenerator', () => {
         if (!walls.has(`${x},${y}`)) open.add(`${x},${y}`);
       }
     }
-    // Structural tripwire (#1099): flood from the entrance stairs reaches every open cell —
-    // MST connection plus loop corridors leave no isolated pocket.
-    const stairs = map.placedItems.find((i) => i.type === 'stairs');
-    const seen = new Set([`${stairs.gridX},${stairs.gridY}`]);
-    const queue = [[stairs.gridX, stairs.gridY]];
+    // Structural tripwire (#1099): flood from a deterministic open cell reaches
+    // every open cell — MST connection plus loop corridors leave no isolated
+    // pocket. (Since the 2026-11-12 furniture Fisher-Yates re-bake this seed's
+    // entrance stairs land on a door cell and dedupe drops them, so the flood
+    // starts from the first open cell in row-major order — same claim.)
+    const [sx, sy] = [...open][0].split(',').map(Number);
+    const seen = new Set([`${sx},${sy}`]);
+    const queue = [[sx, sy]];
     while (queue.length) {
       const [x, y] = queue.shift();
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -274,25 +282,27 @@ describe('dungeonGenerator', () => {
     }
     expect(positions.size).toBe(map.placedItems.length);
     expect(ids.size).toBe(map.placedItems.length);
-    // Exact census subsumes every former presence/cap loop: rooms 1-7 yield the max 7 NPCs,
-    // this seed rolls exactly 1 trap, and no secret door here (the flagship pins one at 8,14).
+    // Exact census subsumes every former presence/cap loop: rooms 0-7 yield the
+    // max 7 NPCs, this seed rolls 2 pits (one room, one corridor), and no secret
+    // door here (the flagship pins one at 8,14).
     expect(census).toEqual({
-      torch: 20, bookshelf: 3, table: 4, chair: 7, chest: 2, bed: 1, statue: 3, altar: 1,
-      trap: 1, npc: 7, stairs: 1, door: 13,
+      torch: 18, table: 3, chair: 3, statue: 2, chest: 4, bed: 2, trap: 2,
+      pillar: 4, npc: 7, door: 13,
     });
-    // NPC draws land on the name/rotation tables; junction trap is a corridor pit.
+    // NPC draws land on the name/rotation tables; one trap is a room pit, the
+    // other the corridor junction pit.
     expect(map.placedItems.filter((i) => i.type === 'npc').map(itemBytes)).toEqual([
-      'npc-0:npc@9,4:0:Spider:hidden',
-      'npc-1:npc@4,9:0:Goblin:hidden',
-      'npc-2:npc@7,18:0:Zombie:hidden',
-      'npc-3:npc@4,23:180:Goblin:hidden',
-      'npc-4:npc@9,24:180:Goblin:hidden',
-      'npc-5:npc@15,4:0:Bandit:hidden',
-      'npc-6:npc@24,6:270:Orc:hidden',
+      'npc-0:npc@9,4:180:Spider:hidden',
+      'npc-1:npc@3,9:180:Spider:hidden',
+      'npc-2:npc@7,18:180:Spider:hidden',
+      'npc-3:npc@4,23:0:Skeleton:hidden',
+      'npc-4:npc@10,24:0:Goblin:hidden',
+      'npc-5:npc@16,4:180:Skeleton:hidden',
+      'npc-6:npc@23,6:180:Spider:hidden',
     ]);
     expect(map.placedItems.filter((i) => i.type === 'trap')
       .map((i) => `${i.id}@${i.gridX},${i.gridY}:${i.trapType}`))
-      .toEqual(['corridor-trap-4-7@4,7:pit']);
+      .toEqual(['trap-7-25-5@25,5:pit', 'corridor-trap-17-24@17,24:pit']);
   });
 
   it('options coerce honestly: density ±saturate to 0/1 byte-exact, seed 0 honored, gridSize 0 falls back to 30', () => {
@@ -306,7 +316,7 @@ describe('dungeonGenerator', () => {
     // seed 0 is falsy but must still echo AND drive mulberry32 (#959 coercion honesty)…
     const zero = generateDungeon({ gridSize: 20, seed: 0 });
     expect(zero.seed).toBe(0);
-    expect(zero.name).toBe('The Iron Vault of Eternal Night');
+    expect(zero.name).toBe('The Sunken Temple of Shadows');
     // …but a NaN seed (bad parseInt from the generate modal) no longer slips
     // past `!= null` to silently drive mulberry32(0) while stamping seed:NaN
     // (JSON null on disk) — it falls back to a fresh random integer seed

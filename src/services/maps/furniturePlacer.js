@@ -10,7 +10,7 @@
  * - Corridor traps at junctions
  */
 
-import { pick } from './rng.js';
+import { pick, shuffle } from './rng.js';
 import { rectCenter, rectContains } from './bspTree.js';
 
 export function placeFurniture({ rooms, gridSize, rng, grid, corridorCells, finalDoors }) {
@@ -99,7 +99,10 @@ function placeTorches(room, placedItems, gridSize, rng, grid) {
   });
 
   const count = Math.min(1 + Math.floor(rng() * 3), unique.length);
-  const shuffled = unique.slice().sort(function () { return rng() - 0.5; });
+  // Seeded Fisher-Yates (rng.js shuffle) — engine-deterministic draw count;
+  // sort(function(){return rng()-0.5}) made this consume a V8-dependent
+  // number of draws, breaking same-seed reproducibility (2026-11-12 bug).
+  const shuffled = shuffle(unique.slice(), rng);
   for (let i = 0; i < count; i++) {
     const t = shuffled[i];
     placedItems.push({
@@ -235,7 +238,7 @@ function addLargeRoomTableChairs(room, placedItems, c, rng) {
     { dx: 2, dy: 0, rot: 90 },
   ];
   const numChairs = 2 + Math.floor(rng() * 3);
-  const shuffled = chairDefs.slice().sort(function () { return rng() - 0.5; });
+  const shuffled = shuffle(chairDefs.slice(), rng);
   for (let i = 0; i < numChairs; i++) {
     const ch = shuffled[i];
     const chx = tableX + ch.dx, chy = tableY + ch.dy;
@@ -508,7 +511,7 @@ function placeCorridorTraps(placedItems, rng, gridSize, grid, corridorCells) {
   const junctions = cells.filter(function (c) {
     return openNeighborCount(c[0], c[1]) >= 3;
   });
-  const shuffled = junctions.slice().sort(function () { return rng() - 0.5; });
+  const shuffled = shuffle(junctions.slice(), rng);
   for (let i = 0; i < Math.min(trapCount, shuffled.length); i++) {
     const [tx, ty] = shuffled[i];
     placedItems.push({
