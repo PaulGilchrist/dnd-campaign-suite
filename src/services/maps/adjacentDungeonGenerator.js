@@ -416,15 +416,18 @@ function placeNpcs({ rooms, grid, gridSize, placedItems, rng }) {
 
 function collectSecretDoorCandidates(rooms, grid, gridSize) {
   const secDoorCandidates = [];
+  // Bounds-checked wall probe (same shape as roomGenerator's isOpen): a seam
+  // outside the grid is simply not a wall, never an out-of-range row read.
+  const isWall = (x, y) => x >= 0 && x < gridSize && y >= 0 && y < gridSize && grid[y][x];
   for (const room of rooms) {
     const { x: rx, y: ry, w: rw, h: rh } = room.rect;
     for (let x = rx; x < rx + rw; x++) {
-      if (ry > 0 && grid[ry - 1][x]) secDoorCandidates.push({ x, y: ry - 1 });
-      if (ry + rh < gridSize && grid[ry + rh][x]) secDoorCandidates.push({ x, y: ry + rh });
+      if (isWall(x, ry - 1)) secDoorCandidates.push({ x, y: ry - 1 });
+      if (isWall(x, ry + rh)) secDoorCandidates.push({ x, y: ry + rh });
     }
     for (let y = ry; y < ry + rh; y++) {
-      if (rx > 0 && grid[y][rx - 1]) secDoorCandidates.push({ x: rx - 1, y });
-      if (rx + rw < gridSize && grid[y][rx + rw]) secDoorCandidates.push({ x: rx + rw, y });
+      if (isWall(rx - 1, y)) secDoorCandidates.push({ x: rx - 1, y });
+      if (isWall(rx + rw, y)) secDoorCandidates.push({ x: rx + rw, y });
     }
   }
   return secDoorCandidates;
@@ -446,7 +449,7 @@ function placeSecretDoors({ rooms, grid, gridSize, placedItems, rng }) {
   }
 }
 
-function placeTraps({ rooms, grid, placedItems, rng }) {
+function placeTraps({ rooms, grid, gridSize, placedItems, rng }) {
   const occCells = cellsOf(placedItems);
   const trapCandidates = [];
   for (const room of rooms) {
@@ -454,7 +457,7 @@ function placeTraps({ rooms, grid, placedItems, rng }) {
     const { x: rx, y: ry, w: rw, h: rh } = room.rect;
     for (let x = rx + 1; x < rx + rw - 1; x++) {
       for (let y = ry + 1; y < ry + rh - 1; y++) {
-        if (!grid[y][x] && !occCells.has(x + ',' + y)) {
+        if (x >= 0 && x < gridSize && y >= 0 && y < gridSize && !grid[y][x] && !occCells.has(x + ',' + y)) {
           trapCandidates.push({ x, y });
         }
       }
@@ -503,8 +506,13 @@ export function generateAdjacentDungeon(opts) {
 
   const grid = buildWalledGrid(gridSize);
 
-  const minRoom = Math.max(4, Math.floor(gridSize / 8));
-  const maxRoom = Math.max(8, Math.min(18, Math.floor(gridSize / 2.5)));
+  // Rooms keep a 1-cell wall margin on each side (see the placeRooms clamp), so
+  // no room may span more than gridSize - 2. Small grids would otherwise get
+  // 4–8-wide rooms from the floors alone and rects that hang off the grid
+  // (crash 2026-11-12). Mirrors bspTree's Math.min(maxRoom, space) clamp.
+  const roomMaxSpan = Math.max(2, gridSize - 2);
+  const minRoom = Math.min(Math.max(4, Math.floor(gridSize / 8)), roomMaxSpan);
+  const maxRoom = Math.min(Math.max(8, Math.min(18, Math.floor(gridSize / 2.5))), roomMaxSpan);
 
   const targetRooms = opts.roomCount != null
     ? opts.roomCount
@@ -546,7 +554,7 @@ export function generateAdjacentDungeon(opts) {
 
   placeSecretDoors({ rooms, grid, gridSize, placedItems, rng });
 
-  placeTraps({ rooms, grid, placedItems, rng });
+  placeTraps({ rooms, grid, gridSize, placedItems, rng });
 
   return {
     name: generateName(rng),

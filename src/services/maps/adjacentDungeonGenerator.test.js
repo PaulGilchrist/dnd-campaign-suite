@@ -318,4 +318,75 @@ describe('generateAdjacentDungeon', () => {
       crate: 3, barrel: 1, npc: 5, stairs: 1, secretdoor: 3, trap: 2,
     });
   });
+
+  // Small-grid crash (SD backlog 2026-11-12): the old Math.max(8,…) room floor
+  // handed 4–8-wide rects to a 7-wide grid; the overflow made
+  // collectSecretDoorCandidates read grid[y] past the last row
+  // (TypeError reading '1') on 36/60 seeds. Room spans now clamp to gridSize-2
+  // and secret-door/trap seam probes are bounds-checked, so a 7×7 grid honestly
+  // collapses to its one 4–5-wide seed room instead of throwing.
+  it('regression g7 seed 5 (once a crash): byte-pinned single-room map', () => {
+    const map = generateAdjacentDungeon({ gridSize: 7, seed: 5, density: 0.5, roomCount: 8, layoutStyle: 'balanced' });
+    expect([map.name, map.description, map.seed]).toEqual([
+      'The Iron Mines of Shadows',
+      'A long-forgotten dungeon complex deep underground. Rooms branch off in multiple directions, each more foreboding than the last. The undead are said to wander these halls.',
+      5,
+    ]);
+    expect(ascii(map)).toEqual([
+      '#######',
+      '#######',
+      '##.....',
+      '##.....',
+      '##.....',
+      '##.....',
+      '##.....',
+    ]);
+    expect(map.placedItems.map(itemBytes)).toEqual([
+      'torch-0-0:torch@4,2:90',
+      'torch-0-1:torch@3,2:90',
+      'entrance-stairs:stairs@4,4:',
+      'secret-door-0:secretdoor@2,1::hidden',
+      'secret-door-1:secretdoor@3,1::hidden',
+      'secret-door-2:secretdoor@1,2::hidden',
+    ]);
+  });
+
+  // Modal-constructible sweep (criterion 2): every spot grid the modal field
+  // allows × all four layout styles × 60 seeds must generate, stay in bounds,
+  // and replay byte-identical for its seed (zero exceptions; the balanced/7×7
+  // leg is the exact repro from the ticket).
+  it.each([7, 8, 10, 12, 15, 20, 30, 50, 100])(
+    'modal-constructible sweep g%i: 4 styles × seeds 0..59 generate, in bounds, deterministic',
+    (gridSize) => {
+      const modalArgs = (seed, layoutStyle) => ({
+        gridSize,
+        density: 0.5,
+        seed,
+        roomCount: 8,
+        corridorLength: 'compact',
+        layoutStyle,
+        minRoom: Math.max(3, Math.floor(Math.max(4, Math.floor(gridSize / 8)))),
+        maxRoom: Math.max(6, Math.floor(Math.max(8, Math.min(18, Math.floor(gridSize / 2.5))))),
+      });
+      for (const layoutStyle of ['balanced', 'linear', 'forking', 'winding']) {
+        for (let seed = 0; seed < 60; seed++) {
+          const opts = modalArgs(seed, layoutStyle);
+          const map = generateAdjacentDungeon(opts); // throws = test fails
+          expect(map.gridSize).toBe(gridSize);
+          for (const wall of map.walls) {
+            const [x, y] = wall.split(',').map(Number);
+            expect(x >= 0 && x < gridSize && y >= 0 && y < gridSize).toBe(true);
+          }
+          for (const item of map.placedItems) {
+            expect(item.gridX >= 0 && item.gridX < gridSize && item.gridY >= 0 && item.gridY < gridSize).toBe(true);
+          }
+          // Determinism for its seed (no wall-clock anywhere in the pipeline).
+          expect(map.placedItems.map(itemBytes)).toEqual(
+            generateAdjacentDungeon(opts).placedItems.map(itemBytes),
+          );
+        }
+      }
+    },
+    20000, // g100 × 240 double-generations is CPU-heavy under jsdom
+  );
 });

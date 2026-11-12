@@ -72,8 +72,12 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
             let result;
             if (mode === 'adjacent') {
                 const sizeMultiplier = roomSize === 'cramped' ? 0.7 : roomSize === 'spacious' ? 1.3 : 1;
-                const baseMinRoom = Math.max(4, Math.floor(gridSize / 8));
-                const baseMaxRoom = Math.max(8, Math.min(18, Math.floor(gridSize / 2.5)));
+                // Cap room bounds to what the grid can hold (1-cell wall margin
+                // per side, matching the generator's clamp) — the old floors
+                // handed a 7-wide grid an impossible 4–8-wide spec (2026-11-12).
+                const roomMaxSpan = Math.max(2, gridSize - 2);
+                const baseMinRoom = Math.min(Math.max(4, Math.floor(gridSize / 8)), roomMaxSpan);
+                const baseMaxRoom = Math.min(Math.max(8, Math.min(18, Math.floor(gridSize / 2.5))), roomMaxSpan);
                 result = generateAdjacentDungeon({
                     gridSize: gridSize,
                     density: density / 100,
@@ -81,8 +85,8 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                     roomCount: roomCount,
                     corridorLength: corridorLength,
                     layoutStyle: layoutStyle,
-                    minRoom: Math.max(3, Math.floor(baseMinRoom * sizeMultiplier)),
-                    maxRoom: Math.max(6, Math.floor(baseMaxRoom * sizeMultiplier)),
+                    minRoom: Math.min(Math.max(3, Math.floor(baseMinRoom * sizeMultiplier)), roomMaxSpan),
+                    maxRoom: Math.min(Math.max(6, Math.floor(baseMaxRoom * sizeMultiplier)), roomMaxSpan),
                 });
             } else {
                 result = generateDungeon({

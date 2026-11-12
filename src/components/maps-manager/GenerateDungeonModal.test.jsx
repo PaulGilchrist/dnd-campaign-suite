@@ -371,6 +371,22 @@ describe('GenerateDungeonModal', () => {
       selectMode('Room Adjacent');
       await submitAdjacent(expected, () => fireEvent.click(screen.getByText(label)));
     });
+
+    // Small-grid fix (2026-11-12): room bounds cap to gridSize - 2 (1-cell wall
+    // margin per side), so a 7-wide grid never sees the old impossible 4–8-wide
+    // spec. Grid-30 pins above stay byte-identical (cap 28 never binds).
+    it.each([
+      ['Cramped', { minRoom: 3, maxRoom: 5 }],
+      ['Standard', { minRoom: 4, maxRoom: 5 }],
+      ['Spacious', { minRoom: 5, maxRoom: 5 }],
+    ])('at grid 7 "%s" passes capped %o (never 4–8-wide)', async (label, expected) => {
+      render(<GenerateDungeonModal {...props} />);
+      selectMode('Room Adjacent');
+      await submitAdjacent({ ...expected, gridSize: 7 }, () => {
+        changeField(/Grid Size/, '7');
+        fireEvent.click(screen.getByText(label));
+      });
+    });
   });
 
   describe('error handling', () => {
