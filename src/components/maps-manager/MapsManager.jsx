@@ -218,7 +218,12 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
         }
     };
 
+    // A fresh rename must not inherit a stale banner (e.g. the dup-rename
+    // "already exists" left hovering after an earlier cancel) — mirrors the
+    // setError(null)-on-action pattern of the activate/create lanes
+    // (backlog 2026-11-12 RS).
     const handleStartRename = (fileName, currentName) => {
+        setError(null);
         setRenamingMap(fileName);
         setRenameValue(currentName);
     };
@@ -226,6 +231,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     const handleRenameSave = async (oldFileName) => {
         const newName = renameValue.trim();
         if (!newName) {
+            // Empty/whitespace blur is a silent cancel — a cancel also drops any
+            // stale banner it superseded (backlog 2026-11-12 RS).
+            setError(null);
             setRenamingMap(null);
             return;
         }
@@ -264,6 +272,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
             e.preventDefault();
             handleRenameSave(fileName);
         } else if (e.key === 'Escape') {
+            // Escape cancels — clear any banner from an earlier commit attempt
+            // so nothing stale survives the cancel (backlog 2026-11-12 RS).
+            setError(null);
             setRenamingMap(null);
         }
     };

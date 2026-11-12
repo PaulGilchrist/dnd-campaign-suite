@@ -62,7 +62,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears, dis
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-12 RS: the Maps-manager error banner survives a rename CANCEL (Escape or empty-blur) and only clears on the next successful action — after a dup-rename error, pressing Escape leaves the stale "already exists" message hovering over an untouched row; clear `error` in `handleStartRename` (and/or the Escape/empty branches). (minor UX)
 
 ## Blocked / Not Verified (fold-gate ledger)
 
