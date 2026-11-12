@@ -33,6 +33,10 @@ function stripMarkdownSymbols(text) {
     .trim();
 }
 
+// Search fields for the "Search notes" filter (useCrudList) — shared with the
+// post-save visibility check in handleSave so the two can never drift.
+const NOTE_SEARCH_FIELDS = ['description'];
+
 // Display title for a note (row aria-label + delete confirm share this one
 // derivation): notes have no name field, so use the party location, falling
 // back to a plain-text shortened title derived from the description.
@@ -207,7 +211,18 @@ function NoteModal({
             <button
               className="ct-btn ct-btn-primary"
               onClick={onSave}
-              disabled={saving || !formData.description.trim()}
+              // Validation-by-disable, harmonized with the Sessions planner
+              // (SessionPlannerModal Save gate, improve 2026-11-12 NN backlog):
+              // an empty Party Location keeps Save inert so a saved row can
+              // never silently relabel itself "No location". The existing
+              // description gate stays; the legacy "No location" row-label
+              // fallback still renders for older rows (server stays
+              // permissive — only the client save path is gated).
+              disabled={
+                saving ||
+                !formData.description.trim() ||
+                !(formData.partyLocation || '').trim()
+              }
             >
               <i className="fa-solid fa-floppy-disk" />{' '}
               {saving ? 'Saving…' : 'Save'}
@@ -228,7 +243,7 @@ function Notes({ campaignName, characters, isLocalhost }) {
     modalOpen, editingItem: editingNote, formData,
     saving, setSaving,
     openNew, openEdit, closeModal, updateFormField,
-  } = useCrudList(notes, ['description']);
+  } = useCrudList(notes, NOTE_SEARCH_FIELDS);
   const [deleting, setDeleting] = useState(false);
   // Server-surfaced save/delete errors (e.g. 409 concurrent-edit conflict) —
   // mirrors the error state in NPCs.jsx / Factions.jsx.
@@ -352,7 +367,13 @@ function Notes({ campaignName, characters, isLocalhost }) {
 
   // Save note (create or update)
   const handleSave = async () => {
-    if (!formData || !formData.description.trim()) return;
+    // Handler guard mirrors the Save button's disabled gate (Sessions'
+    // empty-Name law): a whitespace-only location never reaches the server.
+    if (
+      !formData ||
+      !formData.description.trim() ||
+      !(formData.partyLocation || '').trim()
+    ) return;
 
     setSaving(true);
     try {
@@ -366,6 +387,21 @@ function Notes({ campaignName, characters, isLocalhost }) {
 
       await saveNotesList(updatedNotes);
       showError(null);
+      // Post-save visibility guarantee (improve 2026-11-12 NN backlog): a row
+      // saved while the "Search notes" filter is armed can land OUTSIDE the
+      // filter and look like a lost write. When the saved row no longer
+      // matches the active query, drop the filter so the row is immediately
+      // visible with no extra interaction; a still-matching save leaves the
+      // user's filter untouched.
+      const activeQuery = searchQuery.trim().toLowerCase();
+      if (
+        activeQuery &&
+        !NOTE_SEARCH_FIELDS.some((field) =>
+          String(updated[field] || '').toLowerCase().includes(activeQuery)
+        )
+      ) {
+        setSearchQuery('');
+      }
       missedListBroadcast.current = false;
       handleCloseModal();
     } catch (error) {

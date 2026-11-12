@@ -53,6 +53,12 @@ const openEditorWithStaleEdit = (ui) => {
   fireEvent.change(ui.getByTestId('preview-toggle-textarea'), {
     target: { value: 'A stale edit' },
   });
+  // Party location is required by the Save gate (harmonized with Sessions,
+  // improve 2026-11-12) — without it the button stays disabled and the save
+  // never reaches the mocked conflict rejection.
+  fireEvent.change(ui.getByLabelText(/party location/i), {
+    target: { value: 'Stale Hollow' },
+  });
   fireEvent.click(ui.getByRole('button', { name: /^save/i }));
 };
 
@@ -72,11 +78,7 @@ describe('Notes — concurrent-save conflict surfacing', () => {
       <Notes campaignName="test" characters={[]} isLocalhost={true} />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /new note/i }));
-    fireEvent.change(screen.getByTestId('preview-toggle-textarea'), {
-      target: { value: 'A stale edit' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^save/i }));
+    openEditorWithStaleEdit(screen);
 
     const alert = await waitFor(() => {
       const el = document.querySelector('.notes-form-error');
@@ -93,18 +95,15 @@ describe('Notes — concurrent-save conflict surfacing', () => {
       <Notes campaignName="test" characters={[]} isLocalhost={true} />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /new note/i }));
-    fireEvent.change(screen.getByTestId('preview-toggle-textarea'), {
-      target: { value: 'A stale edit' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^save/i }));
+    openEditorWithStaleEdit(screen);
     await waitFor(() => expect(document.querySelector('.notes-form-error')).not.toBeNull());
 
     // Cancel on a dirty draft first NAMES the discard (improve 2026-10-29-V)
-    // — accept it; the close still clears the banner.
+    // — accept it; the close still clears the banner. The NAMED entity is the
+    // typed party location (noteDisplayName law).
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "A stale edit"?');
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Stale Hollow"?');
     confirmSpy.mockRestore();
     expect(document.querySelector('.notes-form-error')).toBeNull();
   });
@@ -118,6 +117,9 @@ describe('Notes — concurrent-save conflict surfacing', () => {
     fireEvent.click(screen.getByRole('button', { name: /new note/i }));
     fireEvent.change(screen.getByTestId('preview-toggle-textarea'), {
       target: { value: 'A fresh note' },
+    });
+    fireEvent.change(screen.getByLabelText(/party location/i), {
+      target: { value: 'Fresh Vault' },
     });
     fireEvent.click(screen.getByRole('button', { name: /^save/i }));
 

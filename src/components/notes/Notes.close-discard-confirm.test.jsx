@@ -28,7 +28,10 @@ let notesFixture = [
     dateCreated: '2026-01-01T00:00:00.000Z',
     dateModified: '2026-01-02T00:00:00.000Z',
     partyLevel: 1,
-    partyLocation: '',
+    // Non-empty location keeps the save path VALID under the harmonized
+    // location gate (improve 2026-11-12) so the 409/draft legs still reach
+    // the save handler; naming therefore goes through the location.
+    partyLocation: 'Test Hollow',
   },
 ];
 
@@ -68,7 +71,7 @@ const renderNotes = () =>
   render(<Notes campaignName="test-campaign" characters={[]} isLocalhost />);
 
 const openEditor = async () => {
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit note: old note' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit note: Test Hollow' }));
 };
 
 const closeX = () => screen.getByRole('button', { name: 'Close' });
@@ -88,7 +91,7 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
       dateCreated: '2026-01-01T00:00:00.000Z',
       dateModified: '2026-01-02T00:00:00.000Z',
       partyLevel: 1,
-      partyLocation: '',
+      partyLocation: 'Test Hollow',
     }];
     confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -124,7 +127,7 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     fireEvent.click(cancelButton());
 
     expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "my unsaved draft"?');
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Test Hollow"?');
     expect(screen.getByText(/NOT saved/)).toHaveTextContent(CONFLICT_MESSAGE);
     expect(editor()).toBeInTheDocument();
     expect(editor().value).toBe('my unsaved draft');
@@ -141,7 +144,7 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     fireEvent.click(cancelButton());
 
     expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "typo fix in progress"?');
+    expect(confirmSpy).toHaveBeenCalledWith('Discard changes to "Test Hollow"?');
     await waitFor(() => expect(editor()).toBeNull());
     // Clean close: no missed-broadcast refresh, list untouched.
     expect(loadCallCount).toBe(1);
@@ -206,6 +209,6 @@ describe('Notes ×/Cancel close: dirty draft names the discard', () => {
     fireEvent.click(screen.getByRole('button', { name: /delete/i }));
     await waitFor(() => expect(editor()).toBeNull());
     expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Delete Note "old note"?');
+    expect(confirmSpy).toHaveBeenCalledWith('Delete Note "Test Hollow"?');
   });
 });

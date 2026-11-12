@@ -26,7 +26,10 @@ let notesFixture = [
     dateCreated: '2026-01-01T00:00:00.000Z',
     dateModified: '2026-01-02T00:00:00.000Z',
     partyLevel: 1,
-    partyLocation: '',
+    // Non-empty location keeps the save path VALID under the harmonized
+    // location gate (improve 2026-11-12) so the 409/recovery legs still reach
+    // the save handler.
+    partyLocation: 'Test Hollow',
   },
 ];
 
@@ -67,7 +70,7 @@ const renderNotes = () =>
   render(<Notes campaignName="test-campaign" characters={[]} isLocalhost />);
 
 const openEditor = async () => {
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit note: old note' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit note: Test Hollow' }));
 };
 
 // Open the editor, dirty the description draft, attempt a save → banner up.
@@ -94,7 +97,7 @@ describe('Notes 409 recovery: Reload list names the discard', () => {
       dateCreated: '2026-01-01T00:00:00.000Z',
       dateModified: '2026-01-02T00:00:00.000Z',
       partyLevel: 1,
-      partyLocation: '',
+      partyLocation: 'Test Hollow',
     };
     confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -145,7 +148,9 @@ describe('Notes 409 recovery: Reload list names the discard', () => {
     // Reopen re-seeds the fresh row/stamp and re-applying the edit saves
     // clean — no 409 loop.
     saveError = null;
-    fireEvent.click(screen.getByRole('button', { name: 'Edit note: other-tab text' }));
+    // Row label follows the location (noteDisplayName law), even though the
+    // OTHER TAB's edit changed the description.
+    fireEvent.click(screen.getByRole('button', { name: 'Edit note: Test Hollow' }));
     expect(screen.getByTestId('preview-toggle-note-description').value).toBe('other-tab text');
     expect(loadCallCount).toBe(2);
     fireEvent.change(screen.getByTestId('preview-toggle-note-description'), {

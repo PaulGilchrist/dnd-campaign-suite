@@ -194,6 +194,44 @@ describe('Notes', () => {
       expect(searchInput.value).toBe('');
       expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
     });
+
+    // Post-save visibility guarantee (improve 2026-11-12 NN backlog): saving
+    // while the filter is armed must never leave the saved row invisible
+    // (the "looks like a lost write" trap).
+    it('clears an armed filter after a save whose row would not match it', async () => {
+      const saveItems = vi.fn().mockResolvedValue(undefined);
+      mockHook({ items: searchable, saveItems });
+      renderNotes();
+      fireEvent.change(screen.getByLabelText('Search notes'), {
+        target: { value: 'fireball' },
+      });
+      openNewNote();
+      setDescription('A brand new trap log');
+      fireEvent.change(screen.getByLabelText(/party location/i), {
+        target: { value: 'Glyph Chamber' },
+      });
+      await act(async () => fireEvent.click(saveButton()));
+      expect(saveItems).toHaveBeenCalled();
+      // Filter reset without further interaction, so the new row shows.
+      expect(screen.getByLabelText('Search notes').value).toBe('');
+    });
+
+    it('keeps an armed filter untouched when the saved row still matches it', async () => {
+      const saveItems = vi.fn().mockResolvedValue(undefined);
+      mockHook({ items: searchable, saveItems });
+      renderNotes();
+      fireEvent.change(screen.getByLabelText('Search notes'), {
+        target: { value: 'fireball' },
+      });
+      openNewNote();
+      setDescription('Fireball scorch marks on the wall');
+      fireEvent.change(screen.getByLabelText(/party location/i), {
+        target: { value: 'Glyph Chamber' },
+      });
+      await act(async () => fireEvent.click(saveButton()));
+      expect(saveItems).toHaveBeenCalled();
+      expect(screen.getByLabelText('Search notes').value).toBe('fireball');
+    });
   });
 
   describe('modal', () => {
@@ -250,6 +288,33 @@ describe('Notes', () => {
         expect(saveButton()).toBeDisabled();
       },
     );
+
+    // Validation-by-disable harmonization (improve 2026-11-12 NN backlog):
+    // Notes mirrors the Sessions empty-Name gate — an empty/whitespace party
+    // location keeps Save disabled so a row can never silently save as
+    // "No location".
+    it.each(['', ' ', '\n\t '])(
+      'disables save when party location is %j even with a filled description',
+      (partyLocation) => {
+        renderNotes();
+        openNewNote();
+        setDescription('Some real content');
+        fireEvent.change(screen.getByLabelText(/party location/i), {
+          target: { value: partyLocation },
+        });
+        expect(saveButton()).toBeDisabled();
+      },
+    );
+
+    it('enables save once both description and party location are filled', () => {
+      renderNotes();
+      openNewNote();
+      setDescription('Some real content');
+      fireEvent.change(screen.getByLabelText(/party location/i), {
+        target: { value: 'Skull Creek Cave' },
+      });
+      expect(saveButton()).toBeEnabled();
+    });
   });
 
   describe('saving notes', () => {
@@ -281,6 +346,11 @@ describe('Notes', () => {
       renderNotes();
       openEditNote();
       setDescription('Updated text');
+      // The location gate (harmonized 2026-11-12) makes Save inert until the
+      // legacy empty-location row gets a location — type one before saving.
+      fireEvent.change(screen.getByLabelText(/party location/i), {
+        target: { value: 'Dungeon' },
+      });
       await act(async () => fireEvent.click(saveButton()));
       const callArgs = saveItems.mock.calls[0][0];
       expect(callArgs).toHaveLength(1);
