@@ -71,14 +71,9 @@
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.music-btn:hover:not(:disabled) {
+.music-btn:hover {
   background-color: var(--background-color-card-hover);
   color: var(--color-hover);
-}
-
-.music-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .music-volume {

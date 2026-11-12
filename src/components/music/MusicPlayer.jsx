@@ -52,6 +52,28 @@ function MusicMoodChip({ mood, active, trackCount, onSelect, onDelete }) {
   );
 }
 
+// Transport chrome retires on stop (backlog 2026-11-12 NN): with no mood
+// armed, Play/Pause and Stop do not render at all — the sidebar face of
+// TvMusicTransport's `if (!active) return null` law (same guard-clause
+// idiom). The lingering disabled pair was a silent no-op (disabled buttons
+// never fire onClick), so hiding it changes no commit or log bytes — only
+// the chrome. The volume slider and track editor stay outside this
+// component: they act on non-transport state in every mood state. Pure
+// props, hoisted for the complexity budget (MusicMoodChip idiom).
+function MusicTransportControls({ mood, playing, onTogglePlay, onStop }) {
+  if (!mood) return null;
+  return (
+    <>
+      <button className="music-btn" onClick={onTogglePlay} title={playing ? 'Pause' : 'Play'}>
+        <i className={`fa-solid ${playing ? 'fa-pause' : 'fa-play'}`}></i>
+      </button>
+      <button className="music-btn" onClick={onStop} title="Stop">
+        <i className="fa-solid fa-stop"></i>
+      </button>
+    </>
+  );
+}
+
 // Create-category form (improve 2026-11-07): name + preset icon picker.
 // Pure presentational — all state/handlers owned by MusicPlayer.
 function MusicCategoryForm({ label, icon, error, onLabelChange, onIconChange, onSubmit, onCancel }) {
@@ -677,12 +699,16 @@ function MusicPlayer({ campaignName, visible = true }) {
           />
         )}
       <div className="music-controls">
-        <button className="music-btn" onClick={togglePlay} disabled={!music.mood} title={playing ? 'Pause' : 'Play'}>
-          <i className={`fa-solid ${playing ? 'fa-pause' : 'fa-play'}`}></i>
-        </button>
-        <button className="music-btn" onClick={stopMusic} disabled={!music.mood} title="Stop">
-          <i className="fa-solid fa-stop"></i>
-        </button>
+        {/* Stop-retires-chrome law lives in MusicTransportControls (guard
+            clause mirroring TvMusicTransport's zero-chrome stop face). The
+            volume slider and track editor stay in every mood state — they
+            act on non-transport state (shared volume, per-mood tracks). */}
+        <MusicTransportControls
+          mood={music.mood}
+          playing={playing}
+          onTogglePlay={togglePlay}
+          onStop={stopMusic}
+        />
         <input
           className="music-volume"
           type="range"
