@@ -62,6 +62,15 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                 // The generator's real effective seed (typed or random) so the
                 // map is reproducible from the document on disk.
                 seed: result.seed,
+                // Full effective options (UF backlog 2026-11-12): the terrain
+                // generator consumes exactly gridSize + seed (the blank-seed
+                // field resolves to the generator's own random draw, reported
+                // back as result.seed); rivers/features are derived, not knobs.
+                generationOpts: {
+                    mode: 'terrain',
+                    gridSize: typedGridSize,
+                    seed: result.seed,
+                },
             });
 
             onMapCreated();

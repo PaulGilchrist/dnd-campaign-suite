@@ -389,6 +389,10 @@ const buildOutdoorMapData = (name, body) => {
     // whitelist and used to drop the body's seed, so a terrain map could never
     // be reproduced from its document on disk. Mirrors buildIndoorMapData.
     seed: body.seed,
+    // Full effective generation options (UF backlog 2026-11-12): stamped by
+    // the generate modals so the doc alone can re-derive its own map. Same
+    // verbatim passthrough law as seed (undefined drops from the JSON).
+    generationOpts: body.generationOpts,
     zoom: 1,
     panX: 0,
     panY: 0,
@@ -410,6 +414,10 @@ const buildIndoorMapData = (name, body) => ({
   generationMode: body.generationMode,
   description: body.description,
   seed: body.seed,
+  // Full effective generation options (UF backlog 2026-11-12): stamped by the
+  // generate-dungeon modal so the doc alone can re-derive its own dungeon.
+  // Same verbatim passthrough law as seed (undefined drops from the JSON).
+  generationOpts: body.generationOpts,
   terrain: body.terrain ?? {},
   pois: body.pois ?? [],
   zoom: 1,

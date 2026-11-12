@@ -79,6 +79,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
         try {
 
             let result;
+            let generationOpts;
             if (mode === 'adjacent') {
                 const sizeMultiplier = roomSize === 'cramped' ? 0.7 : roomSize === 'spacious' ? 1.3 : 1;
                 // Cap room bounds to what the grid can hold (1-cell wall margin
@@ -87,7 +88,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                 const roomMaxSpan = Math.max(2, gridSize - 2);
                 const baseMinRoom = Math.min(Math.max(4, Math.floor(gridSize / 8)), roomMaxSpan);
                 const baseMaxRoom = Math.min(Math.max(8, Math.min(18, Math.floor(gridSize / 2.5))), roomMaxSpan);
-                result = generateAdjacentDungeon({
+                const adjacentOpts = {
                     gridSize: gridSize,
                     density: density / 100,
                     seed: seedValue,
@@ -96,18 +97,28 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                     layoutStyle: layoutStyle,
                     minRoom: Math.min(Math.max(3, Math.floor(baseMinRoom * sizeMultiplier)), roomMaxSpan),
                     maxRoom: Math.min(Math.max(6, Math.floor(baseMaxRoom * sizeMultiplier)), roomMaxSpan),
-                });
+                };
+                result = generateAdjacentDungeon(adjacentOpts);
+                // Chosen UI label on top of the effective generator options so
+                // the saved doc alone re-derives the dungeon (UF backlog
+                // 2026-11-12); mode mirrors the top-level generationMode law.
+                generationOpts = { mode: 'adjacent', roomSize: roomSize, ...adjacentOpts };
             } else {
-                result = generateDungeon({
+                const bspOpts = {
                     gridSize: gridSize,
                     density: density / 100,
                     seed: seedValue,
-                });
+                };
+                result = generateDungeon(bspOpts);
+                generationOpts = { mode: 'bsp', ...bspOpts };
             }
 
             const { name: generatedName, ...mapData } = result;
             void generatedName;
-            await mapsService.createMap(campaignName, name, mapData);
+            // Full effective options ride the create body so the saved doc can
+            // re-derive its own dungeon (UF backlog 2026-11-12); the server
+            // create builders pass `generationOpts` through verbatim.
+            await mapsService.createMap(campaignName, name, { ...mapData, generationOpts });
 
             onMapCreated();
             onClose();

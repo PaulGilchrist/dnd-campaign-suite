@@ -408,6 +408,86 @@ describe('GenerateDungeonModal', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // generationOpts stamping (UF backlog 2026-11-12): the createMap payload
+  // must carry the full EFFECTIVE options so the saved doc alone can
+  // re-derive its own dungeon.
+  // -------------------------------------------------------------------------
+  describe('generationOpts stamping', () => {
+    const createPayload = () => mapsServiceMocks.createMap.mock.calls[0][2];
+
+    it('stamps bsp mode with the effective gridSize/density/seed', async () => {
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Bsp Stamped');
+      changeField(/Grid Size/, '20');
+      changeField(/Seed/, '42');
+      fireEvent.change(screen.getByRole('slider', { name: /Density/ }), { target: { value: '80' } });
+      clickGenerate();
+
+      await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+      expect(createPayload().generationOpts).toEqual({
+        mode: 'bsp',
+        gridSize: 20,
+        density: 0.8,
+        seed: 42,
+      });
+      // The generator received the same effective knobs (mode excluded).
+      expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith({
+        gridSize: 20, density: 0.8, seed: 42,
+      });
+    });
+
+    it('stamps the actual random seed used when the seed field is blank', async () => {
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Random Seed');
+      clickGenerate();
+
+      await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+      const usedSeed = dungeonMocks.generateDungeon.mock.calls[0][0].seed;
+      expect(typeof usedSeed).toBe('number');
+      expect(Number.isInteger(usedSeed)).toBe(true);
+      // The stamped seed is THE seed handed to the generator, not a re-draw.
+      expect(createPayload().generationOpts.seed).toBe(usedSeed);
+    });
+
+    it('stamps adjacent mode with every effective option incl. roomSize label and derived spans', async () => {
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Adjacent Stamped');
+      selectMode('Room Adjacent');
+      changeField(/Grid Size/, '20');
+      changeField(/Seed/, '42');
+      fireEvent.change(screen.getByRole('slider', { name: /Room Count/ }), { target: { value: '10' } });
+      fireEvent.click(screen.getByText('Spacious'));
+      fireEvent.click(screen.getByText('Sprawling (long halls)'));
+      fireEvent.click(screen.getByText('Winding'));
+      clickGenerate();
+
+      await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+      // Grid-20 spacious math: base [4,8] × 1.3 → minRoom 5, maxRoom 10.
+      // Adjacent mode has no density slider — the default 50% (0.5) is the
+      // effective knob value handed to the generator.
+      expect(createPayload().generationOpts).toEqual({
+        mode: 'adjacent',
+        roomSize: 'spacious',
+        gridSize: 20,
+        density: 0.5,
+        seed: 42,
+        roomCount: 10,
+        corridorLength: 'sprawling',
+        layoutStyle: 'winding',
+        minRoom: 5,
+        maxRoom: 10,
+      });
+      // The generator got the same derived opts WITHOUT the label-only extras.
+      expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
+        expect.not.objectContaining({ mode: expect.anything(), roomSize: expect.anything() }),
+      );
+      expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
+        expect.objectContaining({ minRoom: 5, maxRoom: 10, roomCount: 10, density: 0.5 }),
+      );
+    });
+  });
+
   describe('error handling', () => {
     it.each([
       ['generation error', () => dungeonMocks.generateDungeon.mockImplementationOnce(() => { throw new Error('First fail'); }), 'First fail'],

@@ -142,6 +142,14 @@ describe('GenerateTerrainModal', () => {
           terrain: {},
           pois: [],
           seed: expected.docSeed,
+          // UF backlog 2026-11-12: the create body carries the full EFFECTIVE
+          // options — mode + typed grid + the generator's effective seed (the
+          // random draw when the field was blank, echoed as docSeed).
+          generationOpts: {
+            mode: 'terrain',
+            gridSize: expected.gridSize,
+            seed: expected.docSeed,
+          },
         });
       });
     });
