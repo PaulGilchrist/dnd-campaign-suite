@@ -53,8 +53,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-12 NN) `storage.set('combatSummary')` control writes are UNGUARDED full-board POSTs (no `baseVersion`) while the `boardVersion`/409 doctrine already exists for protected writers (`createCreatureHandlers.js` ~L569-574 shows the pattern). Even if the race bug's chosen fix is echo-side disarm, stamping `baseVersion` on the delegation/card writes would make "last-writer's stale mirror silently wins" structurally impossible for the whole handler family. Likely files: `initiative/createCreatureHandlers.js`, `services/ui/storage.js`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - ~~Same-bucket two-tab write RACE~~ — RESOLVED 2026-11-12 by the first ride (Priority Target 4): verdict = scoped-PATCH merge beats stale full-POST per arrival order; law-violating interleaving FILED as `bug-race-arm-patch-beats-swap-clear-post.md`.
