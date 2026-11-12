@@ -38,3 +38,21 @@ Compute the derived values in the JSX, mirroring the terrain modal. If the inten
 
 ## Severity
 Minor UX issue. The generator and the created map are correct; only the descriptive hint misinforms the user about map size/scale. Low-risk copy fix.
+
+## Resolution
+**FIXED 2026-11-12 (fix subagent).** Diagnosis confirmed: `GenerateDungeonModal.jsx` printed the raw per-side cell count as both feet and total squares in **both** mode branches, while the generator produces an N×N grid of 5 ft cells.
+
+**What changed:**
+- `src/components/maps-manager/GenerateDungeonModal.jsx` — both hint lines (BSP + Room-Adjacent branches) now read
+  `{gridSize * FEET_PER_CELL} ft × {gridSize * FEET_PER_CELL} ft ({gridSize * gridSize} squares)`,
+  importing the canonical `FEET_PER_CELL = 5` from `src/services/combat/movementBudget.js` (the only exported feet-per-cell constant; `mapConfig.js` holds only `CELL_SIZE = 40` px, and the map hook `useSelectMove.js` already imports `FEET_PER_CELL` from this module — same pattern). Mirrors the sibling `GenerateTerrainModal.jsx:75` inline-computed hint.
+- `src/components/maps-manager/GenerateDungeonModal.test.jsx` — 2 new regression tests in the `rendering` suite: the default hint is exactly `150 ft × 150 ft (900 squares)` (grid 30), updates to `100 ft × 100 ft (400 squares)` on grid 20, and the corrected hint shows in Room-Adjacent mode too.
+
+**Verification:**
+- Live repro BEFORE fix (Playwright, localhost:5173, test-campaign → Maps → Indoor → Generate Dungeon): hint read `30 ft × 30 ft (30 squares)` at default grid 30 and `20 ft × 20 ft (20 squares)` at grid 20 in both BSP and Room-Adjacent branches; generated `qa-dungeon-gen.json` (name "QA Dungeon Gen", grid 20, seed 42) landed `{gridSize:20, seed:42, walls:256}` with wall coords spanning x∈[0,19], y∈[0,19] → genuinely 400 cells, hint wrong.
+- Live re-verify AFTER fix: hint now reads `150 ft × 150 ft (900 squares)` (default) and `100 ft × 100 ft (400 squares)` at grid 20 in **both** modes. Sibling Generate Terrain hint sanity-checked unchanged: `60 hexes × 30 hexes (1800 hexes)`.
+- Tests: `npx vitest run src/components/maps-manager/GenerateDungeonModal.test.jsx` → 32/32; whole folder `npx vitest run src/components/maps-manager` → 10 files / 146 tests passed; `npm run lint` → clean (zero warnings).
+- Cleanup: sandbox map `qa-dungeon-gen` API-deleted (ghost 404, maps back to 4 owner fixtures); change-data + campaign log admin-cleared for test-campaign.
+
+Dual-ruleset note: hint text is ruleset-agnostic (no 5e/2024 twin of this modal). Out of scope, untouched: the seed-validation and clamp-copy backlog items in the app-exploration Improvement backlog for these modals.
+

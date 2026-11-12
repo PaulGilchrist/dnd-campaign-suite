@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { generateDungeon, generateAdjacentDungeon } from '../../services/maps/dungeonGenerator.js';
 import * as mapsService from '../../services/maps/mapsService.js';
+import { FEET_PER_CELL } from '../../services/combat/movementBudget.js';
 import './GenerateDungeonModal.css';
 
 const MODE_OPTIONS = [
@@ -137,7 +138,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                     onChange={e => setGridSize(Number(e.target.value))}
                                 />
                                 <span className="dungeon-gen-hint">
-                                    {gridSize} ft &times; {gridSize} ft ({gridSize} squares)
+                                    {gridSize * FEET_PER_CELL} ft &times; {gridSize * FEET_PER_CELL} ft ({gridSize * gridSize} squares)
                                 </span>
                             </label>
 
@@ -170,7 +171,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                     onChange={e => setGridSize(Number(e.target.value))}
                                 />
                                 <span className="dungeon-gen-hint">
-                                    {gridSize} ft &times; {gridSize} ft ({gridSize} squares)
+                                    {gridSize * FEET_PER_CELL} ft &times; {gridSize * FEET_PER_CELL} ft ({gridSize * gridSize} squares)
                                 </span>
                             </label>
 

@@ -98,6 +98,21 @@ describe('GenerateDungeonModal', () => {
       expect(screen.getByRole('slider', { name: /Room Count/ })).toBeInTheDocument();
     });
 
+    // Grid hint must describe the real map: gridSize cells-per-side at
+    // FEET_PER_CELL (5 ft) per cell → N·5 ft square, N² total cells.
+    it('shows the grid-size hint as feet-per-side and total squares', () => {
+      render(<GenerateDungeonModal {...props} />);
+      expect(screen.getByText('150 ft × 150 ft (900 squares)')).toBeInTheDocument();
+      changeField(/Grid Size/, '20');
+      expect(screen.getByText('100 ft × 100 ft (400 squares)')).toBeInTheDocument();
+    });
+
+    it('shows the corrected grid-size hint in Room Adjacent mode too', () => {
+      render(<GenerateDungeonModal {...props} />);
+      selectMode('Room Adjacent');
+      expect(screen.getByText('150 ft × 150 ft (900 squares)')).toBeInTheDocument();
+    });
+
     it('enables Generate only when map name has content', () => {
       render(<GenerateDungeonModal {...props} />);
       expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
