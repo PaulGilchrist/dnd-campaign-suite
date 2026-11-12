@@ -120,6 +120,27 @@
   color: var(--color-text);
 }
 
+/* Rules-launchpad popup-blocked toast (backlog 2026-11-12 TE) — same token
+   block as .sidebar-delete-error above; role=status + 2.5s auto-hide live in
+   Sidebar.jsx (the sessions/encounter/music toast idiom). */
+.sidebar-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 4px 2px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-error-border);
+  border-radius: 4px;
+  background-color: var(--background-color-error);
+  color: var(--color-error-light);
+  font-size: 0.8rem;
+}
+
+.sidebar-toast-text {
+  flex: 1;
+  white-space: normal;
+}
+
 /* Sidebar header */
 .sidebar-header {
   display: flex;

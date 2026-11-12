@@ -76,8 +76,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-12 TE] Rules sidebar launchpad has no popup-blocked feedback.** `openRules` (`src/components/sidebar/Sidebar.jsx:54-56`) ignores `window.open`'s return; when the browser blocks the popup the user gets ZERO feedback — no toast, no fallback, view unchanged (live-simulated with `window.open=()=>null`). Cheap fix: `const w = window.open(...); if (!w) showToast('Popup blocked — allow popups for this site to open the Rules reference')` (reuse the existing toast lane) or render the URL as an inline `<a target=_blank>` fallback in a popover.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - ~~AI Generate Dungeon/Terrain modal live success-faces~~ — CLOSED by SD 2026-11-12; post-fix batch re-lived end-to-end by TE the same day (16 sandbox generations, disk-verified). These are **procedural** generators, NOT AI — no omlx/model call is made.

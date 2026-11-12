@@ -24,6 +24,14 @@ const VIEW_LABELS = {
 
 const RULES_URL = 'https://paulgilchrist.github.io/dnd-tools/rules/general';
 
+// Popup-blocked feedback for the Rules launchpad (backlog 2026-11-12 TE):
+// window.open returns null when the browser blocks the popup, leaving the
+// click otherwise silent. One short sentence naming the failure and the fix.
+const RULES_POPUP_BLOCKED_MESSAGE =
+    'Popup blocked — allow popups for this site to open the Rules reference';
+// Mirrors the .sessions-toast/.encounter-toast/.music-toast auto-hide window.
+const RULES_TOAST_AUTO_HIDE_MS = 2500;
+
 // Dice popup is pure UI feedback — auto-hide so its full-page overlay never
 // intercepts clicks (mirrors the .music-toast auto-hide idiom).
 const DICE_POPUP_AUTO_HIDE_MS = 4000;
@@ -51,8 +59,11 @@ const NAV_ITEMS = [
     { view: 'settlements', onClick: 'onSettlementsClick', localhostOnly: true, arenaHidden: true },
 ];
 
-function openRules() {
-    window.open(RULES_URL, '_blank');
+function openRules(showBlockedToast) {
+    const popup = window.open(RULES_URL, '_blank');
+    // Blocked popups return falsy — without this the click looked dead
+    // (no toast, no view change; live-simulated with window.open→null).
+    if (!popup) showBlockedToast(RULES_POPUP_BLOCKED_MESSAGE);
 }
 
 function activeClass(activeView, view) {
@@ -67,7 +78,7 @@ function getActiveInfo(activeView, activeCharacter) {
     return { label: viewInfo?.label || '', icon: viewInfo?.icon || '' };
 }
 
-function NavButton({ item, activeView, handlers, isLocalhost }) {
+function NavButton({ item, activeView, handlers, isLocalhost, rulesToast, showRulesToast }) {
     if (item.localhostOnly && !isLocalhost) return null;
 
     const { label, icon } = VIEW_LABELS[item.view] || item;
@@ -75,9 +86,19 @@ function NavButton({ item, activeView, handlers, isLocalhost }) {
 
     if (item.external) {
         return (
-            <button className="sidebar-section-header" onClick={openRules}>
-                <i className={`fa-solid ${icon}`}></i> {displayLabel} <i className="fa-solid fa-external-link-alt fa-xs"></i>
-            </button>
+            <>
+                <button className="sidebar-section-header" onClick={() => openRules(showRulesToast)}>
+                    <i className={`fa-solid ${icon}`}></i> {displayLabel} <i className="fa-solid fa-external-link-alt fa-xs"></i>
+                </button>
+                {/* Popup-blocked feedback rides the app's toast lane (role=status,
+                    local state + auto-hide — mirrors MusicToast/SessionsToast). */}
+                {rulesToast && (
+                    <div className="sidebar-toast" role="status">
+                        <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span className="sidebar-toast-text">{rulesToast}</span>
+                    </div>
+                )}
+            </>
         );
     }
 
@@ -137,6 +158,14 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
 
 function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
     const [diceResult, setDiceResult] = useState(null);
+    // Display-only Rules-launchpad feedback (popup blocked) — mirrors the
+    // sessions/encounter/music toast idiom (auto-hide timer is a benign UI
+    // category, display only, no game state).
+    const [rulesToast, setRulesToast] = useState(null);
+    const showRulesToast = (message) => {
+        setRulesToast(message);
+        setTimeout(() => setRulesToast(null), RULES_TOAST_AUTO_HIDE_MS); // toast auto-hide (display only, no game state)
+    };
 
     // Auto-hide timer (display only, no game state). A re-roll replaces
     // diceResult, restarting the countdown on the new result; early close
@@ -207,6 +236,8 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                         activeView={activeView}
                         handlers={navHandlers}
                         isLocalhost={isLocalhost}
+                        rulesToast={rulesToast}
+                        showRulesToast={showRulesToast}
                     />
                 ))}
                 {isLocalhost && (
