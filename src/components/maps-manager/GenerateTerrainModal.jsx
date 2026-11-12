@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { generateHexTerrain } from '../../services/maps/hexTerrainGenerator.js';
 import { parseGridInput } from '../../services/maps/gridInput.js';
-import { parseSeedInput } from '../../services/maps/seedInput.js';
+import { parseSeedInput, SEED_INPUT_PLACEHOLDER } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import './GenerateTerrainModal.css';
 import './gen-modal-shared.css';
@@ -122,7 +122,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                             type="text"
                             value={seed}
                             onChange={editSeed}
-                            placeholder="Random"
+                            placeholder={SEED_INPUT_PLACEHOLDER}
                         />
                     </label>
                 </div>

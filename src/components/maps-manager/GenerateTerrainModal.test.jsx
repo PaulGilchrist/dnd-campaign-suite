@@ -30,7 +30,7 @@ const setGridSize = (value) =>
   fireEvent.change(screen.getByLabelText(/Grid Size/), { target: { value } });
 
 const setSeed = (value) =>
-  fireEvent.change(screen.getByPlaceholderText('Random'), { target: { value } });
+  fireEvent.change(screen.getByPlaceholderText('Random if empty'), { target: { value } });
 
 const clickGenerate = () =>
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));

@@ -10,9 +10,15 @@
 //     identical shared child-token set.
 //  3. The shared child ruleset lives once: neither modal CSS file redefines a
 //     shared token.
+//  4. The seed field's placeholder copy is likewise unified (VG backlog
+//     2026-11-12: the twins drifted to "Random if empty" vs "Random" over the
+//     same parseSeedInput law): both JSX files must reference the shared
+//     SEED_INPUT_PLACEHOLDER constant from services/maps/seedInput.js, and
+//     neither may hard-code a loose placeholder literal.
 import { readFileSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
+import { SEED_INPUT_PLACEHOLDER } from '../../services/maps/seedInput.js';
 
 // Vitest runs from the repo root; import.meta.url is Vite-transformed here, so
 // resolve the twin files against cwd explicitly.
@@ -80,5 +86,23 @@ describe('generate-modal twin class parity', () => {
       expect(defines(dungeonCss, token), `dungeon CSS must not redefine .${token}`).toBe(false);
       expect(defines(terrainCss, token), `terrain CSS must not redefine .${token}`).toBe(false);
     }
+  });
+
+  it.each([
+    ['GenerateDungeonModal.jsx', dungeonJsx],
+    ['GenerateTerrainModal.jsx', terrainJsx],
+  ])('%s sources its seed placeholder from the shared constant, never a literal', (file, src) => {
+    expect(src, `${file} must import SEED_INPUT_PLACEHOLDER`).toContain('SEED_INPUT_PLACEHOLDER');
+    expect(src, `${file} must use the constant as the seed placeholder`).toContain(
+      'placeholder={SEED_INPUT_PLACEHOLDER}'
+    );
+    // No loose "Random…" placeholder strings may creep back into either twin.
+    const looseSeedPlaceholders = [...src.matchAll(/placeholder="Random[^"]*"/g)]
+      .map((match) => match[0]);
+    expect(looseSeedPlaceholders, `${file} hard-codes a seed placeholder`).toEqual([]);
+  });
+
+  it('keeps the shared constant itself equal to the unified copy', () => {
+    expect(SEED_INPUT_PLACEHOLDER).toBe('Random if empty');
   });
 });

@@ -8,6 +8,11 @@
 
 export const SEED_ERROR = 'Seed must be a whole number';
 
+// Shared seed-field placeholder for the twin generate modals (VG backlog
+// 2026-11-12: the twins drifted to "Random if empty" vs "Random" while the
+// parseSeedInput law underneath is identical — one copy of the UI promise).
+export const SEED_INPUT_PLACEHOLDER = 'Random if empty';
+
 // Returns { seed: <integer> } for a valid number ("0" included),
 // { seed: null } for empty/whitespace, or { error: SEED_ERROR }.
 export function parseSeedInput(raw) {

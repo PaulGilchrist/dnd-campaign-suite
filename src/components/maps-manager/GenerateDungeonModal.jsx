@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { generateDungeon, generateAdjacentDungeon } from '../../services/maps/dungeonGenerator.js';
 import { parseGridInput } from '../../services/maps/gridInput.js';
-import { parseSeedInput } from '../../services/maps/seedInput.js';
+import { parseSeedInput, SEED_INPUT_PLACEHOLDER } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { FEET_PER_CELL } from '../../services/combat/movementBudget.js';
 import './GenerateDungeonModal.css';
@@ -279,7 +279,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                             type="text"
                             value={seed}
                             onChange={editSeed}
-                            placeholder="Random if empty"
+                            placeholder={SEED_INPUT_PLACEHOLDER}
                         />
                     </label>
 
