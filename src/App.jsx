@@ -922,7 +922,7 @@ function App() {
              onSaveClick={handleSaveClick}
            />
         )}
-        {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} onViewCharacter={handleCharacterClick} />}
+        {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} onViewCharacter={handleCharacterClick} onOpenEncounters={() => setActiveView('encounter')} />}
         {activeView === 'mapsManager' && (
           <MapsAreaView
             campaignName={campaignName}

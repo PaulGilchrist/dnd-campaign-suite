@@ -236,6 +236,29 @@ function boardHasSubjects(combatSummary, characters) {
     return characters.length > 0 || creaturesOrEmpty(combatSummary).length > 0
 }
 
+// Empty-state face for the boardHasSubjects false branch (zero characters and
+// an empty-skeleton/absent board): replaces the former bare void with one line
+// of guidance. Re-uses the global .ct-container/.ct-empty-state/.ct-btn tiers
+// (no new CSS). The deep-link into the Encounter Builder is GM-only — the
+// Encounters view is not in the visitor sidebar — while the copy itself shows
+// for everyone. Rendered as a module-scope component so Initiative's own
+// complexity stays at its eslint ceiling.
+function InitiativeEmptyState({ isLocalhost, onOpenEncounters }) {
+    return (
+        <div className='ct-container'>
+            <div className='ct-empty-state'>
+                <i className='fa-solid fa-dice-d20' aria-hidden='true'></i>
+                <p>No one is on the initiative board yet — add characters, or join monsters via the Encounter Builder to start combat.</p>
+                {isLocalhost && onOpenEncounters && (
+                    <button className='ct-btn ct-btn-primary' onClick={onOpenEncounters}>
+                        Open Encounter Builder
+                    </button>
+                )}
+            </div>
+        </div>
+    )
+}
+
 function ConditionSavePopup({ popup, onClose }) {
     return (
         <Popup onClickOrKeyDown={onClose}>
@@ -302,7 +325,7 @@ function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignN
     )
 }
 
-function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter }) {
+function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName, onViewCharacter, onOpenEncounters }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
     const [activeCreatureName, setActiveCreatureName] = React.useState(null)
@@ -1070,7 +1093,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 />
             )}
             </>
-            ) : null}
+            ) : <InitiativeEmptyState isLocalhost={isLocalhost} onOpenEncounters={onOpenEncounters} />}
         </div>
     )
 }
