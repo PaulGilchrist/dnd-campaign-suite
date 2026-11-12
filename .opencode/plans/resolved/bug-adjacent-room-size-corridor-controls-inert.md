@@ -24,3 +24,20 @@ In `generateAdjacentDungeon`, consume the passed options: `const minRoom = clamp
 
 ## Severity
 Broken feature — the controls are visible, selectable and documented by the modal copy, but produce a zero-delta output; users generating dungeons will believe room/corridor style was applied when it was not.
+
+## Resolution
+**FIXED 2026-11-12 (fix-run).** The "Likely location" guess was confirmed exactly: `generateAdjacentDungeon()` never read `opts.minRoom` / `opts.maxRoom` / `opts.corridorLength` — it recomputed `minRoom`/`maxRoom` from `gridSize` alone, and corridor carving (`connectClusters`) only ever fired for orphaned clusters, so both control groups were dead by construction.
+
+**What changed** (`src/services/maps/adjacentDungeonGenerator.js` only — the modal was already computing and passing the options correctly):
+- **Room Size:** the generator now consumes `opts.minRoom`/`opts.maxRoom`, clamped into the same `[2, roomMaxSpan]` envelope as the internal floors (`minRoom` also floors at 2, `maxRoom ≥ minRoom` enforced). Omitting the opts falls back to the legacy gridSize floors, so pre-flag default maps replay byte-identical.
+- **Corridor Length:** `opts.corridorLength` maps to a room-spacing (`CORRIDOR_GAPS`: compact 1 / moderate 2 / sprawling 3). `findSharedEdge` generalized to a gap-range adjacency probe; `compact` keeps the legacy exact-1-cell shared wall + door cell (byte-identical to pre-fix output), while `moderate`/`sprawling` space rooms further apart and join them with the existing centre-to-centre L-corridor primitive (`carveCorridor`, same pattern `connectClusters` already uses) instead of a single door. Unlike the suggested fix's "length budget multiplier", no new corridor system was invented — spacing + the established corridor carver was enough. Wide gaps also accept a `[gap-1, gap+2]` spacing range so edge-clamped placements still connect: a collision sweep (grids 20/30 × 40 seeds) shows **0/80 identical pairs** across options while sprawling honestly packs fewer rooms into small grids.
+
+**Files:**
+- `src/services/maps/adjacentDungeonGenerator.js` — fix
+- `src/services/maps/adjacentDungeonGenerator.room-size-corridor-options.test.js` — NEW regression test (6 its: cramped vs standard vs spacious all differ at one seed; opts == internal floors is an honest byte-identical no-op; `minRoom:99` clamps and differs from default; compact vs moderate vs sprawling all differ and compact ≡ unnamed; sprawling stays one connected dungeon; seed contract holds)
+
+**Verification:**
+- Repro re-run live in test-campaign BEFORE the fix: the three UI generations (`qa-adj-cram`/`qa-adj-spc`/`qa-adj-spraw`, grid 20 seed 42, room count 8) were one normalized md5 `16f569da…` — bug confirmed exactly as filed.
+- Re-verified live AFTER the fix (fresh page, real UI, same steps): md5s `86a44896…` / `b31d4296…` / `b7e87ae1…` — all three differ, all differ from the pre-fix bytes; Room Size scales floor area (Cramped 259 walls vs Spacious 220) and Sprawling replaces door cells with carved halls (0 doors). BSP mode sanity-generated `qa-bsp-sanity` byte-stable (mode `bsp`, walls 512) — other modes untouched.
+- Tests: new file 6/6; `adjacentDungeonGenerator.test.js` 18/18 (ALL legacy byte pins — flagship, layouts, g7 regression, modal-constructible sweep — preserved unchanged); `src/services/maps/` 18 files/326 tests; `src/components/maps-manager/` 10 files/167 tests. `npm run lint` zero warnings; `no-timers-guard` OK.
+- Cleanup: all 4 sandbox maps API-deleted (ghost 404 each), Maps dir back to the 4 owner fixtures, change-data `{}` + log `[]` + overlays `[]` via closed-tab two-pass admin clears GET-verified; console 0 errors/0 warnings.

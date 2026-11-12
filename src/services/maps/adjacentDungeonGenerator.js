@@ -30,23 +30,29 @@ function overlapsExisting(rooms, rect, pad) {
   return false;
 }
 
-function findSharedEdge(a, b) {
-  if (b.y + b.h + 1 === a.y) {
+// Shared-edge probe: rects `a` and `b` sit on one axis with a gap in
+// [minGap, maxGap] cells between them and at least one cell of edge overlap.
+// mode = (1,1) is the classic wall-to-wall adjacency joined by a single door
+// cell (wallY/wallX names that wall); wider modes feed hall carving.
+function findSharedEdge(a, b, minGap, maxGap) {
+  maxGap = maxGap != null ? maxGap : minGap;
+  const gapOk = (s) => s >= minGap && s <= maxGap;
+  if (gapOk(a.y - (b.y + b.h))) {
     const overlapStart = Math.max(b.x, a.x);
     const overlapEnd = Math.min(b.x + b.w - 1, a.x + a.w - 1);
     if (overlapStart <= overlapEnd) return { side: 'n', overlapStart, overlapEnd, wallY: a.y - 1 };
   }
-  if (b.y === a.y + a.h + 1) {
+  if (gapOk(b.y - (a.y + a.h))) {
     const overlapStart = Math.max(b.x, a.x);
     const overlapEnd = Math.min(b.x + b.w - 1, a.x + a.w - 1);
     if (overlapStart <= overlapEnd) return { side: 's', overlapStart, overlapEnd, wallY: a.y + a.h };
   }
-  if (b.x + b.w + 1 === a.x) {
+  if (gapOk(a.x - (b.x + b.w))) {
     const overlapStart = Math.max(b.y, a.y);
     const overlapEnd = Math.min(b.y + b.h - 1, a.y + a.h - 1);
     if (overlapStart <= overlapEnd) return { side: 'w', overlapStart, overlapEnd, wallX: a.x - 1 };
   }
-  if (b.x === a.x + a.w + 1) {
+  if (gapOk(b.x - (a.x + a.w))) {
     const overlapStart = Math.max(b.y, a.y);
     const overlapEnd = Math.min(b.y + b.h - 1, a.y + a.h - 1);
     if (overlapStart <= overlapEnd) return { side: 'e', overlapStart, overlapEnd, wallX: a.x + a.w };
@@ -95,7 +101,7 @@ function pickSourceRoomIndex(rooms, layoutStyle, rng) {
   return Math.floor(rng() * rooms.length);
 }
 
-function placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layoutStyle, rng }) {
+function placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layoutStyle, corridorGap, rng }) {
   const placedItems = [];
   const maxAttempts = targetRooms * 30;
   let attempts = 0;
@@ -119,18 +125,18 @@ function placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layo
       switch (side) {
         case 'n':
           nx = sx - Math.floor(newW / 2) + Math.floor(rng() * Math.min(newW, Math.max(1, sw)));
-          ny = sy - newH - 1;
+          ny = sy - newH - corridorGap;
           break;
         case 's':
           nx = sx - Math.floor(newW / 2) + Math.floor(rng() * Math.min(newW, Math.max(1, sw)));
-          ny = sy + sh + 1;
+          ny = sy + sh + corridorGap;
           break;
         case 'w':
-          nx = sx - newW - 1;
+          nx = sx - newW - corridorGap;
           ny = sy - Math.floor(newH / 2) + Math.floor(rng() * Math.min(newH, Math.max(1, sh)));
           break;
         case 'e':
-          nx = sx + sw + 1;
+          nx = sx + sw + corridorGap;
           ny = sy - Math.floor(newH / 2) + Math.floor(rng() * Math.min(newH, Math.max(1, sh)));
           break;
       }
@@ -142,15 +148,24 @@ function placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layo
 
       if (overlapsExisting(rooms, newRect, 0)) continue;
 
-      const edge = findSharedEdge(srcRoom.rect, newRect);
+      const edge = corridorGap === 1
+        ? findSharedEdge(srcRoom.rect, newRect, 1)
+        : findSharedEdge(srcRoom.rect, newRect, corridorGap - 1, corridorGap + 2);
       if (!edge) continue;
 
       const roomId = rooms.length;
       carveRoomRect(grid, gridSize, newRect);
 
-      const door = placeDoorAtEdge(grid, gridSize, edge, srcRoom.id, roomId);
-      if (door) {
-        placedItems.push(door);
+      if (corridorGap === 1) {
+        const door = placeDoorAtEdge(grid, gridSize, edge, srcRoom.id, roomId);
+        if (door) {
+          placedItems.push(door);
+        }
+      } else {
+        // Rooms spaced further apart join via a carved hall instead of a single
+        // door cell — same centre-to-centre L-corridor the cluster connector
+        // already uses, so the layout grows longer halls with the gap.
+        carveCorridor(grid, gridSize, rectCenter(srcRoom.rect), rectCenter(newRect), rng() < 0.5);
       }
 
       const roomObj = { rect: newRect, id: roomId, connected: [srcRoom.id], type: 'common' };
@@ -504,6 +519,12 @@ export function generateAdjacentDungeon(opts) {
 
   const layoutStyle = opts.layoutStyle || 'balanced';
 
+  // Room spacing between adjacent rooms (wall cells between them): compact
+  // keeps the classic 1-cell shared wall joined by a door; moderate/sprawling
+  // space rooms further apart and join them with carved halls.
+  const CORRIDOR_GAPS = { compact: 1, moderate: 2, sprawling: 3 };
+  const corridorGap = CORRIDOR_GAPS[opts.corridorLength] != null ? CORRIDOR_GAPS[opts.corridorLength] : 1;
+
   const grid = buildWalledGrid(gridSize);
 
   // Rooms keep a 1-cell wall margin on each side (see the placeRooms clamp), so
@@ -511,8 +532,14 @@ export function generateAdjacentDungeon(opts) {
   // 4–8-wide rooms from the floors alone and rects that hang off the grid
   // (crash 2026-11-12). Mirrors bspTree's Math.min(maxRoom, space) clamp.
   const roomMaxSpan = Math.max(2, gridSize - 2);
-  const minRoom = Math.min(Math.max(4, Math.floor(gridSize / 8)), roomMaxSpan);
-  const maxRoom = Math.min(Math.max(8, Math.min(18, Math.floor(gridSize / 2.5))), roomMaxSpan);
+  const defaultMinRoom = Math.min(Math.max(4, Math.floor(gridSize / 8)), roomMaxSpan);
+  const defaultMaxRoom = Math.min(Math.max(8, Math.min(18, Math.floor(gridSize / 2.5))), roomMaxSpan);
+  // Honour the Room Size options the modal computes (Cramped 0.7× / Spacious
+  // 1.3×) — these used to be passed in and silently dropped, leaving the
+  // control inert. Same [2, roomMaxSpan] envelope as the internal floors.
+  const clampRoomSpan = (value, fallback) => Math.max(2, Math.min(value != null ? value : fallback, roomMaxSpan));
+  const minRoom = clampRoomSpan(opts.minRoom, defaultMinRoom);
+  const maxRoom = Math.max(minRoom, clampRoomSpan(opts.maxRoom, defaultMaxRoom));
 
   const targetRooms = opts.roomCount != null
     ? opts.roomCount
@@ -528,7 +555,7 @@ export function generateAdjacentDungeon(opts) {
   rooms.push({ rect: { x: seedX, y: seedY, w: seedW, h: seedH }, id: 0, connected: [], type: 'entrance' });
   carveRoomRect(grid, gridSize, rooms[0].rect);
 
-  const placedItems = placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layoutStyle, rng });
+  const placedItems = placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layoutStyle, corridorGap, rng });
 
   connectClusters({ rooms, grid, gridSize, rng });
 
