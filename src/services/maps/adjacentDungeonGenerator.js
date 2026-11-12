@@ -1,4 +1,4 @@
-import { mulberry32, pick } from './rng.js';
+import { mulberry32, pick, shuffle } from './rng.js';
 import { rectCenter, rectIntersects } from './bspTree.js';
 import { generateName, generateDescription } from './dungeonNamegen.js';
 
@@ -116,7 +116,10 @@ function placeRooms({ rooms, grid, gridSize, minRoom, maxRoom, targetRooms, layo
     const newH = minRoom + Math.floor(rng() * (maxRoom - minRoom + 1));
 
     const { x: sx, y: sy, w: sw, h: sh } = srcRoom.rect;
-    const sides = ['n', 's', 'w', 'e'].sort(() => rng() - 0.5);
+    // Seeded Fisher-Yates (rng.js shuffle) — engine-deterministic draw count;
+    // sort(() => rng() - 0.5) made this consume a V8-dependent number of
+    // draws per attempt, breaking same-seed reproducibility (2026-11-12 bug).
+    const sides = shuffle(['n', 's', 'w', 'e'], rng);
 
     let placed = false;
     for (const side of sides) {
@@ -452,7 +455,7 @@ function placeSecretDoors({ rooms, grid, gridSize, placedItems, rng }) {
   const occCells = cellsOf(placedItems);
   const secDoorCandidates = collectSecretDoorCandidates(rooms, grid, gridSize);
   let secDoorsPlaced = 0;
-  const shuffledSec = [...secDoorCandidates].sort(() => rng() - 0.5);
+  const shuffledSec = shuffle([...secDoorCandidates], rng);
   for (const c of shuffledSec) {
     if (secDoorsPlaced >= 3) break;
     const key = c.x + ',' + c.y;
@@ -479,7 +482,7 @@ function placeTraps({ rooms, grid, gridSize, placedItems, rng }) {
     }
   }
   let trapsPlaced = 0;
-  const shuffledTraps = [...trapCandidates].sort(() => rng() - 0.5);
+  const shuffledTraps = shuffle([...trapCandidates], rng);
   for (const c of shuffledTraps) {
     if (trapsPlaced >= 2) break;
     placedItems.push({ id: 'trap-' + trapsPlaced, gridX: c.x, gridY: c.y, type: 'trap', visible: false });

@@ -57,8 +57,8 @@ describe('generateAdjacentDungeon', () => {
   it('byte-exact flagship g20 seed 42: envelope, wall ASCII, and full placed-item roster', () => {
     const map = generateAdjacentDungeon({ gridSize: 20, seed: 42 });
     expect(map).toEqual({
-      name: 'The Hidden Mines of Doom',
-      description: 'Torchlight flickers across walls carved with strange symbols. Rooms branch off in multiple directions, each more foreboding than the last. The undead are said to wander these halls.',
+      name: 'The Cursed Sanctum of Despair',
+      description: 'A long-forgotten dungeon complex deep underground. The sound of dripping water echoes through the corridors. Something stirs in the darkness ahead.',
       gridSize: 20,
       seed: 42,
       walls: expect.any(Array),
@@ -73,18 +73,18 @@ describe('generateAdjacentDungeon', () => {
     // grand room 1 (altar + fountain), private rooms 2-3 (bed/chest/bookshelf), walls not full.
     expect(ascii(map)).toEqual([
       '####################',
-      '###......###########',
-      '###......#......####',
+      '#####.....##########',
+      '#####.....#......###',
+      '#####............###',
+      '#####.....#......###',
+      '###########......###',
+      '###.....###......###',
+      '###.....#####.######',
+      '###.....#.......####',
+      '###.....#.......####',
       '###.............####',
-      '###......#......####',
-      '###......#......####',
-      '####....##......####',
-      '####....####.#######',
-      '####....#.......####',
-      '####............####',
-      '####....#.......####',
-      '####....#.......####',
-      '#########.......####',
+      '###.....#.......####',
+      '###.....#.......####',
       '#########.......####',
       '####################',
       '####################',
@@ -96,46 +96,46 @@ describe('generateAdjacentDungeon', () => {
     // Subsumes torch/door/stairs/NPC presence, door rotation ∈ {0,90}, NPC rotations,
     // secret-door-N/trap-N id prefixes, caps 3/2/7, position dedupe, bounds.
     expect(map.placedItems.map(itemBytes)).toEqual([
-      'door-0-1:door@12,7:90',
-      'door-0-2:door@8,9:0',
-      'door-1-3:door@9,3:0',
+      'door-0-1:door@13,7:90',
+      'door-1-2:door@10,3:0',
+      'door-0-3:door@8,10:0',
       'torch-0-0:torch@12,8:90',
       'torch-0-1:torch@10,8:90',
       'statue-0:statue@12,9:',
-      'altar-1:altar@12,4:0',
-      'torch-1-0:torch@13,2:90',
-      'torch-1-1:torch@13,6:270',
-      'fountain-1:fountain@13,5:',
-      'bed-2:bed@4,6:0',
-      'chest-2:chest@7,6:',
-      'bookshelf-2:bookshelf@4,11:180',
-      'bed-3:bed@3,1:0',
-      'chest-3:chest@8,1:',
-      'bookshelf-3:bookshelf@3,5:180',
-      'npc-0:npc@13,4:270:Goblin:hidden',
-      'npc-1:npc@6,9:270:Orc:hidden',
-      'npc-2:npc@6,3:0:Goblin:hidden',
+      'altar-1:altar@13,4:0',
+      'torch-1-0:torch@14,2:90',
+      'torch-1-1:torch@14,6:270',
+      'fountain-1:fountain@14,5:',
+      'bed-2:bed@5,1:0',
+      'chest-2:chest@9,1:',
+      'bookshelf-2:bookshelf@5,4:180',
+      'bed-3:bed@3,6:0',
+      'chest-3:chest@7,6:',
+      'bookshelf-3:bookshelf@3,12:180',
+      'npc-0:npc@14,4:270:Goblin:hidden',
+      'npc-1:npc@7,3:270:Orc:hidden',
+      'npc-2:npc@5,9:0:Goblin:hidden',
       'entrance-stairs:stairs@12,11:',
-      'secret-door-0:secretdoor@10,14::hidden',
-      'secret-door-1:secretdoor@10,7::hidden',
-      'secret-door-2:secretdoor@8,7::hidden',
+      'secret-door-0:secretdoor@10,7::hidden',
+      'secret-door-1:secretdoor@8,13::hidden',
+      'secret-door-2:secretdoor@8,8::hidden',
       'trap-0:trap@5,10::hidden',
-      'trap-1:trap@5,9::hidden',
+      'trap-1:trap@6,2::hidden',
     ]);
   });
 
   it.each([
-    // last-room expansion, rng-aligned: 3 doors.
+    // last-room expansion, rng-aligned: 2 doors.
     ['linear', 42, [
       '################',
-      '#....#.......###',
+      '################',
+      '################',
+      '################',
+      '#....###########',
+      '#....###########',
       '#............###',
       '#....#.......###',
-      '#....#.......###',
-      '##.######.######',
-      '#............###',
-      '#............###',
-      '#............###',
+      '##.###.......###',
       '#............###',
       '#............###',
       '#............###',
@@ -148,37 +148,37 @@ describe('generateAdjacentDungeon', () => {
     ['winding', 42, [
       '################',
       '################',
-      '################',
-      '################',
-      '#....###########',
-      '#....###########',
+      '######........##',
+      '######........##',
+      '#.............##',
+      '#....#........##',
       '#....#.......###',
       '#............###',
       '#....#.......###',
       '#....#.......###',
-      '##.###.......###',
-      '#....#.......###',
-      '#....###########',
-      '#....###########',
-      '#....###########',
+      '######.......###',
+      '######.......###',
+      '################',
+      '################',
+      '################',
       '################',
     ]],
-    // uniform source pick; byte-identical to forking at this seed (forking@6 below).
+    // uniform source pick; byte-identical to forking at this seed.
     ['balanced', 42, [
       '################',
-      '######.......###',
-      '######.......###',
-      '######.......###',
-      '######.......###',
-      '#....####.######',
-      '#....#.......###',
-      '#....#.......###',
+      '#######....#####',
+      '#######....#####',
+      '#######....#####',
+      '#....##....#####',
+      '#....###.#######',
       '#............###',
       '#....#.......###',
-      '#....#.......###',
-      '#....#.......###',
-      '#....###########',
-      '################',
+      '##.###.......###',
+      '#............###',
+      '#............###',
+      '#............###',
+      '#.....##########',
+      '#.....##########',
       '################',
       '################',
     ]],
@@ -186,31 +186,35 @@ describe('generateAdjacentDungeon', () => {
     expect(ascii(generateAdjacentDungeon({ gridSize: 16, seed, layoutStyle }))).toEqual(expected);
   });
 
-  it('forking layout g16 seed 6: genuinely branches (3 doors) and differs from balanced', () => {
-    const map = generateAdjacentDungeon({ gridSize: 16, seed: 6, layoutStyle: 'forking' });
+  // Seed 6 went chain-shaped (door-0-1/1-2/2-3) when the side shuffle became
+  // Fisher-Yates; seed 2 keeps the branch shape (room 0 and room 1 each spawn
+  // a second child) that distinguishes forking from a linear extension.
+  it('forking layout g16 seed 2: genuinely branches (3 doors) and differs from balanced', () => {
+    const map = generateAdjacentDungeon({ gridSize: 16, seed: 2, layoutStyle: 'forking' });
     expect(map.placedItems.filter((i) => i.type === 'door').map(itemBytes)).toEqual([
-      'door-0-1:door@5,7:90',
-      'door-0-2:door@8,7:90',
-      'door-1-3:door@3,7:90',
+      'door-0-1:door@10,7:0',
+      'door-0-2:door@4,10:90',
+      'door-1-3:door@12,5:90',
     ]);
     expect(ascii(map)).toEqual([
       '################',
-      '#....###########',
-      '#....###########',
-      '#..........#####',
-      '#..........#####',
-      '#..........#####',
-      '#..........#####',
-      '###.#.##.#######',
-      '###.........####',
-      '###.........####',
-      '###.........####',
-      '###.........####',
-      '#######.....####',
-      '################',
-      '################',
+      '#######........#',
+      '#######........#',
+      '#######........#',
+      '#######........#',
+      '###.......##.###',
+      '###.......#....#',
+      '###............#',
+      '###.......#....#',
+      '###.......#....#',
+      '####.######....#',
+      '###....####....#',
+      '###....####....#',
+      '###....#########',
+      '###....#########',
       '################',
     ]);
+    expect(ascii(map)).not.toEqual(ascii(generateAdjacentDungeon({ gridSize: 16, seed: 42, layoutStyle: 'balanced' })));
   });
 
   it('options saturate honestly: density ±saturate to 0/1 byte-exact, seed 0 honored, gridSize defaults to 30', () => {
@@ -256,9 +260,9 @@ describe('generateAdjacentDungeon', () => {
       'torch-0-0:torch@7,4:90',
       'torch-0-1:torch@6,4:90',
       'entrance-stairs:stairs@7,6:',
-      'secret-door-0:secretdoor@4,7::hidden',
-      'secret-door-1:secretdoor@9,4::hidden',
-      'secret-door-2:secretdoor@6,8::hidden',
+      'secret-door-0:secretdoor@9,6::hidden',
+      'secret-door-1:secretdoor@4,6::hidden',
+      'secret-door-2:secretdoor@5,3::hidden',
     ]);
     expect(ascii(rc1)).toEqual(ascii(rc0));
     expect(rc1.placedItems.map(itemBytes)).toEqual(rc0.placedItems.map(itemBytes));
@@ -314,8 +318,8 @@ describe('generateAdjacentDungeon', () => {
     // Exact census subsumes all former presence + cap checks (secretdoor ≤ 3, trap ≤ 2,
     // npc ≤ 7 — here 6 rooms give 5 NPC slots, and 6 rooms are joined by 5 doors).
     expect(census).toEqual({
-      door: 5, torch: 4, altar: 1, pillar: 4, bed: 3, chest: 3, bookshelf: 3, chair: 2,
-      crate: 3, barrel: 1, npc: 5, stairs: 1, secretdoor: 3, trap: 2,
+      door: 5, torch: 4, bed: 4, chest: 4, bookshelf: 4, chair: 3, altar: 1,
+      fountain: 1, barrel: 1, npc: 5, stairs: 1, secretdoor: 3, trap: 2,
     });
   });
 
@@ -328,8 +332,8 @@ describe('generateAdjacentDungeon', () => {
   it('regression g7 seed 5 (once a crash): byte-pinned single-room map', () => {
     const map = generateAdjacentDungeon({ gridSize: 7, seed: 5, density: 0.5, roomCount: 8, layoutStyle: 'balanced' });
     expect([map.name, map.description, map.seed]).toEqual([
-      'The Iron Mines of Shadows',
-      'A long-forgotten dungeon complex deep underground. Rooms branch off in multiple directions, each more foreboding than the last. The undead are said to wander these halls.',
+      'The Hidden Tomb of the Dark Lord',
+      'Torchlight flickers across walls carved with strange symbols. Strange markings on the floor suggest ritual activity. Traps and guardians still protect the dungeon\'s secrets.',
       5,
     ]);
     expect(ascii(map)).toEqual([
@@ -345,9 +349,9 @@ describe('generateAdjacentDungeon', () => {
       'torch-0-0:torch@4,2:90',
       'torch-0-1:torch@3,2:90',
       'entrance-stairs:stairs@4,4:',
-      'secret-door-0:secretdoor@2,1::hidden',
-      'secret-door-1:secretdoor@3,1::hidden',
-      'secret-door-2:secretdoor@1,2::hidden',
+      'secret-door-0:secretdoor@1,5::hidden',
+      'secret-door-1:secretdoor@6,1::hidden',
+      'secret-door-2:secretdoor@1,6::hidden',
     ]);
   });
 
