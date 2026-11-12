@@ -358,7 +358,8 @@ export function createCreatureHandlers({
     // Shared write tail — plain and confirmed-friendly lanes arm identically
     // (setTarget + board write + React republish). Scoped write (backlog
     // 2026-11-04 CR): arming changes exactly one creature's targetName, so the
-    // wire carries only `{creatures:[{name,targetName}]}` via storage.patch —
+    // wire carries only `{creatures:[{name,targetName,seenController?}]}` via
+    // storage.patch —
     // the server PATCH lane (campaigns-changedata.js) merges it into current
     // board truth by creature name and broadcasts the FULL merged board on the
     // normal change-<campaign>-combatSummary SSE channel, so cross-tab
@@ -381,8 +382,24 @@ export function createCreatureHandlers({
         setTarget(combatSummary, creatureName, targetName)
         // Unknown creatures never arm (setTarget is inert for them too) — the
         // server patch lane would skip such a record with a warning anyway.
-        if (combatSummary.creatures.some(c => c.name === creatureName)) {
-            storage.patch('combatSummary', { creatures: [{ name: creatureName, targetName: targetName || null }] }, campaignName)
+        const armedRow = combatSummary.creatures.find(c => c.name === creatureName)
+        if (armedRow) {
+            // Race guard (bug-race-arm-patch-beats-swap-clear-post): this scoped
+            // PATCH coalesces ~120 ms, so a concurrent control swap/release —
+            // the full-board POST that deletes targetName on the SAME write —
+            // usually lands FIRST, and the by-name merge re-armed the already-
+            // swapped row, silently defeating the owner law ("the new controller
+            // starts unarmed") while the control_arm_cleared audit claimed the
+            // clear. A delegated row's arm declares its controller context
+            // (seenController — a wire-only field the merge lane strips and
+            // drops the arm with when the row's controller has moved; see
+            // dropStaleArmWrites in campaigns-changedata.js). GM/PC rows (no
+            // delegated controller at issue time) ship the exact legacy bytes —
+            // the blessed first-time-assign face (an existing arm SURVIVES the
+            // first assign) must stay merge-permissive.
+            const record = { name: creatureName, targetName: targetName || null }
+            if (armedRow.controller) record.seenController = armedRow.controller
+            storage.patch('combatSummary', { creatures: [record] }, campaignName)
         }
         setCombatSummary(cloneDeep(combatSummary))
     }

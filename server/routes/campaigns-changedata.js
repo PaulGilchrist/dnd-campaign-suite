@@ -413,6 +413,59 @@ function mergePatchFields(target, patch, stats) {
     }
 }
 
+/**
+ * Swap-law race guard for the combatSummary arm lane
+ * (bug-race-arm-patch-beats-swap-clear-post): the owner law "a direct
+ * controller→controller swap (or release) never leaves an armed target behind"
+ * lives in the CLIENT swap handler, which deletes `targetName` on the same
+ * full-board POST that flips `controller`. But the arm lane writes a scoped,
+ * client-coalesced (~120 ms) PATCH — cross-tab, that PATCH can arrive AFTER
+ * the swap's POST and the by-name merge happily re-arms the already-swapped
+ * row, silently defeating the law and falsifying the control_arm_cleared
+ * audit row (live-confirmed 2026-11-12 run NN, wire stamps +17 ms POST /
+ * +124 ms PATCH).
+ *
+ * The arm lane now declares the delegated controller its write was issued
+ * against (`seenController` — a wire-only field, stripped here and never
+ * stored). When the stored row answers to a DIFFERENT controller at merge
+ * time, the arm was issued against a pre-swap world and its `targetName` is
+ * dropped from the patch: the swap/release wins, the row stays exactly as
+ * the swap POST left it, and the audit stays honest. The full-board echo
+ * then re-derives every client's arm select from the merged truth.
+ *
+ * Null/absent seen context is DELIBERATELY permissive: GM/PC rows carry no
+ * delegated controller, and the blessed first-time-assign law ("an existing
+ * arm SURVIVES the first assign — the new controller's device sees it")
+ * must keep holding even when an arm races an assign. Legacy unstamped
+ * writers merge byte-identically to today. Returns the names of records
+ * whose stale arm write was dropped (for response honesty + the named
+ * server-log line beside it, per the skipped/unmatched doctrine above).
+ */
+function dropStaleArmWrites(campaign, key, patch, stored) {
+    if (key !== 'combatSummary' || !namedRecords(patch.creatures)) return [];
+    const storedRecords = Array.isArray(stored?.creatures) ? stored.creatures : [];
+    const dropped = [];
+    for (const record of patch.creatures) {
+        if (!('seenController' in record)) continue;
+        const seen = record.seenController ?? null;
+        delete record.seenController; // wire-only field — never persists on a row
+        if (seen === null || !('targetName' in record)) continue;
+        const current = storedRecords.find((r) => r.name === record.name)?.controller ?? null;
+        if (seen !== current) {
+            delete record.targetName;
+            dropped.push(record.name);
+        }
+    }
+    if (dropped.length) {
+        console.error(
+            `[campaigns-changedata] PATCH ${key} (${campaign}) dropped stale arm write(s) for: ` +
+            `${dropped.join(', ')} — the row's controller changed since the arm was issued ` +
+            `(the new controller starts unarmed).`
+        );
+    }
+    return dropped;
+}
+
 // PATCH /api/campaigns/:campaign/:key — see the merge doctrine above.
 router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
@@ -431,7 +484,6 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
         });
     }
 
-    const merged = lodash.cloneDeep(data[key]);
     // Merge accounting (backlog 2026-11-04 CS): the old reply said "Data
     // patched successfully" even when EVERY record was skipped — the truth
     // lived only in the server console, so a silently-dropped arming arm was
@@ -440,6 +492,10 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     // (`skipped`). Field-level patches with no named-record arrays report
     // applied: 0 / skipped: [] — nothing was dropped, there were just no
     // records to merge; clients detect drops via `skipped.length > 0`.
+    // Stale arm writes lost to a controller swap/release (dropStaleArmWrites)
+    // are named in `staleArmDropped` — same never-silent-success doctrine.
+    const staleArmDropped = dropStaleArmWrites(campaign, key, patch, data[key]);
+    const merged = lodash.cloneDeep(data[key]);
     const stats = { applied: 0, skipped: [] };
     mergePatchFields(merged, patch, stats);
     const { skipped } = stats;
@@ -482,7 +538,7 @@ router.patch('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     // exists (byte-identical to a full POST echo).
     publish(`change-${campaign}-${key}`, storedValue, campaign);
 
-    res.json({ message: 'Data patched successfully', applied: stats.applied, skipped });
+    res.json({ message: 'Data patched successfully', applied: stats.applied, skipped, staleArmDropped });
 }));
 
 // PUT /api/campaigns/:campaign/:key — reserved-key guard only.
