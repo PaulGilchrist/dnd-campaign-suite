@@ -77,3 +77,70 @@ Data-integrity/privacy leak (hidden GM quest titles exposed to any network
 client via one-probe-at-a-time 409 copy) plus an ungated GM-data write lane;
 no player-visible UI path (sidebar already hides Quests) but the API is
 reachable directly.
+
+## Resolution
+
+FIXED 2026-11-12 (fix run). The bug file's diagnosis was accurate on both
+counts; live repro confirmed first: visitor-Host GET → 200 `{"quests":[]}`
+(correct), visitor POST of that snapshot → 409
+`Quest "The Lost Artifact" was created or deleted…` (hidden title LEAKED),
+and a visitor DELETE of a GM probe-row id → 200 (ungated write LANDED,
+row gone from disk).
+
+**Face shipped: whole-lane GM gate (the sessions face, not notes-writes-
+only).** Grep of the client found NO visitor read consumer for `/quests`:
+consumers are `Quests.jsx` (sidebar `localhostOnly` — verified, no UI change
+needed), the `Sessions.jsx` picker (Sessions is GM-only and its own lane
+already 403s GET), CampaignBuilder drafts (GM-only), `applyWorldProposal.js`
+(AI routes are localhost-only), and `seededCampaign.js` starter seeds —
+whose ONLY runner is campaign creation, itself refuseUnlessGm
+(`campaigns-admin.js:57`), so seeds never execute from a visitor tab. The
+read lane already surfaced nothing useful to visitors (`[]` + per-row 403),
+so gating the list GET behind the same 403 is consistent and strictly safer.
+
+**Files changed**
+- `server/routes/quests.js` — wraps the factory router exactly like
+  `sessions.js`: `Router()` + path-scoped `refuseUnlessGm` on
+  `/api/campaigns/:campaign/quests` BEFORE `router.use(baseRouter)`; 403
+  copy `Access denied: GM-only feature` + `[quests] BLOCKED non-localhost
+  <METHOD> <URL> — GM-only` dev-log, on EVERY method. The factory
+  `transformList`/`authorizeRead`/`forbiddenMessage` options were REMOVED —
+  unreachable once the wrapper intercepts all non-localhost requests
+  (sessions has none either). Shared `jsonEntityCrud.js` untouched.
+- `server/routes/quests.test.js` — the two pins that locked the OLD visitor
+  GET-list face (200 `[]`) updated to the new 403 face (intentional behavior
+  change; LAN GET-by-id 403 pins pass unchanged via the wrapper).
+- `server/routes/quests-localhost-guard.test.js` — NEW, mirrors
+  `sessions-localhost-guard.test.js` conventions (real factory; fs +
+  campaignPaths + changeData mocked): 5 LAN hosts × {GET list, GET by id,
+  POST empty snapshot (the leak-409 leg — asserts no hidden title, no
+  `conflict` key), POST full-content append (the pre-fix LANDS leg),
+  DELETE} all ⇒ 403 + disk inert + zero broadcast; plus 4 localhost faces
+  byte-unchanged (list/row 200, POST stamp + `replaced` broadcast, DELETE +
+  `deleted` broadcast). 29 pins.
+
+**Verification**
+- Unit: `npx vitest run server/routes/quests-localhost-guard.test.js` 29/29;
+  `npx vitest run server/routes` 105 files / 1626 tests green; `npm run lint`
+  zero warnings; `no-timers-guard` OK.
+- Live (API restarted post-change, dev pair on :5173/:80, visitor simulated
+  with forged `Host: 192.168.0.44:5173` AND a genuine `http://<en0-ip>:5173`
+  request through the Vite proxy): GET list / POST snapshot / GET by id /
+  DELETE all **403 `Access denied: GM-only feature`** — no quest title in
+  any body, disk md5 inert, `[quests] BLOCKED` logged for all four methods.
+- GM sanity (localhost Playwright tab, test-campaign): Quests UI create
+  `OP Guard Probe Quest` → row + 200; edit description → landed; modal
+  `.ct-btn-danger` delete behind native `Delete quest "OP Guard Probe
+  Quest"?` → row gone. Console: 0 errors/warnings.
+- Cleanup: `quests.json` byte-identical to pre-run baseline (md5
+  5055fb78ca48941f1370ec97b9f6fe64), probe rows removed, change-data `{}` +
+  log `[]` (closed-tab two-pass admin clears, disk files absent), servers
+  killed by port-PID.
+
+**Out-of-scope note (not changed):** `npcs.js` / `factions.js` /
+`settlements.js` route files carry ZERO origin guards (grep: no
+`isLocalhost`/`refuseUnlessGm` anywhere in them) — the same ungated
+planner-write family the sessions/quests fixes closed; npcs pre-made rows are
+protected by the bestiary CRUD guard but custom-NPC lanes and factions/
+settlements planner data remain visitor-writable/leakable via the same
+whole-array 409 mechanism (empty-state campaigns land writes).

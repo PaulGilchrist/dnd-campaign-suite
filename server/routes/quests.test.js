@@ -153,7 +153,7 @@ describe('quests - GET /api/campaigns/:campaign/quests', () => {
         expect(res.body.quests).toEqual([]);
     });
 
-    it('should return empty quests list for non-localhost users even when quests exist', async () => {
+    it('should 403 non-localhost list GETs (whole lane GM-only since the quests-localhost-guard fix)', async () => {
         const questsData = [
             { id: 'quest-1', title: 'Slay the Dragon', description: 'Defeat the red dragon', stage: 'active', objectives: ['Find the lair', 'Defeat the dragon'] },
             { id: 'quest-2', title: 'Rescue the Villager', description: 'Save the captured villager', stage: 'completed', objectives: ['Locate the captors', 'Rescue the villager'] },
@@ -165,8 +165,11 @@ describe('quests - GET /api/campaigns/:campaign/quests', () => {
             .get('/api/campaigns/test-campaign/quests')
             .set('Host', '192.168.1.100');
 
-        expect(res.status).toBe(200);
-        expect(res.body.quests).toEqual([]);
+        // Pre-fix face was 200 {"quests":[]} (row-level filter). The lane gate
+        // now refuses before the factory reads; quests-localhost-guard.test.js
+        // owns the full visitor matrix.
+        expect(res.status).toBe(403);
+        expect(res.body.error).toBe('Access denied: GM-only feature');
     });
 
     it('should return all quests for localhost users', async () => {
@@ -229,7 +232,7 @@ describe('quests - GET /api/campaigns/:campaign/quests', () => {
         expect(res.body.quests[0]).toEqual(questData);
     });
 
-    it('should return 403 for any non-localhost hostname', async () => {
+    it('should 403 any non-localhost hostname on the list GET', async () => {
         const questsData = [
             { id: 'quest-1', title: 'Quest One', description: 'Content', stage: 'active', objectives: [] },
         ];
@@ -240,8 +243,9 @@ describe('quests - GET /api/campaigns/:campaign/quests', () => {
             .get('/api/campaigns/test-campaign/quests')
             .set('Host', 'example.com');
 
-        expect(res.status).toBe(200);
-        expect(res.body.quests).toEqual([]);
+        // Whole-lane gate (see the sibling test above): was 200 [] pre-fix.
+        expect(res.status).toBe(403);
+        expect(res.body.error).toBe('Access denied: GM-only feature');
     });
 });
 
