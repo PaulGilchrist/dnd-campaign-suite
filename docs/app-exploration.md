@@ -61,8 +61,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-11 LZ — allies editor could carry a one-click "Self only (hostile)" affordance:** the betrayal-flip sequence today is Clear All → hunt the self checkbox → Confirm (the disabled-at-0 state forces the detour); a preset chip doing exactly that would shorten the lane editors actually use for split-team/defector staging. Files: `common/AllySelectionModal.jsx`, `initiative/useAllyEditor.js`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Friendly-fire confirm through the DELEGATION (visitor) lane — not a blocked lane, simply unattempted this run; promoted to Priority Target 2.

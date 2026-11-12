@@ -54,6 +54,8 @@ describe('useAllyEditor', () => {
         expect(result.current.modalProps.creatures.map(c => c.name))
             .toEqual(['Grim', 'Sera', 'Zombie']);
         expect(result.current.modalProps.currentAllies).toEqual(['Grim']);
+        // LZ 2026-11-11: subject name drives the modal's "Self only (hostile)" preset
+        expect(result.current.modalProps.selfName).toBe('Grim');
         expect(result.current.modalProps.title).toBe('Allies of Grim');
     });
 
@@ -69,6 +71,9 @@ describe('useAllyEditor', () => {
         // backlog) — the write/audit subject below stays the holder alone.
         expect(result.current.modalProps.title).toBe('Allies of Grim (second turn)');
         expect(result.current.modalProps.currentAllies).toEqual(['Grim']);
+        // Preset anchor is the HOLDER — a roster candidate (synthetic row excluded)
+        expect(result.current.modalProps.selfName).toBe('Grim');
+        expect(result.current.modalProps.creatures.map(c => c.name)).toContain('Grim');
         // and confirming lands on the HOLDER bucket, auditing the real character
         act(() => result.current.confirmAllyEditor(['Grim', 'Sera']));
         expect(setAllyList).toHaveBeenCalledWith('Grim', ['Grim', 'Sera'], 'test-campaign');

@@ -266,6 +266,76 @@ describe('AllySelectionModal', () => {
     expect(onConfirm).toHaveBeenCalledWith(['Orc']);
   });
 
+  // ── "Self only (hostile)" one-click preset (LZ backlog 2026-11-11) ──
+
+  const selfChip = () =>
+    screen.queryByRole('button', { name: /Self only \(hostile\)/i });
+
+  it('renders the preset chip when selfName is a candidate in the list', () => {
+    renderModal({ selfName: 'Hero' });
+
+    expect(selfChip()).toBeInTheDocument();
+  });
+
+  it('hides the preset chip when selfName is not provided', () => {
+    renderModal();
+
+    expect(selfChip()).not.toBeInTheDocument();
+  });
+
+  it('hides the preset chip when selfName is not a candidate in the list', () => {
+    renderModal({ selfName: 'BanishedGhost' });
+
+    expect(selfChip()).not.toBeInTheDocument();
+  });
+
+  it('preset from the 0-selection state checks exactly self and enables Confirm (1)', () => {
+    renderModal({ selfName: 'Goblin' });
+
+    expect(screen.getByRole('button', { name: /Confirm Allies \(0\)/ })).toBeDisabled();
+
+    fireEvent.click(selfChip());
+
+    expect(checkboxFor('Goblin')).toBeChecked();
+    expect(checkboxFor('Hero')).not.toBeChecked();
+    expect(checkboxFor('Orc')).not.toBeChecked();
+    expect(selectedCount()).toHaveTextContent('1 selected');
+    expect(screen.getByRole('button', { name: /Confirm Allies \(1\)/ })).toBeEnabled();
+  });
+
+  it('preset overwrites any prior multi-select with exactly self', () => {
+    renderModal({ selfName: 'Hero', currentAllies: ['Goblin', 'Orc'] });
+
+    // Whatever the prior state (even Select All), one click resets to self only.
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }));
+    fireEvent.click(selfChip());
+
+    expect(checkboxFor('Hero')).toBeChecked();
+    expect(checkboxFor('Goblin')).not.toBeChecked();
+    expect(checkboxFor('Orc')).not.toBeChecked();
+    expect(selectedCount()).toHaveTextContent('1 selected');
+  });
+
+  it('preset → Confirm emits exactly [self] (betrayal flip in two clicks)', () => {
+    renderModal({ selfName: 'Orc' });
+
+    fireEvent.click(selfChip());
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Allies \(1\)/ }));
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(['Orc']);
+  });
+
+  it('preset → Cancel is inert (no confirm payload, cancel only)', () => {
+    renderModal({ selfName: 'Goblin' });
+
+    fireEvent.click(selfChip());
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   // ── Cancel ──
 
   it('cancels without confirming, even after selecting allies', () => {

@@ -6,6 +6,7 @@ export default function AllySelectionModal({
     icon,
     creatures,
     currentAllies,
+    selfName,
     onConfirm,
     onCancel,
 }) {
@@ -31,6 +32,14 @@ export default function AllySelectionModal({
         setSelected([]);
     };
 
+    // One-click betrayal flip (LZ backlog 2026-11-11): self-only = "trusts no
+    // one". Draft-state only — same lane as Clear All/Select All, nothing is
+    // written until Confirm.
+    const selfInList = !!selfName && creatures.some(c => c.name === selfName);
+    const selectSelfOnly = () => {
+        setSelected([selfName]);
+    };
+
     const handleConfirm = () => {
         if (selected.length === 0) return;
         onConfirm(selected);
@@ -53,6 +62,11 @@ export default function AllySelectionModal({
                         <button type="button" className="ally-select-btn" onClick={clearAll}>
                             <i className="fa-solid fa-xmark"></i> Clear All
                         </button>
+                        {selfInList && (
+                            <button type="button" className="ally-select-btn" onClick={selectSelfOnly}>
+                                <i className="fa-solid fa-user-slash"></i> Self only (hostile)
+                            </button>
+                        )}
                         <span className="ally-count">{selected.length} selected</span>
                     </div>
                     {/* Self-only is the sanctioned "trust no one" route (useAllyEditor

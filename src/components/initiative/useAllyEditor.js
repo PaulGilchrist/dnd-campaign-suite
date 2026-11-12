@@ -60,6 +60,10 @@ export function useAllyEditor({ campaignName, isLocalhost }) {
     const modalProps = target ? {
         creatures: target.creatures,
         currentAllies: getAllyList(target.name),
+        // The subject's own name — enables the modal's one-click "Self only
+        // (hostile)" preset (LZ backlog 2026-11-11). Holder name for the
+        // (Second Turn) remap, which is always a real roster candidate.
+        selfName: target.name,
         // Header names the HOLDER (the write subject) plus a display-only hint
         // when opened from the twin's card, so the GM can tell WHICH card's
         // modal is open (holder/normal opens keep the old byte-exact title).
