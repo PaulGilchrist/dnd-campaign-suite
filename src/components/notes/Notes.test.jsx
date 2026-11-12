@@ -163,13 +163,16 @@ describe('Notes', () => {
 
   describe('search', () => {
     const searchable = [
-      makeNote({ description: 'Fireball is a 3rd level spell' }),
+      // partyLocation on the first row pins the widened field list
+      // (improve 2026-11-12 OP backlog): the row TITLE is searchable too.
+      makeNote({ description: 'Fireball is a 3rd level spell', partyLocation: 'Ember Hollow Shrine' }),
       makeNote({ id: '2', description: 'Thunderwave explosion' }),
     ];
 
     it.each`
       query            | shouldMatch                          | shouldNotMatch
       ${'fireball'}    | ${'Fireball is a 3rd level spell'}  | ${'Thunderwave explosion'}
+      ${'HOLLOW shr'}  | ${'Fireball is a 3rd level spell'}  | ${'Thunderwave explosion'}
       ${'nonexistent'} | ${null}                              | ${'Fireball is a 3rd level spell'}
     `('filters notes by search query: "$query"', ({ query, shouldMatch, shouldNotMatch }) => {
       mockHook({ items: searchable });
@@ -227,6 +230,26 @@ describe('Notes', () => {
       setDescription('Fireball scorch marks on the wall');
       fireEvent.change(screen.getByLabelText(/party location/i), {
         target: { value: 'Glyph Chamber' },
+      });
+      await act(async () => fireEvent.click(saveButton()));
+      expect(saveItems).toHaveBeenCalled();
+      expect(screen.getByLabelText('Search notes').value).toBe('fireball');
+    });
+
+    // PartyLocation leg of the same law (improve 2026-11-12 OP backlog): the
+    // row may match the armed query ONLY via its location — the shared
+    // NOTE_SEARCH_FIELDS list must keep the filter in that case too.
+    it('keeps an armed filter when the saved row matches it only via partyLocation', async () => {
+      const saveItems = vi.fn().mockResolvedValue(undefined);
+      mockHook({ items: searchable, saveItems });
+      renderNotes();
+      fireEvent.change(screen.getByLabelText('Search notes'), {
+        target: { value: 'fireball' },
+      });
+      openNewNote();
+      setDescription('Scorch marks on the wall');
+      fireEvent.change(screen.getByLabelText(/party location/i), {
+        target: { value: 'Fireball Altar' },
       });
       await act(async () => fireEvent.click(saveButton()));
       expect(saveItems).toHaveBeenCalled();

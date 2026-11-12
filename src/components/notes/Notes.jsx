@@ -35,7 +35,10 @@ function stripMarkdownSymbols(text) {
 
 // Search fields for the "Search notes" filter (useCrudList) — shared with the
 // post-save visibility check in handleSave so the two can never drift.
-const NOTE_SEARCH_FIELDS = ['description'];
+// partyLocation joins description (improve 2026-11-12 OP backlog): rows are
+// TITLED by partyLocation (aria-label + delete confirm), so a filter that
+// can't find the title it displays feels like a lost write.
+const NOTE_SEARCH_FIELDS = ['description', 'partyLocation'];
 
 // Display title for a note (row aria-label + delete confirm share this one
 // derivation): notes have no name field, so use the party location, falling
