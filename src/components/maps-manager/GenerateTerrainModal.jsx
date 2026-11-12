@@ -4,6 +4,7 @@ import { parseGridInput } from '../../services/maps/gridInput.js';
 import { parseSeedInput } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import './GenerateTerrainModal.css';
+import './gen-modal-shared.css';
 
 function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
@@ -89,8 +90,8 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
 
                 {error && <div className="maps-manager-error">{error}</div>}
 
-                <div className="dungeon-gen-form">
-                    <label className="dungeon-gen-field">
+                <div className="gen-modal-form">
+                    <label className="gen-modal-field">
                         <span>Map Name</span>
                         <input
                             type="text"
@@ -101,7 +102,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                         />
                     </label>
 
-                    <label className="dungeon-gen-field">
+                    <label className="gen-modal-field">
                         <span>Grid Size</span>
                         <input
                             type="number"
@@ -110,12 +111,12 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                             value={gridSize}
                             onChange={editGrid}
                         />
-                        <span className="dungeon-gen-hint">
+                        <span className="gen-modal-hint">
                             {gridSize * 2} hexes &times; {gridSize} hexes ({gridSize * gridSize * 2} hexes)
                         </span>
                     </label>
 
-                    <label className="dungeon-gen-field">
+                    <label className="gen-modal-field">
                         <span>Seed (optional)</span>
                         <input
                             type="text"
@@ -125,7 +126,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                         />
                     </label>
                 </div>
-                <div className="dungeon-gen-note">
+                <div className="gen-modal-note">
                     Generates a terrain map with fractal noise for realistic elevation, lakes, rivers, beaches, and coastline. Use the seed to get different results.
                 </div>
                 <div className="maps-manager-modal-actions">
@@ -133,7 +134,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                         Cancel
                     </button>
                     <button
-                        className="dungeon-gen-generate-btn"
+                        className="gen-modal-generate-btn"
                         onClick={handleGenerate}
                         disabled={!mapName.trim() || generating}
                     >

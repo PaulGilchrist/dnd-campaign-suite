@@ -58,8 +58,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-12 UF] The Terrain modal reuses the Dungeon modal's `dungeon-gen-*` class names for its internals (`.terrain-gen-modal` root but `.dungeon-gen-generate-btn`/`.dungeon-gen-hint` children)** — harmless visually but confusing for tests/harnesses (a `.dungeon-gen-*` query hits both twins; UF's selectors need per-modal scoping anyway). Suggest a neutral shared prefix (`.gen-modal-*`) or `terrain-gen-*` mirroring, pinned by one grep so the twins stay copy-identical.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - ~~Room-Adjacent same-seed reproducibility~~ — TESTED by UF and BROKEN: filed `bug-adjacent-generator-random-sort-irreproducible.md` (engine/warm-state dependent; not blocked, open bug).

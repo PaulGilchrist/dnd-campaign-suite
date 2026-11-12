@@ -5,6 +5,7 @@ import { parseSeedInput } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { FEET_PER_CELL } from '../../services/combat/movementBudget.js';
 import './GenerateDungeonModal.css';
+import './gen-modal-shared.css';
 
 const MODE_OPTIONS = [
     { value: 'bsp', label: 'BSP Dungeon', icon: 'fa-solid fa-grid-2' },
@@ -136,8 +137,8 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
 
                 {error && <div className="maps-manager-error">{error}</div>}
 
-                <div className="dungeon-gen-form">
-                    <label className="dungeon-gen-field">
+                <div className="gen-modal-form">
+                    <label className="gen-modal-field">
                         <span>Map Name</span>
                         <input
                             type="text"
@@ -149,13 +150,13 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                     </label>
 
                     {/* Mode selector */}
-                    <div className="dungeon-gen-mode-selector">
-                        <span className="dungeon-gen-field-label">Generation Mode</span>
-                        <div className="dungeon-gen-mode-options">
+                    <div className="gen-modal-mode-selector">
+                        <span className="gen-modal-field-label">Generation Mode</span>
+                        <div className="gen-modal-mode-options">
                             {MODE_OPTIONS.map(opt => (
                                 <button
                                     key={opt.value}
-                                    className={`dungeon-gen-mode-btn ${mode === opt.value ? 'active' : ''}`}
+                                    className={`gen-modal-mode-btn ${mode === opt.value ? 'active' : ''}`}
                                     onClick={() => setMode(opt.value)}
                                 >
                                     <i className={opt.icon}></i> {opt.label}
@@ -166,7 +167,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
 
                     {mode === 'bsp' ? (
                         <>
-                            <label className="dungeon-gen-field">
+                            <label className="gen-modal-field">
                                 <span>Grid Size</span>
                                 <input
                                     type="number"
@@ -175,12 +176,12 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                     value={gridSize}
                                     onChange={editGrid}
                                 />
-                                <span className="dungeon-gen-hint">
+                                <span className="gen-modal-hint">
                                     {gridSize * FEET_PER_CELL} ft &times; {gridSize * FEET_PER_CELL} ft ({gridSize * gridSize} squares)
                                 </span>
                             </label>
 
-                            <label className="dungeon-gen-field">
+                            <label className="gen-modal-field">
                                 <span>Density: {density}%</span>
                                 <input
                                     type="range"
@@ -190,7 +191,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                     value={density}
                                     onChange={e => setDensity(Number(e.target.value))}
                                 />
-                                <span className="dungeon-gen-hint">
+                                <span className="gen-modal-hint">
                                     {density <= 30 ? 'Sparse — wide halls, fewer rooms' :
                                      density <= 60 ? 'Moderate — balanced layout' :
                                      'Dense — many rooms, tight corridors'}
@@ -199,7 +200,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         </>
                     ) : (
                         <>
-                            <label className="dungeon-gen-field">
+                            <label className="gen-modal-field">
                                 <span>Grid Size</span>
                                 <input
                                     type="number"
@@ -208,12 +209,12 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                     value={gridSize}
                                     onChange={editGrid}
                                 />
-                                <span className="dungeon-gen-hint">
+                                <span className="gen-modal-hint">
                                     {gridSize * FEET_PER_CELL} ft &times; {gridSize * FEET_PER_CELL} ft ({gridSize * gridSize} squares)
                                 </span>
                             </label>
 
-                            <label className="dungeon-gen-field">
+                            <label className="gen-modal-field">
                                 <span>Room Count: {roomCount}</span>
                                 <input
                                     type="range"
@@ -225,13 +226,13 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                 />
                             </label>
 
-                            <label className="dungeon-gen-field">
+                            <label className="gen-modal-field">
                                 <span>Room Size</span>
-                                <div className="dungeon-gen-option-group">
+                                <div className="gen-modal-option-group">
                                     {['cramped', 'standard', 'spacious'].map(size => (
                                         <button
                                             key={size}
-                                            className={`dungeon-gen-option-btn ${roomSize === size ? 'active' : ''}`}
+                                            className={`gen-modal-option-btn ${roomSize === size ? 'active' : ''}`}
                                             onClick={() => setRoomSize(size)}
                                         >
                                             {size.charAt(0).toUpperCase() + size.slice(1)}
@@ -240,13 +241,13 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                 </div>
                             </label>
 
-                            <label className="dungeon-gen-field">
+                            <label className="gen-modal-field">
                                 <span>Corridor Length</span>
-                                <div className="dungeon-gen-option-group">
+                                <div className="gen-modal-option-group">
                                     {CORRIDOR_OPTIONS.map(opt => (
                                         <button
                                             key={opt.value}
-                                            className={`dungeon-gen-option-btn ${corridorLength === opt.value ? 'active' : ''}`}
+                                            className={`gen-modal-option-btn ${corridorLength === opt.value ? 'active' : ''}`}
                                             onClick={() => setCorridorLength(opt.value)}
                                         >
                                             {opt.label}
@@ -255,13 +256,13 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                 </div>
                             </label>
 
-                            <label className="dungeon-gen-field">
+                            <label className="gen-modal-field">
                                 <span>Layout Style</span>
-                                <div className="dungeon-gen-option-group">
+                                <div className="gen-modal-option-group">
                                     {LAYOUT_OPTIONS.map(opt => (
                                         <button
                                             key={opt.value}
-                                            className={`dungeon-gen-option-btn ${layoutStyle === opt.value ? 'active' : ''}`}
+                                            className={`gen-modal-option-btn ${layoutStyle === opt.value ? 'active' : ''}`}
                                             onClick={() => setLayoutStyle(opt.value)}
                                         >
                                             {opt.label}
@@ -272,7 +273,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         </>
                     )}
 
-                    <label className="dungeon-gen-field">
+                    <label className="gen-modal-field">
                         <span>Seed (optional)</span>
                         <input
                             type="text"
@@ -291,7 +292,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         Cancel
                     </button>
                     <button
-                        className="dungeon-gen-generate-btn"
+                        className="gen-modal-generate-btn"
                         onClick={handleGenerate}
                         disabled={!mapName.trim() || generating}
                     >

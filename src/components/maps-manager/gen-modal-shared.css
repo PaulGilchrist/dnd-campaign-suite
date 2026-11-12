@@ -1,0 +1,233 @@
+/* Shared child ruleset for the Dungeon/Terrain generate-modal twins.
+   Both twin JSX files import this EXPLICITLY (do not rely on MapsManager
+   loading both components). Child classes use the neutral `gen-modal-*`
+   prefix so a query never crosses twins by accident; the per-modal ROOT
+   identifiers `.dungeon-gen-modal` / `.terrain-gen-modal` stay in the JSX
+   (harnesses scope the twins by the root). Parity pinned by
+   generateModalParity.test.js — keep the twins copy-identical here. */
+
+.maps-manager-modal-overlay .gen-modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.maps-manager-modal-overlay .gen-modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.maps-manager-modal-overlay .gen-modal-field > span {
+    font-weight: 500;
+    color: var(--color-header);
+    margin-bottom: 2px;
+}
+
+.maps-manager-modal-overlay .gen-modal-field input[type="text"],
+.maps-manager-modal-overlay .gen-modal-field input[type="number"] {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color-input);
+    border-radius: 6px;
+    background: var(--background-color-input);
+    color: var(--color-text);
+    font-size: 14px;
+    max-width: 120px;
+}
+
+.maps-manager-modal-overlay .gen-modal-field input[type="text"] {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.maps-manager-modal-overlay .gen-modal-field input:focus {
+    outline: none;
+    border-color: var(--border-color-focus);
+}
+
+.maps-manager-modal-overlay .gen-modal-hint {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+}
+
+.maps-manager-modal-overlay .gen-modal-note {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin: 12px 0;
+    line-height: 1.5;
+}
+
+/* Mode selector */
+.maps-manager-modal-overlay .gen-modal-mode-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.maps-manager-modal-overlay .gen-modal-field-label {
+    font-weight: 500;
+    color: var(--color-header);
+    font-size: 14px;
+}
+
+.maps-manager-modal-overlay .gen-modal-mode-options {
+    display: flex;
+    gap: 8px;
+}
+
+.maps-manager-modal-overlay .gen-modal-mode-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: #ccc;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.maps-manager-modal-overlay .gen-modal-mode-btn:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.maps-manager-modal-overlay .gen-modal-mode-btn.active {
+    background: #4a90d9;
+    border-color: #2c5f8a;
+    color: #fff;
+}
+
+/* Option group (pill-style buttons) */
+.maps-manager-modal-overlay .gen-modal-option-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.maps-manager-modal-overlay .gen-modal-option-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.maps-manager-modal-overlay .gen-modal-option-btn:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.maps-manager-modal-overlay .gen-modal-option-btn.active {
+    background: #4a7db5;
+    border-color: #3a6a9a;
+    color: #fff;
+}
+
+.maps-manager-modal-overlay .gen-modal-generate-btn {
+    background: var(--color-primary) !important;
+    color: var(--color-text-inverse) !important;
+    font-weight: 600 !important;
+}
+
+.maps-manager-modal-overlay .gen-modal-generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.maps-manager-modal-overlay .gen-modal-generate-btn:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+/* ===== Light theme overrides ===== */
+
+[data-theme="light"] .maps-manager-modal-overlay .gen-modal-mode-btn {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .maps-manager-modal-overlay .gen-modal-mode-btn:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .maps-manager-modal-overlay .gen-modal-mode-btn.active {
+    background: #4a7db5;
+    border-color: #3a6a9a;
+    color: #fff;
+}
+
+[data-theme="light"] .maps-manager-modal-overlay .gen-modal-option-btn {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .maps-manager-modal-overlay .gen-modal-option-btn:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .maps-manager-modal-overlay .gen-modal-option-btn.active {
+    background: #4a7db5;
+    border-color: #3a6a9a;
+    color: #fff;
+}
+
+[data-theme="light"] .maps-manager-modal-overlay .gen-modal-generate-btn {
+    background: #4a7db5 !important;
+    color: #fff !important;
+}
+
+@media (prefers-color-scheme: light) {
+    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-mode-btn {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-mode-btn:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-mode-btn.active {
+        background: #4a7db5;
+        border-color: #3a6a9a;
+        color: #fff;
+    }
+
+    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-option-btn {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-option-btn:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-option-btn.active {
+        background: #4a7db5;
+        border-color: #3a6a9a;
+        color: #fff;
+    }
+
+    body:not([data-theme="dark"]) .maps-manager-modal-overlay .gen-modal-generate-btn {
+        background: #4a7db5 !important;
+        color: #fff !important;
+    }
+}
