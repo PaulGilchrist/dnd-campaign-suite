@@ -72,6 +72,27 @@ function isActiveEconomyRowGmDriven(combatSummary, activeCreatureName) {
     return row?.type !== 'player'
 }
 
+// Mount-merge roster guard (bug-initiative-mount-merge-empty-roster-clobbers-
+// board): between campaign-select and the rules-engine enrichment resolving,
+// `characters` is [] even in a full-party campaign ("Loading party stats").
+// Merging a stored board against that UNSETTLED roster would evict every
+// type:'player' row (initiativeService ghost-player filter) and the mount's
+// unguarded full-store POST would silently replace the live board with only
+// its non-player rows — a routine second-tab open destroying the whole table's
+// initiative state. Defer authoring until the roster settles. A stored board
+// with ZERO player rows (pure monster/NPC arena board, quick-join skeleton) has
+// nothing to evict, and any non-empty roster is by definition settled data, so
+// both of those faces merge normally — zero-character Arena/Starter campaigns
+// keep creating their board on mount. Module scope: the Initiative component
+// sits at the eslint statement/complexity ceilings (isActiveEconomyRowGmDriven
+// precedent).
+function mountMergeMustWaitForRoster(initialSummary, characters) {
+    return (
+        characters.length === 0
+        && (initialSummary.creatures || []).some((c) => c.type === 'player')
+    )
+}
+
 function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, 'activeBuffs', [], campaignName)
     setRuntimeValue(creatureName, 'invokeDuplicityAdvantageTargets', [], campaignName)
@@ -777,6 +798,26 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const initialSummary = await loadCombatSummary(campaignName)
 
             if (initialSummary && initialSummary.creatures) {
+                // Roster-settled guard (bug-initiative-mount-merge-empty-roster-
+                // clobbers-board): merging a stored board that carries player rows
+                // against an UNSETTLED (empty) roster evicts every one of those rows
+                // (initiativeService merge ghost-player filter) and the unguarded
+                // full-store POST below silently replaces the live board with only
+                // its non-player rows — rows, rolled initiatives, targetName arms
+                // and the turn pointer, lost table-wide with no error or log row.
+                // A second GM tab that opens Initiative while "Loading party stats"
+                // is still on screen hit this 2/2 at human click speed. Do NOT author
+                // — and do NOT mirror an evicted board locally (this tab's later
+                // full-store writes would carry the same eviction) — instead wait:
+                // `characters.length === 0` flipping to non-empty re-runs this
+                // effect (dep below) and the merge proceeds against the real
+                // roster. Module-scope helper keeps the arrow under its eslint
+                // complexity ceiling (same precedent as isActiveEconomyRowGmDriven).
+                if (mountMergeMustWaitForRoster(initialSummary, characters)) {
+                    console.warn('[initiative] mount-merge deferred — character roster still loading')
+                    return
+                }
+
                 const merged = mergeCombatSummaryWithCharacters(initialSummary, characters, utils.getName)
 
                 if (cancelled) return
@@ -821,7 +862,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             }
         })()
         return () => { cancelled = true }
-    }, [campaignName, isLocalhost]) // eslint-disable-line react-hooks/exhaustive-deps
+        // The roster-empty BOOLEAN (not the array identity) joins the deps so the
+        // deferred merge re-runs exactly once when the roster settles (see the
+        // guard above) — and never on later roster re-bakes (write-storm guard
+        // for settled multi-tab re-mounts). `characters` itself is read from this
+        // render's closure, which is fresh on that flip.
+    }, [campaignName, isLocalhost, characters.length === 0]) // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <div className={`initiative${tvMode ? ' initiative--tv' : ''}`}>
