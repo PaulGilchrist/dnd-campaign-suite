@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { Router } from 'express';
 import { processImageUpload, deleteCharacterImage } from '../utils/imageUtils.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDataFile, campaignImagesDir, ensureDataDir } from '../utils/campaignPaths.js';
@@ -11,6 +12,8 @@ import {
   stampForSave,
 } from '../utils/jsonEntityCrud.js';
 import { publish } from '../utils/changeData.js';
+
+const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 
 const broadcastNPCsList = (action, campaign, payload = {}) => {
   publish(`npcs-list-${campaign}`, { action, ...payload }, campaign);
@@ -153,4 +156,34 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
   }
 }));
 
-export default baseRouter;
+// ---------------------------------------------------------------------------
+// Write authority — the NPC manager is a GM-authoring lane (sidebar marks it
+// localhostOnly), mirroring the notes.js refuseUnlessGm wrapper shape (same
+// 403 copy + dev-log): every WRITE (whole-array POST, per-row DELETE, and
+// the PUT-upsert above) refuses non-localhost origins. READS stay open to
+// visitors because player-side runtime features legitimately consume GET
+// /npcs from non-localhost tabs: the visitor-visible Initiative view fetches
+// the list at mount (Initiative.jsx loadNPCs effect, ungated by isLocalhost),
+// and the player attack pipeline reads NPC rows for map-aware modifiers
+// (contextBuilder-map.js / automation/common/damageRoll.js loadNPCs calls —
+// both degrade to the sync context when the fetch 403s, silently losing
+// cover/range/melee-proximity math on player rolls). The factory offers no
+// per-lane write hook, so the gate wraps the mounted router with a path-
+// scoped use() BEFORE baseRouter. bug-npcs-factions-settlements-lanes-no-
+// origin-guard.
+// ---------------------------------------------------------------------------
+function refuseUnlessGm(req, res) {
+  if (isLocalhost(req)) return true;
+  console.log(`[npcs] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
+  res.status(403).json({ error: 'Access denied: GM-only feature' });
+  return false;
+}
+
+const router = Router();
+router.use('/api/campaigns/:campaign/npcs', (req, res, next) => {
+  if (req.method !== 'GET' && !refuseUnlessGm(req, res)) return;
+  next();
+});
+router.use(baseRouter);
+
+export default router;

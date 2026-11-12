@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { Router } from 'express';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import {
@@ -14,6 +15,8 @@ import { publish } from '../utils/changeData.js';
 // Display noun for conflict/404 copy (matches the NPC lane's 'NPC'; duplicate-
 // name 400 copy stays lowercase 'A settlement with that name already exists').
 const SINGULAR_DISPLAY_NAME = 'Settlement';
+
+const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 
 // Mirrors broadcastNPCsList (routes/npcs.js) / broadcastNotesList
 // (routes/notes.js): every list mutation publishes a `settlements-list-<campaign>`
@@ -114,4 +117,29 @@ baseRouter.put('/api/campaigns/:campaign/settlements/:settlementName', asyncHand
   }
 }));
 
-export default baseRouter;
+// ---------------------------------------------------------------------------
+// GM-only lane — the Settlements planner is a GM-authoring surface (sidebar
+// marks it localhostOnly; every client consumer of /settlements is a GM-only
+// view — Settlements.jsx, the Sessions planner's picker, Campaign Admin's
+// AiWorldConsole, and the CampaignBuilder draft lane — no visitor reads it).
+// The whole lane (reads AND writes, including the PUT-upsert above) refuses
+// non-localhost origins, mirroring the sessions.js / quests.js refuseUnlessGm
+// wrapper shape (same 403 copy + dev-log). The gate wraps the mounted router
+// with a path-scoped use() BEFORE baseRouter so the custom PUT lane is
+// covered too. bug-npcs-factions-settlements-lanes-no-origin-guard.
+// ---------------------------------------------------------------------------
+function refuseUnlessGm(req, res) {
+  if (isLocalhost(req)) return true;
+  console.log(`[settlements] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
+  res.status(403).json({ error: 'Access denied: GM-only feature' });
+  return false;
+}
+
+const router = Router();
+router.use('/api/campaigns/:campaign/settlements', (req, res, next) => {
+  if (!refuseUnlessGm(req, res)) return;
+  next();
+});
+router.use(baseRouter);
+
+export default router;
