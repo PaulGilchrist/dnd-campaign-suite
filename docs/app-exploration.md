@@ -64,7 +64,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-12 QR] Dice-tray decorative SVG glyphs leak into accessible/button text.** Each `.dice-btn` concatenates its inline `<svg><text>` digit into `textContent` — buttons read `4d4`, `8d8`, `10d10`, `12d12`, `%d100` (aria-labels `Roll d4` keep AT names clean, but body-text snapshots/census probes get polluted — QR wasted a probe cycle suspecting a printf-template leak). Add `aria-hidden="true"`/`focusable="false"` to the tray SVGs, or move digits out of `<text>`.
 - **[2026-11-12 QR] `[SSE] connection error` logs at console.error on benign disconnects.** Every tab unload (4/4 matched QR's closes) relays a client `console.error` through the vite proxy — a network blip mid-session will look like an app fault in console-hygiene checks. Suggest warn-tier (or silent while EventSource auto-reconnect succeeds) in `src/services/ui/sseClient.js`.
 
 ## Blocked / Not Verified (fold-gate ledger)

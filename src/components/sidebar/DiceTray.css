@@ -50,6 +50,63 @@
   height: 26px;
 }
 
+/* Decorative digit/% glyphs drawn as generated content on a positioned
+ * wrapper around the (aria-hidden) die-shape SVG. Generated content is not
+ * part of textContent, so .dice-btn reads exactly "d4"…"d100" in body-text
+ * dumps (backlog 2026-11-12: SVG <text> digits leaked as "4d4"/"%d100").
+ * Positions/sizes mirror the retired <text> anchors scaled to the rendered
+ * box: tray svgs 26px over a 36-unit viewBox, result d100 40px over 48. */
+.dice-glyph {
+  position: relative;
+  display: inline-flex;
+}
+
+.dice-glyph::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  line-height: 1;
+  font-weight: bold;
+  color: currentColor;
+}
+
+.dice-glyph-d4::after {
+  content: '4';
+  top: 75%;
+  font-size: 7.2px;
+}
+
+.dice-glyph-d8::after {
+  content: '8';
+  top: 53%;
+  font-size: 6.5px;
+}
+
+.dice-glyph-d10::after {
+  content: '10';
+  top: 56%;
+  font-size: 5.4px;
+}
+
+.dice-glyph-d12::after {
+  content: '12';
+  top: 53%;
+  font-size: 5px;
+}
+
+.dice-glyph-d100::after {
+  content: '%';
+  top: 53%;
+  font-size: 5px;
+}
+
+.dice-glyph-d100-result::after {
+  content: '%';
+  top: 52%;
+  font-size: 7.5px;
+}
+
 .dice-result-svg {
   width: 40px;
   height: 40px;

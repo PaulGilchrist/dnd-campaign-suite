@@ -2,39 +2,47 @@ import { useEffect } from 'react';
 import { rollDie } from '../../services/dice/diceRoller.js';
 import './DiceTray.css';
 
+// Decorative die faces: the shape is an aria-hidden SVG and the digit glyph
+// is CSS generated content (.dice-glyph-*::after in DiceTray.css). Generated
+// content never enters textContent, so tray buttons read exactly "d4"/"d100"
+// in body-text dumps instead of leaking "4d4"/"%d100" (backlog 2026-11-12).
 function D4Icon() {
     return (
-          <svg viewBox="0 0 36 36" className="dice-svg">
-              <polygon points="18,4 32,32 4,32" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
-              <text x="18" y="27" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontSize="10" fontWeight="bold">4</text>
-          </svg>
+          <span className="dice-glyph dice-glyph-d4">
+              <svg viewBox="0 0 36 36" className="dice-svg" aria-hidden="true" focusable="false">
+                  <polygon points="18,4 32,32 4,32" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+              </svg>
+          </span>
       );
 }
 
 function D8Icon() {
     return (
-          <svg viewBox="0 0 36 36" className="dice-svg">
-              <polygon points="18,2 34,18 18,34 2,18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
-              <text x="18" y="19" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontSize="9" fontWeight="bold">8</text>
-          </svg>
+          <span className="dice-glyph dice-glyph-d8">
+              <svg viewBox="0 0 36 36" className="dice-svg" aria-hidden="true" focusable="false">
+                  <polygon points="18,2 34,18 18,34 2,18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+              </svg>
+          </span>
       );
 }
 
 function D10Icon() {
     return (
-          <svg viewBox="0 0 36 36" className="dice-svg">
-              <polygon points="18,2 32,12 28,34 8,34 4,12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
-              <text x="18" y="20" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontSize="7.5" fontWeight="bold">10</text>
-          </svg>
+          <span className="dice-glyph dice-glyph-d10">
+              <svg viewBox="0 0 36 36" className="dice-svg" aria-hidden="true" focusable="false">
+                  <polygon points="18,2 32,12 28,34 8,34 4,12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+              </svg>
+          </span>
       );
 }
 
 function D12Icon() {
     return (
-          <svg viewBox="0 0 36 36" className="dice-svg">
-              <polygon points="18,2 32,9 32,27 18,34 4,27 4,9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
-              <text x="18" y="19" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontSize="7" fontWeight="bold">12</text>
-          </svg>
+          <span className="dice-glyph dice-glyph-d12">
+              <svg viewBox="0 0 36 36" className="dice-svg" aria-hidden="true" focusable="false">
+                  <polygon points="18,2 32,9 32,27 18,34 4,27 4,9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+              </svg>
+          </span>
       );
 }
 
@@ -53,14 +61,15 @@ function DicePopup({ result, onClose }) {
             case 'd8': return <D8Icon />;
             case 'd10': return <D10Icon />;
             case 'd12': return <D12Icon />;
-            case 'd6': return <i className="fa-solid fa-dice-d6"></i>;
-            case 'd20': return <i className="fa-solid fa-dice-d20"></i>;
+            case 'd6': return <i className="fa-solid fa-dice-d6" aria-hidden="true"></i>;
+            case 'd20': return <i className="fa-solid fa-dice-d20" aria-hidden="true"></i>;
             case 'd100': return (
-                   <svg viewBox="0 0 48 48" className="dice-svg dice-result-svg">
-                       <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="2.5" />
-                       <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth="1" />
-                       <text x="24" y="25" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontSize="9" fontWeight="bold">%</text>
-                   </svg>
+                   <span className="dice-glyph dice-glyph-d100-result">
+                       <svg viewBox="0 0 48 48" className="dice-svg dice-result-svg" aria-hidden="true" focusable="false">
+                           <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="2.5" />
+                           <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth="1" />
+                       </svg>
+                   </span>
                );
             default: return null;
           }
@@ -81,7 +90,7 @@ function DicePopup({ result, onClose }) {
             >
                 <div className="dice-tray-popup-modal">
                    <button className="dice-tray-popup-close" onClick={onClose} aria-label="Close">
-                       <i className="fa-solid fa-xmark"></i>
+                       <i className="fa-solid fa-xmark" aria-hidden="true"></i>
                    </button>
                    <div className="dice-tray-result">
                        <div className="dice-tray-result-icon">{getResultIcon(result.label)}</div>
@@ -110,14 +119,15 @@ function DiceTray({ onRoll }) {
             case 'd8': return <D8Icon />;
             case 'd10': return <D10Icon />;
             case 'd12': return <D12Icon />;
-            case 'd6': return <i className="fa-solid fa-dice-d6"></i>;
-            case 'd20': return <i className="fa-solid fa-dice-d20"></i>;
+            case 'd6': return <i className="fa-solid fa-dice-d6" aria-hidden="true"></i>;
+            case 'd20': return <i className="fa-solid fa-dice-d20" aria-hidden="true"></i>;
             case 'd100': return (
-                  <svg viewBox="0 0 36 36" className="dice-svg">
-                      <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2.5" />
-                      <circle cx="18" cy="18" r="11" fill="none" stroke="currentColor" strokeWidth="1" />
-                      <text x="18" y="19" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontSize="7" fontWeight="bold">%</text>
-                  </svg>
+                  <span className="dice-glyph dice-glyph-d100">
+                      <svg viewBox="0 0 36 36" className="dice-svg" aria-hidden="true" focusable="false">
+                          <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2.5" />
+                          <circle cx="18" cy="18" r="11" fill="none" stroke="currentColor" strokeWidth="1" />
+                      </svg>
+                  </span>
               );
             default: return null;
          }
