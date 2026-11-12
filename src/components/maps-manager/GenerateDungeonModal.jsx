@@ -260,7 +260,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
 
                 </div>
                 <div>
-                    Note: This is meant to be just a starting point for you to finish into a fully flushed out map<br/>
+                    Note: This is meant to be just a starting point for you to finish into a fully fleshed out map<br/>
                 </div>
                 <div className="maps-manager-modal-actions">
                     <button onClick={onClose} disabled={generating}>

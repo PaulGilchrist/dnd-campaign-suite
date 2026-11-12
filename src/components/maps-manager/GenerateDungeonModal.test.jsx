@@ -88,6 +88,15 @@ describe('GenerateDungeonModal', () => {
       expect(screen.getByPlaceholderText('Random if empty')).toBeInTheDocument();
     });
 
+    // Copy pin (SD backlog 2026-11-12): the note reads "fleshed out", never "flushed".
+    it('renders the starting-point note with "fleshed out" copy', () => {
+      render(<GenerateDungeonModal {...props} />);
+      expect(screen.getByText(
+        'Note: This is meant to be just a starting point for you to finish into a fully fleshed out map',
+      )).toBeInTheDocument();
+      expect(screen.queryByText(/flushed/)).not.toBeInTheDocument();
+    });
+
     it('pre-fills map name from initialMapName prop', () => {
       render(<GenerateDungeonModal {...props} initialMapName="Pre-filled Name" />);
       expect(screen.getByDisplayValue('Pre-filled Name')).toBeInTheDocument();
