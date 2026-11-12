@@ -13,7 +13,7 @@ const NAV_BUTTONS = [
   { label: 'Log', view: 'campaignLog', handler: 'onLogClick' },
   { label: 'Maps', view: 'mapsManager', handler: 'onMapsClick', playerLabel: 'Map' },
   { label: 'Music', view: 'music', handler: 'onMusicClick' },
-  { label: 'Notes', view: 'notes', handler: 'onNotesClick' },
+  { label: 'Notes', view: 'notes', handler: 'onNotesClick', localhostOnly: true },
   { label: 'NPCs', view: 'npcs', handler: 'onNPCsClick', localhostOnly: true },
   { label: 'Quests', view: 'quests', handler: 'onQuestsClick', localhostOnly: true },
   { label: 'Sessions', view: 'sessions', handler: 'onSessionsClick', localhostOnly: true },

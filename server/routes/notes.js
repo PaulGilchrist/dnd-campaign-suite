@@ -1,3 +1,4 @@
+import { Router } from 'express';
 import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
 import { publish } from '../utils/changeData.js';
 
@@ -27,7 +28,7 @@ const broadcastNotesList = (action, campaign, payload = {}) => {
   publish(`notes-list-${campaign}`, { action, ...payload }, campaign);
 };
 
-export default createJsonEntityRouter('notes', {
+const baseRouter = createJsonEntityRouter('notes', {
   pluralDisplayName: 'notes',
   singularDisplayName: 'Note',
   // 409 conflict copy labels rows by the same recipe the list renders as the
@@ -51,3 +52,32 @@ export default createJsonEntityRouter('notes', {
   },
   forbiddenMessage: 'Access denied: private note',
 });
+
+// ---------------------------------------------------------------------------
+// Write authority — Notes is a GM-authoring lane (owner doctrine: GM features
+// are localhost-only; mirrors maps.js / campaigns-character.js / inventory.js
+// refuseUnlessGm). Reads keep the isPrivate visibility filter above; every
+// WRITE (whole-array POST, per-row DELETE, and any future PUT) refuses
+// non-localhost origins with the canonical GM-only 403. Without this gate the
+// lane was structurally unsatisfiable for players: the read filter hides
+// private rows from their snapshot, so the whole-array concurrent-save guard
+// (jsonEntityCrud findConcurrentWrite) read their absence as "deleted
+// elsewhere" and 409'd EVERY player save whenever any private note existed —
+// unrecoverable via "Reload list" — and the conflict copy LEAKED the private
+// row's label. bug-players-can-never-save-notes-when-any-private-note-exists.
+// ---------------------------------------------------------------------------
+function refuseUnlessGm(req, res) {
+  if (isLocalhost(req)) return true;
+  console.log(`[notes] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
+  res.status(403).json({ error: 'Access denied: GM-only feature' });
+  return false;
+}
+
+const router = Router();
+router.use('/api/campaigns/:campaign/notes', (req, res, next) => {
+  if (req.method !== 'GET' && !refuseUnlessGm(req, res)) return;
+  next();
+});
+router.use(baseRouter);
+
+export default router;

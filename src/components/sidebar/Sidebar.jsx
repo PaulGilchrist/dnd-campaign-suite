@@ -43,7 +43,7 @@ const NAV_ITEMS = [
     // Ambience duty is delegable, so the music panel is open to players too
     // (main content area, activeView 'music').
     { view: 'music', onClick: 'onMusicClick' },
-    { view: 'notes', onClick: 'onNotesClick', arenaHidden: true },
+    { view: 'notes', onClick: 'onNotesClick', localhostOnly: true, arenaHidden: true },
     { view: 'npcs', onClick: 'onNPCsClick', localhostOnly: true },
     { view: 'quests', onClick: 'onQuestsClick', localhostOnly: true, arenaHidden: true },
     { external: true, icon: 'fa-book', label: 'Rules' },
