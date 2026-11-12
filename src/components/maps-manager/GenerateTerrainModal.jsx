@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { generateHexTerrain } from '../../services/maps/hexTerrainGenerator.js';
+import { parseSeedInput } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import './GenerateTerrainModal.css';
 
@@ -18,13 +19,21 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
         }
 
         const safeGridSize = Math.max(30, Math.min(100, gridSize));
+
+        // Block a non-numeric seed with an inline error instead of the old
+        // silent random fallback (SD 2026-11-12). Seed 0 is a valid seed.
+        const seedInput = parseSeedInput(seed);
+        if (seedInput.error) {
+            setError(seedInput.error);
+            return;
+        }
+
         setGenerating(true);
 
         try {
-            const seedValue = seed.trim() ? parseInt(seed.trim(), 10) || undefined : undefined;
             const result = generateHexTerrain({
                 gridSize: safeGridSize,
-                seed: seedValue,
+                seed: seedInput.seed ?? undefined,
             });
 
             await mapsService.createMap(campaignName, name, {
@@ -32,6 +41,9 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                 gridSize: safeGridSize,
                 terrain: result.terrain,
                 pois: [],
+                // The generator's real effective seed (typed or random) so the
+                // map is reproducible from the document on disk.
+                seed: result.seed,
             });
 
             onMapCreated();

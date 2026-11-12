@@ -51,7 +51,7 @@ export function generateHexTerrain({ gridSize = 30, seed, weights } = {}) {
     applyWeights(terrain, weights, allHexes, effectiveSeed);
   }
 
-  return { terrain, rivers };
+  return { terrain, rivers, seed: effectiveSeed };
 }
 
 const TERRAIN_ELEVATION = {

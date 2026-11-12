@@ -139,7 +139,20 @@ describe('hexTerrainGenerator', () => {
         },
       ],
     ])('generateHexTerrain({gridSize:%i}) is an all-water map with no rivers', (gridSize, terrain) => {
-      expect(generateHexTerrain({ gridSize, seed: 42 })).toEqual({ terrain, rivers: [] });
+      expect(generateHexTerrain({ gridSize, seed: 42 })).toEqual({ terrain, rivers: [], seed: 42 });
+    });
+
+    // Returned effective seed (SD backlog 2026-11-12): the twin generate modal
+    // stores result.seed on the created map doc so terrain maps are
+    // reproducible from disk. A typed seed (0 included) echoes back; an
+    // unseeded run reports the seed it actually drew.
+    it('exposes the effective seed — typed seed echoes (0 honoured), unseeded draws an integer', () => {
+      expect(generateHexTerrain({ gridSize: 5, seed: 0 }).seed).toBe(0);
+      expect(generateHexTerrain({ gridSize: 5, seed: 42 }).seed).toBe(42);
+      const unseeded = generateHexTerrain({ gridSize: 5 });
+      expect(Number.isInteger(unseeded.seed)).toBe(true);
+      // Same effective seed → byte-identical output (reproducibility pin).
+      expect(generateHexTerrain({ gridSize: 5, seed: 0 })).toEqual(generateHexTerrain({ gridSize: 5, seed: 0 }));
     });
 
     // T-inval — coercion honesty (#959): only positive integers generate; 3.5 and

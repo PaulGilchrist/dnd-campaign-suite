@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { generateDungeon, generateAdjacentDungeon } from '../../services/maps/dungeonGenerator.js';
+import { parseSeedInput } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { FEET_PER_CELL } from '../../services/combat/movementBudget.js';
 import './GenerateDungeonModal.css';
@@ -50,10 +51,18 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
             setError(`Grid size must be between 5 and 100. Using ${safeGridSize}.`);
         }
 
+        // Block a non-numeric seed with an inline error BEFORE generating —
+        // a NaN seed silently degraded to seed 0 on disk (null) (SD 2026-11-12).
+        const seedInput = parseSeedInput(seed);
+        if (seedInput.error) {
+            setError(seedInput.error);
+            return;
+        }
+        const seedValue = seedInput.seed ?? Math.floor(Math.random() * 2147483647);
+
         setGenerating(true);
 
         try {
-            const seedValue = seed ? parseInt(seed, 10) : Math.floor(Math.random() * 2147483647);
 
             let result;
             if (mode === 'adjacent') {

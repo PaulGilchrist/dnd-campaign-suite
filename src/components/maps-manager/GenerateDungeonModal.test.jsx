@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GenerateDungeonModal from './GenerateDungeonModal';
 
-const { dungeonMocks } = vi.hoisted(() => {
+const { dungeonMocks, dungeonResult } = vi.hoisted(() => {
   const dungeonResult = {
     name: 'Test Dungeon',
     gridSize: 30,
@@ -15,6 +15,7 @@ const { dungeonMocks } = vi.hoisted(() => {
     panY: 0,
   };
   return {
+    dungeonResult,
     dungeonMocks: {
       generateDungeon: vi.fn(() => ({ ...dungeonResult })),
       generateAdjacentDungeon: vi.fn(() => ({ ...dungeonResult })),
@@ -193,14 +194,72 @@ describe('GenerateDungeonModal', () => {
         () => fireEvent.change(screen.getByRole('slider', { name: /Density/ }), { target: { value: typed } }));
     });
 
-    it.each([
-      ['42', 42],
-      ['abc', NaN],
-    ])('passes seed input "%s" through parseInt', async (typedSeed, expectedSeed) => {
+    it('passes a valid numeric seed through to generateDungeon', async () => {
       render(<GenerateDungeonModal {...props} />);
-      await submitAndExpect(dungeonMocks.generateDungeon, { seed: expectedSeed },
-        () => changeField(/Seed/, typedSeed));
+      await submitAndExpect(dungeonMocks.generateDungeon, { seed: 42 },
+        () => changeField(/Seed/, '42'));
     });
+
+    // Seed "0" is falsy but a whole number — it must drive the RNG, not be
+    // dropped to random (SD backlog 2026-11-12, criterion 3).
+    it('honours seed "0" (falsy but valid)', async () => {
+      render(<GenerateDungeonModal {...props} />);
+      await submitAndExpect(dungeonMocks.generateDungeon, { seed: 0 },
+        () => changeField(/Seed/, '0'));
+    });
+
+    // Criterion 4: the generator's effective seed is routed into the created
+    // map document (result minus name is the createMap payload).
+    it('routes the generated seed into the createMap payload', async () => {
+      dungeonMocks.generateDungeon.mockImplementationOnce((opts) => ({
+        ...dungeonResult,
+        seed: opts.seed,
+      }));
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Seeded');
+      changeField(/Seed/, '42');
+      clickGenerate();
+      await waitFor(() => {
+        expect(mapsServiceMocks.createMap).toHaveBeenCalledWith(
+          'test-campaign',
+          'Seeded',
+          expect.objectContaining({ seed: 42 }),
+        );
+      });
+    });
+
+    // Criteria 1: a non-numeric seed blocks generation with a persistent
+    // inline error — no generator call, no createMap POST, modal stays open,
+    // and fixing the seed succeeds.
+    it.each(['abc', '4.5', '12abc'])(
+      'blocks seed "%s" with an inline error, no map created, and recovers after a fix',
+      async (typedSeed) => {
+        render(<GenerateDungeonModal {...props} />);
+        fillMapName('Dungeon');
+        changeField(/Seed/, typedSeed);
+        clickGenerate();
+
+        const error = await screen.findByText('Seed must be a whole number');
+        expect(error).toHaveClass('maps-manager-error');
+        expect(dungeonMocks.generateDungeon).not.toHaveBeenCalled();
+        expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
+        expect(props.onMapCreated).not.toHaveBeenCalled();
+        expect(props.onClose).not.toHaveBeenCalled();
+        // Persistent: still there, buttons re-enabled, seed preserved for fixing
+        expect(screen.getByText('Seed must be a whole number')).toBeInTheDocument();
+        expect(screen.getByDisplayValue(typedSeed)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
+
+        changeField(/Seed/, '7');
+        clickGenerate();
+        await waitFor(() => {
+          expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
+            expect.objectContaining({ seed: 7 }),
+          );
+          expect(props.onClose).toHaveBeenCalledTimes(1);
+        });
+      },
+    );
   });
 
   describe('adjacent mode parameters', () => {

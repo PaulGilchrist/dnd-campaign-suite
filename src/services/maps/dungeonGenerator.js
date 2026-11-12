@@ -30,7 +30,11 @@ export function generateDungeon(opts) {
   opts = opts || {};
   const gridSize = opts.gridSize || 30;
   const density = opts.density != null ? Math.max(0, Math.min(1, opts.density)) : 0.5;
-  const rng = opts.seed != null ? mulberry32(opts.seed) : Math.random.bind(Math);
+  // Only a real whole-number seed drives the RNG: a NaN from a bad parseInt
+  // used to slip through `!= null` and silently behave as seed 0 while being
+  // stamped as seed:NaN (JSON null on disk, not reproducible) (SD 2026-11-12).
+  const seed = Number.isInteger(opts.seed) ? opts.seed : null;
+  const rng = seed != null ? mulberry32(seed) : Math.random.bind(Math);
 
   // ---- 1-3b. Generate rooms, carve, connect, cap dead ends ----
   const { grid, rooms, corridorCells } = generateRooms({ gridSize, density, rng });
@@ -56,7 +60,7 @@ export function generateDungeon(opts) {
     name: generateName(rng),
     description: generateDescription(rng),
     gridSize: gridSize,
-    seed: opts.seed != null ? opts.seed : Math.floor(Math.random() * 2147483647),
+    seed: seed != null ? seed : Math.floor(Math.random() * 2147483647),
     walls: walls,
     placedItems: dedupedItems,
     players: [],

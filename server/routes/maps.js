@@ -385,6 +385,10 @@ const buildOutdoorMapData = (name, body) => {
     gridSize,
     terrain: body.terrain ?? {},
     pois: body.pois ?? [],
+    // Generate-terrain seed (SD backlog 2026-11-12): the create builder is a
+    // whitelist and used to drop the body's seed, so a terrain map could never
+    // be reproduced from its document on disk. Mirrors buildIndoorMapData.
+    seed: body.seed,
     zoom: 1,
     panX: 0,
     panY: 0,

@@ -5,7 +5,10 @@ import GenerateTerrainModal from './GenerateTerrainModal.jsx';
 
 const { terrainMocks, mapsServiceMocks } = vi.hoisted(() => ({
   terrainMocks: {
-    generateHexTerrain: vi.fn(() => ({ terrain: {} })),
+    // Echoes the effective seed the way the real generator now does: the
+    // typed seed when given (0 included), else a fixed stand-in for the
+    // generator's internal random draw.
+    generateHexTerrain: vi.fn((opts) => ({ terrain: {}, seed: opts?.seed ?? 98765 })),
   },
   mapsServiceMocks: {
     createMap: vi.fn().mockResolvedValue({}),
@@ -111,7 +114,9 @@ describe('GenerateTerrainModal', () => {
   // Generation flow
   // -------------------------------------------------------------------------
   describe('generation flow', () => {
-    const untouched = { name: 'Test', gridSize: 30, seed: undefined };
+    // docSeed = the seed the generator reports back, which must land in the
+    // created map document (criteria 4/5: reproducible from disk).
+    const untouched = { name: 'Test', gridSize: 30, seed: undefined, docSeed: 98765 };
 
     it('is disabled until the map name has content', () => {
       render(<GenerateTerrainModal {...props} />);
@@ -122,7 +127,7 @@ describe('GenerateTerrainModal', () => {
 
     it.each([
       ['untouched defaults', {}, untouched],
-      ['typed grid size and seed', { gridSize: '50', seed: '42' }, { name: 'Test', gridSize: 50, seed: 42 }],
+      ['typed grid size and seed', { gridSize: '50', seed: '42' }, { name: 'Test', gridSize: 50, seed: 42, docSeed: 42 }],
       ['grid size clamped to the minimum of 30', { gridSize: '10' }, untouched],
       ['grid size clamped to the maximum of 100', { gridSize: '150' }, { ...untouched, gridSize: 100 }],
       ['whitespace trimmed from the name', { name: '  Trimmed  ' }, { ...untouched, name: 'Trimmed' }],
@@ -138,9 +143,48 @@ describe('GenerateTerrainModal', () => {
           gridSize: expected.gridSize,
           terrain: {},
           pois: [],
+          seed: expected.docSeed,
         });
       });
     });
+
+    // Criterion 3: seed "0" must drive the generator and be stored verbatim —
+    // the old `parseInt(seed) || undefined` silently random-ized it.
+    it('honours seed "0" through generation and into the map document', async () => {
+      generateWith({ seed: '0' });
+      await waitFor(() => {
+        expect(terrainMocks.generateHexTerrain).toHaveBeenCalledWith({ gridSize: 30, seed: 0 });
+        expect(mapsServiceMocks.createMap).toHaveBeenCalledWith('test-campaign', 'Test',
+          expect.objectContaining({ seed: 0 }));
+      });
+    });
+
+    // Criterion 2: a non-numeric seed blocks generation with a persistent
+    // inline error (no silent random fallback), and a fixed seed succeeds.
+    it.each(['abc', '4.5', '12abc'])(
+      'blocks seed "%s" with an inline error, no map created, and recovers after a fix',
+      async (typedSeed) => {
+        generateWith({ seed: typedSeed });
+
+        const error = await screen.findByText('Seed must be a whole number');
+        expect(error).toHaveClass('maps-manager-error');
+        expect(terrainMocks.generateHexTerrain).not.toHaveBeenCalled();
+        expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
+        expect(props.onMapCreated).not.toHaveBeenCalled();
+        expect(props.onClose).not.toHaveBeenCalled();
+        expect(screen.getByDisplayValue(typedSeed)).toBeInTheDocument();
+        expect(getGenerateButton()).toBeEnabled();
+
+        setSeed('7');
+        clickGenerate();
+        await waitFor(() => {
+          expect(terrainMocks.generateHexTerrain).toHaveBeenCalledWith(
+            expect.objectContaining({ seed: 7 }),
+          );
+          expect(props.onClose).toHaveBeenCalledTimes(1);
+        });
+      },
+    );
 
     it('notifies onMapCreated then closes on success', async () => {
       generateWith();

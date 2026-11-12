@@ -307,6 +307,12 @@ describe('dungeonGenerator', () => {
     const zero = generateDungeon({ gridSize: 20, seed: 0 });
     expect(zero.seed).toBe(0);
     expect(zero.name).toBe('The Iron Vault of Eternal Night');
+    // …but a NaN seed (bad parseInt from the generate modal) no longer slips
+    // past `!= null` to silently drive mulberry32(0) while stamping seed:NaN
+    // (JSON null on disk) — it falls back to a fresh random integer seed
+    // (SD backlog 2026-11-12).
+    const nan = generateDungeon({ gridSize: 20, seed: NaN });
+    expect(Number.isInteger(nan.seed) && nan.seed >= 0).toBe(true);
     // …while gridSize 0 hits the || default and collapses to 30 (asserted, not smoothed over).
     expect(generateDungeon({ gridSize: 0, seed: 42 }).gridSize).toBe(30);
     // Missing opts coerce to an empty object; the map is still carved, not collapsed.
