@@ -89,6 +89,29 @@ function writeFailed(result) {
 }
 
 /**
+ * Assign-branch mutation for handleControllerChange (hoisted for the
+ * complexity cap). Stamps `controller` and, per the owner law (2026-11-11,
+ * MB-2 ruling extending cd3dc2361's release law), a DIRECT controller→
+ * controller swap NEVER inherits the previous controller's armed target:
+ * `targetName` is deleted on the SAME full-board write so B's card opens
+ * unarmed. First-time assigns (no prior controller) and same-controller
+ * re-stamps keep the arm untouched. Returns the swap witness
+ * { previousController, clearedTarget } only when a clear actually
+ * happened, else null (drives the control_arm_cleared audit row).
+ */
+function applyControllerAssign(creature, controllerName) {
+    const previousController = creature.controller || null
+    if (previousController && previousController !== controllerName && creature.targetName) {
+        const clearedTarget = creature.targetName
+        delete creature.targetName
+        creature.controller = controllerName
+        return { previousController, clearedTarget }
+    }
+    creature.controller = controllerName
+    return null
+}
+
+/**
  * Audit channel for manual GM HP overrides (bug-initiative-hp-input-no-range-
  * clamp): every committed card edit writes an hp_change entry in the exact
  * damage/healing-lane shape (type/targetName/sourceName/delta/currentHp/
@@ -411,13 +434,14 @@ export function createCreatureHandlers({
         if (!isLocalhost || !combatSummary) return
         const creature = combatSummary.creatures.find(c => c.name === creatureName)
         if (!creature || creature.type === 'player') return
+        let swap = null
         if (controllerName) {
             const isValidPlayer = combatSummary.creatures.some(c => c.type === 'player' && c.name === controllerName)
             if (!isValidPlayer) {
                 console.error(`[handleControllerChange] ${controllerName} is not a player on the tracker — control not assigned`)
                 return
             }
-            creature.controller = controllerName
+            swap = applyControllerAssign(creature, controllerName)
         } else {
             delete creature.controller
             // Owner law (2026-11-11): a release NEVER leaves an armed target behind —
@@ -439,6 +463,18 @@ export function createCreatureHandlers({
                 : `${creature.name} returned to the GM${fallback ? ` (auto-controlled by ${fallback})` : ''}.`,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[handleControllerChange] control log failed:', e) })
+        // Swap-clear audit (acceptance: the handoff is never audit-silent): one
+        // extra row ONLY when the swap actually deleted an armed target.
+        if (swap) {
+            addEntry(campaignName, {
+                type: 'automation',
+                characterName: creature.name,
+                automationType: 'control_arm_cleared',
+                name: 'Control',
+                description: `${creature.name} handed directly from ${swap.previousController} to ${controllerName} — armed target ${swap.clearedTarget} cleared on the handoff (the new controller starts unarmed).`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[handleControllerChange] swap-arm-clear log failed:', e) })
+        }
     }
 
     const handleRemoveNpc = function handleRemoveNpc(creatureName) {

@@ -65,8 +65,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-11 MB-2, LIVE-confirmed) Direct controller→controller swap inherits the previous controller's armed target: one `selectOption` gesture A→B leaves cs `targetName` intact, so B's card opens already armed on A's target with NO friendly-fire confirm for B and no audit mention (only two `control_assigned` rows). `handleControllerChange`'s assign branch (`createCreatureHandlers.js` ~L410) sets `creature.controller` but never touches `creature.targetName`. Owner law covers RELEASE ("never inherit a stale arm"); if the same intent holds for swaps, mirror the delete in the assign branch. Needs a 30-second owner ruling first — ruling could also bless the carry-over as intentional (GM could legitimately pre-arm before handing over).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Whether the swap-lane arm-inherit is INTENDED (owner ruling outstanding — the live face is confirmed, the design question is not; Priority Target 1 / backlog bullet).

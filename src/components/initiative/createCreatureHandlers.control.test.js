@@ -136,6 +136,66 @@ describe('handleControllerChange', () => {
         expect(zombie.targetName).toBe('Fairy');
     });
 
+    // Owner law (2026-11-11, MB-2 ruling extending the release law): a DIRECT
+    // controller→controller swap never inherits the previous controller's armed
+    // target — targetName is deleted on the SAME full-board write that stamps B,
+    // and the handoff logs its own audit row (never audit-silent).
+    it('direct A→B swap clears the armed targetName on the same write and audits the handoff', () => {
+        const { handlers, combatSummary, setCombatSummary } = makeHandlers();
+        handlers.handleControllerChange('Zombie', 'Alice');
+        combatSummary.creatures.find(c => c.name === 'Zombie').targetName = 'Fairy';
+
+        handlers.handleControllerChange('Zombie', 'Bob');
+
+        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie');
+        expect(zombie.controller).toBe('Bob');
+        expect('targetName' in zombie).toBe(false);
+        // Both halves land on the single persisted + echoed board (one SSE write).
+        expect(storage.set).toHaveBeenLastCalledWith('combatSummary', combatSummary, campaignName);
+        const swapped = setCombatSummary.mock.calls.at(-1)[0].creatures.find(c => c.name === 'Zombie');
+        expect(swapped.controller).toBe('Bob');
+        expect('targetName' in swapped).toBe(false);
+        // Audit: the usual control_assigned row PLUS a swap-clear row.
+        expect(addEntry).toHaveBeenCalledTimes(3);
+        expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, expect.objectContaining({
+            automationType: 'control_assigned',
+            characterName: 'Zombie',
+        }));
+        expect(addEntry).toHaveBeenNthCalledWith(3, campaignName, expect.objectContaining({
+            type: 'automation',
+            characterName: 'Zombie',
+            automationType: 'control_arm_cleared',
+            description: 'Zombie handed directly from Alice to Bob — armed target Fairy cleared on the handoff (the new controller starts unarmed).',
+        }));
+    });
+
+    it('first-time assign (no prior controller) keeps the arm and logs no swap-clear row', () => {
+        const { handlers, combatSummary } = makeHandlers();
+        combatSummary.creatures.find(c => c.name === 'Zombie').targetName = 'Fairy';
+
+        handlers.handleControllerChange('Zombie', 'Bob');
+
+        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie');
+        expect(zombie.controller).toBe('Bob');
+        expect(zombie.targetName).toBe('Fairy');
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry.mock.calls.every(([, e]) => e.automationType !== 'control_arm_cleared')).toBe(true);
+    });
+
+    it('same-controller re-stamp is not a swap — the arm survives, no clear row', () => {
+        const { handlers, combatSummary } = makeHandlers();
+        handlers.handleControllerChange('Zombie', 'Bob');
+        combatSummary.creatures.find(c => c.name === 'Zombie').targetName = 'Fairy';
+
+        handlers.handleControllerChange('Zombie', 'Bob');
+
+        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie');
+        expect(zombie.controller).toBe('Bob');
+        expect(zombie.targetName).toBe('Fairy');
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        expect(addEntry.mock.calls.every(([, e]) => e.automationType !== 'control_arm_cleared')).toBe(true);
+    });
+
     it('unknown controller name is refused with a console.error and zero writes', () => {
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const { handlers, combatSummary, setCombatSummary } = makeHandlers();
