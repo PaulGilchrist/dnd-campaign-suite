@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { Router } from 'express';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import {
@@ -92,4 +93,29 @@ baseRouter.put('/api/campaigns/:campaign/sessions/:sessionName', asyncHandler((r
   }
 }));
 
-export default baseRouter;
+// ---------------------------------------------------------------------------
+// GM-only lane — the Sessions planner is a GM-authoring surface (sidebar
+// marks it localhostOnly; there is no visitor read/write consumer). The whole
+// lane (reads AND writes) refuses non-localhost origins, mirroring the
+// notes.js refuseUnlessGm wrapper shape (same 403 copy + dev-log). The
+// factory offers no per-lane write hook, so the gate wraps the mounted router
+// with a path-scoped use() BEFORE baseRouter (per-route use() after creation
+// lands too late). bug-sessions-lane-no-gm-write-guard.
+// ---------------------------------------------------------------------------
+const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+function refuseUnlessGm(req, res) {
+  if (isLocalhost(req)) return true;
+  console.log(`[sessions] BLOCKED non-localhost ${req.method} ${req.originalUrl} — GM-only`);
+  res.status(403).json({ error: 'Access denied: GM-only feature' });
+  return false;
+}
+
+const router = Router();
+router.use('/api/campaigns/:campaign/sessions', (req, res, next) => {
+  if (!refuseUnlessGm(req, res)) return;
+  next();
+});
+router.use(baseRouter);
+
+export default router;
