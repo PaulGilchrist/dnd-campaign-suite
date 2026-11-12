@@ -420,6 +420,11 @@ export function createCreatureHandlers({
             creature.controller = controllerName
         } else {
             delete creature.controller
+            // Owner law (2026-11-11): a release NEVER leaves an armed target behind —
+            // clear the released creature's `targetName` on the SAME full-board write
+            // (one SSE echo carries both), so the GM or a later re-delegation always
+            // starts unarmed. Absent renders the card select unarmed (`|| ''`).
+            delete creature.targetName
         }
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))

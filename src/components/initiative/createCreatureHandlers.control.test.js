@@ -102,6 +102,40 @@ describe('handleControllerChange', () => {
         }));
     });
 
+    // Owner law (2026-11-11): release clears the armed target on the SAME write —
+    // a re-delegation or the GM never inherits a stale ally-targeted arm.
+    it('release clears the armed targetName alongside the controller stamp (one write)', () => {
+        const { handlers, combatSummary, setCombatSummary } = makeHandlers();
+        handlers.handleControllerChange('Zombie', 'Bob');
+        combatSummary.creatures.find(c => c.name === 'Zombie').targetName = 'Alice';
+
+        handlers.handleControllerChange('Zombie', null);
+
+        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie');
+        expect(zombie.controller).toBeUndefined();
+        expect(zombie.targetName).toBeUndefined();
+        // Both halves land on the single persisted + echoed board.
+        expect(storage.set).toHaveBeenLastCalledWith('combatSummary', combatSummary, campaignName);
+        expect(setCombatSummary).toHaveBeenLastCalledWith(expect.objectContaining({
+            creatures: expect.arrayContaining([
+                expect.not.objectContaining({ name: 'Zombie', targetName: 'Alice' }),
+            ]),
+        }));
+        const released = setCombatSummary.mock.calls.at(-1)[0].creatures.find(c => c.name === 'Zombie');
+        expect(released.targetName).toBeUndefined();
+    });
+
+    it('assign keeps an already-armed targetName untouched', () => {
+        const { handlers, combatSummary } = makeHandlers();
+        combatSummary.creatures.find(c => c.name === 'Zombie').targetName = 'Fairy';
+
+        handlers.handleControllerChange('Zombie', 'Bob');
+
+        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie');
+        expect(zombie.controller).toBe('Bob');
+        expect(zombie.targetName).toBe('Fairy');
+    });
+
     it('unknown controller name is refused with a console.error and zero writes', () => {
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const { handlers, combatSummary, setCombatSummary } = makeHandlers();

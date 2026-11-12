@@ -59,8 +59,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-11 MA) Release/revocation could also CLEAR the released monster's armed `targetName` (shared cs field) so a later re-delegation or the GM never inherits a stale ally-targeted arm; needs the Priority-Target-1 design answer first — record as owner law if survival is intended, otherwise this becomes a small improve.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Staged-damage-popup release face (visitor card mid-staged `Done` when GM releases) — not rig-in'd this run; fix ships unit pins + playbook law. Priority Target 1.
