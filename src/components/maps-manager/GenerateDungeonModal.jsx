@@ -46,9 +46,14 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
             return;
         }
 
-        const safeGridSize = Math.max(7, Math.min(100, gridSize));
-        if (safeGridSize !== gridSize) {
-            setError(`Grid size must be between 5 and 100. Using ${safeGridSize}.`);
+        // Block an out-of-range grid size with a persistent inline error BEFORE
+        // generating — the old clamp set a (wrongly-worded) message but kept
+        // going, and onClose() unmounted the modal so it was never seen
+        // (SD 2026-11-12). Empty input reads as 0, so NaN and blanks are
+        // honestly refused here too.
+        if (!Number.isInteger(gridSize) || gridSize < 7 || gridSize > 100) {
+            setError('Grid size must be between 7 and 100');
+            return;
         }
 
         // Block a non-numeric seed with an inline error BEFORE generating —
@@ -67,10 +72,10 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
             let result;
             if (mode === 'adjacent') {
                 const sizeMultiplier = roomSize === 'cramped' ? 0.7 : roomSize === 'spacious' ? 1.3 : 1;
-                const baseMinRoom = Math.max(4, Math.floor(safeGridSize / 8));
-                const baseMaxRoom = Math.max(8, Math.min(18, Math.floor(safeGridSize / 2.5)));
+                const baseMinRoom = Math.max(4, Math.floor(gridSize / 8));
+                const baseMaxRoom = Math.max(8, Math.min(18, Math.floor(gridSize / 2.5)));
                 result = generateAdjacentDungeon({
-                    gridSize: safeGridSize,
+                    gridSize: gridSize,
                     density: density / 100,
                     seed: seedValue,
                     roomCount: roomCount,
@@ -81,7 +86,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                 });
             } else {
                 result = generateDungeon({
-                    gridSize: safeGridSize,
+                    gridSize: gridSize,
                     density: density / 100,
                     seed: seedValue,
                 });

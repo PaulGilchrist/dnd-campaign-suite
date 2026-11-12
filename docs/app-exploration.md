@@ -68,8 +68,8 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab admin clears GET-verifie
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **[2026-11-12 SD] Generate Dungeon grid-size out-of-range clamp is silent + copy contradicts the clamp.** `GenerateDungeonModal.jsx:47` clamps to `[7,100]` (and the number input is `min=7`) but the warning string at `:49` says "Grid size must be between **5** and 100" — AND `handleGenerate` does NOT return after setting it, then `onClose()` unmounts the modal, so the warning is NEVER shown: a user typing 5 just gets a 7×7 map with zero feedback. Surface a persistent clamp notice and align the copy to min 7.
 - **[2026-11-12 SD] Copy typo:** `GenerateDungeonModal.jsx:248` note "just a starting point for you to finish into a fully **flushed** out map" → "fleshed out".
+- **[2026-11-12 improve-run] Generate Dungeon ROOM-ADJACENT mode crashes the real generator at small grids (pre-existing, diff-proved not introduced by the grid-gate improve).** `generateAdjacentDungeon` with grid 7 + defaults (minRoom 4, maxRoom 8, roomCount 8) throws `Cannot read properties of undefined (reading '1')` for 36/60 seeds (grid 30: 0/60); the modal's catch surfaces the raw JS message as the inline error. Old code passed byte-identical args for in-range input, so the shipped [7,100] gate did not change behaviour. Needs: reproduction triage → likely a `bug-*.md` filing per the nothing-gets-parked law, and/or a small-grid floor for adjacent mode (raise effective min room bounds or min grid for that mode). Files: `src/services/maps/adjacentDungeonGenerator.js`, `GenerateDungeonModal.jsx` adjacent branch.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

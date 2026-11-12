@@ -171,17 +171,86 @@ describe('GenerateDungeonModal', () => {
       expect(dungeonMocks.generateAdjacentDungeon).not.toHaveBeenCalled();
     });
 
-    it.each([
-      ['3', 7],
-      ['200', 100],
-      ['50', 50],
-    ])('clamps grid size input %s to %s', async (typed, clamped) => {
+    // Criteria 1/2/4: an out-of-range (or blanked, which reads as 0) grid size
+    // blocks generation with a persistent inline error aligned to the real
+    // [7,100] gate — no generator call, no createMap POST, modal stays open
+    // (SD backlog 2026-11-12; the old silent clamp is retired).
+    it.each(['5', '150', '3', '200', ''])(
+      'blocks grid size "%s" with an inline error and no map created',
+      async (typed) => {
+        render(<GenerateDungeonModal {...props} />);
+        fillMapName('Dungeon');
+        changeField(/Grid Size/, typed);
+        clickGenerate();
+
+        const error = await screen.findByText('Grid size must be between 7 and 100');
+        expect(error).toHaveClass('maps-manager-error');
+        expect(dungeonMocks.generateDungeon).not.toHaveBeenCalled();
+        expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
+        expect(props.onMapCreated).not.toHaveBeenCalled();
+        expect(props.onClose).not.toHaveBeenCalled();
+        // Persistent: still there after the beat, Generate re-enabled, field
+        // preserved for fixing
+        expect(screen.getByText('Grid size must be between 7 and 100')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
+      },
+    );
+
+    it.each(['5', '150'])(
+      'blocks grid size "%s" in Room Adjacent mode too (shared field/gate)',
+      async (typed) => {
+        render(<GenerateDungeonModal {...props} />);
+        fillMapName('Dungeon');
+        selectMode('Room Adjacent');
+        changeField(/Grid Size/, typed);
+        clickGenerate();
+
+        expect(await screen.findByText('Grid size must be between 7 and 100')).toBeInTheDocument();
+        expect(dungeonMocks.generateAdjacentDungeon).not.toHaveBeenCalled();
+        expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
+        expect(props.onClose).not.toHaveBeenCalled();
+      },
+    );
+
+    // Criterion 3: correcting the field dismisses the error path and generates.
+    it('recovers after correcting an out-of-range grid size', async () => {
       render(<GenerateDungeonModal {...props} />);
-      await submitAndExpect(dungeonMocks.generateDungeon, { gridSize: clamped },
+      fillMapName('Dungeon');
+      changeField(/Grid Size/, '5');
+      clickGenerate();
+      expect(await screen.findByText('Grid size must be between 7 and 100')).toBeInTheDocument();
+
+      changeField(/Grid Size/, '20');
+      clickGenerate();
+      await waitFor(() => {
+        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
+          expect.objectContaining({ gridSize: 20 }),
+        );
+        expect(mapsServiceMocks.createMap).toHaveBeenCalledTimes(1);
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+      });
+      // The corrected value no longer blocks (same recovery face as the seed
+      // gate: the successful generate closes the modal).
+      expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled();
+    });
+
+    // Criterion 5: in-range values pass through unclamped — boundaries 7/100,
+    // default 30 (pinned in the flow test above), in BOTH modes.
+    it.each([
+      ['bsp', '7'],
+      ['bsp', '100'],
+      ['adjacent', '7'],
+      ['adjacent', '100'],
+    ])('passes boundary grid size %s through %s mode unclamped', async (mode, typed) => {
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Dungeon');
+      if (mode === 'adjacent') selectMode('Room Adjacent');
+      const generatorMock = mode === 'adjacent'
+        ? dungeonMocks.generateAdjacentDungeon
+        : dungeonMocks.generateDungeon;
+      await submitAndExpect(generatorMock, { gridSize: Number(typed) },
         () => changeField(/Grid Size/, typed));
-      if (typed !== '50') {
-        expect(screen.getByText(new RegExp(`Using ${clamped}`))).toBeInTheDocument();
-      }
+      expect(screen.queryByText('Grid size must be between 7 and 100')).not.toBeInTheDocument();
     });
 
     it.each([
