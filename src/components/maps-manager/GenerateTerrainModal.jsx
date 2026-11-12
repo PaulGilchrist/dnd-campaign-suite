@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { generateHexTerrain } from '../../services/maps/hexTerrainGenerator.js';
+import { parseGridInput } from '../../services/maps/gridInput.js';
 import { parseSeedInput } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import './GenerateTerrainModal.css';
@@ -11,6 +12,12 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
 
+    // Editing any field clears a stale error banner so it never lingers next
+    // to now-valid inputs (TE backlog 2026-11-12).
+    const editName = (event) => { setError(null); setMapName(event.target.value); };
+    const editGrid = (event) => { setError(null); setGridSize(Number(event.target.value)); };
+    const editSeed = (event) => { setError(null); setSeed(event.target.value); };
+
     const handleGenerate = async () => {
         const name = mapName.trim();
         if (!name) {
@@ -18,7 +25,18 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
             return;
         }
 
-        const safeGridSize = Math.max(30, Math.min(100, gridSize));
+        // Block an out-of-range grid size with a persistent inline error
+        // BEFORE generating — the old silent clamp (min 30, max 100) landed a
+        // bigger map than the hint promised and closed the modal so no notice
+        // was ever seen, diverging from the dungeon twin's block law
+        // (TE backlog 2026-11-12). Empty input reads as 0, so blanks and
+        // non-integers are honestly refused here too.
+        const gridInput = parseGridInput(gridSize, 30, 100);
+        if (gridInput.error) {
+            setError(gridInput.error);
+            return;
+        }
+        const typedGridSize = gridInput.gridSize;
 
         // Block a non-numeric seed with an inline error instead of the old
         // silent random fallback (SD 2026-11-12). Seed 0 is a valid seed.
@@ -32,13 +50,13 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
 
         try {
             const result = generateHexTerrain({
-                gridSize: safeGridSize,
+                gridSize: typedGridSize,
                 seed: seedInput.seed ?? undefined,
             });
 
             await mapsService.createMap(campaignName, name, {
                 type: 'outdoor',
-                gridSize: safeGridSize,
+                gridSize: typedGridSize,
                 terrain: result.terrain,
                 pois: [],
                 // The generator's real effective seed (typed or random) so the
@@ -68,7 +86,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                         <input
                             type="text"
                             value={mapName}
-                            onChange={e => setMapName(e.target.value)}
+                            onChange={editName}
                             placeholder="e.g. The Wild Frontier"
                             autoFocus
                         />
@@ -81,7 +99,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                             min={30}
                             max={100}
                             value={gridSize}
-                            onChange={e => setGridSize(Number(e.target.value))}
+                            onChange={editGrid}
                         />
                         <span className="dungeon-gen-hint">
                             {gridSize * 2} hexes &times; {gridSize} hexes ({gridSize * gridSize * 2} hexes)
@@ -93,7 +111,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                         <input
                             type="text"
                             value={seed}
-                            onChange={e => setSeed(e.target.value)}
+                            onChange={editSeed}
                             placeholder="Random"
                         />
                     </label>

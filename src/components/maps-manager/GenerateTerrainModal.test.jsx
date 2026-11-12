@@ -128,8 +128,6 @@ describe('GenerateTerrainModal', () => {
     it.each([
       ['untouched defaults', {}, untouched],
       ['typed grid size and seed', { gridSize: '50', seed: '42' }, { name: 'Test', gridSize: 50, seed: 42, docSeed: 42 }],
-      ['grid size clamped to the minimum of 30', { gridSize: '10' }, untouched],
-      ['grid size clamped to the maximum of 100', { gridSize: '150' }, { ...untouched, gridSize: 100 }],
       ['whitespace trimmed from the name', { name: '  Trimmed  ' }, { ...untouched, name: 'Trimmed' }],
     ])('passes %s through to terrain generation and createMap', async (_label, inputs, expected) => {
       generateWith(inputs);
@@ -146,6 +144,81 @@ describe('GenerateTerrainModal', () => {
           seed: expected.docSeed,
         });
       });
+    });
+
+    // TE backlog 2026-11-12: the silent clamp (Math.max(30, Math.min(100, n)))
+    // is retired — an out-of-range, cleared (React-19: Number('') === 0), or
+    // non-integer grid now BLOCKS with a persistent inline error aligned to
+    // the real [30,100] gate, exactly like the dungeon twin: no generator
+    // call, no createMap POST, modal stays open.
+    it.each(['20', '101', '', '45.5'])(
+      'blocks grid size "%s" with an inline error, no map created, modal stays open',
+      async (typed) => {
+        generateWith({ gridSize: typed });
+
+        const error = await screen.findByText('Grid size must be between 30 and 100');
+        expect(error).toHaveClass('maps-manager-error');
+        expect(terrainMocks.generateHexTerrain).not.toHaveBeenCalled();
+        expect(mapsServiceMocks.createMap).not.toHaveBeenCalled();
+        expect(props.onMapCreated).not.toHaveBeenCalled();
+        expect(props.onClose).not.toHaveBeenCalled();
+        // Persistent: still there after the beat, Generate re-enabled, field
+        // preserved for fixing
+        expect(screen.getByText('Grid size must be between 30 and 100')).toBeInTheDocument();
+        expect(getGenerateButton()).toBeEnabled();
+      },
+    );
+
+    it('recovers after correcting an out-of-range grid size', async () => {
+      generateWith({ gridSize: '20' });
+      expect(await screen.findByText('Grid size must be between 30 and 100')).toBeInTheDocument();
+
+      setGridSize('40');
+      clickGenerate();
+      await waitFor(() => {
+        expect(terrainMocks.generateHexTerrain).toHaveBeenCalledWith(
+          expect.objectContaining({ gridSize: 40 }),
+        );
+        expect(mapsServiceMocks.createMap).toHaveBeenCalledWith('test-campaign', 'Test',
+          expect.objectContaining({ gridSize: 40 }));
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // In-range values pass through UNCLAMPED — the stored gridSize equals
+    // what was typed, boundaries 30/100 included (no silent 30-grid surprise).
+    it.each(['30', '40', '100'])(
+      'passes grid size "%s" through to the generator and document unclamped',
+      async (typed) => {
+        generateWith({ gridSize: typed });
+        await waitFor(() => {
+          expect(terrainMocks.generateHexTerrain).toHaveBeenCalledWith(
+            expect.objectContaining({ gridSize: Number(typed) }),
+          );
+          expect(mapsServiceMocks.createMap).toHaveBeenCalledWith('test-campaign', 'Test',
+            expect.objectContaining({ gridSize: Number(typed) }));
+        });
+        expect(screen.queryByText('Grid size must be between 30 and 100')).not.toBeInTheDocument();
+      },
+    );
+
+    // TE backlog 2026-11-12: editing any of the three fields clears a stale
+    // banner so it never lingers beside now-valid inputs mid-form.
+    it.each([
+      ['map name', () => typeMapName('Renamed')],
+      ['grid size', () => setGridSize('40')],
+      ['seed', () => setSeed('7')],
+    ])('editing the %s field clears a stale error banner', async (_label, edit) => {
+      render(<GenerateTerrainModal {...props} />);
+      typeMapName('Test');
+      setGridSize('20');
+      clickGenerate();
+
+      const banner = 'Grid size must be between 30 and 100';
+      expect(await screen.findByText(banner)).toBeInTheDocument();
+
+      edit();
+      expect(screen.queryByText(banner)).not.toBeInTheDocument();
     });
 
     // Criterion 3: seed "0" must drive the generator and be stored verbatim —

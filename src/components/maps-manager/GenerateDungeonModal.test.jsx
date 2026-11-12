@@ -221,6 +221,25 @@ describe('GenerateDungeonModal', () => {
       },
     );
 
+    // TE backlog 2026-11-12: editing any of the three fields clears a stale
+    // banner so it never lingers beside now-valid inputs mid-form.
+    it.each([
+      ['map name', () => fillMapName('Renamed')],
+      ['grid size', () => changeField(/Grid Size/, '20')],
+      ['seed', () => changeField(/Seed/, '7')],
+    ])('editing the %s field clears a stale error banner', async (_label, edit) => {
+      render(<GenerateDungeonModal {...props} />);
+      fillMapName('Dungeon');
+      changeField(/Grid Size/, '5');
+      clickGenerate();
+
+      const banner = 'Grid size must be between 7 and 100';
+      expect(await screen.findByText(banner)).toBeInTheDocument();
+
+      edit();
+      expect(screen.queryByText(banner)).not.toBeInTheDocument();
+    });
+
     // Criterion 3: correcting the field dismisses the error path and generates.
     it('recovers after correcting an out-of-range grid size', async () => {
       render(<GenerateDungeonModal {...props} />);

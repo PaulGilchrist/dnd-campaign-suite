@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { generateDungeon, generateAdjacentDungeon } from '../../services/maps/dungeonGenerator.js';
+import { parseGridInput } from '../../services/maps/gridInput.js';
 import { parseSeedInput } from '../../services/maps/seedInput.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { FEET_PER_CELL } from '../../services/combat/movementBudget.js';
@@ -39,6 +40,12 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
     const [corridorLength, setCorridorLength] = useState('compact');
     const [layoutStyle, setLayoutStyle] = useState('balanced');
 
+    // Editing any field clears a stale error banner so it never lingers next
+    // to now-valid inputs (TE backlog 2026-11-12).
+    const editName = (event) => { setError(null); setMapName(event.target.value); };
+    const editGrid = (event) => { setError(null); setGridSize(Number(event.target.value)); };
+    const editSeed = (event) => { setError(null); setSeed(event.target.value); };
+
     const handleGenerate = async () => {
         const name = mapName.trim();
         if (!name) {
@@ -50,9 +57,11 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
         // generating — the old clamp set a (wrongly-worded) message but kept
         // going, and onClose() unmounted the modal so it was never seen
         // (SD 2026-11-12). Empty input reads as 0, so NaN and blanks are
-        // honestly refused here too.
-        if (!Number.isInteger(gridSize) || gridSize < 7 || gridSize > 100) {
-            setError('Grid size must be between 7 and 100');
+        // honestly refused here too. Shared with the terrain twin via
+        // gridInput.js so the gates cannot drift apart again.
+        const gridInput = parseGridInput(gridSize, 7, 100);
+        if (gridInput.error) {
+            setError(gridInput.error);
             return;
         }
 
@@ -122,7 +131,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         <input
                             type="text"
                             value={mapName}
-                            onChange={e => setMapName(e.target.value)}
+                            onChange={editName}
                             placeholder="e.g. Goblin Hideout"
                             autoFocus
                         />
@@ -153,7 +162,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                     min={7}
                                     max={100}
                                     value={gridSize}
-                                    onChange={e => setGridSize(Number(e.target.value))}
+                                    onChange={editGrid}
                                 />
                                 <span className="dungeon-gen-hint">
                                     {gridSize * FEET_PER_CELL} ft &times; {gridSize * FEET_PER_CELL} ft ({gridSize * gridSize} squares)
@@ -186,7 +195,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                                     min={7}
                                     max={100}
                                     value={gridSize}
-                                    onChange={e => setGridSize(Number(e.target.value))}
+                                    onChange={editGrid}
                                 />
                                 <span className="dungeon-gen-hint">
                                     {gridSize * FEET_PER_CELL} ft &times; {gridSize * FEET_PER_CELL} ft ({gridSize * gridSize} squares)
@@ -257,7 +266,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         <input
                             type="text"
                             value={seed}
-                            onChange={e => setSeed(e.target.value)}
+                            onChange={editSeed}
                             placeholder="Random if empty"
                         />
                     </label>
