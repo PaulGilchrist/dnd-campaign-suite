@@ -248,12 +248,25 @@ export function createCreatureHandlers({
         // seam until dismissed; "defeated" is kills only (hp ≤ 0), anything
         // else fled and pays nothing. UI presentation only — no game rule
         // reads this key.
+        // Victory law (IMP-1, backlog 2026-11-13): a Clear only celebrates when
+        // the closing board generation actually saw an attack — a pure prep-time
+        // tidy stays silent. Evidence: the campaign `lastAttack` key (written by
+        // every attack-roll lane) differs from the fingerprint the PREVIOUS clear
+        // banked into its stamp. The Clear itself is the board-generation seam,
+        // so the fingerprint always advances — stale attacks from an already-
+        // cleared board can never re-celebrate. celebrated:false stamps are
+        // written (not skipped) so an undismissed stale banner is outranked too.
         const foeRows = closingSummary.creatures.filter(c => c.type === 'npc')
         const defeatedFoes = foeRows.filter(c => (c.currentHp ?? 0) <= 0).length
         const playerRows = closingSummary.creatures.filter(c => c.type === 'player')
         const survivors = playerRows.filter(c =>
             (getRuntimeValue(c.name, 'currentHitPoints') ?? c.currentHp ?? 1) > 0
         ).length
+        const lastAttack = getRuntimeValue('campaign', 'lastAttack') || null
+        const attackEvidence = lastAttack ? JSON.stringify(lastAttack) : null
+        const previousStamp = getRuntimeValue('campaign', 'lastCombatResult')
+        const celebrated = !!attackEvidence
+            && attackEvidence !== (previousStamp?.attackEvidence ?? null)
         setRuntimeValue('campaign', 'lastCombatResult', {
             stamp: Date.now(),
             rounds: closingSummary.round ?? 1,
@@ -262,6 +275,8 @@ export function createCreatureHandlers({
             survivors,
             partySize: playerRows.length,
             wipe: playerRows.length > 0 && survivors === 0,
+            celebrated,
+            attackEvidence,
         }, campaignName)
         const newSummary = clearCombat(characters, numOfNpc, (name) => name)
         storage.set('combatSummary', newSummary, campaignName)

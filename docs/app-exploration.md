@@ -59,8 +59,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-13 BE: **Victory banner fires on a routine Initiative Clear** — pressing `Clear` → `Yes, Clear Board` on a board where nothing ever attacked still celebrates `Victory! The party survived 1 round! 0 foes defeated · 1 drove off`. Honest numbers, but a GM tidying the tracker mid-prep gets a combat-victory framing (per-client banner; MB-2 law). Consider suppressing the banner when the board clears with zero `attack` rows this board-generation, or retitling the clear case ("Board cleared"). Files: `src/components/initiative/` victory-banner mount + `createCreatureHandlers` clear lane. Non-blocking UX polish.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Designer TRIM-DROPPED live face — two baited rides produced no invention (AD/ZC); accept the unit pin (`designer.plan-scope.test.js`) unless a scripted-model rig ships.

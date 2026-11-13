@@ -137,13 +137,16 @@ export function useTvPresentation({ campaignName, displayCreatures, activeCreatu
     // ── Victory banner ── handleClear stamps `lastCombatResult` (campaign
     // runtime key) at the combat seam; every client celebrates until dismissed.
     // Dismissal is the per-client stamp. Auto-hides once foes rejoin the board
-    // (a new fight outranks the old result).
+    // (a new fight outranks the old result). IMP-1 (backlog 2026-11-13): only
+    // stamps whose `celebrated` flag is true ever display — a prep-time board
+    // clear with zero attacks this board-generation stamps celebrated:false,
+    // so a tracker tidy never masquerades as a combat victory.
     const lastCombatResult = useRuntimeValue('campaign', 'lastCombatResult', campaignName)
     const [victoryDismissTick, setVictoryDismissTick] = React.useState(0)
     const trackerHasFoes = displayCreatures.some(c => c.type === 'npc')
     const victoryVisible = React.useMemo(() => {
         void victoryDismissTick
-        if (!lastCombatResult || trackerHasFoes) return false
+        if (!lastCombatResult || !lastCombatResult.celebrated || trackerHasFoes) return false
         try {
             return localStorage.getItem(VICTORY_DISMISS_KEY) !== String(lastCombatResult.stamp)
         } catch {

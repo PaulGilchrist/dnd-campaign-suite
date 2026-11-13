@@ -314,7 +314,7 @@ describe('Initiative TV mode', () => {
     });
 
     it('victory banner shows the stamped result, dismiss persists, foes on the board outrank it', async () => {
-        lastCombatResult = { stamp: 42, rounds: 5, foes: 3, defeated: 3, survivors: 2, partySize: 2, wipe: false };
+        lastCombatResult = { stamp: 42, rounds: 5, foes: 3, defeated: 3, survivors: 2, partySize: 2, wipe: false, celebrated: true, attackEvidence: '{"attackerName":"AasimarTest"}' };
         // Foes still on the tracker → the old result stays silent.
         await act(async () => { render(<Initiative {...props} />); });
         await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
@@ -336,7 +336,7 @@ describe('Initiative TV mode', () => {
     });
 
     it('defeat copy honors the wipe outcome', async () => {
-        lastCombatResult = { stamp: 43, rounds: 2, foes: 4, defeated: 1, survivors: 0, partySize: 3, wipe: true };
+        lastCombatResult = { stamp: 43, rounds: 2, foes: 4, defeated: 1, survivors: 0, partySize: 3, wipe: true, celebrated: true, attackEvidence: '{"attackerName":"Goblin"}' };
         vi.mocked(combatData.loadCombatSummary).mockResolvedValue(cloneDeep(ROSTER_PARTY_ONLY));
         await act(async () => { render(<Initiative {...props} />); });
 
@@ -344,6 +344,15 @@ describe('Initiative TV mode', () => {
         expect(screen.getByText('The party fell after 2 rounds.')).toBeInTheDocument();
         expect(screen.getByText('1 foe defeated · 3 drove off')).toBeInTheDocument();
         expect(screen.getByText('0 of 3 heroes standing')).toBeInTheDocument();
+    });
+
+    it('IMP-1: a celebrated:false stamp (prep-time zero-attack clear) never mounts the banner', async () => {
+        lastCombatResult = { stamp: 44, rounds: 1, foes: 0, defeated: 0, survivors: 13, partySize: 13, wipe: false, celebrated: false, attackEvidence: null };
+        vi.mocked(combatData.loadCombatSummary).mockResolvedValue(cloneDeep(ROSTER_PARTY_ONLY));
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByText(/^Initiative \(round \d+\)$/)).toBeInTheDocument(); });
+        expect(screen.queryByText('Victory!')).not.toBeInTheDocument();
+        expect(document.querySelector('.victory-banner')).toBeNull();
     });
 
     describe('MonsterCardModal privacy — GM-private stat block', () => {

@@ -559,6 +559,9 @@ describe('handleClear / confirmClear', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('Bob', 'dreadAmbushSpeedActive', null, campaignName);
         // TV-mode victory banner: the closing roster's outcome is stamped BEFORE
         // the wipe (UI key; kills-only defeat count — Goblin at 5 HP fled, not fell).
+        // IMP-1 victory law: NOTHING attacked in this board-generation (the mock
+        // store has no campaign lastAttack) → the stamp is written silenced:
+        // celebrated:false advances the attack-evidence boundary without a banner.
         expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastCombatResult', expect.objectContaining({
             rounds: expect.any(Number),
             foes: 1,
@@ -566,6 +569,8 @@ describe('handleClear / confirmClear', () => {
             survivors: expect.any(Number),
             partySize: expect.any(Number),
             wipe: false,
+            celebrated: false,
+            attackEvidence: null,
         }), campaignName);
         expect(setRuntimeValue).toHaveBeenCalledTimes(3);
         expect(sweepNewCombatClocks).toHaveBeenCalledWith(campaignName);
@@ -592,6 +597,59 @@ describe('handleClear / confirmClear', () => {
         expect(storage.set).not.toHaveBeenCalled();
         expect(setCombatSummary).not.toHaveBeenCalled();
         expect(setActiveCreatureName).not.toHaveBeenCalled();
+    });
+
+    // IMP-1 victory law (backlog 2026-11-13): the banner celebrates only a clear
+    // whose board-generation actually rolled attacks. Evidence = campaign
+    // `lastAttack` (written by every attack lane) differing from the fingerprint
+    // the PREVIOUS clear banked; the Clear itself is the generation seam.
+    it('victory law (IMP-1): fresh attack evidence this board-generation celebrates (celebrated:true + fingerprint banked)', () => {
+        clearCombat.mockReturnValue({ round: 2, creatures: [{ name: 'Alice', type: 'player' }] });
+        const attack = { attackerName: 'Alice', targetName: 'Goblin', hit: true, total: 17, timestamp: 1234 };
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (prop === 'currentHitPoints') return 10;
+            if (key === 'campaign' && prop === 'lastAttack') return attack;
+            return null;
+        });
+        const { handlers } = makeHandlers([
+            { name: 'Alice', type: 'player', currentHp: 20 },
+            { name: 'Goblin', type: 'npc', currentHp: 0 },
+        ], { numOfNpc: 1 });
+
+        handlers.confirmClear();
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastCombatResult', expect.objectContaining({
+            foes: 1,
+            defeated: 1,
+            celebrated: true,
+            attackEvidence: JSON.stringify(attack),
+        }), campaignName);
+    });
+
+    it('victory law (IMP-1): attack evidence already banked by the previous clear stays silent (stale lastAttack, new prep board)', () => {
+        clearCombat.mockReturnValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+        const attack = { attackerName: 'Alice', targetName: 'Goblin', hit: true, total: 17, timestamp: 1234 };
+        const fingerprint = JSON.stringify(attack);
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (prop === 'currentHitPoints') return 10;
+            if (key === 'campaign' && prop === 'lastAttack') return attack;
+            if (key === 'campaign' && prop === 'lastCombatResult') {
+                return { stamp: 99, foes: 1, defeated: 1, celebrated: true, attackEvidence: fingerprint };
+            }
+            return null;
+        });
+        const { handlers } = makeHandlers([
+            { name: 'Alice', type: 'player', currentHp: 20 },
+        ]);
+
+        handlers.confirmClear();
+
+        // The stamp still WRITES (advancing the boundary + outranking any
+        // undismissed stale banner) but with the banner suppressed.
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastCombatResult', expect.objectContaining({
+            celebrated: false,
+            attackEvidence: fingerprint,
+        }), campaignName);
     });
 });
 
