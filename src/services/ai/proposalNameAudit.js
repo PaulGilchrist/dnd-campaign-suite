@@ -6,7 +6,7 @@
  * while rumor/npc_dialogue are fail-closed allow-listed. This helper closes
  * the consistency gap as a NON-BLOCKING advisory: it scrubs the proposal's
  * prose for proper-name candidates and reports which ones match nothing in
- * the campaign's npcs/settlements/factions ledgers, so the referee sees
+ * the campaign's npcs/settlements/factions/quests ledgers, so the referee sees
  * "names not in the ledger — check spelling: …" BEFORE choosing to apply.
  * Nothing here can refuse a write — the apply lane is untouched.
  */
@@ -88,7 +88,8 @@ export function extractProperNameRuns(text) {
     return extractProperNameCandidates(text).map(candidate => candidate.run)
 }
 
-/** Ledger GET payloads arrive as { npcs: [...] } / { settlements: [...] } / { factions: [...] }. */
+/** Ledger GET payloads arrive as { npcs: [...] } / { settlements: [...] } /
+ *  { factions: [...] } / { quests: [...] } (or bare arrays). */
 export function ledgerNameList(payload, key) {
     const list = Array.isArray(payload) ? payload : payload?.[key]
     return (Array.isArray(list) ? list : []).map(entry => entry?.name).filter(Boolean)
@@ -123,20 +124,29 @@ function isLedgerAnchored(candidate, knownWords, knownNames) {
     return words.length > 0 && words.every(word => knownWords.has(word))
 }
 
+// The full world ledger flattened to trimmed name strings: NPCs, settlements,
+// factions AND quest titles (2026-11-13 AD: quest_draft cards naturally
+// cross-reference existing ledger quests, so their titles ground exactly like
+// faction names — same stem-exact machinery, no new matcher).
+function flattenLedgerNames(ledgers) {
+    return [...(ledgers?.npcNames || []), ...(ledgers?.settlementNames || []),
+        ...(ledgers?.factionNames || []), ...(ledgers?.questNames || [])]
+        .map(name => String(name || '').trim()).filter(Boolean)
+}
+
 /**
  * Unknown proper names referenced by a quest_draft proposal's prose
  * (description + rewards; the quest title itself is a title, not a
  * reference). A candidate is "known" when it is ledger-anchored (see
  * isLedgerAnchored). The ledgers are the full campaign world ledger:
- * NPCs, settlements AND factions.
+ * NPCs, settlements, factions AND quest titles.
  * @returns {string[]} unrecognised name phrases, in order, deduped — []
  *   for non-quest kinds, no checkable names, or an empty/unloaded ledger
  *   (nothing to check against: stay silent, never guess).
  */
 export function findUnknownLedgerNames(proposal, ledgers) {
     if (!proposal || proposal.kind !== 'quest_draft') return []
-    const ledgerNames = [...(ledgers?.npcNames || []), ...(ledgers?.settlementNames || []), ...(ledgers?.factionNames || [])]
-        .map(name => String(name || '').trim()).filter(Boolean)
+    const ledgerNames = flattenLedgerNames(ledgers)
     if (!ledgerNames.length) return []
     const knownWords = new Set()
     const knownNames = new Set()

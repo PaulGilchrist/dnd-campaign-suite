@@ -126,6 +126,43 @@ describe('findUnknownLedgerNames — possessive/plural face (YB 2026-11-13)', ()
     });
 });
 
+describe('findUnknownLedgerNames — quest titles join the ledger (2026-11-13 AD)', () => {
+    // Quest_draft cards naturally cross-reference existing ledger quests, so
+    // quest titles ground candidate names exactly like faction names — same
+    // stem-exact / every-word machinery, no new matcher.
+    const LEDGERS = {
+        npcNames: ['Marta Copperkettle'],
+        settlementNames: ['Bravor'],
+        factionNames: ['The Iron Consortium'],
+        questNames: ['The Lost Artifact'],
+    };
+
+    it('a verbatim or partial quest-title mention is not flagged', () => {
+        expect(findUnknownLedgerNames(quest('Follow up on The Lost Artifact.'), LEDGERS)).toEqual([]);
+        // article-less partial ref — every word still lives in the title
+        expect(findUnknownLedgerNames(quest('Pick up where the Lost Artifact quest left off in Bravor.'), LEDGERS)).toEqual([]);
+        expect(findUnknownLedgerNames(quest('Ask about Artifact lore in Bravor.'), LEDGERS)).toEqual([]);
+    });
+
+    it("straight- and curly-quote possessives of a quest title are suppressed", () => {
+        expect(findUnknownLedgerNames(quest("The Lost Artifact's ruins hold more."), LEDGERS)).toEqual([]);
+        expect(findUnknownLedgerNames(quest('The Lost Artifact’s reward was shared.'), LEDGERS)).toEqual([]);
+    });
+
+    it('plain plural suppressed on an EXACT stem; corrupted title variants still flagged', () => {
+        expect(findUnknownLedgerNames(quest('The Lost Artifacts lie buried.'), LEDGERS)).toEqual([]);
+        expect(findUnknownLedgerNames(quest('Rumours speak of The Lost Artefact below.'), LEDGERS))
+            .toEqual(['The Lost Artefact']);
+    });
+
+    it('the quests ledger participates in the audit (quest-only ledger still checks)', () => {
+        // Before this fix a quest-only ledger was empty-to-the-audit and the
+        // invented name slipped through un-checked.
+        expect(findUnknownLedgerNames(quest('Finish the Lost Artifact, then warn Nobody McFakeface.'),
+            { questNames: ['The Lost Artifact'] })).toEqual(['Nobody McFakeface']);
+    });
+});
+
 describe('ledgerNameList — payload shape tolerance', () => {
     it('reads {npcs:[…]} / {settlements:[…]} wrappers and bare arrays', () => {
         expect(ledgerNameList({ npcs: [{ name: 'Marta' }, { name: null }, {}] }, 'npcs')).toEqual(['Marta']);

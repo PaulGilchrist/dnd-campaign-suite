@@ -15,12 +15,14 @@ vi.mock('../../services/ai/applyWorldProposal.js', () => ({ applyWorldProposal: 
 vi.mock('../../services/npcs/npcsService.js', () => ({ loadNPCs: vi.fn() }));
 vi.mock('../../services/campaign/settlementsService.js', () => ({ loadSettlements: vi.fn() }));
 vi.mock('../../services/campaign/factionsService.js', () => ({ loadFactions: vi.fn() }));
+vi.mock('../../services/campaign/questsService.js', () => ({ loadQuests: vi.fn() }));
 
 import { askWorldKeeper } from '../../services/ai/aiClient.js';
 import { applyWorldProposal } from '../../services/ai/applyWorldProposal.js';
 import { loadNPCs } from '../../services/npcs/npcsService.js';
 import { loadSettlements } from '../../services/campaign/settlementsService.js';
 import { loadFactions } from '../../services/campaign/factionsService.js';
+import { loadQuests } from '../../services/campaign/questsService.js';
 import AiWorldConsole from './AiWorldConsole.jsx';
 
 const CN = 'test-campaign';
@@ -47,6 +49,8 @@ beforeEach(() => {
     loadNPCs.mockResolvedValue({ npcs: [{ name: 'Marta Copperkettle' }] });
     loadSettlements.mockResolvedValue({ settlements: [{ name: 'Bravor' }] });
     loadFactions.mockResolvedValue({ factions: [{ name: 'The Iron Consortium' }] });
+    // loadQuests unwraps the payload — the real service resolves a bare array.
+    loadQuests.mockResolvedValue([{ name: 'The Lost Artifact' }]);
 });
 
 const askQuest = async (proposal) => {
@@ -95,6 +99,7 @@ describe('AiWorldConsole — quest_draft accept-scrutiny chip', () => {
         loadNPCs.mockResolvedValue({ npcs: [] });
         loadSettlements.mockResolvedValue({ settlements: [] });
         loadFactions.mockResolvedValue({ factions: [] });
+        loadQuests.mockResolvedValue([]);
         await askQuest(fabricatedQuest);
         await waitFor(() => expect(loadNPCs).toHaveBeenCalled());
         expect(advisory()).toBeNull();
@@ -104,6 +109,7 @@ describe('AiWorldConsole — quest_draft accept-scrutiny chip', () => {
         loadNPCs.mockRejectedValue(new Error('offline'));
         loadSettlements.mockRejectedValue(new Error('offline'));
         loadFactions.mockRejectedValue(new Error('offline'));
+        loadQuests.mockRejectedValue(new Error('offline'));
         await askQuest(fabricatedQuest);
         await waitFor(() => expect(loadNPCs).toHaveBeenCalled());
         expect(advisory()).toBeNull();
@@ -118,7 +124,24 @@ describe('AiWorldConsole — quest_draft accept-scrutiny chip', () => {
         expect(loadNPCs).not.toHaveBeenCalled();
         expect(loadSettlements).not.toHaveBeenCalled();
         expect(loadFactions).not.toHaveBeenCalled();
+        expect(loadQuests).not.toHaveBeenCalled();
         expect(advisory()).toBeNull();
+    });
+
+    // 2026-11-13 AD — quest-title cross-references: a card that cites an
+    // existing ledger quest stays grounded while a genuinely invented name
+    // still surfaces.
+    it('a quest title cited by a new card is grounded; an invented name is still named', async () => {
+        await askQuest({
+            kind: 'quest_draft',
+            name: 'Echoes in the Ruins',
+            description: "A follow-up to The Lost Artifact: the temple's second vault calls to Zarvok.",
+            rewards: '',
+        });
+        await waitFor(() => expect(loadQuests).toHaveBeenCalledWith(CN));
+        await waitFor(() => expect(advisory()).not.toBeNull());
+        expect(advisory().textContent).toContain('Zarvok');
+        expect(advisory().textContent).not.toContain('Lost Artifact');
     });
 
     it('apply path is unchanged: the chip notwithstanding, Add quest writes with the same proposal', async () => {

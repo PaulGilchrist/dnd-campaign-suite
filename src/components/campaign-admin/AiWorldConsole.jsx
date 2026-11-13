@@ -13,6 +13,7 @@ import { findUnknownLedgerNames, ledgerNameList } from '../../services/ai/propos
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { loadSettlements } from '../../services/campaign/settlementsService.js'
 import { loadFactions } from '../../services/campaign/factionsService.js'
+import { loadQuests } from '../../services/campaign/questsService.js'
 import './AiWorldConsole.css'
 
 const KINDS = [
@@ -44,12 +45,16 @@ export default function AiWorldConsole({ campaignName }) {
     React.useEffect(() => {
         if (!proposal || proposal.kind !== 'quest_draft') return undefined
         let cancelled = false
-        Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName), loadFactions(campaignName)]).then(([npcs, settlements, factions]) => {
+        Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName), loadFactions(campaignName), loadQuests(campaignName)]).then(([npcs, settlements, factions, quests]) => {
             if (cancelled) return
             setLedgerNames({
                 npcNames: npcs.status === 'fulfilled' ? ledgerNameList(npcs.value, 'npcs') : [],
                 settlementNames: settlements.status === 'fulfilled' ? ledgerNameList(settlements.value, 'settlements') : [],
                 factionNames: factions.status === 'fulfilled' ? ledgerNameList(factions.value, 'factions') : [],
+                // 2026-11-13 AD — quest titles ground cross-references the same
+                // way factions do (loadQuests unwraps to a bare array, which
+                // ledgerNameList already tolerates).
+                questNames: quests.status === 'fulfilled' ? ledgerNameList(quests.value, 'quests') : [],
             })
         })
         return () => { cancelled = true }
