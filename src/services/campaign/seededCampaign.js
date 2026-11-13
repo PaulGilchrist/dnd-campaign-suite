@@ -151,7 +151,12 @@ function buildEncounterData(description, picks) {
 
 async function persistDungeonMap(campaignName, dungeon, mapName) {
   await createMap(campaignName, mapName, { type: 'indoor', gridSize: dungeon.gridSize });
-  await saveMapData(campaignName, mapName, dungeon);
+  // Whole-doc PUT is REPLACE, and the server's erasure guard 400s any body
+  // omitting a required indoor field the created doc carries (`type`/
+  // `gridSize`/`walls`/`placedItems`). The generator output has everything
+  // but `type`, so stamp it before the save (bug-erase-guard-breaks-seeded-
+  // campaign-create: the raw PUT 400'd and half-seeded arena/starter).
+  await saveMapData(campaignName, mapName, { ...dungeon, type: 'indoor' });
   return { name: mapName, slug: toKebabCase(mapName) };
 }
 
