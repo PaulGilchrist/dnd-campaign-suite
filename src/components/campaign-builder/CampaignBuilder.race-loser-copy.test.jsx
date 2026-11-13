@@ -66,6 +66,11 @@ const raceLoserBanner = async ({ findByText, findByRole }, { name, action, serve
   loser.mockRejectedValue(new Error(serverCopy));
   groupsFixture = { ...groupsFixture, npcs: [], factions: [] };
   fireEvent.click(rowButton(name, action === 'reject' ? 'button.ct-btn-danger' : 'button.ct-btn-primary'));
+  // Reject arms the shared DeleteConfirmModal gate first — the DELETE only
+  // fires from the modal's confirm (backlog 2026-11-13 ZC).
+  if (action === 'reject') {
+    fireEvent.click(screen.getByText('Yes, Delete Permanently'));
+  }
   const alert = await findByRole('alert');
   // Resync contract holds: the list re-fetched after the failure (mount +
   // error-path reload) and the gone row no longer renders.
@@ -139,6 +144,7 @@ describe('CampaignBuilder drafts-lane race-loser copy', () => {
     await findByText('QA Race NPC');
     groupsFixture = { ...groupsFixture, npcs: [] };
     fireEvent.click(rowButton('QA Race NPC', 'button.ct-btn-danger'));
+    fireEvent.click(screen.getByText('Yes, Delete Permanently'));
     await waitFor(() => expect(rejectDraft).toHaveBeenCalled());
     expect(queryByRole('alert')).toBeNull();
   });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DRAFT_KINDS, loadDrafts, approveDraft, rejectDraft, draftRowIdentity } from '../../services/campaign/draftActions.js';
 import DraftFlag from '../common/DraftFlag.jsx';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import AiDesignerSection from './AiDesignerSection.jsx';
 import './CampaignBuilder.css';
@@ -70,6 +71,30 @@ function DraftRow({ kind, row, busy, onApprove, onReject }) {
 // banner names rows exactly as the GM sees them.
 const rowDisplayName = row => row.name || row.displayName || row.fileName || 'Draft row';
 
+/** Reject gate over the shared DeleteConfirmModal role="dialog" tier — the
+ * same a11y family the maps-manager row Delete, sessions lane, and Initiative
+ * Clear migrated to (backlog 2026-11-13 ZC: Reject used to be a silent
+ * one-click destroy of the drafted row). The prompt names the draft and states
+ * the row is destroyed; the confirm label follows the maps-manager delete
+ * precedent ("Yes, Delete Permanently"). Cancel/dismiss writes NOTHING — the
+ * delete only ever runs from onConfirm. */
+function RejectDraftModal({ row, onCancel, onConfirm }) {
+  return (
+    <DeleteConfirmModal
+      titleId="campaign-builder-reject-title"
+      title="Reject Draft"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      This will permanently reject the AI draft &apos;<strong>{rowDisplayName(row)}</strong>
+      &apos; — the drafted row is destroyed. It never went live, and this{' '}
+      <strong>cannot be undone</strong> (recoverable only from the AI designer&apos;s
+      restore-point snapshot).
+    </DeleteConfirmModal>
+  );
+}
+
 /** The verbatim 404 copy the entity CRUD lanes answer with when the row is
  * already gone (server/utils/jsonEntityCrud.js `${singular} not found` plus
  * the encounters/sessions/maps routes) — i.e. a double-decision race the OTHER
@@ -94,6 +119,10 @@ function CampaignBuilder({ campaignName }) {
   const [groups, setGroups] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Draft awaiting a Reject confirmation ({ kind, row }) — non-null arms the
+  // shared DeleteConfirmModal gate; only the modal's confirm reaches
+  // runAction(rejectDraft, …), cancel/dismiss clears it with zero writes.
+  const [pendingReject, setPendingReject] = useState(null);
 
   // `keepError: true` marks SSE-triggered reloads (backlog 2026-11-01 AT:
   // approve-race banner self-erase). An action failure that 409s "was
@@ -263,11 +292,23 @@ function CampaignBuilder({ campaignName }) {
                 row={row}
                 busy={busy}
                 onApprove={(k, r) => runAction(approveDraft, k, r)}
-                onReject={(k, r) => runAction(rejectDraft, k, r)}
+                onReject={(k, r) => setPendingReject({ kind: k, row: r })}
               />
             ))}
           </section>
         ))
+      )}
+
+      {pendingReject && (
+        <RejectDraftModal
+          row={pendingReject.row}
+          onCancel={() => setPendingReject(null)}
+          onConfirm={() => {
+            const { kind, row } = pendingReject;
+            setPendingReject(null);
+            runAction(rejectDraft, kind, row);
+          }}
+        />
       )}
     </div>
   );

@@ -61,6 +61,13 @@ const factionRejectButton = () => {
   return name.closest('.campaign-builder-row').querySelector('button.ct-btn-danger');
 };
 
+// Reject arms the shared DeleteConfirmModal gate first; the DELETE only fires
+// when the modal's confirm button is clicked (backlog 2026-11-13 ZC).
+const clickReject = () => {
+  fireEvent.click(factionRejectButton());
+  fireEvent.click(screen.getByText('Yes, Delete Permanently'));
+};
+
 describe('CampaignBuilder failed-action list sync', () => {
   beforeEach(() => {
     capturedHandler = null;
@@ -80,7 +87,7 @@ describe('CampaignBuilder failed-action list sync', () => {
     // Winner tab deleted the row first: server truth no longer carries it,
     // and this tab's DELETE 404s.
     rejectDraft.mockRejectedValue(new Error('Faction not found'));
-    fireEvent.click(factionRejectButton());
+    clickReject();
     groupsFixture = { ...withDraft(), factions: [] };
 
     // Banner names the draft with the friendly race-loser copy (backlog
@@ -105,7 +112,7 @@ describe('CampaignBuilder failed-action list sync', () => {
     await findByText('QA AS Draft One');
 
     rejectDraft.mockRejectedValue(new Error('Network hiccup'));
-    fireEvent.click(factionRejectButton());
+    clickReject();
 
     // Fixture unchanged (row is NOT deleted server-side) — the re-fetch must
     // keep rendering it; only the banner reports the failure.
@@ -120,7 +127,7 @@ describe('CampaignBuilder failed-action list sync', () => {
     await findByText('QA AS Draft One');
 
     rejectDraft.mockRejectedValue(new Error('Faction not found'));
-    fireEvent.click(factionRejectButton());
+    clickReject();
     groupsFixture = { ...withDraft(), factions: [], settlements: [] };
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
 

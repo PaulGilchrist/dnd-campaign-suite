@@ -75,6 +75,9 @@ describe('CampaignBuilder', () => {
         ));
 
         fireEvent.click(row.querySelector('button.ct-btn-danger'));
+        // Reject rides the shared DeleteConfirmModal gate first — the action
+        // only fires once the confirm button is clicked (delete-confirm tier).
+        fireEvent.click(document.querySelector('.delete-confirm-btn'));
         await waitFor(() => expect(rejectDraft).toHaveBeenCalledWith(
             'test-campaign', 'npcs', expect.objectContaining({ name: 'Oldhem the Ferryman' })
         ));
