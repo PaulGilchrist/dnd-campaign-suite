@@ -95,14 +95,25 @@ describe('askNpcDirector funnel', () => {
         expect(fetchFn).not.toHaveBeenCalled();
     });
 
-    it('no stat block ⇒ needs_human without calling the model', async () => {
+    it('no stat block ⇒ needs_human without calling the model (audit stays honest at attempts: 0)', async () => {
         const fetchFn = vi.fn();
         vi.stubGlobal('fetch', fetchFn);
         const r = await askNpcDirector({ campaign: 'test-campaign', creatureName: 'NPC 1', aiConfig: CFG, state: STATE, log });
         expect(r.ok).toBe(false);
         expect(r.code).toBe('AI_NEEDS_HUMAN');
         expect(fetchFn).not.toHaveBeenCalled();
-        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_director' }));
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_director', attempts: 0 }));
+    });
+
+    it('no living targets ⇒ pre-loop needs_human, zero model calls, attempts: 0', async () => {
+        const fetchFn = vi.fn();
+        vi.stubGlobal('fetch', fetchFn);
+        const noTargets = { ...STATE, combatSummary: { ...STATE.combatSummary, creatures: [{ name: 'Goblin 1', type: 'npc', currentHp: 7 }] } };
+        const r = await askNpcDirector({ campaign: 'test-campaign', creatureName: 'Goblin 1', aiConfig: CFG, state: noTargets, log });
+        expect(r.ok).toBe(false);
+        expect(r.code).toBe('AI_NEEDS_HUMAN');
+        expect(fetchFn).not.toHaveBeenCalled();
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_director', attempts: 0 }));
     });
 
     it('turn-lock ON and not its turn ⇒ refused before any model call', async () => {
@@ -114,6 +125,7 @@ describe('askNpcDirector funnel', () => {
         });
         expect(r).toEqual({ ok: false, code: 'NOT_THEIR_TURN' });
         expect(fetchFn).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalled(); // gate refusal never audits — nothing to count
     });
 
     it('valid proposal returns the canonicalized intent + audits', async () => {
@@ -121,7 +133,7 @@ describe('askNpcDirector funnel', () => {
         const r = await askNpcDirector({ campaign: 'test-campaign', creatureName: 'Goblin 1', aiConfig: CFG, state: STATE, log });
         expect(r.ok).toBe(true);
         expect(r.intent).toMatchObject({ intent: 'attack', actionName: 'Scimitar', targetName: 'Rakan', creatureName: 'Goblin 1' });
-        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_director' }));
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_director', attempts: 1 }));
     });
 
     it('hallucinated action: retry ONCE then needs_human (never guessed)', async () => {
@@ -131,6 +143,7 @@ describe('askNpcDirector funnel', () => {
         expect(r.ok).toBe(false);
         expect(r.code).toBe('AI_NEEDS_HUMAN');
         expect(fetchFn).toHaveBeenCalledTimes(2);
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_director', attempts: 2 })); // honest audit: both attempts burned
     });
 
     it('economy spent: attack refused at validation, pass accepted', async () => {

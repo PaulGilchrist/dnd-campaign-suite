@@ -59,8 +59,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 XA — `needs_human` fallback rows log `attempts: 0` even when attempts were burned.** The fail-closed fallback hardcodes attempt 0 in `auditLog(..., fallback, 0)` (referee) and `directorAudit(..., 0)`, so a 2-attempt invalid run reads identical to a no-model-call refusal (no-stat-block). Pass the consumed-attempt count through (audit honesty, cheap). `server/services/ai/index.js`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Designer APPROVE leg (approve a draft → real entity row + restore) — deliberately not fired this run: the reject leg proved the funnel and firing Approve would dirty `npcs.json` mid-session while the seed-lane bug is open; owed next run (Priority Target 2).

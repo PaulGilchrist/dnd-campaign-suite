@@ -31,11 +31,13 @@ describe('aiConfigLive', () => {
 });
 
 describe('askReferee', () => {
-    it('AI off ⇒ zero provider traffic', async () => {
+    it('AI off ⇒ zero provider traffic, zero audit rows', async () => {
         const fetchFn = fetchSequence(VALID);
-        const res = await askReferee({ campaign: 'test-campaign', action: 'attack', aiConfig: { ...CFG, mode: 'off' }, log: vi.fn() });
+        const log = vi.fn();
+        const res = await askReferee({ campaign: 'test-campaign', action: 'attack', aiConfig: { ...CFG, mode: 'off' }, log });
         expect(res).toMatchObject({ ok: false, code: 'AI_OFF' });
         expect(fetchFn).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalled(); // pre-loop refusal never audits — nothing to count
     });
 
     it('valid proposal ⇒ ok, ruling returned (NOT applied), ai_ruling audit logged', async () => {
@@ -48,6 +50,7 @@ describe('askReferee', () => {
         expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             type: 'ai_ruling',
             characterName: 'Hero',
+            attempts: 1, // success row carries the real attempt index
             description: expect.stringContaining('dice'),
         }));
     });
@@ -62,13 +65,16 @@ describe('askReferee', () => {
         expect(fn).toHaveBeenCalledTimes(2); // exactly ONE retry (§9.1)
         expect(log).toHaveBeenCalledTimes(1);
         expect(log.mock.calls[0][1].ruling.type).toBe('needs_human');
+        expect(log.mock.calls[0][1].attempts).toBe(2); // honest audit: both model calls were burned
     });
 
     it('invalid then valid ⇒ second attempt succeeds', async () => {
         fetchSequence('garbage', '```json\n' + VALID + '\n```');
-        const res = await askReferee({ campaign: 'test-campaign', action: 'x', aiConfig: CFG, state: {}, log: vi.fn(async () => {}) });
+        const log = vi.fn(async () => {});
+        const res = await askReferee({ campaign: 'test-campaign', action: 'x', aiConfig: CFG, state: {}, log });
         expect(res.ok).toBe(true);
         expect(res.ruling.expression).toBe('1d20+5');
+        expect(log.mock.calls[0][1].attempts).toBe(2); // success row carries the winning attempt index
     });
 
     it('endpoint down twice ⇒ needs_human (no model = human, never a silent ruling)', async () => {
@@ -78,6 +84,7 @@ describe('askReferee', () => {
         expect(res.ok).toBe(false);
         expect(res.ruling.type).toBe('needs_human');
         expect(res.ruling.text).toContain('AI_UNAVAILABLE');
+        expect(log.mock.calls[0][1].attempts).toBe(2); // thrown calls still count as attempts burned
     });
 
     it('log failures never break the ruling response', async () => {

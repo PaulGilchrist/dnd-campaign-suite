@@ -57,12 +57,13 @@ describe('askWorldKeeper funnel', () => {
     beforeEach(() => vi.clearAllMocks());
     afterEach(() => vi.unstubAllGlobals());
 
-    it('AI off ⇒ AI_OFF, no traffic', async () => {
+    it('AI off ⇒ AI_OFF, no traffic, no audit rows', async () => {
         const fetchFn = vi.fn();
         vi.stubGlobal('fetch', fetchFn);
         const r = await askWorldKeeper({ campaign: 'test-campaign', kind: 'recap', world: {}, allow: ALLOW, aiConfig: null, log });
         expect(r).toEqual({ ok: false, code: 'AI_OFF' });
         expect(fetchFn).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalled(); // pre-loop refusal never audits — nothing to count
     });
 
     it('valid recap returns the proposal + audits ai_world', async () => {
@@ -70,7 +71,7 @@ describe('askWorldKeeper funnel', () => {
         const r = await askWorldKeeper({ campaign: 'test-campaign', kind: 'recap', world: {}, allow: ALLOW, aiConfig: CFG, log });
         expect(r.ok).toBe(true);
         expect(r.proposal.kind).toBe('recap');
-        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world' }));
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', attempts: 1 }));
     });
 
     it('fabricated NPC: retry once then needs_human (never guessed)', async () => {
@@ -81,5 +82,16 @@ describe('askWorldKeeper funnel', () => {
         expect(r.code).toBe('AI_NEEDS_HUMAN');
         expect(r.proposal.kind).toBe('needs_human');
         expect(fetchFn).toHaveBeenCalledTimes(2);
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', attempts: 2 })); // honest audit: both attempts burned
+    });
+
+    it('dead endpoint twice ⇒ needs_human with attempts: 2 (thrown calls still burn attempts)', async () => {
+        const fetchFn = vi.fn(async () => { throw new Error('ECONNREFUSED'); });
+        vi.stubGlobal('fetch', fetchFn);
+        const r = await askWorldKeeper({ campaign: 'test-campaign', kind: 'recap', world: {}, allow: ALLOW, aiConfig: CFG, log });
+        expect(r.ok).toBe(false);
+        expect(r.code).toBe('AI_NEEDS_HUMAN');
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+        expect(log).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ai_world', attempts: 2 }));
     });
 });

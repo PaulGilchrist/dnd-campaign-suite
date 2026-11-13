@@ -47,7 +47,9 @@ export async function askReferee({ campaign, action, characterName, aiConfig, st
     const messages = buildRefereeMessages({ action, characterName, state, actorStats });
 
     let lastError = 'no attempt made';
+    let attemptsMade = 0; // honest audit: how many model calls the loop actually consumed
     for (let attempt = 1; attempt <= 2; attempt++) { // one retry, then human (§9.1)
+        attemptsMade++;
         let content;
         try {
             content = await chat({ ...chatOpts(aiConfig), messages });
@@ -64,7 +66,7 @@ export async function askReferee({ campaign, action, characterName, aiConfig, st
     }
 
     const fallback = needsHumanRuling(lastError);
-    await auditLog(log, campaign, characterName, fallback, 0);
+    await auditLog(log, campaign, characterName, fallback, attemptsMade);
     return { ok: false, code: 'AI_NEEDS_HUMAN', ruling: fallback };
 }
 
@@ -129,17 +131,19 @@ export async function askNpcDirector({ campaign, creatureName, aiConfig, state =
 
     const monster = lookupMonsterActions(creatureName);
     if (!monster || monster.actions.length === 0) {
-        return await directorFail(log, campaign, creatureName, `no stat-block actions on file for '${creatureName}' — the GM directs this one`);
+        return await directorFail(log, campaign, creatureName, `no stat-block actions on file for '${creatureName}' — the GM directs this one`, 0); // pre-loop refusal — zero model calls
     }
     const gate = directorGate(creatureName, state);
     if (gate.code) return { ok: false, code: gate.code };
     if (gate.targets.length === 0 && !gate.actionsSpent) {
-        return await directorFail(log, campaign, creatureName, 'no living targets in combat — the GM decides what this monster does');
+        return await directorFail(log, campaign, creatureName, 'no living targets in combat — the GM decides what this monster does', 0); // pre-loop refusal — zero model calls
     }
     const { allow, messages } = directorPrompt(creatureName, monster, gate);
 
     let lastError = 'no attempt made';
+    let attemptsMade = 0; // honest audit: how many model calls the loop actually consumed
     for (let attempt = 1; attempt <= 2; attempt++) { // one retry, then human (§9.1)
+        attemptsMade++;
         let content;
         try {
             content = await chat({ ...chatOpts(aiConfig), messages });
@@ -155,12 +159,12 @@ export async function askNpcDirector({ campaign, creatureName, aiConfig, state =
         }
         lastError = `invalid intent: ${result.errors.join('; ')}`;
     }
-    return await directorFail(log, campaign, creatureName, lastError);
+    return await directorFail(log, campaign, creatureName, lastError, attemptsMade);
 }
 
-async function directorFail(log, campaign, creatureName, reason) {
+async function directorFail(log, campaign, creatureName, reason, attempts) {
     const intent = { intent: 'needs_human', creatureName, text: `AI director: ${String(reason).slice(0, 200)}` };
-    await directorAudit(log, campaign, intent, 0);
+    await directorAudit(log, campaign, intent, attempts);
     return { ok: false, code: 'AI_NEEDS_HUMAN', intent };
 }
 
@@ -176,7 +180,9 @@ export async function askWorldKeeper({ campaign, kind, focus, world, allow, aiCo
     const messages = buildWorldMessages({ kind, focus, world, allow });
 
     let lastError = 'no attempt made';
+    let attemptsMade = 0; // honest audit: how many model calls the loop actually consumed
     for (let attempt = 1; attempt <= 2; attempt++) { // one retry, then human (§9.1)
+        attemptsMade++;
         let content;
         try {
             content = await chat({ ...chatOpts(aiConfig), messages });
@@ -192,7 +198,7 @@ export async function askWorldKeeper({ campaign, kind, focus, world, allow, aiCo
         lastError = `invalid proposal: ${result.errors.join('; ')}`;
     }
     const proposal = { kind: 'needs_human', text: `AI world keeper unavailable — the GM supplies this. (${String(lastError).slice(0, 160)})` };
-    await worldAudit(log, campaign, proposal, 0);
+    await worldAudit(log, campaign, proposal, attemptsMade);
     return { ok: false, code: 'AI_NEEDS_HUMAN', proposal };
 }
 
