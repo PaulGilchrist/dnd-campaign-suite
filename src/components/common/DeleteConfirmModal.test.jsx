@@ -55,6 +55,62 @@ describe('DeleteConfirmModal', () => {
         expect(container.querySelector('.modal-shell-overlay')).toBeInTheDocument();
     });
 
+    // Backlog 2026-11-13 AD: WAI-ARIA modal-dismiss parity inherited by EVERY
+    // consumer of the family — Escape and a pure backdrop click route to the
+    // inert onCancel; clicks inside the panel and drags that STARTED there
+    // never dismiss; the Tab trap and both buttons keep the faces pinned above.
+    it('Escape routes to onCancel without touching onConfirm', () => {
+        const onCancel = vi.fn();
+        const onConfirm = vi.fn();
+        renderModal({ onCancel, onConfirm });
+
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('a direct backdrop click (mousedown + click on the overlay) routes to onCancel', () => {
+        const onCancel = vi.fn();
+        const onConfirm = vi.fn();
+        renderModal({ onCancel, onConfirm });
+        const overlay = document.querySelector('.modal-shell-overlay');
+
+        fireEvent.mouseDown(overlay);
+        fireEvent.click(overlay);
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('clicks inside the dialog panel never dismiss', () => {
+        const onCancel = vi.fn();
+        renderModal({ onCancel });
+        const panel = document.querySelector('.modal-shell');
+
+        // bubbling click from the heading / body copy / panel itself
+        fireEvent.click(screen.getByRole('heading', { name: 'Delete Thing' }));
+        fireEvent.click(panel.querySelector('p'));
+        fireEvent.click(panel);
+        expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('a drag that starts inside the panel and ends on the backdrop does not dismiss', () => {
+        const onCancel = vi.fn();
+        renderModal({ onCancel });
+        const overlay = document.querySelector('.modal-shell-overlay');
+        const panel = document.querySelector('.modal-shell');
+
+        // e.g. text selected in the body, mouseup released over the backdrop:
+        // the click lands on the overlay but the mousedown was inside.
+        fireEvent.mouseDown(panel.querySelector('p'));
+        fireEvent.click(overlay);
+        expect(onCancel).not.toHaveBeenCalled();
+
+        // and the guard resets: the next pure backdrop click still dismisses
+        fireEvent.mouseDown(overlay);
+        fireEvent.click(overlay);
+        expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
     // Sanctioned extension (backlog 2026-11-04 CO, campaign-delete lane):
     // an optional typed-name gate rendered INSIDE the dialog, above the
     // action row, plus inline role="alert" copy that keeps the dialog open.

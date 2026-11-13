@@ -5,7 +5,9 @@
 // of a native window.confirm (backlog 2026-11-01 AZ2). Structure preserved:
 // role="dialog" + aria-modal + heading-labelled-by + initial focus on the dialog's
 // first focusable element + two-way Tab trap + Cancel / `.delete-confirm-btn`
-// action row. Rides the neutral global `.modal-shell-*` confirmation shell
+// action row. Escape and a pure backdrop click route to onCancel (backlog
+// 2026-11-13 AD — WAI-ARIA modal-dismiss parity for the whole family). Rides
+// the neutral global `.modal-shell-*` confirmation shell
 // (App.css, backlog EN 2026-11-08) — the visuals were copied VERBATIM from
 // the original `.maps-manager-modal*` chrome so every consumer renders
 // byte-equivalent while combat/hostile confirms no longer borrow a
@@ -36,6 +38,11 @@ function getModalFocusable(modalEl) {
 // Omitted (falsy) consumers keep the button always enabled as before.
 function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm, children, typedConfirm, error, confirmDisabled = false }) {
     const modalRef = useRef(null);
+    // True while the in-flight drag STARTED inside the dialog panel, so a
+    // mouseup that lands on the backdrop (text selection dragged off the
+    // panel) never dismisses — only a mousedown+click fully on the backdrop
+    // counts as a click-outside (backlog 2026-11-13 AD).
+    const panelMouseDownRef = useRef(false);
 
     // Move focus into the dialog when it opens so keyboard and screen-reader
     // users land on the confirm instead of behind the backdrop.
@@ -48,7 +55,16 @@ function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm,
 
     // Focus trap: while focus is inside the dialog, Tab from the LAST element
     // wraps to the FIRST and Shift+Tab from the FIRST wraps to the LAST.
+    // Escape routes to onCancel (backlog 2026-11-13 AD, WAI-ARIA modal law:
+    // a role="dialog" always answers Escape): the Cancel lane it shares with
+    // the button is fully inert for every consumer (useDeleteRequest's
+    // cancel is a no-write, the reject/clear/admin lanes close the arm), so
+    // the destructive confirm can never fire through this path.
     const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            onCancel();
+            return;
+        }
         if (e.key !== 'Tab') return;
         const focusable = getModalFocusable(modalRef.current);
         if (focusable.length === 0) return;
@@ -67,8 +83,31 @@ function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm,
         }
     };
 
+    // Backdrop dismiss (backlog 2026-11-13 AD): mirrors the house
+    // overlay-convention (EncounterModal.jsx:110-121, DiceTray.jsx:79-89) —
+    // role="presentation", clicks bubbling from inside the panel are inert,
+    // a pure backdrop click is onCancel only. The panelMouseDown guard adds
+    // the drag safety this family needs: text selected in the dialog body
+    // and released over the backdrop must not count as a backdrop click.
+    const handleOverlayMouseDown = (e) => {
+        panelMouseDownRef.current = Boolean(e.target.closest('.modal-shell'));
+    };
+
+    const handleOverlayClick = (e) => {
+        const insidePanel = Boolean(e.target.closest('.modal-shell'));
+        const dragStartedInPanel = panelMouseDownRef.current;
+        panelMouseDownRef.current = false;
+        if (insidePanel || dragStartedInPanel) return;
+        onCancel();
+    };
+
     return (
-        <div className="modal-shell-overlay">
+        <div
+            className="modal-shell-overlay"
+            role="presentation"
+            onMouseDown={handleOverlayMouseDown}
+            onClick={handleOverlayClick}
+        >
             <div
                 className="modal-shell"
                 role="dialog"

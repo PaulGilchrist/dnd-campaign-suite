@@ -540,12 +540,13 @@ describe('MapsManager', () => {
             expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
         });
 
-        it('keeps the modal open when the overlay is clicked', async () => {
+        it('closes via Cancel when the overlay is clicked (backdrop dismiss, 2026-11-13 AD)', async () => {
             await renderWithMaps(makeMap({ name: 'Dungeon Level 1' }));
             openDeleteModal();
 
             fireEvent.click(screen.getByRole('heading', { name: 'Delete Map' }).closest('.modal-shell-overlay'));
-            expect(screen.getByRole('heading', { name: 'Delete Map' })).toBeInTheDocument();
+            expect(screen.queryByRole('heading', { name: 'Delete Map' })).not.toBeInTheDocument();
+            expect(mapsService.deleteMap).not.toHaveBeenCalled();
         });
 
         it('calls deleteMap and closes the modal when confirmed', async () => {

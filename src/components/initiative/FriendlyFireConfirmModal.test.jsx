@@ -5,7 +5,8 @@
 // verbatim question copy (byte-identical to the native string it replaced),
 // the heading/confirm-label derivation, the null-when-idle mount contract, the
 // callback pass-through, and the modal family's dismissal convention PINNED
-// (backdrop click and Escape do NOT cancel — an explicit button answers).
+// (backlog 2026-11-13 AD: backdrop click and Escape route to the inert
+// onCancel — an explicit confirm still owns the destructive leg).
 // Handler bridge + arm/log contract → createCreatureHandlers.friendly-fire.test.js;
 // container wiring + select revert → Initiative.friendly-fire.test.jsx;
 // underlying a11y tier internals → common/DeleteConfirmModal.test.jsx.
@@ -76,12 +77,13 @@ describe('FriendlyFireConfirmModal', () => {
         expect(onConfirm).toHaveBeenCalledTimes(1);
     });
 
-    it('family dismissal convention: backdrop click and Escape do NOT cancel — it waits indefinitely', () => {
+    it('family dismissal convention (2026-11-13 AD): backdrop click and Escape route to onCancel', () => {
         const { onCancel, onConfirm } = renderModal(PENDING);
-        fireEvent.click(document.querySelector('.modal-shell-overlay'));
+        const overlay = document.querySelector('.modal-shell-overlay');
+        fireEvent.mouseDown(overlay);
+        fireEvent.click(overlay);
         fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-        expect(onCancel).not.toHaveBeenCalled();
+        expect(onCancel).toHaveBeenCalledTimes(2);
         expect(onConfirm).not.toHaveBeenCalled();
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 });

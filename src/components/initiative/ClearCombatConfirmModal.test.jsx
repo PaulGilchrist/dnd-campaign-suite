@@ -7,8 +7,9 @@
 // §9 — instead of promising the whole board empties; scope + irreversibility
 // per the house NAMED canon), the heading/confirm-label derivation, the
 // null-when-idle mount contract, the callback pass-through, and the modal
-// family's dismissal convention PINNED (backdrop click and Escape do NOT
-// cancel — an explicit button answers).
+// family's dismissal convention PINNED (backlog 2026-11-13 AD: backdrop click
+// and Escape route to the inert onCancel — an explicit confirm still owns the
+// destructive leg).
 // Factory bridge + confirmed body → createCreatureHandlers.test.jsx;
 // container wiring + both DOM faces → initiative.test.jsx;
 // underlying a11y tier internals → common/DeleteConfirmModal.test.jsx.
@@ -60,12 +61,13 @@ describe('ClearCombatConfirmModal', () => {
         expect(onConfirm).toHaveBeenCalledTimes(1);
     });
 
-    it('family dismissal convention: backdrop click and Escape do NOT cancel — it waits indefinitely', () => {
+    it('family dismissal convention (2026-11-13 AD): backdrop click and Escape route to onCancel', () => {
         const { onCancel, onConfirm } = renderModal(true);
-        fireEvent.click(document.querySelector('.modal-shell-overlay'));
+        const overlay = document.querySelector('.modal-shell-overlay');
+        fireEvent.mouseDown(overlay);
+        fireEvent.click(overlay);
         fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-        expect(onCancel).not.toHaveBeenCalled();
+        expect(onCancel).toHaveBeenCalledTimes(2);
         expect(onConfirm).not.toHaveBeenCalled();
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 });

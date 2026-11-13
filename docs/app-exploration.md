@@ -51,7 +51,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-13 AD] `DeleteConfirmModal` family has NO dismiss affordance besides its buttons: `handleKeyDown` early-returns for every non-Tab key (no Escape) and `modal-shell-overlay` carries no onClick (no backdrop close) — a `role=dialog aria-modal=true` per WAI-ARIA should honor Escape → `onCancel`. Affects EVERY consumer (draft Reject, maps-manager row Delete, sessions lane, Initiative Clear, typed-name campaign delete). Fix: Escape → onCancel inside the trap handler (+ optional backdrop click); one shared-component change.
 - [2026-11-13 AD] World-keeper ledger advisory chatters on legitimate quest-TITLE references: quest_draft cards naturally name existing ledger quests (lived face: `names not in the ledger — check spelling: Lost Artifact`) because `proposalNameAudit.js` diffs only npcs+settlements+factions. Suggest adding quest titles to the diffed ledger (or at least for the quest_draft kind) so honest cross-references stop flagging — the matcher already has the stem-exact machinery.
 
 ## Blocked / Not Verified (fold-gate ledger)
