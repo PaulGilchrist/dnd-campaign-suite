@@ -66,6 +66,30 @@ function DraftRow({ kind, row, busy, onApprove, onReject }) {
   );
 }
 
+// Display name of a draft row — same fallback chain DraftRow renders, so a
+// banner names rows exactly as the GM sees them.
+const rowDisplayName = row => row.name || row.displayName || row.fileName || 'Draft row';
+
+/** The verbatim 404 copy the entity CRUD lanes answer with when the row is
+ * already gone (server/utils/jsonEntityCrud.js `${singular} not found` plus
+ * the encounters/sessions/maps routes) — i.e. a double-decision race the OTHER
+ * GM tab won: its approve promoted/re-stamped the row or its reject deleted it
+ * before this tab's write landed. Mirror the planner conflict family instead of
+ * resurfacing the raw server string: name the draft, state the list refreshed
+ * (runAction re-fetches before this mapping runs). Any other failure message
+ * (500s, validation, name-law refusals) passes through untouched. */
+const DRAFT_NOT_FOUND = /^(?:NPC|Faction|Quest|Settlement|Session|Encounter|Map) not found$/i;
+
+const draftActionErrorMessage = (err, row) => {
+  const message = err?.message || 'Draft action failed';
+  if (DRAFT_NOT_FOUND.test(message.trim())) {
+    return `Draft "${rowDisplayName(row)}" was approved or removed in another tab ` +
+      'or session since you loaded it — the drafts list has already refreshed — ' +
+      'nothing to do here.';
+  }
+  return message;
+};
+
 function CampaignBuilder({ campaignName }) {
   const [groups, setGroups] = useState(null);
   const [error, setError] = useState(null);
@@ -95,10 +119,6 @@ function CampaignBuilder({ campaignName }) {
 
   useEffect(() => { reload(); }, [reload]);
 
-  // Display name of a draft row — same fallback chain DraftRow renders, so a
-  // batch banner names rows exactly as the GM sees them.
-  const rowDisplayName = row => row.name || row.displayName || row.fileName || 'Draft row';
-
   // `options.deferError` marks a step inside an "Approve all" batch (backlog
   // 2026-11-01 AU: mid-loop failures go invisible). The batch is ONE gesture,
   // so a row-k 409 must not flash and then be erased by row-k+1's opening
@@ -123,7 +143,7 @@ function CampaignBuilder({ campaignName }) {
       // a stale, fully-actionable ghost. reload() clears the banner itself,
       // so surface the failure message only after it settles.
       await reload();
-      const message = err.message || 'Draft action failed';
+      const message = draftActionErrorMessage(err, row);
       if (options?.deferError === true) return message;
       setError(message);
       setBusy(false);

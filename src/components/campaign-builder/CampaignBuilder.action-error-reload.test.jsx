@@ -83,9 +83,12 @@ describe('CampaignBuilder failed-action list sync', () => {
     fireEvent.click(factionRejectButton());
     groupsFixture = { ...withDraft(), factions: [] };
 
-    // Banner names the failure…
+    // Banner names the draft with the friendly race-loser copy (backlog
+    // 2026-11-13 ZC: the raw server string must never render)…
     await waitFor(() => expect(screen.getByRole('alert').textContent)
-      .toContain('Faction not found'));
+      .toContain('QA AS Draft One'));
+    expect(screen.getByRole('alert').textContent).toMatch(/list has already refreshed/);
+    expect(screen.getByRole('alert').textContent).not.toContain('Faction not found');
     // …and the ghost row is gone via the error-path reload (mount + one
     // re-fetch — the busy-skip in handleSSEEvent means no other load fires).
     await waitFor(() => expect(queryByText('QA AS Draft One')).toBeNull());
