@@ -18,6 +18,7 @@ import { loadSettlements, saveSettlement, deleteSettlement } from './settlements
 import { loadSessions, saveSession, deleteSession } from './sessionsService.js';
 import { loadEncounters, loadEncounter, updateEncounter, deleteEncounter } from '../encounters/encountersService.js';
 import { loadMaps, loadMapData, saveMapData, deleteMap } from '../maps/mapsService.js';
+import { nameLawViolation } from '../ai/entityNameLaw.js';
 
 /** Drop the draft flag without leaving an explicit `draft: false` residue. */
 const approved = (row) => Object.fromEntries(
@@ -58,9 +59,38 @@ export async function loadDrafts(campaignName) {
 
 const identity = row => row.id ?? row.name ?? row.slug ?? row.fileName;
 
+/** The kind word nameLawViolation() reasons about, per draft list kind
+ *  (maps rows were authored as the designer's `mapPlan` kind). */
+const KIND_WORD_OF = {
+  factions: 'faction', settlements: 'settlement', npcs: 'npc', quests: 'quest',
+  encounters: 'encounter', sessions: 'session', maps: 'mapPlan',
+};
+
+/**
+ * Approve-time belt-and-braces (bug-designer-draft-accepts-kind-word-entity-
+ * name): validateEntity now refuses kind-word/placeholder names BEFORE a
+ * draft lands, but legacy drafts already on disk from before that fix must
+ * not silently go LIVE on approval — approving is the last gate before any
+ * player can see the row.
+ */
+function nameLawRefusal(kind, row) {
+  const kindWord = KIND_WORD_OF[kind];
+  if (!kindWord) return null; // unknown kinds fail loudly below, never silently
+  const fields = kind === 'maps' ? ['name', 'displayName', 'slug'] : ['name'];
+  for (const field of fields) {
+    const violation = nameLawViolation(kindWord, row?.[field], field);
+    if (violation) return violation;
+  }
+  return null;
+}
+
 /** Approve one draft row through its kind's normal save lane. */
 export async function approveDraft(campaignName, kind, row) {
   const c = campaignName;
+  const violation = nameLawRefusal(kind, row);
+  if (violation) {
+    throw new Error(`Not approved — ${violation}. Reject this draft and regenerate it with the AI designer instead.`);
+  }
   switch (kind) {
     case 'quests': {
       const all = await loadQuests(c);

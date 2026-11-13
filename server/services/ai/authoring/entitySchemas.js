@@ -30,6 +30,7 @@
  */
 
 import { validateAgainstSchema } from './schemaValidator.js';
+import { nameLawViolation } from '../../../../src/services/ai/entityNameLaw.js';
 
 // -- shared pieces ----------------------------------------------------------
 
@@ -445,11 +446,30 @@ export { ENTITY_KINDS };
 // -- validation entry points (fail-closed { ok, errors }, see ../schemas.js
 //    convention) -------------------------------------------------------------
 
-/** Validate one authored row of a known kind against its entity schema. */
+/**
+ * Validate one authored row of a known kind against its entity schema, PLUS
+ * the shared name law (src/services/ai/entityNameLaw.js) the prompts advertise
+ * — the schema alone accepts any non-empty string, so a row named "npc" used
+ * to sail through every lane (whole-set, per-entity resume, refine) straight
+ * into a live approved row (bug-designer-draft-accepts-kind-word-entity-name).
+ * Errors returned here are exactly what the repair turns quote back to the
+ * model, so namingRule()'s vocabulary is now an enforceable law.
+ */
 export function validateEntity(kind, row) {
     const schema = ENTITY_SCHEMAS[kind];
     if (!schema) return { ok: false, errors: [`unknown entity kind: ${JSON.stringify(kind)}`] };
-    return validateAgainstSchema(row, schema, { schemas: ENTITY_SCHEMAS });
+    const res = validateAgainstSchema(row, schema, { schemas: ENTITY_SCHEMAS });
+    const lawErrors = [];
+    const nameViolation = nameLawViolation(kind, row?.name);
+    if (nameViolation) lawErrors.push(nameViolation);
+    // mapPlan is the one kind with a second name-bearing field (displayName);
+    // the others forbid it (additionalProperties:false), so the schema speaks.
+    if (kind === 'mapPlan') {
+        const displayViolation = nameLawViolation(kind, row?.displayName, 'displayName');
+        if (displayViolation) lawErrors.push(displayViolation);
+    }
+    if (!lawErrors.length) return res;
+    return { ok: false, errors: [...res.errors, ...lawErrors] };
 }
 
 /** Whole-blueprint shape check (structure only — refs are referential.js's job). */

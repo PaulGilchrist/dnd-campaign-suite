@@ -40,10 +40,13 @@ Counts must be proportional to scope (a session prep ≠ 40 entities) and consis
 /**
  * Anti-placeholder naming guidance (backlog 2026-10-31 AP: a quest landed
  * literally named "quest" — the shape word `quest{...}` leaked into `name`).
- * Owner ruling: SOFT prompt fix only — validators untouched. One shared
- * fragment injected at all three schema-bearing seams (blueprint batch,
- * per-entity resume, refine via refine.js), so wherever a shape is embedded
- * the model also sees a discriminating example and an explicit prohibition.
+ * Originally a SOFT prompt-only fix; superseded by
+ * bug-designer-draft-accepts-kind-word-entity-name: an unenforceable law is
+ * not a law, so the SAME vocabulary is now validated server-side by
+ * nameLawViolation() in ./entitySchemas.js. One shared fragment injected at
+ * all three schema-bearing seams (blueprint batch, per-entity resume, refine
+ * via refine.js), so wherever a shape is embedded the model also sees a
+ * discriminating example and an explicit prohibition.
  */
 export const NAME_EXAMPLES = {
     faction: 'The Ember Guild',
@@ -55,13 +58,25 @@ export const NAME_EXAMPLES = {
     mapPlan: 'fungal-hollows / Fungal Hollows',
 };
 
+/**
+ * The forbidden placeholder vocabulary, SHARED with the server-side enforcement:
+ * nameLawViolation() in src/services/ai/entityNameLaw.js refuses any of these
+ * as a whole name (case-insensitive), so the prompt bans exactly what the
+ * validator checks — one source of truth for the law.
+ */
+import { NAME_PLACEHOLDERS } from '../../../../src/services/ai/entityNameLaw.js';
+
+export { NAME_PLACEHOLDERS };
+
+const quoted = (values) => values.map(v => `"${v}"`).join(', ');
+
 /** Whole-roster line (batch) or targeted one-liner (resume/refine, per kind). */
 export function namingRule(kind) {
     if (kind) {
-        return `Name it with a proper, unique in-world name like "${NAME_EXAMPLES[kind]}" — NEVER "${kind}" or the kind word, and NEVER a placeholder ("placeholder", "example", "test", "TBD", "Untitled", "New ${kind}").`;
+        return `Name it with a proper, unique in-world name like "${NAME_EXAMPLES[kind]}" — NEVER "${kind}" or the kind word, and NEVER a placeholder (${quoted(NAME_PLACEHOLDERS)}, "New ${kind}").`;
     }
     const pairs = Object.entries(NAME_EXAMPLES).map(([k, v]) => `${k} "${v}"`).join(', ');
-    return `EVERY name must be a proper, unique in-world name (e.g. ${pairs}) — NEVER name an entity after its kind ("quest", "npc", "faction", "settlement", "encounter", "session", "mapPlan") and NEVER a placeholder ("placeholder", "example", "test", "TBD", "Untitled").`;
+    return `EVERY name must be a proper, unique in-world name (e.g. ${pairs}) — NEVER name an entity after its kind ("quest", "npc", "faction", "settlement", "encounter", "session", "mapPlan") and NEVER a placeholder (${quoted(NAME_PLACEHOLDERS)}).`;
 }
 
 // Field-shape one-liners per kind (rule text mirrors entitySchemas.js).
