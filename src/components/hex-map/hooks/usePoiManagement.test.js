@@ -140,9 +140,11 @@ describe('usePoiManagement', () => {
 
     it('renames the target poi only and clears rename plus menu state', () => {
         const { result, setPois } = setup();
+        let committed;
         act(() => {
-            result.current.handleRenamePoi('poi-1', 'New City Name');
+            committed = result.current.handleRenamePoi('poi-1', 'New City Name');
         });
+        expect(committed).toBe(true);
         expect(applyUpdater(setPois, 0, basePois)).toEqual([
             { id: 'poi-1', label: 'New City Name', type: 'city', q: 1, r: 0, visible: true },
             basePois[1],
@@ -160,22 +162,31 @@ describe('usePoiManagement', () => {
         expect(applyUpdater(setPois, 0, basePois)[0].label).toBe('Old Bridge');
     });
 
+    // Improvement 2026-11-13 (backlog "POI inline rename has no cancel face"):
+    // a blank rename is refused with `false` and NOTHING closes — the silent
+    // close is dead. The editor stays armed so RenameInput can visibly
+    // restore the old label (see POIContextMenu.test.jsx).
     it.each([
         { name: 'spaces only', newLabel: '   ' },
         { name: 'empty string', newLabel: '' },
         { name: 'tabs and newlines', newLabel: '\t\n ' },
         { name: 'non-string value', newLabel: undefined },
-    ])('keeps the previous label for a whitespace-only rename ($name) but still closes the editor and menu', ({ newLabel }) => {
+    ])('refuses a whitespace-only rename ($name) with `false` and zero writes, keeping editor and menu open', ({ newLabel }) => {
         const { result, setPois } = setup();
         act(() => {
             result.current.handlePoiContextMenu('poi-1');
+            result.current.setShowRename('poi-1');
         });
+        let committed;
         act(() => {
-            result.current.handleRenamePoi('poi-1', newLabel);
+            committed = result.current.handleRenamePoi('poi-1', newLabel);
         });
+        expect(committed).toBe(false);
         expect(setPois).not.toHaveBeenCalled();
-        expect(result.current.showRename).toBeNull();
-        expect(result.current.selectedPoiMenu).toBeNull();
+        // Both the menu and the editor arm survive the refusal intact —
+        // RenameInput owns the visible restore of the old label.
+        expect(result.current.selectedPoiMenu).toEqual({ id: 'poi-1', q: 1, r: 0 });
+        expect(result.current.showRename).toBe('poi-1');
     });
 
     it('links then unlinks a map on the target poi without disturbing other pois', () => {

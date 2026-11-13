@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel } from '../../services/maps/hexMapUtils';
 import * as mapsService from '../../services/maps/mapsService.js';
@@ -42,23 +42,62 @@ function MenuOption({ x, y, fill, fontSize = '11', className = 'menu-option', on
     );
 }
 
+// Inline rename editor (backlog 2026-11-13, replaces the "no cancel face"
+// law): three faces — Enter/blur COMMIT (unchanged laws), Escape REVERTS-AND-
+// CLOSES with zero writes, and a refused blank commit is no longer silent.
+// A full Notes-style discard-confirm (window.confirm "Discard changes…") is
+// too heavy for a 28px inline SVG field, so Escape rides the lighter
+// sibling pattern the modal family already uses: it routes to the plain
+// close handler and the typed draft is simply dropped — onRename never runs,
+// so no setPois write lands and the map's autosave PUT lane never fires.
+// The menu's fate matches every commit path: the whole menu closes (HexMap
+// wires onClose to null BOTH selectedPoiMenu and showRename).
 function RenameInput({ editing, menuX, menuY, menuWidth, selectedItem, onRename, onClose }) {
-    if (!editing) return null;
+    // Armed by Escape before the editor closes: guards against a blur racing
+    // the unmount resurrecting the cancelled draft as a commit. Reset when
+    // the editor is not mounted so a re-open always starts uncancelled.
+    const cancelledRef = useRef(false);
+    if (!editing) {
+        cancelledRef.current = false;
+        return null;
+    }
+
+    // onRename (usePoiManagement.handleRenamePoi) owns the blank-name law and
+    // reports back: false = refused. On refusal nothing is written and the
+    // editor stays open with the OLD label restored into the input, so the
+    // user can see the blank was not accepted. Any other outcome (including
+    // undefined from a plain mock) commits and closes.
+    const tryCommit = (e) => {
+        if (onRename(selectedItem.id, e.target.value) === false) {
+            e.target.value = selectedItem.label || '';
+            return;
+        }
+        onClose();
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            tryCommit(e);
+        } else if (e.key === 'Escape') {
+            // Revert-and-close. stopPropagation keeps the menu-level window
+            // listener from 18d1acc55 from double-handling this keydown (its
+            // .context-menu-input guard already makes it inert here; this is
+            // belt-and-braces so the input's cancel is the only handler).
+            e.stopPropagation();
+            cancelledRef.current = true;
+            onClose();
+        }
+    };
+
     return (
         <foreignObject x={menuX + 4} y={menuY + 34} width={menuWidth - 8} height="28">
             <input
                 type="text"
                 defaultValue={selectedItem.label || ''}
                 className="context-menu-input"
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        onRename(selectedItem.id, e.target.value);
-                        onClose();
-                    }
-                }}
+                onKeyDown={handleKeyDown}
                 onBlur={(e) => {
-                    onRename(selectedItem.id, e.target.value);
-                    onClose();
+                    if (!cancelledRef.current) tryCommit(e);
                 }}
                 autoFocus
             />

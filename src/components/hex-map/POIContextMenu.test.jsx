@@ -406,11 +406,16 @@ describe('POIContextMenu', () => {
             expect(screen.queryByText('Dungeon Map')).not.toBeInTheDocument();
         });
 
-        it('is inert inside the inline rename input (separate cancel-face backlog item)', () => {
+        it('is inert inside the inline rename input — the INPUT owns Escape there', () => {
+            // Improvement 2026-11-13 replaced the inert-input law: Escape now
+            // cancels via RenameInput's OWN handler (see 'rename input'
+            // below). The window listener must not ALSO fire onClose — the
+            // input-level Escape wins and the menu layer stays silent. The
+            // single onClose comes from the input's own revert-and-close.
             renderMenu({ showRename: 'poi-1' });
             fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
-            expect(defaultProps.onClose).not.toHaveBeenCalled();
             expect(defaultProps.onRename).not.toHaveBeenCalled();
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
         });
 
         it('leaves no live listener once the menu is closed (Escape dispatches nothing)', () => {
@@ -448,6 +453,100 @@ describe('POIContextMenu', () => {
             }
             expect(defaultProps.onRename).toHaveBeenCalledWith('poi-1', 'Northern Bastion');
             expect(defaultProps.onRename).toHaveBeenCalledTimes(1);
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+        });
+
+        // Improvement 2026-11-13 (backlog "POI inline rename has no cancel
+        // face"): Escape = revert-and-close, and a refused blank commit is
+        // visibly rolled back instead of closing silently.
+        it('Escape reverts-and-closes: onRename never called, onClose once (zero-write cancel)', () => {
+            renderMenu({ showRename: 'poi-1' });
+            const input = screen.getByRole('textbox');
+            fireEvent.change(input, { target: { value: 'Abandoned Keep' } });
+            fireEvent.keyDown(input, { key: 'Escape' });
+            expect(defaultProps.onRename).not.toHaveBeenCalled();
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+            // Every other mutation callback stays untouched too.
+            ['onToggleVisibility', 'onDelete', 'onLinkMap', 'onUnlinkMap', 'onRemoveRoads', 'setShowRename']
+                .forEach((key) => expect(defaultProps[key]).not.toHaveBeenCalled());
+        });
+
+        it('Escape unmounts the input and keeps the OLD label on the POI (stateful parent)', () => {
+            // Mirrors HexMap.jsx wiring: onClose nulls BOTH the menu and the
+            // rename arm, so the chip re-renders with the untouched label.
+            function Board() {
+                const [selected, setSelected] = useState({ id: 'poi-1', q: 0, r: 0 });
+                const [renameId, setRenameId] = useState('poi-1');
+                const close = () => {
+                    setSelected(null);
+                    setRenameId(null);
+                };
+                return (
+                    <svg>
+                        <text className="poi-label">{BASE_POI.label}</text>
+                        <POIContextMenu
+                            {...defaultProps}
+                            selectedPoi={selected}
+                            showRename={renameId}
+                            onClose={close}
+                        />
+                    </svg>
+                );
+            }
+            const { container } = render(<Board />);
+            const input = container.querySelector('input.context-menu-input');
+            expect(input).toBeInTheDocument();
+            fireEvent.change(input, { target: { value: 'Discarded Draft' } });
+            fireEvent.keyDown(input, { key: 'Escape' });
+            expect(container.querySelector('input.context-menu-input')).not.toBeInTheDocument();
+            expect(container.querySelector('.poi-context-menu')).not.toBeInTheDocument();
+            expect(container.querySelector('.poi-label').textContent).toBe('City A');
+            expect(defaultProps.onRename).not.toHaveBeenCalled();
+        });
+
+        it('a blur racing the Escape teardown never commits the cancelled draft', () => {
+            // The mocked onClose changes no parent state, so the input stays
+            // mounted for the test — a blur landing on it after the cancel
+            // must be swallowed by the cancelled-draft guard.
+            renderMenu({ showRename: 'poi-1' });
+            const input = screen.getByRole('textbox');
+            fireEvent.change(input, { target: { value: 'Abandoned Keep' } });
+            fireEvent.keyDown(input, { key: 'Escape' });
+            fireEvent.blur(input);
+            expect(defaultProps.onRename).not.toHaveBeenCalled();
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+        });
+
+        it.each(['Enter', 'blur'])(
+            'a refused blank commit on %s visibly restores the old label and keeps the editor open',
+            (trigger) => {
+                // Stands in for usePoiManagement.handleRenamePoi's law: blank
+                // is refused with `false` and nothing is written.
+                const onRename = vi.fn(() => false);
+                renderMenu({ showRename: 'poi-1', onRename });
+                const input = screen.getByRole('textbox');
+                fireEvent.change(input, { target: { value: '   ' } });
+                if (trigger === 'Enter') {
+                    fireEvent.keyDown(input, { key: 'Enter' });
+                } else {
+                    fireEvent.blur(input);
+                }
+                expect(onRename).toHaveBeenCalledWith('poi-1', '   ');
+                expect(onRename).toHaveBeenCalledTimes(1);
+                // Not silent any more: the input shows the OLD text again…
+                expect(input).toHaveValue('City A');
+                // …and nothing closed — the editor/menu stay armed.
+                expect(defaultProps.onClose).not.toHaveBeenCalled();
+            }
+        );
+
+        it('an accepted commit (onRename returns true) closes the menu as before', () => {
+            const onRename = vi.fn(() => true);
+            renderMenu({ showRename: 'poi-1', onRename });
+            const input = screen.getByRole('textbox');
+            fireEvent.change(input, { target: { value: 'Reylin Cross' } });
+            fireEvent.keyDown(input, { key: 'Enter' });
+            expect(onRename).toHaveBeenCalledWith('poi-1', 'Reylin Cross');
             expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
         });
     });

@@ -141,16 +141,20 @@ function usePoiManagement({ pois, setPois, roads, setRoads, terrain, hexCols, he
     }, [pois, requestDelete, setPois, setRoads]);
 
     const handleRenamePoi = useCallback((poiId, newLabel) => {
-        // Trim before committing; a whitespace-only (or empty) label keeps the
-        // previous one — never persist a nameless POI. Still closes the editor.
+        // Trim before committing; a whitespace-only (or empty) label is
+        // REFUSED with `false` and nothing is written at all (backlog
+        // 2026-11-13, replaces the silent close): the caller (RenameInput)
+        // visibly restores the old label and the editor stays open, so the
+        // user can see the blank was not accepted. `true` = committed, old
+        // editor/menu state cleared.
         const trimmed = typeof newLabel === 'string' ? newLabel.trim() : '';
-        if (trimmed) {
-            setPois(prev => prev.map(p =>
-                p.id === poiId ? { ...p, label: trimmed } : p
-            ));
-        }
+        if (!trimmed) return false;
+        setPois(prev => prev.map(p =>
+            p.id === poiId ? { ...p, label: trimmed } : p
+        ));
         setShowRename(null);
         setSelectedPoiMenu(null);
+        return true;
     }, [setPois]);
 
     const handleLinkMap = useCallback((poiId, mapName) => {
