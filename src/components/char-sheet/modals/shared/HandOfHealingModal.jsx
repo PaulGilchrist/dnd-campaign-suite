@@ -159,7 +159,10 @@ function HandOfHealingResultStage({ healName, result, monkName, campaignName, ha
                         <span className="healing-formula">{result.formula}: </span>
                         <span className="healing-dice-rolled">{rollValues.join(' + ')}</span>
                         {result.bonus !== 0 && <span className="healing-bonus"> {result.bonus >= 0 ? '+' : ''}{result.bonus}</span>}
-                        <span className="healing-total">= <strong>{result.healAmount}</strong> HP restored</span>
+                        {/* Ledger honesty (bug-hand-of-healing-modal-overstates-restored-hp):
+                            the clamped actualHeal — HP really restored — is what the audit row
+                            reports via healDesc, so the modal shows it too, never the raw roll. */}
+                        <span className="healing-total"> = <strong>{result.actualHeal}</strong> HP restored{result.actualHeal === 0 && ' (Already at full HP)'}</span>
                     </div>
                 </div>
 
@@ -181,8 +184,8 @@ function HandOfHealingResultStage({ healName, result, monkName, campaignName, ha
     );
 }
 
-function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkName, targetName, targetCurrentHp, targetMaxHp, hasPhysiciansTouch, campaignName, pending, creatureTargets, confirmHeal, onClose }) {
-    const [result, setResult] = React.useState(pending ? null : { targetName, formula, rolls, bonus, healAmount, targetCurrentHp, targetMaxHp });
+function HandOfHealingModal({ healName, formula, rolls, bonus, actualHeal, monkName, targetName, targetCurrentHp, targetMaxHp, hasPhysiciansTouch, campaignName, pending, creatureTargets, confirmHeal, onClose }) {
+    const [result, setResult] = React.useState(pending ? null : { targetName, formula, rolls, bonus, actualHeal, targetCurrentHp, targetMaxHp });
     const [healError, setHealError] = React.useState(null);
 
     const runHeal = useCallback(async (name) => {

@@ -26,3 +26,23 @@ Include `actualHeal` (and/or the `healDesc` annotation) in the `handOfHealing` m
 
 ## Severity
 **Minor UX issue** escalating to **data-trust risk**: the log (GM’s record of resource spend) and the player-visible modal tell different stories about the same heal. Not a silent-write defect — the authoritative row is honest.
+
+## Resolution
+**FIXED 2026-11-13.** The "Likely location" was confirmed exactly: `performMonkHeal` computed `actualHeal` (clamped) for the honest log annotation but the `handOfHealing` modal payload only carried `healAmount` (pre-clamp roll sum), and `HandOfHealingModal` rendered that as “N HP restored”.
+
+**Changes:**
+- `src/services/automation/handlers/healing/healingHandler.js` — `performMonkHeal` payload now carries `actualHeal` alongside `healAmount` (payload gains the field; no behavior change to the write/log lane, which was already honest).
+- `src/components/char-sheet/modals/shared/HandOfHealingModal.jsx` — result stage renders `result.actualHeal` (not `healAmount`) as the bold “HP restored” number, appends `(Already at full HP)` when zero (mirroring `healDesc`/audit-row wording), and the cosmetic fused-`+9=` spacing is fixed to ` = ` (matching the `HealingPoolModal` sibling’s `.healing-total` style). `healAmount` is no longer destructured by the component (payload keeps it — pinned by maintained lane `healingHandler.monk.test.js` #1811).
+- Dual-ruleset: single shared `healingHandler.js`/modal serves both 5e and 2024 (only `focusLabel` branches) — one fix covers both; no sibling module needed changing.
+- **Optional pre-spend warning: SKIPPED deliberately.** The picker rows are built from `collectTouchTargets` → `combatSummary` creature rows, which heal writes NEVER touch (stale-row HP is a separately-filed backlog item — live repro showed every row at `1/1` while the bucket mirror was at max). An “at max” hint/confirm built on that stale source would itself be dishonest; it should land after the row-vs-bucket source fix.
+- Existing tests updated to the widened payload contract: `HandOfHealingModal.test.jsx` (baseProps/resolved props carry `actualHeal`), `.cla159.test.jsx` + `.dialog-semantics.test.jsx` (mock payloads carry `actualHeal`).
+
+**New regression tests:**
+- `src/components/char-sheet/modals/shared/HandOfHealingModal.restored-hp-honesty.test.jsx` — locks the copy: actualHeal 0 → `0 HP restored (Already at full HP)` and the roll sum must NOT surface; partial → clamped amount only; full landing → amount, no annotation.
+- `src/services/automation/handlers/healing/healingHandler.monk-actual-heal-payload.test.js` — locks payload `actualHeal` propagation (0-clamped + partial) and the honest audit-row annotation.
+
+**Verification:**
+- Live repro BEFORE fix (test-campaign, Warrior-of-Mercy swap on Disciplined_Monk per playbook §2, board from fresh campaign select): modal `1d12 + 7 + 2: 7 +9= 16 HP restored` on `EvasiveFighter (112 / 112 HP)` while the `ability_use` row said `= 16 (Already at full HP)`; focus 20→19; bucket untouched.
+- Live re-run AFTER fix on :5173 (same steps: sheet row → picker → target → Heal): full-HP face renders `1d12 + 7 + 2: 5 +9 = 0 HP restored (Already at full HP)` — mirrors the log row. CONTROL (AasimarTest seeded `currentHitPoints:116`/143): modal `= 12 HP restored`, header `128 / 143`, log `(Regained 12 HP)`, bucket GET `128` — all agree.
+- Tests: new files 6/6 pass; `npx vitest run src/services/automation/handlers/healing` 17 files/180 pass; `npx vitest run src/components/char-sheet/modals/shared` 99 files/566 pass; `npm run lint` clean (zero warnings).
+- Exit state: Disciplined_Monk.json restored byte-exact (md5 `ba4d456c4ab7605d7ca4246a17cfe58f`); change-data `{}` + log `[]` after admin clears; `git status --porcelain public/campaigns/` empty.

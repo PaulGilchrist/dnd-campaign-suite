@@ -29,6 +29,7 @@ const healResultPayload = {
   rolls: [5],
   bonus: 7,
   healAmount: 12,
+  actualHeal: 12,
   targetCurrentHp: 11,
   targetMaxHp: 11,
 };

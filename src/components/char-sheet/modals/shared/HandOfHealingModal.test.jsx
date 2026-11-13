@@ -26,7 +26,7 @@ const baseProps = {
   formula: '1d4 + 2',
   rolls: [3, 1],
   bonus: 2,
-  healAmount: 6,
+  actualHeal: 6,
   monkName: 'Monk1',
   targetName: 'Goblin',
   targetCurrentHp: 15,
@@ -57,7 +57,7 @@ describe('HandOfHealingModal', () => {
     });
 
     it('renders the healing section: target HP, formula, dice, bonus sign, and bold total', () => {
-      render(<HandOfHealingModal {...makeProps({ formula: '2d6 + 3', bonus: 2, healAmount: 8 })} />);
+      render(<HandOfHealingModal {...makeProps({ formula: '2d6 + 3', bonus: 2, actualHeal: 8 })} />);
       const h4 = screen.getByRole('heading', { level: 4 });
       expect(h4.textContent).toContain('Healing');
       expect(h4.textContent).toContain('Goblin');
@@ -99,8 +99,9 @@ describe('HandOfHealingModal', () => {
     });
 
     it('renders zero heal amount and empty formula without crashing', () => {
-      render(<HandOfHealingModal {...makeProps({ formula: '', healAmount: 0, rolls: [] })} />);
+      render(<HandOfHealingModal {...makeProps({ formula: '', actualHeal: 0, rolls: [] })} />);
       expect(document.querySelector('.healing-total').textContent).toContain('0 HP restored');
+      expect(document.querySelector('.healing-total').textContent).toContain('Already at full HP');
     });
 
     it.each([

@@ -39,6 +39,7 @@ const healResultPayload = {
   rolls: [5],
   bonus: 7,
   healAmount: 12,
+  actualHeal: 12,
   targetCurrentHp: 11,
   targetMaxHp: 11,
 };
@@ -66,6 +67,7 @@ function makeResolvedProps(overrides = {}) {
     rolls: [5],
     bonus: 7,
     healAmount: 12,
+    actualHeal: 12,
     confirmHeal: undefined,
     ...overrides,
   });
