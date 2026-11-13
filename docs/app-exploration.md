@@ -101,7 +101,6 @@ change-data `{}` + log `[]` + overlays `[]` — stably empty across THREE post-c
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- *(2026-11-13 DG)* **Outdoor-map POI context menu uses non-DOM SVG `<text>` options.** Every hex-map POI menu action (`Hide`/`Rename`/`Unlink Map (…)`/`Delete`/`Remove Roads (N)`) is an SVG `text` node with no `click` method — `el.click()` throws `TypeError: opt.click is not a function`, so keyboard/AT activation is likely equally absent. Only workaround is `dispatchEvent(new MouseEvent('click',{bubbles:true}))`. Suggested approach: make the menu options real `<g role="menuitem" tabindex="0">` (or overlay HTML buttons) with a keydown-Enter handler, mirroring how the indoor `.item-context-menu .menu-option` HTML lane already behaves.
 
 
 ## Blocked / Not Verified (fold-gate ledger)

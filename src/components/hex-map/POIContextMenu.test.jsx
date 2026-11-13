@@ -225,6 +225,125 @@ describe('POIContextMenu', () => {
         });
     });
 
+    // Improvement 2026-11-13: options retired the bare-SVG-<text> face (no
+    // .click(), no keyboard activation) for focusable <g role="menuitem">
+    // wrappers whose Enter/Space keydown fires the SAME closure as a click,
+    // exactly once (an SVG <g> never synthesises a click from a keypress).
+    describe('keyboard activation', () => {
+        function menuitemNames(container) {
+            return [...container.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent.trim());
+        }
+
+        it('exposes role="menu" on the container and role="menuitem" on every option', () => {
+            const { container } = renderMenu({ roads: [{ fromPoiId: 'poi-1', toPoiId: 'poi-2' }] });
+            const menu = container.querySelector('.poi-context-menu');
+            expect(menu).toHaveAttribute('role', 'menu');
+            expect(menuitemNames(container)).toEqual([
+                'Hide',
+                'Rename',
+                'Link to Map...',
+                'Delete',
+                'Remove Roads (1)',
+                '✕',
+            ]);
+        });
+
+        it('labels the Show / Unlink Map (…) variants as menuitems too', () => {
+            const { container } = renderMenu({
+                pois: [{ ...BASE_POI, visible: false, linkedMap: 'dungeon-map.json' }],
+            });
+            expect(menuitemNames(container)).toEqual([
+                'Show',
+                'Rename',
+                'Unlink Map (Dungeon Map)',
+                'Delete',
+                '✕',
+            ]);
+        });
+
+        it('every menuitem is keyboard-focusable (.focus() lands document.activeElement on it)', () => {
+            renderMenu();
+            screen.getAllByRole('menuitem').forEach((el) => {
+                el.focus();
+                expect(document.activeElement).toBe(el);
+            });
+        });
+
+        it.each([
+            { name: 'Hide', props: {}, item: 'Hide', callback: 'onToggleVisibility', args: ['poi-1'], expectClose: true },
+            {
+                name: 'Show',
+                props: { pois: [{ ...BASE_POI, visible: false }] },
+                item: 'Show',
+                callback: 'onToggleVisibility',
+                args: ['poi-1'],
+                expectClose: true,
+            },
+            { name: 'Rename', props: {}, item: 'Rename', callback: 'setShowRename', args: ['poi-1'], expectClose: false },
+            {
+                name: 'Unlink Map',
+                props: { pois: [{ ...BASE_POI, linkedMap: 'dungeon-map.json' }] },
+                item: 'Unlink Map (Dungeon Map)',
+                callback: 'onUnlinkMap',
+                args: ['poi-1'],
+                expectClose: true,
+            },
+            {
+                name: 'Remove Roads',
+                props: { roads: [{ fromPoiId: 'poi-1', toPoiId: 'poi-2' }] },
+                item: 'Remove Roads (1)',
+                callback: 'onRemoveRoads',
+                args: ['poi-1'],
+                expectClose: true,
+            },
+            { name: 'Delete', props: {}, item: 'Delete', callback: 'onDelete', args: ['poi-1'], expectClose: true },
+            { name: 'close button', props: {}, item: '✕', callback: 'onClose', args: [], expectClose: true },
+        ])('Enter on $name fires the same handler exactly once and closes as expected', ({ props, item, callback, args, expectClose }) => {
+            renderMenu(props);
+            fireEvent.keyDown(screen.getByRole('menuitem', { name: item, exact: true }), { key: 'Enter' });
+            expect(defaultProps[callback]).toHaveBeenCalledTimes(1);
+            expect(defaultProps[callback]).toHaveBeenCalledWith(...args);
+            // The menu is native-confirm-free on every activation face.
+            expect(confirmSpy).not.toHaveBeenCalled();
+            if (expectClose) {
+                expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+            } else {
+                expect(defaultProps.onClose).not.toHaveBeenCalled();
+            }
+        });
+
+        it('Space on Hide activates like Enter (bonus face), exactly once', () => {
+            renderMenu();
+            fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Hide', exact: true }), { key: ' ' });
+            expect(defaultProps.onToggleVisibility).toHaveBeenCalledTimes(1);
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+        });
+
+        it.each(['a', 'Escape', 'Tab'])(
+            'non-activating key %s on a menuitem dispatches nothing (dismiss stays inert/zero-write)',
+            (key) => {
+                renderMenu();
+                fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Hide', exact: true }), { key });
+                Object.values(defaultProps)
+                    .filter((v) => typeof v === 'function')
+                    .forEach((fn) => expect(fn).not.toHaveBeenCalled());
+            }
+        );
+
+        it('opens the link picker on Enter on Link to Map... and links exactly once on Enter on a map row', () => {
+            const { container } = renderMenu({ indoorMaps: ['dungeon-map.json'] });
+            fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Link to Map...', exact: true }), { key: 'Enter' });
+            expect(menuitemNames(container)).toEqual(['Hide', 'Rename', 'Link to Map...', 'Dungeon Map', 'Delete', '✕']);
+            const row = screen.getByRole('menuitem', { name: 'Dungeon Map', exact: true });
+            row.focus();
+            expect(document.activeElement).toBe(row);
+            fireEvent.keyDown(row, { key: 'Enter' });
+            expect(defaultProps.onLinkMap).toHaveBeenCalledWith('poi-1', 'dungeon-map.json');
+            expect(defaultProps.onLinkMap).toHaveBeenCalledTimes(1);
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('rename input', () => {
         it.each([
             { label: 'City A', expected: 'City A' },

@@ -13,6 +13,32 @@ function getLinkPickerLayout(showLinkPicker, indoorMaps) {
     return { count, offset: count * PICKER_ITEM_HEIGHT, extraHeight: count * PICKER_ITEM_HEIGHT + 8 };
 }
 
+// Keyboard-activatable option row (improvement 2026-11-13): options used to
+// be bare SVG <text> nodes — no .click() method, no focus, no keyboard/AT
+// activation. Each option's <text> label keeps its exact position/attrs and
+// its onClick (mouse face unchanged); the wrapping <g role="menuitem"
+// tabIndex={0}> makes the row focusable and fires the SAME onActivate
+// closure on Enter/Space. A keypress never synthesises a click event on an
+// SVG <g> (only native controls do), so the keydown handler cannot
+// double-fire the onClick. Escape stays inert (dismiss law: backdrop click
+// on the svg root is the only pointer dismiss, and it is zero-write).
+function MenuOption({ x, y, fill, fontSize = '11', className = 'menu-option', onActivate, children }) {
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            onActivate();
+        }
+    };
+    return (
+        <g role="menuitem" tabIndex={0} className="menu-option-item" onKeyDown={handleKeyDown}>
+            <text x={x} y={y} fill={fill} fontSize={fontSize} className={className} onClick={onActivate}>
+                {children}
+            </text>
+        </g>
+    );
+}
+
 function RenameInput({ editing, menuX, menuY, menuWidth, selectedItem, onRename, onClose }) {
     if (!editing) return null;
     return (
@@ -40,29 +66,15 @@ function RenameInput({ editing, menuX, menuY, menuWidth, selectedItem, onRename,
 function LinkOption({ menuX, menuY, hasLink, linkedMap, onUnlinkMap, onShowPicker }) {
     if (hasLink) {
         return (
-            <text
-                x={menuX + 8}
-                y={menuY + 64}
-                fill="#e8a040"
-                fontSize="11"
-                className="menu-option"
-                onClick={onUnlinkMap}
-            >
-                                    Unlink Map ({mapsService.formatMapName(linkedMap)})
-                                </text>
+            <MenuOption x={menuX + 8} y={menuY + 64} fill="#e8a040" onActivate={onUnlinkMap}>
+                {`Unlink Map (${mapsService.formatMapName(linkedMap)})`}
+            </MenuOption>
         );
     }
     return (
-        <text
-            x={menuX + 8}
-            y={menuY + 64}
-            fill="#ccc"
-            fontSize="11"
-            className="menu-option"
-            onClick={onShowPicker}
-        >
+        <MenuOption x={menuX + 8} y={menuY + 64} fill="#ccc" onActivate={onShowPicker}>
             Link to Map...
-        </text>
+        </MenuOption>
     );
 }
 
@@ -76,17 +88,15 @@ function LinkPicker({ showLinkPicker, menuX, menuY, menuWidth, layout, indoorMap
             {indoorMaps.length === 0 ? (
                 <text x={menuX + 10} y={pickerStart + 14} fill="#888" fontSize="10">No indoor maps available</text>
             ) : indoorMaps.slice(0, MAX_PICKER_ITEMS).map((m, i) => (
-                <text
+                <MenuOption
                     key={m}
                     x={menuX + 10}
                     y={pickerStart + 14 + i * PICKER_ITEM_HEIGHT}
                     fill="#ccc"
-                    fontSize="11"
-                    className="menu-option"
-                    onClick={() => onPickMap(m)}
+                    onActivate={() => onPickMap(m)}
                 >
                     {mapsService.formatMapName(m)}
-                </text>
+                </MenuOption>
             ))}
         </g>
     );
@@ -129,33 +139,29 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
     };
 
     return (
-        <g className="poi-context-menu" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+        <g className="poi-context-menu" role="menu" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
             <g>
                 <rect x={menuX} y={menuY} width={MENU_WIDTH} height={menuHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
 
                 {/* Hide/Show */}
-                <text
+                <MenuOption
                     x={menuX + 8}
                     y={menuY + 20}
                     fill="#ccc"
-                    fontSize="11"
-                    className="menu-option"
-                    onClick={() => { onToggleVisibility(selectedPoi.id); onClose(); }}
+                    onActivate={() => { onToggleVisibility(selectedPoi.id); onClose(); }}
                 >
                     {selectedItem.visible !== false ? 'Hide' : 'Show'}
-                </text>
+                </MenuOption>
 
                 {/* Rename */}
-                <text
+                <MenuOption
                     x={menuX + 8}
                     y={menuY + 42}
                     fill="#ccc"
-                    fontSize="11"
-                    className="menu-option"
-                    onClick={() => { setShowRename(selectedPoi.id); setShowLinkPicker(false); }}
+                    onActivate={() => { setShowRename(selectedPoi.id); setShowLinkPicker(false); }}
                 >
                     Rename
-                </text>
+                </MenuOption>
 
                 <RenameInput
                     editing={showRename === selectedPoi.id}
@@ -176,7 +182,8 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
                     onShowPicker={() => setShowLinkPicker(true)}
                 />
 
-                {/* Link picker dropdown (uses SVG text for reliable event handling) */}
+                {/* Link picker dropdown (option rows carry the same
+                    menuitem/keyboard treatment as the named actions) */}
                 <LinkPicker
                     showLinkPicker={showLinkPicker}
                     menuX={menuX}
@@ -188,13 +195,11 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
                 />
 
                 {/* Delete */}
-                <text
+                <MenuOption
                     x={menuX + 8}
                     y={menuY + 86 + pickerLayout.offset}
                     fill="#ccc"
-                    fontSize="11"
-                    className="menu-option"
-                    onClick={() => {
+                    onActivate={() => {
                         // Delete stages through the shared requestDelete seam:
                         // usePoiManagement arms the descriptor and HexMap.jsx
                         // renders it through DeleteFromMapModal — the same
@@ -212,33 +217,31 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
                     }}
                 >
                     Delete
-                </text>
+                </MenuOption>
 
                 {/* Remove Roads */}
                 {hasRoads && (
-                    <text
+                    <MenuOption
                         x={menuX + 8}
                         y={menuY + 108 + pickerLayout.offset}
                         fill="#e8a040"
-                        fontSize="11"
-                        className="menu-option"
-                        onClick={() => { onRemoveRoads(selectedPoi.id); onClose(); }}
+                        onActivate={() => { onRemoveRoads(selectedPoi.id); onClose(); }}
                     >
-                        Remove Roads ({connectedRoads.length})
-                    </text>
+                        {`Remove Roads (${connectedRoads.length})`}
+                    </MenuOption>
                 )}
 
                 {/* Close button */}
-                <text
+                <MenuOption
                     x={menuX + MENU_WIDTH - 12}
                     y={menuY + 12}
                     fill="#999"
                     fontSize="10"
                     className="menu-close"
-                    onClick={() => { setShowLinkPicker(false); onClose(); }}
+                    onActivate={() => { setShowLinkPicker(false); onClose(); }}
                 >
                     ✕
-                </text>
+                </MenuOption>
             </g>
         </g>
     );
