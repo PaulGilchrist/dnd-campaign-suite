@@ -55,6 +55,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => {
 
 import * as mapsService from '../../../services/maps/mapsService.js';
 import * as runtimeModule from '../../../hooks/runtime/useRuntimeState.js';
+import { hexGridPixelBounds, clampHexPan } from '../../../services/maps/hexViewMath.js';
 
 const campaignStore = runtimeModule.__campaignStore;
 
@@ -68,6 +69,12 @@ const settleAutosave = async () => {
 
 const characters = [{ name: 'Thorin' }];
 
+// Fully-settled document (real-config grid 10): pan stored exactly where the
+// loader's settle-at-mount clamp puts it, so a quiet open compares byte-equal
+// against the dirty baseline and the ONLY writes these lanes observe are the
+// travelState-reconcile ones under test.
+const SETTLED_PAN = clampHexPan(hexGridPixelBounds(20, 10), 10, 3, 40, 60);
+
 const createMapData = (travelState) => ({
     type: 'outdoor',
     displayName: 'Frostpeak Wilderness',
@@ -77,8 +84,8 @@ const createMapData = (travelState) => ({
     pois: [],
     gridSize: 10,
     zoom: 3,
-    panX: 40,
-    panY: 60,
+    panX: SETTLED_PAN.x,
+    panY: SETTLED_PAN.y,
     marchingOrder: [],
     partyPosition: { q: 7, r: 3 },
     weather: null,

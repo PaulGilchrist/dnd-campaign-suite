@@ -4,7 +4,10 @@
  *
  * Owns here: when loadMapData resolves with a map, the hook requests it once
  * with campaign + map name, and the FULL post-load state equals the loaded
- * payload exactly (one exact full toEqual, #786). Missing optional fields
+ * payload (one exact full toEqual, #786) with the VIEW pre-settled: the loader
+ * now applies the old-default centering / clamp normalization itself (shared
+ * hexViewMath, backlog 2026-11-12 VX) so HexMap's post-flip layout pass can no
+ * longer re-dirty the baseline. Missing optional fields
  * land on the REAL config defaults (#800 pattern: config is un-mocked);
  * zoom clamps up to MIN_ZOOM; the needsResetViewRef old-default quirk and
  * blank-displayName fallback behave as documented; the loaded flag flips as
@@ -29,6 +32,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { cloneDeep } from 'lodash';
 import useMapLoader from './useMapLoader.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM } from '../../../config/outdoorConfig.js';
+import { hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM } from '../../../services/maps/hexViewMath.js';
 
 // Fake only the transport seam (#791). Config, hexKey, and travelService run
 // real; travelService's getDailyHexBudget executes for inactive fixtures but
@@ -53,6 +57,20 @@ const characters = [
 const CENTER_POS = {
     q: Math.floor((DEFAULT_GRID_SIZE * GRID_COLS_MULTIPLIER) / 2),
     r: Math.floor(DEFAULT_GRID_SIZE / 2),
+};
+
+// View bytes the loader pre-applies at mount (backlog 2026-11-12 VX): the
+// old-default (0,0) pan settles to the shared centerHexView reset, everything
+// else to the clamp — bit-identical to what HexMap's post-flip layout pass
+// computes, so the view leg no longer re-dirties the baseline one commit late.
+const settledView = (gridSize, zoom, panX, panY) => {
+    const z = Math.max(MIN_ZOOM, zoom);
+    const p = clampHexPan(hexGridPixelBounds(gridSize * GRID_COLS_MULTIPLIER, gridSize), gridSize, z, panX, panY);
+    return { zoom: z, panX: p.x, panY: p.y };
+};
+const centeredView = (gridSize) => {
+    const p = centerHexView(gridSize * GRID_COLS_MULTIPLIER, gridSize, VIEW_RESET_ZOOM);
+    return { zoom: VIEW_RESET_ZOOM, panX: p.x, panY: p.y };
 };
 
 // Renders the hook against a map whose load resolves and waits for the load
@@ -126,9 +144,10 @@ describe('useMapLoader - load existing map data', () => {
             rivers: [{ hexes: ['2,2'] }],
             roads: [{ hexes: ['3,3'] }],
             pois: [{ name: 'Watchtower' }],
-            zoom: 5,
-            panX: 100,
-            panY: 200,
+            // Every field lands verbatim EXCEPT the view, which the loader
+            // pre-settles (clamp pass) to what HexMap's layout pass would
+            // have normalized to one commit later.
+            ...settledView(12, 5, 100, 200),
             marchingOrder: ['Alaric', 'Serena'],
             partyPosition: { q: 7, r: 4 },
             weather: 'stormy',
@@ -146,16 +165,19 @@ describe('useMapLoader - load existing map data', () => {
 
     describe('view reset flag (normalizeExistingView)', () => {
         it.each([
-            { label: 'the old default pan (0, 0)', loaded: { panX: 0, panY: 0 }, expectedPan: { panX: 0, panY: 0 }, expectedReset: true },
-            { label: 'a saved single-axis pan', loaded: { panX: 0, panY: 75 }, expectedPan: { panX: 0, panY: 75 }, expectedReset: false },
+            { label: 'the old default pan (0, 0)', loaded: { panX: 0, panY: 0 }, expectedView: centeredView(DEFAULT_GRID_SIZE), expectedReset: true },
+            { label: 'a saved single-axis pan', loaded: { panX: 0, panY: 75 }, expectedView: settledView(DEFAULT_GRID_SIZE, MIN_ZOOM, 0, 75), expectedReset: false },
             // Current behavior: missing pan bytes are NOT (0, 0), so they are
-            // treated as a saved view (only an explicit (0, 0) requests a reset).
-            { label: 'missing pan fields', loaded: {}, expectedPan: { panX: 0, panY: 0 }, expectedReset: false },
-        ])('pan $expectedPan for $label requests a view reset: $expectedReset',
-            async ({ loaded, expectedPan, expectedReset }) => {
+            // treated as a saved view (only an explicit (0, 0) requests a
+            // reset) — but the saved view is still CLAMPED into coverage at
+            // mount (backlog 2026-11-12 VX: the loader pre-applies what the
+            // HexMap layout pass used to normalize post-flip).
+            { label: 'missing pan fields', loaded: {}, expectedView: settledView(DEFAULT_GRID_SIZE, MIN_ZOOM, 0, 0), expectedReset: false },
+        ])('view $expectedView for $label requests a view reset: $expectedReset',
+            async ({ loaded, expectedView, expectedReset }) => {
                 const { result } = await renderLoadedMap(loaded);
 
-                expect({ panX: result.current.panX, panY: result.current.panY }).toEqual(expectedPan);
+                expect({ zoom: result.current.zoom, panX: result.current.panX, panY: result.current.panY }).toEqual(expectedView);
                 expect(result.current.needsResetViewRef.current).toBe(expectedReset);
             });
     });
@@ -178,9 +200,7 @@ describe('useMapLoader - load existing map data', () => {
                 rivers: [],
                 roads: [],
                 pois: [],
-                zoom: MIN_ZOOM,
-                panX: 0,
-                panY: 0,
+                ...settledView(DEFAULT_GRID_SIZE, MIN_ZOOM, 0, 0),
                 marchingOrder: ['Thorin', 'Gandalf'],
                 partyPosition: CENTER_POS,
                 weather: null,

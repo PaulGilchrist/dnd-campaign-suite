@@ -8,6 +8,7 @@ import {
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { hexKey, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
+import { VIEW_RESET_ZOOM } from '../../services/maps/hexViewMath.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
@@ -468,8 +469,8 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
     useLayoutEffect(() => {
         if (needsResetViewRef.current) {
             needsResetViewRef.current = false;
-            const clamped = centerView(2);
-            setZoom(2);
+            const clamped = centerView(VIEW_RESET_ZOOM);
+            setZoom(VIEW_RESET_ZOOM);
             setPanX(clamped.x);
             setPanY(clamped.y);
             return;

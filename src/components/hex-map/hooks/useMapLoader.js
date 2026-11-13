@@ -3,6 +3,7 @@ import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { buildMapLoadRejectedNotice } from '../../../services/maps/mapLoadNotice.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
+import { hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM } from '../../../services/maps/hexViewMath.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
@@ -11,10 +12,15 @@ import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } fr
 // AUTOSAVE_DEBOUNCE_MS in src/components/map/hooks/useMapLoader.js).
 const HEX_AUTOSAVE_DEBOUNCE_MS = 1000;
 
-// The one envelope shape the persistence effect writes; load paths seed the
-// dirty baseline with this SAME builder so a zero-edit open compares equal and
-// skips the full-document PUT (backlog 2026-10-26 write-amplification twin of
-// the indoor lane — outdoor emitted six no-op PUTs per open).
+// The one envelope shape the persistence effect writes. The load path seeds the
+// dirty baseline with the document's STORED bytes (buildStoredEnvelope, same
+// key set) so the flip-commit envelope — the fully-normalized, defaults-adopted,
+// view-settled snapshot — differs exactly when disk is not yet settled and
+// flushes at most ONE write; a settled document compares byte-equal and writes
+// nothing (backlog 2026-10-26 write-amplification twin of the indoor lane —
+// outdoor emitted six no-op PUTs per open; 2026-11-12 VX follow-up: adoption +
+// view-reset used to be seeded ADOPTED, leaving the post-flip view-normalize
+// pass to re-dirty the just-seeded baseline — a separate write per mount leg).
 function buildHexEnvelope({ displayName, gridSize, terrain, rivers, roads, pois, zoom, panX, panY, marchingOrder, partyPosition, weather, travelState }, carriedStamp) {
     return {
         type: 'outdoor',
@@ -59,6 +65,53 @@ function normalizeExistingView(existing) {
     const loadedPanX = (!isOldDefault && existing.panX != null) ? existing.panX : 0;
     const loadedPanY = (!isOldDefault && existing.panY != null) ? existing.panY : 0;
     return { loadedZoom, loadedPanX, loadedPanY, isOldDefault };
+}
+
+// The view HexMap's post-mount layout pass (needsResetViewRef centering /
+// clampPan normalization) will settle zoom/pan to — computed HERE with the
+// shared hexViewMath so the values are bit-identical to the layout pass's own
+// output. The loader applies these bytes to state AND seeds the envelope from
+// them, so the view-reset leg converges to the dirty baseline instead of
+// re-dirtying it one commit after the loading flip (backlog 2026-11-12 VX: the
+// reset wrote a whole-document PUT of its own per open). When the layout pass
+// still runs (needsResetViewRef stays armed on the old-default case), every
+// setter it issues receives the identical value and React bails — zero drift.
+function settleLoadedView(loadedGridSize, { loadedZoom, loadedPanX, loadedPanY, isOldDefault }) {
+    const hexCols = loadedGridSize * GRID_COLS_MULTIPLIER;
+    if (isOldDefault) {
+        const centered = centerHexView(hexCols, loadedGridSize, VIEW_RESET_ZOOM);
+        return { zoom: VIEW_RESET_ZOOM, panX: centered.x, panY: centered.y };
+    }
+    const clamped = clampHexPan(hexGridPixelBounds(hexCols, loadedGridSize), loadedGridSize, loadedZoom, loadedPanX, loadedPanY);
+    return { zoom: loadedZoom, panX: clamped.x, panY: clamped.y };
+}
+
+// The envelope EXACTLY as stored on disk (raw loaded bytes, undefined keys and
+// all — deliberately NOT the resolver's normalized values). Seeding the dirty
+// baseline with these bytes makes the flip-commit envelope differ precisely
+// when the document still needs its default-adoption/view-settle write, and
+// deep-equal — zero PUTs — once those settled bytes are on disk. The write that
+// fires therefore carries adoption defaults (marchingOrder/roads/weather/
+// travelState) AND the settled view together in one serialized document.
+function buildStoredEnvelope(existing) {
+    return buildHexEnvelope({
+        // Raw stored bytes ONLY — every key (including displayName: today's
+        // mount writes persist it when absent) so the baseline answers exactly
+        // "what does disk hold?", never "what would we render".
+        displayName: existing.displayName,
+        gridSize: existing.gridSize,
+        terrain: existing.terrain,
+        rivers: existing.rivers,
+        roads: existing.roads,
+        pois: existing.pois,
+        zoom: existing.zoom,
+        panX: existing.panX,
+        panY: existing.panY,
+        marchingOrder: existing.marchingOrder,
+        partyPosition: existing.partyPosition,
+        weather: existing.weather,
+        travelState: existing.travelState,
+    }, pickGenerationStamp(existing));
 }
 
 // Weather (improve 2026-10-26-E budget-at-mount): a legacy file travelState
@@ -131,15 +184,16 @@ function readStoreTripSnapshot(weather) {
 }
 
 // Load-time travel adoption (improve 2026-10-26-D + backlog 2026-10-27-M):
-// decide the save-ref bytes and the dirty-gate baseline travelState from the
-// loaded document. Returns { travelInitData, baselineTravel } where
-// travelInitData is null when the file carries no live trip.
+// decide the save-ref travelState bytes from the loaded document. Returns
+// travelInitData (null when the file carries no live trip). The dirty baseline
+// no longer reads this return value — it holds the STORED bytes — so the
+// flip-commit envelope carries the adopted/reconciled ref bytes and the ONE
+// post-settle write publishes exactly them.
 //
-// When the file carries a live trip: adopt it into the save ref BEFORE the
-// baseline seed (which reads the return value) so the bytes are exactly what
-// the publisher re-emits on resume (deep-equal ⇒ a quiet resume emits zero
-// PUTs) while a later unrelated edit (pan, terrain) re-writes the same
-// travelState instead of clobbering it back to null (improve 2026-10-26-D).
+// When the file carries a live trip: adopt it into the save ref so the bytes
+// are exactly what the publisher re-emits on resume; a later unrelated edit
+// (pan, terrain) then CARRIES the trip instead of clobbering it back to null
+// (improve 2026-10-26-D).
 //
 // Reconcile-at-adopt (backlog 2026-10-27-M): when the campaign store ALSO
 // declares a live trip and its bytes DIVERGE from the file's (a quiet-adopt
@@ -149,7 +203,7 @@ function readStoreTripSnapshot(weather) {
 // (the loading-flip pass included) already carries the reconciled bytes: no
 // PUT window can re-publish the stale trip before the 53066f5c9
 // reconciliation publish lands. Equal bytes (quiet resume) deep-compare ⇒
-// identical ref/baseline ⇒ the zero-PUT contract holds; a store that speaks
+// the zero-PUT contract holds; a store that speaks
 // no live trip keeps the pure file-adoption lane untouched. Empty
 // campaignName ⇒ no store lane wired ⇒ never consult it (mirrors
 // readSharedTripAuthority's empty-lane contract).
@@ -158,7 +212,11 @@ function adoptLoadedTrip(existing, ctx) {
     const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
     ctx.resumedTripRef.current = hasActiveTravel;
     if (!hasActiveTravel) {
-        return { travelInitData: null, baselineTravel: ctx.travelStateRef.current };
+        // The file declares NO trip — the held-bytes session starts clean.
+        // Never resurrect the previous map's ref bytes across an in-place
+        // switch: they would ride the settled envelope into the new URL.
+        ctx.travelStateRef.current = null;
+        return null;
     }
     ctx.setTravelInit(travelInitData);
     const storeTrip = ctx.campaignName ? readStoreTripSnapshot(existing.weather || null) : null;
@@ -166,12 +224,17 @@ function adoptLoadedTrip(existing, ctx) {
         ? storeTrip
         : travelInitData;
     ctx.resumedTripRef.current = true;
-    return { travelInitData, baselineTravel: travelInitData };
+    return travelInitData;
 }
 
 function applyExistingMap(existing, mapName, characters, ctx) {
     const { loadedTerrain, loadedRivers, loadedRoads, loadedPois, loadedGridSize } = resolveLoadedCollections(existing);
-    const { loadedZoom, loadedPanX, loadedPanY, isOldDefault } = normalizeExistingView(existing);
+    const normalizedView = normalizeExistingView(existing);
+    const settledView = settleLoadedView(loadedGridSize, normalizedView);
+    // Dirty baseline = the document's STORED bytes (built before any default
+    // normalization touches them), so the flip-commit envelope differs exactly
+    // when disk still needs its one settling write.
+    ctx.lastSavedRef.current = buildStoredEnvelope(existing);
 
     if (!existing.type) existing.type = 'outdoor';
     ctx.heldMapTypeRef.current = existing.type;
@@ -184,15 +247,18 @@ function applyExistingMap(existing, mapName, characters, ctx) {
     ctx.setRivers(loadedRivers);
     ctx.setRoads(loadedRoads);
     ctx.setPois(loadedPois);
-    ctx.setZoom(loadedZoom);
-    ctx.setPanX(loadedPanX);
-    ctx.setPanY(loadedPanY);
+    ctx.setZoom(settledView.zoom);
+    ctx.setPanX(settledView.panX);
+    ctx.setPanY(settledView.panY);
     ctx.hexMapDisplayNameRef.current = existing.displayName || mapName;
     if (existing.weather) ctx.setWeather(existing.weather);
 
-    const { baselineTravel } = adoptLoadedTrip(existing, ctx);
+    adoptLoadedTrip(existing, ctx);
 
-    if (isOldDefault) {
+    if (normalizedView.isOldDefault) {
+        // Keep the centering pass armed — it now rewrites EXACTLY the bytes the
+        // loader already adopted (shared hexViewMath), so every setter bails and
+        // the view-reset leg contributes no envelope drift of its own.
         ctx.needsResetViewRef.current = true;
     }
 
@@ -205,25 +271,6 @@ function applyExistingMap(existing, mapName, characters, ctx) {
         r: Math.floor(loadedGridSize / 2),
     };
     ctx.setPartyPosition(loadedPartyPos);
-
-    // Seed the dirty baseline with the normalized loaded snapshot (same
-    // builder the persistence effect uses) so opening a map without edits
-    // writes nothing.
-    ctx.lastSavedRef.current = buildHexEnvelope({
-        displayName: existing.displayName || mapName,
-        gridSize: loadedGridSize,
-        terrain: loadedTerrain,
-        rivers: loadedRivers,
-        roads: loadedRoads,
-        pois: loadedPois,
-        zoom: loadedZoom,
-        panX: loadedPanX,
-        panY: loadedPanY,
-        marchingOrder: loadOrder,
-        partyPosition: loadedPartyPos,
-        weather: existing.weather || null,
-        travelState: baselineTravel,
-    }, ctx.carriedStampRef.current);
 
     // Claim the held-bytes name BEFORE setLoading(false): the persistence
     // guard (:201) compares live mapName against this ref, and the flush
@@ -536,8 +583,9 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
     // flushing there would clobber server data with empty defaults), the
     // mapName-vs-held-bytes check below, the held-document-shape check (only
     // outdoor documents may persist from this lane), and the DIRTY gate: the
-    // envelope is deep-compared against the last document known to be on the
-    // server (seeded from the normalized load snapshot), so a zero-edit open — and
+    // envelope is deep-compared against the document bytes known to be on the
+    // server (seeded at load from the STORED bytes via buildStoredEnvelope), so
+    // a zero-edit open of a settled document — and
     // the echo of this tab's own write — never re-PUTs the whole document
     // (backlog 2026-10-26: this lane emitted six no-op PUTs per open+back).
     // The ref guard is CROSS-MAP prevention, not de-dup: the save addresses

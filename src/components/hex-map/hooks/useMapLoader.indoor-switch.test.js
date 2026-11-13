@@ -22,14 +22,18 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMapLoader from './useMapLoader.js';
 import * as mapsService from '../../../services/maps/mapsService.js';
+import { hexGridPixelBounds, clampHexPan } from '../../../services/maps/hexViewMath.js';
 
 const CAMPAIGN = 'test-campaign';
 const OUTDOOR = 'qa-hex-fix';
 const INDOOR = 'battle-arena';
 const CHARACTERS = [{ name: 'Thorin', class: 'Fighter' }];
 
-// Non-zero pan ⇒ not the old-default view: a quiet outdoor open performs no
-// view normalization itself (mirrors the live rig map).
+// Fully-settled outdoor document (real-config grid 30): pan stored at the
+// loader's mount clamp point, defaults present — a zero-edit open writes
+// NOTHING, so every save observed in this lane's tests is one the test caused
+// (backlog 2026-11-12 VX zero-write contract).
+const SETTLED_PAN = clampHexPan(hexGridPixelBounds(60, 30), 30, 2, -100, -50);
 const OUTDOOR_DOC = {
     type: 'outdoor',
     displayName: 'QA Hex Fix',
@@ -39,10 +43,12 @@ const OUTDOOR_DOC = {
     roads: [],
     pois: [{ id: 'poi-arena', type: 'dungeon', q: 31, r: 15, visible: true, linkedMap: 'battle-arena.json' }],
     zoom: 2,
-    panX: -100,
-    panY: -50,
+    panX: SETTLED_PAN.x,
+    panY: SETTLED_PAN.y,
     marchingOrder: ['Thorin'],
     partyPosition: { q: 30, r: 15 },
+    weather: null,
+    travelState: null,
 };
 
 // Indoor document as stored: zero pan (isOldDefault → the component's

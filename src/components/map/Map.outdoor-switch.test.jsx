@@ -281,11 +281,20 @@ vi.mock('../hex-map/svg/SettlementSVG.jsx', () => ({ default: (props) => <g {...
 vi.mock('../hex-map/svg/TowerSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
 
 import Map from './Map.jsx';
+import { hexGridPixelBounds, clampHexPan } from '../../services/maps/hexViewMath.js';
 
 const CAMPAIGN = 'test-campaign';
 const MAP_A = 'vale-a.json';
 const MAP_B = 'vale-b.json';
 const CHARS = [{ name: 'Thorin' }];
+
+// Grid-12 pan exactly where the loader's settle-at-mount clamp puts it (plus
+// the adopted travelState null) so the payloads are FULLY SETTLED documents:
+// the zero-edit-open zero-write contract holds and every save these lanes
+// observe is one the test caused (backlog 2026-11-12 VX; an unsettled payload
+// would legitimately earn its one settling write — even mid-switch, via the
+// unmount flush).
+const SETTLED_PAN = clampHexPan(hexGridPixelBounds(24, 12), 12, 3, 40, 60);
 
 // Distinct outdoor payloads: every observable byte (displayName, terrain,
 // pois, weather, view) differs between A and B so staleness is detectable.
@@ -298,12 +307,12 @@ const payloadA = () => ({
     pois: [{ id: 'poi-a', type: 'camp', q: 1, r: 1, label: 'Watchtower A', visible: true }],
     gridSize: 12,
     zoom: 3,
-    panX: 40,
-    panY: 60,
+    panX: SETTLED_PAN.x,
+    panY: SETTLED_PAN.y,
     marchingOrder: ['Thorin'],
     partyPosition: { q: 7, r: 3 },
     weather: 'fog',
-    travelState: {},
+    travelState: null,
 });
 const payloadB = () => ({
     type: 'outdoor',
@@ -314,12 +323,12 @@ const payloadB = () => ({
     pois: [{ id: 'poi-b', type: 'tower', q: 2, r: 2, label: 'Bastion B', visible: true }],
     gridSize: 12,
     zoom: 3,
-    panX: 40,
-    panY: 60,
+    panX: SETTLED_PAN.x,
+    panY: SETTLED_PAN.y,
     marchingOrder: ['Thorin'],
     partyPosition: { q: 7, r: 3 },
     weather: 'stormy',
-    travelState: {},
+    travelState: null,
 });
 
 const mapEl = (mapName) => (

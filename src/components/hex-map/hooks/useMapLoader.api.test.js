@@ -4,8 +4,10 @@
  *
  * Owns here: every exposed setter updates its paired state slot; each change
  * persists to mapsService.saveMapData as one exact full snapshot envelope;
- * setTravelStateRef publishes the ref + bumps travelSaveVersion + persists
- * travelState; a load resolving after unmount never saves.
+ * the mount-write census (one settling PUT for an unsettled doc, zero for a
+ * settled one — backlog 2026-11-12 VX); setTravelStateRef publishes the ref +
+ * bumps travelSaveVersion + persists travelState; a load resolving after
+ * unmount never saves.
  *
  * Lane map (do NOT duplicate across these files):
  * - mount/load args + loaded-field application -> useMapLoader.loadExisting.test.js
@@ -22,6 +24,14 @@ import useMapLoader from './useMapLoader.js';
 // Fake only the transport seam and the numeric config fixtures (real
 // DEFAULT_GRID_SIZE is 30 — fixtures pin 10-scale math); the hook's own
 // state/reducer logic runs for real.
+vi.mock('../../../config/outdoorConfig.js', () => ({
+    DEFAULT_GRID_SIZE: 10,
+    GRID_COLS_MULTIPLIER: 2,
+    MIN_ZOOM: 2,
+    DEFAULT_TERRAIN: 'plains',
+    HEX_SIZE: 30,
+}));
+
 vi.mock('../../../services/maps/mapsService.js', () => ({
     loadMapData: vi.fn(),
     saveMapData: vi.fn(() => Promise.resolve()),
@@ -31,14 +41,8 @@ vi.mock('../../../services/campaign/travelService.js', () => ({
     getDailyHexBudget: vi.fn(() => 4),
 }));
 
-vi.mock('../../../config/outdoorConfig.js', () => ({
-    DEFAULT_GRID_SIZE: 10,
-    GRID_COLS_MULTIPLIER: 2,
-    MIN_ZOOM: 2,
-    DEFAULT_TERRAIN: 'plains',
-}));
-
 import * as mapsService from '../../../services/maps/mapsService.js';
+import { hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM } from '../../../services/maps/hexViewMath.js';
 
 const CAMPAIGN = 'test-campaign';
 const MAP = 'test-map';
@@ -54,7 +58,18 @@ const characters = [
     { name: 'Gandalf' },
 ];
 
+// View bytes the loader's settle-at-mount pass adopts for a stored (zoom, pan)
+// (shared hexViewMath, mock-configured to HEX_SIZE 30 / multiplier 2) — the
+// SAME computation HexMap's layout pass performs post-mount, so fixtures that
+// store these bytes are fully settled and open with zero PUTs.
+const settledPan = (gridSize, zoom, panX, panY) =>
+    clampHexPan(hexGridPixelBounds(gridSize * 2, gridSize), gridSize, zoom, panX, panY);
+
 // Factory so each render gets fresh objects (the hook stores these by reference).
+// SETTLED document: every adoption default present, pan already at the view
+// the mount pass would normalize it to, travelState the null the loader adopts
+// for a trip-less file — the exact bytes a settling mount write leaves behind.
+const PAN_12 = settledPan(12, 3, 40, 60);
 const loadedMap = () => ({
     type: 'outdoor',
     displayName: 'Frostpeak Wilderness',
@@ -64,12 +79,12 @@ const loadedMap = () => ({
     pois: [{ name: 'Watchtower' }],
     gridSize: 12,
     zoom: 3,
-    panX: 40,
-    panY: 60,
+    panX: PAN_12.x,
+    panY: PAN_12.y,
     marchingOrder: ['Gandalf', 'Thorin'],
     partyPosition: { q: 7, r: 3 },
     weather: 'fog',
-    travelState: {},
+    travelState: null,
 });
 
 // The exact envelope the save effect writes: every persisted slot of current
@@ -83,8 +98,8 @@ const savedSnapshot = (overrides = {}) => ({
     roads: [],
     pois: [{ name: 'Watchtower' }],
     zoom: 3,
-    panX: 40,
-    panY: 60,
+    panX: PAN_12.x,
+    panY: PAN_12.y,
     marchingOrder: ['Gandalf', 'Thorin'],
     partyPosition: { q: 7, r: 3 },
     weather: 'fog',
@@ -251,22 +266,25 @@ describe('useMapLoader - API & persistence', () => {
     // (b) saves resume under B exactly once when B's bytes land (#800 flush
     // determinism preserved — the trigger remains the loading STATE).
     describe('in-place mapName switch (same hook instance, no remount)', () => {
-        const loadedMapB = () => ({
-            type: 'outdoor',
-            displayName: 'The Marshlands',
-            terrain: { '9,9': 'bog' },
-            rivers: [],
-            roads: [],
-            pois: [{ name: 'Fen Shrine' }],
-            gridSize: 14,
-            zoom: 4,
-            panX: 7,
-            panY: 9,
-            marchingOrder: ['Gandalf', 'Thorin'],
-            partyPosition: { q: 5, r: 2 },
-            weather: 'clear',
-            travelState: {},
-        });
+        const loadedMapB = () => {
+            const pan = settledPan(14, 4, 7, 9);
+            return {
+                type: 'outdoor',
+                displayName: 'The Marshlands',
+                terrain: { '9,9': 'bog' },
+                rivers: [],
+                roads: [],
+                pois: [{ name: 'Fen Shrine' }],
+                gridSize: 14,
+                zoom: 4,
+                panX: pan.x,
+                panY: pan.y,
+                marchingOrder: ['Gandalf', 'Thorin'],
+                partyPosition: { q: 5, r: 2 },
+                weather: 'clear',
+                travelState: null,
+            };
+        };
 
         const renderSwitchableHook = async () => {
             let resolveB = () => {};
@@ -311,8 +329,8 @@ describe('useMapLoader - API & persistence', () => {
                 roads: [],
                 pois: [{ name: 'Fen Shrine' }],
                 zoom: 4,
-                panX: 7,
-                panY: 9,
+                panX: settledPan(14, 4, 7, 9).x,
+                panY: settledPan(14, 4, 7, 9).y,
                 marchingOrder: ['Gandalf', 'Thorin'],
                 partyPosition: { q: 5, r: 2 },
                 weather: 'clear',
@@ -347,6 +365,79 @@ describe('useMapLoader - API & persistence', () => {
         // inside the load path would fall through to createAndSaveNewMap and save,
         // so zero save calls proves the quiet path held (act-clean, no crash).
         expect(mapsService.saveMapData).not.toHaveBeenCalled();
+    });
+
+    // Mount-write coalescing (backlog 2026-11-12 VX): a zero-edit open of an
+    // UNSETTLED document (create-stamped bytes: no marchingOrder/roads/
+    // rivers/weather/travelState, legacy zoom/pan) must flush AT MOST ONE
+    // whole-document PUT for the whole mount — the baseline holds the stored
+    // bytes, the flip-commit envelope the fully-settled ones, and the 1s
+    // debounce folds every remaining mount leg into that same flush. The one
+    // write carries the adopted defaults AND the view reset together, plus the
+    // generation stamp verbatim.
+    it('zero-edit open of an unsettled doc emits exactly ONE PUT with adopted defaults + view reset + stamp', async () => {
+        mapsService.loadMapData.mockResolvedValue({
+            type: 'outdoor',
+            displayName: 'Raw Rock',
+            terrain: { '1,1': 'hills' },
+            pois: [],
+            gridSize: 12,
+            zoom: 1,          // below MIN_ZOOM → view leg must settle to the reset bytes
+            panX: 0,
+            panY: 0,          // old default pan → centerHexView reset
+            partyPosition: { q: 12, r: 6 },
+            seed: 7,
+            generationOpts: { mode: 'terrain', gridSize: 12, seed: 7 },
+            // NO rivers/roads/marchingOrder/weather/travelState keys at all.
+        });
+        const utils = renderHook(() => useMapLoader(CAMPAIGN, MAP, characters));
+        await waitFor(() => expect(utils.result.current.loading).toBe(false));
+        // The write is QUEUED, not immediate — nothing flushes pre-debounce.
+        expect(mapsService.saveMapData).not.toHaveBeenCalled();
+
+        await settleAutosave();
+        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
+        const body = mapsService.saveMapData.mock.calls[0][2];
+        const centered = centerHexView(24, 12, VIEW_RESET_ZOOM);
+        expect(body).toEqual({
+            type: 'outdoor',
+            displayName: 'Raw Rock',
+            gridSize: 12,
+            terrain: { '1,1': 'hills' },
+            rivers: [],
+            roads: [],
+            pois: [],
+            zoom: VIEW_RESET_ZOOM,
+            panX: centered.x,
+            panY: centered.y,
+            marchingOrder: ['Thorin', 'Gandalf'],
+            partyPosition: { q: 12, r: 6 },
+            weather: null,
+            travelState: null,
+            seed: 7,
+            generationOpts: { mode: 'terrain', gridSize: 12, seed: 7 },
+        });
+
+        // Post-flush byte-identical churn (echo lane re-emitting the same
+        // values) adds no further writes.
+        act(() => {
+            utils.result.current.setTerrain({ '1,1': 'hills' });
+            utils.result.current.setPois([]);
+        });
+        await settleAutosave();
+        expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
+    });
+
+    // Zero-write contract: a document whose adopted defaults + normalized view
+    // are ALREADY on disk (exactly what the settling write above leaves behind)
+    // compares byte-equal against the dirty baseline — a zero-edit open fires
+    // ZERO PUTs.
+    it('fully-settled doc open emits ZERO PUTs', async () => {
+        const { result } = await renderLoadedHook();
+
+        await settleAutosave();   // let any (forbidden) debounce flush land
+        expect(mapsService.saveMapData).not.toHaveBeenCalled();
+        expect(result.current.hexMapNameRef.current).toBe(MAP);
     });
 
     // Generation-stamp carry (VG backlog 2026-11-12): the board must never strip

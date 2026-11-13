@@ -29,6 +29,7 @@ import useMapLoader from './useMapLoader.js';
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { buildMapLoadRejectedNotice } from '../../../services/maps/mapLoadNotice.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
+import { centerHexView, VIEW_RESET_ZOOM } from '../../../services/maps/hexViewMath.js';
 
 // Fake only the transport seam — config, hexKey, travelService and the
 // notice builder run real.
@@ -155,6 +156,14 @@ describe('hex useMapLoader — rejected-load fallback (notice + zero-PUT gate)',
     });
 
     it('successful load: no notice, no writes, console stays clean', async () => {
+        // Fully-settled document: adoption defaults present, travelState the
+        // adopted null, and the pan stored EXACTLY where the loader's
+        // settle-at-mount pass puts it (centered output is a clamp fixed
+        // point) — stored bytes deep-equal the flip-commit envelope, so the
+        // zero-edit open writes nothing (backlog 2026-11-12 VX zero-write
+        // contract; an UNSETTLED document gets exactly ONE settling write,
+        // pinned in useMapLoader.api.test.js).
+        const settled = centerHexView(20, 10, VIEW_RESET_ZOOM);
         mapsService.loadMapData.mockResolvedValue({
             type: 'outdoor',
             displayName: 'Good Map',
@@ -163,9 +172,13 @@ describe('hex useMapLoader — rejected-load fallback (notice + zero-PUT gate)',
             roads: [],
             pois: [],
             gridSize: 10,
-            zoom: 2,
-            panX: 0,
-            panY: 0,
+            zoom: VIEW_RESET_ZOOM,
+            panX: settled.x,
+            panY: settled.y,
+            marchingOrder: [],
+            partyPosition: { q: 10, r: 5 },
+            weather: null,
+            travelState: null,
         });
 
         const { result } = renderLoader();

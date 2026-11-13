@@ -59,8 +59,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-12 VX] Zero-edit hex board-open flushes THREE whole-doc PUTs within ~4s (default-adoption + view-reset flushes don't coalesce — each re-serializes the 1800-cell doc). The autosave is already 1s-debounced; folding the mount adoption + view-reset into ONE post-settle write would cut the churn (indoor twin mounts quieter). (`src/components/hex-map/hooks/useMapLoader.js` mount/normalize legs)
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - ~~Regenerate-from-stamped-opts (PT1)~~ — SHIPPED `ec482e51c`, VX live-verified 6/6 faces + concurrent-board race CLOSED CLEAN.
