@@ -3,6 +3,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js'
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js'
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js'
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
+import { resolveLiveTargetHp } from './liveTargetHp.js'
 import { addEntry } from '../../../ui/logService.js'
 
 export function resolveChannelDivinityCharges(playerStats) {
@@ -53,7 +54,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const targets = []
         for (const creature of combatSummary.creatures) {
             if (await isWithinRange(playerStats.name, creature.name, rangeFt)) {
-                targets.push({ name: creature.name, type: creature.type, currentHp: creature.currentHp, maxHp: creature.maxHp })
+                // Bucket-first HP (liveTargetHp): heal writes never move the cs row,
+                // so the chooser must show what the modal shows one click later.
+                targets.push({ name: creature.name, type: creature.type, ...resolveLiveTargetHp(creature) })
             }
         }
         if (targets.length > 0) {

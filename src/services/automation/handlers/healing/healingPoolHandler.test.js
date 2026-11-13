@@ -353,6 +353,38 @@ describe('healingPoolHandler — CLA-163 healing_pool lane', () => {
       ]);
     });
 
+    it('target rows prefer the live bucket currentHitPoints/hitPoints over the stale cs row (EH 2026-11-13)', async () => {
+      // GET-proved drift face: real heals wrote the bucket to 134/143 while the
+      // combatSummary player row stayed at 100/100 — the chooser must show what
+      // the target modal shows one click later.
+      mockCombat({ summary: { creatures: [{ name: 'Fighting_Rogue', type: 'player', currentHp: 100, maxHp: 100 }] } });
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'Fighting_Rogue' && key === 'currentHitPoints') return 134;
+        if (name === 'Fighting_Rogue' && key === 'hitPoints') return 143;
+        return null;
+      });
+
+      const result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
+
+      expect(result.payload.creatureTargets).toEqual([
+        { name: 'Fighting_Rogue', type: 'player', currentHp: 134, maxHp: 143 },
+      ]);
+    });
+
+    it('target rows fall back to the cs row values when the bucket is missing/empty', async () => {
+      mockCombat({ summary: { creatures: [{ name: 'Fighting_Rogue', type: 'player', currentHp: 100, maxHp: 100 }] } });
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'currentHitPoints') return ''; // empty-string = no-data fingerprint
+        return null;
+      });
+
+      const result = await handle(makeAction(), { name: 'Warrior of the Gods', level: 5 }, campaignName, mapName);
+
+      expect(result.payload.creatureTargets).toEqual([
+        { name: 'Fighting_Rogue', type: 'player', currentHp: 100, maxHp: 100 },
+      ]);
+    });
+
     it('honors auto.range through real rangeToFeet (30 ft → 30)', async () => {
       mockCombat({ summary: { creatures: [{ name: 'Goblin', type: 'humanoid', currentHp: 7, maxHp: 7 }] } });
 

@@ -12,6 +12,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
 import { resolveDiceExpression, evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 import { characterFileName } from '../../../campaign/characterFileName.js';
+import { resolveLiveTargetHp } from './liveTargetHp.js';
 
 async function fetchTargetCharacterData(targetName, campaignName) {
     try {
@@ -158,13 +159,15 @@ async function resolveArmedMonkHealTarget(playerStats, campaignName) {
 }
 
 // Touch-range (5 ft) creature picker, mirroring the verified Healing Light
-// healingPool lane (CLA-163): self remains selectable.
+// healingPool lane (CLA-163): self remains selectable. Eligibility gating is
+// range/liveness only — the HP it DISPLAYS resolves bucket-first (liveTargetHp)
+// because heal writes never move the cs row (EH 2026-11-13 drift law).
 async function collectTouchTargets(cs, playerStats) {
     if (!cs?.creatures?.length) return [];
     const targets = [];
     for (const creature of cs.creatures) {
         if (creature.name === playerStats.name || await isWithinRange(playerStats.name, creature.name, 5)) {
-            targets.push({ name: creature.name, type: creature.type, currentHp: creature.currentHp, maxHp: creature.maxHp });
+            targets.push({ name: creature.name, type: creature.type, ...resolveLiveTargetHp(creature) });
         }
     }
     return targets;
