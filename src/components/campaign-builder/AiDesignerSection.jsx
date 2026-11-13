@@ -24,29 +24,29 @@ function PlanEditor({ plan, setPlan, busy, onGenerate, onCancel }) {
       <h4>Review the build plan</h4>
       <label className="ai-designer-plan-field">
         Scope
-        <select value={plan.scope} onChange={(e) => setPlan({ ...plan, scope: e.target.value })}>
+        <select aria-label="Scope" value={plan.scope} onChange={(e) => setPlan({ ...plan, scope: e.target.value })}>
           {['campaign', 'one_shot', 'arc', 'session', 'bespoke'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </label>
       <label className="ai-designer-plan-field">
         Levels (min)
-        <input type="number" min="1" max="20" value={plan.levelRange?.min ?? ''}
+        <input type="number" aria-label="Levels (min)" min="1" max="20" value={plan.levelRange?.min ?? ''}
           onChange={(e) => setPlan({ ...plan, levelRange: { ...(plan.levelRange || {}), min: Number(e.target.value) || 1, max: plan.levelRange?.max ?? (Number(e.target.value) || 1) } })} />
       </label>
       <label className="ai-designer-plan-field">
         Levels (max)
-        <input type="number" min="1" max="20" value={plan.levelRange?.max ?? ''}
+        <input type="number" aria-label="Levels (max)" min="1" max="20" value={plan.levelRange?.max ?? ''}
           onChange={(e) => setPlan({ ...plan, levelRange: { min: plan.levelRange?.min ?? 1, max: Number(e.target.value) || 1 } })} />
       </label>
       <label className="ai-designer-plan-field ai-designer-plan-summary">
         Story spine
-        <textarea rows="5" value={plan.storySummary || ''} onChange={(e) => setPlan({ ...plan, storySummary: e.target.value })} />
+        <textarea aria-label="Story spine" rows="5" value={plan.storySummary || ''} onChange={(e) => setPlan({ ...plan, storySummary: e.target.value })} />
       </label>
       <div className="ai-designer-plan-counts">
         {PLAN_KINDS.map(kind => (
           <label key={kind} className="ai-designer-plan-field">
             {kind}s
-            <input type="number" min="0" max="50" value={countFor(kind)} onChange={(e) => setCount(kind, e.target.value)} />
+            <input type="number" aria-label={`${kind}s`} min="0" max="50" value={countFor(kind)} onChange={(e) => setCount(kind, e.target.value)} />
           </label>
         ))}
       </div>

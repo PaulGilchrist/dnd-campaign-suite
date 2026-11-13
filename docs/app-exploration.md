@@ -59,7 +59,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 XA — Designer plan editor inputs lack accessible names.** Levels min/max + the 7 entity-kind count number inputs and scope select expose no `aria-label` (probe: `aria-label` empty; labels are text-only siblings) — hurts a11y and forces brittle nth() automation. `campaign-builder` plan card.
 - **2026-11-13 XA — `needs_human` fallback rows log `attempts: 0` even when attempts were burned.** The fail-closed fallback hardcodes attempt 0 in `auditLog(..., fallback, 0)` (referee) and `directorAudit(..., 0)`, so a 2-attempt invalid run reads identical to a no-model-call refusal (no-stat-block). Pass the consumed-attempt count through (audit honesty, cheap). `server/services/ai/index.js`.
 
 ## Blocked / Not Verified (fold-gate ledger)
