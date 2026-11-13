@@ -299,7 +299,36 @@ async function generateOne({ scope, allow, kind, item, siblings, chatFn, aiConfi
     return null;
 }
 
+// Plain-English row description (the ai_dress f91276b39 pattern: the producer
+// stamps `description` and the Log renders it verbatim instead of the derived
+// describer prose). Wording always matches the row's stage AND outcome —
+// failures name the error, successes name the scope/entity count.
+function auditDescription(payload) {
+    const countPhrase = (n) => `${n} ${n === 1 ? 'entity' : 'entities'}`;
+    const errorsPhrase = (errors) => (Array.isArray(errors) ? errors.filter(Boolean).join('; ') : '') || 'unknown error';
+    if (payload.stage === 'plan') {
+        return payload.error
+            ? `AI designer plan failed — ${payload.error}`
+            : `AI designer proposed a build plan (scope "${payload.scope}", ${countPhrase((payload.entityPlan || []).reduce((sum, p) => sum + (Number(p?.count) || 0), 0))})`;
+    }
+    if (payload.fallback) {
+        return `AI designer generate fell back to ${payload.fallback} — ${errorsPhrase(payload.errors)}`;
+    }
+    if (Array.isArray(payload.errors) && payload.errors.length) {
+        // Mid-resume stops: a partial leg kept the drafted survivors as
+        // individually-approvable drafts; a zero-success/subset-failure leg
+        // wrote nothing. The mid-batch apply failure face has a snapshot —
+        // rows went down before the throw, so the restore point is named
+        // instead of the “wrote nothing” claim.
+        const head = payload.partial
+            ? `AI designer drafted ${payload.partial.drafted} of ${payload.partial.planned} entities before stopping`
+            : `AI designer ${payload.stage} stopped${payload.snapshot ? ` (restore point ${payload.snapshot})` : ' — wrote nothing'}`;
+        return `${head} — ${errorsPhrase(payload.errors)}`;
+    }
+    return `AI designer drafted ${countPhrase(createdTotal(payload.created))}${payload.resumed ? ' via per-entity resume' : ''} (restore point ${payload.snapshot || 'none'})`;
+}
+
 function audit(log, campaign, payload, attempts) {
     if (typeof log !== 'function') return;
-    log(campaign, { type: 'ai_designer', name: 'AI designer', attempts, ...payload });
+    log(campaign, { type: 'ai_designer', name: 'AI designer', attempts, ...payload, description: auditDescription(payload) });
 }

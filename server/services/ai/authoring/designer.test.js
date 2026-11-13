@@ -135,7 +135,7 @@ describe('generateBlueprint — stage:generate audit shape', () => {
         const entry = generateAudit();
         expect(entry).toBeTruthy();
         expect('errors' in entry).toBe(false);
-        expect(Object.keys(entry).sort()).toEqual(['attempts', 'created', 'name', 'snapshot', 'stage', 'type']);
+        expect(Object.keys(entry).sort()).toEqual(['attempts', 'created', 'description', 'name', 'snapshot', 'stage', 'type']);
     });
 });
 
@@ -287,6 +287,7 @@ describe('generateBlueprint — resume partial drafts (mid-set stop)', () => {
         expect(resumeAudit()).toEqual({
             type: 'ai_designer', name: 'AI designer', attempts: 0, stage: 'generate-resume',
             errors: ['generation stopped at faction #1/1 — model output kept failing validation'],
+            description: 'AI designer generate-resume stopped — wrote nothing — generation stopped at faction #1/1 — model output kept failing validation',
         });
     });
 

@@ -338,6 +338,17 @@ describe('AI audit rows render labeled one-line summaries', () => {
     expect(firstLine()).toBe('AI dressed "battle-arena" with 4 ops (applied)');
   });
 
+  // XA backlog (2026-11-13 improve): designer audit rows now stamp a human
+  // `description` too (the ai_dress pattern) — it renders verbatim, never
+  // through the derived describeDesigner fallback.
+  it('designer row with an authored description renders it verbatim', () => {
+    setup(Log, [designer({
+      stage: 'generate', attempts: 1, created: { npcs: 3 }, snapshot: 's.zip',
+      description: 'AI designer drafted 3 entities (restore point s.zip)',
+    })]);
+    expect(firstLine()).toBe('AI designer drafted 3 entities (restore point s.zip)');
+  });
+
   // ── robustness + sanitization ─────────────────────────────
 
   it('unknown ai audit shape degrades to a readable key line — no JSON dump, no [object Object]', () => {
