@@ -608,3 +608,68 @@ describe('AiRefereeSection — override preservation + decoding/temperature cont
         expect(value).toMatchObject(CONFIGURED);
     });
 });
+
+// Backlog 2026-11-13 XA — composer lifecycle between asks: a SUCCESSFUL ask
+// consumes the thought (textarea renders EMPTY so a second thought can never
+// silently CONCATENATE); both failure legs (hard failure, AI_NEEDS_HUMAN)
+// PRESERVE the text so the GM never loses a thought mid-rephrase.
+describe('AiRefereeSection — composer clears on success, preserves on failure', () => {
+    const composer = () => screen.getByPlaceholderText(/Describe what a player does/);
+    const actorSelect = () => screen.getByRole('combobox', { name: 'Acting character' });
+
+    it('suggest success: card appears with an EMPTY composer, and a second ask sends only its own text', async () => {
+        synced.aiConfig = CONFIGURED;
+        const fetchMock = stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('I light a lantern');
+
+        await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
+        expect(composer()).toHaveValue(''); // the consumed thought is gone…
+        expect(askButton()).toBeDisabled(); // …and there is nothing left to re-send
+        // only the composer resets — the actor selection survives the ask
+        expect(actorSelect()).toHaveValue('Rakan');
+
+        // the concatenation regression itself: type a fresh thought, ask again
+        fireEvent.change(composer(), { target: { value: 'I check for traps' } });
+        fireEvent.click(askButton());
+        await waitFor(() => expect(refereePosts(fetchMock)).toHaveLength(2));
+        expect(refereePosts(fetchMock)[1]).toEqual({
+            url: expect.stringContaining(`/campaigns/${CN}/ai/referee`),
+            body: { action: 'I check for traps', characterName: 'Rakan' }, // no mega-prompt
+        });
+    });
+
+    it('autopilot auto-apply success clears the composer too', async () => {
+        synced.aiConfig = { ...CONFIGURED, mode: 'autopilot' };
+        stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('I cast magic missile');
+
+        await waitFor(() => expect(screen.getByText(/Applied:.*→ 9/)).toBeInTheDocument());
+        expect(composer()).toHaveValue(''); // auto-applied thought is consumed as well
+    });
+
+    it('hard failure (e.g. AI_UNAVAILABLE) keeps the thought for a retry', async () => {
+        synced.aiConfig = CONFIGURED;
+        stubFetch({ referee: { error: 'AI backend exploded' }, refereeStatus: 500 });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('I try to pick the lock');
+
+        await waitFor(() => expect(screen.getByText(/Not applied:.*AI backend exploded/)).toBeInTheDocument());
+        expect(composer()).toHaveValue('I try to pick the lock'); // nothing lost
+        expect(askButton()).toBeEnabled(); // ready to re-fire the same thought
+    });
+
+    it('needs_human dismiss-only card keeps the thought for re-phrasing', async () => {
+        synced.aiConfig = CONFIGURED;
+        stubFetch({ referee: { ok: false, code: 'AI_NEEDS_HUMAN', ruling: { type: 'needs_human', text: 'AI referee unavailable — the referee adjudicates this turn.' } } });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        askAbout('I do something vague');
+
+        await waitFor(() => expect(screen.getByText(/AI proposes: needs_human/)).toBeInTheDocument());
+        expect(composer()).toHaveValue('I do something vague'); // wasted attempt — text survives…
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        await waitFor(() => expect(screen.queryByText(/AI proposes: needs_human/)).toBeNull());
+        expect(composer()).toHaveValue('I do something vague'); // …and still there after Dismiss
+    });
+});

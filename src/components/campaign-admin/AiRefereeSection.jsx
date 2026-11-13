@@ -132,6 +132,13 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
         const res = await askAiReferee({ campaignName, action, characterName, actorStats })
         setAsking(false)
         if (!res.ok && res.code !== 'AI_NEEDS_HUMAN') { setResult({ applied: false, detail: res.error || res.code || 'AI unavailable' }); return }
+        // Backlog 2026-11-13 XA — a SUCCESSFUL ask consumes the thought: clear the
+        // composer so a second thought can never silently CONCATENATE with the
+        // first (witnessed live: the model honestly adjudicated the mega-prompt).
+        // Both failure legs above keep the text (nothing was proposed yet — the GM
+        // re-phrases the same thought), and the AI_NEEDS_HUMAN card that falls
+        // through here is a wasted attempt the GM will re-ask, so it keeps it too.
+        if (res.ok) setAction('')
         setProposal(res.ruling)
         // autopilot applies ATOMIC ops at once; automation/needs_human wait
         // for the referee's click — forever if need be (no clock decides).
