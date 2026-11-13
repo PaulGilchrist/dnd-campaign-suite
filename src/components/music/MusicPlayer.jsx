@@ -12,12 +12,27 @@ import './MusicPlayer.css';
 
 const YT_FRAME_ID = 'yt-music-frame';
 
+// Shared split law for the tracks textarea: parseTrackList and the entered-
+// line count (mixed-save drop warning) MUST agree on what a "line" is, so
+// both slice on this one separator — no second parser (improve 2026-11-13 DG).
+const TRACK_SEPARATORS = /[\n,]+/;
+
 function parseTrackList(text) {
   return text
-    .split(/[\n,]+/)
+    .split(TRACK_SEPARATORS)
     .map(line => extractVideoId(line))
     .filter(Boolean)
     .map(videoId => ({ videoId, title: videoId }));
+}
+
+// Mixed-save warning copy (improve 2026-11-13 DG backlog): the zero-valid
+// refusal is honest but a MIXED list used to save the parseable subset in
+// silence — same input, two feedback laws. Once the valid rows land, the
+// dropped remainder is announced on the .music-editor-error seam with the
+// exact count. Hoisted (MusicMoodChip idiom) to keep saveTracks lean.
+function droppedLinesWarning(droppedCount) {
+  if (droppedCount <= 0) return null;
+  return `${droppedCount} line(s) are not valid YouTube URLs or video ids and were not saved`;
 }
 
 // One sidebar mood chip: the play button plus, for custom categories only,
@@ -215,6 +230,15 @@ function MusicPlayer({ campaignName, visible = true }) {
   // wiped/garbled draft is visible before the Save click pays the
   // leaf-inline rejection.
   const parsedTracks = useMemo(() => parseTrackList(trackText), [trackText]);
+  // Non-empty entered lines, counted with the SAME TRACK_SEPARATORS split
+  // parseTrackList uses (single source of truth — whitespace-only lines
+  // never count). The delta against parsedTracks is what a Save would drop
+  // (improve 2026-11-13 DG); it is only surfaced at save time, not typed-
+  // live, because "were not saved" must never lie about an unsaved draft.
+  const enteredLineCount = useMemo(
+    () => trackText.split(TRACK_SEPARATORS).filter(line => line.trim()).length,
+    [trackText]
+  );
   // Display-only save/reset confirmation toast (mirrors .sessions-toast /
   // .encounter-toast): names the mood so the confirmation lands even while the
   // stay-open editor keeps focus (and after Reset's re-seed).
@@ -498,7 +522,8 @@ function MusicPlayer({ campaignName, visible = true }) {
 
   const saveTracks = useCallback(async () => {
     if (!refuseMissingMood('track save')) return;
-    const tracks = parseTrackList(trackText);
+    // Same memo the live hint reads — save and hint can never disagree.
+    const tracks = parsedTracks;
     if (tracks.length === 0) {
       // Invalid user input, not an app fault: the inline .music-editor-error
       // below (plus the live zero-count hint) is the user-facing feedback, so
@@ -524,7 +549,15 @@ function MusicPlayer({ campaignName, visible = true }) {
       setPlayerMounted(true);
       youtubePlayer.playTracks(tracks.map(t => t.videoId));
     }
-    setEditorError(null);
+    // Mixed-list honesty (improve 2026-11-13 DG): the valid rows saved and the
+    // toast fires, but unparseable non-empty lines evaporated — say so on the
+    // same .music-editor-error seam the zero-valid refusal uses. Fully-valid
+    // saves keep the old clean slate (delta 0 → null).
+    const droppedCount = enteredLineCount - tracks.length;
+    if (droppedCount > 0) {
+      console.debug(`[MusicPlayer] ${droppedCount} unparseable track line(s) dropped on save`);
+    }
+    setEditorError(droppedLinesWarning(droppedCount));
     // Stay-open save (backlog 2026-11-08 EM): multi-session track curation
     // made the old close-on-save an open→type→save churn loop. The editor
     // stays mounted with the textarea content intact, and the dirty guard
@@ -534,7 +567,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     // Cancel's job; Save never discards.
     seedDraft({ trackText });
     showToast(`${moodLabel(editMood)} tracks saved — keep editing`);
-  }, [trackText, editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood]);
+  }, [trackText, parsedTracks, enteredLineCount, editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood]);
 
   const resetMood = useCallback(async () => {
     if (!refuseMissingMood('override reset')) return;
