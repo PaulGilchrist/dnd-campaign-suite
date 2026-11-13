@@ -268,6 +268,39 @@ describe('placed-item click-select → visible delete dock', () => {
         expect(confirmSpy).not.toHaveBeenCalled();
     });
 
+    it('GM: dock is a modeless labelled dock — role="complementary" + name, and it is NEVER in the [role="dialog"] tier', async () => {
+        // Backlog 2026-11-13 CF: the dock used to carry role="dialog", so a
+        // [role="dialog"] probe resolved it (or matched 2 when the real
+        // confirm opened) and screen readers announced a modeless panel as
+        // modal. It now mirrors the labelled-dock pattern (complementary +
+        // aria-label), keeping the `Selected item: <label>` name.
+        const { container } = await act(async () => renderMap());
+        await settleAutosave();
+        await clickToken(container);
+
+        const dock = container.querySelector('.item-details-dock');
+        expect(dock).toHaveAttribute('role', 'complementary');
+        expect(dock).toHaveAttribute('aria-label', 'Selected item: QA Marta');
+        expect(dock).not.toHaveAttribute('aria-modal');
+        // Dock open, no confirm modal → nothing at all in the dialog tier.
+        expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(0);
+        expect(screen.queryByRole('dialog')).toBeNull();
+
+        // Dock Delete → the shared DeleteFromMapModal is the EXACTLY ONE
+        // [role="dialog"] element even while the dock stays mounted behind it.
+        await act(async () => { fireEvent.click(deleteDockButton()); });
+        const dialogs = container.querySelectorAll('[role="dialog"]');
+        expect(dialogs).toHaveLength(1);
+        expect(dialogs[0]).toHaveAttribute('aria-modal', 'true');
+        expect(dialogs[0]).toHaveTextContent('Delete "QA Marta" from the map?');
+        expect(container.querySelector('.item-details-dock')).toBeInTheDocument();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        });
+        expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(0);
+    });
+
     it('GM: dock Delete opens the SAME named in-app dialog; accept removes the item and persists the filtered array', async () => {
         const { container } = await act(async () => renderMap());
         await settleAutosave();

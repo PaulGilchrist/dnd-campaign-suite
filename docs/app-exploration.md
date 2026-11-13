@@ -75,7 +75,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-13 CF] `item-details-dock` carries `role="dialog"` but renders no heading/`aria-labelledby` — it is a modeless dock, not a modal; the stray role breaks `document.querySelector('[role="dialog"]')` probes (CF tripped twice) and mis-announces to screen readers (dialog role implies modal). Either drop the role or give it `aria-label="Item details"` and keep it out of the dialog tier; files: `src/components/map/` (ItemDetailsDock).
 
 ## Blocked / Not Verified (fold-gate ledger)
 

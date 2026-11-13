@@ -19,7 +19,14 @@ function ItemDetailsDock({ item, handleDeleteItem, onDismiss }) {
     const label = placedItemLabel(item);
 
     return (
-        <div className="item-details-dock" role="dialog" aria-label={`Selected item: ${label}`}>
+        // Modeless detail panel, NOT a modal: role="dialog" here mis-announced
+        // it as modal and kept it in the [role="dialog"] tier (backlog
+        // 2026-11-13 CF — probes resolving the dock instead of, or alongside,
+        // the real DeleteConfirmModal). role="complementary" + aria-label
+        // mirrors the app's labelled-dock pattern (FirstSessionChecklist) and
+        // keeps the `Selected item: <label>` name; the shared DeleteFromMapModal
+        // is the only dialog tier on this screen.
+        <div className="item-details-dock" role="complementary" aria-label={`Selected item: ${label}`}>
             <span className="item-details-dock-name">{label}</span>
             <button
                 type="button"
