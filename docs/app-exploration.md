@@ -56,7 +56,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-12 WY — whole-map PUT replace-semantics guard covers only `players`:** the PUT route 400s loudly when a body omits `players` while the store has it ("every player token would be erased" — great pattern), but any OTHER missing field (gridSize/type/terrain on outdoor docs, walls/placedItems on indoor) is silently dropped — an outdoor doc flattens and the list builder's `type||'indoor'` fallback then re-routes it to the WRONG editor (live-observed while harness-staging a partial PUT). Suggest generalizing the erasure guard (required-key sets per map type) or offering a per-field PATCH lane for maps like change-data's.
 - **2026-11-12 WY — `ai_dress` audit rows have no `description`:** the log list renders them through the title-case fallback ("Ai Dress") while every other lane authors human rows with a description — the registry-shaped fix is a one-line `description` (e.g. `AI dressed "map" with 4 ops (preview)`) on both row kinds.
 
 ## Blocked / Not Verified (fold-gate ledger)
