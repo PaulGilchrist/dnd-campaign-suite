@@ -343,11 +343,17 @@ describe('HealingPoolModal - Dice Pool', () => {
     await renderModal({}, { current: 3, max: 4 });
 
     fireEvent.click(rollBtn());
+
+    // Roll copy is clamped to the 4 HP of room before committing.
+    expect(document.querySelector('.healing-total')?.textContent).toBe(' = 4 HP to restore');
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
     expect(hpWrites()).toEqual([['Paladin1', 'currentHitPoints', 40, CAMPAIGN]]);
+    // Ledger honesty (bug-healing-light-dice-pool-silent-zero-heal): the row logs
+    // the HP that actually restored (36 → 40), not the raw roll sum.
     expect(logService.addEntry.mock.calls).toEqual([
-      [CAMPAIGN, diceHealLog({ amount: 12, rolls: [12], poolAfter: 2 })],
+      [CAMPAIGN, diceHealLog({ amount: 4, rolls: [12], poolAfter: 2 })],
     ]);
   });
 

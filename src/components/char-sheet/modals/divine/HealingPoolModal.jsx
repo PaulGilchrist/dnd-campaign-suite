@@ -135,20 +135,42 @@ function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp,
     );
 }
 
-function HealingDiceSection({ resolvedTargetName, targetCurrentHp, targetMaxHp, effectiveMaxDicePerUse, safePool, rolledFaces, accumulatedTotal, dieType, applyDiceHeal }) {
+function resolveHealCapacity(targetMaxHp, targetCurrentHp, accumulatedTotal) {
+    if (targetMaxHp <= 0) return null; // HP truth unavailable — keep the roll gate open
+    return Math.max(0, targetMaxHp - targetCurrentHp - accumulatedTotal);
+}
+
+function resolveRestorableTotal(targetMaxHp, targetCurrentHp, accumulatedTotal) {
+    if (targetMaxHp <= 0) return accumulatedTotal;
+    return Math.min(accumulatedTotal, Math.max(0, targetMaxHp - targetCurrentHp));
+}
+
+function resolveDiceActualHeal(targetMax, targetCurrentHp, newHp, accumulatedTotal) {
+    if (targetMax <= 0) return accumulatedTotal; // HP truth unavailable — legacy fallback
+    return Math.max(0, newHp - targetCurrentHp);
+}
+
+function HealingDiceSection({ resolvedTargetName, targetCurrentHp, targetMaxHp, effectiveMaxDicePerUse, safePool, rolledFaces, restorableTotal, noHealCapacity, dieType, applyDiceHeal }) {
     return (
         <div className="short-rest-section">
             <h4>Roll Dice — {resolvedTargetName} ({targetCurrentHp} / {targetMaxHp} HP){effectiveMaxDicePerUse < Infinity && <span className="bloodied-badge"> (Max {effectiveMaxDicePerUse} dice)</span>}</h4>
             <div className="short-rest-dice-row">
-                <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0 || (effectiveMaxDicePerUse < Infinity && rolledFaces.length >= effectiveMaxDicePerUse)}>
+                <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0 || (effectiveMaxDicePerUse < Infinity && rolledFaces.length >= effectiveMaxDicePerUse) || noHealCapacity}>
                     <i className="fas fa-dice-d12"></i> Roll a d{dieType}
                 </button>
             </div>
+            {noHealCapacity && (
+                <p className="healing-restriction-note">
+                    {rolledFaces.length === 0
+                        ? `${resolvedTargetName} is already at full HP. No die spent.`
+                        : `These rolls already fill ${resolvedTargetName} to maximum HP — further dice would restore nothing.`}
+                </p>
+            )}
             {rolledFaces.length > 0 && (
                 <div className="healing-roll-details" style={{ marginTop: '8px' }}>
                     <span className="healing-formula">Rolled {rolledFaces.length}d{dieType}: </span>
                     <span className="healing-dice-rolled">{rolledFaces.join(' + ')}</span>
-                    <span className="healing-total"> = <strong>{accumulatedTotal}</strong> HP to restore</span>
+                    <span className="healing-total"> = <strong>{restorableTotal}</strong> HP to restore</span>
                     <div style={{ marginTop: '4px', fontSize: '0.9em', color: '#888' }}>
                         Remaining: {safePool} dice
                     </div>
@@ -183,7 +205,7 @@ function HealingLogSection({ log }) {
     );
 }
 
-function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, accumulatedTotal, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, log, handleClose, featureName }) {
+function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, restorableTotal, noHealCapacity, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, log, handleClose, featureName }) {
     return (
         // Dialog semantics per the shared DeleteConfirmModal-class tier
         // (backlog 2026-11-10 HD, ShortRestModal bc409413d pattern): the existing
@@ -231,7 +253,8 @@ function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, reso
                     effectiveMaxDicePerUse={effectiveMaxDicePerUse}
                     safePool={safePool}
                     rolledFaces={rolledFaces}
-                    accumulatedTotal={accumulatedTotal}
+                    restorableTotal={restorableTotal}
+                    noHealCapacity={noHealCapacity}
                     dieType={dieType}
                     applyDiceHeal={applyDiceHeal}
                 />
@@ -384,6 +407,13 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
     const isTargetBloodied = targetCurrentHp > 0 && targetCurrentHp <= Math.floor(targetMaxHp / 2);
 
+    // Dice-lane honesty: how much of the pending rolls can actually restore HP
+    // (null = HP truth unknown, gate stays open). The "N HP to restore" copy is
+    // clamped so it can never promise restoration the commit cannot deliver.
+    const healCapacity = resolveHealCapacity(targetMaxHp, targetCurrentHp, accumulatedTotal);
+    const noHealCapacity = healCapacity === 0;
+    const restorableTotal = resolveRestorableTotal(targetMaxHp, targetCurrentHp, accumulatedTotal);
+
     const getTargetConditions = React.useCallback(() => {
         const runtimeConditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
 
@@ -461,6 +491,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const applyDiceHeal = () => {
         if (safePool <= 0) return;
         if (effectiveMaxDicePerUse < Infinity && rolledFaces.length >= effectiveMaxDicePerUse) return;
+        if (noHealCapacity) return;
 
         consumeChannelDivinity();
         const roll = Math.floor(Math.random() * dieType) + 1;
@@ -476,18 +507,28 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const applyAccumulatedHealing = React.useCallback(() => {
         if (accumulatedTotal <= 0) return;
 
-        const newPool = safePool;
+        let newPool = safePool;
 
         const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
         const targetMax = targetCreature ? (targetCreature.type === 'player' ? (getRuntimeValue(targetCreature.name, 'hitPoints') ?? 0) : targetCreature.maxHp) : playerStats.hitPoints;
         const newHp = Math.min(targetMax, targetCurrentHp + accumulatedTotal);
-        setRuntimeValue(resolvedTargetName, 'currentHitPoints', newHp, campaignName);
+        const actualHeal = resolveDiceActualHeal(targetMax, targetCurrentHp, newHp, accumulatedTotal);
+        // Ledger honesty mirroring the amount lane's `result.actualHeal` and the monk
+        // lane's "Already at full HP … No use spent." refusal: only the HP that really
+        // restores is written and logged, and dice that can restore nothing (target
+        // filled by another tab after the rolls) are returned to the pool.
+        if (actualHeal > 0) {
+            setRuntimeValue(resolvedTargetName, 'currentHitPoints', newHp, campaignName);
+        } else {
+            newPool = safePool + rolledFaces.length;
+            setPoolRemaining(newPool);
+        }
         addEntry(campaignName, {
             type: 'healing_pool',
             sourceName: playerStats.name,
             featureName,
             targetName: resolvedTargetName,
-            amount: accumulatedTotal,
+            amount: actualHeal,
             diceUsed: rolledFaces.length,
             dieType: dieType,
             rolls: rolledFaces,
@@ -496,13 +537,13 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         setLog(prev => [...prev, {
             action: `Roll ${rolledFaces.length}d${dieType}`,
             target: resolvedTargetName,
-            amount: accumulatedTotal,
+            amount: actualHeal,
             poolAfter: newPool,
             rolls: rolledFaces.join(' + ')
         }]);
         setAccumulatedTotal(0);
         setRolledFaces([]);
-    }, [accumulatedTotal, safePool, rolledFaces, playerStats.hitPoints, targetCurrentHp, playerStats.name, campaignName, featureName, dieType, resolvedTargetName, combatSummary]);
+    }, [accumulatedTotal, safePool, rolledFaces, playerStats.hitPoints, targetCurrentHp, playerStats.name, campaignName, featureName, dieType, resolvedTargetName, combatSummary, setPoolRemaining]);
 
     const handleClose = () => {
         if (isDicePool && accumulatedTotal > 0) {
@@ -622,7 +663,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 applyHeal={applyHeal}
                 effectiveMaxDicePerUse={effectiveMaxDicePerUse}
                 rolledFaces={rolledFaces}
-                accumulatedTotal={accumulatedTotal}
+                restorableTotal={restorableTotal}
+                noHealCapacity={noHealCapacity}
                 applyDiceHeal={applyDiceHeal}
                 hasRestoringTouch={hasRestoringTouch}
                 curableEntries={curableEntries}
