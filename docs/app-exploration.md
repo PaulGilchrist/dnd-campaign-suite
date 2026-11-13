@@ -60,8 +60,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-12 VG] After a reload the campaign-selection screen flashes BRIEFLY before the last campaign auto-restores (~1 s, title flips `CharSheets`→`<char>`); fast users (and harnesses) click into a vanishing DOM. A "restoring last session…" state, or skipping the selection screen when a last-campaign pref exists, would remove the race.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - ~~Room-Adjacent same-seed reproducibility~~ — FIXED `d88c3cfb4`, VG re-verified node==Chromium byte-identity + fresh-UI pair 2/2. CLOSED.
