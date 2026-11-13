@@ -223,6 +223,67 @@ describe('AiDressButton', () => {
         });
     });
 
+    // Backlog (2026-11-12 WY) ai-dress-hides-vocabulary: the modal states its
+    // ITEM-only capability vocabulary up front, and an honestly furniture-only
+    // answer to a structure-implied ask is called out with a sentinel instead
+    // of silently dropping the walls. The dress cycle itself is unchanged.
+    describe('capability vocabulary (hint + structure sentinel)', () => {
+        const CAPABILITY_HINT = /dress supports item-level operations only/i;
+        const SENTINEL = /the model proposed no structural changes \(dress supports items only\)/i;
+
+        async function askWith(text) {
+            fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+            fireEvent.change(screen.getByPlaceholderText(/how should this map change/i), { target: { value: text } });
+            dressMapProposal.mockResolvedValue(PROPOSAL);
+            fireEvent.click(screen.getByRole('button', { name: /dress map/i }));
+            await waitFor(() => expect(screen.getByText('add chest at 12,8')).toBeInTheDocument());
+        }
+
+        it('the hint renders inside .ai-instruction-overlay every time the modal opens', () => {
+            const { container } = render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+            const hint = screen.getByText(CAPABILITY_HINT);
+            expect(container.querySelector('.ai-instruction-overlay').contains(hint)).toBe(true);
+            expect(hint.textContent).toMatch(/tables, chairs, chests/i);
+            expect(hint.textContent).toMatch(/walls, doors or other structural changes/i);
+        });
+
+        it('the map-view mount shows the same hint (shared component, both entry points)', () => {
+            const { container } = render(
+                <AiDressButton campaignName="test-campaign" map={MAP} mount="map" onProposalChange={vi.fn()} />
+            );
+            fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+            const hint = screen.getByText(CAPABILITY_HINT);
+            expect(container.querySelector('.ai-instruction-overlay').contains(hint)).toBe(true);
+        });
+
+        it('a structure-implied ask answered with furniture-only ops gets the honest sentinel near the preview', async () => {
+            render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            await askWith('enclose the room with walls');
+            const notice = screen.getByRole('status');
+            expect(notice.textContent).toMatch(SENTINEL);
+            // The preview is still offered (the model honestly obeyed the subset).
+            expect(screen.getByText('add chest at 12,8')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /apply to map/i })).toBeInTheDocument();
+        });
+
+        it('a purely item-only instruction never shows the sentinel (no false positives)', async () => {
+            render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            await askWith('add a table at 10,10 and two chairs');
+            expect(screen.queryByText(SENTINEL)).toBeNull();
+        });
+
+        it('Apply after a sentinelled preview still saves through the normal lane (cycle unchanged)', async () => {
+            render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            await askWith('enclose the room with walls');
+            fireEvent.click(screen.getByRole('button', { name: /apply to map/i }));
+            await waitFor(() => expect(saveMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena', PROPOSAL.updated));
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ai_dress', action: 'applied', map: 'battle-arena', ops: 1,
+            }));
+        });
+    });
+
     // Backlog (2026-11-05 CX) no-config-path-POSTs-before-telling: with AI
     // unset/off the ask form told you only AFTER a POST drew the server's
     // by-design 403. Now the gate mirrors AiRefereeSection (`mode && mode !==

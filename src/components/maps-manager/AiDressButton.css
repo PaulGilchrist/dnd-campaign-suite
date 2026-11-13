@@ -44,3 +44,21 @@
   padding: 0.3rem 0.5rem;
   font-size: 0.8rem;
 }
+
+/* Structure-implied-but-items-only proposal (backlog 2026-11-12 WY
+   ai-dress-hides-vocabulary) — same strip vocabulary as .ai-refine-notice,
+   honest neutral warning tokens. */
+.ai-dress-notice {
+  margin: 0;
+  color: var(--color-text);
+  background: var(--background-color-warning);
+  border: 1px solid var(--border-color-warning);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.ai-dress-notice i {
+  color: var(--color-text-secondary);
+  margin-right: 4px;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { dressMapProposal } from '../../services/ai/aiClient.js';
+import { dressStructureNotice } from '../../services/ai/dressCapabilities.js';
 import { saveMapData } from '../../services/maps/mapsService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -31,6 +32,13 @@ import './AiDressButton.css';
  *     (DressPreviewOverlay) on its canvas. Close/Apply/3D-switch/unmount
  *     pushes null — the preview vanishes with zero residue.
  * Ask, Apply, the log pair and the error lane behave identically at both.
+ *
+ * Backlog (2026-11-12 WY) ai-dress-hides-vocabulary: the ask form states the
+ * capability vocabulary UP FRONT (item/furniture ops only — never walls,
+ * doors or structural layers, which validateLiveDressPlan rejects), and the
+ * preview shows an honest sentinel when a structure-implied ask came back
+ * items-only, so "why did the walls vanish?" is never a silent surprise.
+ * The dress cycle itself is untouched: propose → preview → Apply.
  */
 function failureText(res) {
   return (res.errors || [res.error || res.code || 'dress failed']).join(' · ');
@@ -58,6 +66,11 @@ function AiDressAsk({ instruction, setInstruction, busy, aiLive, onAsk }) {
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onAsk(); }}
         />
       </label>
+      <p className="ai-instruction-hint">
+        <i className="fa-solid fa-circle-info" /> Dress supports item-level operations only —
+        props, furniture, POIs and tokens (tables, chairs, chests…). It cannot add, move or
+        remove walls, doors or other structural changes.
+      </p>
       <p className="ai-instruction-hint">⌘/Ctrl+Enter proposes — nothing saves until you preview and Apply.</p>
       <div className="ai-instruction-actions">
         <button type="button" className="ct-btn ct-btn-primary" disabled={busy || !aiLive || !instruction.trim()} onClick={onAsk}>
@@ -68,13 +81,19 @@ function AiDressAsk({ instruction, setInstruction, busy, aiLive, onAsk }) {
   );
 }
 
-function AiDressPreview({ proposal, busy, onApply, docked }) {
+function AiDressPreview({ proposal, instruction, busy, onApply, docked }) {
+  const structureNotice = dressStructureNotice(instruction, proposal);
   return (
     <div className="ai-dress-preview">
       <p className="ai-dress-preview-title">Proposed changes — nothing is saved yet:</p>
       <ul>
         {proposal.preview.map((line, i) => <li key={`${i}-${line}`}>{line}</li>)}
       </ul>
+      {structureNotice && (
+        <p className="ai-dress-notice" role="status">
+          <i className="fa-solid fa-circle-info" /> {structureNotice}
+        </p>
+      )}
       {docked && (
         <p className="ai-dress-preview-hint">
           <i className="fa-solid fa-crosshairs" /> Markers show on the map — read them against the grid before applying.
@@ -103,6 +122,10 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [proposal, setProposal] = useState(null);
+  // The instruction that PRODUCED the live proposal — snapshotted at response
+  // time so the structure sentinel reads what was actually sent, not a prompt
+  // the GM may have edited while the preview is on screen.
+  const [sentInstruction, setSentInstruction] = useState('');
   const mapKey = map.slug || map.fileName;
   const docked = mount === 'map';
 
@@ -116,7 +139,7 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
     return () => onProposalChange(null);
   }, [open, proposal, onProposalChange]);
 
-  const close = () => { setOpen(false); setProposal(null); setError(null); setInstruction(''); };
+  const close = () => { setOpen(false); setProposal(null); setSentInstruction(''); setError(null); setInstruction(''); };
 
   const ask = async () => {
     const text = instruction.trim();
@@ -125,7 +148,7 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
     setError(null);
     const res = await dressMapProposal({ campaignName, mapName: mapKey, instruction: text });
     setBusy(false);
-    if (res.ok) { setProposal(res); return; }
+    if (res.ok) { setProposal(res); setSentInstruction(text); return; }
     setError(failureText(res));
   };
 
@@ -163,7 +186,7 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
       busy={busy} onClose={close}
       overlayClassName={docked ? 'ai-instruction-overlay-dock' : undefined}>
       {proposal
-        ? <AiDressPreview proposal={proposal} busy={busy} onApply={apply} docked={docked} />
+        ? <AiDressPreview proposal={proposal} instruction={sentInstruction} busy={busy} onApply={apply} docked={docked} />
         : <AiDressAsk instruction={instruction} setInstruction={setInstruction} busy={busy} aiLive={aiLive} onAsk={ask} />}
       {error && <p className="ai-dress-error" role="alert">{error}</p>}
     </AiInstructionModal>
