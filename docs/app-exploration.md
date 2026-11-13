@@ -75,7 +75,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-13 CF] Indoor map editor silently EVICTS non-roster player tokens: `useMapLoader.js:105-110` filters doc `players` to campaign character names on mount and the reconciled array autosaves — a hand-seeded or renamed token vanishes within ~2 s with zero feedback. A one-line toast (`Removed 1 token with no matching character`) or console.info would turn the surprise into feedback; files: `src/components/map/hooks/useMapLoader.js`.
 - [2026-11-13 CF] `item-details-dock` carries `role="dialog"` but renders no heading/`aria-labelledby` — it is a modeless dock, not a modal; the stray role breaks `document.querySelector('[role="dialog"]')` probes (CF tripped twice) and mis-announces to screen readers (dialog role implies modal). Either drop the role or give it `aria-label="Item details"` and keep it out of the dialog tier; files: `src/components/map/` (ItemDetailsDock).
 
 ## Blocked / Not Verified (fold-gate ledger)

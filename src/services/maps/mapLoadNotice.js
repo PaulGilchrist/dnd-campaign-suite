@@ -15,3 +15,16 @@
 export function buildMapLoadRejectedNotice(mapName) {
     return `Could not load "${mapName}" — opened a fresh copy. Make an edit to save it back.`;
 }
+
+/**
+ * Notice copy for the mount-time players-reconcile eviction (backlog
+ * 2026-11-13 CF): the indoor loader drops doc `players` whose names are not
+ * in the campaign roster (hand-seeded/renamed tokens vanish and the
+ * reconciled array autosaves). The filter behavior is unchanged — this only
+ * makes it visible: a count + reason toast rides the shared map-notice
+ * channel, while the hook pairs it with a console.info listing the evicted
+ * names for debugging.
+ */
+export function buildTokenEvictionNotice(count) {
+    return `Removed ${count} token${count === 1 ? '' : 's'} with no matching character`;
+}

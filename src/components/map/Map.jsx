@@ -178,6 +178,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     // on the board instead of living only in the campaign log. Those
     // producers pass { sticky: true } (backlog 2026-11-03 CN) — the advisory
     // stays until dismissed; the rejected-load lane keeps the 4000ms timer.
+    // The token-eviction lane (backlog 2026-11-13 CF) also feeds it: mount
+    // reconcile dropping roster-less player tokens announces the count/reason
+    // instead of vanishing them silently.
     const {
         message: mapNotice,
         sticky: mapNoticeSticky,
@@ -188,6 +191,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
     const { mapData, setMapData, placedItems, setPlacedItems, flushSave } = useMapLoader({
         campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost,
         onLoadRejected: showMapNotice,
+        onTokensEvicted: showMapNotice,
     });
 
     const {

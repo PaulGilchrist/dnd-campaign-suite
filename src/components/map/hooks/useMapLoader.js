@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService';
-import { buildMapLoadRejectedNotice } from '../../../services/maps/mapLoadNotice';
+import { buildMapLoadRejectedNotice, buildTokenEvictionNotice } from '../../../services/maps/mapLoadNotice';
 import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig';
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
@@ -28,7 +28,23 @@ function buildSavePayload(mapData, gridSize, placedItems) {
     };
 }
 
-function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost = true, onLoadRejected }) {
+// Mount-time players-reconcile (backlog 2026-11-13 CF): drop doc `players`
+// whose names miss the campaign roster. Filter logic unchanged — extracted so
+// the eviction feedback stays under the load effect's complexity/max-depth
+// caps: console.info lists the evicted names and the `notify` toast seam gets
+// the count + reason. Returns null when nothing would be evicted (clean open,
+// fully silent); otherwise the reconciled array.
+function reconcilePlayersWithRoster(existingPlayers, characters, notify) {
+    const charNames = new Set(characters.map(c => c.name));
+    const reconciled = existingPlayers.filter(p => charNames.has(p.name));
+    if (reconciled.length === existingPlayers.length) return null;
+    const evictedNames = existingPlayers.filter(p => !charNames.has(p.name)).map(p => p.name);
+    console.info('Indoor map editor evicted player tokens with no matching character:', evictedNames);
+    if (notify) notify(buildTokenEvictionNotice(evictedNames.length));
+    return reconciled;
+}
+
+function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridSize, setGridSize, isLocalhost = true, onLoadRejected, onTokensEvicted }) {
     const [mapData, setMapData] = useState(null);
     const [placedItems, setPlacedItems] = useState([]);
     const svgLoadInProgressRef = useRef(false);
@@ -40,6 +56,10 @@ function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridS
     // re-trigger whole-document reloads).
     const onLoadRejectedRef = useRef(onLoadRejected);
     onLoadRejectedRef.current = onLoadRejected;
+    // Token-eviction notice callback (backlog 2026-11-13 CF), read via ref so
+    // an inline arrow from the caller never re-arms the load effect.
+    const onTokensEvictedRef = useRef(onTokensEvicted);
+    onTokensEvictedRef.current = onTokensEvicted;
     // Display name for the rejected-load notice (backlog
     // map-load-notice-slug-naming): the manager row's name the user clicked,
     // read via ref so a name-identity change never re-arms the load effect.
@@ -103,10 +123,14 @@ function useMapLoader({ campaignName, characters, mapName, mapDisplayName, gridS
                     lastSavedRef.current = buildSavePayload(loadedData, loadedGridSize, loadedPlacedItems);
 
                     if (characters && characters.length > 0) {
-                        const charNames = new Set(characters.map(c => c.name));
-                        const existingPlayers = loadedData.players || [];
-                        const reconciled = existingPlayers.filter(p => charNames.has(p.name));
-                        if (reconciled.length !== existingPlayers.length) {
+                        // Eviction feedback (backlog 2026-11-13 CF): filter
+                        // behavior untouched — the reconciled array still
+                        // autosaves via the normal dirty lane; the helper now
+                        // also emits the toast (count + reason) and the
+                        // console.info of the evicted names.
+                        const reconciled = reconcilePlayersWithRoster(
+                            loadedData.players || [], characters, onTokensEvictedRef.current);
+                        if (reconciled) {
                             setMapData(prev => ({ ...prev, players: reconciled }));
                         }
                     }
