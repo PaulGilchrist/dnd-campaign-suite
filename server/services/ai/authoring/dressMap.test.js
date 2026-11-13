@@ -122,7 +122,12 @@ describe('dressMapProposal — indoor happy lane', () => {
         expect(res.updated.draft).toBe(true);
         // Proposal only — the on-disk fixture is EXACTLY what it was.
         expect(MOCK_FS.get(`${MAPS}/sunken-temple.json`)).toBe(doc);
-        expect(log).toHaveBeenCalledWith('unit', expect.objectContaining({ type: 'ai_dress', map: 'sunken-temple', ops: 3, attempts: 1 }));
+        // Human-readable description (WY 2026-11-12 backlog: ai_dress audit rows
+        // had none, so the log list fell back to the title-case type label).
+        expect(log).toHaveBeenCalledWith('unit', expect.objectContaining({
+            type: 'ai_dress', map: 'sunken-temple', ops: 3, attempts: 1,
+            description: 'AI dressed "sunken-temple" with 3 ops (preview)',
+        }));
     });
 
     it('the digest stays compact: ids and cells in, walls/paint/fog/revealed blobs out', async () => {

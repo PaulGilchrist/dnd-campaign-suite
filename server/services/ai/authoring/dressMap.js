@@ -294,9 +294,15 @@ MAP DIGEST (the live document — ids and cells exactly as listed): ${json(diges
     ];
 }
 
+// Human-authored log row (write_rejected/map_regenerated sibling pattern: the
+// producer stamps a plain-English `description` and the log renders it
+// verbatim). Only successes carry one — a refusal row keeps the client-side
+// describer prose with its per-attempt detail.
 function audit(log, info) {
     if (typeof log !== 'function') return;
-    log(info.campaign, { type: 'ai_dress', name: 'AI dress', map: info.map, instruction: String(info.instruction).slice(0, 200), ops: info.ops, attempts: info.attempts });
+    const row = { type: 'ai_dress', name: 'AI dress', map: info.map, instruction: String(info.instruction).slice(0, 200), ops: info.ops, attempts: info.attempts };
+    if (info.description) row.description = info.description;
+    log(info.campaign, row);
 }
 
 /** Everything refusible before a model call — refine.js's gate shape again. */
@@ -352,7 +358,11 @@ export async function dressMapProposal({ campaign, mapName, instruction, aiConfi
         if (!shape.ok) { lastErrors = shape.errors; repairOf = parsed.value; continue; }
         const applied = applyDressOps(doc, parsed.value.ops);
         if (applied.errors) { lastErrors = applied.errors; repairOf = parsed.value; continue; }
-        audit(log, { campaign, map: mapKey, instruction: ask, ops: parsed.value.ops.length, attempts: attempt });
+        const opsCount = parsed.value.ops.length;
+        audit(log, {
+            campaign, map: mapKey, instruction: ask, ops: opsCount, attempts: attempt,
+            description: `AI dressed "${mapKey}" with ${opsCount} op${opsCount === 1 ? '' : 's'} (preview)`,
+        });
         return { ok: true, map: mapKey, ops: parsed.value.ops, preview: applied.preview, updated: applied.updated };
     }
     audit(log, { campaign, map: mapKey, instruction: ask, ops: 0, attempts: 0 });

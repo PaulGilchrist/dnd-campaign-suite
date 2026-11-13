@@ -321,6 +321,23 @@ describe('AI audit rows render labeled one-line summaries', () => {
     expect(firstLine()).toContain('proposed 1 op after 1 attempt');
   });
 
+  // WY backlog (2026-11-12): both producers now author a human `description`
+  // on the row (server preview audit + client applied addEntry) —
+  // formatAiAuditLine prefers it verbatim, so the row never renders through
+  // the derived describer/label fallback.
+  it('dress preview row with an authored description renders it verbatim', () => {
+    setup(Log, [dress({ description: 'AI dressed "battle-arena" with 4 ops (preview)' })]);
+    expect(firstLine()).toBe('AI dressed "battle-arena" with 4 ops (preview)');
+  });
+
+  it('dress applied row with an authored description renders it verbatim', () => {
+    setup(Log, [dress({
+      action: 'applied', instruction: undefined, attempts: undefined,
+      description: 'AI dressed "battle-arena" with 4 ops (applied)',
+    })]);
+    expect(firstLine()).toBe('AI dressed "battle-arena" with 4 ops (applied)');
+  });
+
   // ── robustness + sanitization ─────────────────────────────
 
   it('unknown ai audit shape degrades to a readable key line — no JSON dump, no [object Object]', () => {

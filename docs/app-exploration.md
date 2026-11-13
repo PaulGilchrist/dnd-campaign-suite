@@ -56,7 +56,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-12 WY — `ai_dress` audit rows have no `description`:** the log list renders them through the title-case fallback ("Ai Dress") while every other lane authors human rows with a description — the registry-shaped fix is a one-line `description` (e.g. `AI dressed "map" with 4 ops (preview)`) on both row kinds.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

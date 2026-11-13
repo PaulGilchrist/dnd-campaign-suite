@@ -67,9 +67,12 @@ describe('AiDressButton', () => {
         fireEvent.click(screen.getByRole('button', { name: /apply to map/i }));
         await waitFor(() => expect(saveMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena', PROPOSAL.updated));
         // Applied dressing lands in the campaign log (automation-logging rule),
-        // draft flag rode through on the merged document.
+        // draft flag rode through on the merged document. The row carries a
+        // human `description` (WY backlog: rows had none — the log list fell
+        // back to the derived type label), singular op count reads "1 op".
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             type: 'ai_dress', action: 'applied', map: 'battle-arena', ops: 1,
+            description: 'AI dressed "battle-arena" with 1 op (applied)',
         }));
         expect(saveMapData.mock.calls[0][2].draft).toBe(true);
         // Applied → collapsed again, ready for the next pass.
@@ -193,6 +196,7 @@ describe('AiDressButton', () => {
             await waitFor(() => expect(saveMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena', PROPOSAL.updated));
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'ai_dress', action: 'applied', map: 'battle-arena', ops: 1,
+                description: 'AI dressed "battle-arena" with 1 op (applied)',
             }));
             // Apply → close() → the ops mirror wipes (canvas preview vanishes).
             await waitFor(() => expect(onProposalChange).toHaveBeenLastCalledWith(null));
@@ -280,6 +284,28 @@ describe('AiDressButton', () => {
             await waitFor(() => expect(saveMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena', PROPOSAL.updated));
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'ai_dress', action: 'applied', map: 'battle-arena', ops: 1,
+                description: 'AI dressed "battle-arena" with 1 op (applied)',
+            }));
+        });
+
+        // WY backlog (2026-11-12): the applied row names the map + op count in a
+        // plural register ("4 ops") exactly mirroring the server's preview row.
+        it('a multi-op Apply logs the plural description', async () => {
+            render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            const manyOps = {
+                ...PROPOSAL,
+                ops: Array.from({ length: 4 }, (_, i) => ({ op: 'add', target: 'item', item: { type: 'chest' }, gridX: 5 + i, gridY: 5 })),
+            };
+            fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+            fireEvent.change(screen.getByPlaceholderText(/how should this map change/i), { target: { value: 'dress it up' } });
+            dressMapProposal.mockResolvedValue(manyOps);
+            fireEvent.click(screen.getByRole('button', { name: /dress map/i }));
+            await waitFor(() => expect(screen.getByText('add chest at 12,8')).toBeInTheDocument());
+            fireEvent.click(screen.getByRole('button', { name: /apply to map/i }));
+            await waitFor(() => expect(saveMapData).toHaveBeenCalled());
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ai_dress', action: 'applied', ops: 4,
+                description: 'AI dressed "battle-arena" with 4 ops (applied)',
             }));
         });
     });

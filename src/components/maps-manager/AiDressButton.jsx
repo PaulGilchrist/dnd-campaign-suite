@@ -160,7 +160,13 @@ function AiDressButton({ campaignName, map, mount = 'list', onProposalChange }) 
     setError(null);
     try {
       await saveMapData(campaignName, mapKey, proposal.updated);
-      await addEntry(campaignName, { type: 'ai_dress', action: 'applied', name: 'AI dress', map: proposal.map, ops: proposal.ops.length });
+      const opsCount = proposal.ops.length;
+      await addEntry(campaignName, {
+        type: 'ai_dress', action: 'applied', name: 'AI dress', map: proposal.map, ops: opsCount,
+        // Human row copy (write_rejected/map_regenerated sibling pattern) — the
+        // log list renders this verbatim instead of the derived fallback line.
+        description: `AI dressed "${proposal.map}" with ${opsCount} op${opsCount === 1 ? '' : 's'} (applied)`,
+      });
       close();
     } catch (err) {
       setError(String(err?.message || 'Failed to save the dressed map'));
