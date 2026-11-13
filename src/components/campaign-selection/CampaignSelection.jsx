@@ -4,6 +4,7 @@ import { getCampaignTypes, CAMPAIGN_TYPE_BADGES } from '../../services/campaign/
 import { createSeededCampaign, localDateStamp } from '../../services/campaign/seededCampaign.js';
 import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import useEphemeralToast from '../map/hooks/useEphemeralToast.js';
+import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 import SeededCampaignModal, { ModalError } from './SeededCampaignModal.jsx';
 import './CampaignSelection.css';
 
@@ -287,6 +288,13 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
     setNewCampaignName('');
   };
 
+  // Escape + pure backdrop dismiss (backlog 2026-11-13 DG): both quick-create
+  // modals now answer the app-wide dialog law, routed to the same inert
+  // Cancel lane (closeModal clears only local form state — nothing to discard,
+  // so no confirm arms). Mid-create the Create button is disabled and the
+  // screen swaps to the full-page "Creating…" face, so dismiss needs no gate.
+  const newCampaignDismiss = useModalDismiss(closeModal);
+
   const openSeedModal = (presetKey) => {
     if (modalOpen) return; // see openNewCampaignModal — no stacked overlays
     setSeedPreset(presetKey);
@@ -390,7 +398,13 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
           />
        
          {isLocalhost && showNewCampaignModal && (
-           <div className="modal-overlay">
+           <div
+             className="modal-overlay"
+             role="presentation"
+             onMouseDown={newCampaignDismiss.handleOverlayMouseDown}
+             onClick={newCampaignDismiss.handleOverlayClick}
+             onKeyDown={newCampaignDismiss.handleKeyDown}
+           >
              <div className="modal-content">
                <h2>New Campaign</h2>
                <input

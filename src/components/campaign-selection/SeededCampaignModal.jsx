@@ -1,3 +1,5 @@
+import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
+
 /**
  * Name-entry modal for the seeded quick-create campaigns (Arena/Starter).
  * Extracted from CampaignSelection so the parent stays under the complexity
@@ -10,6 +12,11 @@
  * `error` is the inline denial lane (backlog 2026-11-11 LZ): a refused create
  * (e.g. the CAMPAIGN_LOCK 403) renders here with the typed name preserved —
  * the app never drops to the full-page error screen for it.
+ * Escape and a pure backdrop click route to onCancel (backlog 2026-11-13 DG:
+ * WAI-ARIA modal-dismiss parity with the DeleteConfirmModal family — an
+ * un-submitted name is nothing to discard, so no confirm arms); while
+ * `seeding` is true both buttons are disabled and the dismiss lanes stay
+ * inert mid-create. Wiring lives in hooks/ui/useModalDismiss.js.
  */
 /**
  * Inline denial strip shared by both quick-create modals (backlog 2026-11-11
@@ -26,8 +33,16 @@ export function ModalError({ message }) {
 
 function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, onCancel, error }) {
   const titleId = `seeded-campaign-title-${preset.prefix.toLowerCase()}`;
+  const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
+    useModalDismiss(onCancel, { disabled: seeding });
   return (
-    <div className="modal-overlay">
+    <div
+      className="modal-overlay"
+      role="presentation"
+      onMouseDown={handleOverlayMouseDown}
+      onClick={handleOverlayClick}
+      onKeyDown={handleKeyDown}
+    >
       <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <h2 id={titleId}>{preset.button}</h2>
         <p className="seeded-campaign-note">{preset.note}</p>
