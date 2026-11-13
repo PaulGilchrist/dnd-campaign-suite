@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel } from '../../services/maps/hexMapUtils';
 import * as mapsService from '../../services/maps/mapsService.js';
@@ -20,8 +20,11 @@ function getLinkPickerLayout(showLinkPicker, indoorMaps) {
 // tabIndex={0}> makes the row focusable and fires the SAME onActivate
 // closure on Enter/Space. A keypress never synthesises a click event on an
 // SVG <g> (only native controls do), so the keydown handler cannot
-// double-fire the onClick. Escape stays inert (dismiss law: backdrop click
-// on the svg root is the only pointer dismiss, and it is zero-write).
+// double-fire the onClick. Escape is NOT an activation key here (it never
+// reaches onActivate); the menu-level Escape DISMISS law lives in
+// POIContextMenu below (replaces the adc78327f "Escape inert" law —
+// backlog 2026-11-13: Escape = dismiss-zero-write, mirroring the
+// 3f41dc16b modal family).
 function MenuOption({ x, y, fill, fontSize = '11', className = 'menu-option', onActivate, children }) {
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -104,6 +107,28 @@ function LinkPicker({ showLinkPicker, menuX, menuY, menuWidth, layout, indoorMap
 
 function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onDelete, onRename, onLinkMap, onUnlinkMap, onRemoveRoads, setShowRename, onClose, indoorMaps = [], viewPortBounds, roads = [] }) {
     const [showLinkPicker, setShowLinkPicker] = useState(false);
+
+    // Escape = dismiss-zero-write (backlog 2026-11-13, REPLACING the
+    // adc78327f "Escape inert" law): the keyboard now rides the SAME onClose
+    // backdrop path the svg-root click uses — the menu unmounts, no mutation
+    // callback fires, so the map's autosave PUT lane never runs, and the
+    // focused item's action is never activated (the modal-family law from
+    // 3f41dc16b: Escape routes to the plain Cancel handler, nothing else).
+    // The listener lives on window rather than as a menu-root onKeyDown
+    // because acceptance covers focus anywhere — menu root, a menuitem, or
+    // the board/svg behind the menu. Escape inside the inline rename input
+    // stays inert (its cancel face is a separate backlog item).
+    useEffect(() => {
+        if (!selectedPoi) return undefined;
+        const handleKeyDown = (e) => {
+            if (e.key !== 'Escape') return;
+            if (e.target instanceof HTMLElement && e.target.classList.contains('context-menu-input')) return;
+            setShowLinkPicker(false);
+            onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedPoi, onClose]);
 
     if (!selectedPoi) return null;
 

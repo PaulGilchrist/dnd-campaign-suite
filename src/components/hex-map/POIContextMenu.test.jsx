@@ -1,4 +1,5 @@
 // @maintained-by-ai
+import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import POIContextMenu from './POIContextMenu.jsx';
@@ -319,8 +320,8 @@ describe('POIContextMenu', () => {
             expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
         });
 
-        it.each(['a', 'Escape', 'Tab'])(
-            'non-activating key %s on a menuitem dispatches nothing (dismiss stays inert/zero-write)',
+        it.each(['a', 'Tab'])(
+            'non-activating key %s on a menuitem dispatches nothing (menu-local keys stay zero-write)',
             (key) => {
                 renderMenu();
                 fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Hide', exact: true }), { key });
@@ -340,6 +341,84 @@ describe('POIContextMenu', () => {
             fireEvent.keyDown(row, { key: 'Enter' });
             expect(defaultProps.onLinkMap).toHaveBeenCalledWith('poi-1', 'dungeon-map.json');
             expect(defaultProps.onLinkMap).toHaveBeenCalledTimes(1);
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    // Improvement 2026-11-13 (replaces the adc78327f "Escape inert" law):
+    // Escape = dismiss-zero-write, riding the same onClose backdrop path as
+    // the svg-root click (modal-family law of 3f41dc16b). The window-level
+    // listener must answer regardless of where focus lives — menu root, a
+    // menuitem, or the board behind the menu — and it must NEVER activate
+    // the focused option.
+    describe('Escape dismissal (zero-write)', () => {
+        function expectOnlyOnClose() {
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+            ['onToggleVisibility', 'onDelete', 'onRename', 'onLinkMap', 'onUnlinkMap', 'onRemoveRoads', 'setShowRename']
+                .forEach((key) => expect(defaultProps[key]).not.toHaveBeenCalled());
+            expect(confirmSpy).not.toHaveBeenCalled();
+        }
+
+        it.each([
+            { name: 'a menuitem', getTarget: () => screen.getByRole('menuitem', { name: 'Hide', exact: true }) },
+            { name: 'the menu root', getTarget: (container) => container.querySelector('.poi-context-menu') },
+            { name: 'the board behind the menu', getTarget: () => window },
+        ])('Escape on $name dismisses via onClose with zero activation', ({ getTarget }) => {
+            const { container } = renderMenu();
+            fireEvent.keyDown(getTarget(container), { key: 'Escape' });
+            expectOnlyOnClose();
+        });
+
+        it('unmounts the menu immediately (stateful parent: onClose nulls the selection)', () => {
+            function Board() {
+                const [selected, setSelected] = useState({ id: 'poi-1', q: 0, r: 0 });
+                return (
+                    <svg>
+                        <POIContextMenu
+                            {...defaultProps}
+                            selectedPoi={selected}
+                            onClose={() => setSelected(null)}
+                        />
+                    </svg>
+                );
+            }
+            const { container } = render(<Board />);
+            expect(container.querySelector('.poi-context-menu')).toBeInTheDocument();
+            fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Delete', exact: true }), { key: 'Escape' });
+            expect(container.querySelector('.poi-context-menu')).not.toBeInTheDocument();
+            // Zero activation on the way out.
+            expect(defaultProps.onDelete).not.toHaveBeenCalled();
+            expect(defaultProps.onToggleVisibility).not.toHaveBeenCalled();
+        });
+
+        it('closes an open link picker and re-opens cleanly after an Escape dismissal', () => {
+            const { container, rerender } = renderMenu({ indoorMaps: ['dungeon-map.json'] });
+            fireEvent.click(screen.getByText('Link to Map...'));
+            expect(screen.getByText('Dungeon Map')).toBeInTheDocument();
+            fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Dungeon Map', exact: true }), { key: 'Escape' });
+            expect(defaultProps.onLinkMap).not.toHaveBeenCalled();
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+            // Parent re-opens the same POI (selectedPoi toggled null → set):
+            // the stale picker must not resurface.
+            rerender(<POIContextMenu {...defaultProps} indoorMaps={['dungeon-map.json']} selectedPoi={null} />);
+            rerender(<POIContextMenu {...defaultProps} indoorMaps={['dungeon-map.json']} />);
+            expect(container.querySelector('.poi-context-menu')).toBeInTheDocument();
+            expect(screen.queryByText('Dungeon Map')).not.toBeInTheDocument();
+        });
+
+        it('is inert inside the inline rename input (separate cancel-face backlog item)', () => {
+            renderMenu({ showRename: 'poi-1' });
+            fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
+            expect(defaultProps.onClose).not.toHaveBeenCalled();
+            expect(defaultProps.onRename).not.toHaveBeenCalled();
+        });
+
+        it('leaves no live listener once the menu is closed (Escape dispatches nothing)', () => {
+            const { rerender } = renderMenu();
+            fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Hide', exact: true }), { key: 'Escape' });
+            expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+            rerender(<POIContextMenu {...defaultProps} selectedPoi={null} />);
+            fireEvent.keyDown(window, { key: 'Escape' });
             expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
         });
     });
