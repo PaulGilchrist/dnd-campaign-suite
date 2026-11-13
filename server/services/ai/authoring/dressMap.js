@@ -16,13 +16,18 @@
  * preview + pre-validated merged document) returns to the GM; the normal
  * map PUT lane (mapsService.saveMapData) persists it, drafts keep their
  * draft flag, and walls/paint/fog/image layers are untouchable because the
- * op set has no verbs for them.
+ * op set has no verbs for them — and add-item ops whose item.type NAMES a
+ * structural layer ("wall") are refused fail-closed (wall-as-item law, see
+ * addPlacedItem), so the promise holds against smuggled nouns too.
  */
 import fs from 'fs';
 import path from 'path';
 import { campaignMapsDir, normalizeMapFile } from '../../../utils/campaignPaths.js';
 // Single kebab implementation (pinned client/server parity) — no third copy.
 import { toKebabCase } from '../../../routes/maps.js';
+// Shared dress capability vocabulary (refine.js/proposedNoChange.js sibling
+// pattern — one source of truth for what "structural" means).
+import { structuralItemType } from '../../../../src/services/ai/dressCapabilities.js';
 import { chat } from '../providers/localProvider.js';
 import { aiConfigLive } from '../index.js';
 import { extractJsonObject } from '../promptBuilder.js';
@@ -139,6 +144,16 @@ function freshId(rows, prefix) {
 
 function addPlacedItem(rows, op, at, ctx) {
     if (!op.item?.type) { ctx.errors.push(`${at} needs item.type (chest, trap, torch, door…)`); return; }
+    // Wall-as-item refusal (bug-ai-dress-wall-as-item-sentinel-contradiction):
+    // the schema whitelists TARGETS, so `item:{type:'wall'}` otherwise lands
+    // as a "?" placeholder prop while the modal copy promises walls are
+    // impossible. Refuse structural nouns fail-closed through the ordinary
+    // all-or-nothing error lane (registered prop sprites like stairs/door
+    // stay placeable); the repair retry reads this sentence and re-proposes.
+    if (structuralItemType(op.item.type)) {
+        ctx.errors.push(`${at}: item type ${json(op.item.type)} names a structural layer the op set cannot build — place a real prop instead (chest, table, torch, door, statue…) or drop the op`);
+        return;
+    }
     const row = {
         id: freshId(rows, `ai-dress-item-${op.item.type}-${op.gridX}-${op.gridY}`),
         type: op.item.type,
@@ -282,7 +297,7 @@ function buildDressMessages({ digest, instruction }) {
             content: `You dress ONE existing live D&D map for the Game Master with in-place operations. You never regenerate it and you never touch walls, painting, fog, revealed area, or images — your op set has NO verbs for them.
 Output ONLY a single JSON object: {"ops":[…]}, nothing else. Each op:
 { "op": "add"|"move"|"remove", "target": "item"|"poi"|"token", "gridX": n, "gridY": n, … }
-- item  = placed prop (chest, trap, torch, door, furniture…) — INDOOR maps only; add carries item{type,name?}
+- item  = placed prop (chest, trap, torch, door, furniture…) — INDOOR maps only; add carries item{type,name?}. item.type must name a PROP — never a structural noun ("wall", "barricade", "doorway"…): structural item types are refused, you have no verbs for the wall/paint/fog layers.
 - poi   = labelled point of interest; add carries poi{name,description?,targetMap?}. poi.targetMap (kebab file name of another map) opens a portal — portals are OUTDOOR hex maps only (party travel is hex-based); never put targetMap on an indoor map's poi.
 - token = monster/NPC marker on the token lane — INDOOR maps only; add carries token{name,kind monster|npc,fromEncounter?}
 - add needs gridX/gridY on open ground inside the grid (hex: a cell that exists in the terrain — check the counts and pick sensible central land).

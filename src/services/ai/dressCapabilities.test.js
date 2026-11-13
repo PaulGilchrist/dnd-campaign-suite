@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
     instructionImpliesStructure,
     proposalIncludesStructuralOps,
+    structuralItemType,
     dressStructureNotice,
     STRUCTURE_SENTINEL,
 } from './dressCapabilities.js';
@@ -54,6 +55,63 @@ describe('proposalIncludesStructuralOps', () => {
         expect(proposalIncludesStructuralOps(null)).toBe(false);
         expect(proposalIncludesStructuralOps([null])).toBe(false);
     });
+
+    // bug-ai-dress-wall-as-item-sentinel-contradiction (live XA face): the
+    // model smuggled the wall ask through as target:'item' rows — the preview
+    // then READ "add wall at x,y" while the sentinel beside it claimed "no
+    // structural changes". The gate must read the same words the preview does.
+    it('flags wall-as-item smuggling on an item-class target (the live contradiction face)', () => {
+        expect(proposalIncludesStructuralOps([
+            { op: 'add', target: 'item', item: { type: 'wall' }, gridX: 4, gridY: 5 },
+            { op: 'add', target: 'item', item: { type: 'chest' }, gridX: 5, gridY: 6 },
+        ])).toBe(true);
+        expect(proposalIncludesStructuralOps([
+            { op: 'add', target: 'item', item: { type: 'prop', name: 'stone wall' }, gridX: 4, gridY: 5 },
+        ])).toBe(true);
+        // LIVE second face (fix-run): the model re-smuggled as snake_case
+        // `type:'stone_wall'` — "_" is a \b word char, so the boundary law
+        // must treat it as a separator, not glue.
+        expect(proposalIncludesStructuralOps([
+            { op: 'add', target: 'item', item: { type: 'stone_wall' }, gridX: 4, gridY: 5 },
+        ])).toBe(true);
+        // stairs-as-prop shares the preview vocabulary — the sentinel stays
+        // quiet rather than claim "no structural changes" beside `add stairs`.
+        expect(proposalIncludesStructuralOps([
+            { op: 'add', target: 'item', item: { type: 'stairs' }, gridX: 4, gridY: 5 },
+        ])).toBe(true);
+    });
+
+    it('plain props and POI labels never read as structural ops', () => {
+        expect(proposalIncludesStructuralOps([
+            { op: 'add', target: 'item', item: { type: 'chest', name: 'treasure chest' }, gridX: 5, gridY: 6 },
+            { op: 'add', target: 'poi', poi: { name: 'Ruined Gateway' }, gridX: 1, gridY: 2 },
+        ])).toBe(false);
+    });
+});
+
+describe('structuralItemType — the server add-item refusal vocabulary', () => {
+    it('refuses structural nouns that the map cannot render', () => {
+        expect(structuralItemType('wall')).toBe(true);
+        expect(structuralItemType('Walls')).toBe(true);
+        expect(structuralItemType('stone wall')).toBe(true);
+        expect(structuralItemType('stone_wall')).toBe(true); // snake_case re-smuggle
+        expect(structuralItemType('barricade')).toBe(true);
+        expect(structuralItemType('doorway')).toBe(true);
+    });
+
+    it('allows every prop noun the indoor map actually renders (itemSprites ART_TYPES)', () => {
+        // door/stairs/secretDoor read structural in prose but are SERVED prop types.
+        for (const type of ['door', 'secretDoor', 'stairs', 'arrowSlitWall', 'chest', 'table', 'torch']) {
+            expect(structuralItemType(type)).toBe(false);
+        }
+    });
+
+    it('tolerates junk input', () => {
+        expect(structuralItemType('')).toBe(false);
+        expect(structuralItemType('   ')).toBe(false);
+        expect(structuralItemType(null)).toBe(false);
+        expect(structuralItemType(42)).toBe(false);
+    });
 });
 
 describe('dressStructureNotice', () => {
@@ -72,5 +130,17 @@ describe('dressStructureNotice', () => {
     it('stays silent before a proposal exists and when ops really are structural', () => {
         expect(dressStructureNotice('enclose the room with walls', null)).toBeNull();
         expect(dressStructureNotice('enclose the room with walls', { ops: [{ op: 'add', target: 'wall' }] })).toBeNull();
+    });
+
+    // The filed contradiction itself: structure ask + wall-NAMED item rows ⇒
+    // the notice must go quiet (the preview is visibly listing walls).
+    it('never contradicts a preview that lists wall-as-item rows', () => {
+        const smuggled = {
+            ops: [
+                { op: 'add', target: 'item', item: { type: 'wall', name: 'stone wall' }, gridX: 4, gridY: 5 },
+                { op: 'add', target: 'item', item: { type: 'chest' }, gridX: 5, gridY: 6 },
+            ],
+        };
+        expect(dressStructureNotice('Build a stone wall around the center of the room and place a treasure chest inside the enclosure.', smuggled)).toBeNull();
     });
 });

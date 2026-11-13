@@ -16,10 +16,24 @@
  * "chest, trap, torch, door…"), and "room"/"window" name landmarks and props
  * too ("throne room" is the modal's own placeholder) — matching those would
  * false-positive the sentinel on legitimate item asks.
+ *
+ * WALL-AS-ITEM LAW (bug-ai-dress-wall-as-item-sentinel-contradiction): the
+ * schema whitelists TARGETS, not item nouns — a model can smuggle a wall ask
+ * through as `target:'item', item:{type:'wall'}`. Since the liveDressPlanSchema
+ * only constrains `target`, BOTH seams now read the item nouns: the sentinel
+ * gate below scans them (the notice can never claim "no structural changes"
+ * beside `add wall at x,y` preview lines), and the server applier refuses
+ * wall-named add types fail-closed via structuralItemType().
  */
+import { itemSpriteHref } from '../maps/itemSprites.js';
 
-/** Structural-change vocabulary: walls/enclosures/architecture, not props. */
-const STRUCTURE_TERMS = /\b(?:walls?|doorways?|enclos(?:e|es|ed|ing|ure)|barricad(?:e|es|ing)?|partitions?|barriers?|fences?|staircases?|stairs|ceilings?|corridors?|hallways?|structur\w*)\b/i;
+// Structural-change vocabulary: walls/enclosures/architecture, not props.
+// Boundaries are spelled `(?<![A-Za-z0-9])…(?![A-Za-z0-9])` instead of `\b`
+// because `\b` counts "_" as a WORD char — the live model re-smuggled walls
+// as `type:'stone_wall'` and a \b-based scan read it as one identifier with
+// no "wall" inside it. (CamelCase stays safe the same way: 'arrowSlitWall'
+// has a real sprite and its "Wall" is letter-joined → never matches.)
+const STRUCTURE_TERMS = /(?<![A-Za-z0-9])(?:walls?|doorways?|enclos(?:e|es|ed|ing|ure)|barricad(?:e|es|ing)?|partitions?|barriers?|fences?|staircases?|stairs|ceilings?|corridors?|hallways?|structur\w*)(?![A-Za-z0-9])/i;
 
 /** The op targets liveDressPlanSchema validates — anything else is structural. */
 const ITEM_CLASS_TARGETS = new Set(['item', 'poi', 'token']);
@@ -34,12 +48,34 @@ export function instructionImpliesStructure(text) {
 }
 
 /**
- * True when any proposed op addresses a structural target. The validated plan
- * never contains one (the schema refuses them) — this stays honest if the op
- * vocabulary ever grows, and it is the second half of the sentinel gate.
+ * True when any proposed op addresses a structural target OR dresses a prop
+ * NAMED like a structural layer (`target:'item', item:{type:'wall'}` — the
+ * smuggled face the live model produced). The preview list renders item.type
+ * verbatim (`add wall at 4,5`), so the sentinel gate reads the same words:
+ * a proposal listing wall-ish rows never pairs with "no structural changes".
+ * Only item nouns are scanned — a landmark POI called "Ruined Gateway" is a
+ * label, not a preview row that reads like architecture.
  */
 export function proposalIncludesStructuralOps(ops) {
-  return (ops || []).some((op) => op && !ITEM_CLASS_TARGETS.has(op.target));
+  return (ops || []).some((op) => Boolean(op) && (
+    !ITEM_CLASS_TARGETS.has(op.target)
+    || STRUCTURE_TERMS.test(String(op.item?.type ?? ''))
+    || STRUCTURE_TERMS.test(String(op.item?.name ?? ''))
+  ));
+}
+
+/**
+ * Server-side refusal predicate (dressMap.js `addPlacedItem`): a proposed
+ * item TYPE that names a structural layer the op set cannot build. Rows like
+ * `type:'wall'` land as generic "?" placeholders — they promise masonry and
+ * deliver a dashed box beside the untouched-but-empty `walls[]` lane. Types
+ * the map actually RENDERS are legitimate dressing even when their noun reads
+ * structural ('stairs', 'door', 'secretDoor', 'arrowSlitWall' all have real
+ * sprites in itemSprites.js) — those stay allowed.
+ */
+export function structuralItemType(type) {
+  if (typeof type !== 'string' || !type.trim()) return false;
+  return STRUCTURE_TERMS.test(type) && itemSpriteHref(type) === null;
 }
 
 /**

@@ -34,11 +34,14 @@ import './AiDressButton.css';
  * Ask, Apply, the log pair and the error lane behave identically at both.
  *
  * Backlog (2026-11-12 WY) ai-dress-hides-vocabulary: the ask form states the
- * capability vocabulary UP FRONT (item/furniture ops only — never walls,
- * doors or structural layers, which validateLiveDressPlan rejects), and the
- * preview shows an honest sentinel when a structure-implied ask came back
- * items-only, so "why did the walls vanish?" is never a silent surprise.
- * The dress cycle itself is untouched: propose → preview → Apply.
+ * capability vocabulary UP FRONT (item/furniture ops only — prop sprites like
+ * doors and stairs ARE served; real walls/paint/fog layers are not, and the
+ * server refuses wall-named item TYPES fail-closed after the wall-as-item
+ * bug), and the preview shows an honest sentinel when a structure-implied
+ * ask came back items-only, so "why did the walls vanish?" is never a silent
+ * surprise. The sentinel gate also reads item nouns, so it can never
+ * contradict `add wall at x,y` preview lines. The dress cycle is untouched:
+ * propose → preview → Apply.
  */
 function failureText(res) {
   return (res.errors || [res.error || res.code || 'dress failed']).join(' · ');
@@ -68,8 +71,8 @@ function AiDressAsk({ instruction, setInstruction, busy, aiLive, onAsk }) {
       </label>
       <p className="ai-instruction-hint">
         <i className="fa-solid fa-circle-info" /> Dress supports item-level operations only —
-        props, furniture, POIs and tokens (tables, chairs, chests…). It cannot add, move or
-        remove walls, doors or other structural changes.
+        props, furniture, POIs and tokens (tables, chairs, chests, prop doors…). It cannot add,
+        move or remove real walls, paint or fog — the structural map layers.
       </p>
       <p className="ai-instruction-hint">⌘/Ctrl+Enter proposes — nothing saves until you preview and Apply.</p>
       <div className="ai-instruction-actions">

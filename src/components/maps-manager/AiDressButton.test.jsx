@@ -249,7 +249,11 @@ describe('AiDressButton', () => {
             const hint = screen.getByText(CAPABILITY_HINT);
             expect(container.querySelector('.ai-instruction-overlay').contains(hint)).toBe(true);
             expect(hint.textContent).toMatch(/tables, chairs, chests/i);
-            expect(hint.textContent).toMatch(/walls, doors or other structural changes/i);
+            expect(hint.textContent).toMatch(/cannot add, move or remove real walls, paint or fog/i);
+            // bug-ai-dress-wall-as-item: prop doors ARE served (sprite art +
+            // prompt vocabulary) — the hint must not forbid them.
+            expect(hint.textContent).toMatch(/prop doors/i);
+            expect(hint.textContent).not.toMatch(/cannot add, move or remove walls, doors/i);
         });
 
         it('the map-view mount shows the same hint (shared component, both entry points)', () => {
@@ -274,6 +278,33 @@ describe('AiDressButton', () => {
         it('a purely item-only instruction never shows the sentinel (no false positives)', async () => {
             render(<AiDressButton campaignName="test-campaign" map={MAP} />);
             await askWith('add a table at 10,10 and two chairs');
+            expect(screen.queryByText(SENTINEL)).toBeNull();
+        });
+
+        // bug-ai-dress-wall-as-item-sentinel-contradiction — the filed face:
+        // a wall-typed item proposal smuggled through the item-class target.
+        // The server now refuses it fail-closed, but the sentinel gate is the
+        // second line of honesty: while any preview line reads like masonry,
+        // "no structural changes" must never render beside it.
+        it('a preview listing add-wall rows never pairs with the no-structural-changes sentinel', async () => {
+            render(<AiDressButton campaignName="test-campaign" map={MAP} />);
+            const smuggled = {
+                ok: true,
+                map: 'battle-arena',
+                ops: [
+                    { op: 'add', target: 'item', item: { type: 'wall', name: 'stone wall' }, gridX: 3, gridY: 3 },
+                    { op: 'add', target: 'item', item: { type: 'chest' }, gridX: 5, gridY: 5 },
+                ],
+                preview: ['add wall at 3,3', 'add chest at 5,5'],
+                updated: { name: 'battle-arena', placedItems: [] },
+            };
+            fireEvent.click(screen.getByRole('button', { name: /dress "battle arena" with ai/i }));
+            fireEvent.change(screen.getByPlaceholderText(/how should this map change/i), {
+                target: { value: 'Build a stone wall around the center of the room and place a treasure chest inside the enclosure.' },
+            });
+            dressMapProposal.mockResolvedValue(smuggled);
+            fireEvent.click(screen.getByRole('button', { name: /dress map/i }));
+            await waitFor(() => expect(screen.getByText('add wall at 3,3')).toBeInTheDocument());
             expect(screen.queryByText(SENTINEL)).toBeNull();
         });
 
