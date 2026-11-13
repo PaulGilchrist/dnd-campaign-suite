@@ -12,6 +12,7 @@ import { applyWorldProposal } from '../../services/ai/applyWorldProposal.js'
 import { findUnknownLedgerNames, ledgerNameList } from '../../services/ai/proposalNameAudit.js'
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { loadSettlements } from '../../services/campaign/settlementsService.js'
+import { loadFactions } from '../../services/campaign/factionsService.js'
 import './AiWorldConsole.css'
 
 const KINDS = [
@@ -43,11 +44,12 @@ export default function AiWorldConsole({ campaignName }) {
     React.useEffect(() => {
         if (!proposal || proposal.kind !== 'quest_draft') return undefined
         let cancelled = false
-        Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName)]).then(([npcs, settlements]) => {
+        Promise.allSettled([loadNPCs(campaignName), loadSettlements(campaignName), loadFactions(campaignName)]).then(([npcs, settlements, factions]) => {
             if (cancelled) return
             setLedgerNames({
                 npcNames: npcs.status === 'fulfilled' ? ledgerNameList(npcs.value, 'npcs') : [],
                 settlementNames: settlements.status === 'fulfilled' ? ledgerNameList(settlements.value, 'settlements') : [],
+                factionNames: factions.status === 'fulfilled' ? ledgerNameList(factions.value, 'factions') : [],
             })
         })
         return () => { cancelled = true }

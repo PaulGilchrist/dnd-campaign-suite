@@ -59,7 +59,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (YB 2026-11-13) World-keeper ledger advisory is possessive-noisy: flags "The Iron Consortium's" as "not in the ledger — check spelling" while the ledger holds "The Iron Consortium" — strip trailing `'s`/`s` variants before the diff. `src/services/ai/applyWorldProposal.js` (or the shared ledger-name matcher).
 - (YB 2026-11-13) World `quest_draft`'s `Add quest to ledger` lands the quest LIVE (status active, no `draft:true` flag) while the receipt reads "(AI-drafted)" — the draft-flag convention elsewhere (npcs/maps/encounters land `draft:true` until Approve) makes this copy/state pair ambiguous; either stamp the row draft:true and approve-implicit, or reword the receipt to "added directly to the ledger".
 
 ## Blocked / Not Verified (fold-gate ledger)

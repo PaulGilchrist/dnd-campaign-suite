@@ -6,7 +6,7 @@
  * while rumor/npc_dialogue are fail-closed allow-listed. This helper closes
  * the consistency gap as a NON-BLOCKING advisory: it scrubs the proposal's
  * prose for proper-name candidates and reports which ones match nothing in
- * the campaign's npcs/settlements ledgers, so the referee sees
+ * the campaign's npcs/settlements/factions ledgers, so the referee sees
  * "names not in the ledger — check spelling: …" BEFORE choosing to apply.
  * Nothing here can refuse a write — the apply lane is untouched.
  */
@@ -64,51 +64,91 @@ function collectRun(text, start, firstToken) {
 
 /**
  * Proper-name candidate phrases found in prose ("Nobody McFakeface",
- * "Nowhere-on-Sea"). Heuristic scrub: sentence-initial single words and
- * all-caps tokens are skipped to keep the advisory quiet in honest prose.
+ * "Nowhere-on-Sea"), each tagged sentenceStart when the run opens its
+ * sentence. Heuristic scrub: sentence-initial single words and all-caps
+ * tokens are skipped to keep the advisory quiet in honest prose.
  */
-export function extractProperNameRuns(text) {
+export function extractProperNameCandidates(text) {
     const runs = []
     if (typeof text !== 'string' || !text) return runs
     RUN_RE.lastIndex = 0
     let match
     while ((match = RUN_RE.exec(text))) {
+        const sentenceStart = isSentenceStart(text, match.index)
         const { run, end } = collectRun(text, match.index, match[0])
         RUN_RE.lastIndex = end
-        if (isPlausibleName(run, isSentenceStart(text, match.index))) {
-            runs.push(run.join(' '))
+        if (isPlausibleName(run, sentenceStart)) {
+            runs.push({ run: run.join(' '), sentenceStart })
         }
     }
     return runs
 }
 
-/** Ledger GET payloads arrive as { npcs: [...] } / { settlements: [...] }. */
+export function extractProperNameRuns(text) {
+    return extractProperNameCandidates(text).map(candidate => candidate.run)
+}
+
+/** Ledger GET payloads arrive as { npcs: [...] } / { settlements: [...] } / { factions: [...] }. */
 export function ledgerNameList(payload, key) {
     const list = Array.isArray(payload) ? payload : payload?.[key]
     return (Array.isArray(list) ? list : []).map(entry => entry?.name).filter(Boolean)
 }
 
+// Whole-phrase normalisation for the stem-exact face of isLedgerAnchored
+// (splitWords drops to single words; a phrase keeps its spaces collapsed).
+function normalizePhrase(text) {
+    return String(text).toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Is a candidate phrase grounded in the ledger? Two sanctioned faces:
+ *  1. STEM-EXACT: the normalised phrase IS a ledger name, or becomes one by
+ *     stripping a trailing possessive ('s / ’s) or a plain plural s. The
+ *     de-s stem must be an EXACT ledger name — never fuzzy: with ledger
+ *     "Iron Consortium", "Iron Consortiums" resolves but "Iron Consortiumii"
+ *     and the typo "Iron Conshortium" do not (YB 2026-11-13: possessives of
+ *     ledger names, e.g. "The Iron Consortium's", were surfaced as unknowns).
+ *  2. EVERY WORD (partial-name grounding): every word appears in some ledger
+ *     name — "Marta" still grounds to "Marta Copperkettle". A sentence-start
+ *     run drops its LEAD token first: the scrubber fuses a capitalised verb
+ *     into the phrase ("Repay Marta Copperkettle", "Deliver Marta's") and
+ *     that verb is never part of a name. Tightened from ANY word: one shared
+ *     stop-word ("the"/"iron") used to silently suppress whole typos.
+ */
+function isLedgerAnchored(candidate, knownWords, knownNames) {
+    const phrase = normalizePhrase(candidate.run)
+    if (knownNames.has(phrase) || knownNames.has(phrase.replace(/(?:['’]s|s)$/, ''))) return true
+    let words = splitWords(candidate.run)
+    if (candidate.sentenceStart && words.length > 1) words = words.slice(1)
+    return words.length > 0 && words.every(word => knownWords.has(word))
+}
+
 /**
  * Unknown proper names referenced by a quest_draft proposal's prose
  * (description + rewards; the quest title itself is a title, not a
- * reference). A candidate is "known" when any of its words appears in any
- * ledger name (case-insensitive, mirroring the server's matchAllowed).
+ * reference). A candidate is "known" when it is ledger-anchored (see
+ * isLedgerAnchored). The ledgers are the full campaign world ledger:
+ * NPCs, settlements AND factions.
  * @returns {string[]} unrecognised name phrases, in order, deduped — []
  *   for non-quest kinds, no checkable names, or an empty/unloaded ledger
  *   (nothing to check against: stay silent, never guess).
  */
 export function findUnknownLedgerNames(proposal, ledgers) {
     if (!proposal || proposal.kind !== 'quest_draft') return []
-    const ledgerNames = [...(ledgers?.npcNames || []), ...(ledgers?.settlementNames || [])]
+    const ledgerNames = [...(ledgers?.npcNames || []), ...(ledgers?.settlementNames || []), ...(ledgers?.factionNames || [])]
         .map(name => String(name || '').trim()).filter(Boolean)
     if (!ledgerNames.length) return []
     const knownWords = new Set()
-    for (const name of ledgerNames) splitWords(name).forEach(word => knownWords.add(word))
+    const knownNames = new Set()
+    for (const name of ledgerNames) {
+        splitWords(name).forEach(word => knownWords.add(word))
+        knownNames.add(normalizePhrase(name))
+    }
     const prose = [proposal.description, proposal.rewards].filter(Boolean).join('\n')
     const unknown = []
-    for (const run of extractProperNameRuns(prose)) {
-        if (splitWords(run).some(word => knownWords.has(word))) continue
-        if (!unknown.includes(run)) unknown.push(run)
+    for (const candidate of extractProperNameCandidates(prose)) {
+        if (isLedgerAnchored(candidate, knownWords, knownNames)) continue
+        if (!unknown.includes(candidate.run)) unknown.push(candidate.run)
     }
     return unknown
 }

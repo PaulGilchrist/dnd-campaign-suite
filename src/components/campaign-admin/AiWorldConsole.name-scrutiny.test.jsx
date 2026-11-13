@@ -14,11 +14,13 @@ vi.mock('../../services/ai/aiClient.js', () => ({ askWorldKeeper: vi.fn() }));
 vi.mock('../../services/ai/applyWorldProposal.js', () => ({ applyWorldProposal: vi.fn() }));
 vi.mock('../../services/npcs/npcsService.js', () => ({ loadNPCs: vi.fn() }));
 vi.mock('../../services/campaign/settlementsService.js', () => ({ loadSettlements: vi.fn() }));
+vi.mock('../../services/campaign/factionsService.js', () => ({ loadFactions: vi.fn() }));
 
 import { askWorldKeeper } from '../../services/ai/aiClient.js';
 import { applyWorldProposal } from '../../services/ai/applyWorldProposal.js';
 import { loadNPCs } from '../../services/npcs/npcsService.js';
 import { loadSettlements } from '../../services/campaign/settlementsService.js';
+import { loadFactions } from '../../services/campaign/factionsService.js';
 import AiWorldConsole from './AiWorldConsole.jsx';
 
 const CN = 'test-campaign';
@@ -44,6 +46,7 @@ beforeEach(() => {
     applyWorldProposal.mockResolvedValue({ applied: true, detail: 'quest added.' });
     loadNPCs.mockResolvedValue({ npcs: [{ name: 'Marta Copperkettle' }] });
     loadSettlements.mockResolvedValue({ settlements: [{ name: 'Bravor' }] });
+    loadFactions.mockResolvedValue({ factions: [{ name: 'The Iron Consortium' }] });
 });
 
 const askQuest = async (proposal) => {
@@ -71,9 +74,27 @@ describe('AiWorldConsole — quest_draft accept-scrutiny chip', () => {
         expect(advisory()).toBeNull();
     });
 
+    // YB 2026-11-13 — possessive-noise fix, component wiring face: faction
+    // ledger names count, and POSSESSIVE forms of ledger names stay out of
+    // the advisory while an invented name still surfaces.
+    it('possessive of a ledger faction stays out of the advisory; an invented name is named', async () => {
+        await askQuest({
+            kind: 'quest_draft',
+            name: 'Parley at the Quay',
+            description: "The Iron Consortium's agent Marta Copperkettle meets Zarvok on the quay.",
+            rewards: '',
+        });
+        await waitFor(() => expect(loadFactions).toHaveBeenCalledWith(CN));
+        await waitFor(() => expect(advisory()).not.toBeNull());
+        expect(advisory().textContent).toContain('Zarvok');
+        expect(advisory().textContent).not.toContain('Iron Consortium');
+        expect(advisory().textContent).not.toContain('Marta');
+    });
+
     it('empty ledgers → graceful silence (nothing to check against, no crash)', async () => {
         loadNPCs.mockResolvedValue({ npcs: [] });
         loadSettlements.mockResolvedValue({ settlements: [] });
+        loadFactions.mockResolvedValue({ factions: [] });
         await askQuest(fabricatedQuest);
         await waitFor(() => expect(loadNPCs).toHaveBeenCalled());
         expect(advisory()).toBeNull();
@@ -82,6 +103,7 @@ describe('AiWorldConsole — quest_draft accept-scrutiny chip', () => {
     it('ledger fetch death → the card still renders un-adorned and stays applyable', async () => {
         loadNPCs.mockRejectedValue(new Error('offline'));
         loadSettlements.mockRejectedValue(new Error('offline'));
+        loadFactions.mockRejectedValue(new Error('offline'));
         await askQuest(fabricatedQuest);
         await waitFor(() => expect(loadNPCs).toHaveBeenCalled());
         expect(advisory()).toBeNull();
@@ -95,6 +117,7 @@ describe('AiWorldConsole — quest_draft accept-scrutiny chip', () => {
         await waitFor(() => expect(screen.getByText('Ash and ember.')).toBeInTheDocument());
         expect(loadNPCs).not.toHaveBeenCalled();
         expect(loadSettlements).not.toHaveBeenCalled();
+        expect(loadFactions).not.toHaveBeenCalled();
         expect(advisory()).toBeNull();
     });
 
