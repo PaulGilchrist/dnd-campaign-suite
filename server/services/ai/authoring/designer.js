@@ -154,9 +154,11 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
             lastErrors = ['blueprint was not valid JSON (likely truncated output)'];
             break;
         }
-        const errors = collectBlueprintErrors(campaign, { ...parsed.value, scope });
+        const { blueprint: trimmed, dropped } = trimBlueprintToPlan(parsed.value, scope);
+        const candidate = { ...trimmed, scope };
+        const errors = collectBlueprintErrors(campaign, candidate);
         if (errors.length === 0) {
-            return finalize(campaign, { ...parsed.value, scope }, log, attempt);
+            return finalize(campaign, candidate, log, attempt, dropped ? { dropped } : {});
         }
         // Parsed-but-structurally-invalid: the small repair prompt is genuinely useful —
         // keep the two-attempt repair lane for this face only.
@@ -225,6 +227,35 @@ function plannedEntityCount(plan) {
         const item = plan.find(p => p.kind === kind);
         return sum + (item && item.count > 0 ? item.count : 0);
     }, 0);
+}
+
+/**
+ * Trim a batch emit to the GM's EDITED plan (backlog YB 2026-11-13): kinds the
+ * plan counted 0 (or omitted entirely) are off-plan — rows the model invented
+ * for them are emptied BEFORE validation, so they can never trip the
+ * unique-name/referential guards (whose canon-collision rejections then forced
+ * the per-entity resume fallback and wasted the whole batch call) and are
+ * never written to disk. Kinds with count > 0 keep every row so their normal
+ * validation semantics (batch-internal + outward uniqueness, name law) are
+ * unchanged. Mirrors the resume loop's plan.find selection; a scope without an
+ * entityPlan list keeps the old unscoped behaviour.
+ */
+function trimBlueprintToPlan(blueprint, scope) {
+    const plan = Array.isArray(scope?.entityPlan) ? scope.entityPlan : null;
+    if (!plan || plan.length === 0) return { blueprint, dropped: 0 };
+    let dropped = 0;
+    const trimmed = { ...blueprint };
+    for (const kind of RESUME_ORDER) {
+        const item = plan.find(p => p.kind === kind);
+        if (item && item.count > 0) continue;
+        const key = PLAN_KIND[kind];
+        const rows = trimmed[key];
+        if (Array.isArray(rows) && rows.length > 0) {
+            dropped += rows.length;
+            trimmed[key] = [];
+        }
+    }
+    return { blueprint: trimmed, dropped };
 }
 
 function draftedEntityCount(blueprint) {

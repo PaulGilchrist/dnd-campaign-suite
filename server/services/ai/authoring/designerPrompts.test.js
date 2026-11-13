@@ -51,6 +51,43 @@ describe('blueprint batch seam — guidance rides the built system message', () 
     });
 });
 
+describe('blueprint batch seam — edited plan counts scope the prompt (YB 2026-11-13)', () => {
+    const build = (entityPlan) => buildBlueprintMessages({
+        storyBible: { party: [] },
+        scope: { scope: 'session', storySummary: 'x', entityPlan },
+        monsterMenu: [], existingNames: {}, history: [],
+    })[0].content;
+
+    it('zeroed kinds are explicitly forbidden; only the planned entities are demanded', () => {
+        const system = build([
+            { kind: 'faction', count: 0 }, { kind: 'npc', count: 1 }, { kind: 'settlement', count: 1 },
+            { kind: 'quest', count: 0 }, { kind: 'encounter', count: 1 }, { kind: 'session', count: 1 },
+            { kind: 'mapPlan', count: 1 },
+        ]);
+        expect(system).toMatch(/do not propose any factions or quests/i);
+        expect(system).toMatch(/ONLY the planned entities/i);
+        expect(system).toMatch(/Exactly: 1 npc/);
+        // planned kinds are never named in the prohibition line
+        expect(system).not.toMatch(/do not propose any[^.\n]*npc/i);
+    });
+
+    it('kinds absent from the plan count as zero and are forbidden too', () => {
+        const system = build([{ kind: 'npc', count: 2 }]);
+        expect(system).toMatch(/Exactly: 2 npcs/);
+        for (const kind of ['faction', 'settlement', 'quest', 'encounter', 'session', 'mapPlan']) {
+            expect(system).toMatch(new RegExp(`do NOT propose any[^.\\n]*${kind}`, 'i'));
+        }
+    });
+
+    it('a plan-less scope keeps the old unscoped contract (no plan-contract copy)', () => {
+        for (const plan of [undefined, []]) {
+            const system = build(plan);
+            expect(system).not.toMatch(/do not propose any/i);
+            expect(system).not.toMatch(/ONLY the planned entities/i);
+        }
+    });
+});
+
 describe('single-entity resume seam — per-kind guidance in the system message', () => {
     it('quest emit bans naming it "quest" and shows the example', () => {
         const messages = buildSingleEntityMessages({

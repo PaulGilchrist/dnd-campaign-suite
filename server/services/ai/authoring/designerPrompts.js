@@ -90,6 +90,36 @@ export const KIND_FIELD_RULES = {
     mapPlan: 'mapPlan{name kebab-case,displayName,generator hex|dungeon,params{gridSize,density,seed},dressing{pois[],placedItemOps[],tokens[]}} — placedItemOps and tokens are dungeon-only (hex maps carry terrain + POIs only)',
 };
 
+/**
+ * The GM's EDITED plan counts scope the batch prompt (backlog YB 2026-11-13):
+ * kinds the plan counted 0 are explicitly forbidden, so the model cannot invent
+ * off-plan canon entities whose names then trip the unique-name guard and force
+ * the per-entity resume fallback (a whole wasted model call). Mirrors the
+ * resume loop's own selection: first plan item per kind, count > 0 means
+ * planned, missing/zero means off-plan. A scope without an entityPlan list
+ * keeps the old unscoped contract.
+ */
+function planContractRule(scope) {
+    const plan = Array.isArray(scope?.entityPlan) ? scope.entityPlan : null;
+    if (!plan || plan.length === 0) return '';
+    const countFor = (kind) => {
+        const item = plan.find(p => p.kind === kind);
+        return item && item.count > 0 ? item.count : 0;
+    };
+    const kinds = Object.keys(KIND_FIELD_RULES);
+    const plural = (kind, n) => `${n} ${n === 1 ? kind : `${kind}s`}`;
+    const planned = kinds.filter(k => countFor(k) > 0);
+    const zero = kinds.filter(k => countFor(k) === 0);
+    const lines = [`THE GM's EDITED BUILD PLAN IS THE CONTRACT — produce ONLY the planned entities:`];
+    lines.push(planned.length
+        ? `- Exactly: ${planned.map(k => plural(k, countFor(k))).join(', ')} — no more, no fewer, of each kind.`
+        : '- Every planned count is 0: emit empty lists for all kinds.');
+    if (zero.length) {
+        lines.push(`- Do NOT propose any ${zero.map(k => `${k}s`).join(' or ')} — the plan counts 0 of them; off-plan rows of those kinds are dropped before validation and never drafted.`);
+    }
+    return lines.join('\n') + '\n\n';
+}
+
 function blueprintRules({ scope, allow }) {
     return `Build the COMPLETE blueprint now: one JSON object, nothing else.
 
@@ -99,7 +129,7 @@ function blueprintRules({ scope, allow }) {
   "quests": [...], "encounters": [...], "sessions": [...], "mapPlans": [...]
 }
 
-Hard rules — violating any one makes the whole batch fail validation:
+${planContractRule(scope)}Hard rules — violating any one makes the whole batch fail validation:
 1. EVERY name must be unique in the batch AND not collide with existing names: ${json(allow.existingNames)}. ${namingRule()}
 2. encounter.selectedMonsters entries: {"index","name","qty"} using ONLY this bestiary menu (index+name verbatim): ${json(allow.monsters)}.
 3. settlement.notableNPCs and session.links values must name existing campaign rows OR rows you create in this same blueprint.
