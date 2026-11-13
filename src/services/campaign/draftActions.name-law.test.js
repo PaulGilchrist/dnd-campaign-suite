@@ -28,6 +28,9 @@ vi.mock('../encounters/encountersService.js', () => ({
 vi.mock('../maps/mapsService.js', () => ({
     loadMaps: vi.fn(), loadMapData: vi.fn(), saveMapData: vi.fn(), deleteMap: vi.fn(),
 }));
+vi.mock('../ui/logService.js', () => ({
+    addEntry: vi.fn(), getLog: vi.fn(),
+}));
 
 import { loadQuests, saveQuests } from './questsService.js';
 import { saveNPC } from '../npcs/npcsService.js';

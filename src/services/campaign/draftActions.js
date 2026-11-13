@@ -10,6 +10,10 @@
  * re-reads the fresh list (minimizing the concurrent-edit window; a 409 still
  * surfaces via the services' err.conflict flag) and overwrites with just the
  * draft flag removed on the target row.
+ *
+ * Each successful decision ALSO writes one thin `ai_draft_approved`/
+ * `ai_draft_rejected` campaign-log row (backlog 2026-11-13) so other GM tabs
+ * can see where a live entity came from — see auditDraftDecision below.
  */
 import { loadQuests, saveQuests, deleteQuest } from './questsService.js';
 import { loadFactions, saveFactions, deleteFaction } from './factionsService.js';
@@ -19,6 +23,7 @@ import { loadSessions, saveSession, deleteSession } from './sessionsService.js';
 import { loadEncounters, loadEncounter, updateEncounter, deleteEncounter } from '../encounters/encountersService.js';
 import { loadMaps, loadMapData, saveMapData, deleteMap } from '../maps/mapsService.js';
 import { nameLawViolation } from '../ai/entityNameLaw.js';
+import { addEntry } from '../ui/logService.js';
 
 /** Drop the draft flag without leaving an explicit `draft: false` residue. */
 const approved = (row) => Object.fromEntries(
@@ -84,8 +89,45 @@ function nameLawRefusal(kind, row) {
   return null;
 }
 
-/** Approve one draft row through its kind's normal save lane. */
+/** Human-facing singular kind for the audit description (maps rows read
+ *  better as "map" than the designer's "mapPlan" authoring kind). */
+const AUDIT_KIND_OF = { ...KIND_WORD_OF, maps: 'map' };
+
+/** Best available display name for a draft row across the kind shapes. */
+const auditLabel = row => row?.name ?? row?.displayName ?? row?.slug
+  ?? row?.fileName?.replace(/\.json$/, '') ?? row?.id ?? 'unnamed';
+
+/**
+ * Thin campaign-log audit row for an approve/reject decision (backlog
+ * 2026-11-13: approvals used to ride the plain CRUD save lane with zero
+ * trace, so another GM tab could not see that a live entity came from a
+ * draft approval). Rides the same POST /log lane as the `adventure_regenerated`
+ * and `ai_director_applied` audit siblings — log/audit data ONLY: the save/
+ * delete lanes stay untouched and nothing re-POSTs through the change-data
+ * store. Fires only AFTER the lane succeeded; a log-write failure never
+ * masks or reverses the decision the GM already made.
+ */
+async function auditDraftDecision(campaignName, action, kind, row) {
+  const isApprove = action === 'approve';
+  const verb = isApprove ? 'Approved' : 'Rejected';
+  try {
+    await addEntry(campaignName, {
+      type: `ai_draft_${isApprove ? 'approved' : 'rejected'}`,
+      name: 'AI draft review',
+      description: `${verb} AI draft: ${AUDIT_KIND_OF[kind] || kind} "${auditLabel(row)}"`,
+    });
+  } catch (err) {
+    console.error(`[draftActions] ai_draft_${isApprove ? 'approved' : 'rejected'} audit row failed:`, err);
+  }
+}
+
+/** Approve one draft row through its kind's normal save lane, then audit. */
 export async function approveDraft(campaignName, kind, row) {
+  await approveViaNormalLane(campaignName, kind, row);
+  await auditDraftDecision(campaignName, 'approve', kind, row);
+}
+
+async function approveViaNormalLane(campaignName, kind, row) {
   const c = campaignName;
   const violation = nameLawRefusal(kind, row);
   if (violation) {
@@ -128,8 +170,14 @@ export async function approveDraft(campaignName, kind, row) {
   }
 }
 
-/** Reject (delete) one draft row through its kind's normal delete lane. */
+/** Reject (delete) one draft row through its kind's normal delete lane, then audit. */
 export async function rejectDraft(campaignName, kind, row) {
+  const result = await rejectViaNormalLane(campaignName, kind, row);
+  await auditDraftDecision(campaignName, 'reject', kind, row);
+  return result;
+}
+
+async function rejectViaNormalLane(campaignName, kind, row) {
   const c = campaignName;
   switch (kind) {
     case 'quests': return deleteQuest(c, row.id);
