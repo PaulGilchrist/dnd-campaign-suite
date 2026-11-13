@@ -49,7 +49,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears; re-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 ZC — build-plan audit row records the MODEL-PROPOSED counts, not the GM's edited plan:** `AI designer proposed a build plan (scope "session", 3 entities)` even when the GM edits to 1 before generating, and the generate row (`drafted 1 entity`) carries no planned-vs-proposed delta or `dropped` count on the clean face. Provenance gap for reconstructing what the GM actually asked for. `server/services/ai/authoring/designer.js` finalize stamp.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

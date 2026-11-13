@@ -7,8 +7,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../providers/localProvider.js', () => ({ chat: vi.fn(), isLocalEndpoint: () => true }));
 vi.mock('../index.js', () => ({ aiConfigLive: (c) => !!(c && c.mode && c.mode !== 'off') }));
+const { notesState } = vi.hoisted(() => ({ notesState: { plans: [] } }));
 vi.mock('./designNotes.js', () => ({
-    loadNotes: vi.fn(() => ({ messages: [], plans: [], storySummary: null })),
+    loadNotes: vi.fn(() => ({ messages: [], plans: notesState.plans, storySummary: null })),
     appendMessages: vi.fn(),
     recordPlan: vi.fn(),
 }));
@@ -32,7 +33,7 @@ import { collectBlueprintErrors } from './apply.js';
 
 const AI = { mode: 'autopilot', endpoint: 'http://localhost:1234/v1', model: 'm' };
 const log = vi.fn();
-beforeEach(() => { log.mockClear(); applyBlueprint.mockReset(); collectBlueprintErrors.mockReset().mockReturnValue([]); });
+beforeEach(() => { log.mockClear(); applyBlueprint.mockReset(); collectBlueprintErrors.mockReset().mockReturnValue([]); notesState.plans = []; });
 
 const auditRows = () => log.mock.calls.map(([, entry]) => entry).filter(e => e.type === 'ai_designer');
 
@@ -136,6 +137,89 @@ describe('designer audit descriptions (ai_dress pattern)', () => {
         const row = auditRows().find(e => e.stage === 'generate-resume');
         expect(row.description).toBe(
             'AI designer drafted 1 of 2 entities before stopping — generation stopped at quest #1/1 — model output kept failing validation');
+    });
+
+    // ── Backlog ZC 2026-11-13: proposed-vs-executed provenance ──────────────
+    it('edited-counts batch face names BOTH the executed plan total and the model-proposed total', async () => {
+        // The model proposed 3 npcs; the GM edited the plan down to 1 before generating.
+        notesState.plans = [{ scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'npc', count: 3 }], proposedAt: 1 }];
+        const scope = { scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'npc', count: 1 }] };
+        const blueprint = { scope, npcs: [{ name: 'V' }], factions: [], quests: [], settlements: [], sessions: [], encounters: [], mapPlans: [] };
+        const chatFn = vi.fn(async () => JSON.stringify(blueprint));
+        applyBlueprint.mockResolvedValue({ ok: true, created: { npcs: 1 }, snapshot: 's.zip', errors: [] });
+        const res = await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        expect(res.ok).toBe(true);
+        const row = auditRows().find(e => e.stage === 'generate' && !e.fallback);
+        expect(row).toMatchObject({ planned: 1, proposed: 3 });
+        expect(row.description).toBe(
+            'AI designer drafted 1 entity per the edited plan (1 planned, model proposed 3, restore point s.zip)');
+    });
+
+    it('edited-counts resume face keeps the per-entity-resume marker alongside both totals', async () => {
+        notesState.plans = [{
+            scope: 'session', sessionNumber: 4,
+            entityPlan: [{ kind: 'faction', count: 2 }, { kind: 'quest', count: 2 }], proposedAt: 1,
+        }];
+        const scope = {
+            scope: 'session', sessionNumber: 4,
+            entityPlan: [{ kind: 'faction', count: 1 }, { kind: 'quest', count: 0 }],
+        };
+        const chatFn = vi.fn(async (cfg) => {
+            if (cfg.schemaName === 'campaign_blueprint') return 'garbage-not-json';
+            return JSON.stringify({ name: 'The Salvage Court' });
+        });
+        applyBlueprint.mockResolvedValue({ ok: true, created: { factions: 1 }, snapshot: 's.zip', errors: [] });
+        await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        const row = auditRows().find(e => e.stage === 'generate' && !e.fallback);
+        expect(row.resumed).toBe(true);
+        expect(row.description).toBe(
+            'AI designer drafted 1 entity per the edited plan (1 planned, model proposed 4, via per-entity resume, restore point s.zip)');
+    });
+
+    it('agreement face stays simple — no delta clutter, no extra payload keys', async () => {
+        notesState.plans = [{ scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'npc', count: 1 }], proposedAt: 1 }];
+        const scope = { scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'npc', count: 1 }] };
+        const blueprint = { scope, npcs: [{ name: 'V' }], factions: [], quests: [], settlements: [], sessions: [], encounters: [], mapPlans: [] };
+        const chatFn = vi.fn(async () => JSON.stringify(blueprint));
+        applyBlueprint.mockResolvedValue({ ok: true, created: { npcs: 1 }, snapshot: 's.zip', errors: [] });
+        await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        const row = auditRows().find(e => e.stage === 'generate' && !e.fallback);
+        expect('planned' in row).toBe(false);
+        expect('proposed' in row).toBe(false);
+        expect(row.description).toBe('AI designer drafted 1 entity (restore point s.zip)');
+    });
+
+    it('trimmed off-plan rows keep riding the copy as a dropped count (both faces)', async () => {
+        const plan = [{ kind: 'faction', count: 1 }];
+        notesState.plans = [{ scope: 'session', sessionNumber: 4, entityPlan: plan, proposedAt: 1 }];
+        const scope = { scope: 'session', sessionNumber: 4, entityPlan: plan };
+        // Model invents 2 npc rows for an off-plan kind → trimmed before write.
+        const blueprint = { scope, npcs: [{ name: 'N1' }, { name: 'N2' }], factions: [{ name: 'F0' }], quests: [], settlements: [], sessions: [], encounters: [], mapPlans: [] };
+        const chatFn = vi.fn(async () => JSON.stringify(blueprint));
+        applyBlueprint.mockResolvedValue({ ok: true, created: { factions: 1 }, snapshot: 's.zip', errors: [] });
+        await generateBlueprint({ campaign: 'c', scope, aiConfig: AI, chatFn, log });
+        const row = auditRows().find(e => e.stage === 'generate' && !e.fallback);
+        expect(row.dropped).toBe(2); // payload key preserved (designer.plan-scope pin)
+        expect(row.description).toBe('AI designer drafted 1 entity (restore point s.zip, dropped 2 off-plan)');
+
+        // Divergent face carries the dropped phrase too.
+        log.mockClear(); applyBlueprint.mockClear();
+        notesState.plans = [{ scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'faction', count: 2 }], proposedAt: 1 }];
+        const edited = { scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'faction', count: 1 }, { kind: 'quest', count: 0 }] };
+        await generateBlueprint({ campaign: 'c', scope: edited, aiConfig: AI, chatFn, log });
+        const editedRow = auditRows().find(e => e.stage === 'generate' && !e.fallback);
+        expect(editedRow.description).toBe(
+            'AI designer drafted 1 entity per the edited plan (1 planned, model proposed 2, restore point s.zip, dropped 2 off-plan)');
+    });
+
+    it('the plan row still records the model-proposed counts after a GM edit exists', async () => {
+        // Criterion: proposePlan is untouched — history/plans never feed its copy.
+        notesState.plans = [{ scope: 'session', entityPlan: [{ kind: 'npc', count: 9 }] }];
+        const scope = { scope: 'session', sessionNumber: 4, entityPlan: [{ kind: 'encounter', count: 1 }, { kind: 'npc', count: 2 }] };
+        const res = await proposePlan({ campaign: 'c', aiConfig: AI, chatFn: vi.fn(async () => JSON.stringify(scope)), log });
+        expect(res.ok).toBe(true);
+        expect(auditRows()[0].description)
+            .toBe('AI designer proposed a build plan (scope "session", 3 entities)');
     });
 
     it('zero-success stop and subset-integrity failure both say nothing was written and name the error', async () => {

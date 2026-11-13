@@ -128,6 +128,12 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
     scope = stripServerStamps(scope);
 
     const notes = loadNotes(campaign);
+    // Provenance (backlog ZC 2026-11-13): the plan audit row keeps the raw
+    // model-proposed counts; a GM edit only re-POSTs the edited scope. The
+    // proposal itself is still in designNotes' plan history, so compare the
+    // two here and thread both totals into the generate row's stamp whenever
+    // they diverge — the server honours edited counts, so it knows both sides.
+    const provenance = planProvenance(notes, scope);
     const bible = buildStoryBible(campaign, { notes });
     const levels = scope.levelRange || bible.partyLevels;
     const menu = monsterMenu({ minCr: Math.max(0, (levels.min || 1) - 2), maxCr: (levels.max || 20) + 2 });
@@ -162,7 +168,7 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
         const candidate = { ...trimmed, scope };
         const errors = collectBlueprintErrors(campaign, candidate);
         if (errors.length === 0) {
-            return finalize(campaign, candidate, log, attempt, dropped ? { dropped } : {});
+            return finalize(campaign, candidate, log, attempt, { ...(dropped ? { dropped } : {}), ...provenance });
         }
         // Parsed-but-structurally-invalid: the small repair prompt is genuinely useful —
         // keep the two-attempt repair lane for this face only.
@@ -171,7 +177,7 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
     }
 
     audit(log, campaign, { stage: 'generate', fallback: 'per-entity resume', errors: lastErrors.slice(0, 5) }, callsConsumed);
-    return resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig, callsConsumed });
+    return resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig, callsConsumed, provenance });
 }
 
 async function finalize(campaign, blueprint, log, attempts, extra = {}) {
@@ -191,7 +197,7 @@ async function finalize(campaign, blueprint, log, attempts, extra = {}) {
 
 /** Truncation recovery: emit the scope's entities one at a time, in
  *  dependency order, each anchored to the full story bible + finished siblings. */
-async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig, callsConsumed }) {
+async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig, callsConsumed, provenance = {} }) {
     const blueprint = { scope };
     // Honest audit (114009c66 law): every ai_designer row from here on carries
     // the model calls ACTUALLY consumed — the failed batch leg plus each call
@@ -217,7 +223,7 @@ async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chat
     // renders the honest "via per-entity resume" verdict instead of the give-up
     // phrase; attempts carries the total model calls actually consumed
     // (failed batch leg + every resume call), matching the sibling audit law.
-    return finalize(campaign, blueprint, log, consumed.calls, { resumed: true });
+    return finalize(campaign, blueprint, log, consumed.calls, { resumed: true, ...provenance });
 }
 
 // Server-owned stamps the scope schema (additionalProperties:false) never
@@ -236,6 +242,31 @@ function plannedEntityCount(plan) {
         const item = plan.find(p => p.kind === kind);
         return sum + (item && item.count > 0 ? item.count : 0);
     }, 0);
+}
+
+// Same reduce the plan audit row uses (auditDescription's stage==='plan'
+// branch) so proposed/executed totals can never diverge by formula alone.
+function planCountTotal(entityPlan) {
+    return Array.isArray(entityPlan) && entityPlan.length
+        ? entityPlan.reduce((sum, p) => sum + (Number(p?.count) || 0), 0)
+        : null;
+}
+
+/**
+ * Proposed-vs-executed totals for the generate audit row (backlog ZC).
+ * designNotes' plan history stores each raw model proposal (recordPlan); the
+ * last one matching this scope kind is the proposal the GM edited. Returns {}
+ * — no extra payload keys — when either total is unknown (legacy no-plan
+ * generate) or they agree, so the clean face keeps its simple honest copy and
+ * the byte-clean success payload.
+ */
+function planProvenance(notes, scope) {
+    const plans = Array.isArray(notes?.plans) ? notes.plans : [];
+    const proposed = [...plans].reverse().find(p => p && p.scope === scope?.scope);
+    const proposedTotal = planCountTotal(proposed?.entityPlan);
+    const plannedTotal = planCountTotal(scope?.entityPlan);
+    if (proposedTotal === null || plannedTotal === null || proposedTotal === plannedTotal) return {};
+    return { planned: plannedTotal, proposed: proposedTotal };
 }
 
 /**
@@ -340,17 +371,20 @@ async function generateOne({ scope, allow, kind, item, siblings, chatFn, aiConfi
     return null;
 }
 
+function entityCountPhrase(n) {
+    return `${n} ${n === 1 ? 'entity' : 'entities'}`;
+}
+
 // Plain-English row description (the ai_dress f91276b39 pattern: the producer
 // stamps `description` and the Log renders it verbatim instead of the derived
 // describer prose). Wording always matches the row's stage AND outcome —
 // failures name the error, successes name the scope/entity count.
 function auditDescription(payload) {
-    const countPhrase = (n) => `${n} ${n === 1 ? 'entity' : 'entities'}`;
     const errorsPhrase = (errors) => (Array.isArray(errors) ? errors.filter(Boolean).join('; ') : '') || 'unknown error';
     if (payload.stage === 'plan') {
         return payload.error
             ? `AI designer plan failed — ${payload.error}`
-            : `AI designer proposed a build plan (scope "${payload.scope}", ${countPhrase((payload.entityPlan || []).reduce((sum, p) => sum + (Number(p?.count) || 0), 0))})`;
+            : `AI designer proposed a build plan (scope "${payload.scope}", ${entityCountPhrase((payload.entityPlan || []).reduce((sum, p) => sum + (Number(p?.count) || 0), 0))})`;
     }
     if (payload.fallback) {
         return `AI designer generate fell back to ${payload.fallback} — ${errorsPhrase(payload.errors)}`;
@@ -366,7 +400,25 @@ function auditDescription(payload) {
             : `AI designer ${payload.stage} stopped${payload.snapshot ? ` (restore point ${payload.snapshot})` : ' — wrote nothing'}`;
         return `${head} — ${errorsPhrase(payload.errors)}`;
     }
-    return `AI designer drafted ${countPhrase(createdTotal(payload.created))}${payload.resumed ? ' via per-entity resume' : ''} (restore point ${payload.snapshot || 'none'})`;
+    return generateSuccessDescription(payload);
+}
+
+// Provenance (backlog ZC 2026-11-13): when planProvenance found the GM's
+// edited plan diverging from the model's proposal, name both totals; the
+// agreement face stays simple. A trimmed off-plan count always rides the
+// copy (it was payload-only before — the Log renders only the description).
+function generateSuccessDescription(payload) {
+    const drafted = entityCountPhrase(createdTotal(payload.created));
+    const resume = payload.resumed ? ' via per-entity resume' : '';
+    const dropped = Number(payload.dropped) > 0 ? `, dropped ${payload.dropped} off-plan` : '';
+    const snapshot = `restore point ${payload.snapshot || 'none'}`;
+    const edited = Number.isFinite(payload.planned) && Number.isFinite(payload.proposed)
+        && payload.planned !== payload.proposed;
+    if (!edited) {
+        return `AI designer drafted ${drafted}${resume} (${snapshot}${dropped})`;
+    }
+    return `AI designer drafted ${drafted} per the edited plan (${payload.planned} planned,`
+        + ` model proposed ${payload.proposed}${resume.replace(' via', ', via')}, ${snapshot}${dropped})`;
 }
 
 function audit(log, campaign, payload, attempts) {
