@@ -37,3 +37,20 @@ On successful category delete, in the same commit that removes `customCategories
 
 ## Severity
 Data integrity risk — a confirmed silent misrouted write: an override list persists for a category that no longer exists, under a UI state that claims a different mood. Not catastrophic (swept by Admin clear; niche path), but it is exactly the "displays X, stores Y" class.
+
+## Resolution
+FIXED 2026-11-13. Root cause confirmed exactly as diagnosed: `executeDeleteCategory` in `src/components/music/MusicPlayer.jsx` tore the editor down (`clearDraft` + `setEditing(false)`) when `editing && editMood === moodKey`, but never reset `editMood`; `openEditor` then fell back to the dangling key (`music.mood || editMood`), the controlled `#music-editor-mood` select silently rendered its first option (displayed `Combat`), and `saveTracks` wrote `overrides[editMood]` verbatim — an orphan row for a deleted category.
+
+One correction to the suggested fix: the proposed guard `isCustomMood(editMood) && !customCategories[editMood]` would NOT have fired — a dangling key is absent from the merged `moods` catalogue entirely, so `isCustomMood()` returns `false` for it. The existence check is against `moods`, not the custom prefix.
+
+Changes (`src/components/music/MusicPlayer.jsx` only — no 2024/ruleset sibling; music is single-implementation):
+1. **Primary (expected-behavior (a)):** in `executeDeleteCategory`, on successful delete, `editMood === moodKey` now resets to `MOODS[0].key` regardless of whether the editor was open (the chip-× lane with a closed editor dangled too); the editor-closes-with-the-delete behavior is kept.
+2. **Defense-in-depth (expected-behavior (b)):** shared `refuseMissingMood(what)` guard used at the top of both `saveTracks` and `resetMood` — if `editMood` is missing from the merged `moods` catalogue (e.g. the category was deleted in ANOTHER tab, which this tab's reset lane never sees), the write is refused with inline `.music-editor-error` copy `Mood "<label>" no longer exists — pick a mood before saving` plus a `console.debug` trace (invalid-input precedent: the zero-valid-tracks lane). No PATCH leaves the tab.
+
+The cosmetic sibling (discard dialog naming the raw deleted key) is fixed by the editMood reset — the label resolves through `moodLabel` to a real mood again.
+
+Verification:
+- Live repro BEFORE fix (test-campaign, :5173): created `QA CF 2`, opened editor, typed `dQw4w9WgXcQ`, deleted category via in-editor button + `Yes, Delete Category`, reopened editor → select displayed `Combat` while save toast read `custom-qa-cf-2 tracks saved — keep editing` and GET change-data showed `music.overrides["custom-qa-cf-2"]` with `customCategories: {}`. Exact bug.
+- Live re-run AFTER fix, same steps: reopened editor select reads/displays `Town` with a matching `<option>` and Town starter tracks seeded; Save toast `Town tracks saved — keep editing`; GET shows `overrides.town` only, NO `custom-qa-cf-2` key. Adjacent sanity: create → save tracks → chip playable → chip-× delete all still exact; 0 console errors.
+- New regression test `src/components/music/MusicPlayer.deleted-category-orphan-overrides.test.jsx` (5 tests): in-editor-delete reopen/save-to-displayed-mood no-orphan lock; closed-editor chip-× reset; post-delete discard dialog names a real label; remote-tab-delete Save refusal zero-write; Reset refusal zero-write (remote echoes simulated via `setRuntimeObject` skipSync, per the remote-adoption test idiom).
+- `npx vitest run src/components/music/` → 13 files / 94 tests passed. `npm run lint` → zero errors/warnings. Full suite + Admin clears (change-data `{}`, log `[]`) — see run record.

@@ -483,7 +483,21 @@ function MusicPlayer({ campaignName, visible = true }) {
     }
   }, [pendingDiscard, seedEditor, clearDraft]);
 
+  // Defense-in-depth for the orphan-write class (bug-music-deleted-category-
+  // orphan-overrides): never persist overrides under a key the sidebar
+  // catalogue no longer contains — such a bucket is invisible to every UI
+  // lane and would resurface as ghost tracks if the slug is ever recreated.
+  // The editor-delete lane already resets editMood; this guards every other
+  // way the state could dangle (e.g. a category deleted in another tab).
+  const refuseMissingMood = useCallback((what) => {
+    if (moods.some(m => m.key === editMood)) return true;
+    console.debug(`[MusicPlayer] ${what} refused — mood "${editMood}" no longer exists in the catalogue`);
+    setEditorError(`Mood "${moodLabel(editMood)}" no longer exists — pick a mood before saving`);
+    return false;
+  }, [moods, editMood, moodLabel]);
+
   const saveTracks = useCallback(async () => {
+    if (!refuseMissingMood('track save')) return;
     const tracks = parseTrackList(trackText);
     if (tracks.length === 0) {
       // Invalid user input, not an app fault: the inline .music-editor-error
@@ -520,9 +534,10 @@ function MusicPlayer({ campaignName, visible = true }) {
     // Cancel's job; Save never discards.
     seedDraft({ trackText });
     showToast(`${moodLabel(editMood)} tracks saved — keep editing`);
-  }, [trackText, editMood, music, campaignName, showToast, seedDraft, moodLabel]);
+  }, [trackText, editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood]);
 
   const resetMood = useCallback(async () => {
+    if (!refuseMissingMood('override reset')) return;
     const overrides = { ...music.overrides };
     delete overrides[editMood];
     const saved = await saveMusicOverrides(campaignName, overrides);
@@ -540,7 +555,7 @@ function MusicPlayer({ campaignName, visible = true }) {
     seedDraft({ trackText: text });
     setEditorError(null);
     showToast(`${moodLabel(editMood)} overrides reset to defaults`);
-  }, [editMood, music, campaignName, showToast, seedDraft, moodLabel]);
+  }, [editMood, music, campaignName, showToast, seedDraft, moodLabel, refuseMissingMood]);
 
   // --- Campaign-specific categories (improve 2026-11-07) -------------------
   // Same permission model as track editing (user decision: ambience duty is
@@ -638,9 +653,19 @@ function MusicPlayer({ campaignName, visible = true }) {
       return;
     }
     setRuntimeObject('campaign', { music: saved }, campaignName, true);
-    if (editing && editMood === moodKey) {
-      clearDraft();
-      setEditing(false);
+    // A deleted category must never stay as the editor's mood (bug-music-
+    // deleted-category-orphan-overrides): openEditor falls back to
+    // `music.mood || editMood`, so a dangling editMood re-seeded the editor,
+    // the controlled select silently rendered its FIRST option while saving
+    // wrote orphan overrides under the invisible key. Resetting to the
+    // catalogue default keeps the displayed mood and the write target in
+    // agreement, and moodLabel() keeps resolving a real label.
+    if (editMood === moodKey) {
+      setEditMood(MOODS[0].key);
+      if (editing) {
+        clearDraft();
+        setEditing(false);
+      }
     }
     showToast(`Category ${label} deleted`);
     addEntry({
