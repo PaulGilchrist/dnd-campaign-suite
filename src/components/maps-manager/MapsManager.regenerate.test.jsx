@@ -1,12 +1,14 @@
 // @maintained-by-ai: 2026-11-12
-// Row-level Regenerate-from-stamped-opts lane (VG backlog 2026-11-12): rows whose doc
-// carries generationOpts get an ENABLED `Regenerate "<label>"` button whose title is the
-// read-only "Generated with: …" stamp tooltip; legacy docs (no stamp) get an honest
-// DISABLED face ("No generation options recorded for this map") — clicking it opens
-// nothing and writes nothing. Confirm rides the shared DeleteConfirmModal role="dialog"
-// tier with the starter lane's "Yes, Regenerate" label; Cancel closes with zero writes.
-// The generator-dispatch / PUT-preservation / audit-row legs live beside the service in
-// ../services/maps/regenerateMap.test.js.
+// Row-level Regenerate-from-stamped-opts lane (VG backlog 2026-11-12; list-envelope
+// data VX 2026-11-12): rows whose LIST envelope carries generationOpts get an ENABLED
+// `Regenerate "<label>"` button whose title is the read-only "Generated with: …" stamp
+// tooltip; legacy docs (no stamp) get an honest DISABLED face ("No generation options
+// recorded for this map") — clicking it opens nothing and writes nothing. The face is
+// known at list-render time: mounting fires ZERO whole-doc loadMapData calls (the old
+// lazy per-row stamp-probe is retired). Confirm rides the shared DeleteConfirmModal
+// role="dialog" tier with the starter lane's "Yes, Regenerate" label; Cancel closes
+// with zero writes. The generator-dispatch / PUT-preservation / audit-row legs live
+// beside the service in ../services/maps/regenerateMap.test.js.
 
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -60,7 +62,13 @@ const ADJACENT_TOOLTIP =
     + 'Density: 50% · Room size: Standard · Rooms: 8 · Room bounds: 4-9 · '
     + 'Corridors: Compact · Layout: Balanced';
 
-const GENERATED_MAP = { fileName: 'gen-cave.json', name: 'Gen Cave', type: 'indoor', isActive: false };
+const GENERATED_MAP = {
+    fileName: 'gen-cave.json',
+    name: 'Gen Cave',
+    type: 'indoor',
+    isActive: false,
+    generationOpts: ADJACENT_OPTS,
+};
 const LEGACY_MAP = { fileName: 'battle-arena.json', name: 'Battle Arena', type: 'indoor', isActive: false };
 
 const props = {
@@ -74,10 +82,7 @@ const regenButton = (name) => screen.getByRole('button', { name: `Regenerate "${
 beforeEach(() => {
     vi.resetAllMocks();
     mapsService.loadMaps.mockResolvedValue({ maps: [GENERATED_MAP, LEGACY_MAP] });
-    mapsService.loadMapData.mockImplementation(async (_campaign, fileName) =>
-        fileName === 'gen-cave.json'
-            ? { description: '', generationOpts: ADJACENT_OPTS }
-            : { description: '' });
+    mapsService.loadMapData.mockResolvedValue({ description: '' });
     regenerateMapDocument.mockResolvedValue({});
 });
 
@@ -101,18 +106,16 @@ describe('MapsManager row Regenerate faces', () => {
         expect(button).toBeDisabled();
     });
 
-    it('probe in flight: the button is disabled with the checking face (never a promised affordance)', async () => {
-        let release;
-        const gate = new Promise((resolve) => { release = resolve; });
-        mapsService.loadMapData.mockReturnValue(gate);
-        render(<MapsManager {...props} />);
-        await waitFor(() => expect(screen.getByText('Gen Cave')).toBeInTheDocument());
-
-        expect(regenButton('Gen Cave')).toBeDisabled();
-        expect(regenButton('Gen Cave')).toHaveAttribute('title', 'Checking generation options…');
-
-        release({ description: '', generationOpts: ADJACENT_OPTS });
-        await waitFor(() => expect(regenButton('Gen Cave')).toHaveAttribute('title', ADJACENT_TOOLTIP));
+    it('the face is known at list-render time — no "Checking…" transient and no per-row probe', async () => {
+        // Regression pin for the retired N+1 stamp-probe (VX backlog 2026-11-12):
+        // mounting the view must fire ZERO whole-doc loadMapData calls and every
+        // row must render its final face on the first paint after the list lands.
+        await renderManager();
+        expect(mapsService.loadMapData).not.toHaveBeenCalled();
+        expect(regenButton('Gen Cave')).toBeEnabled();
+        expect(regenButton('Gen Cave')).toHaveAttribute('title', ADJACENT_TOOLTIP);
+        expect(regenButton('Battle Arena')).toBeDisabled();
+        expect(screen.queryByText('Checking generation options…')).not.toBeInTheDocument();
     });
 
     it('clicking the disabled legacy face opens NO dialog and causes ZERO writes', async () => {
@@ -125,13 +128,6 @@ describe('MapsManager row Regenerate faces', () => {
         expect(regenerateMapDocument).not.toHaveBeenCalled();
         expect(mapsService.saveMapData).not.toHaveBeenCalled();
         expect(mapsService.createMap).not.toHaveBeenCalled();
-    });
-
-    it('the lazy probes are pure reads — no whole-doc save is ever issued for a face', async () => {
-        await renderManager();
-        await waitFor(() => expect(regenButton('Gen Cave')).toBeEnabled());
-        expect(mapsService.loadMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena.json');
-        expect(mapsService.saveMapData).not.toHaveBeenCalled();
     });
 });
 

@@ -46,17 +46,17 @@ function DeleteMapModal({ maps, fileName, onCancel, onConfirm }) {
     );
 }
 
-// Row Regenerate-button faces (VG backlog 2026-11-12). Three honest states: stamped doc
+// Row Regenerate-button faces (VG backlog 2026-11-12; list-envelope data VX 2026-11-12).
+// Two honest states, both known at list-render time — the server folds each doc's small
+// generationOpts stamp into the /maps list row (no per-row whole-doc GET): stamped doc
 // → enabled with the read-only "Generated with: …" stamp tooltip (the row-tooltip
-// pattern the Description button already rides); fetched doc WITHOUT the stamp (legacy
-// fixtures, hand-authored maps) → disabled with the plain-English reason; probe still
-// in flight → disabled "Checking…" (never promises an affordance it hasn't verified).
+// pattern the Description button already rides); doc WITHOUT the stamp (legacy
+// fixtures, hand-authored maps) → disabled with the plain-English reason.
 const LEGACY_REGENERATE_TITLE = 'No generation options recorded for this map';
-const CHECKING_REGENERATE_TITLE = 'Checking generation options…';
 
-function regenerateFace(generationOpts, fetched) {
+function regenerateFace(generationOpts) {
     if (generationOpts) return { disabled: false, title: describeGenerationOpts(generationOpts) };
-    return { disabled: true, title: fetched ? LEGACY_REGENERATE_TITLE : CHECKING_REGENERATE_TITLE };
+    return { disabled: true, title: LEGACY_REGENERATE_TITLE };
 }
 
 // Regenerate gate over the same shared DeleteConfirmModal a11y tier as the row's
@@ -152,7 +152,6 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     const [editDescription, setEditDescription] = useState('');
     const [loadingMapData, setLoadingMapData] = useState(false);
     const [savingDescription, setSavingDescription] = useState(false);
-    const [generationOptsByFile, setGenerationOptsByFile] = useState({});
     const [regeneratingMap, setRegeneratingMap] = useState(null);
     const [regenerating, setRegenerating] = useState(false);
 
@@ -176,37 +175,12 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
         loadMapsList();
     }, [loadMapsList]);
 
-    // The maps-LIST row envelope carries no generationOpts (server/routes/maps.js list
-    // builder) and the server stays untouched, so the row faces derive from a lazy
-    // per-row document GET — reads only, zero writes. null = read cleanly but no
-    // stamp (legacy face); absent key = still in flight (checking face). A failed read
-    // also lands on null: mapsService.loadMapData already console.errors it, and the
-    // honest face for "no stamp could be read" stays the legacy one (VG backlog
-    // 2026-11-12). Results are cached per fileName — the stamp never changes under a
-    // row (whole-doc PUTs pass generationOpts through), so list reloads reuse it.
-    useEffect(() => {
-        const pending = maps.filter(m => !(m.fileName in generationOptsByFile));
-        if (pending.length === 0) return undefined;
-        let cancelled = false;
-        Promise.all(pending.map(async (m) => {
-            try {
-                const doc = await mapsService.loadMapData(campaignName, m.fileName);
-                return [m.fileName, doc?.generationOpts || null];
-            } catch {
-                return [m.fileName, null];
-            }
-        })).then(faces => {
-            if (!cancelled) {
-                setGenerationOptsByFile(prev => ({ ...prev, ...Object.fromEntries(faces) }));
-            }
-        });
-        return () => { cancelled = true; };
-    }, [maps, campaignName, generationOptsByFile]);
-
-    // A campaign switch must not carry the previous campaign's per-file stamps over.
-    useEffect(() => {
-        setGenerationOptsByFile({});
-    }, [campaignName]);
+    // The row Regenerate faces derive straight from each list row's generationOpts —
+    // the server folds the small (≤10-key) stamp into the /maps list envelope
+    // (server/routes/maps.js list builder), so mounting this view fires ZERO whole-doc
+    // GETs (the old lazy per-row stamp-probe fetched every full map document,
+    // 1800-cell terrain docs included, just to render a tooltip — VX backlog
+    // 2026-11-12). A campaign switch simply re-fetches the list.
 
     // SSE handler — re-fetch maps list on maps-list event, update active map directly on activate event
     // WARNING: SSE re-render loop risk — guarded setters via useSSEEqualityGuard
@@ -371,9 +345,10 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
 
     // Confirm leg of the row Regenerate lane: re-derive the doc's stamped opts through
     // the client generators and PUT back onto the same doc (service owns the single
-    // map_regenerated audit row). Cancel never reaches here — zero writes.
+    // map_regenerated audit row). Cancel never reaches here — zero writes. The opts
+    // ride the list row itself (folded from the doc by the server list builder).
     const handleRegenerate = async (fileName) => {
-        const generationOpts = generationOptsByFile[fileName];
+        const generationOpts = maps.find(m => m.fileName === fileName)?.generationOpts;
         if (!generationOpts) {
             setRegeneratingMap(null);
             return;
@@ -493,7 +468,7 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
             {maps.length > 0 && (
                 <ul className="maps-manager-list">
                     {maps.map(map => {
-                        const face = regenerateFace(generationOptsByFile[map.fileName], map.fileName in generationOptsByFile);
+                        const face = regenerateFace(map.generationOpts);
                         return (
                         <li
                             key={map.fileName}
@@ -559,10 +534,11 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                     proposal on the live document — preview first, GM Apply is
                                     the only write, through the normal map save lane. */}
                                 <AiDressButton campaignName={campaignName} map={map} />
-                                {/* Row Regenerate from the doc's generationOpts stamp (VG backlog
-                                    2026-11-12): enabled with a read-only "Generated with: …" tooltip
-                                    on stamped rows; an honest disabled face (zero writes on any
-                                    interaction) on legacy docs. */}
+                                {/* Row Regenerate from the doc's generationOpts stamp, carried on the
+                                    list row itself (VG backlog 2026-11-12, VX list-envelope fold):
+                                    enabled with a read-only "Generated with: …" tooltip on stamped
+                                    rows; an honest disabled face (zero writes on any interaction)
+                                    on legacy docs. */}
                                 <button
                                     className="regenerate-btn"
                                     onClick={() => setRegeneratingMap(map.fileName)}
@@ -593,7 +569,7 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                 <RegenerateMapModal
                     maps={maps}
                     fileName={regeneratingMap}
-                    generationOpts={generationOptsByFile[regeneratingMap]}
+                    generationOpts={maps.find(m => m.fileName === regeneratingMap)?.generationOpts}
                     busy={regenerating}
                     onCancel={() => setRegeneratingMap(null)}
                     onConfirm={handleRegenerate}

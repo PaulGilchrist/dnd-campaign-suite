@@ -124,12 +124,22 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     // (row hover tooltip) without a per-row document fetch (backlog 2026-10-26).
     let description = '';
     let isDraftMap = false;
+    // The small generationOpts stamp (≤10 keys) rides the list envelope too, so the
+    // row's Regenerate face is known at list-render time — no per-row whole-doc GET
+    // (the old lazy stamp-probe fetched 1800-cell terrain docs just for a tooltip,
+    // once per row per mount — VX backlog 2026-11-12). Large doc fields (walls/
+    // placedItems/terrain/rivers) stay in the per-slug GET lane. Docs without the
+    // key (legacy fixtures, hand-authored maps) honestly omit it.
+    let generationOpts;
     try {
       const mapContent = JSON.parse(fs.readFileSync(path.join(mapsDir, f), 'utf-8'));
       mapType = mapContent.type || 'indoor';
       if (mapContent.displayName) displayName = mapContent.displayName;
       description = mapContent.description || '';
       isDraftMap = mapContent.draft === true;
+      if (mapContent.generationOpts && typeof mapContent.generationOpts === 'object') {
+        generationOpts = mapContent.generationOpts;
+      }
     } catch (_e) { /* ignore */ }
     // Draft invisibility (campaign-authoring plan Phase 3): an AI-drafted map
     // never appears in a non-GM listing.
@@ -142,6 +152,7 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
       type: mapType,
       description,
       draft: isDraftMap || undefined,
+      generationOpts,
       isActive: slugFromFileName(f) === activeMap
     };
   }).filter(Boolean);
