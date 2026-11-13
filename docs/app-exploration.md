@@ -34,7 +34,7 @@
 2. ~~**cs-row staleness law**~~ — READ side CLOSED (improve heal-chooser-bucket-hp 2026-11-13): heal target-choosers (`collectTouchTargets`, `healingPoolHandler` scan) now display bucket `currentHitPoints`/`hitPoints` first, cs row only as fallback (`liveTargetHp.js`), live-pinned chooser==modal across all three families. RESIDUAL (product decision, untouched): heals still never WRITE `combatSummary` player rows, so the board/initiative HP display keeps its own stale-row face.
 3. **HealingPoolModal cure lanes un-ridden**: batch `Cure Selected (N for M HP)` face, single Cure cost, `bloodiedOnly` gate (Divine Health?), `restoringTouchConditions` face — needs a target carrying a CUREABLE-condition (`activeConditions` seed).
 4. **HandOfHealingPickerStage → Physician's Touch section** (second live face) — same conditioner rig as #3, Physician's Touch holder as healer.
-5. **qa-arena EB `Load` face**: click produced NO dialog/dropdown while disk holds 3 pool rows — is the saved pool surfaced anywhere at all in a fresh arena? (probe list DOM, then decide bug vs improvement).
+5. ~~**qa-arena EB `Load` face**~~ — CLOSED (improve arena-load-affordance 2026-11-13): list face LIVE-PROVED, the EH reading was a locator blind (the picker is `.encounter-modal-overlay`, zero `[role=dialog]`/`.modal-overlay`/dropdown — see playbook EB Load-picker DOM law); no code change.
 6. Carry-over blocked: Natural-RNG weatherChange dialog; Camp-while-PAUSED; Designer TRIM-DROPPED (unit-pinned).
 
 ## Depth Seeds (live 2026-11-13 EH unless noted)
@@ -71,7 +71,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass: pass-1 clear, 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 EH — arena `Load` affordance reads inert on a seeded arena.** New Arena Battle ships 3 pool rows on disk (`Sparring — Goblin Pack` etc.) but clicking `Load` in Encounter Builder produced no dialog/dropdown in DOM probes — either a hidden-elsewhere list (locator blind) or a real dead affordance on fresh arenas. Prove the list face next ride before any code claim. `encounter-builder/`.
 - **2026-11-13 EH — result-modal arithmetic string cosmetic**: `1d12 + 7 + 2: 10 +9= 19 HP restored` fuses the two bonuses into `+9=` with odd spacing (roll-view family too — `1d6: 6 = 6 HP to restore` when N HP may not be restored, see bug). `HandOfHealingModal.jsx` (~162), `HealingPoolModal.jsx` roll-log copy.
 
 ## Blocked / Not Verified (fold-gate ledger)
@@ -82,4 +81,4 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass: pass-1 clear, 
 - POI `enter_refused refusal:'missing'` CLICK face (carried — live-unreachable by law, unit-pinned).
 - **EH — HealingPoolModal CURE lanes** (single Cure / batch `Cure Selected` / `bloodiedOnly` / Restoring-Touch condition sets) un-ridden: needs a target seeded with a CUREABLE condition; rig exists (bucket `activeConditions` write) but budget went to the two bug investigations. Next descent PT#3.
 - **EH — Physician's Touch section inside the Hand-of-Healing result modal** un-ridden (needs same conditioner rig + Mercy holder).
-- **EH — qa-arena `Load` list face**: see backlog — ambiguous whether the seeded pool is surfaced at all; honestly recorded as unverified, not a code claim.
+- ~~**EH — qa-arena `Load` list face**~~ — RESOLVED by improve arena-load-affordance 2026-11-13: the list face is PROVEN LIVE (Load click opens `.encounter-modal` "Load Encounter" rendering every pool row by name; row click hydrates the builder; network GET/PUT witnesses; 0 console errors). The EH "no dialog/dropdown" was a locator blind — the modal belongs to no dialog-role/generic-overlay family (see playbook EB Load-picker DOM law). Seeded rows ride the identical `POST /encounters` lane (no arena-type branch anywhere in the read/list/modal path), so the fresh-arena case is code-identical to the test-campaign rig lived. Zero code changes.
