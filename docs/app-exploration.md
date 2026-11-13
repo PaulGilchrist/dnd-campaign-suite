@@ -60,7 +60,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass API clears GET-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- [2026-11-12 VG] `generationOpts` now rides map docs (all three modes) enabling exact doc-only re-derivation, but no UI affordance consumes it: a row-level "Regenerate with the same options" (or even a read-only "Generated with: …" tooltip on row hover) would turn the stamp from forensic data into a player-facing feature; legacy docs without the key should hide/disable the affordance honestly.
 - [2026-11-12 VG] After a reload the campaign-selection screen flashes BRIEFLY before the last campaign auto-restores (~1 s, title flips `CharSheets`→`<char>`); fast users (and harnesses) click into a vanishing DOM. A "restoring last session…" state, or skipping the selection screen when a last-campaign pref exists, would remove the race.
 
 ## Blocked / Not Verified (fold-gate ledger)

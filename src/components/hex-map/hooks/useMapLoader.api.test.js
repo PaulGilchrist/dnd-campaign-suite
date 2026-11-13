@@ -348,4 +348,38 @@ describe('useMapLoader - API & persistence', () => {
         // so zero save calls proves the quiet path held (act-clean, no crash).
         expect(mapsService.saveMapData).not.toHaveBeenCalled();
     });
+
+    // Generation-stamp carry (VG backlog 2026-11-12): the board must never strip
+    // seed/generationOpts from the doc it re-saves — opening a generated map used
+    // to clobber the stamp on the mount flush, silently killing the Maps-manager
+    // Regenerate lane for that map (live-proved 2026-11-12).
+    describe('generation-stamp carry', () => {
+        it('carries seed + generationOpts verbatim into the save envelope', async () => {
+            const stamp = { mode: 'terrain', gridSize: 30, seed: 7 };
+            mapsService.loadMapData.mockResolvedValue({ ...loadedMap(), seed: 7, generationOpts: stamp });
+            const utils = renderHook(() => useMapLoader(CAMPAIGN, MAP, characters));
+            await waitFor(() => expect(utils.result.current.loading).toBe(false));
+            // Zero-edit open stays clean: the stamp bytes ride the baseline too.
+            expect(mapsService.saveMapData).not.toHaveBeenCalled();
+
+            act(() => { utils.result.current.setWeather('rain'); });
+            await settleAutosave();
+
+            expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
+            const body = mapsService.saveMapData.mock.calls[0][2];
+            expect(body.seed).toBe(7);
+            expect(body.generationOpts).toEqual(stamp);
+            expect(body.weather).toBe('rain');
+        });
+
+        it('a legacy doc without a stamp never grows stamp keys', async () => {
+            const { result } = await renderLoadedHook();
+            act(() => { result.current.setWeather('rain'); });
+            await settleAutosave();
+
+            const body = mapsService.saveMapData.mock.calls[0][2];
+            expect('seed' in body).toBe(false);
+            expect('generationOpts' in body).toBe(false);
+        });
+    });
 });

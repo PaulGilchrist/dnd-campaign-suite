@@ -7,6 +7,7 @@ import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 import GenerateDungeonModal from './GenerateDungeonModal.jsx';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
 import AiDressButton from './AiDressButton.jsx';
+import { regenerateMapDocument, describeGenerationOpts } from '../../services/maps/regenerateMap.js';
 import './MapsManager.css';
 import DraftFlag from '../common/DraftFlag.jsx';
 
@@ -41,6 +42,44 @@ function DeleteMapModal({ maps, fileName, onCancel, onConfirm }) {
         >
             This will permanently delete the map &apos;<strong>{mapName}</strong>&apos; and all its
             contents (walls, items, creature positions). This <strong>cannot be undone</strong>.
+        </DeleteConfirmModal>
+    );
+}
+
+// Row Regenerate-button faces (VG backlog 2026-11-12). Three honest states: stamped doc
+// → enabled with the read-only "Generated with: …" stamp tooltip (the row-tooltip
+// pattern the Description button already rides); fetched doc WITHOUT the stamp (legacy
+// fixtures, hand-authored maps) → disabled with the plain-English reason; probe still
+// in flight → disabled "Checking…" (never promises an affordance it hasn't verified).
+const LEGACY_REGENERATE_TITLE = 'No generation options recorded for this map';
+const CHECKING_REGENERATE_TITLE = 'Checking generation options…';
+
+function regenerateFace(generationOpts, fetched) {
+    if (generationOpts) return { disabled: false, title: describeGenerationOpts(generationOpts) };
+    return { disabled: true, title: fetched ? LEGACY_REGENERATE_TITLE : CHECKING_REGENERATE_TITLE };
+}
+
+// Regenerate gate over the same shared DeleteConfirmModal a11y tier as the row's
+// Delete (role="dialog", initial focus on Cancel, Tab trap); confirm label follows
+// the starter lane's RegenerateAdventureModal precedent ("Yes, Regenerate"). Only
+// ever opened from a row whose stamp was read back — the dialog names the recorded
+// opts so the GM sees exactly what will be re-rolled before confirming.
+function RegenerateMapModal({ maps, fileName, generationOpts, busy, onCancel, onConfirm }) {
+    const mapName = maps.find(m => m.fileName === fileName)?.name || fileName;
+    const optsLine = describeGenerationOpts(generationOpts);
+    return (
+        <DeleteConfirmModal
+            titleId="maps-manager-regenerate-title"
+            title="Regenerate Map"
+            confirmLabel="Yes, Regenerate"
+            confirmDisabled={busy}
+            onCancel={onCancel}
+            onConfirm={() => onConfirm(fileName)}
+        >
+            Re-roll{' '}<strong>{mapName}</strong>
+            {optsLine ? <> from its recorded options (<em>{optsLine}</em>)</> : ' from its recorded options'}
+            . Names, description and tokens stay &mdash; the generated layout (and any
+            hand-edits to it) is replaced. This <strong>cannot be undone</strong>.
         </DeleteConfirmModal>
     );
 }
@@ -113,6 +152,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     const [editDescription, setEditDescription] = useState('');
     const [loadingMapData, setLoadingMapData] = useState(false);
     const [savingDescription, setSavingDescription] = useState(false);
+    const [generationOptsByFile, setGenerationOptsByFile] = useState({});
+    const [regeneratingMap, setRegeneratingMap] = useState(null);
+    const [regenerating, setRegenerating] = useState(false);
 
     const generateModalOpeners = { indoor: setShowGenerateModal, outdoor: setShowTerrainModal };
 
@@ -133,6 +175,38 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     useEffect(() => {
         loadMapsList();
     }, [loadMapsList]);
+
+    // The maps-LIST row envelope carries no generationOpts (server/routes/maps.js list
+    // builder) and the server stays untouched, so the row faces derive from a lazy
+    // per-row document GET — reads only, zero writes. null = read cleanly but no
+    // stamp (legacy face); absent key = still in flight (checking face). A failed read
+    // also lands on null: mapsService.loadMapData already console.errors it, and the
+    // honest face for "no stamp could be read" stays the legacy one (VG backlog
+    // 2026-11-12). Results are cached per fileName — the stamp never changes under a
+    // row (whole-doc PUTs pass generationOpts through), so list reloads reuse it.
+    useEffect(() => {
+        const pending = maps.filter(m => !(m.fileName in generationOptsByFile));
+        if (pending.length === 0) return undefined;
+        let cancelled = false;
+        Promise.all(pending.map(async (m) => {
+            try {
+                const doc = await mapsService.loadMapData(campaignName, m.fileName);
+                return [m.fileName, doc?.generationOpts || null];
+            } catch {
+                return [m.fileName, null];
+            }
+        })).then(faces => {
+            if (!cancelled) {
+                setGenerationOptsByFile(prev => ({ ...prev, ...Object.fromEntries(faces) }));
+            }
+        });
+        return () => { cancelled = true; };
+    }, [maps, campaignName, generationOptsByFile]);
+
+    // A campaign switch must not carry the previous campaign's per-file stamps over.
+    useEffect(() => {
+        setGenerationOptsByFile({});
+    }, [campaignName]);
 
     // SSE handler — re-fetch maps list on maps-list event, update active map directly on activate event
     // WARNING: SSE re-render loop risk — guarded setters via useSSEEqualityGuard
@@ -295,6 +369,29 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
         }
     };
 
+    // Confirm leg of the row Regenerate lane: re-derive the doc's stamped opts through
+    // the client generators and PUT back onto the same doc (service owns the single
+    // map_regenerated audit row). Cancel never reaches here — zero writes.
+    const handleRegenerate = async (fileName) => {
+        const generationOpts = generationOptsByFile[fileName];
+        if (!generationOpts) {
+            setRegeneratingMap(null);
+            return;
+        }
+        setRegenerating(true);
+        try {
+            setError(null);
+            await regenerateMapDocument(campaignName, fileName, generationOpts);
+            setRegeneratingMap(null);
+            await loadMapsList();
+        } catch (err) {
+            setError(err.message || 'Failed to regenerate map');
+            setRegeneratingMap(null);
+        } finally {
+            setRegenerating(false);
+        }
+    };
+
     const handleMapCreated = useCallback(async () => {
         setError(null);
         await loadMapsList();
@@ -395,7 +492,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
 
             {maps.length > 0 && (
                 <ul className="maps-manager-list">
-                    {maps.map(map => (
+                    {maps.map(map => {
+                        const face = regenerateFace(generationOptsByFile[map.fileName], map.fileName in generationOptsByFile);
+                        return (
                         <li
                             key={map.fileName}
                             className={`maps-manager-item ${map.isActive ? 'active' : ''}`}
@@ -460,10 +559,24 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                     proposal on the live document — preview first, GM Apply is
                                     the only write, through the normal map save lane. */}
                                 <AiDressButton campaignName={campaignName} map={map} />
+                                {/* Row Regenerate from the doc's generationOpts stamp (VG backlog
+                                    2026-11-12): enabled with a read-only "Generated with: …" tooltip
+                                    on stamped rows; an honest disabled face (zero writes on any
+                                    interaction) on legacy docs. */}
+                                <button
+                                    className="regenerate-btn"
+                                    onClick={() => setRegeneratingMap(map.fileName)}
+                                    disabled={face.disabled}
+                                    title={face.title}
+                                    aria-label={`Regenerate "${map.name}"`}
+                                >
+                                    <i className="fa-solid fa-rotate"></i> Regenerate
+                                </button>
                                 <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)} aria-label={`Delete "${map.name}"`}>Delete</button>
                             </div>
                         </li>
-                    ))}
+                        );
+                    })}
                 </ul>
             )}
 
@@ -473,6 +586,17 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                     fileName={deletingMap}
                     onCancel={() => setDeletingMap(null)}
                     onConfirm={handleDelete}
+                />
+            )}
+
+            {regeneratingMap && (
+                <RegenerateMapModal
+                    maps={maps}
+                    fileName={regeneratingMap}
+                    generationOpts={generationOptsByFile[regeneratingMap]}
+                    busy={regenerating}
+                    onCancel={() => setRegeneratingMap(null)}
+                    onConfirm={handleRegenerate}
                 />
             )}
 

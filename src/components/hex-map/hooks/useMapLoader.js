@@ -15,7 +15,7 @@ const HEX_AUTOSAVE_DEBOUNCE_MS = 1000;
 // dirty baseline with this SAME builder so a zero-edit open compares equal and
 // skips the full-document PUT (backlog 2026-10-26 write-amplification twin of
 // the indoor lane — outdoor emitted six no-op PUTs per open).
-function buildHexEnvelope({ displayName, gridSize, terrain, rivers, roads, pois, zoom, panX, panY, marchingOrder, partyPosition, weather, travelState }) {
+function buildHexEnvelope({ displayName, gridSize, terrain, rivers, roads, pois, zoom, panX, panY, marchingOrder, partyPosition, weather, travelState }, carriedStamp) {
     return {
         type: 'outdoor',
         displayName,
@@ -31,7 +31,26 @@ function buildHexEnvelope({ displayName, gridSize, terrain, rivers, roads, pois,
         partyPosition,
         weather,
         travelState,
+        // Generation-stamp passthrough VERBATIM (VG backlog 2026-11-12): `seed` and
+        // `generationOpts` are not board-editable fields — an envelope that dropped
+        // them silently killed the Maps-manager Regenerate lane for every generated
+        // map the board merely OPENED (mount-flush wiped the stamp, live-proved
+        // 2026-11-12). Same undefined-drops law as the server create builders:
+        // legacy docs that never carried these keys stay byte-shape-unchanged.
+        ...(carriedStamp || {}),
     };
+}
+
+// The document keys carried through every board save untouched. Undefined values are
+// OMITTED (not stored as undefined) so baseline/save envelopes key-match the create/
+// rejected lanes' stamp-free shapes and lodash dirty-compare stays honest.
+const GENERATION_STAMP_KEYS = ['seed', 'generationOpts'];
+function pickGenerationStamp(existing) {
+    const carried = {};
+    for (const key of GENERATION_STAMP_KEYS) {
+        if (existing && existing[key] !== undefined) carried[key] = existing[key];
+    }
+    return carried;
 }
 
 function normalizeExistingView(existing) {
@@ -156,6 +175,8 @@ function applyExistingMap(existing, mapName, characters, ctx) {
 
     if (!existing.type) existing.type = 'outdoor';
     ctx.heldMapTypeRef.current = existing.type;
+    // Capture the doc's generation stamp for every save this session emits.
+    ctx.carriedStampRef.current = pickGenerationStamp(existing);
 
     ctx.setMapData(existing);
     ctx.setGridSize(loadedGridSize);
@@ -202,7 +223,7 @@ function applyExistingMap(existing, mapName, characters, ctx) {
         partyPosition: loadedPartyPos,
         weather: existing.weather || null,
         travelState: baselineTravel,
-    });
+    }, ctx.carriedStampRef.current);
 
     // Claim the held-bytes name BEFORE setLoading(false): the persistence
     // guard (:201) compares live mapName against this ref, and the flush
@@ -269,6 +290,9 @@ function renderFreshMap(mapName, characters, ctx) {
     ctx.hexMapDisplayNameRef.current = mapName;
     ctx.heldMapTypeRef.current = 'outdoor';
     ctx.resumedTripRef.current = false;
+    // A fresh/rejected document carries no generation stamp — never resurrect the
+    // previous map's stamp into this session's saves.
+    ctx.carriedStampRef.current = {};
     // Claim the held-bytes name before the loading flip so the #800 flush
     // commit passes the persistence name guard (see applyExistingMap). While
     // `loading` is still true the persistence effect skips every commit, so
@@ -407,6 +431,9 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
     // edit or after one view-normalize adoption. The persistence effect
     // adopts view-only drift while armed so a zero-edit open PUTs nothing.
     const awaitingFirstEditRef = useRef(false);
+    // Doc-carried generation stamp (seed/generationOpts) every save envelope re-emits
+    // verbatim (VG backlog 2026-11-12) — claimed by the load paths with the held bytes.
+    const carriedStampRef = useRef({});
     // Latest rejection-notice callback, read via ref so the load effect never
     // re-arms on callback identity (inline arrows from the caller would
     // re-trigger whole-document reloads).
@@ -467,7 +494,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
             hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
             heldMapTypeRef,
             travelStateRef, lastSavedRef, resumedTripRef,
-            awaitingFirstEditRef,
+            awaitingFirstEditRef, carriedStampRef,
         };
 
         const loadMap = async () => {
@@ -557,7 +584,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
             partyPosition,
             weather,
             travelState: travelStateRef.current,
-        });
+        }, carriedStampRef.current);
         // Rejected-load fallback gate (backlog map-fresh-fallback-silent):
         // while armed, the fresh document is RENDER-ONLY until real intent.
         // The needsResetViewRef centering pass (HexMap layout effect) rewrites

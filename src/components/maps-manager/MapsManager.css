@@ -189,9 +189,17 @@
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.maps-manager-item-actions button:hover {
+.maps-manager-item-actions button:hover:not(:disabled) {
     background: #3a3a3a;
     border-color: #555;
+}
+
+/* Disabled row-action face (Regenerate on legacy docs, VG backlog 2026-11-12) —
+   mirrors the create lane's button:disabled face above so every honest dead button
+   in this view reads the same. */
+.maps-manager-item-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .maps-manager-item-actions .delete-btn {
