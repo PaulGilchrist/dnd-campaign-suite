@@ -5,7 +5,8 @@
 // Contract pinned here: map-badge rendering + lookup guard, radio/row selection
 // machine (confirm inert before selection, forwards selected key, Skip closes),
 // option ({value,label}) targets forwarding their value, HP/size row metadata,
-// and the live hideConfirm guard (ref rec #176 "dead conditional"): empty targets
+// explicit `Select <Name>` radio aria-labels (EH a11y parity), and the live
+// hideConfirm guard (ref rec #176 "dead conditional"): empty targets
 // with hideConfirm falsy still render a disabled confirm, empty targets with
 // hideConfirm=true suppress it entirely.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -162,6 +163,41 @@ describe('SecondaryTargetModal', () => {
         expect(npcRow).toHaveTextContent('(Small)');
         expect(npcRow).toHaveTextContent('20%');
         expect(npcRow).not.toHaveTextContent('7/35 HP');
+    });
+
+    // 2026-11-13 EH: every candidate radio carries an explicit accessible name
+    // (`Select <Name>` allies-editor precedent) with a clean HP separator, so AT
+    // row nav never announces only the mashed label concatenation.
+    it('gives every candidate radio an explicit Select <Name> aria-label with HP detail', () => {
+        render(
+            <SecondaryTargetModal
+                {...baseProps}
+                targets={[
+                    { name: 'Hero', type: 'pc', size: 'Medium', currentHp: 55, maxHp: 132 },
+                    { name: 'Goblin', type: 'npc', currentHp: 7, maxHp: 35 },
+                    { name: 'No Hp', type: 'creature' },
+                    { label: 'Switch Places', value: 'switch' },
+                ]}
+                showSize
+            />
+        );
+
+        const radios = Array.from(document.querySelectorAll('input[type="radio"][name="secondaryTarget"]'));
+        expect(radios).toHaveLength(4);
+        expect(radios.every(r => r.getAttribute('aria-label'))).toBe(true);
+        expect(radios[0]).toHaveAccessibleName('Select Hero, 55 of 132 HP');
+        expect(radios[1]).toHaveAccessibleName('Select Goblin, 20% HP');
+        expect(radios[2]).toHaveAccessibleName('Select No Hp');
+        expect(radios[3]).toHaveAccessibleName('Select Switch Places');
+
+        // Explicit aria-label overrides the implicit label, so the mashed
+        // concatenated announcement is gone from the accessible name.
+        expect(radios[0].getAttribute('aria-label')).not.toContain('55/132');
+        expect(radios[0].getAttribute('aria-label')).not.toContain('(42%)');
+
+        // Selection machine unchanged with the labels in place: label click still selects.
+        fireEvent.click(radios[0].closest('.secondary-target-row'));
+        expect(radios[0]).toBeChecked();
     });
 
     // ref #176 adjudication: the `!hideConfirm || targets.length > 0` guard's false

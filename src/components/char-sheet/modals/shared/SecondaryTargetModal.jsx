@@ -26,6 +26,21 @@ function rowVisibilityFlags(target, showHp, showSize) {
     };
 }
 
+// Accessible name for a candidate row's radio (backlog 2026-11-13 EH): mirrors the
+// explicit `Select <Name>` precedent in AllySelectionModal/EncounterMonsterTable.
+// HP shown on the row stays information-complete via a clean separator, so AT row
+// nav no longer announces the mashed concatenation ("Name55/132 HP (4%)").
+function rowAriaLabel(target, shouldShowHp) {
+    const name = isOptionTarget(target) ? target.label : target.name;
+    let label = `Select ${name}`;
+    if (!isOptionTarget(target) && hasHpValues(target)) {
+        label += shouldShowHp
+            ? `, ${target.currentHp} of ${target.maxHp} HP`
+            : `, ${hpPercent(target)}% HP`;
+    }
+    return label;
+}
+
 function TargetNameContent({ target, shouldShowSize, shouldShowHp }) {
     return (
         <>
@@ -53,6 +68,7 @@ function SecondaryTargetRow({ target, selected, showHp, showSize, handleSelect, 
             <input
                 type="radio"
                 name="secondaryTarget"
+                aria-label={rowAriaLabel(target, shouldShowHp)}
                 checked={isSelected}
                 onChange={() => handleSelect(targetKeyOf(target))}
             />

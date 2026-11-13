@@ -167,7 +167,7 @@ function setHealAmount(value) {
 }
 
 async function selectTarget(name) {
-  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(`^${name}`) }));
+  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(`^Select ${name}`) }));
   fireEvent.click(screen.getByRole('button', { name: 'Heal' }));
   await screen.findByRole('button', { name: 'Apply Heal' });
 }

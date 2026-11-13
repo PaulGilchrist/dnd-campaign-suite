@@ -148,7 +148,7 @@ function mount(overrides = {}) {
 }
 
 function castOnOrc() {
-  fireEvent.click(screen.getByRole('radio', { name: 'Orc 1' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Select Orc 1' }));
   fireEvent.click(screen.getByRole('button', { name: 'Cast Lesser Restoration' }));
 }
 
@@ -167,8 +167,8 @@ describe('CharBonusActions - Lesser Restoration pickers', () => {
     mount({ pendingLesserRestoration: makePending() });
     expect(screen.getByText('Lesser Restoration', { selector: '.sp-header' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cast Lesser Restoration' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Divine_Cleric' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Orc 1' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Select Divine_Cleric' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Select Orc 1' })).toBeInTheDocument();
   });
 
   it('advances target step to a target-specific condition picker and confirms with targetName and condition', async () => {
@@ -178,11 +178,11 @@ describe('CharBonusActions - Lesser Restoration pickers', () => {
     await waitFor(() => {
       expect(screen.getByText('Choose one condition to remove from Orc 1.')).toBeInTheDocument();
     });
-    expect(screen.getByRole('radio', { name: 'Poisoned condition' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Select Poisoned condition' })).toBeInTheDocument();
     // Host-owned two-step state: the condition step replaces the target step.
     expect(screen.queryByRole('button', { name: 'Cast Lesser Restoration' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Poisoned condition' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Select Poisoned condition' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Condition' }));
     expect(mockHandleConfirm).toHaveBeenCalledTimes(1);
     expect(mockHandleConfirm).toHaveBeenCalledWith({ targetName: 'Orc 1', condition: 'poisoned' });

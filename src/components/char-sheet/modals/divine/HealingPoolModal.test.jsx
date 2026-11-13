@@ -148,7 +148,7 @@ const poolLine = (text) =>
   screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === text);
 
 async function selectTarget(name) {
-  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(`^${name}`) }));
+  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(`^Select ${name}`) }));
   fireEvent.click(screen.getByRole('button', { name: 'Heal' }));
 }
 
@@ -305,8 +305,8 @@ describe('HealingPoolModal - base open/close contract', () => {
 
     expect(screen.getByText('Choose target for Lay On Hands')).toBeInTheDocument();
     expect(screen.getByText('Choose a creature within range to heal with Lay On Hands.')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /^Orc Warrior/ })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /^Goblin/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /^Select Orc Warrior/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /^Select Goblin/ })).toBeInTheDocument();
     expect(screen.getByText('15/30 HP (50%)')).toBeInTheDocument();
     expect(screen.getByText('3/7 HP (43%)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Heal' })).toBeInTheDocument();
