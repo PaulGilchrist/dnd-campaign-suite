@@ -59,7 +59,7 @@ describe('designer audit descriptions (ai_dress pattern)', () => {
         expect(res.code).toBe('AI_NEEDS_HUMAN');
         const row = auditRows()[0];
         expect(row.stage).toBe('plan');
-        expect(row.attempts).toBe(0);
+        expect(row.attempts).toBe(2); // honest audit: both plan calls were burned (114009c66 law)
         expect(row.description)
             .toBe('AI designer plan failed — plan was not valid JSON');
     });

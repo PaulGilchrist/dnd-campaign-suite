@@ -91,7 +91,9 @@ export async function proposePlan({ campaign, aiConfig, log, chatFn = chat }) {
     const messages = buildPlanMessages({ storyBible: bible, history: notes.messages });
 
     let lastError = 'no attempt made';
+    let callsConsumed = 0; // honest audit (114009c66 law): model calls the loop actually consumed
     for (let attempt = 1; attempt <= 2; attempt++) {
+        callsConsumed++;
         let result;
         try {
             result = await callJson(chatFn, chatOpts(aiConfig), messages, decode('build_plan', ENTITY_SCHEMAS.scope));
@@ -108,7 +110,7 @@ export async function proposePlan({ campaign, aiConfig, log, chatFn = chat }) {
         }
         lastError = `invalid plan: ${shape.errors.join('; ')}`;
     }
-    audit(log, campaign, { stage: 'plan', error: lastError }, 0);
+    audit(log, campaign, { stage: 'plan', error: lastError }, callsConsumed);
     return { ok: false, code: 'AI_NEEDS_HUMAN', error: lastError };
 }
 
@@ -134,7 +136,9 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
 
     let lastErrors = ['no attempt made'];
     let repairMessages = messages;
+    let callsConsumed = 0; // honest audit (114009c66 law): model calls the batch loop actually consumed
     for (let attempt = 1; attempt <= 2; attempt++) {
+        callsConsumed++;
         let content;
         try {
             content = await chatFn({
@@ -166,11 +170,11 @@ export async function generateBlueprint({ campaign, scope, aiConfig, log, chatFn
         repairMessages = buildRepairMessages(messages, String(content).slice(0, 60000), errors);
     }
 
-    audit(log, campaign, { stage: 'generate', fallback: 'per-entity resume', errors: lastErrors.slice(0, 5) }, 0);
-    return resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig });
+    audit(log, campaign, { stage: 'generate', fallback: 'per-entity resume', errors: lastErrors.slice(0, 5) }, callsConsumed);
+    return resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig, callsConsumed });
 }
 
-async function finalize(campaign, blueprint, log, attempt, extra = {}) {
+async function finalize(campaign, blueprint, log, attempts, extra = {}) {
     const applied = await applyBlueprint(campaign, blueprint, { log });
     // Persist rejection reasons on the audit (AGENTS: log event details) —
     // omitted on success so the clean-path payload keeps its shape (§144 idiom).
@@ -178,17 +182,21 @@ async function finalize(campaign, blueprint, log, attempt, extra = {}) {
         stage: 'generate',
         created: applied.created,
         snapshot: applied.snapshot,
-        attempts: attempt,
+        attempts,
         ...extra,
         ...(applied.errors?.length ? { errors: applied.errors.slice(0, 5) } : {}),
-    }, attempt);
+    }, attempts);
     return applied;
 }
 
 /** Truncation recovery: emit the scope's entities one at a time, in
  *  dependency order, each anchored to the full story bible + finished siblings. */
-async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig }) {
+async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chatFn, aiConfig, callsConsumed }) {
     const blueprint = { scope };
+    // Honest audit (114009c66 law): every ai_designer row from here on carries
+    // the model calls ACTUALLY consumed — the failed batch leg plus each call
+    // the resume fires — never a stale zero after calls have fired.
+    const consumed = { calls: callsConsumed };
     const plan = (scope.entityPlan || []).filter(p => PLAN_KIND[p.kind]);
     const planned = plannedEntityCount(plan);
     for (const kind of RESUME_ORDER) {
@@ -197,18 +205,19 @@ async function resumeEntityGeneration({ campaign, scope, bible, allow, log, chat
         blueprint[key] = [];
         if (!item || item.count <= 0) continue;
         for (let i = 0; i < item.count; i++) {
-            const row = await generateOne({ campaign, scope, bible, allow, kind, item, siblings: blueprint, chatFn, aiConfig });
+            const row = await generateOne({ campaign, scope, bible, allow, kind, item, siblings: blueprint, chatFn, aiConfig, consumed });
             if (!row) {
-                return resumeStopped({ campaign, blueprint, kind, index: i, itemCount: item.count, planned, log });
+                return resumeStopped({ campaign, blueprint, kind, index: i, itemCount: item.count, planned, log, attempts: consumed.calls });
             }
             blueprint[key].push(row);
         }
     }
     // Whole-set integrity is re-checked inside applyBlueprint before writing.
-    // resumed:true marks this as the per-entity lane's success (attempts: 0 =
-    // zero batch attempts survived), so the Log view renders the honest
-    // "via per-entity resume" verdict instead of the give-up phrase.
-    return finalize(campaign, blueprint, log, 0, { resumed: true });
+    // resumed:true marks this as the per-entity lane's success, so the Log view
+    // renders the honest "via per-entity resume" verdict instead of the give-up
+    // phrase; attempts carries the total model calls actually consumed
+    // (failed batch leg + every resume call), matching the sibling audit law.
+    return finalize(campaign, blueprint, log, consumed.calls, { resumed: true });
 }
 
 // Server-owned stamps the scope schema (additionalProperties:false) never
@@ -275,10 +284,10 @@ function createdTotal(created) {
  * nothing is written and the audit/return stay byte-identical to the old
  * whole-set discard; the stop point always rides the honest error copy.
  */
-async function resumeStopped({ campaign, blueprint, kind, index, itemCount, planned, log }) {
+async function resumeStopped({ campaign, blueprint, kind, index, itemCount, planned, log, attempts }) {
     const stopError = `generation stopped at ${kind} #${index + 1}/${itemCount} — model output kept failing validation`;
     if (draftedEntityCount(blueprint) === 0) {
-        audit(log, campaign, { stage: 'generate-resume', errors: [stopError] }, 0);
+        audit(log, campaign, { stage: 'generate-resume', errors: [stopError] }, attempts);
         return { ok: false, code: 'AI_NEEDS_HUMAN', errors: [stopError], created: {}, snapshot: null };
     }
     const applied = await applyBlueprint(campaign, blueprint, { log });
@@ -287,21 +296,21 @@ async function resumeStopped({ campaign, blueprint, kind, index, itemCount, plan
         // references an entity past the stop point) — discard exactly like
         // the zero-success stop; nothing was written.
         const errors = [stopError, ...(applied.errors || [])].slice(0, 5);
-        audit(log, campaign, { stage: 'generate-resume', errors }, 0);
+        audit(log, campaign, { stage: 'generate-resume', errors }, attempts);
         return { ok: false, code: 'AI_NEEDS_HUMAN', errors, created: {}, snapshot: null };
     }
     const partial = { drafted: createdTotal(applied.created), planned };
     audit(log, campaign, {
         stage: 'generate-resume', errors: [stopError], partial,
         created: applied.created, snapshot: applied.snapshot,
-    }, 0);
+    }, attempts);
     return {
         ok: false, code: 'AI_NEEDS_HUMAN', errors: [stopError], partial,
         created: applied.created, snapshot: applied.snapshot,
     };
 }
 
-async function generateOne({ scope, allow, kind, item, siblings, chatFn, aiConfig }) {
+async function generateOne({ scope, allow, kind, item, siblings, chatFn, aiConfig, consumed }) {
     const messages = buildSingleEntityMessages({
         scope, kind, planNotes: item.notes,
         siblings: Object.fromEntries(Object.entries(siblings).filter(([, v]) => v.length)),
@@ -310,6 +319,7 @@ async function generateOne({ scope, allow, kind, item, siblings, chatFn, aiConfi
     let lastError = 'invalid';
     let lastContent = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
+        consumed.calls++; // honest audit: one model call fires per iteration (even on thrown/invalid legs)
         const attemptMessages = attempt === 1 ? messages : [
             ...messages,
             { role: 'assistant', content: String(lastContent).slice(0, 20000) },

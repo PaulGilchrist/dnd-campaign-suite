@@ -163,9 +163,10 @@ describe('generateBlueprint — truncation → per-entity resume (fail-fast)', (
         const [campaignArg, bp] = applyBlueprint.mock.calls[0];
         expect(campaignArg).toBe('c');
         expect(bp.factions).toEqual([{ name: 'F0' }, { name: 'F1' }]);
-        // The fallback audit stays honest about what happened.
+        // The fallback audit stays honest about what happened — including the
+        // batch calls ACTUALLY consumed before the fallback (114009c66 law).
         expect(fallbackAudit()).toMatchObject({
-            attempts: 0,
+            attempts: 1,
             fallback: 'per-entity resume',
             errors: ['blueprint was not valid JSON (likely truncated output)'],
         });
@@ -248,9 +249,10 @@ describe('generateBlueprint — resume partial drafts (mid-set stop)', () => {
         expect(applyBlueprint).toHaveBeenCalledWith('c',
             expect.objectContaining({ factions: [{ name: 'The Salvage Court' }], quests: [] }),
             { log });
-        // The ai_designer audit carries the partial outcome honestly.
+        // The ai_designer audit carries the partial outcome honestly — attempts
+        // counts every call consumed so far (1 batch + 1 faction + 2 failed quest).
         expect(resumeAudit()).toMatchObject({
-            attempts: 0,
+            attempts: 4,
             partial: { drafted: 1, planned: 2 },
             created: { factions: 1, maps: 0 },
             snapshot: 's.zip',
@@ -285,7 +287,7 @@ describe('generateBlueprint — resume partial drafts (mid-set stop)', () => {
         expect(res.partial).toBeUndefined();
         expect(applyBlueprint).not.toHaveBeenCalled();
         expect(resumeAudit()).toEqual({
-            type: 'ai_designer', name: 'AI designer', attempts: 0, stage: 'generate-resume',
+            type: 'ai_designer', name: 'AI designer', attempts: 3, stage: 'generate-resume',
             errors: ['generation stopped at faction #1/1 — model output kept failing validation'],
             description: 'AI designer generate-resume stopped — wrote nothing — generation stopped at faction #1/1 — model output kept failing validation',
         });
@@ -324,8 +326,10 @@ describe('generateBlueprint — resume partial drafts (mid-set stop)', () => {
     });
 
     // Regression (bug-designer-resume-success-says-gave-up): the resume success
-    // audit must carry a truthful resumed marker — attempts: 0 alone rendered
-    // as "gave up after retries" in the Log view despite a full success payload.
+    // audit must carry a truthful resumed marker — the old attempts: 0 alone
+    // rendered as "gave up after retries" in the Log view despite a full success
+    // payload. Post-114009c66-law the row also carries the calls ACTUALLY
+    // consumed (1 batch + 2 resume calls = 3), never a stale zero.
     it('full-success resume audits resumed:true alongside the success payload', async () => {
         const chatFn = vi.fn(async (cfg) => {
             if (cfg.schemaName === 'campaign_blueprint') return 'garbage-not-json';
@@ -337,7 +341,7 @@ describe('generateBlueprint — resume partial drafts (mid-set stop)', () => {
         const successAudit = log.mock.calls.map(([, entry]) => entry)
             .find(e => e.type === 'ai_designer' && e.stage === 'generate' && !e.fallback);
         expect(successAudit).toMatchObject({
-            attempts: 0,
+            attempts: 3,
             resumed: true,
             created: { factions: 1, quests: 1 },
             snapshot: 's.zip',

@@ -187,10 +187,12 @@ function describeDesigner(entry) {
   if (created) parts.push(`created ${created}`);
   else if ('created' in entry) parts.push('created nothing');
   if (entry.snapshot) parts.push(`restore point ${entry.snapshot}`);
-  // Verdict phrase: resume successes (attempts: 0, batch never survived) say
-  // how they were drafted; a batch success names its attempts; legacy
-  // un-marked successes (attempts < 1, no resumed flag) render no phrase —
-  // never "gave up after retries" contradicting a success payload.
+  // Verdict phrase: resume successes (resumed marker; attempts carries the
+  // model calls actually consumed, batch leg + resume, per the 2026-11-13
+  // sibling audit law) say how they were drafted; a batch success names its
+  // attempts; legacy un-marked successes (attempts < 1, no resumed flag)
+  // render no phrase — never "gave up after retries" contradicting a success
+  // payload.
   if (entry.resumed) parts.push('(via per-entity resume)');
   else if (Number(entry.attempts) >= 1) parts.push(attemptsPhrase(entry.attempts));
   return parts.join(' — ');
