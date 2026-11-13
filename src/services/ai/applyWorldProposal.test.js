@@ -70,6 +70,24 @@ describe('applyWorldProposal', () => {
         }
     });
 
+    // Receipt copy (backlog YB 2026-11-13): the quest lands LIVE (status
+    // active, no draft flag) directly in the ledger, so the detail that feeds
+    // the Applied notice and the audit row must state that plainly — never
+    // "(AI-drafted)" wording that implies a draft pending approval.
+    it('quest_draft receipt says added directly to the ledger, never "draft"', async () => {
+        const r = await applyWorldProposal({
+            campaignName: CN,
+            proposal: { kind: 'quest_draft', name: 'Tide-Born Whisper', description: 'Follow the humming tide.' },
+        });
+        expect(r.applied).toBe(true);
+        expect(r.detail).toBe("quest 'Tide-Born Whisper' added directly to the ledger");
+        expect(r.detail).not.toMatch(/draft/i);
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+            type: 'ai_world_applied',
+            description: expect.stringContaining('added directly to the ledger'),
+        }));
+    });
+
     it('quest CRUD failure is caught + refused, never thrown at the console', async () => {
         saveQuests.mockRejectedValueOnce(new Error('ledger locked'));
         const r = await applyWorldProposal({ campaignName: CN, proposal: { kind: 'quest_draft', name: 'X', description: 'y' } });

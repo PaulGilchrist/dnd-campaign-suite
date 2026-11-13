@@ -36,7 +36,10 @@ async function addQuestDraft(campaignName, proposal) {
         notes: 'AI-drafted — confirmed by the referee',
     }
     await saveQuests(campaignName, [...(quests || []), quest])
-    return { applied: true, detail: `quest '${proposal.name}' added to the ledger (AI-drafted)` }
+    // Receipt copy (backlog YB 2026-11-13): the row lands LIVE in the ledger
+    // (status active, no draft flag), so the receipt must say so plainly —
+    // never wording that implies draft-pending-approval semantics.
+    return { applied: true, detail: `quest '${proposal.name}' added directly to the ledger` }
 }
 
 function narrativeApply(campaignName, proposal) {

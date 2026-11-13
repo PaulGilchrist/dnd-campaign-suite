@@ -239,9 +239,9 @@ describe('AI audit rows render labeled one-line summaries', () => {
   it('world applied row shows its stamped description', () => {
     setup(Log, [{
       id: 'wa', type: 'ai_world_applied', name: 'AI world keeper', timestamp: TS,
-      description: "AI world keeper applied: quest_draft — quest 'The Lost Relic' added to the ledger (AI-drafted)",
+      description: "AI world keeper applied: quest_draft — quest 'The Lost Relic' added directly to the ledger",
     }]);
-    expect(firstLine()).toContain("quest 'The Lost Relic' added to the ledger");
+    expect(firstLine()).toContain("quest 'The Lost Relic' added directly to the ledger");
   });
 
   // ── ai_authoring rows (bug-log-ai-authoring-raw-json) ─────
