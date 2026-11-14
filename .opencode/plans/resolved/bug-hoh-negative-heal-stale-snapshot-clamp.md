@@ -37,3 +37,37 @@ Make the application leg resolve the same row the gate resolved: in `applyMonkHe
 
 ### Severity
 Broken feature / data integrity risk — a positive-intent heal click silently costs the target 59 HP and spends a limited resource, and poisons the log with contradictory rows (`isHealing:true` on a negative delta).
+
+## Resolution
+
+**FIXED 2026-11-14 (fix run).**
+
+### What was actually wrong
+
+The bug file's diagnosis was CONFIRMED against the real code and reproduced live exactly before any edits (clean test-campaign → Initiative mount → EF row 1/1 → full-store `POST /EvasiveFighter {value:{currentHitPoints:60}}` with the bucket-max mirror absent from the client store, as the filed run's replace+reload left it → Warrior-of-Mercy fixture → picker `Select EvasiveFighter, 60 of 1 HP` → mid-dwell scoped `PATCH /combatSummary` maxHp 112 → radio echo `60 of 112` → select + Heal): result panel `1d12 + 7 + 2: 9 + 9 = -59 HP restored (1 / 1 HP)`, EF bucket 60→1, Focus 20→19, `hp_change {delta:-59, currentHp:1, maxHp:1, isHealing:true}`, ability_use `… = 18 (Already at full HP)`.
+
+Root cause exactly as diagnosed — two HP-truth legs:
+- `monkHealTargetAtFullHp` gates on the SSE-adopted live row (`resolveMonkHealGateRow`);
+- `applyMonkHeal` fed the dispatch-captured `cs` into `applyHealingToTarget` → `modifyHitPoints` (`src/services/shared/hpModifier.js`), whose upper clamp `newHp = Math.min(maxHp, oldHp + heal)` has no floor at the resolved current HP. With `maxHp` resolving BELOW `oldHp` (stale 1/1 fan-out placeholder; the bucket carries no `hitPoints` max after a full-store replace), the positive heal became a negative write.
+
+### Changes
+
+- `src/services/automation/handlers/healing/healingHandler.js` — `applyMonkHeal` re-anchors the target row through the SAME `resolveMonkHealGateRow` the gate uses (SSE cache first, captured-cs fallback) before handing the board to `applyHealingToTarget`: capacity truth is single-sourced across gate and application. No-cache lanes keep their captured-cs bytes.
+- `src/services/shared/hpModifier.js` — choke-point defense: the HP ladder (extracted into `clampHpLadder`, shared by both lanes — also de-escalated an eslint complexity warning the inline-twin version tripped) gains a **heal-never-drains floor**: with `delta > 0` and a known positive `maxHp`, `newHp` never lands below `oldHp` (a stale-max heal becomes a 0-delta write, event suppressed). `maxHp === 0` is exempt so the existing `??`-vs-`||` STRUCT pin keeps its bytes; damage lanes (negative delta) untouched.
+- `src/services/automation/common/healingRoll.js` — `logHealingToSSE` stamps `isHealing: actualHeal > 0` (delta sign) instead of a blanket `true`, so an `hp_change` row can never again carry `isHealing:true` beside a negative delta.
+
+### Verification
+
+- New regression tests (green):
+  - `src/services/automation/handlers/healing/healingHandler.handOfHealing.stale-snapshot-apply-leg.test.js` — divergent dwell: the row handed to the CLA-092 choke is the LIVE cache row (max 112 ≥ bucket 60), never the stale snapshot (max 1); honest spend laws hold (1 Focus FOR a real heal, `Regained N HP` audit, positive payload face); no-cache fallback keeps captured-cs bytes.
+  - `src/services/shared/hpModifier.heal-never-drains.test.js` — stale-max heal writes 60→60 delta 0 (never 60→1) in both lanes; normal clamp/damage/STRUCT-0-max pins unchanged.
+- Full vitest suite: 3296 files / 35466 tests GREEN (EXIT=0). `npm run lint` clean (0 warnings). `no-timers-guard` OK.
+- Live re-verification (fixed code, identical repro steps): same divergent dwell committed `1d12 + 7 + 2: 12 + 9 = 21 HP restored`, panel `(81 / 112 HP)`, bucket 60→**81** (positive, capped by live headroom 52), `hp_change {delta:+21, currentHp:81, maxHp:112, isHealing:true}`, ability_use `… = 21 (Regained 21 HP)`, Focus 20→19 spent FOR the real heal.
+- Adjacent faces re-lived clean on the same dwell: second honest heal 81→89 (`+8 (Regained 8 HP)`), full-HP press → inline `EvasiveFighter is already at full HP. No focus spent.` with ZERO POSTs, Cancel zero-spend, console 0 errors, overlays untouched.
+- Exit sweep: subclass surgery restored byte-exact (md5 `ba4d456c…`), closed-tab admin clears GET-verified cd `{}` + log `[]` (disk files absent), `git status --porcelain public/campaigns/` EMPTY.
+
+### Notes / residuals
+
+- The residual Improve-suggestion "route an actualHeal === 0 outcome to the refuse path with zero Focus spend" is NOT re-plumbed: with the single-sourced row the gate-pass now implies positive application headroom; a zero-heal after a passed gate is only reachable via the already-carried bucket-side race (fold-gate ledger, unit-pinned) and lands as an honest 0-delta row — never a drain.
+- Improvement-backlog bullet "mount-snapshot can render an inverted fraction (`60 of 1`)" is display-only and unchanged by this fix (still owned by the PT#3 decision).
+- Other heal-lane row builders besides `logHealingToSSE` (e.g. `spellCastService/execution/helpers.js`, massHeal lanes) still stamp `isHealing: true` unconditionally, and `applyHealingDirectly` has no heal-never-drains floor of its own — but it clamps against the BUCKET/sheet max (no stale-cs-row fallback), so it cannot produce this bug's negative face. Widening the floor/stamp convention app-wide is audit hygiene, not data-integrity.

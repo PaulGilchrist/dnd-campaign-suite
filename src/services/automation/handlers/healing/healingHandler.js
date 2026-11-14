@@ -195,9 +195,20 @@ function resolveMonkHealRoll({ action, playerStats, targetName, campaignName, ma
 
 // CLA-092 canonical choke: combatants apply via applyHealingToTarget (clamps at
 // target max on the combatSummary entry); out-of-combat falls back to direct write.
+// MM 2026-11-14 (negative-heal fix): the application leg MUST clamp against the
+// SAME row the commit gate resolved (resolveMonkHealGateRow — SSE-adopted cache
+// first, dispatch snapshot fallback). `cs` is the combat context captured when
+// the feature click dispatched; a mid-dwell board echo that lifts the live row
+// max above the target's HP while the snapshot row still sits BELOW it (a 1/1
+// fan-out placeholder under a bucket-current target — bug-hoh-negative-heal-
+// stale-snapshot-clamp) let the gate honestly allow the heal, then
+// min(bucket + roll, staleMax) wrote a NEGATIVE "heal" delta into the bucket
+// with the Focus spent and "(Already at full HP)" in the audit.
 function applyMonkHeal({ cs, targetName, healAmount, playerStats, campaignName }) {
     if (cs?.creatures?.some(c => c.name === targetName)) {
-        return applyHealingToTarget(cs, targetName, healAmount, campaignName);
+        const row = resolveMonkHealGateRow(targetName, cs, campaignName);
+        const board = { ...cs, creatures: cs.creatures.map(c => (c.name === targetName ? row : c)) };
+        return applyHealingToTarget(board, targetName, healAmount, campaignName);
     }
     return applyHealingDirectly(playerStats, targetName, healAmount, campaignName);
 }

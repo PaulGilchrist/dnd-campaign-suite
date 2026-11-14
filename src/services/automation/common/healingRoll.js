@@ -81,7 +81,11 @@ export function logHealingToSSE(campaignName, info) {
         delta: actualHeal,
         currentHp: newHp,
         maxHp,
-        isHealing: true,
+        // Audit honesty (bug-hoh-negative-heal-stale-snapshot-clamp): the sign
+        // of the written delta is the truth — a heal that clamped to zero (or
+        // any pathological negative) must never stamp isHealing:true beside an
+        // "(Already at full HP)" ability_use row on the same click.
+        isHealing: actualHeal > 0,
         isUnconscious: false,
         rollInfo: rollInfo || null,
         maximizeHealingDice: maximize || false,
