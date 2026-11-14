@@ -62,6 +62,7 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass: clear → re-e
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
+- **2026-11-14 improve-run scout — class-agnostic tracked-resource 0-seeds still fan into every bucket:** the owned-only gate shipped in `03e419d35` covers only the three statically-ownable Pool keys; `computeTrackedResources` (`src/services/rules/trackedResources.js`) still CREATES every remaining catalog key for every character with the ownership boolean gating only the value to 0 — e.g. `sorceryPoints: 0`, `ragePoints: 0` for non-sorcerers/non-barbarians, and `*Uses` ghosts like `gloriousDefenseUses: 0` on non-paladins (`addPaladinDivineResources`), persisted by the first full-store POST after campaign-select and re-fanned as `null` rows by long rest (outside the `GATED_POOL_KEYS` list in `restRules-longRest.js`). Mechanism identical to the fixed Pool ghosts, but the flip is WIDER: some keys are handler-owned latches whose 0-seed is load-bearing (CLA-130 safety net — `tranceOfOrderUses` comment at `trackedResources.js:48-50`, "deliberately never in `_trackedResources`"), so this needs a per-key owner-classification pass (statically-ownable → gate like the Pools; handler-owned latch → document and keep) rather than a blanket gate. Zero-consumer today; inflates buckets + misleads the Admin change-data viewer.
 
 ## Blocked / Not Verified (fold-gate ledger)
 
