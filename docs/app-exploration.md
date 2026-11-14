@@ -76,7 +76,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before the admin clears 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (IZ 2026-11-14) Amount-lane silent clamp: typing 90 into the LoH amount input vs pool 60 rewrites the VISIBLE value to 60 with zero feedback (no `healing-restriction-note`, no toast) — and at pool 0 `Apply Heal` is disabled with only the `Pool: 0 / 65` line as explanation. Honest math, invisible law — an inline "clamped to pool" hint (the full-HP note seam already exists beside it) and/or a pool-exhausted note would surface why the number changed / why nothing is pressable. `HealingApplySection` in `char-sheet/modals/divine/HealingPoolModal.jsx`.
 - (IZ 2026-11-14) `fanaticalFocusUsed: false` per-sheet-open latch-reset write is class-agnostic (`CharSheet.jsx:603`) — rides Fighter/Warlock/every non-paladin buckets too; semantically honest ('latch unused', LR nulls it per `restRules-longRest.js:193`) but the paladin-flavored key on non-paladins is exactly the naming ghost-shape `ee3c3e7a7` retired for the `:0`/pool family, and it's one unconditional POST per sheet open. Candidates: gate the reset to the lanes that read it, or rename to a lane-neutral latch key.
 
 ## Blocked / Not Verified (fold-gate ledger)

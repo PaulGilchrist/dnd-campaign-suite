@@ -150,6 +150,20 @@ function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp,
             {(noHealCapacity || healRefusal) && (
                 <p className="healing-restriction-note">{healRefusal || `${resolvedTargetName} is already at full HP. No pool spent.`}</p>
             )}
+            {/* Amount-lane honesty (backlog 2026-11-14 IZ silent-clamp): the
+                display above already clamps (value={Math.min(healAmount, safePool)},
+                max={safePool}) — this note surfaces WHY a typed number changed
+                instead of rewriting it invisibly. Shares the one note seam. */}
+            {safePool > 0 && healAmount > safePool && (
+                <p className="healing-restriction-note">
+                    Amount clamped to the remaining pool of {safePool} HP.
+                </p>
+            )}
+            {safePool <= 0 && (
+                <p className="healing-restriction-note">
+                    Healing pool exhausted — no HP left to spend, so Apply Heal is disabled until the pool recovers.
+                </p>
+            )}
         </div>
     );
 }
