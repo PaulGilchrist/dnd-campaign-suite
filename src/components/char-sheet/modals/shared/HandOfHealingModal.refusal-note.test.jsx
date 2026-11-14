@@ -96,11 +96,11 @@ describe('HandOfHealingModal picker refusal note (REFUSE PRE-SPEND)', () => {
     expect(screen.queryByText('Fighting_Rogue is already at full HP. No focus spent.')).not.toBeInTheDocument();
   });
 
-  it('Skip on a full-HP monk routes the self refusal to the same inline note', async () => {
+  it('Heal self on a full-HP monk routes the self refusal to the same inline note', async () => {
     const confirmHeal = vi.fn().mockResolvedValue({ refusal: 'Disciplined_Monk is already at full HP. No focus spent.' });
     render(<HandOfHealingModal {...makePendingProps(confirmHeal)} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heal self' }));
 
     expect(await screen.findByText('Disciplined_Monk is already at full HP. No focus spent.')).toBeInTheDocument();
     expect(confirmHeal).toHaveBeenCalledWith('Disciplined_Monk');

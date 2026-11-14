@@ -104,7 +104,13 @@ function LiveHpTargetRow({ campaignName, ...rowProps }) {
     return <SecondaryTargetRow {...rowProps} target={{ ...rowProps.target, ...resolveLiveTargetHp(rowProps.target) }} />;
 }
 
-function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt, liveHp }) {
+// skipLabel / onDismiss / dismissLabel are per-consumer props (improve LC 2026-11-14
+// hoh-picker-skip-semantics): the HoH picker's onSkip is NOT a dismiss — it
+// self-heals the monk through the same commit lane as a target pick (real focus
+// spend), so that consumer relabels the button (`Heal self`) and passes a
+// distinct zero-spend Cancel via onDismiss. Every consumer that omits these
+// props renders the unchanged `Skip` face — no global rename.
+function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt, liveHp, skipLabel, onDismiss, dismissLabel }) {
     const [selected, setSelected] = useState(null);
     const [mapStatuses, setMapStatuses] = useState(null);
 
@@ -197,8 +203,16 @@ function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSki
                         </button>
                     ) : null}
                     <button className="sp-dismiss-btn" onClick={onSkip} type="button">
-                        Skip
+                        {skipLabel || 'Skip'}
                     </button>
+                    {/* Distinct no-spend dismiss tier (modal-family `Cancel` precedent:
+                        AspectOfTheWildsModal / TeleportModal / FeatureChoiceModal) —
+                        rendered only for consumers that pass a real dismiss handler. */}
+                    {onDismiss && (
+                        <button className="sp-dismiss-btn" onClick={onDismiss} type="button">
+                            {dismissLabel || 'Cancel'}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

@@ -60,7 +60,12 @@ describe('CLA-159 HandOfHealingModal pending target picker', () => {
     expect(screen.getByText('Bandit 1')).toBeInTheDocument();
     expect(screen.getByText('Disciplined_Monk')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Heal' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    // improve hoh-picker-skip-semantics: the shared chooser's default `Skip`
+    // label is a misread trap here (it self-heals, never dismisses) — the HoH
+    // consumer relabels it honestly and adds a distinct Cancel.
+    expect(screen.getByRole('button', { name: 'Heal self' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
     expect(screen.queryByText(/HP restored/)).not.toBeInTheDocument();
   });
 
@@ -82,11 +87,11 @@ describe('CLA-159 HandOfHealingModal pending target picker', () => {
     expect(screen.queryByText(/Choose target/)).not.toBeInTheDocument();
   });
 
-  it('Skip self-heals the monk instead of requiring a target pick', async () => {
+  it('Heal self self-heals the monk instead of requiring a target pick', async () => {
     const confirmHeal = vi.fn().mockResolvedValue({ ...healResultPayload, targetName: 'Disciplined_Monk' });
     render(<HandOfHealingModal {...makePendingProps({ confirmHeal })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heal self' }));
 
     await waitFor(() => {
       expect(confirmHeal).toHaveBeenCalledWith('Disciplined_Monk');

@@ -4,7 +4,9 @@
 // for a NON-rest flow, so each shell now carries the ShortRestModal tier
 // (bc409413d): role="dialog" + aria-modal="true" + aria-labelledby → its visible
 // heading. Mutually-exclusive stages share ids safely (never co-mount). Button
-// behavior is pinned unchanged (Skip/pick → confirmHeal, Done → onClose).
+// behavior is pinned unchanged (Heal self/pick → confirmHeal, Done → onClose;
+// improve hoh-picker-skip-semantics relabelled the picker's self-heal lane and
+// added a distinct zero-spend Cancel → onClose).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import HandOfHealingModal from './HandOfHealingModal.jsx';
@@ -114,7 +116,7 @@ describe('HandOfHealingModal dialog semantics', () => {
   it('error stage: failed confirmHeal still renders a [role="dialog"] with the heal-name heading', async () => {
     render(<HandOfHealingModal {...makePendingProps({ confirmHeal: vi.fn().mockResolvedValue(null) })} />);
     expectDialogTier(/Choose target for Hand of Healing/);
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Heal self' }));
     await waitFor(() => {
       const shell = expectDialogTier(/Hand of Healing/);
       const heading = document.getElementById(shell.getAttribute('aria-labelledby'));

@@ -80,7 +80,14 @@ function reanchorTargetsToLiveBoard(creatureTargets, campaignName) {
     });
 }
 
-function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, refusalNote, campaignName }) {
+// LC 2026-11-14 (improve hoh-picker-skip-semantics): the shared chooser's
+// `Skip` button is a misread trap here — onSkip does NOT dismiss, it routes
+// the monk through the SAME commit lane as a target pick (`runHeal(monkName)`,
+// real focus spend when damaged). The picker therefore relabels it honestly
+// (`Heal self`) and passes onDismiss = onClose, a distinct zero-spend Cancel
+// riding the same pure-dismiss lane as Escape (setModalState clears a local UI
+// flag only: zero focus, zero heal, zero log rows).
+function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, onClose, refusalNote, campaignName }) {
     // Same wake-vs-read order as the result-stage subscription below (and the
     // fe3e5eece cs-row echo law it implemented): App.jsx handleChangeKeyEvent
     // runs syncCombatSummaryCache BEFORE the store notify, so when this echo
@@ -107,6 +114,8 @@ function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, r
                     targets={liveCreatureTargets}
                     onTargetSelected={onPick}
                     onSkip={onSkip}
+                    skipLabel="Heal self"
+                    onDismiss={onClose}
                     featureDescription={`Choose a creature you can touch to heal with ${healName}.`}
                     confirmLabel="Heal"
                     confirmIcon="fa-hand-holding-heart"
@@ -357,6 +366,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, actualHeal, monkN
                 creatureTargets={creatureTargets || []}
                 onPick={runHeal}
                 onSkip={() => runHeal(monkName)}
+                onClose={onClose}
                 refusalNote={refusalNote}
                 campaignName={campaignName}
             />

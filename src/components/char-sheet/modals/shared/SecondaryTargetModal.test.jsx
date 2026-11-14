@@ -233,4 +233,35 @@ describe('SecondaryTargetModal', () => {
         const visibleConfirm = screen.getByRole('button', { name: /Cast Cure Wounds/ });
         expect(visibleConfirm).toBeDisabled();
     });
+
+    // improve hoh-picker-skip-semantics (LC 2026-11-14): per-consumer label /
+    // dismiss props. Default face is byte-identical for every existing consumer
+    // (`Skip`, no `Cancel`); only consumers that pass them see the new chrome.
+    it('keeps the default Skip face without skipLabel/onDismiss and honors them when passed', () => {
+        const onSkip = vi.fn();
+        const onDismiss = vi.fn();
+
+        const defaults = render(
+            <SecondaryTargetModal {...baseProps} onSkip={onSkip} />
+        );
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+        defaults.unmount();
+
+        render(
+            <SecondaryTargetModal
+                {...baseProps}
+                onSkip={onSkip}
+                skipLabel="Heal self"
+                onDismiss={onDismiss}
+            />
+        );
+        expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Heal self' }));
+        expect(onSkip).toHaveBeenCalledTimes(1);
+        // Distinct no-spend dismiss rides its own handler, never onSkip.
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onDismiss).toHaveBeenCalledTimes(1);
+        expect(onSkip).toHaveBeenCalledTimes(1);
+    });
 });
