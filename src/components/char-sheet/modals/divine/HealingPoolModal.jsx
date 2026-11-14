@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 import useTrackedResource from '../../../../hooks/runtime/useTrackedResource.js'
 import { addEntry } from '../../../../services/ui/logService.js'
 import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js'
@@ -440,6 +440,19 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     };
 
     const resolvedTargetName = selectedTargetName || playerStats.name;
+
+    // Display echo subscription (improve heal-modal-live-hp-echo): the header,
+    // capacity gate and bloodied badge below all resolve HP via
+    // resolveTargetCurrentHp — an imperative getRuntimeValue read that only
+    // re-runs when the modal re-renders, so an external bucket write mid-dwell
+    // left `100 / 143` on screen until reopen. Subscribing here makes every
+    // target-bucket SSE echo re-render the modal and re-resolve the display.
+    // Display-only: the return values are deliberately unused (the single HP
+    // truth stays resolveTargetCurrentHp) and this path writes nothing; the
+    // commit-time re-reads (88daae2be) remain the integrity gate.
+    useRuntimeValue(resolvedTargetName, 'currentHitPoints', campaignName)
+    useRuntimeValue(resolvedTargetName, 'hitPoints', campaignName)
+
     const targetMaxHp = (() => {
         const creature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
         if (creature) {
@@ -754,6 +767,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                         confirmLabel="Heal"
                         confirmIcon="fa-hand-holding-heart"
                         showHp={true}
+                        liveHp={true}
+                        campaignName={campaignName}
                     />
                 </div>
             </div>

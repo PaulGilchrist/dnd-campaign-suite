@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import './SecondaryTargetModal.css';
 import { getTargetMapStatuses, distanceBadgeText } from '../../../../services/maps/spellOverlayService.js';
+import { useRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { resolveLiveTargetHp } from '../../../../services/automation/handlers/healing/liveTargetHp.js';
 
 function isOptionTarget(target) {
     return 'value' in target;
@@ -88,7 +90,21 @@ function SecondaryTargetRow({ target, selected, showHp, showSize, handleSelect, 
     );
 }
 
-function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt }) {
+// Bucket-live variant of the row (improve heal-modal-live-hp-echo): heal
+// choosers pass `liveHp` so each candidate row subscribes to the target's
+// runtime HP buckets — an SSE echo landing mid-dwell re-renders the row and
+// its radio aria-label instead of stranding them on the open-moment snapshot.
+// HP still resolves through resolveLiveTargetHp (bucket-first, cs-row
+// fallback) — the same precedence the producer used at open time, so monsters
+// (no runtime HP keys) keep their row values untouched. Snapshot consumers
+// never mount this wrapper, so their rows render byte-identically.
+function LiveHpTargetRow({ campaignName, ...rowProps }) {
+    useRuntimeValue(rowProps.target.name, 'currentHitPoints', campaignName);
+    useRuntimeValue(rowProps.target.name, 'hitPoints', campaignName);
+    return <SecondaryTargetRow {...rowProps} target={{ ...rowProps.target, ...resolveLiveTargetHp(rowProps.target) }} />;
+}
+
+function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt, liveHp }) {
     const [selected, setSelected] = useState(null);
     const [mapStatuses, setMapStatuses] = useState(null);
 
@@ -128,17 +144,21 @@ function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSki
                     {description && <p dangerouslySetInnerHTML={{ __html: description }} />}
                     {!description && targets.length > 0 && <p>Choose a target from the {targets.length} available:</p>}
                     <div className="secondary-target-list">
-                        {targets.map((target, i) => (
-                            <SecondaryTargetRow
-                                key={i}
-                                target={target}
-                                selected={selected}
-                                showHp={showHp}
-                                showSize={showSize}
-                                handleSelect={handleSelect}
-                                mapStatuses={mapStatuses}
-                            />
-                        ))}
+                        {targets.map((target, i) => {
+                            const Row = liveHp && !isOptionTarget(target) ? LiveHpTargetRow : SecondaryTargetRow;
+                            return (
+                                <Row
+                                    key={i}
+                                    target={target}
+                                    selected={selected}
+                                    showHp={showHp}
+                                    showSize={showSize}
+                                    handleSelect={handleSelect}
+                                    mapStatuses={mapStatuses}
+                                    campaignName={campaignName}
+                                />
+                            );
+                        })}
                     </div>
                     {variantLabel && (
                         <label className={`secondary-target-variant ${variantDisabled ? 'secondary-target-variant-disabled' : ''}`}>

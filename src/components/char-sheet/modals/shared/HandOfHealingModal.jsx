@@ -53,7 +53,7 @@ function getTargetConditions(targetName, campaignName) {
 // refused a zero-capacity target with ZERO Focus spent — the picker stays open
 // with the note inline, mirroring the d595cff2c noHealCapacity copy placement
 // (.healing-restriction-note, same global class Healing-Light uses).
-function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, refusalNote }) {
+function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, refusalNote, campaignName }) {
     return (
         <div className="short-rest-overlay no-print">
             <div
@@ -75,6 +75,8 @@ function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, r
                     confirmLabel="Heal"
                     confirmIcon="fa-hand-holding-heart"
                     showHp={true}
+                    liveHp={true}
+                    campaignName={campaignName}
                 />
             </div>
         </div>
@@ -255,6 +257,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, actualHeal, monkN
                 onPick={runHeal}
                 onSkip={() => runHeal(monkName)}
                 refusalNote={refusalNote}
+                campaignName={campaignName}
             />
         );
     }

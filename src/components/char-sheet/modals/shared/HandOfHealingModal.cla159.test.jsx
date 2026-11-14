@@ -6,6 +6,7 @@ import HandOfHealingModal from './HandOfHealingModal.jsx';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => []),
   setRuntimeValue: vi.fn(),
+  useRuntimeValue: vi.fn(() => null), // display-echo subscription seam (return value unused by the heal modals)
 }));
 
 vi.mock('../../../../services/ui/utils.js', () => ({
