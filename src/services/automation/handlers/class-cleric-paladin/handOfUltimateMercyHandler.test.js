@@ -1,4 +1,4 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai: 2026-11-14
 // Deterministic unit coverage for handOfUltimateMercyHandler.handle — all external
 // services mocked; pins focus-point cost/fallback chain, 0-HP gate, dice expression
 // selection (default/custom/maximized), runtime + storage writes, condition curing,
@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+  setRuntimeBatch: vi.fn(),
 }));
 
 vi.mock('../../../dice/diceRoller.js', () => ({
@@ -262,12 +263,40 @@ describe('handOfUltimateMercyHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'focusPoints', 0, campaignName);
     });
 
-    it('should set target HP to heal amount via setRuntimeValue', async () => {
+    it('should set target HP to heal amount via a merged setRuntimeBatch write', async () => {
       setupSuccessPath(12);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('DownedAlly', 'currentHitPoints', 12, campaignName);
+      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('DownedAlly', {
+        currentHitPoints: 12,
+        deathSaves: [false, false, false],
+        deathFailures: [false, false, false],
+        isDead: 0,
+      }, campaignName);
+    });
+
+    it('should clear the death-state keys on resurrect (isDead-stuck regression)', async () => {
+      // bug-houm-resurrection-leaves-isdead-stuck: the old lane wrote only
+      // currentHitPoints, leaving isDead:1 + deathFailures:[t,t,t] on a living
+      // 31-HP creature so its next death rendered the DEAD panel with no
+      // death-save counter/roll lane. The resurrect commit must carry the full
+      // CLA-092 death-state reset (same write set as the sheet-revive lane).
+      setupSuccessPath(31);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+      const [target, writes, campaign] = useRuntimeState.setRuntimeBatch.mock.calls[0];
+      expect(target).toBe('DownedAlly');
+      expect(campaign).toBe(campaignName);
+      expect(writes.currentHitPoints).toBe(31);
+      expect(writes.isDead).toBe(0);
+      expect(writes.deathSaves).toEqual([false, false, false]);
+      expect(writes.deathFailures).toEqual([false, false, false]);
+      // HP must NOT ride a separate single-key write — that was the leak face.
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'DownedAlly', 'currentHitPoints', expect.anything(), campaignName);
     });
 
     it('should dispatch focus-points-updated and combat-summary-updated events', async () => {
@@ -318,6 +347,16 @@ describe('handOfUltimateMercyHandler.handle', () => {
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(storage.set).not.toHaveBeenCalled();
+    });
+
+    it('should not batch-reset player death-state keys for npc targets', async () => {
+      mockRuntime();
+      mockRoll(8);
+      resolveTarget.mockResolvedValue({ target: { name: 'Goblin', type: 'npc', currentHp: 0 }, cs: { creatures: [] } });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
     });
   });
 

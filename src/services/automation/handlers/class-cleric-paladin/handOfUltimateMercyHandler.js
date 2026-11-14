@@ -1,5 +1,5 @@
 import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRoller.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
 import storage from '../../../ui/storage.js';
@@ -29,7 +29,20 @@ function resolveTargetHp(targetInfo, targetName, campaignName) {
 
 async function applyResurrectionHeal(targetInfo, targetName, healAmount, campaignName) {
     if (targetInfo.target.type === 'player') {
-        await setRuntimeValue(targetName, 'currentHitPoints', healAmount, campaignName);
+        // Resurrection always lifts the bucket from 0 to positive, so it must
+        // carry the app-wide death-state reset — the same one the sheet-revive
+        // lane commits (CharHitPoints, merged one-POST idiom) and the CLA-092
+        // heal choke performs for its oldHp<=0 -> newHp>0 transition
+        // (applyHealing.js). The old currentHitPoints-only write left
+        // isDead:1 + stale deathFailures on a living creature
+        // (bug-houm-resurrection-leaves-isdead-stuck), poisoning its next
+        // death-save lane. One setRuntimeBatch POST writes the whole set.
+        setRuntimeBatch(targetName, {
+            currentHitPoints: healAmount,
+            deathSaves: [false, false, false],
+            deathFailures: [false, false, false],
+            isDead: 0,
+        }, campaignName);
     } else {
         targetInfo.target.currentHp = healAmount;
         if (targetInfo.cs) {
