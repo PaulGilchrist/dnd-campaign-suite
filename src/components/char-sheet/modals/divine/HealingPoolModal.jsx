@@ -117,7 +117,7 @@ function ConditionCureSections({ hasRestoringTouch, curableEntries, selectedCond
     );
 }
 
-function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, safePool, healAmount, setHealAmount, applyHeal }) {
+function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, safePool, healAmount, setHealAmount, noHealCapacity, healRefusal, applyHeal }) {
     return (
         <div className="short-rest-section">
             <h4>Heal — {resolvedTargetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}</h4>
@@ -136,12 +136,19 @@ function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp,
                         style={{ width: '62px', marginLeft: '6px' }}
                     />
                 </label>
-                <button className="char-btn" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0 || (bloodiedOnly && !isTargetBloodied)}>
+                <button className="char-btn" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0 || (bloodiedOnly && !isTargetBloodied) || noHealCapacity}>
                     <i className="fas fa-heart"></i> Apply Heal
                 </button>
             </div>
             {bloodiedOnly && !isTargetBloodied && (
                 <p className="healing-restriction-note">This feature can only heal Bloodied creatures (at half HP or less).</p>
+            )}
+            {/* Render-gate note + commit-time refusal note share one seam (the
+                dice lane's noHealCapacity pattern / the f3950317c-615a7580a
+                refusal copy family). This section never re-filters away, so an
+                inside note is safe here. */}
+            {(noHealCapacity || healRefusal) && (
+                <p className="healing-restriction-note">{healRefusal || `${resolvedTargetName} is already at full HP. No pool spent.`}</p>
             )}
         </div>
     );
@@ -237,7 +244,7 @@ function HealingLogSection({ log }) {
     );
 }
 
-function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, restorableTotal, noHealCapacity, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, cureRefusal, log, handleClose, featureName }) {
+function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, noHealCapacity, healRefusal, applyHeal, effectiveMaxDicePerUse, rolledFaces, restorableTotal, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, cureRefusal, log, handleClose, featureName }) {
     return (
         // Dialog semantics per the shared DeleteConfirmModal-class tier
         // (backlog 2026-11-10 HD, ShortRestModal bc409413d pattern): the existing
@@ -273,6 +280,8 @@ function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, reso
                     safePool={safePool}
                     healAmount={healAmount}
                     setHealAmount={setHealAmount}
+                    noHealCapacity={noHealCapacity}
+                    healRefusal={healRefusal}
                     applyHeal={applyHeal}
                 />
             )}
@@ -381,6 +390,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const [rolledFaces, setRolledFaces] = React.useState([]);
     const [selectedTargetName, setSelectedTargetName] = React.useState(null);
     const [cureRefusal, setCureRefusal] = React.useState(null);
+    const [healRefusal, setHealRefusal] = React.useState(null);
     const [showTargetSelection, setShowTargetSelection] = React.useState(!!(creatureTargets && creatureTargets.length > 1));
 
     const effectiveMaxDicePerUse = resolveMaxDicePerUse(maxDicePerUseProp, playerStats);
@@ -441,9 +451,10 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
     const isTargetBloodied = targetCurrentHp > 0 && targetCurrentHp <= Math.floor(targetMaxHp / 2);
 
-    // Dice-lane honesty: how much of the pending rolls can actually restore HP
-    // (null = HP truth unknown, gate stays open). The "N HP to restore" copy is
-    // clamped so it can never promise restoration the commit cannot deliver.
+    // Heal-lane honesty (both lanes): how much of the pending rolls/requested
+    // amount can actually restore HP (null = HP truth unknown, gate stays
+    // open). The "N HP to restore" copy is clamped so it can never promise
+    // restoration the commit cannot deliver.
     const healCapacity = resolveHealCapacity(targetMaxHp, targetCurrentHp, accumulatedTotal);
     const noHealCapacity = healCapacity === 0;
     const restorableTotal = resolveRestorableTotal(targetMaxHp, targetCurrentHp, accumulatedTotal);
@@ -485,34 +496,67 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     };
 
     const applyHeal = () => {
-        const amount = Math.min(healAmount, safePool);
-        if (amount <= 0) return;
-        consumeChannelDivinity();
-        const newPool = safePool - amount;
-        setPoolRemaining(newPool);
+        const requested = Math.min(healAmount, safePool);
+        if (requested <= 0) return;
 
+        // Integrity: re-read the target's live HP at COMMIT time — the modal
+        // dwells open across external bucket writes. Same honesty law as the
+        // dice commit (88daae2be), the HoH pre-spend gate (f3950317c) and the
+        // single-cure refusal (615a7580a): a heal that can restore nothing
+        // costs zero pool, writes zero HP and logs zero audit row.
         const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
+        let freshCurrentHp, targetMax;
+        if (targetCreature) {
+            freshCurrentHp = resolveTargetCurrentHp(combatSummary, resolvedTargetName, playerStats);
+            targetMax = targetCreature.type === 'player'
+                ? (getRuntimeValue(targetCreature.name, 'hitPoints') ?? 0)
+                : targetCreature.maxHp;
+        } else {
+            const stored = getRuntimeValue(resolvedTargetName, 'currentHitPoints');
+            freshCurrentHp = stored != null && stored !== '' ? Number(stored) : targetCurrentHp;
+            targetMax = playerStats.hitPoints;
+        }
+        // Unknown HP truth (max <= 0) keeps the gate open — same stance as resolveHealCapacity.
+        const amount = targetMax > 0 ? Math.min(requested, Math.max(0, targetMax - freshCurrentHp)) : requested;
+        if (amount <= 0) {
+            setHealRefusal(`${resolvedTargetName} is already at full HP. No pool spent.`);
+            return;
+        }
+        setHealRefusal(null);
+
         if (targetCreature && combatSummary) {
             const result = applyHealingToTarget(combatSummary, resolvedTargetName, amount, campaignName);
-            if (result) {
-                addEntry(campaignName, {
-                    type: 'healing_pool',
-                    sourceName: playerStats.name,
-                    featureName,
-                    targetName: resolvedTargetName,
-                    amount: result.actualHeal,
-                    poolAfter: newPool,
-                }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
-                setLog(prev => [...prev, { action: 'Heal', target: resolvedTargetName, amount: result.actualHeal, poolAfter: newPool }]);
-                setHealAmount(Math.min(healAmount, newPool));
+            // The engine re-reads and clamps at its own commit — its delta is the
+            // ground truth for what restored. Losing the race to another writer
+            // between the capacity check and this call must still charge and log
+            // only the HP that really restored (zero → charged-with-no-ledger fix).
+            const actualHeal = result ? result.actualHeal : 0;
+            if (actualHeal <= 0) {
+                setHealRefusal(`${resolvedTargetName} is already at full HP. No pool spent.`);
+                return;
             }
+            consumeChannelDivinity();
+            const newPool = safePool - actualHeal;
+            setPoolRemaining(newPool);
+            addEntry(campaignName, {
+                type: 'healing_pool',
+                sourceName: playerStats.name,
+                featureName,
+                targetName: resolvedTargetName,
+                amount: actualHeal,
+                poolAfter: newPool,
+            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
+            setLog(prev => [...prev, { action: 'Heal', target: resolvedTargetName, amount: actualHeal, poolAfter: newPool }]);
+            setHealAmount(Math.min(healAmount, newPool));
         } else {
-            // Same commit-time re-read as the dice lane: never let a stale snapshot
-            // overwrite an HP value another writer already raised.
-            const stored = getRuntimeValue(resolvedTargetName, 'currentHitPoints');
-            const freshCurrentHp = stored != null && stored !== '' ? Number(stored) : targetCurrentHp;
-            const newHp = Math.min(playerStats.hitPoints, freshCurrentHp + amount);
+            // Off-board/self lane writes the bucket itself; `amount` is already
+            // clamped to the fresh capacity, so newHp never exceeds the maximum
+            // nor drops below the freshly-read current HP.
+            consumeChannelDivinity();
+            const newHp = Math.min(targetMax, freshCurrentHp + amount);
             setRuntimeValue(resolvedTargetName, 'currentHitPoints', newHp, campaignName);
+            const newPool = safePool - amount;
+            setPoolRemaining(newPool);
             addEntry(campaignName, {
                 type: 'healing_pool',
                 sourceName: playerStats.name,
@@ -731,6 +775,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 isTargetBloodied={isTargetBloodied}
                 healAmount={healAmount}
                 setHealAmount={setHealAmount}
+                noHealCapacity={noHealCapacity}
+                healRefusal={healRefusal}
                 applyHeal={applyHeal}
                 effectiveMaxDicePerUse={effectiveMaxDicePerUse}
                 rolledFaces={rolledFaces}

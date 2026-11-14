@@ -33,11 +33,13 @@ import HealingPoolModal from './HealingPoolModal.jsx';
 // combat context exists" — expect.any(Number) replaced by an exact write
 // tuple through the live store.)
 //
-// Flagged product quirks (asserted as-is, not fixed here):
-// 1. The combat lane deducts the FULL requested amount from the pool but
-//    logs the engine's clamped actualHeal — an overheal over-deducts pool.
-// 2. The no-combat lane clamps HP at the target maximum but logs the
-//    requested amount in the healing_pool payload and log row.
+// Flagged product quirks RESOLVED (bug-amount-heal-lane-charges-pool-on-full-
+// hp-target): (1) the combat lane and (2) the no-combat lane used to deduct
+// the FULL requested amount while the row logged the clamped/actual value —
+// both lanes now charge and log exactly the HP that restores, with a
+// commit-time capacity gate (zero-capacity press refuses with an inline
+// .healing-restriction-note and zero pool spend / zero writes / zero rows)
+// pinned in HealingPoolModal.amount-capacity.test.jsx.
 // 3. The heal amount input and dice roll-details block use inline styles
 //    (also flagged in the bloodied, curing, dice and channel-divinity lanes).
 // The healing_pool payload carries no timestamp field, so the Date.now pin
@@ -299,9 +301,12 @@ describe('HealingPoolModal - HP Healing', () => {
     expect(logRows()).toEqual([['Heal', 'Paladin1', '5', '5']]);
   });
 
-  it('clamps a no-combat overheal at the target maximum HP (quirk: pool deducts and log records the full requested amount)', async () => {
+  it('clamps a no-combat overheal honestly — pool spends and the row states only the HP that restores', async () => {
+    // Honesty law (bug-amount-heal-lane-charges-pool-on-full-hp-target): the
+    // former quirk (pool lost the FULL 10, row claimed amount 10 on a 2-HP
+    // restore) is dead — pool-spend == actual HP restored.
     damageUtils.getCombatContext.mockResolvedValue(null);
-    hpStore.Paladin1.currentHitPoints = 38;
+    hpStore.Paladin1.currentHitPoints = 38; // 2 HP of room
 
     await renderModal({}, { current: 12, max: 20 });
     setHealAmount(10);
@@ -309,16 +314,18 @@ describe('HealingPoolModal - HP Healing', () => {
 
     expect(hpWrites()).toEqual([['Paladin1', 'currentHitPoints', 40, CAMPAIGN]]); // clamped at 40
     expect(hpStore.Paladin1.currentHitPoints).toBe(40);
-    expect(poolUpdate.mock.calls).toEqual([[2]]); // full 10 deducted despite only 2 healed
-    expect(poolStore.current).toBe(2);
+    expect(poolUpdate.mock.calls).toEqual([[10]]); // only the 2 that restored were spent
+    expect(poolStore.current).toBe(10);
     expect(logService.addEntry.mock.calls).toEqual([
-      [CAMPAIGN, healLog({ amount: 10, poolAfter: 2 })],
+      [CAMPAIGN, healLog({ amount: 2, poolAfter: 10 })],
     ]);
-    expect(logRows()).toEqual([['Heal', 'Paladin1', '10', '2']]);
+    expect(logRows()).toEqual([['Heal', 'Paladin1', '2', '10']]);
   });
 
-  it('logs the engine clamped actualHeal while still deducting the full requested amount from the pool (flagged quirk)', async () => {
-    summary.creatures[1].currentHp = 28; // Orc at 28/30 — 5-request overheals
+  it('clamps the engine-lane charge to the clamped actualHeal — pool-spend == HP restored', async () => {
+    // Honesty law (same bug): the engine used to be called with the raw 5 and
+    // the pool lost it all while the row admitted only 2 restored.
+    summary.creatures[1].currentHp = 28; // Orc at 28/30 — 2 HP of room
 
     await renderModal(
       { creatureTargets: [
@@ -331,13 +338,14 @@ describe('HealingPoolModal - HP Healing', () => {
     setHealAmount(5);
     fireEvent.click(healBtn());
 
+    expect(applyHealingService.applyHealingToTarget).toHaveBeenCalledWith(summary, 'Orc Warrior', 2, CAMPAIGN); // commit-time capacity clamp
     expect(summary.creatures[1].currentHp).toBe(30); // engine clamped at max
-    expect(poolUpdate.mock.calls).toEqual([[5]]); // pool lost the full 5
-    expect(poolStore.current).toBe(5);
+    expect(poolUpdate.mock.calls).toEqual([[8]]); // pool lost only the 2 that restored
+    expect(poolStore.current).toBe(8);
     expect(logService.addEntry.mock.calls).toEqual([
-      [CAMPAIGN, healLog({ targetName: 'Orc Warrior', amount: 2, poolAfter: 5 })],
+      [CAMPAIGN, healLog({ targetName: 'Orc Warrior', amount: 2, poolAfter: 8 })],
     ]);
-    expect(logRows()).toEqual([['Heal', 'Orc Warrior', '2', '5']]);
+    expect(logRows()).toEqual([['Heal', 'Orc Warrior', '2', '8']]);
   });
 
   // ── Gating and forced-click inertness ──
