@@ -6,6 +6,9 @@ import storage from '../../../ui/storage.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { infoPopup } from '../../common/infoPopup.js';
 import { hasHealingMaximization, resolveDiceExpression } from '../../../combat/automation/automationService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
+import { resolveLiveTargetHp } from '../healing/liveTargetHp.js';
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
 
@@ -75,37 +78,48 @@ function cureConditionsFor(targetName, auto, campaignName) {
     return { cureConditions, promise: null };
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
-    const playerName = playerStats.name;
+// Corpse candidate list for the in-sheet chooser (improve 2026-11-14, mirrors
+// healingHandler.collectTouchTargets): every board creature whose BUCKET-
+// CANONICAL HP (resolveLiveTargetHp — `currentHitPoints` first, cs row only as
+// fallback for bucket-less rows like monsters) is 0, caster excluded. The same
+// precedence the commit gate (resolveTargetHp) re-checks at confirm, so the
+// picker never offers a target its own gate would call living.
+function collectCorpseTargets(cs, playerName) {
+    if (!cs?.creatures?.length) return [];
+    return cs.creatures
+        .filter(c => c.name !== playerName)
+        .map(c => ({ name: c.name, type: c.type, ...resolveLiveTargetHp(c) }))
+        .filter(t => t.currentHp === 0);
+}
 
-    const costAmount = auto.resourceCostAmount || 5;
-
-    const currentFP = resolveFocusPoints(playerName, campaignName, playerStats);
-
-    if (currentFP < costAmount) {
-        return infoPopup(action.name, `Not enough Focus Points. Need ${costAmount}, have ${currentFP}.`, auto);
-    }
-
-    const targetInfo = await resolveTarget(campaignName, playerName);
-    if (!targetInfo?.target) {
-        return infoPopup(action.name, 'Select a target in combat first.', auto);
-    }
-
+// The armed-commit contract (7d64885e3 + 24caf7978): bucket-0 gate → roll →
+// focus −cost → ONE setRuntimeBatch POST (currentHitPoints + deathSaves +
+// deathFailures + isDead:0) → one hp_change|resurrection:true row → success
+// popup. Shared verbatim by the armed direct lane and the picker commit — a
+// refusal returns refused:true with ZERO spend, ZERO writes, ZERO log rows.
+async function commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo }) {
     const targetName = targetInfo.target.name;
+
+    // Re-read Focus at commit: the click-time gate above only pre-screens the
+    // chooser open; a mid-dwell drain by another lane must refuse zero-spend
+    // (gateMonkHealCommit's refuse-before-spend precedent).
+    const currentFP = resolveFocusPoints(playerName, campaignName, playerStats);
+    if (currentFP < costAmount) {
+        return { refused: true, popup: infoPopup(action.name, `Not enough Focus Points. Need ${costAmount}, have ${currentFP}.`, auto) };
+    }
 
     const targetHp = resolveTargetHp(targetInfo, targetName, campaignName);
     const targetMaxHp = resolveTargetMaxHp(targetInfo, targetName, campaignName);
 
     if (targetHp > 0) {
-        return infoPopup(action.name, `${targetName} is not at 0 Hit Points.`, auto);
+        return { refused: true, popup: infoPopup(action.name, `${targetName} is not at 0 Hit Points.`, auto) };
     }
 
     const maximize = hasHealingMaximization(playerStats);
     const resolvedExpression = resolveDiceExpression(auto.healExpression || '4d10', playerStats);
     const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
     if (!rollResult) {
-        return infoPopup(action.name, 'Failed to roll healing dice.', auto);
+        return { refused: true, popup: infoPopup(action.name, 'Failed to roll healing dice.', auto) };
     }
 
     await setRuntimeValue(playerName, 'focusPoints', currentFP - costAmount, campaignName);
@@ -147,5 +161,75 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         ? ` Also removed: ${cureConditions.join(', ')}.`
         : '';
 
-    return infoPopup(action.name, `${playerName} uses ${action.name} on ${targetName}. Returns to life with ${healAmount} HP. Expended ${costAmount} Focus Points.${cureMsg}`, auto);
+    return {
+        refused: false,
+        popup: infoPopup(action.name, `${playerName} uses ${action.name} on ${targetName}. Returns to life with ${healAmount} HP. Expended ${costAmount} Focus Points.${cureMsg}`, auto),
+    };
+}
+
+export async function handle(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+
+    const costAmount = auto.resourceCostAmount || 5;
+
+    const currentFP = resolveFocusPoints(playerName, campaignName, playerStats);
+
+    if (currentFP < costAmount) {
+        return infoPopup(action.name, `Not enough Focus Points. Need ${costAmount}, have ${currentFP}.`, auto);
+    }
+
+    // Armed-corpse direct lane (criterion: arm → press → commit, no chooser):
+    // an armed combatSummary targetName keeps the pre-improve bytes — commit
+    // straight through, and a living armed target still takes the bucket-read
+    // `<Target> is not at 0 Hit Points.` zero-spend refusal.
+    const armedTarget = await resolveTarget(campaignName, playerName);
+    if (armedTarget?.target) {
+        const { popup } = await commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo: armedTarget });
+        return popup;
+    }
+
+    // No armed target — in-sheet corpse chooser (improve 2026-11-14, backlog
+    // "HoUoM has no in-sheet target chooser"): instead of refusing and forcing
+    // an Initiative detour to arm targetName, open the SHARED SecondaryTargetModal
+    // (same component/chrome as the adjacent Hand of Healing picker) filtered to
+    // board targets at 0 HP. Zero-spend refusals keep the pre-improve honesty
+    // family: no board at all reads exactly like before; a board with only
+    // living rows says so plainly rather than opening a silently-empty chooser.
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures?.length) {
+        return infoPopup(action.name, 'Select a target in combat first.', auto);
+    }
+    const corpseTargets = collectCorpseTargets(cs, playerName);
+    if (corpseTargets.length === 0) {
+        return infoPopup(action.name, 'No target at 0 Hit Points.', auto);
+    }
+
+    return {
+        type: 'modal',
+        modalName: 'handOfUltimateMercy',
+        payload: {
+            featureName: action.name,
+            casterName: playerName,
+            costAmount,
+            creatureTargets: corpseTargets,
+            // Picker commit (HandOfHealing confirmHeal shape): re-resolve the
+            // row cache-first (resolveMonkHealGateRow precedent — the picker
+            // can dwell across board echoes), then run the SAME armed-commit
+            // contract. A refusal (revived mid-dwell, focus drained) returns
+            // { refusal } so the picker stays open with an inline note and
+            // spends NOTHING; a success returns { popup } the host renders
+            // after closing the chooser.
+            confirmResurrect: async (targetName) => {
+                const liveRow = getCombatSummary(campaignName)?.creatures?.find(c => c.name === targetName);
+                const snapshotRow = cs.creatures.find(c => c.name === targetName);
+                const target = liveRow ?? snapshotRow;
+                if (!target) {
+                    return { refusal: `${targetName} is no longer on the combat board. No Focus Points spent.` };
+                }
+                const { refused, popup } = await commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo: { target, cs } });
+                return refused ? { refusal: popup.payload.description } : { popup: popup.payload };
+            },
+        },
+    };
 }

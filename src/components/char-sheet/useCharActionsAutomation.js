@@ -315,6 +315,22 @@ export default function useCharActionsAutomation({
         const modalMap = {
             healingPool: simpleModal('healingPoolModal'),
             handOfHealing: simpleModal('handOfHealingModal'),
+            // In-sheet corpse chooser (backlog 2026-11-14 NP): the payload
+            // carries the bucket-0 candidate roster + the confirmResurrect
+            // commit closure from handOfUltimateMercyHandler; this opener
+            // threads the host-side wiring (telepathicSpeech precedent) —
+            // a resolved commit closes the chooser and surfaces the success
+            // automation_info popup, a dismiss/Cancel closes zero-spend.
+            handOfUltimateMercy: (payload) => setModalState({ handOfUltimateMercyModal: {
+                ...payload,
+                onResolved: (popupPayload) => {
+                    setModalState({ handOfUltimateMercyModal: null });
+                    if (popupPayload) setPopupHtml(popupPayload);
+                },
+                onClose: () => {
+                    setModalState({ handOfUltimateMercyModal: null });
+                },
+            }}),
             fontOfMagic: () => setModalState({ fontOfMagicModal: true }),
             resourcePool: simpleModal('resourcePoolModal'),
             wildCompanion: simpleModal('wildCompanionModal'),

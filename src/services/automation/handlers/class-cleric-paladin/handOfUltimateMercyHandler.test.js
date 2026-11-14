@@ -32,6 +32,14 @@ vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(),
+}));
+
+vi.mock('../../../encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(),
+}));
+
 vi.mock('../../../combat/automation/automationService.js', () => ({
   hasHealingMaximization: vi.fn(),
   resolveDiceExpression: vi.fn((expr) => expr),
@@ -45,6 +53,8 @@ import * as diceRoller from '../../../dice/diceRoller.js';
 import * as logPoster from '../../../ui/logService.js';
 import storage from '../../../ui/storage.js';
 import { resolveTarget } from '../../common/targetResolver.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -97,6 +107,40 @@ function setupNpcTarget(name = 'Goblin', conditions = []) {
   mockRuntime({ conditions });
   resolveTarget.mockResolvedValue({ target: cs.creatures[0], cs });
   return cs;
+}
+
+// Per-name HP router for the chooser/filter lanes: `currentHitPoints`/`hitPoints`
+// resolve BY NAME (names absent from the maps read null → the bucket-canonical
+// row fallback kicks in), everything else mirrors mockRuntime.
+function mockRuntimeByName({ fp = 5, hpByName = {}, maxHpByName = {}, conditions = [] } = {}) {
+  useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+    if (key === 'focusPoints') return fp;
+    if (key === 'currentHitPoints') return hpByName[name] ?? null;
+    if (key === 'hitPoints') return maxHpByName[name] ?? null;
+    if (key === 'activeConditions') return conditions;
+    return null;
+  });
+}
+
+// Mixed board: caster + a bucket-0 player whose cs row still reads 45 (stale
+// row — bucket is canonical), a living player whose cs row reads 12 under a
+// 30-HP bucket, and a bucket-less npc corpse resolved from its row.
+function makeMixedBoard() {
+  return {
+    creatures: [
+      { name: 'TestCleric', type: 'player', currentHp: 50, maxHp: 112 },
+      { name: 'CorpseAlly', type: 'player', currentHp: 45, maxHp: 90 },
+      { name: 'LivingAlly', type: 'player', currentHp: 12, maxHp: 40 },
+      { name: 'DeadRug', type: 'npc', currentHp: 0, maxHp: 21 },
+    ],
+  };
+}
+
+function makeMixedBuckets() {
+  return {
+    hpByName: { TestCleric: 50, CorpseAlly: 0, LivingAlly: 30 },
+    maxHpByName: { TestCleric: 112, CorpseAlly: 90, LivingAlly: 40 },
+  };
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -157,9 +201,13 @@ describe('handOfUltimateMercyHandler.handle', () => {
   });
 
   describe('Target resolution', () => {
-    it('should return popup when no target selected', async () => {
+    it('should return popup when no target selected and no combat board exists', async () => {
+      // No armed target AND no combatSummary (getCombatContext resolves
+      // undefined) — the pre-chooser refusal stays honest zero-spend instead
+      // of opening a silently-empty chooser.
       mockRuntime();
       resolveTarget.mockResolvedValue(null);
+      getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -514,6 +562,180 @@ describe('handOfUltimateMercyHandler.handle', () => {
       resolveTarget.mockResolvedValue(null);
       await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(logPoster.addEntry).not.toHaveBeenCalled();
+    });
+  });
+
+  // Backlog 2026-11-14 NP improve (HoUoM in-sheet target chooser): with no
+  // armed combatSummary target the sheet row opens the SHARED SecondaryTargetModal
+  // lane (modal result consumed by useCharActionsAutomation's modalMap) instead
+  // of refusing and forcing an Initiative detour — filtered to board targets
+  // whose BUCKET currentHitPoints is 0. The armed direct-commit lane and every
+  // zero-spend refusal face stay byte-identical.
+  describe('In-sheet corpse chooser (no armed target)', () => {
+    it('opens the chooser filtered to bucket-0 board targets, excluding the caster', async () => {
+      mockRuntimeByName(makeMixedBuckets());
+      resolveTarget.mockResolvedValue(null);
+      getCombatContext.mockResolvedValue(makeMixedBoard());
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('handOfUltimateMercy');
+      // Bucket-canonical filter: CorpseAlly (bucket 0 under a stale 45 row) and
+      // DeadRug (bucket-less npc, row 0) are offered; LivingAlly (bucket 30
+      // above a stale 12 row) is NOT; the caster is never offered.
+      expect(result.payload.creatureTargets.map(t => t.name)).toEqual(['CorpseAlly', 'DeadRug']);
+      expect(result.payload.creatureTargets[0]).toMatchObject({ name: 'CorpseAlly', type: 'player', currentHp: 0, maxHp: 90 });
+      expect(result.payload.creatureTargets[1]).toMatchObject({ name: 'DeadRug', type: 'npc', currentHp: 0, maxHp: 21 });
+      expect(result.payload.featureName).toBe('Hand of Ultimate Mercy');
+      expect(result.payload.casterName).toBe('TestCleric');
+      expect(result.payload.costAmount).toBe(5);
+      expect(typeof result.payload.confirmResurrect).toBe('function');
+      // Opening the chooser spends NOTHING: no focus write, no batch, no roll, no log row.
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+      expect(logPoster.addEntry).not.toHaveBeenCalled();
+    });
+
+    it('refuses zero-spend with a board that has no bucket-0 targets instead of opening an empty chooser', async () => {
+      mockRuntimeByName({
+        hpByName: { TestCleric: 50, CorpseAlly: 45, LivingAlly: 30 },
+        maxHpByName: { TestCleric: 112, CorpseAlly: 90, LivingAlly: 40 },
+      });
+      resolveTarget.mockResolvedValue(null);
+      const board = makeMixedBoard();
+      board.creatures.find(c => c.name === 'DeadRug').currentHp = 5;
+      getCombatContext.mockResolvedValue(board);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('No target at 0 Hit Points.');
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logPoster.addEntry).not.toHaveBeenCalled();
+    });
+
+    it('keeps the armed-corpse direct lane (no chooser) when targetName points at a bucket-0 target', async () => {
+      mockRuntimeByName(makeMixedBuckets());
+      mockRoll(31);
+      const cs = makeMixedBoard();
+      resolveTarget.mockResolvedValue({ target: cs.creatures.find(c => c.name === 'CorpseAlly'), cs });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('TestCleric uses Hand of Ultimate Mercy on CorpseAlly. Returns to life with 31 HP. Expended 5 Focus Points.');
+      expect(getCombatContext).not.toHaveBeenCalled();
+    });
+
+    it('keeps the living-armed refusal (no chooser detour) when the armed target bucket HP > 0', async () => {
+      mockRuntimeByName(makeMixedBuckets());
+      const cs = makeMixedBoard();
+      resolveTarget.mockResolvedValue({ target: cs.creatures.find(c => c.name === 'LivingAlly'), cs });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('LivingAlly is not at 0 Hit Points.');
+      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logPoster.addEntry).not.toHaveBeenCalled();
+    });
+
+    describe('confirmResurrect (picker commit)', () => {
+      async function openChooser({ fp = 5, hpByName } = {}) {
+        mockRuntimeByName({ fp, hpByName: hpByName || makeMixedBuckets().hpByName, maxHpByName: makeMixedBuckets().maxHpByName });
+        resolveTarget.mockResolvedValue(null);
+        getCombatContext.mockResolvedValue(makeMixedBoard());
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        return result.payload.confirmResurrect;
+      }
+
+      it('preserves the landed commit contract exactly: batch write, focus −5, one resurrection hp_change row, success popup', async () => {
+        const confirmResurrect = await openChooser();
+        mockRoll(31);
+        // Commit resolves the row cache-first (SSE-adopted combatData cache).
+        getCombatSummary.mockReturnValue(makeMixedBoard());
+
+        const result = await confirmResurrect('CorpseAlly');
+
+        expect(result.refusal).toBeUndefined();
+        expect(result.popup).toMatchObject({ type: 'automation_info', name: 'Hand of Ultimate Mercy' });
+        expect(result.popup.description).toBe('TestCleric uses Hand of Ultimate Mercy on CorpseAlly. Returns to life with 31 HP. Expended 5 Focus Points.');
+        expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+        expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('CorpseAlly', {
+          currentHitPoints: 31,
+          deathSaves: [false, false, false],
+          deathFailures: [false, false, false],
+          isDead: 0,
+        }, campaignName);
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'focusPoints', 0, campaignName);
+        expect(logPoster.addEntry).toHaveBeenCalledTimes(1);
+        const [, entry] = logPoster.addEntry.mock.calls[0];
+        expect(entry).toMatchObject({
+          type: 'hp_change',
+          characterName: 'TestCleric',
+          targetName: 'CorpseAlly',
+          delta: 31,
+          currentHp: 31,
+          maxHp: 90,
+          isHealing: true,
+          sourceName: 'TestCleric',
+          note: 'Hand of Ultimate Mercy',
+          resurrection: true,
+        });
+      });
+
+      it('refuses a corpse revived mid-dwell with an inline note and zero spend', async () => {
+        const confirmResurrect = await openChooser();
+        getCombatSummary.mockReturnValue(makeMixedBoard());
+        // Mid-dwell echo heals the corpse back to life before the commit click.
+        useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+          if (key === 'focusPoints') return 5;
+          if (key === 'currentHitPoints') return name === 'CorpseAlly' ? 45 : 30;
+          return null;
+        });
+
+        const result = await confirmResurrect('CorpseAlly');
+
+        expect(result.refusal).toBe('CorpseAlly is not at 0 Hit Points.');
+        expect(result.popup).toBeUndefined();
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+        expect(logPoster.addEntry).not.toHaveBeenCalled();
+      });
+
+      it('refuses zero-spend when the focus pool drained mid-dwell', async () => {
+        const confirmResurrect = await openChooser();
+        getCombatSummary.mockReturnValue(makeMixedBoard());
+        // Re-read at commit sees the drained pool (gateMonkHealCommit precedent).
+        useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+          if (key === 'focusPoints') return 2;
+          if (key === 'currentHitPoints') return name === 'CorpseAlly' ? 0 : 30;
+          return null;
+        });
+
+        const result = await confirmResurrect('CorpseAlly');
+
+        expect(result.refusal).toBe('Not enough Focus Points. Need 5, have 2.');
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logPoster.addEntry).not.toHaveBeenCalled();
+      });
+
+      it('refuses a name that left the combat board mid-dwell with zero spend', async () => {
+        const confirmResurrect = await openChooser();
+        getCombatSummary.mockReturnValue({ creatures: [] });
+        getCombatContext.mockResolvedValue({ creatures: [] });
+
+        const result = await confirmResurrect('VanishedAlly');
+
+        expect(result.refusal).toBe('VanishedAlly is no longer on the combat board. No Focus Points spent.');
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logPoster.addEntry).not.toHaveBeenCalled();
+      });
     });
   });
 });

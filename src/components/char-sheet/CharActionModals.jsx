@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { setSkipFlag } from '../../services/automation/common/oncePerTurn.js';
 import HealingPoolModal from './modals/divine/HealingPoolModal.jsx'
 import HandOfHealingModal from './modals/shared/HandOfHealingModal.jsx'
+import HandOfUltimateMercyModal from './modals/shared/HandOfUltimateMercyModal.jsx'
 import FontOfMagicModal from './modals/FontOfMagicModal.jsx'
 import ResourcePoolModal from './modals/ResourcePoolModal.jsx'
 import WildCompanionModal from './modals/WildCompanionModal.jsx'
@@ -114,6 +115,12 @@ function ResourcePoolsHostModals({ mergedModalState, setModalState, playerStats,
                     {...mergedModalState.handOfHealingModal}
                     campaignName={campaignName}
                     onClose={() => setModalState({ handOfHealingModal: null })}
+                />
+            )}
+            {mergedModalState.handOfUltimateMercyModal && (
+                <HandOfUltimateMercyModal
+                    {...mergedModalState.handOfUltimateMercyModal}
+                    campaignName={campaignName}
                 />
             )}
             {mergedModalState.fontOfMagicModal && (

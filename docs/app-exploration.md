@@ -63,7 +63,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before clears; pass 1 cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 NP — HoUoM has no in-sheet target chooser:** the sheet row refuses with `Select a target in combat first.` and forces a detour to Initiative to arm `targetName`, while the adjacent `Hand of Healing:` opens the shared `SecondaryTargetModal`. Suggest reusing the chooser filtered to board targets whose bucket HP is 0 (fall back to honoring an armed target). Files: `useCharActionsAutomation.js`, `SecondaryTargetModal.jsx`.
 - **2026-11-14 NP — DeathSavePromptModal offers no dismiss for accidental arms:** button census is [Roll Death Save] (pre-roll) — a GM card mistype to 0 can only be exited by actually pressing Roll (or the documented restore-then-Roll void-guard dance); a GM-only Cancel riding the existing zero-write void lane would close the friction. Files: `DeathSavePromptModal.jsx`, `savePromptService.js` clear lane.
 
 ## Blocked / Not Verified (fold-gate ledger)
