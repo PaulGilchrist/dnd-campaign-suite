@@ -46,7 +46,7 @@ function conditionLabel(name) {
     return name;
 }
 
-function ConditionCureSections({ hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, safePool, batchTotalCost, resolvedTargetName, cureCost, alsoCures }) {
+function ConditionCureSections({ hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, safePool, batchTotalCost, resolvedTargetName, cureCost, alsoCures, cureRefusal }) {
     return (
         <>
             {hasRestoringTouch && curableEntries.length > 0 && (
@@ -89,17 +89,29 @@ function ConditionCureSections({ hasRestoringTouch, curableEntries, selectedCond
                 </div>
             )}
 
-            {!hasRestoringTouch && alsoCures && alsoCures.length > 0 && (
+            {/* Single-cure tier (no Restoring Touch): renders the SAME
+                target-filtered curableEntries as the batch tier — an alsoCures
+                entry the target doesn't actually have never renders (it could
+                only cost pool HP for nothing and log a fake `condition broken`
+                row). Keys are deduped + labels catalog-cased inside
+                buildCurableEntries. */}
+            {!hasRestoringTouch && alsoCures && alsoCures.length > 0 && curableEntries.length > 0 && (
                 <div className="short-rest-section">
                     <h4>Cure Conditions ({cureCost} HP each)</h4>
                     <div className="short-rest-dice-row">
-                        {[...new Set(alsoCures)].map((condition, i) => (
-                            <button key={`${condition}-${i}`} className="char-btn" onClick={() => applyCure(condition)} disabled={safePool < cureCost}>
-                                <i className="fas fa-shield-alt"></i> {condition}
+                        {curableEntries.map((entry) => (
+                            <button key={entry.key} className="char-btn" onClick={() => applyCure(entry.key)} disabled={safePool < cureCost}>
+                                <i className="fas fa-shield-alt"></i> {entry.label}
                             </button>
                         ))}
                     </div>
                 </div>
+            )}
+            {/* Sibling of the section (not inside it): after a refusal the
+                re-render filters the whole section away — the note must still
+                surface why nothing happened. */}
+            {cureRefusal && (
+                <p className="healing-restriction-note">{cureRefusal}</p>
             )}
         </>
     );
@@ -225,7 +237,7 @@ function HealingLogSection({ log }) {
     );
 }
 
-function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, restorableTotal, noHealCapacity, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, log, handleClose, featureName }) {
+function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, resolvedTargetName, targetCurrentHp, targetMaxHp, bloodiedOnly, isTargetBloodied, healAmount, setHealAmount, applyHeal, effectiveMaxDicePerUse, rolledFaces, restorableTotal, noHealCapacity, applyDiceHeal, hasRestoringTouch, curableEntries, selectedConditions, toggleCondition, applyBatchCure, applyCure, batchTotalCost, cureCost, alsoCures, cureRefusal, log, handleClose, featureName }) {
     return (
         // Dialog semantics per the shared DeleteConfirmModal-class tier
         // (backlog 2026-11-10 HD, ShortRestModal bc409413d pattern): the existing
@@ -292,6 +304,7 @@ function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, reso
                 resolvedTargetName={resolvedTargetName}
                 cureCost={cureCost}
                 alsoCures={alsoCures}
+                cureRefusal={cureRefusal}
             />
 
             {log.length > 0 && <HealingLogSection log={log} />}
@@ -312,9 +325,21 @@ function resolveHealingPoolResourceKey(resourceKeyProp, isDicePool, featureName)
 
 function buildCurableEntries(alsoCures, restoringTouchConditions, targetConditions) {
     const allCurableEntries = [...(alsoCures || []), ...(restoringTouchConditions || [])];
-    return allCurableEntries
-        .map(name => ({ key: resolveConditionKey(name), label: conditionLabel(name) }))
-        .filter(entry => entry.key && targetConditions.some(c => conditionMatches(c, entry.key)));
+    // Dedupe by resolved key (an entry listed in both alsoCures and Restoring
+    // Touch's cureConditions, or repeated there, renders one button/checkbox)
+    // and keep only conditions the target actually has — both tiers render
+    // exclusively from this filtered list.
+    const seen = new Set();
+    const entries = [];
+    for (const name of allCurableEntries) {
+        const entry = { key: resolveConditionKey(name), label: conditionLabel(name) };
+        if (!entry.key || seen.has(entry.key)) continue;
+        if (targetConditions.some(c => conditionMatches(c, entry.key))) {
+            seen.add(entry.key);
+            entries.push(entry);
+        }
+    }
+    return entries;
 }
 
 function computeCharismaMod(playerStats) {
@@ -355,6 +380,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const [accumulatedTotal, setAccumulatedTotal] = React.useState(0);
     const [rolledFaces, setRolledFaces] = React.useState([]);
     const [selectedTargetName, setSelectedTargetName] = React.useState(null);
+    const [cureRefusal, setCureRefusal] = React.useState(null);
     const [showTargetSelection, setShowTargetSelection] = React.useState(!!(creatureTargets && creatureTargets.length > 1));
 
     const effectiveMaxDicePerUse = resolveMaxDicePerUse(maxDicePerUseProp, playerStats);
@@ -571,19 +597,30 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
     const applyCure = (condition) => {
         if (safePool < cureCost) return;
-        consumeChannelDivinity();
-        const newPool = safePool - cureCost;
-        setPoolRemaining(newPool);
 
+        // Integrity: re-read the live bucket at commit time and refuse when the
+        // target doesn't actually have the condition — the render filter above
+        // can go stale while the modal dwells (another tab cured it). Same
+        // honesty law as the HoH pre-spend refusal (f3950317c): a cure that
+        // removes nothing costs zero pool and logs zero audit row.
         const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
         const filtered = conditions.filter(c => !conditionMatches(c, condition));
-        setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
-
         // Unified audit convention (backlog 2026-11-13 FX cure-casing split): the
         // condition field carries the CONDITIONS-catalog display label
         // ("Poisoned"), matching the Physician's Touch reference lane — never the
         // raw key. The filter above stays conditionMatches (key-insensitive).
         const label = conditionLabel(condition);
+        if (filtered.length === conditions.length) {
+            setCureRefusal(`${resolvedTargetName} is not affected by ${label}. No pool spent.`);
+            return;
+        }
+        setCureRefusal(null);
+
+        consumeChannelDivinity();
+        const newPool = safePool - cureCost;
+        setPoolRemaining(newPool);
+        setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
+
         addEntry(campaignName, {
             type: 'condition',
             characterName: resolvedTargetName,
@@ -709,6 +746,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 batchTotalCost={batchTotalCost}
                 cureCost={cureCost}
                 alsoCures={alsoCures}
+                cureRefusal={cureRefusal}
                 log={log}
                 handleClose={handleClose}
                 featureName={featureName}

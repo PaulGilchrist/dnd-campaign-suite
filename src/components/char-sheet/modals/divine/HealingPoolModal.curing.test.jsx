@@ -10,7 +10,9 @@ import HealingPoolModal from './HealingPoolModal.jsx';
 // hide), exact activeConditions write payloads and live-store transitions for
 // single and batch cures, exact condition-log payloads, cure-cost gating
 // (enabled/disabled, Pool after / Not enough pool! notes), forced-click
-// inertness on blocked cures, and inertness of close/Escape/overlay (a
+// inertness on blocked cures, the single tier's commit-time no-match refusal
+// (zero pool/write/row + inline note, bug-single-cure-tier...), and inertness
+// of close/Escape/overlay (a
 // pending selection must never cure on close).
 // Deferred to owners:
 // - HealingPoolModal.bloodied.test.jsx — bloodied badge/gate/restriction note
@@ -215,13 +217,21 @@ describe('HealingPoolModal - Curing', () => {
 
   it.each([
     {
-      lane: 'individual (deduped)',
+      lane: 'individual (deduped, target-filtered)',
       props: { alsoCures: ['Blinded', 'Blinded', 'Poisoned'], cureCost: 5 },
+      conditions: ['blinded', 'poisoned'],
       buttons: ['Blinded', 'Poisoned'],
     },
-    { lane: 'alsoCures empty', props: { alsoCures: [] }, buttons: [] },
-    { lane: 'alsoCures null', props: { alsoCures: null }, buttons: [] },
-  ])('renders the $lane cure section', async ({ props, buttons }) => {
+    {
+      lane: 'individual on an unafflicted target',
+      props: { alsoCures: ['Blinded', 'Poisoned'], cureCost: 5 },
+      conditions: [],
+      buttons: [],
+    },
+    { lane: 'alsoCures empty', props: { alsoCures: [] }, conditions: ['blinded'], buttons: [] },
+    { lane: 'alsoCures null', props: { alsoCures: null }, conditions: ['blinded'], buttons: [] },
+  ])('renders the $lane cure section', async ({ props, conditions, buttons }) => {
+    store.Paladin1.activeConditions = conditions;
     await renderModal(props);
 
     if (buttons.length === 0) {
@@ -458,12 +468,13 @@ describe('HealingPoolModal - Curing', () => {
   // reference lane emits (HandOfHealingModal.test.jsx 'condition log entry').
 
   describe('unified display-label audit casing', () => {
-    it('single cure from raw-key alsoCures against a label-cased store logs "Blinded"', async () => {
+    it('single cure from raw-key alsoCures renders and logs the catalog label "Blinded"', async () => {
       store.Paladin1.activeConditions = ['Blinded'];
 
       await renderModal({ alsoCures: ['blinded'], cureCost: 5 }, { current: 100, max: 100 });
-      // The single tier renders the raw catalog string on its button.
-      fireEvent.click(cureBtn('blinded'));
+      // The single tier renders the CONDITIONS-catalog label on its button,
+      // not the raw lowercase key (same seam as the batch tier's entry.label).
+      fireEvent.click(cureBtn('Blinded'));
 
       expect(logService.addEntry).toHaveBeenCalledTimes(1);
       expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, conditionLog('Paladin1', 'Blinded'));
@@ -491,6 +502,55 @@ describe('HealingPoolModal - Curing', () => {
       // One full-batch pool write, unchanged.
       expect(poolUpdate).toHaveBeenCalledTimes(1);
       expect(poolUpdate).toHaveBeenCalledWith(90);
+    });
+  });
+
+  // ── Single-tier commit honesty (bug-single-cure-tier-unfiltered-costs-pool-and-fakes-audit-row) ──
+  // The single tier once rendered every alsoCures entry unfiltered and applyCure
+  // charged cureCost + logged `condition broken` even for a condition the target
+  // never had. Rendering is now target-filtered (pinned above); this pins the
+  // commit-time guard covering the stale-render face (bucket drifts while the
+  // modal dwells): a cure that removes nothing costs zero pool, writes zero to
+  // the target, logs zero audit row, and shows the .healing-restriction-note
+  // refusal inline (same seam as the HoH pre-spend gate, f3950317c).
+
+  describe('single-tier commit guard', () => {
+    it('pressing a cure the target no longer has is inert — inline refusal, zero pool, zero writes, zero log', async () => {
+      await renderModal({ alsoCures: ['Blinded'], cureCost: 5 }, { current: 100, max: 100 });
+      // The button rendered while the target had the condition; another writer
+      // (tab/AI referee) clears the bucket while the modal dwells open.
+      store.Paladin1.activeConditions = [];
+
+      fireEvent.click(cureBtn('Blinded'));
+
+      expect(screen.getByText('Paladin1 is not affected by Blinded. No pool spent.')).toHaveClass('healing-restriction-note');
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(store.Paladin1.activeConditions).toEqual([]);
+      expect(poolUpdate).not.toHaveBeenCalled();
+      expect(poolStore.current).toBe(100);
+      expect(logService.addEntry).not.toHaveBeenCalled();
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
+
+    it('stale-enable face: after a refusal, an externally re-applied condition makes the re-rendered button cure honestly (live commit-time re-read)', async () => {
+      await renderModal({ alsoCures: ['Blinded'], cureCost: 5 }, { current: 100, max: 100 });
+      store.Paladin1.activeConditions = [];
+      fireEvent.click(cureBtn('Blinded'));
+      expect(screen.getByText('Paladin1 is not affected by Blinded. No pool spent.')).toBeInTheDocument();
+
+      // Another writer re-applies the condition while the modal dwells; a state
+      // change (amount input) re-renders so the filtered section remounts.
+      store.Paladin1.activeConditions = ['blinded'];
+      fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '2' } });
+
+      fireEvent.click(cureBtn('Blinded'));
+
+      expect(screen.queryByText(/No pool spent/)).not.toBeInTheDocument();
+      expect(poolUpdate).toHaveBeenCalledTimes(1);
+      expect(poolUpdate).toHaveBeenCalledWith(95);
+      expect(logService.addEntry).toHaveBeenCalledTimes(1);
+      expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, conditionLog('Paladin1', 'Blinded'));
+      expect(cureWrites()).toEqual([['Paladin1', 'activeConditions', [], CAMPAIGN]]);
     });
   });
 
