@@ -38,3 +38,25 @@ In `applyAccumulatedHealing` (and the amount-path else branch), re-read at commi
 
 ## Severity
 Data integrity risk — a positive-delta "heal" silently overwrites a HIGHER current HP with a lower one (witnessed −39 HP). Window is narrow (external bucket write between the rolls and `Done`), but the modal can dwell indefinitely per the no-timers policy, and the fix's documented refund promise is dead code without the fresh read.
+
+## Summary
+Fixed: `applyAccumulatedHealing` and the amount-path else branch now re-read the target's `currentHitPoints` via `getRuntimeValue` at COMMIT time (mirroring `hpModifier.modifyHitPoints`), so an external fill landing mid-modal clamps or refunds instead of overwriting a higher HP with a stale-snapshot value. Repro re-run live twice (bug confirmed 1/1 pre-fix: bucket 143 → 110; post-fix: bucket stays 143, dice refunded to pool 21, honest `amount:0` row), refund path now fires, normal heal control still commits honestly (100 → 109, `amount:9`). Pinned by `HealingPoolModal.stale-closure.test.jsx` (3/3); divine-modal folder 16 files/238 tests green; lint zero warnings.
+
+## Resolution
+Landed 2026-11-13. The diagnosis in "Likely location" was correct as filed.
+
+**What was wrong.** `HealingPoolModal.jsx` computed `targetCurrentHp` in a render-time IIFE from `getRuntimeValue(...)`, and the modal never re-renders when another writer changes the TARGET's bucket (no subscription). `applyAccumulatedHealing` (the dice lane's `Done`/Escape commit) built `newHp = min(targetMax, STALE + accumulatedTotal)` and unconditionally POSTed it over the bucket, so an external fill landing between the last roll and `Done` was clobbered (live pre-fix: bucket `143 → 110` after rolls `6+4` from a stale `100` snapshot, ledger row `amount:10`). With the stale snapshot, `resolveDiceActualHeal` always saw capacity, so the `d595cff2c` refund branch ("dice that can restore nothing … are returned to the pool") was unreachable dead code. The amount-path no-creature `else` branch had the same closure-write flaw.
+
+**Fix (files changed).**
+- `src/components/char-sheet/modals/divine/HealingPoolModal.jsx`
+  - Extracted the render IIFE's bucket-first HP resolution into module-level `resolveTargetCurrentHp(combatSummary, resolvedTargetName, playerStats)` — one source of truth, byte-identical resolution law (player creature → runtime `currentHitPoints`; monster → cs row `currentHp`; no creature → caster bucket, then sheet max).
+  - `applyAccumulatedHealing` now calls it at COMMIT time (`freshCurrentHp`) for `newHp`/`actualHeal` — same commit-time `getRuntimeValue` re-read idiom as `shared/hpModifier.js` `modifyHitPoints:34`. Zero fresh capacity → the EXISTING refund branch fires (dice returned, HP untouched, `amount:0` row); partial capacity → commit caps at max and the row logs only the restored capacity. Never writes below current HP. Dropped the now-unused `targetCurrentHp` closure from the useCallback deps.
+  - Amount-path else branch: commit-time re-read of `getRuntimeValue(resolvedTargetName, 'currentHitPoints')` (closure value only as absent-bucket fallback) before `Math.min(max, fresh + amount)`. Its logged `amount` stays the allocated amount — that lane's documented over-cap semantics (map §healing-pool law: "over-max heals pay ALLOCATED not actual") were deliberately not changed.
+  - No dual-ruleset twin: `HealingPoolModal.jsx` is shared by 5e and 2024 (single component; the monk `HandOfHealingModal` lane commits on the picker click, no dwell window — untouched).
+- `src/components/char-sheet/modals/divine/HealingPoolModal.stale-closure.test.jsx` (NEW) — 3 faces on the mutable-store harness mirroring `HealingPoolModal.dice.test.jsx` conventions: full fill mid-modal → zero HP writes + refund `poolUpdate [[20],[19],[21]]` + `amount:0` payload + table row; partial raise 100→140 with 10 rolled → writes `143`, row `amount:3`, no refund; amount-lane raise 100→140 with amount 5 → writes `143` (pre-fix would write 105).
+
+**Verification.**
+- Live pre-fix repro 1/1 in test-campaign (drift-rig per steps 1–7): header stayed `100 / 143` after the mid-modal fill to 143; `Done` (rolls 6+4) wrote `currentHitPoints: 110`, row `amount:10`, pool 19 — exactly the filed behavior.
+- Live post-fix (same steps): bucket stays `143` (zero HP written), `healinglightPool` back to `21` (both dice refunded), row `{amount:0, diceUsed:2, rolls:[3,5], poolAfter:21}`. Adjacent sanity face: damaged target 100, rolls 4+5, `Done` → bucket `109`, row `amount:9, poolAfter:19` (real heals unaffected).
+- Tests: `HealingPoolModal.stale-closure.test.jsx` 3/3; `divine/` folder 16 files / 238 tests pass; healing-adjacent sweep (handlers/healing + applyHealing + hpModifier + modals/shared) 120 files / 804 tests pass; `npm run lint` zero warnings.
+- Cleanup: test-campaign change-data `{}` + log `[]` GET-verified from a localhost origin after closing the tab; campaign fixtures on disk untouched (`git status --porcelain public/campaigns/` empty).

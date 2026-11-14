@@ -135,6 +135,26 @@ function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp,
     );
 }
 
+// Target-current-HP resolution shared by render (header/gate) and commit.
+// MUST be called at COMMIT time too, not only at render: a mounted modal never
+// re-renders when another writer (tab/AI-referee) changes the target's bucket,
+// so committing from the render closure can overwrite a HIGHER current HP with
+// a stale + roll value (bug-healing-pool-dice-commit-stale-closure-damages-hp).
+// Mirrors the commit-time getRuntimeValue re-read in hpModifier.modifyHitPoints.
+function resolveTargetCurrentHp(combatSummary, resolvedTargetName, playerStats) {
+    const creature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
+    if (creature) {
+        if (creature.type === 'player') {
+            const stored = getRuntimeValue(creature.name, 'currentHitPoints');
+            if (stored != null && stored !== '') return Number(stored);
+        } else {
+            return creature.currentHp;
+        }
+    }
+    const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
+    return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
+}
+
 function resolveHealCapacity(targetMaxHp, targetCurrentHp, accumulatedTotal) {
     if (targetMaxHp <= 0) return null; // HP truth unavailable — keep the roll gate open
     return Math.max(0, targetMaxHp - targetCurrentHp - accumulatedTotal);
@@ -391,19 +411,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         }
         return playerStats.hitPoints;
     })();
-    const targetCurrentHp = (() => {
-        const creature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
-        if (creature) {
-            if (creature.type === 'player') {
-                const stored = getRuntimeValue(creature.name, 'currentHitPoints');
-                if (stored != null && stored !== '') return Number(stored);
-            } else {
-                return creature.currentHp;
-            }
-        }
-        const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
-        return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
-    })();
+    const targetCurrentHp = resolveTargetCurrentHp(combatSummary, resolvedTargetName, playerStats);
 
     const isTargetBloodied = targetCurrentHp > 0 && targetCurrentHp <= Math.floor(targetMaxHp / 2);
 
@@ -473,7 +481,11 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 setHealAmount(Math.min(healAmount, newPool));
             }
         } else {
-            const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + amount);
+            // Same commit-time re-read as the dice lane: never let a stale snapshot
+            // overwrite an HP value another writer already raised.
+            const stored = getRuntimeValue(resolvedTargetName, 'currentHitPoints');
+            const freshCurrentHp = stored != null && stored !== '' ? Number(stored) : targetCurrentHp;
+            const newHp = Math.min(playerStats.hitPoints, freshCurrentHp + amount);
             setRuntimeValue(resolvedTargetName, 'currentHitPoints', newHp, campaignName);
             addEntry(campaignName, {
                 type: 'healing_pool',
@@ -511,8 +523,13 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
         const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
         const targetMax = targetCreature ? (targetCreature.type === 'player' ? (getRuntimeValue(targetCreature.name, 'hitPoints') ?? 0) : targetCreature.maxHp) : playerStats.hitPoints;
-        const newHp = Math.min(targetMax, targetCurrentHp + accumulatedTotal);
-        const actualHeal = resolveDiceActualHeal(targetMax, targetCurrentHp, newHp, accumulatedTotal);
+        // Integrity: re-read the target's CURRENT HP at commit time — the modal can
+        // dwell open across external bucket writes, and committing from the render
+        // closure turned a "heal" into silent HP LOSS (stale 100 + rolls overwrote a
+        // bucket another tab had already filled to max).
+        const freshCurrentHp = resolveTargetCurrentHp(combatSummary, resolvedTargetName, playerStats);
+        const newHp = Math.min(targetMax, freshCurrentHp + accumulatedTotal);
+        const actualHeal = resolveDiceActualHeal(targetMax, freshCurrentHp, newHp, accumulatedTotal);
         // Ledger honesty mirroring the amount lane's `result.actualHeal` and the monk
         // lane's "Already at full HP … No use spent." refusal: only the HP that really
         // restores is written and logged, and dice that can restore nothing (target
@@ -543,7 +560,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         }]);
         setAccumulatedTotal(0);
         setRolledFaces([]);
-    }, [accumulatedTotal, safePool, rolledFaces, playerStats.hitPoints, targetCurrentHp, playerStats.name, campaignName, featureName, dieType, resolvedTargetName, combatSummary, setPoolRemaining]);
+    }, [accumulatedTotal, safePool, rolledFaces, playerStats, campaignName, featureName, dieType, resolvedTargetName, combatSummary, setPoolRemaining]);
 
     const handleClose = () => {
         if (isDicePool && accumulatedTotal > 0) {
