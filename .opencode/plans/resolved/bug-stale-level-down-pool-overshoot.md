@@ -38,3 +38,26 @@ Clamp at the single resolve point: in `resolveCurrent`, when `hasKey && storedVa
 ## Severity
 
 Data integrity risk — a persisted, self-perpetuating invalid state that lets a resource spend exceed its class-derived capacity and renders inverted numbers across badge/modal/chooser; triggered by any event that lowers a derived max (level edit downward, respec tooling). Not currently reachable via normal leveling-UP play, which is why it survived every prior healing-lane descent.
+
+## Resolution
+
+**FIXED 2026-11-14 (fix run).** Root cause confirmed exactly as diagnosed: `useTrackedResource.js` `resolveCurrent()` returned the stored bucket value verbatim whenever the key exists, with no clamp against the level-derived max, so a level-down left `layOnHandsPool: 95` riding above the L13 capacity of 65 — badge/modal rendered `95/65` and the spend lane billed past class capacity.
+
+**Fix (clamp at the single resolve point, as suggested):** `resolveCurrent()`'s stored-bucket branch now runs `clampToMax(storageKey, storedValue, maxGetter)` → `Math.min(stored, maxGetter())` for finite numbers. Guards keep every sibling lane byte-identical:
+- **Non-numeric pass-through** (typeof + `Number.isFinite` check both sides) — the `hasInspiration` boolean latch (`maxGetter: () => false`) and null-as-armed latches ride their stored value untouched.
+- **HP family exempt** (`CLAMP_EXEMPT_KEYS = ['currentHitPoints','hitPoints']`) — the `224 of 147 HP` side face stays a separate owner ruling (temp-HP / heal-overflow semantics, per this file's own instruction); note the HP row (`CharHitPoints.jsx`) and the chooser's `resolveLiveTargetHp` read the store directly and never rode this hook, so the exemption costs nothing today and forbids an accidental future clamp.
+- **Seed/default branches untouched** — `_trackedResources` seeds are `{current: max}`-consistent by construction.
+No write-back added: the modal's existing `newPool = safePool - actualHeal` arithmetic rewrites the bucket to a valid value on the first spend (self-healing), so display and ledger converge without a read-path server write. Both rulesets share this hook — no 2024 twin needed.
+
+**Files changed:**
+- `src/hooks/runtime/useTrackedResource.js` — `clampToMax` + exemption list, applied to the stored-bucket branch.
+- `src/hooks/runtime/useTrackedResource.max-clamp.test.js` — NEW: 7 pins (stored 95 + derived max 65 → resolved 65; re-clamp on storage-change re-read; ≤max pass-through incl. 0; boolean latch unclamped; HP exempt; non-finite max pass-through).
+- `src/hooks/runtime/useTrackedResource.test.js` — two stale micro-pins updated: the `maxGetter` call-count pin (clamp legitimately reads max) and the campaignName re-read plumbing pin whose arbitrary stored 42 exceeded the test's own max 20 (→ 12; intent preserved).
+
+**Live re-verification (test-campaign, :5173, exact repro re-run):** EF victim 40/112 + 3-row board; EP sheet-open → real L20 heal (pool 100→78 — pre-fix sanity control, honest); scoped PATCH pool→95; disk `"level": 20`→`13` (sanctioned one-field surgery); reload + re-select + open sheet.
+- Pre-fix faces re-witnessed on the same rig shape (bug CONFIRMED before code change): badge `95/65`, modal `Pool: 95 / 65 HP`, amount `max="95"`, 70-typed commit succeeded (`Heal|EF|50|45` capacity-clamped, bucket rode >65 invalid); HP side face `Hit Points: 224/147`.
+- Post-fix: badge **`Lay On Hands Pool: 65/65 (cur/max)`**, modal **`Pool: 65 / 65 HP`**, amount **`max="65"`**; typing 70 → display clamps to 65 with the shipped note `Amount clamped to the remaining pool of 65 HP.`; commit = **65 pool HP max** (`Heal|EvasiveFighter|65|0`, EF 40→105), log row `{type:'healing_pool', amount:65, poolAfter:0}` — the inverted state no longer renders and over-cap spending is impossible.
+- Adjacent sanity: sub-max lane unaffected — bucket 30 (< max 65) renders `30/65` verbatim, a typed-10 heal commits the honest capacity amount (`amount: 7`, `poolAfter: 23` persisted). HP side face intentionally unchanged (`224/147`), as ruled.
+- Cleanup: `ElderPaladin.json` restored byte-exact (md5 `6e4341e4…`, `git status --porcelain public/campaigns/ public/data/` EMPTY); closed-tab admin clears GET-verified `{}`/`[]`, disk change-data file absent.
+
+**Tests/lint:** `useTrackedResource.max-clamp.test.js` + `useTrackedResource.test.js` 32/32; `src/hooks/runtime/` folder 171/171; consumer folders `modals/divine/` + `TrackedResourceInput.test.jsx` 273/273; `npm run lint` zero warnings; full `npm run test:run` green (see fix-run return).

@@ -157,8 +157,10 @@ describe('useTrackedResource', () => {
       );
 
       expect(result.current.current).toBe(8);
-      // maxGetter is called once for the returned max value
-      expect(maxGetter).toHaveBeenCalledTimes(1);
+      // maxGetter: once per resolution (useState init + deps effect) by the
+      // stored-bucket read-clamp (bug-stale-level-down-pool-overshoot) plus
+      // once for the returned max value.
+      expect(maxGetter).toHaveBeenCalledTimes(3);
     });
 
     it('prefers playerStats over defaultValue when both are available', () => {
@@ -366,7 +368,7 @@ describe('useTrackedResource', () => {
       getRuntimeValue
         .mockReturnValueOnce(10)
         .mockReturnValueOnce(10)
-        .mockReturnValueOnce(42);
+        .mockReturnValueOnce(12);
       hasRuntimeValue.mockReturnValue(true);
 
       const maxGetter = vi.fn(() => 20);
@@ -380,7 +382,7 @@ describe('useTrackedResource', () => {
 
       rerender({ campaign: 'CampaignB' });
 
-      expect(result.current.current).toBe(42);
+      expect(result.current.current).toBe(12);
     });
 
     it('re-reads when storageKey changes', () => {
