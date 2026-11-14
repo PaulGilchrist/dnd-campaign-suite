@@ -19,6 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { applyLongRest } from './restRules.js'
 import { getLongRestResources } from './restRules-constants.js'
+import { GATED_TRACKED_KEYS, HANDLER_OWNED_LATCH_KEYS } from '../trackedResources.js'
 
 // Mock dependencies
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -139,8 +140,20 @@ describe('applyLongRest', () => {
       // ragePoints, sorceryPoints, illusorySelfUses... all rest on this one
       // registration-membership proof: buildLongRestCharData nulls EVERY
       // LONG_REST_RESOURCES key, so single-key echo tests add nothing (#1301).
+      // Full-set registration membership: every LONG_REST_RESOURCES key ->
+      // null. EXCEPTION (improve tracked-resource-ghost-keys): the batch
+      // skips GATED_TRACKED_KEYS the resting character does NOT own — the
+      // fixture below registers EVERY gated key in `_trackedResources`
+      // (exactly what computeTrackedResources bakes for a hypothetical
+      // all-owner), so the full null fan-out must fire for every key with
+      // zero exceptions. Unowned skips + retained latch fans are pinned in
+      // the lane below; every latch keeps the unconditional CLA-130 fan-out.
+      const trackedAll = Object.fromEntries(
+        GATED_TRACKED_KEYS.map((key) => [key, { current: 1, max: 1 }]),
+      )
       const stats = makeStats({
         specialActions: [{ name: 'Resourceful' }],
+        _trackedResources: trackedAll,
         spellAbilities: {
           spell_slots_level_1: 4,
           spell_slots_level_2: 3,
@@ -160,18 +173,7 @@ describe('applyLongRest', () => {
       expect(data.spell_slots_level_3).toBe(3)
       // Unset slot levels are skipped, not fabricated
       expect(data).not.toHaveProperty('spell_slots_level_4')
-      // Full-set registration membership: every LONG_REST_RESOURCES key ->
-      // null. EXCEPTION (improve tracked-resource-ghost-keys): the three
-      // gated pool keys are seeded owned-only in computeTrackedResources
-      // (CLA-364 idiom), so the batch re-arm skips them for this
-      // unregistered-fixture Fighter — owner re-arm is pinned in the lane
-      // below; every other latch keeps the unconditional CLA-130 fan-out.
-      const GATED_POOLS = ['layOnHandsPool', 'preserveLifePool', 'healinglightPool']
       for (const key of getLongRestResources()) {
-        if (GATED_POOLS.includes(key)) {
-          expect(data, `${key} must NOT fan into an unowned bucket`).not.toHaveProperty(key)
-          continue
-        }
         expect(data, `${key} must be null-re-armed in the batch`).toHaveProperty(key, null)
       }
       // Badges/conditions cleared inside the SAME atomic write (SSE echo correctness)
@@ -192,27 +194,38 @@ describe('applyLongRest', () => {
       expect(vet).not.toHaveProperty('spell_slots_level_1')
     })
 
-    it('gated pool keys (improve tracked-resource-ghost-keys): owner re-arms to null, unowned keys stay absent', async () => {
-      // Owner lane: a pool registered in the character's _trackedResources
-      // (computeTrackedResources seeded it — e.g. Paladin's layOnHandsPool)
-      // keeps its exact null re-arm byte in the batch.
+    it('gated keys (improve tracked-resource-ghost-keys, ownership pass): owner re-arms to null, unowned keys stay absent', async () => {
+      // Owner lane: a gated key registered in the character's
+      // _trackedResources (computeTrackedResources seeded it — e.g.
+      // Paladin's layOnHandsPool) keeps its exact null re-arm byte in the
+      // batch.
       const owner = makeStats({
         name: 'PaladinOwner',
-        _trackedResources: { layOnHandsPool: { current: 5, max: 25 } },
+        _trackedResources: {
+          layOnHandsPool: { current: 5, max: 25 },
+          gloriousDefenseUses: { current: 1, max: 1 },
+          warPriestUses: { current: 1, max: 1 },
+        },
       })
       await applyLongRest(owner, CAMPAIGN)
       expect(batchFor('PaladinOwner')).toHaveProperty('layOnHandsPool', null)
+      expect(batchFor('PaladinOwner')).toHaveProperty('gloriousDefenseUses', null)
       // …while pools this owner does not carry stay out of the batch.
       expect(batchFor('PaladinOwner')).not.toHaveProperty('preserveLifePool')
       expect(batchFor('PaladinOwner')).not.toHaveProperty('healinglightPool')
 
-      // Non-owner lane: none of the three gated pools is registered — the
-      // batch must reintroduce NO ghost rows (null or otherwise), while the
-      // unconditional latch fan-out still fires (CLA-130 safety net).
+      // Non-owner lane: none of the gated keys is registered — the batch
+      // must reintroduce NO ghost rows (null or otherwise), for the shipped
+      // pool trio AND every key added by the ownership-classification pass,
+      // while the unconditional latch fan-out still fires (CLA-130 safety
+      // net).
       await applyLongRest(makeStats({ name: 'PlainFighter' }), CAMPAIGN)
       const plain = batchFor('PlainFighter')
-      for (const key of ['layOnHandsPool', 'preserveLifePool', 'healinglightPool']) {
+      for (const key of GATED_TRACKED_KEYS) {
         expect(plain, `${key} ghost row must not be fanned into an unowned bucket`).not.toHaveProperty(key)
+      }
+      for (const key of HANDLER_OWNED_LATCH_KEYS) {
+        expect(plain, `${key} CLA-130 null re-arm must stay unconditional`).toHaveProperty(key, null)
       }
       expect(plain).toHaveProperty('tranceOfOrderUses', null)
       expect(plain).toHaveProperty('warriorofthegodsPool', null)
@@ -377,6 +390,9 @@ describe('applyLongRest', () => {
       return makeStats({
         class: { name: 'Druid', subclass: { name: 'Circle of the Land' }, major: { name: 'Circle of the Land' } },
         automation: { passives: [{ type: 'natural_recovery' }] },
+        // improve ghost-keys: naturalRecoverySlots is a GATED key — the
+        // druid's load-baked seed is what keeps its null re-arm in the batch.
+        _trackedResources: { naturalRecoverySlots: { current: 2, max: 3 } },
         ...overrides,
       })
     }
@@ -431,11 +447,16 @@ describe('applyLongRest', () => {
       await applyLongRest(makeStats(), CAMPAIGN)
       const msg = addEntry.mock.calls.find(c => c[1]?.type === 'long_rest')?.[1]?.message ?? ''
       expect(msg).not.toContain('Natural Recovery (spell slots)')
-      // Non-holder: registration nulls still re-arm the keys in the batch, but no
-      // stray standalone writes ever existed for these keys (dead call confirmed).
-      for (const key of NR_KEYS) {
-        expect(batchFor('Test Hero')).toHaveProperty(key, null)
+      // Non-holder: the two unseeded handler latches still re-arm in the
+      // batch (registration membership), while the GATED
+      // naturalRecoverySlots key this Fighter never owned stays fully
+      // absent (improve ghost-keys) — and no stray standalone writes ever
+      // existed for these keys (dead call confirmed).
+      const batch = batchFor('Test Hero')
+      for (const key of ['naturalRecoveryFreeCast', 'naturalRecoveryFreeCastUsed']) {
+        expect(batch).toHaveProperty(key, null)
       }
+      expect(batch).not.toHaveProperty('naturalRecoverySlots')
       expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => NR_KEYS.includes(c[1]))).toHaveLength(0)
     })
   })
@@ -496,7 +517,17 @@ describe('applyLongRest', () => {
     it('resets Bastion of Law (caster and ward target), Stonecunning, Adrenaline Rush and Overchannel', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
         key === 'bastionOfLawWardTarget' ? 'WardTarget' : undefined)
-      await applyLongRest(makeStats(), CAMPAIGN)
+      // improve ghost-keys: stonecunningUses/adrenalineRushUses are GATED
+      // owned-only seeds — the resetFlags duplicate site fires them ONLY for
+      // owners (key present in the load-baked `_trackedResources`). The
+      // fixture registers the owner state; the non-owner leg below proves
+      // the ghost stays gone.
+      await applyLongRest(makeStats({
+        _trackedResources: {
+          stonecunningUses: { current: 2, max: 2 },
+          adrenalineRushUses: { current: 1, max: 1 },
+        },
+      }), CAMPAIGN)
 
       // Bastion of Law — caster side
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawActive', false, CAMPAIGN, true)
@@ -516,12 +547,22 @@ describe('applyLongRest', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushRestTimestamp', null, CAMPAIGN, true)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'Overchannel_useCount', 0, CAMPAIGN, true)
 
-      // No ward target -> no WardTarget writes, caster reset still fires
+      // No ward target -> no WardTarget writes, caster reset still fires;
+      // and for a NON-owner the gated stonecunning/adrenaline rows are
+      // neither fanned by the batch nor re-written by the resetFlags site
+      // (ghost-free long rest, criteria 4) — timestamps keep their
+      // unconditional latch fan.
       vi.clearAllMocks()
       vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawActive', false, CAMPAIGN, true)
       expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'WardTarget')).toHaveLength(0)
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[1] === 'stonecunningUses')).toHaveLength(0)
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[1] === 'adrenalineRushUses')).toHaveLength(0)
+      expect(batchFor('Test Hero')).not.toHaveProperty('stonecunningUses')
+      expect(batchFor('Test Hero')).not.toHaveProperty('adrenalineRushUses')
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningRestTimestamp', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushRestTimestamp', null, CAMPAIGN, true)
     })
 
     it('nulls long-rest post-cast rider keys and leaves short-rest/unsaved riders out of the batch', async () => {

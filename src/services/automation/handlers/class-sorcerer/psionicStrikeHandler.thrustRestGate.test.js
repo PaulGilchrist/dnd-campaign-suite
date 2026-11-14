@@ -160,14 +160,17 @@ describe('CLA-355 tracked resource registration', () => {
         expect(resources.telekineticThrustUses).toEqual({ current: 1, max: 1 });
     });
 
-    it('registers 0 uses without the telekinetic_thrust reaction', () => {
+    it('registers NO key without the telekinetic_thrust reaction (owned-only pass, GATED_TRACKED_KEYS)', () => {
         const resources = computeTrackedResources({
             level: 18,
             rules: '2024',
             class: { name: 'Fighter', subclass: { name: 'Champion' }, class_levels: [] },
             abilities: [],
         });
-        expect(resources.telekineticThrustUses).toEqual({ current: 0, max: 0 });
+        // improve tracked-resource-ghost-keys (2026-11-14): the old {0,0}
+        // seed was a non-owner ghost — the key is now ABSENT (the handler
+        // reads `?.max ?? 1`, so absence is byte-equivalent behavior).
+        expect(resources).not.toHaveProperty('telekineticThrustUses');
     });
 
     it('rest seams re-arm telekineticThrustUses (short OR long rest per app data)', () => {

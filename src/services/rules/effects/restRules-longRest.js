@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getLongRestResources, spellSlotLevels, getLevelAfterLongRest } from './restRules-constants.js'
+import { GATED_TRACKED_KEYS } from '../trackedResources.js'
 import utils from '../../../services/ui/utils.js'
 import { sweepRestClocks } from './zoneDurationClock.js'
 import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
@@ -45,16 +46,29 @@ function resetFlags(name, campaignName, entries) {
   }
 }
 
-// Gated pool keys (improve tracked-resource-ghost-keys): seeded ONLY for
-// owners by computeTrackedResources (CLA-364 idiom — trackedResources.js
-// addPatronPoolResources/addPaladinDivineResources/addClericDivineResources),
-// mirroring the UI absence gates in CharClassFeatures.jsx. Their LONG_REST
-// re-arm must not fan `key: null` rows into non-owner buckets — unowned =
-// nothing to re-arm. Every OTHER LONG_REST_RESOURCES key keeps the
-// unconditional null fan-out: it is the CLA-130 batch safety net that
-// re-arms handler-owned latches (tranceOfOrderUses etc.) which are
-// deliberately never registered in `_trackedResources`.
-const GATED_POOL_KEYS = ['layOnHandsPool', 'preserveLifePool', 'healinglightPool']
+// Gated tracked keys (improve tracked-resource-ghost-keys, 2026-11-14
+// ownership-classification pass): STATICALLY_OWNABLE keys are seeded ONLY for
+// their owners by computeTrackedResources — the full classification lives in
+// trackedResources.js GATED_TRACKED_KEYS (single source of truth; this list
+// agrees with it BY CONSTRUCTION — it imports the same constant). The first
+// three entries are the shipped 03e419d35 pool gate
+// (layOnHandsPool/preserveLifePool/healinglightPool); the pass completes the
+// catalog (sorceryPoints, ragePoints, kiPoints, class-specific *Uses, ...).
+// Their LONG_REST re-arm must not fan `key: null` rows into non-owner
+// buckets — unowned = nothing to re-arm; an owner's seed put the key in
+// `_trackedResources`, so the guard below keeps every owner reset
+// byte-identical.
+//
+// Every OTHER LONG_REST_RESOURCES key keeps the unconditional null fan-out:
+// it is the CLA-130 batch safety net that re-arms handler-owned latches
+// (`tranceOfOrderUses`, `warriorofthegodsPool`, `warpingimplosionUses`, the
+// automation-derived `*Uses` counters — see trackedResources.js
+// HANDLER_OWNED_LATCH_KEYS) which are deliberately NEVER in
+// `_trackedResources` even for their owners — gating them here by
+// `key in tracked` would retire the owners' only re-arm (CLA-364 BUG-A
+// family). RESIDUAL (documented, out of scope): the SHORT_REST_RESOURCES
+// fan-out keeps the same unconditional behavior for its listed keys.
+const GATED_POOL_KEYS = GATED_TRACKED_KEYS
 
 function buildLongRestCharData(playerStats) {
   const charData = {}
@@ -769,7 +783,17 @@ export async function applyLongRest(playerStats, campaignName) {
 
   // Reset Favored Enemy / Stonecunning / Hurl Through Hell / Adrenaline Rush /
   // Giant Ancestry / Overchannel / Hunter's Prey counters on long rest
-  resetFlags(name, campaignName, [
+  // improve ghost-keys parity: entries for GATED (owned-only seeded) keys
+  // fire only for owners — the resting character's load-baked
+  // `_trackedResources` carries the key iff computeTrackedResources' owner
+  // predicate held. For owners this is the documented idempotent duplicate
+  // of the batch null (CLA-130 "null+null is idempotent"); for non-owners
+  // the batch guard already skipped the key, and re-fanning it here would
+  // reintroduce the very ghost rows the seed gate removed. Handler-owned
+  // keys on this list (hurlThroughHell*, cloudsJaunt*, Overchannel_useCount,
+  // _Favored_Enemy_freeCastCount, latches' timestamps) are NEVER gated —
+  // they are not seeded, so the batch guard cannot see them either.
+  const longRestFlagResets = [
     ['_Favored_Enemy_freeCastCount', null],
     ['stonecunningUses', null],
     ['stonecunningRestTimestamp', null],
@@ -785,7 +809,8 @@ export async function applyLongRest(playerStats, campaignName) {
     ['stormsThunderUses', null],
     ['Overchannel_useCount', 0],
     ["_Hunter's_Prey_choice", null],
-  ])
+  ].filter(([key]) => !GATED_POOL_KEYS.includes(key) || key in (playerStats._trackedResources || {}))
+  resetFlags(name, campaignName, longRestFlagResets)
 
   const { hasBolsteringTreats, hasReplenishingMeal } = resetChefFeatures(name, playerStats, campaignName)
 

@@ -115,14 +115,22 @@ function basePlayerStats(extra = {}) {
 }
 
 // Row runner: assertion keyed by label so a failure names the row and key.
+// improve ghost-keys (owned-only pass): rows may expect the ABSENT sentinel —
+// the non-owner `: 0` ghost seed was retired, the key must not be created.
+const ABSENT = Symbol('ABSENT');
 function expectPool(stats, keys, expected, label) {
   const result = computeTrackedResources(stats);
   const actual = {};
   const expectedPool = {};
+  const single = typeof expected === 'object' && expected !== null && 'current' in expected;
   for (const key of keys) {
+    const want = single ? expected : expected[key];
+    if (want === ABSENT || expected === ABSENT) {
+      expect(result, `${label}:${key}`).not.toHaveProperty(key);
+      continue;
+    }
     actual[key] = result[key];
-    // Single-key rows pass the pool directly; multi-key rows pass a key map.
-    expectedPool[key] = 'current' in expected ? expected : expected[key];
+    expectedPool[key] = single ? expected : want;
   }
   expect({ [label]: actual }).toEqual({ [label]: expectedPool });
   return result;
@@ -148,13 +156,16 @@ describe('computeTrackedResources — additional seed lanes', () => {
   });
 
   // :164-168 — gated on specialActions.effect === 'bonus_action_dash'.
-  it('adrenalineRushUses: proficiency value when dash present, 0 on every miss arm', () => {
+  // improve ghost-keys: the dash grant is the OWNERSHIP — miss arms now
+  // carry no row at all (ABSENT), the owner keeps its proficiency value
+  // (and the prof-missing data-hole row keeps {0,0}).
+  it('adrenalineRushUses: proficiency value when dash present, ABSENT on every miss arm', () => {
     const rows = [
       ['dash + prof 4', basePlayerStats({ automation: { specialActions: [{ effect: 'bonus_action_dash' }] }, proficiency: 4 }), { current: 4, max: 4 }],
       ['dash + prof undefined -> 0', basePlayerStats({ automation: { specialActions: [{ effect: 'bonus_action_dash' }] } }), { current: 0, max: 0 }],
-      ['other special action effect', basePlayerStats({ automation: { specialActions: [{ effect: 'other_effect' }] }, proficiency: 4 }), { current: 0, max: 0 }],
-      ['specialActions missing', basePlayerStats({ automation: {} }), { current: 0, max: 0 }],
-      ['automation missing', basePlayerStats(), { current: 0, max: 0 }],
+      ['other special action effect', basePlayerStats({ automation: { specialActions: [{ effect: 'other_effect' }] }, proficiency: 4 }), ABSENT],
+      ['specialActions missing', basePlayerStats({ automation: {} }), ABSENT],
+      ['automation missing', basePlayerStats(), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['adrenalineRushUses'], expected, label);
   });
@@ -173,8 +184,8 @@ describe('computeTrackedResources — additional seed lanes', () => {
       ['5e subclass Fiend Patron CHA -2 -> 1', basePlayerStats({ class: warlock({ subclass: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: -2 }] }), { current: 1, max: 1 }],
       ['2024 major Fiend Patron CHA 3 -> 3 (disk: Uses = Charisma modifier)', basePlayerStats({ rules: '2024', class: warlock({ major: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: 3 }] }), { current: 3, max: 3 }],
       ['2024 subclass Fiend Patron CHA -2 -> floor 1 (minimum once)', basePlayerStats({ rules: '2024', class: warlock({ subclass: { name: 'Fiend Patron' } }), abilities: [{ name: 'Charisma', bonus: -2 }] }), { current: 1, max: 1 }],
-      ['non-Fiend warlock CHA 5 -> 0', basePlayerStats({ class: warlock({ major: { name: 'Archfey' } }), abilities: [{ name: 'Charisma', bonus: 5 }] }), { current: 0, max: 0 }],
-      ['non-warlock CHA 5 -> 0', basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 5 }] }), { current: 0, max: 0 }],
+      ['non-Fiend warlock CHA 5 -> ABSENT (owned-only pass)', basePlayerStats({ class: warlock({ major: { name: 'Archfey' } }), abilities: [{ name: 'Charisma', bonus: 5 }] }), ABSENT],
+      ['non-warlock CHA 5 -> ABSENT', basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 5 }] }), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['darkOnesLuckUses'], expected, label);
   });
@@ -197,7 +208,7 @@ describe('computeTrackedResources — additional seed lanes', () => {
     const rows = [
       ['paladin CHA 3', basePlayerStats({ class: { name: 'Paladin' }, abilities: [{ name: 'Charisma', bonus: 3 }] }), { current: 3, max: 3 }],
       ['paladin CHA 0 -> floor 1', basePlayerStats({ class: { name: 'Paladin' }, abilities: [{ name: 'Charisma', bonus: 0 }] }), { current: 1, max: 1 }],
-      ['non-paladin CHA 5 -> 0', basePlayerStats({ class: { name: 'Cleric' }, abilities: [{ name: 'Charisma', bonus: 5 }] }), { current: 0, max: 0 }],
+      ['non-paladin CHA 5 -> ABSENT (owned-only pass)', basePlayerStats({ class: { name: 'Cleric' }, abilities: [{ name: 'Charisma', bonus: 5 }] }), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['gloriousDefenseUses'], expected, label);
   });
@@ -213,11 +224,11 @@ describe('computeTrackedResources — additional seed lanes', () => {
       ['druid lv20 5e = 10 (ceil table)', basePlayerStats({ class: druid(), level: 20 }), { current: 10, max: 10 }],
       ['druid lv2 5e = 1 (grant level, ceil(1))', basePlayerStats({ class: druid(), level: 2 }), { current: 1, max: 1 }],
       ['druid lv3 5e = 2 (ceil(1.5))', basePlayerStats({ class: druid(), level: 3 }), { current: 2, max: 2 }],
-      ['druid lv1 5e -> 0 (disk grants lv2; ceil-pre-grant refused)', basePlayerStats({ class: druid(), level: 1 }), { current: 0, max: 0 }],
+      ['druid lv1 5e -> ABSENT (disk grants lv2; owned-only pass)', basePlayerStats({ class: druid(), level: 1 }), ABSENT],
       ['druid lv7 2024 = 3 (floor: lv7 half=3.5, combined <= half)', basePlayerStats({ rules: '2024', class: druid(), level: 7 }), { current: 3, max: 3 }],
       ['druid lv6 2024 = 3 (grant level)', basePlayerStats({ rules: '2024', class: druid(), level: 6 }), { current: 3, max: 3 }],
-      ['druid lv5 2024 -> 0 (below 2024 disk lv6 row)', basePlayerStats({ rules: '2024', class: druid(), level: 5 }), { current: 0, max: 0 }],
-      ['non-druid lv7 -> 0', basePlayerStats({ level: 7 }), { current: 0, max: 0 }],
+      ['druid lv5 2024 -> ABSENT (below 2024 disk lv6 row)', basePlayerStats({ rules: '2024', class: druid(), level: 5 }), ABSENT],
+      ['non-druid lv7 -> ABSENT', basePlayerStats({ level: 7 }), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['naturalRecoverySlots'], expected, label);
   });
@@ -246,8 +257,8 @@ describe('computeTrackedResources — additional seed lanes', () => {
       ['no Intelligence entry lv6 -> INT 0 = 12', basePlayerStats({ class: { name: 'Wizard' }, abilities: [{ name: 'Charisma', bonus: 2 }], automation: { passives: [{ type: 'arcane_ward' }] }, level: 6 }), { arcaneWardMax: { current: 12, max: 12 }, arcaneWardHp: { current: 12, max: 12 } }],
       ['INT -2 lv6 = 10 (negative not clamped)', basePlayerStats({ class: { name: 'Wizard' }, abilities: [{ name: 'Intelligence', bonus: -2 }], automation: { passives: [{ type: 'arcane_ward' }] }, level: 6 }), { arcaneWardMax: { current: 10, max: 10 }, arcaneWardHp: { current: 10, max: 10 } }],
       ['non-wizard WITH passive lv6 INT+3 = 15 (class-ungated quirk)', basePlayerStats({ class: { name: 'Cleric' }, abilities: [{ name: 'Intelligence', bonus: 3 }], automation: { passives: [{ type: 'arcane_ward' }] }, level: 6 }), { arcaneWardMax: { current: 15, max: 15 }, arcaneWardHp: { current: 15, max: 15 } }],
-      ['other passive -> 0', basePlayerStats({ abilities: [{ name: 'Intelligence', bonus: 5 }], automation: { passives: [{ type: 'other_passive' }] } }), { arcaneWardMax: { current: 0, max: 0 }, arcaneWardHp: { current: 0, max: 0 } }],
-      ['passives missing -> 0', basePlayerStats({ automation: {} }), { arcaneWardMax: { current: 0, max: 0 }, arcaneWardHp: { current: 0, max: 0 } }],
+      ['other passive -> ABSENT (owned-only pass: the arcane_ward passive IS the ownership)', basePlayerStats({ abilities: [{ name: 'Intelligence', bonus: 5 }], automation: { passives: [{ type: 'other_passive' }] } }), ABSENT],
+      ['passives missing -> ABSENT', basePlayerStats({ automation: {} }), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['arcaneWardMax', 'arcaneWardHp'], expected, label);
     const twin = computeTrackedResources(rows[0][1]);
@@ -312,9 +323,9 @@ describe('computeTrackedResources — additional seed lanes', () => {
       ['ranger lv5 row favored_enemy 2', ranger([{ level: 5, favored_enemy: 2 }]), { current: 2, max: 2 }],
       ['ranger lv5 row favored_enemy 0 -> floor 1', ranger([{ level: 5, favored_enemy: 0 }]), { current: 1, max: 1 }],
       ['ranger lv5 char, level-3 row only -> exact-match miss, floor 1', basePlayerStats({ level: 5, class: { name: 'Ranger', class_levels: [{ level: 3, favored_enemy: 2 }], major: {}, subclass: {} } }), { current: 1, max: 1 }],
-      ['GATE ARM: Fighter seeds 0 (was QUIRK floor 1 — flipped fix#346)', basePlayerStats({ class: { name: 'Fighter' } }), { current: 0, max: 0 }],
-      ['GATE ARM: Wizard with a favored_enemy-bearing row -> 0', basePlayerStats({ class: { name: 'Wizard', class_levels: [{ level: 5, favored_enemy: 4 }], major: {}, subclass: {} } }), { current: 0, max: 0 }],
-      ['GATE ARM: Cleric seeds 0', basePlayerStats({ class: { name: 'Cleric' } }), { current: 0, max: 0 }],
+      ['GATE ARM: Fighter -> ABSENT (owned-only pass; was gate-0)', basePlayerStats({ class: { name: 'Fighter' } }), ABSENT],
+      ['GATE ARM: Wizard with a favored_enemy-bearing row -> ABSENT', basePlayerStats({ class: { name: 'Wizard', class_levels: [{ level: 5, favored_enemy: 4 }], major: {}, subclass: {} } }), ABSENT],
+      ['GATE ARM: Cleric -> ABSENT', basePlayerStats({ class: { name: 'Cleric' } }), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['favoredEnemyUses'], expected, label);
   });
@@ -327,8 +338,8 @@ describe('computeTrackedResources — additional seed lanes', () => {
       ['subclass Moon WIS 2', basePlayerStats({ class: druid({ subclass: { name: 'Circle of the Moon' } }), abilities: [{ name: 'Wisdom', bonus: 2 }] }), { current: 2, max: 2 }],
       ['Moon, WIS entry without bonus -> 1', basePlayerStats({ class: druid({ major: { name: 'Circle of the Moon' } }), abilities: [{ name: 'Wisdom' }] }), { current: 1, max: 1 }],
       ['Moon WIS -1 -> floor 1', basePlayerStats({ class: druid({ major: { name: 'Circle of the Moon' } }), abilities: [{ name: 'Wisdom', bonus: -1 }] }), { current: 1, max: 1 }],
-      ['Land druid WIS 5 -> 0', basePlayerStats({ class: druid({ major: { name: 'Circle of the Land' } }), abilities: [{ name: 'Wisdom', bonus: 5 }] }), { current: 0, max: 0 }],
-      ['non-druid WIS 5 -> 0', basePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 5 }] }), { current: 0, max: 0 }],
+      ['Land druid WIS 5 -> ABSENT (owned-only pass)', basePlayerStats({ class: druid({ major: { name: 'Circle of the Land' } }), abilities: [{ name: 'Wisdom', bonus: 5 }] }), ABSENT],
+      ['non-druid WIS 5 -> ABSENT', basePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 5 }] }), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['moonlightStepUses'], expected, label);
   });
@@ -345,8 +356,8 @@ describe('computeTrackedResources — additional seed lanes', () => {
       ['major Stars lv8 WIS 3', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 3 }], level: 8 }), { current: 3, max: 3 }],
       ['subclass Stars lv6 WIS 2 (gate boundary)', basePlayerStats({ class: druid({ subclass: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 2 }], level: 6 }), { current: 2, max: 2 }],
       ['Stars lv8 WIS +5 -> 5 (disk: "times equal to your Wisdom modifier"; cap-1 would under-seed)', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 8 }), { current: 5, max: 5 }],
-      ['Stars lv5 -> 0 (below gate)', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 5 }), { current: 0, max: 0 }],
-      ['Moon lv10 -> 0', basePlayerStats({ class: druid({ major: { name: 'Circle of the Moon' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 10 }), { current: 0, max: 0 }],
+      ['Stars lv5 -> ABSENT (below gate; owned-only pass)', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 5 }), ABSENT],
+      ['Moon lv10 -> ABSENT', basePlayerStats({ class: druid({ major: { name: 'Circle of the Moon' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 10 }), ABSENT],
       ['Stars lv8 WIS no bonus -> 1', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom' }], level: 8 }), { current: 1, max: 1 }],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['cosmicomenUses'], expected, label);
@@ -372,11 +383,11 @@ describe('computeTrackedResources — additional seed lanes', () => {
     const rows = [
       ['2024 Wild Magic, no automation -> 1', wild('2024', 'Wild Magic Sorcery'), { current: 1, max: 1 }],
       ['5e Wild Magic + specialActions -> 1', wild('5e', 'Wild Magic Sorcery', { specialActions: [{ type: 'feats_of_chaos' }] }), { current: 1, max: 1 }],
-      ['5e Wild Magic, no automation -> 0 (5e needs automation)', wild('5e', 'Wild Magic Sorcery'), { current: 0, max: 0 }],
+      ['5e Wild Magic, no automation -> ABSENT (5e needs automation; owned-only pass)', wild('5e', 'Wild Magic Sorcery'), ABSENT],
       ['specialActions alone, other subclass -> 1', wild('5e', 'Other Magic', { specialActions: [{ type: 'feats_of_chaos' }] }), { current: 1, max: 1 }],
       ['passives alone -> 1', wild('5e', 'Other Magic', { passives: [{ type: 'feats_of_chaos' }] }), { current: 1, max: 1 }],
       ['QUIRK: non-sorcerer with automation -> 1 (class-ungated)', basePlayerStats({ automation: { passives: [{ type: 'feats_of_chaos' }] } }), { current: 1, max: 1 }],
-      ['Storm Sorcery, no automation -> 0', wild('5e', 'Storm Sorcery'), { current: 0, max: 0 }],
+      ['Storm Sorcery, no automation -> ABSENT', wild('5e', 'Storm Sorcery'), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['featsOfChaosUses'], expected, label);
   });

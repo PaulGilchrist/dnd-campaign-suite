@@ -58,6 +58,16 @@ export function computeShortRestHpNewCurrent(currentHp, maxHp, recoveredAmount) 
 // to LONG_REST_RESOURCES array below. The applyLongRest function sets all keys in
 // this array to null via setRuntimeBatch. Use the _<Name>_usedRound key pattern.
 //
+// Ownership classification (improve tracked-resource-ghost-keys, 2026-11-14):
+// every key below that is also a STATICALLY_OWNABLE seed
+// (trackedResources.js GATED_TRACKED_KEYS) is null-re-armed ONLY for
+// characters whose load-baked `_trackedResources` carries it (buildLongRest
+// CharData guard); keys NOT in that list are handler-owned latches /
+// universal lanes and keep the unconditional null fan-out BY DESIGN
+// (CLA-130: they are never in `_trackedResources`, even for their owners —
+// e.g. tranceOfOrderUses, warriorofthegodsPool, warpingimplosionUses,
+// healinghandsUses, thief'sreflexesUses — see HANDLER_OWNED_LATCH_KEYS).
+//
 // INITIATIVE RESET: For once-per-turn trackers that reset when the character rolls
 // initiative, add setRuntimeValue(playerStats.name, '_TrackerName_usedRound', null, campaignName)
 // inside useInitiativeEffects.js handleInitiativeRolled handler.
@@ -74,6 +84,12 @@ export const SHORT_REST_RESOURCES = [
   'focusPoints',
   'superiorityDice',
   'kiPoints',
+  // improve ghost-keys: lowercase 'actionsurgeUses' is NOT a seed ghost — the
+  // catalog twin seed was retired (trackedResources.js CASE-DUP note). This
+  // entry re-arms the RUNTIME row extraActionHandler writes when spending an
+  // automationInfoBuilder-derived extra_action (diverse.js derives
+  // feature.name.toLowerCase()+'Uses'); null-tolerant handler, so the row
+  // only exists after a press and the re-arm is load-bearing (CLA-130).
   'actionsurgeUses',
   'actionSurgeUses',
   'actionSurgeUsedThisRound',

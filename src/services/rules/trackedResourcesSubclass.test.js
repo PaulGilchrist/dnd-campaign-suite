@@ -156,15 +156,27 @@ const diskAbilities = (name, bonus) => [{ name, bonus }];
 const stepsAutomation = { bonusActions: [{ type: ARCHFEY.features.find((f) => /steps/i.test(f.name)).automation.type }] };
 
 // Row runner (canonical form, siblings #1531/#1532): failure names the row.
+// improve ghost-keys (owned-only pass): a value of ABSENT asserts the key is
+// NOT created — the non-owner `: 0` ghost seeds were retired.
+const ABSENT = Symbol('ABSENT');
 function expectPools(stats, keys, expected, label) {
   const result = computeTrackedResources(stats);
-  const actual = {};
-  const want = {};
+  const single = typeof expected === 'object' && expected !== null && 'current' in expected;
   for (const key of keys) {
-    actual[key] = result[key];
-    want[key] = 'current' in expected ? expected : expected[key];
+    const want = single || expected === ABSENT ? expected : expected[key];
+    if (want === ABSENT) {
+      expect(result, `${label}:${key}`).not.toHaveProperty(key);
+    }
   }
-  expect({ [label]: actual }).toEqual({ [label]: want });
+  const actual = {};
+  const wantMap = {};
+  for (const key of keys) {
+    const exp = single || expected === ABSENT ? expected : expected[key];
+    if (exp === ABSENT) continue;
+    actual[key] = result[key];
+    wantMap[key] = exp;
+  }
+  expect({ [label]: actual }).toEqual({ [label]: wantMap });
   return result;
 }
 
@@ -218,20 +230,16 @@ describe('disk census (both rulesets, existence-first)', () => {
 // ── subclass-absent golden + executable channel census ──
 
 describe('subclass channel golden + census', () => {
-  it('subclass-absent rows seed every owned key at {0,0} (preserveLifePool ABSENT — gated pool, CLA-364 idiom), console untouched, pools fresh; _Star_Map_freeCastCount stays computed-not-registered (gap pinned)', () => {
+  it('subclass-absent rows seed NONE of the owned keys (owned-only pass: every OWNED_KEY ABSENT — ghosts retired), console untouched, pools fresh; _Star_Map_freeCastCount stays computed-not-registered (gap pinned)', () => {
     const err = vi.spyOn(console, 'error');
     for (const className of ['Druid', 'Ranger', 'Cleric']) {
       // kitchen-sink-absent form: no major/subclass/class_levels keys at all
+      // — none of the owned keys has an owner predicate that passes, so the
+      // improve ghost-keys pass retires the {0,0} ghosts entirely (the old
+      // preserveLifePool-only exception now covers all eight keys).
       const result = computeTrackedResources(basePlayerStats({ class: { name: className } }));
       for (const key of OWNED_KEYS) {
-        // improve tracked-resource-ghost-keys: preserveLifePool is a gated
-        // pool — unowned (none of these fixtures is a Life-domain cleric)
-        // means the key is ABSENT, not {0,0}.
-        if (key === 'preserveLifePool') {
-          expect({ [`${className}:${key}`]: result[key] }).toEqual({ [`${className}:${key}`]: undefined });
-          continue;
-        }
-        expect({ [`${className}:${key}`]: result[key] }).toEqual({ [`${className}:${key}`]: { current: 0, max: 0 } });
+        expect({ [`${className}:${key}`]: result[key] }).toEqual({ [`${className}:${key}`]: undefined });
       }
       // deterministic + fresh object pool per compute (shared-reference mutants)
       const again = computeTrackedResources(basePlayerStats({ class: { name: className } }));
@@ -243,15 +251,13 @@ describe('subclass channel golden + census', () => {
     err.mockRestore();
 
     // Executable subclass-channel Venn (direction: produced vs registry):
-    // 7 of 8 owned keys seed on every compute; 6 of those 7 are registered —
-    // the gap is exactly _Star_Map_freeCastCount (#1531/#1532 confirmed —
-    // computed-not-in-registry). Consequence: the extra override arm (:419)
-    // cannot re-add it once absent — pinned in the override table below.
-    // improve tracked-resource-ghost-keys: the 8th key, preserveLifePool, is
-    // now CONDITIONALLY seeded (owned-only, CLA-364 idiom) — a Druid compute
-    // omits it entirely.
+    // with the owned-only pass a bare class compute seeds NONE of the
+    // subclass-owned keys, so the registry-gap claim moves to the owner
+    // lane: _Star_Map_freeCastCount remains the ONE owned key computed but
+    // NOT registered (see the Stars owner arm in the gated table below —
+    // and applyServerOverride cannot re-add it once absent, pinned there).
     const venn = computeTrackedResources(basePlayerStats({ class: { name: 'Druid' } }));
-    expect(OWNED_KEYS.filter((k) => k in venn)).toEqual(OWNED_KEYS.filter((k) => k !== 'preserveLifePool'));
+    expect(OWNED_KEYS.filter((k) => k in venn)).toEqual([]);
     expect(OWNED_KEYS.filter((k) => !ALL_TRACKED_RESOURCES.includes(k)))
       .toEqual(['_Star_Map_freeCastCount']);
     // Registered half, exact: the other seven of the owned eight.
@@ -274,9 +280,9 @@ describe('subclass-gated seeds', () => {
     const rows = [
       ['major Stars lv5 WIS+3', druid(STARS.name, 5, diskAbilities('Wisdom', 3)), { current: 3, max: 3 }],
       ['subclass Stars lv3 boundary WIS+2', druid(STARS.name, 3, diskAbilities('Wisdom', 2), true), { current: 2, max: 2 }],
-      ['Stars lv2 -> 0 (below disk lv3 grant)', druid(STARS.name, 2, diskAbilities('Wisdom', 5)), { current: 0, max: 0 }],
-      ['Moon lv5 WIS+5 -> 0', druid(MOON.name, 5, diskAbilities('Wisdom', 5)), { current: 0, max: 0 }],
-      ['GATE: wizard major Stars -> 0 (isDruid gate)', basePlayerStats({ rules: '2024', level: 5, class: cls('Wizard', STARS.name), abilities: diskAbilities('Wisdom', 5) }), { current: 0, max: 0 }],
+      ['Stars lv2 -> ABSENT (below disk lv3 grant; owned-only pass)', druid(STARS.name, 2, diskAbilities('Wisdom', 5)), ABSENT],
+      ['Moon lv5 WIS+5 -> ABSENT', druid(MOON.name, 5, diskAbilities('Wisdom', 5)), ABSENT],
+      ['GATE: wizard major Stars -> ABSENT (isDruid gate)', basePlayerStats({ rules: '2024', level: 5, class: cls('Wizard', STARS.name), abilities: diskAbilities('Wisdom', 5) }), ABSENT],
       ['WIS entry without bonus -> floor 1', druid(STARS.name, 5, [{ name: 'Wisdom' }]), { current: 1, max: 1 }],
       ['WIS -1 -> floor 1', druid(STARS.name, 5, diskAbilities('Wisdom', -1)), { current: 1, max: 1 }],
       ['no abilities at all -> floor 1', druid(STARS.name, 5), { current: 1, max: 1 }],
@@ -298,13 +304,13 @@ describe('subclass-gated seeds', () => {
       // lv6 floor REFUTED at bytes: steps.level === 3, census test above).
       // Old row 'subclass Archfey lv2 + automation -> still seeds (no lv
       // gate)' flipped honestly to the lv2->0 miss arm; lv3 seeds.
-      ['subclass Archfey lv2 -> 0 (below disk lv3 grant; was-seed drift flipped)', war(ARCHFEY.name, 2, stepsAutomation, diskAbilities('Charisma', 2), true), { current: 0, max: 0 }],
+      ['subclass Archfey lv2 -> ABSENT (below disk lv3 grant; owned-only pass)', war(ARCHFEY.name, 2, stepsAutomation, diskAbilities('Charisma', 2), true), ABSENT],
       ['subclass Archfey lv3 boundary -> seeds (disk BY-name grant level)', war(ARCHFEY.name, 3, stepsAutomation, diskAbilities('Charisma', 2), true), { current: 2, max: 2 }],
       ['major Archfey lv5 seeded where phantom lv6-floor law would allow (lv5>=3) — floor is the disk lv3, not lv6', war(ARCHFEY.name, 5, stepsAutomation, diskAbilities('Charisma', 1)), { current: 1, max: 1 }],
-      ['Archfey, no bonusActions -> 0', war(ARCHFEY.name, 5, undefined), { current: 0, max: 0 }],
-      ['Archfey, other bonusAction type -> 0', war(ARCHFEY.name, 5, { bonusActions: [{ type: 'misty_step' }] }, diskAbilities('Charisma', 5)), { current: 0, max: 0 }],
-      ['Celestial Patron + steps automation -> 0 (patron gate)', war(CELESTIAL.name, 5, stepsAutomation, diskAbilities('Charisma', 5)), { current: 0, max: 0 }],
-      ['GATE: wizard Archfey + automation -> 0 (isWarlock gate)', basePlayerStats({ rules: '2024', level: 5, class: cls('Wizard', ARCHFEY.name), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), { current: 0, max: 0 }],
+      ['Archfey, no bonusActions -> ABSENT (owned-only pass)', war(ARCHFEY.name, 5, undefined), ABSENT],
+      ['Archfey, other bonusAction type -> ABSENT', war(ARCHFEY.name, 5, { bonusActions: [{ type: 'misty_step' }] }, diskAbilities('Charisma', 5)), ABSENT],
+      ['Celestial Patron + steps automation -> ABSENT (patron gate)', war(CELESTIAL.name, 5, stepsAutomation, diskAbilities('Charisma', 5)), ABSENT],
+      ['GATE: wizard Archfey + automation -> ABSENT (isWarlock gate)', basePlayerStats({ rules: '2024', level: 5, class: cls('Wizard', ARCHFEY.name), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), ABSENT],
       ['CHA 0 -> floor 1', war(ARCHFEY.name, 5, stepsAutomation, diskAbilities('Charisma', 0)), { current: 1, max: 1 }],
       ['CHA entry without bonus -> floor 1', war(ARCHFEY.name, 5, stepsAutomation, [{ name: 'Charisma' }]), { current: 1, max: 1 }],
       // fix#346: 5e RULESET gate — 5e/classes.json carries NO 'Steps of the
@@ -312,8 +318,8 @@ describe('subclass-gated seeds', () => {
       // disk-absent = no-resource-in-that-edition, same ruling as the
       // tireless/naturesVeil fix#134 idiom. Loud-stamp stands: the stamped
       // automation proxy alone no longer seeds a 5e character.
-      ['RULESET-GATED: 5e major Archfey + automation -> 0 (no 5e disk row)', basePlayerStats({ rules: '5e', level: 5, class: cls('Warlock', ARCHFEY.name), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), { current: 0, max: 0 }],
-      ['5e near-miss disk name The Archfey -> 0 (gates are 2024 names; drift reported)', basePlayerStats({ rules: '5e', level: 5, class: cls('Warlock', 'The Archfey'), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), { current: 0, max: 0 }],
+      ['RULESET-GATED: 5e major Archfey + automation -> ABSENT (no 5e disk row)', basePlayerStats({ rules: '5e', level: 5, class: cls('Warlock', ARCHFEY.name), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), ABSENT],
+      ['5e near-miss disk name The Archfey -> ABSENT (gates are 2024 names; drift reported)', basePlayerStats({ rules: '5e', level: 5, class: cls('Warlock', 'The Archfey'), automation: stepsAutomation, abilities: diskAbilities('Charisma', 5) }), ABSENT],
     ];
     for (const [label, stats, expected] of rows) expectPools(stats, ['_Steps_of_the_Fey_freeCastCount'], expected, label);
   });
@@ -322,22 +328,22 @@ describe('subclass-gated seeds', () => {
     const ranger = (level, abilities, rules = '2024') => basePlayerStats({ rules, level, class: cls('Ranger', undefined), abilities });
     const both = ['tirelessUses', 'naturesVeilUses'];
     const rows = [
-      ['lv10 tireless live, veil still 0 (gate separation)', ranger(10, diskAbilities('Wisdom', 3)), { tirelessUses: { current: 3, max: 3 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['lv9 tireless boundary miss -> 0', ranger(9, diskAbilities('Wisdom', 3)), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['lv13 veil miss, tireless live', ranger(13, diskAbilities('Wisdom', 5)), { tirelessUses: { current: 5, max: 5 }, naturesVeilUses: { current: 0, max: 0 } }],
+      ['lv10 tireless live, veil ABSENT (gate separation)', ranger(10, diskAbilities('Wisdom', 3)), { tirelessUses: { current: 3, max: 3 }, naturesVeilUses: ABSENT }],
+      ['lv9 tireless boundary miss -> both ABSENT', ranger(9, diskAbilities('Wisdom', 3)), { tirelessUses: ABSENT, naturesVeilUses: ABSENT }],
+      ['lv13 veil miss, tireless live', ranger(13, diskAbilities('Wisdom', 5)), { tirelessUses: { current: 5, max: 5 }, naturesVeilUses: ABSENT }],
       ['lv14 both live WIS+4', ranger(14, diskAbilities('Wisdom', 4)), { tirelessUses: { current: 4, max: 4 }, naturesVeilUses: { current: 4, max: 4 } }],
-      ['lv12 WIS 0 -> floor 1', ranger(12, diskAbilities('Wisdom', 0)), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['lv10 WIS -2 -> floor 1', ranger(10, diskAbilities('Wisdom', -2)), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['lv10 no Wisdom entry -> floor 1', ranger(10, []), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['GATE: druid lv15 WIS+5 -> both 0', basePlayerStats({ rules: '2024', level: 15, class: cls('Druid', MOON.name), abilities: diskAbilities('Wisdom', 5) }), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
+      ['lv12 WIS 0 -> floor 1', ranger(12, diskAbilities('Wisdom', 0)), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: ABSENT }],
+      ['lv10 WIS -2 -> floor 1', ranger(10, diskAbilities('Wisdom', -2)), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: ABSENT }],
+      ['lv10 no Wisdom entry -> floor 1', ranger(10, []), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: ABSENT }],
+      ['GATE: druid lv15 WIS+5 -> both ABSENT (owned-only pass)', basePlayerStats({ rules: '2024', level: 15, class: cls('Druid', MOON.name), abilities: diskAbilities('Wisdom', 5) }), { tirelessUses: ABSENT, naturesVeilUses: ABSENT }],
       // fix#134 (#1533): disk census — 5e Ranger lv10 rows are 'Hide in
       // Plain Sight'/'Natural Explorer', lv14 rows 'Favored Enemy'/'Vanish'
       // (census test above, bytes). No Tireless/Veil rows in the 5e disk at
-      // ANY level -> the seed must be 0. Pre-fix capture: lv15 WIS+2
-      // seeded {2,2} (drift row, flipped here).
-      ['RULESET-GATED: 5e ranger lv15 -> both 0 (was drift {2,2}; 5e disk has no rows)', ranger(15, diskAbilities('Wisdom', 2), '5e'), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['RULESET-GATED: 5e ranger lv10 -> tireless 0 (5e disk lv10 has no Tireless)', ranger(10, diskAbilities('Wisdom', 5), '5e'), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['RULESET-GATED: 5e ranger lv17 -> both 0 (no capstone seed for absent rows)', ranger(17, diskAbilities('Wisdom', 5), '5e'), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
+      // ANY level -> no key at all. Pre-fix capture: lv15 WIS+2 seeded
+      // {2,2} (drift row, flipped here).
+      ['RULESET-GATED: 5e ranger lv15 -> both ABSENT (was drift {2,2}; 5e disk has no rows)', ranger(15, diskAbilities('Wisdom', 2), '5e'), { tirelessUses: ABSENT, naturesVeilUses: ABSENT }],
+      ['RULESET-GATED: 5e ranger lv10 -> both ABSENT (5e disk lv10 has no Tireless)', ranger(10, diskAbilities('Wisdom', 5), '5e'), { tirelessUses: ABSENT, naturesVeilUses: ABSENT }],
+      ['RULESET-GATED: 5e ranger lv17 -> both ABSENT (no capstone seed for absent rows)', ranger(17, diskAbilities('Wisdom', 5), '5e'), { tirelessUses: ABSENT, naturesVeilUses: ABSENT }],
       ['INVERSE: 2024 lv20 both live WIS+3 (gate stays live for the edition WITH rows)', ranger(20, diskAbilities('Wisdom', 3)), { tirelessUses: { current: 3, max: 3 }, naturesVeilUses: { current: 3, max: 3 } }],
     ];
     for (const [label, stats, expected] of rows) expectPools(stats, both, expected, label);
@@ -368,17 +374,17 @@ describe('subclass-gated seeds', () => {
     }
   });
 
-  it('ancestral trait gates :319-333 — disk trait bytes, subrace placement flag, automation truthiness, proficiency formula, exact-name match', () => {
+  it('ancestral trait gates :319-333 — disk trait bytes, subrace placement flag, automation truthiness, proficiency formula, exact-name match (miss arms ABSENT, owned-only pass)', () => {
     const rows = [
       ['Dwarf Stonecunning (disk) prof 4', basePlayerStats({ race: { name: 'Dwarf', traits: [stonecunningDisk] }, proficiency: 4 }), { stonecunningUses: { current: 4, max: 4 } }],
-      ['Stonecunning automation:false / missing -> 0', basePlayerStats({ race: { name: 'Dwarf', traits: [{ name: stonecunningDisk.name, automation: false }, { name: stonecunningDisk.name }] }, proficiency: 4 }), { stonecunningUses: { current: 0, max: 0 } }],
-      ['lowercase near-miss stonecunning -> 0 (exact match)', basePlayerStats({ race: { name: 'Dwarf', traits: [{ name: stonecunningDisk.name.toLowerCase(), automation: stonecunningDisk.automation }] }, proficiency: 4 }), { stonecunningUses: { current: 0, max: 0 } }],
-      ['Stone Giant (disk) prof 3 — endurance live, thunder 0 (cross-key separation)', basePlayerStats({ race: { name: 'Goliath', traits: [], subrace: { name: 'Stone Giant', traits: goliathSub('Stone Giant').traits } }, proficiency: 3 }), { stonesEnduranceUses: { current: 3, max: 3 }, stormsThunderUses: { current: 0, max: 0 } }],
-      ['Storm Giant (disk) prof 3 — thunder live, endurance 0', basePlayerStats({ race: { name: 'Goliath', traits: [], subrace: { name: 'Storm Giant', traits: goliathSub('Storm Giant').traits } }, proficiency: 3 }), { stonesEnduranceUses: { current: 0, max: 0 }, stormsThunderUses: { current: 3, max: 3 } }],
-      ["placement: Stone's Endurance on race.traits (not subrace) -> 0 (fromSubrace flag)", basePlayerStats({ race: { name: 'Goliath', traits: [{ name: stonesEnduranceDisk.name, automation: stonesEnduranceDisk.automation }] }, proficiency: 3 }), { stonesEnduranceUses: { current: 0, max: 0 } }],
-      ['subrace missing -> both 0', basePlayerStats({ race: { name: 'Goliath', traits: [] }, proficiency: 3 }), { stonesEnduranceUses: { current: 0, max: 0 }, stormsThunderUses: { current: 0, max: 0 } }],
-      ['race missing -> all 0', basePlayerStats(), { stonecunningUses: { current: 0, max: 0 }, stonesEnduranceUses: { current: 0, max: 0 }, stormsThunderUses: { current: 0, max: 0 } }],
-      ['trait present, proficiency undefined -> 0 (|| 0)', basePlayerStats({ race: { name: 'Dwarf', traits: [stonecunningDisk] } }), { stonecunningUses: { current: 0, max: 0 } }],
+      ['Stonecunning automation:false / missing -> ABSENT', basePlayerStats({ race: { name: 'Dwarf', traits: [{ name: stonecunningDisk.name, automation: false }, { name: stonecunningDisk.name }] }, proficiency: 4 }), { stonecunningUses: ABSENT }],
+      ['lowercase near-miss stonecunning -> ABSENT (exact match)', basePlayerStats({ race: { name: 'Dwarf', traits: [{ name: stonecunningDisk.name.toLowerCase(), automation: stonecunningDisk.automation }] }, proficiency: 4 }), { stonecunningUses: ABSENT }],
+      ['Stone Giant (disk) prof 3 — endurance live, thunder ABSENT (cross-key separation)', basePlayerStats({ race: { name: 'Goliath', traits: [], subrace: { name: 'Stone Giant', traits: goliathSub('Stone Giant').traits } }, proficiency: 3 }), { stonesEnduranceUses: { current: 3, max: 3 }, stormsThunderUses: ABSENT }],
+      ['Storm Giant (disk) prof 3 — thunder live, endurance ABSENT', basePlayerStats({ race: { name: 'Goliath', traits: [], subrace: { name: 'Storm Giant', traits: goliathSub('Storm Giant').traits } }, proficiency: 3 }), { stonesEnduranceUses: ABSENT, stormsThunderUses: { current: 3, max: 3 } }],
+      ["placement: Stone's Endurance on race.traits (not subrace) -> ABSENT (fromSubrace flag)", basePlayerStats({ race: { name: 'Goliath', traits: [{ name: stonesEnduranceDisk.name, automation: stonesEnduranceDisk.automation }] }, proficiency: 3 }), { stonesEnduranceUses: ABSENT }],
+      ['subrace missing -> both ABSENT', basePlayerStats({ race: { name: 'Goliath', traits: [] }, proficiency: 3 }), { stonesEnduranceUses: ABSENT, stormsThunderUses: ABSENT }],
+      ['race missing -> all ABSENT', basePlayerStats(), { stonecunningUses: ABSENT, stonesEnduranceUses: ABSENT, stormsThunderUses: ABSENT }],
+      ['trait present, proficiency undefined -> 0 (|| 0, owner keeps key)', basePlayerStats({ race: { name: 'Dwarf', traits: [stonecunningDisk] } }), { stonecunningUses: { current: 0, max: 0 } }],
     ];
     for (const [label, stats, expected] of rows) expectPools(stats, Object.keys(expected), expected, label);
   });

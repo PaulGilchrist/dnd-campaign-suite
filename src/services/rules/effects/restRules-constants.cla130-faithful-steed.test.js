@@ -151,7 +151,20 @@ describe('CLA-130 Faithful Steed free-cast latch rest-lane contract', () => {
     vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
       key === STEED_LATCH ? 0 : undefined);
 
-    await applyLongRest(makeStats(), CAMPAIGN);
+    // improve ghost-keys: two latches on the LR list are GATED owned-only
+    // seeds (_Star_Map_freeCastCount, _Steps_of_the_Fey_freeCastCount —
+    // trackedResources.js GATED_TRACKED_KEYS). The batch skips them for
+    // characters that do not carry them in `_trackedResources`; this
+    // fixture registers the owner state so the CLA-130 full-family proof
+    // still fires. Non-owner skip arms are pinned in restRules-longRest
+    // .test.js; every other latch keeps the unconditional fan-out.
+    await applyLongRest({
+      ...makeStats(),
+      _trackedResources: {
+        _Star_Map_freeCastCount: { current: 2, max: 2 },
+        _Steps_of_the_Fey_freeCastCount: { current: 1, max: 1 },
+      },
+    }, CAMPAIGN);
 
     const diskKeys = [...freeCastLatchKeys(classes5e), ...freeCastLatchKeys(classes2024)];
     // CLA-130 family floor: Faithful Steed, Contact Patron, Misty Wanderer,

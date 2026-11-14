@@ -60,6 +60,7 @@ vi.mock('../character/classFeatures.js', () => ({
 import { getClassFeatures } from '../character/classFeatures.js';
 import {
   ALL_TRACKED_RESOURCES,
+  GATED_TRACKED_KEYS,
   computeTrackedResources,
   applyServerOverride,
   trackedResourcesToStoreEntries,
@@ -88,7 +89,7 @@ function expectPool(stats, key, expected, label) {
 // ── public surface ──────────────────────────────────────────────
 
 describe('ALL_TRACKED_RESOURCES (registry golden)', () => {
-  it('is the exact 62-key registry, byte-for-byte, in declaration order', () => {
+  it('is the exact 60-key registry, byte-for-byte, in declaration order', () => {
     expect(ALL_TRACKED_RESOURCES).toEqual([
       'currentHitPoints',
       'hitPoints',
@@ -99,10 +100,12 @@ describe('ALL_TRACKED_RESOURCES (registry golden)', () => {
       'channelDivinityCharges',
       'bardicInspirationUses',
       'wildShapeUses',
+      // improve ghost-keys (case-dup pass): the legacy lower-case twins
+      // 'secondwindUses'/'actionsurgeUses' are RETIRED (were intentional
+      // under the old seed; camelCase is the single canonical casing —
+      // see trackedResources.js catalog note).
       'secondWindUses',
-      'secondwindUses', // legacy casing twin — intentional, never retyped
       'actionSurgeUses',
-      'actionsurgeUses', // legacy casing twin — intentional
       'actionSurgeUsedThisRound',
       'ragePoints',
       'layOnHandsPool',
@@ -194,11 +197,12 @@ describe('computeTrackedResources', () => {
     expect(computeTrackedResources(basePlayerStats({ level: 1 })).hitPoints).toEqual({ current: 0, max: 0 });
   });
 
-  it('registry Venn both directions: every adder seeds a registry key; declared exceptions are the documented latch sets', () => {
-    // Kitchen-sink fixture exercises every adder (class-agnostic adders seed 0
-    // unconditionally — except the three gated pool keys, seeded owned-only per
-    // the CLA-364 idiom — so one warlock-with-arcanum fixture reaches all of
-    // them).
+  it('registry Venn both directions: owned-only seeds; declared exceptions are the documented latch sets', () => {
+    // Kitchen-sink fixture exercises the Warlock adders. improve
+    // ghost-keys (ownership pass): class-agnostic adders NO LONGER seed
+    // 0-ghosts — every STATICALLY_OWNABLE key appears only for its owner
+    // (GATED_TRACKED_KEYS), so this Fiend-patron Warlock compute yields the
+    // universal core lane + its owned Warlock/Fiend keys and nothing else.
     getClassFeatures.mockReturnValue({ arcanumLevels: { level6: 1, level7: 1, level8: 1, level9: 1 } });
     const result = computeTrackedResources(basePlayerStats({
       class: wizardClass({ name: 'Warlock', major: { name: 'Fiend' } }),
@@ -211,23 +215,31 @@ describe('computeTrackedResources', () => {
     const registryOnly = ALL_TRACKED_RESOURCES.filter((k) => !(k in result)).sort();
 
     // Computed but absent from registry (reported quirk: harmless today because
-    // applyServerOverride only consults the registry for server-only keys):
-    expect(computedOnly).toEqual(['_Star_Map_freeCastCount', 'darkOnesLuckUses']);
-    // Registry keys never seeded here — handler/exec-owned latches, restored by
-    // restRules seams, plus the conditionally-seeded pool keys (improve
-    // tracked-resource-ghost-keys: healinglightPool/preserveLifePool/
-    // layOnHandsPool are now owned-only, CLA-364 idiom; this fixture is a
-    // Fiend-patron Warlock, so none of the three is owned):
-    expect(registryOnly).toEqual([
+    // applyServerOverride only consults the registry for server-only keys).
+    // _Star_Map_freeCastCount is no longer computed here — Stars-owned only now:
+    expect(computedOnly).toEqual(['darkOnesLuckUses']);
+
+    // Registry keys absent from this compute = every GATED key the fixture
+    // does NOT own, plus the handler/exec-owned latches that are NEVER
+    // seeded (restored by restRules seams). Exact seeded set for this
+    // fixture: the 12 universal core keys + warlockPactMagic + the four
+    // Mystic Arcanum levels (Fiend grants no arcanum-free cast here).
+    const UNSEEDED_LATCHES = [
       'actionSurgeUsedThisRound',
       'dreadambushUses',
-      'healinglightPool',
       'isDead',
-      'layOnHandsPool',
-      'preserveLifePool',
       'rageOfTheGodsUses',
       'tamedSurgeUses',
-    ]);
+    ];
+    const expectRegistryOnly = ALL_TRACKED_RESOURCES.filter(
+      (k) => (GATED_TRACKED_KEYS.includes(k) && k !== 'warlockPactMagic' && !k.startsWith('mysticArcanum'))
+        || UNSEEDED_LATCHES.includes(k),
+    ).sort();
+    expect(registryOnly).toEqual(expectRegistryOnly);
+    // Every gated key listed above is genuinely unowned by this fixture
+    // (no accidental gate-open), and the universal core lane is fully seeded:
+    expect(result).toHaveProperty('warlockPactMagic', { current: 0, max: 0 });
+    expect(result.darkOnesLuckUses).toEqual({ current: 1, max: 1 });
     // CLA-364: never seeded.
     expect(result.tranceOfOrderUses).toBeUndefined();
   });
@@ -289,11 +301,12 @@ describe('computeTrackedResources', () => {
       uncannymetabolismUses: { current: 2, max: 2 },
     });
 
-    // features undefined (getClassFeatures returns undefined) -> same keys at 0, no throw.
+    // features undefined (getClassFeatures returns undefined) -> the
+    // feature-owned keys are ABSENT (owned-only pass, GATED_TRACKED_KEYS).
     getClassFeatures.mockReturnValue(undefined);
     const zeroed = computeTrackedResources(basePlayerStats());
-    expect(zeroed.sorceryPoints).toEqual({ current: 0, max: 0 });
-    expect(zeroed.innateSorceryUses).toEqual({ current: 0, max: 0 });
+    expect(zeroed).not.toHaveProperty('sorceryPoints');
+    expect(zeroed).not.toHaveProperty('innateSorceryUses');
   });
 
   it('focusPoints and kiPoints mirror each other; class_levels row wins over features fallback', () => {
@@ -311,32 +324,40 @@ describe('computeTrackedResources', () => {
     expect(result.kiPoints).toEqual({ current: 4, max: 4 });
   });
 
-  it('fighter 5e: secondWind/actionSurge + casing twins read the EXACT-level class_levels row', () => {
+  it('fighter 5e: secondWind/actionSurge read the EXACT-level class_levels row; the lower-case twins are NEVER seeded (case-dup retired)', () => {
     const fighter = (classLevels) => basePlayerStats({
       rules: '5e', level: 7, class: wizardClass({ name: 'Fighter', class_levels: classLevels }),
     });
     const match = [{ level: 7, second_wind: 1, class_specific: { action_surges: 2 } }];
     const result = computeTrackedResources(fighter(match));
     expect({
-      sw: result.secondWindUses, sww: result.secondwindUses,
-      as: result.actionSurgeUses, asw: result.actionsurgeUses,
+      sw: result.secondWindUses,
+      as: result.actionSurgeUses,
     }).toEqual({
-      sw: { current: 1, max: 1 }, sww: { current: 1, max: 1 },
-      as: { current: 2, max: 2 }, asw: { current: 2, max: 2 },
+      sw: { current: 1, max: 1 },
+      as: { current: 2, max: 2 },
     });
+    // CRITERION 1: no case-variant duplicate rides the bucket — the legacy
+    // feature-name-derived twin seed is gone (case-insensitive dedupe: the
+    // camelCase automation-id casing is the canonical survivor).
+    expect(result).not.toHaveProperty('secondwindUses');
+    expect(result).not.toHaveProperty('actionsurgeUses');
+    expect(ALL_TRACKED_RESOURCES).not.toContain('secondwindUses');
+    expect(ALL_TRACKED_RESOURCES).not.toContain('actionsurgeUses');
 
-    // level-3 row must NOT satisfy a level-7 query.
+    // level-3 row must NOT satisfy a level-7 query — unowned data -> ABSENT,
+    // not a 0-ghost (owned-only pass).
     const miss = computeTrackedResources(fighter([{ level: 3, second_wind: 1, class_specific: { action_surges: 2 } }]));
-    expect(miss.secondWindUses).toEqual({ current: 0, max: 0 });
-    expect(miss.actionSurgeUses).toEqual({ current: 0, max: 0 });
+    expect(miss).not.toHaveProperty('secondWindUses');
+    expect(miss).not.toHaveProperty('actionSurgeUses');
   });
 
-  it('fighter 2024: actionSurge ladder 17->2, 2->1, <2->0; non-fighter 0', () => {
+  it('fighter 2024: actionSurge ladder 17->2, 2->1, <2 ABSENT; non-fighter ABSENT', () => {
     const f = (lvl, name = 'Fighter') => basePlayerStats({ rules: '2024', level: lvl, class: wizardClass({ name }) });
     expect(computeTrackedResources(f(17)).actionSurgeUses).toEqual({ current: 2, max: 2 });
     expect(computeTrackedResources(f(2)).actionSurgeUses).toEqual({ current: 1, max: 1 });
-    expect(computeTrackedResources(f(1)).actionSurgeUses).toEqual({ current: 0, max: 0 });
-    expect(computeTrackedResources(f(17, 'Wizard')).actionSurgeUses).toEqual({ current: 0, max: 0 });
+    expect(computeTrackedResources(f(1))).not.toHaveProperty('actionSurgeUses');
+    expect(computeTrackedResources(f(17, 'Wizard'))).not.toHaveProperty('actionSurgeUses');
   });
 
   it('ragePoints: 5e class_specific.rage_count, 2024 rages, 2024-missing 0, non-barbarian 0', () => {
@@ -351,9 +372,9 @@ describe('computeTrackedResources', () => {
     result = computeTrackedResources(basePlayerStats({
       rules: '2024', class: wizardClass({ name: 'Barbarian', class_levels: [{ level: 5 }] }),
     }));
-    expect(result.ragePoints).toEqual({ current: 0, max: 0 });
+    expect(result).not.toHaveProperty('ragePoints'); // owned-only: 0-rage data rows seed no ghost
     result = computeTrackedResources(basePlayerStats({ class: wizardClass({ name: 'Cleric' }) }));
-    expect(result.ragePoints).toEqual({ current: 0, max: 0 });
+    expect(result).not.toHaveProperty('ragePoints'); // non-Barbarian ABSENT
   });
 
   it('superiorityDice: FS-010 single source — Battle Master 5e ladder / 2024 dice field / Superior Technique style 1 / non-fighter 0', () => {
@@ -375,7 +396,7 @@ describe('computeTrackedResources', () => {
     expect(computeTrackedResources(bm('5e', 11)).superiorityDice).toEqual({ current: 5, max: 5 });
     expect(computeTrackedResources(bm('5e', 16)).superiorityDice).toEqual({ current: 6, max: 6 });
     expect(computeTrackedResources(bm('2024', 5, { superiority_dice: 5 })).superiorityDice).toEqual({ current: 5, max: 5 });
-    expect(computeTrackedResources(bm('2024', 5, { superiority_dice: 0 })).superiorityDice).toEqual({ current: 0, max: 0 });
+    expect(computeTrackedResources(bm('2024', 5, { superiority_dice: 0 }))).not.toHaveProperty('superiorityDice');
     // 2024 disk ladder BY-level census agrees with the 5e fallback shape:
     // superiority_dice column is 4 (lv3-6), 5 (lv7-14), 6 (lv15-20).
     const f2024 = classes2024.find((c) => c.name === 'Fighter');
@@ -390,17 +411,17 @@ describe('computeTrackedResources', () => {
     expect(bm5e.description).toContain('You have four superiority dice, which are d8s');
     expect(bm5e.description).toContain('You gain another superiority die at 7th level and one more at 15th level.');
     expect(bm5e.description).not.toMatch(/at 11th level and one more at 17th level/);
-    // 2024 BM with no class_levels row -> classLevel undefined -> 0 (no crash)
+    // 2024 BM with no class_levels row -> classLevel undefined -> ABSENT (no crash)
     expect(computeTrackedResources(basePlayerStats({
       rules: '2024', class: wizardClass({ name: 'Fighter', major: { name: 'Battle Master' } }),
-    })).superiorityDice).toEqual({ current: 0, max: 0 });
+    }))).not.toHaveProperty('superiorityDice');
     // non-Battle-Master fighter WITH the Superior Technique style -> exactly 1
     expect(computeTrackedResources(basePlayerStats({
       class: wizardClass({ name: 'Fighter', major: { name: 'Champion' }, fightingStyles: ['Superior Technique'] }),
     })).superiorityDice).toEqual({ current: 1, max: 1 });
     expect(computeTrackedResources(basePlayerStats({
       class: wizardClass({ name: 'Wizard', major: { name: 'Champion' } }),
-    })).superiorityDice).toEqual({ current: 0, max: 0 });
+    }))).not.toHaveProperty('superiorityDice');
   });
 
   it('warlockPactMagic: 5e class_specific.pact_slots, 2024 pact_slot_levels, missing row 0, non-warlock 0', () => {
@@ -415,9 +436,9 @@ describe('computeTrackedResources', () => {
     result = computeTrackedResources(basePlayerStats({
       rules: '2024', class: wizardClass({ name: 'Warlock', class_levels: [{ level: 5 }] }),
     }));
-    expect(result.warlockPactMagic).toEqual({ current: 0, max: 0 });
+    expect(result.warlockPactMagic).toEqual({ current: 0, max: 0 }); // owner data-hole keeps the row
     result = computeTrackedResources(basePlayerStats());
-    expect(result.warlockPactMagic).toEqual({ current: 0, max: 0 });
+    expect(result).not.toHaveProperty('warlockPactMagic'); // non-warlock ABSENT
   });
 
   it('mysticArcanum keys appear ONLY when BOTH warlock AND features.arcanumLevels (absence half; presence owned by Additional)', () => {
@@ -436,23 +457,25 @@ describe('computeTrackedResources', () => {
     const rows = [
       ['bard CHA 3', basePlayerStats({ class: wizardClass({ name: 'Bard' }), abilities: [{ name: 'Charisma', bonus: 3 }] }), 'bardicInspirationUses', { current: 3, max: 3 }],
       ['bard no CHA entry', basePlayerStats({ class: wizardClass({ name: 'Bard' }) }), 'bardicInspirationUses', { current: 0, max: 0 }],
-      ['bard gate: non-bard with CHA', basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }] }), 'bardicInspirationUses', { current: 0, max: 0 }],
+      // GATED (owned-only pass): the key itself is Bard-owned — non-bards get
+      // no row at all (was a `: 0` ghost).
+      ['bard gate: non-bard with CHA -> ABSENT', basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }] }), 'bardicInspirationUses', undefined],
       ['paladin lvl 5 = 25', basePlayerStats({ class: wizardClass({ name: 'Paladin' }), level: 5 }), 'layOnHandsPool', { current: 25, max: 25 }],
       ['paladin level undefined = 0', basePlayerStats({ class: wizardClass({ name: 'Paladin' }), level: undefined }), 'layOnHandsPool', { current: 0, max: 0 }],
       // Gated (improve tracked-resource-ghost-keys, CLA-364 idiom): the key is
       // ABSENT for non-paladins — no `layOnHandsPool: 0` ghost row.
       ['paladin gate: non-paladin lvl 5 -> key ABSENT', basePlayerStats({ class: wizardClass({ name: 'Sorcerer' }) }), 'layOnHandsPool', undefined],
       ['cleric lvl 10 boundary = 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), level: 10 }), 'divineInterventionUses', { current: 1, max: 1 }],
-      ['cleric lvl 9 = 0', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), level: 9 }), 'divineInterventionUses', { current: 0, max: 0 }],
-      ['cleric gate: wizard lvl 15', basePlayerStats({ level: 15 }), 'divineInterventionUses', { current: 0, max: 0 }],
+      ['cleric lvl 9 -> ABSENT (feature grant is lv10)', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), level: 9 }), 'divineInterventionUses', undefined],
+      ['cleric gate: wizard lvl 15 -> ABSENT', basePlayerStats({ level: 15 }), 'divineInterventionUses', undefined],
       ['monk lvl 6 boundary = 1', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 6 }), 'wholenessofbodyUses', { current: 1, max: 1 }],
-      ['monk lvl 5 = 0', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 5 }), 'wholenessofbodyUses', { current: 0, max: 0 }],
+      ['monk lvl 5 -> ABSENT (feature grant is lv6)', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 5 }), 'wholenessofbodyUses', undefined],
       ['warPriest WIS 3', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), abilities: [{ name: 'Wisdom', bonus: 3 }] }), 'warPriestUses', { current: 3, max: 3 }],
       ['warPriest WIS -2 clamps to 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), abilities: [{ name: 'Wisdom', bonus: -2 }] }), 'warPriestUses', { current: 1, max: 1 }],
       ['warPriest cleric no WIS entry -> 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }) }), 'warPriestUses', { current: 1, max: 1 }],
-      // GATED (fix#336S flip of the #1531 reported quirk): warPriestUses is a cleric
-      // pool — non-clerics now seed 0, no phantom {1,1} default.
-      ['warPriest gate: wizard, no WIS -> 0', basePlayerStats(), 'warPriestUses', { current: 0, max: 0 }],
+      // GATED (fix#336S value gate widened to a KEY gate by the owned-only
+      // pass): warPriestUses is a cleric pool — non-clerics carry no row.
+      ['warPriest gate: wizard, no WIS -> ABSENT', basePlayerStats(), 'warPriestUses', undefined],
     ];
     for (const [label, stats, key, expected] of rows) expectPool(stats, key, expected, label);
   });
@@ -461,11 +484,11 @@ describe('computeTrackedResources', () => {
     const rows = [
       ['Lucky feat prof 3', { feats: ['Lucky'], proficiency: 3 }, { current: 3, max: 3 }],
       ['lowercase lucky prof 4', { feats: ['lucky'], proficiency: 4 }, { current: 4, max: 4 }],
-      ['other feat', { feats: ['Alert'] }, { current: 0, max: 0 }],
+      ['other feat -> ABSENT (owned-only)', { feats: ['Alert'] }, undefined],
       ['Lucky, proficiency undefined', { feats: ['Lucky'], proficiency: undefined }, { current: 0, max: 0 }],
-      ['feats null', { feats: null }, { current: 0, max: 0 }],
-      ['feats undefined', { feats: undefined }, { current: 0, max: 0 }],
-      ['null/undefined entries inside feats', { feats: [null, 'Alert', undefined] }, { current: 0, max: 0 }],
+      ['feats null -> ABSENT', { feats: null }, undefined],
+      ['feats undefined -> ABSENT', { feats: undefined }, undefined],
+      ['null/undefined entries inside feats -> ABSENT', { feats: [null, 'Alert', undefined] }, undefined],
     ];
     for (const [label, extra, expected] of rows) expectPool(basePlayerStats(extra), 'luckyPoints', expected, label);
   });
@@ -474,8 +497,8 @@ describe('computeTrackedResources', () => {
     const psiClass = (major, subclass, classLevels) => wizardClass({ name: 'Fighter', major: major || {}, subclass: subclass || {}, class_levels: classLevels || [] });
     const rows = [
       ['resource_restoration passive', basePlayerStats({ automation: { passives: [{ type: 'resource_restoration' }] } }), 'sorcerousRestorationUses', { current: 1, max: 1 }],
-      ['other passive', basePlayerStats({ automation: { passives: [{ type: 'other_type' }] } }), 'sorcerousRestorationUses', { current: 0, max: 0 }],
-      ['no automation object', basePlayerStats(), 'sorcerousRestorationUses', { current: 0, max: 0 }],
+      ['other passive -> ABSENT', basePlayerStats({ automation: { passives: [{ type: 'other_type' }] } }), 'sorcerousRestorationUses', undefined],
+      ['no automation object -> ABSENT', basePlayerStats(), 'sorcerousRestorationUses', undefined],
     ];
     for (const [label, stats, key, expected] of rows) expectPool(stats, key, expected, label);
 
@@ -485,9 +508,9 @@ describe('computeTrackedResources', () => {
     const psi = (stats) => computeTrackedResources(stats).psionicEnergy;
     expect(psi(energyRow({ name: 'Psi Warrior' }, {}, { required_major: 'Psi Warrior', energy_die_num: 3 }))).toEqual({ current: 3, max: 3 });
     expect(psi(energyRow({}, { name: 'Psi Warrior' }, { required_major: 'Psi Warrior', energy_die_num: 2 }))).toEqual({ current: 2, max: 2 });
-    expect(psi(energyRow({ name: 'Champion' }, {}, { required_major: 'Psi Warrior', energy_die_num: 3 }))).toEqual({ current: 0, max: 0 });
-    expect(psi(basePlayerStats({ class: psiClass({ name: 'Psi Warrior' }) }))).toEqual({ current: 0, max: 0 });
-    expect(psi(energyRow({ name: 'Psi Warrior' }, {}, { required_major: 'Psi Warrior' }))).toEqual({ current: 0, max: 0 });
+    expect(psi(energyRow({ name: 'Champion' }, {}, { required_major: 'Psi Warrior', energy_die_num: 3 }))).toBeUndefined();
+    expect(psi(basePlayerStats({ class: psiClass({ name: 'Psi Warrior' }) }))).toBeUndefined();
+    expect(psi(energyRow({ name: 'Psi Warrior' }, {}, { required_major: 'Psi Warrior' }))).toBeUndefined();
   });
 });
 
