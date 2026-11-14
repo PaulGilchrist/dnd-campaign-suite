@@ -90,8 +90,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before the admin clears 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 JA — inverted tracked-resource fraction even pre-bug.** The sheet badge renders `95/65 (cur/max)` verbatim whenever stored > derived max; even with the PT#2 clamp fix, consider a defensive `Math.min(current,max)` DISPLAY layer in `CharSummary`/`TrackedResourceInput` so no future producer can ever show an impossible fraction (belt-and-braces separate from the resolveCurrent fix).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Designer TRIM-DROPPED live face — accept the unit pin (`designer.plan-scope.test.js`) unless a scripted-model rig ships (carried).
