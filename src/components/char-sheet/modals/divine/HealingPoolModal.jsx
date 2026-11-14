@@ -133,7 +133,7 @@ function HealingApplySection({ resolvedTargetName, targetCurrentHp, targetMaxHp,
                             const raw = Number(e.target.value);
                             setHealAmount(raw >= 0 ? raw : 0);
                         }}
-                        style={{ width: '62px', marginLeft: '6px' }}
+                        className="healing-amount-input"
                     />
                 </label>
                 <button className="char-btn" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0 || (bloodiedOnly && !isTargetBloodied) || noHealCapacity}>
@@ -220,11 +220,11 @@ function HealingDiceSection({ resolvedTargetName, targetCurrentHp, targetMaxHp, 
                 </p>
             )}
             {rolledFaces.length > 0 && (
-                <div className="healing-roll-details" style={{ marginTop: '8px' }}>
+                <div className="healing-roll-details healing-roll-details-spaced">
                     <span className="healing-formula">Rolled {rolledFaces.length}d{dieType}: </span>
                     <span className="healing-dice-rolled">{rolledFaces.join(' + ')}</span>
                     <span className="healing-total"> = <strong>{restorableTotal}</strong> HP to restore</span>
-                    <div style={{ marginTop: '4px', fontSize: '0.9em', color: '#888' }}>
+                    <div className="healing-roll-remaining">
                         Remaining: {safePool} dice
                     </div>
                 </div>
@@ -274,7 +274,7 @@ function HealingPoolMain({ loading, safePool, safeMax, isDicePool, dieType, reso
             <h3 id="healing-pool-modal-title"><i className="fas fa-hands-helping"></i> {featureName}</h3>
 
             {loading && (
-                <div className="short-rest-section" style={{ textAlign: 'center', padding: '1em' }}>
+                <div className="short-rest-section healing-loading-row">
                     <i className="fas fa-spinner fa-spin"></i> Loading...
                 </div>
             )}

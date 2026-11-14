@@ -90,7 +90,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before the admin clears 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 JA — inline styles in the healing modal family (project rule: NEVER use inline styles).** `HealingPoolModal.jsx` renders the amount input with `style={{ width: '62px', marginLeft: '6px' }}` (~:136) and the dice-roll details block with `style={{ marginTop: '8px' }}` / inner `style={{ marginTop: '4px', fontSize: '0.9em', color: '#888' }}` (~:222-230), plus `HealingPoolMain` `style={{ textAlign: 'center', padding: '1em' }}` loading row — move to CharSheet.css classes (the sheet already owns `.healing-restriction-note`/`.short-rest-*` conventions). Non-blocking, hygiene-only.
 - **2026-11-14 JA — inverted tracked-resource fraction even pre-bug.** The sheet badge renders `95/65 (cur/max)` verbatim whenever stored > derived max; even with the PT#2 clamp fix, consider a defensive `Math.min(current,max)` DISPLAY layer in `CharSummary`/`TrackedResourceInput` so no future producer can ever show an impossible fraction (belt-and-braces separate from the resolveCurrent fix).
 
 ## Blocked / Not Verified (fold-gate ledger)

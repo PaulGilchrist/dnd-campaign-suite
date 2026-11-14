@@ -126,6 +126,18 @@
     font-size: 0.95em;
     line-height: 1.6;
 }
+/* Dice-lane spacing modifier (HealingPoolModal only — the Hand of Healing
+   roll block sits directly under its h4 and must keep the unspaced base). */
+.healing-roll-details-spaced {
+    margin-top: 8px;
+}
+/* Pool-remaining line under the dice roll summary — was an inline style
+   (backlog 2026-11-14 JA inline-styles hygiene). */
+.healing-roll-remaining {
+    margin-top: 4px;
+    font-size: 0.9em;
+    color: #888;
+}
 .healing-formula {
     color: var(--color-header-inner);
 }
@@ -157,6 +169,17 @@
     gap: 8px;
     flex-wrap: wrap;
     margin-top: 8px;
+}
+/* Lay On Hands amount input — was an inline style (backlog 2026-11-14 JA). */
+.healing-amount-input {
+    width: 62px;
+    margin-left: 6px;
+}
+/* Combat-context loading row in the healing pool modal — was an inline style
+   (backlog 2026-11-14 JA). */
+.healing-loading-row {
+    text-align: center;
+    padding: 1em;
 }
 .cure-btn-active {
     background-color: var(--color-header) !important;
