@@ -64,7 +64,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before the admin clears;
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (LC 2026-11-14) `hp_change` from the GM initiative card carries `sourceName:"GM HP override"` but the sheet-editor lane writes `hp_change` with NO sourceName — two indistinguishable manual-edit row families in the log; stamp a source (`"sheet editor"`) on the CharHitPoints lane.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

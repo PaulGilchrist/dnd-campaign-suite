@@ -29,6 +29,10 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
               addEntry(campaignName, {
                   type: 'hp_change',
                   targetName: playerStats.name,
+                  // Mirrors the GM initiative card's 'GM HP override' stamp
+                  // (createCreatureHandlers.logManualHpOverride) so the two
+                  // manual-edit row families are distinguishable in the log.
+                  sourceName: 'sheet editor',
                   delta,
                   currentHp: value,
                   maxHp: effectiveMaxHp,

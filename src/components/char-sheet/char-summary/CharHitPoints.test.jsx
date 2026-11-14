@@ -104,6 +104,9 @@ describe('CharHitPoints', () => {
         expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
           type: 'hp_change',
           targetName: NAME,
+          // Manual sheet-editor lane stamp (LCImprovement: mirrors the GM
+          // card's 'GM HP override' so the row families are distinguishable).
+          sourceName: 'sheet editor',
           delta,
           isHealing,
           isUnconscious,
@@ -155,6 +158,7 @@ describe('CharHitPoints', () => {
     expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
       type: 'hp_change',
       targetName: NAME,
+      sourceName: 'sheet editor',
       delta: -10,
       isUnconscious: true,
     }));
