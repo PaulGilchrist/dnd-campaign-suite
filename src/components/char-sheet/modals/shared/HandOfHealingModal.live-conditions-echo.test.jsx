@@ -205,10 +205,12 @@ describe('HandOfHealingModal - Physician\'s Touch activeConditions echo + commit
 
   describe('commit-time presence guard (stale-button race)', () => {
     it('pressing a button whose condition vanished since render refuses: zero write, zero log row, inline note', async () => {
-      // Both options arrive via the combat-summary lane, which the section
-      // merges at open but never subscribes to (cs read stays as-is by
-      // design) — a deterministic way to hold genuinely stale buttons across
-      // the click with zero runtime-curables left after the refusal.
+      // Both options arrive via the combat-summary lane, which the section now
+      // subscribes (KB 2026-11-14 cs-row echo) — but a stale button is still
+      // deterministically held across the click by mutating the board the
+      // commit-time re-read sees WITHOUT issuing the store echo that would
+      // wake a re-render (the pre-echo click race). Zero runtime-curables
+      // left after the refusal.
       const csBoard = { creatures: [{ name: MONK }, { name: VICTIM, conditions: [{ key: 'blinded' }, { key: 'stunned' }] }] };
       combatData.getCombatSummary.mockReturnValue(csBoard);
       echoBucket({ currentHitPoints: 96, activeConditions: [] });

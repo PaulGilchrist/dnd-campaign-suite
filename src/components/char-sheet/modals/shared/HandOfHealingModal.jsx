@@ -99,6 +99,16 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
     // ledger honest for the click-before-echo race.
     useRuntimeValue(targetName, 'activeConditions', campaignName)
 
+    // KB 2026-11-14 (cs-row echo): the merge in getTargetConditions also reads
+    // the combat-summary creature row, which previously woke nothing — a
+    // cs-side cure left a stale Remove button until some other render. The SSE
+    // adoption (App.jsx handleChangeKeyEvent) first refreshes the combatData
+    // cache the merge reads, then replaceObject-notifies the 'combatSummary'
+    // store, so subscribing its 'creatures' key re-renders the list after the
+    // cache already carries the new board (same wake-vs-read order the bucket
+    // subscription above gives activeConditions).
+    useRuntimeValue('combatSummary', 'creatures', campaignName)
+
     const removeCondition = useCallback((conditionName) => {
         const conditions = getTargetConditions(targetName, campaignName);
         const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), conditionName.toLowerCase()));
