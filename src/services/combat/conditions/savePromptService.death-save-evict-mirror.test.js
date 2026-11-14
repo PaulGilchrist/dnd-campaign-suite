@@ -8,8 +8,14 @@
 // lanes: the campaign-select seed ('campaign' store) and the live
 // change-echo bucket (character-style store named after the full key).
 // Absent on BOTH ⇒ zero fetch; present on EITHER ⇒ the DELETE proceeds
-// (real evict never skipped). Transport bytes stay owned by
-// savePromptService.test.js — this file pins the gate only.
+// (real evict never skipped). The response leg then EVICTS both mirror lanes
+// on any server-confirmed answer (2xx removed / 404 never there), so the
+// double-sweep face — the ghost bucket surviving a real arm+resolve because
+// the null-echo lane drops non-campaign-key clears — fires its DELETEs at
+// most once per client, never on every later clear-leg. Refused/network-
+// failed answers keep the mirror (retry, never a silent miss). Transport
+// bytes stay owned by savePromptService.test.js — this file pins the gate
+// and the eviction.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import {
@@ -17,7 +23,9 @@ import {
   clearDeathSavePrompt,
 } from './savePromptService.js';
 import {
+  getAllStoreKeys,
   getStore,
+  hasRuntimeValue,
   setRuntimeObject,
   clearRuntimeState,
 } from '../../../hooks/runtime/useRuntimeState.js';
@@ -92,14 +100,72 @@ describe('clearDeathSavePrompt — mirror-existence gate', () => {
     expect(clearFetchCalls()[0][0]).toBe(`/api/campaigns/${CAMPAIGN}/${KEY}`);
   });
 
-  it('leaves a stale-positive mirror survivor DELETEing (honest double-sweep 404 face preserved, never a silent miss)', () => {
-    // Null-echo lane drops non-campaign-key clears, so an evicted ghost
-    // bucket survives in the mirror; the gate then replays today's behavior
-    // (DELETE → server's honest 404) instead of guessing at server truth.
+  it('evicts the echo-bucket ghost after a confirmed DELETE (real arm+resolve): a later clear-leg sends nothing', async () => {
+    // The double-sweep face (backlog LC 2026-11-14): the resolve trio's prompt
+    // DELETE succeeds but its null echo is dropped for non-campaign keys, so
+    // the ghost bucket used to survive and EVERY later clear-leg (sheet roll
+    // press, GM-card revive) re-DELETEd the dead key → one honest 404 each.
+    setRuntimeObject(KEY, { promptId: 'armed', targetName: TARGET }, CAMPAIGN, true);
+
+    clearDeathSavePrompt(CAMPAIGN, TARGET); // resolve leg — DELETE proceeds
+    expect(clearFetchCalls()).toHaveLength(1);
+
+    await vi.waitFor(() =>
+      expect(getAllStoreKeys()).not.toContain(KEY)); // server answered ⇒ ghost evicted
+
+    clearDeathSavePrompt(CAMPAIGN, TARGET); // later leg — mirror-absent gate
+    expect(clearFetchCalls()).toHaveLength(1); // still exactly one request
+  });
+
+  it('evicts BOTH mirror lanes (campaign-select seed + echo bucket) on a confirmed DELETE', async () => {
+    getStore('campaign').set(KEY, { promptId: 'seeded', targetName: TARGET });
+    setRuntimeObject(KEY, { promptId: 'seeded', targetName: TARGET }, CAMPAIGN, true);
+
+    clearDeathSavePrompt(CAMPAIGN, TARGET);
+    expect(clearFetchCalls()).toHaveLength(1);
+
+    await vi.waitFor(() =>
+      expect(hasRuntimeValue('campaign', KEY)).toBe(false));
+    expect(getAllStoreKeys()).not.toContain(KEY);
+  });
+
+  it('evicts on an honest 404 (cross-tab survivor): the second clear-leg is silent', async () => {
+    // A passive tab's ghost never saw the resolve; its first clear-leg probes
+    // and the server's honest 404 answers "absent" — evict, no re-probe.
+    globalThis.fetch.mockResolvedValueOnce({ ok: false, status: 404 });
     setRuntimeObject(KEY, { promptId: 'gone', targetName: TARGET }, CAMPAIGN, true);
 
     clearDeathSavePrompt(CAMPAIGN, TARGET);
-
     expect(clearFetchCalls()).toHaveLength(1);
+
+    await vi.waitFor(() =>
+      expect(getAllStoreKeys()).not.toContain(KEY));
+
+    clearDeathSavePrompt(CAMPAIGN, TARGET);
+    expect(clearFetchCalls()).toHaveLength(1);
+  });
+
+  it('keeps the mirror on a refused eviction (403) — a real evict is never silently skipped', async () => {
+    globalThis.fetch.mockResolvedValueOnce({ ok: false, status: 403 });
+    setRuntimeObject(KEY, { promptId: 'pending', targetName: TARGET }, CAMPAIGN, true);
+
+    clearDeathSavePrompt(CAMPAIGN, TARGET);
+    await Promise.resolve();
+    await Promise.resolve(); // let the (non-evicting) response leg settle
+
+    expect(getAllStoreKeys()).toContain(KEY);
+    clearDeathSavePrompt(CAMPAIGN, TARGET); // retried until the server confirms
+    expect(clearFetchCalls()).toHaveLength(2);
+  });
+
+  it('keeps the mirror when the DELETE never reaches the server (network rejection)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    globalThis.fetch.mockRejectedValueOnce(new Error('offline'));
+    setRuntimeObject(KEY, { promptId: 'pending', targetName: TARGET }, CAMPAIGN, true);
+
+    clearDeathSavePrompt(CAMPAIGN, TARGET);
+    await vi.waitFor(() => expect(errSpy).toHaveBeenCalled());
+
+    expect(getAllStoreKeys()).toContain(KEY); // retryable, not guessed absent
   });
 });

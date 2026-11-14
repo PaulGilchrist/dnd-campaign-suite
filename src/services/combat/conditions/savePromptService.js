@@ -1,4 +1,10 @@
-import { getAllStoreKeys, hasRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import {
+  clearRuntimeState,
+  getAllStoreKeys,
+  getStore,
+  hasRuntimeValue,
+  notify,
+} from '../../../hooks/runtime/useRuntimeState.js';
 
 // Save prompts key per promptId (mirrors the concentration lane's multi-hit
 // collapse fix): back-to-back saves on one target stack as separate keys
@@ -86,11 +92,30 @@ function deathSavePromptKey(targetName) {
 // `change-<campaign>-deathSavePrompt-<Name>` value echo (not registered as a
 // campaign key, App.jsx applyStoreUpdate dispatches it to a character-style
 // bucket store named after the full key). Present on either lane ⇒ the server
-// holds (or held) the key; a stale survivor (the shared null-echo lane drops
-// non-campaign-key clears, so an evicted ghost bucket is not swept) only ever
-// replays today's honest double-sweep 404 — never a missed real evict.
+// holds (or last reported holding) the key; evicted on every confirmed server
+// answer (see evictDeathSavePromptMirror) so a resolved prompt never replays
+// the double-sweep 404.
 function deathSavePromptInMirror(key) {
   return hasRuntimeValue('campaign', key) || getAllStoreKeys().includes(key);
+}
+
+// Evict BOTH mirror lanes for the prompt key. The shared null-echo lane only
+// mirrors clears for campaign keys (App.jsx handleChangeKeyEvent), so the
+// key-named echo bucket survives a DELETE untouched (ghost bucket) and every
+// later clear-leg re-DELETEd the dead key — one honest wildcard 404 each
+// (backlog LC 2026-11-14 double-sweep face). Same drain-to-evict doctrine as
+// deleteRuntimeKey's local delete + notify: once the server has answered the
+// DELETE (2xx ⇒ removed, 404 ⇒ never there) this client KNOWS the key is
+// absent, so drop the ghost instead of re-probing it. Refused/errored
+// responses never evict — a real evict is never silently skipped.
+function evictDeathSavePromptMirror(key) {
+  if (hasRuntimeValue('campaign', key)) {
+    getStore('campaign').delete(key);
+    notify('campaign');
+  }
+  if (getAllStoreKeys().includes(key)) {
+    clearRuntimeState(key);
+  }
 }
 
 export function sendDeathSavePrompt(campaignName, promptData) {
@@ -110,12 +135,22 @@ export function sendDeathSavePrompt(campaignName, promptData) {
 // never created — the wildcard DELETE's honest 404 (campaigns-changedata.js)
 // surfaced as console noise on every recovery. Same has()-guard doctrine as
 // deleteRuntimeKey's drain-to-evict ("no second DELETE, no honest-404 churn").
+// Mirror-gate alone still replayed a 404 once per client after a REAL
+// arm+resolve (the ghost bucket survives the resolve DELETE's dropped null
+// echo, LC 2026-11-14 double-sweep face), so the response leg now evicts the
+// ghost on any server-confirmed answer (2xx/404) — later clear-legs send
+// nothing. A non-confirming answer (403/423/5xx/network) keeps the mirror,
+// so a genuinely pending evict is retried, never silently skipped.
 export function clearDeathSavePrompt(campaignName, targetName) {
   const key = deathSavePromptKey(targetName);
   if (!deathSavePromptInMirror(key)) return;
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'DELETE',
-  }).catch((e) => { console.error("[savePromptService] Error:", e); });
+  })
+    .then((res) => {
+      if (res.ok || res.status === 404) evictDeathSavePromptMirror(key);
+    })
+    .catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function clearDeathSaveResult(campaignName, targetName) {
