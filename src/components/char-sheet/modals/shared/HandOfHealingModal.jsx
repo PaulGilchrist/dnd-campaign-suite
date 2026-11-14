@@ -158,7 +158,7 @@ function HandOfHealingResultStage({ healName, result, monkName, campaignName, ha
                     <div className="healing-roll-details">
                         <span className="healing-formula">{result.formula}: </span>
                         <span className="healing-dice-rolled">{rollValues.join(' + ')}</span>
-                        {result.bonus !== 0 && <span className="healing-bonus"> {result.bonus >= 0 ? '+' : ''}{result.bonus}</span>}
+                        {result.bonus !== 0 && <span className="healing-bonus"> {result.bonus >= 0 ? '+' : '-'} {Math.abs(result.bonus)}</span>}
                         {/* Ledger honesty (bug-hand-of-healing-modal-overstates-restored-hp):
                             the clamped actualHeal — HP really restored — is what the audit row
                             reports via healDesc, so the modal shows it too, never the raw roll. */}

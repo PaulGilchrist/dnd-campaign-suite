@@ -71,8 +71,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass: pass-1 clear, 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 EH — result-modal arithmetic string cosmetic**: `1d12 + 7 + 2: 10 +9= 19 HP restored` fuses the two bonuses into `+9=` with odd spacing (roll-view family too — `1d6: 6 = 6 HP to restore` when N HP may not be restored, see bug). `HandOfHealingModal.jsx` (~162), `HealingPoolModal.jsx` roll-log copy.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Designer TRIM-DROPPED live face — accept the unit pin (`designer.plan-scope.test.js`) unless a scripted-model rig ships (carried).

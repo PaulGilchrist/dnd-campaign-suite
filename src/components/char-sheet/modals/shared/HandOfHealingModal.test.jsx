@@ -66,20 +66,29 @@ describe('HandOfHealingModal', () => {
       expect(h4.textContent).toContain('HP');
       expect(screen.getByText('2d6 + 3:')).toBeInTheDocument();
       expect(screen.getByText('3 + 1')).toBeInTheDocument();
-      expect(screen.getByText('+2')).toBeInTheDocument();
+      expect(screen.getByText('+ 2')).toBeInTheDocument();
       const totalEl = document.querySelector('.healing-total');
       expect(totalEl.textContent).toContain('=');
       expect(totalEl.textContent).toContain('HP restored');
       expect(totalEl.querySelector('strong').textContent).toBe('8');
     });
 
+    // Cosmetic spacing pin (backlog 2026-11-13 EH): operators carry spaces on
+    // both sides — `+ 9` / `- 1`, never the fused `+9=`/`-1` face. Values and
+    // signs are unchanged.
     it.each([
-      ['positive bonus shows a plus prefix', 2, '+2'],
-      ['negative bonus shows a minus prefix', -1, '-1'],
+      ['positive bonus renders a spaced plus', 2, '+ 2'],
+      ['negative bonus renders a spaced minus with the magnitude', -1, '- 1'],
     ])('%s', (_label, bonus, expectedText) => {
       render(<HandOfHealingModal {...makeProps({ bonus })} />);
       expect(screen.getByText(expectedText)).toBeInTheDocument();
       expect(document.querySelector('.healing-bonus')).toBeInTheDocument();
+    });
+
+    it('renders the full arithmetic line with consistently spaced operators', () => {
+      render(<HandOfHealingModal {...makeProps({ formula: '1d12 + 7 + 2', rolls: [10], bonus: 9, actualHeal: 19, targetCurrentHp: 41, targetMaxHp: 60 })} />);
+      expect(document.querySelector('.healing-roll-details').textContent)
+        .toBe('1d12 + 7 + 2: 10 + 9 = 19 HP restored');
     });
 
     it('omits the bonus span when bonus is zero', () => {
