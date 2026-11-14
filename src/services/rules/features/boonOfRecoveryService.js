@@ -50,14 +50,16 @@ export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignN
         creature.currentHp = newHp;
     }
 
+    // Log-family parity (2026-11-14 resurrection log-family split): see the
+    // undyingSentinelService twin — Last Stand's 0-HP rescue now lands as an
+    // hp_change heal-family row instead of the type:'healing' outlier.
     addEntry(campaignName, {
-        type: 'healing',
+        type: 'hp_change',
         targetName: creature.name,
         delta: newHp,
-        amount: newHp,
         currentHp: newHp,
         maxHp,
-        isHealing: true,
+        isHealing: newHp > 0,
         isUnconscious: false,
         sourceName: 'Boon Of Recovery - Last Stand',
     }).catch((e) => { console.error("[boonOfRecovery] Error:", e); });

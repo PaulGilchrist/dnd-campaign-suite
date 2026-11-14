@@ -492,7 +492,9 @@ describe('triggerRevivify - edge cases', () => {
         expect(addEntry.mock.calls[0][1].automationType).toBe('healing_blocked');
         expect(addEntry.mock.calls[1]).toEqual(['TestCampaign', {
             type: 'hp_change', targetName: 'Ally', delta: 0, currentHp: 0, maxHp: 30,
-            isHealing: true, sourceName: 'Cleric', note: 'Revivify', timestamp: STAMP_MS,
+            // Sign-stamp law (revival-family parity 2026-11-14): the honest
+            // delta-0 rescue row never carries isHealing:true.
+            isHealing: false, sourceName: 'Cleric', note: 'Revivify', timestamp: STAMP_MS,
         }]);
         // Blocked path: modifyHitPoints never runs -> no dispatch, no runtime writes.
         expect(events).toEqual([]);

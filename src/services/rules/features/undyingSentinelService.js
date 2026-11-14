@@ -51,14 +51,19 @@ export function checkUndyingSentinel(creature, playerComputed, campaignName) {
         creature.currentHp = newHp;
     }
 
+    // Log-family parity (2026-11-14 resurrection log-family split): the 0-HP
+    // auto-intercept row rides the hp_change heal family (delta/currentHp/
+    // maxHp were already authored — only the type and the isHealing literal
+    // were split from the family), so hp_change-keyed audits see revives.
+    // sourceName names the lane, matching the 'sheet editor'/'GM HP override'
+    // forged-source convention for writer-attributed rows.
     addEntry(campaignName, {
-        type: 'healing',
+        type: 'hp_change',
         targetName: creature.name,
         delta: newHp,
-        amount: newHp,
         currentHp: newHp,
         maxHp: maxHp,
-        isHealing: true,
+        isHealing: newHp > 0,
         isUnconscious: false,
         sourceName: 'Undying Sentinel',
     }).catch((e) => { console.error("[undyingSentinelService] Error:", e); });

@@ -27,6 +27,15 @@ function resolveTargetHp(targetInfo, targetName, campaignName) {
     return targetInfo.target.currentHp ?? 0;
 }
 
+// Canonical HP frame for the audit row — same precedence as revivifyService.js
+// (bucket max first, combat-summary row max as fallback).
+function resolveTargetMaxHp(targetInfo, targetName, campaignName) {
+    if (targetInfo.target.type === 'player') {
+        return getRuntimeValue(targetName, 'hitPoints', campaignName) ?? targetInfo.target.maxHp;
+    }
+    return targetInfo.target.maxHp;
+}
+
 async function applyResurrectionHeal(targetInfo, targetName, healAmount, campaignName) {
     if (targetInfo.target.type === 'player') {
         // Resurrection always lifts the bucket from 0 to positive, so it must
@@ -86,6 +95,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const targetName = targetInfo.target.name;
 
     const targetHp = resolveTargetHp(targetInfo, targetName, campaignName);
+    const targetMaxHp = resolveTargetMaxHp(targetInfo, targetName, campaignName);
 
     if (targetHp > 0) {
         return infoPopup(action.name, `${targetName} is not at 0 Hit Points.`, auto);
@@ -110,13 +120,25 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const { cureConditions, promise: curePromise } = cureConditionsFor(targetName, auto, campaignName);
     if (curePromise) await curePromise;
 
+    // Log-family parity (2026-11-14 resurrection log-family split): the audit
+    // row rides the hp_change heal family — the exact field set every other
+    // revive/heal writer commits (revivifyService.js:105, healingRoll.js:83) —
+    // so HP-trail views and hp_change-keyed filters see resurrections instead
+    // of silently missing them. The resurrection:true discriminator is retained
+    // to keep corpse-revives separable within the family, and isHealing follows
+    // the sign of the written delta (sign-stamp law, healingRoll.js:88 — never
+    // a literal true). characterName stays for the log Character filter.
+    const writtenDelta = healAmount - targetHp;
     addEntry(campaignName, {
-        type: 'healing',
+        type: 'hp_change',
         characterName: playerName,
         targetName: targetName,
-        amount: healAmount,
-        sourceName: action.name,
-        abilityName: action.name,
+        delta: writtenDelta,
+        currentHp: healAmount,
+        maxHp: targetMaxHp,
+        isHealing: writtenDelta > 0,
+        sourceName: playerName,
+        note: action.name,
         timestamp: Date.now(),
         resurrection: true,
     }).catch((e) => { console.error("[handOfUltimateMercy] Error:", e); });

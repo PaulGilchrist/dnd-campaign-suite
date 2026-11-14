@@ -108,7 +108,10 @@ export async function triggerRevivify(spell, metaCtx, playerStats, campaignName,
         delta: applied.actualHeal,
         currentHp: applied.newHp,
         maxHp,
-        isHealing: true,
+        // Sign-stamp law (healingRoll.js:88, 2026-11-14 revival-family parity):
+        // a heal-block rescue can log an honest delta-0 row — nothing healed
+        // must never stamp isHealing:true.
+        isHealing: applied.actualHeal > 0,
         sourceName: casterName,
         note: spellName,
         timestamp: Date.now(),

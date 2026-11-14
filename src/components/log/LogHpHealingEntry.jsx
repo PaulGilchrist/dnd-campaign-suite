@@ -94,20 +94,32 @@ export function HpChangeEntry({ entry }) {
   const isZero = entry.delta === 0;
   const isNpc = !!entry.threshold;
   const isTemp = entry.isTempHp;
+  // Resurrection face (2026-11-14 resurrection log-family split): HoUoM moved
+  // from type:'healing' into this family, retaining its resurrection:true
+  // discriminator — carry the 'Brought Back to Life' chrome (dove icon + badge,
+  // reuse of the HealingEntry classes) the old rows rendered.
+  const isResurrection = entry.resurrection === true;
   // Tri-state polarity (#880/#877 house shape): zero delta is neither red damage
   // nor green healing — neutral cls/icon so '0 HP' never rides the heal chrome.
   const polarityCls = isDamage ? 'log-hp-damage' : isZero ? 'log-hp-neutral' : isTemp ? 'log-temp-hp' : 'log-healing';
-  const iconCls = isDamage ? 'fa-heart-crack' : isZero ? 'fa-circle-info' : isTemp ? 'fa-shield' : 'fa-heart';
+  const iconCls = isResurrection ? 'fa-dove' : isDamage ? 'fa-heart-crack' : isZero ? 'fa-circle-info' : isTemp ? 'fa-shield' : 'fa-heart';
   return (
-    <div className={`log-entry log-hp-change ${polarityCls}`}>
+    <div className={`log-entry log-hp-change ${polarityCls}${isResurrection ? ' log-resurrection' : ''}`}>
       <div className="log-entry-header">
         <span className="log-icon">
           <i className={`fas ${iconCls}`}></i>
         </span>
         <span className="log-character">{entry.targetName}</span>
         <span className="log-name">
-          {isNpc ? <NpcChangeName entry={entry} /> : <PlayerChangeName entry={entry} isDamage={isDamage} isZero={isZero} isTemp={isTemp} />}
+          {isNpc ? (
+            <NpcChangeName entry={entry} />
+          ) : isResurrection ? (
+            <>Brought Back to Life{entry.note && <span className="log-dice-formula">{entry.note}</span>}</>
+          ) : (
+            <PlayerChangeName entry={entry} isDamage={isDamage} isZero={isZero} isTemp={isTemp} />
+          )}
         </span>
+        {isResurrection && <span className="log-resurrection-badge">Resurrection</span>}
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-hp-details">

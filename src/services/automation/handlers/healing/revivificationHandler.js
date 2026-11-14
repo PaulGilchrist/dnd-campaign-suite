@@ -80,12 +80,23 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
+    // Log-family parity (2026-11-14 resurrection log-family split): this revive
+    // writer used to commit `type:'heal'` — an unregistered log type that fell
+    // back to GenericEntry and escaped every hp_change-keyed HP audit. It now
+    // rides the hp_change heal-family field set (revivifyService.js:105 twin).
+    const maxHp = target.type === 'player'
+        ? (getRuntimeValue(target.name, 'hitPoints', campaignName) ?? target.maxHp)
+        : target.maxHp;
     addEntry(campaignName, {
-        type: 'heal',
+        type: 'hp_change',
         characterName: playerName,
         targetName: target.name,
-        amount: healAmount,
-        abilityName: action.name,
+        delta: healAmount - targetHp,
+        currentHp: healAmount,
+        maxHp,
+        isHealing: (healAmount - targetHp) > 0,
+        sourceName: playerName,
+        note: action.name,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[revivification] Error:", e); });
 

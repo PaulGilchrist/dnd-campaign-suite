@@ -168,12 +168,12 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
     // No death-save prompt — the target never died.
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
 
-    // Healing log entry verbatim (maxHp read from the runtime store, not the creature).
+    // Healing log entry verbatim (log-family parity 2026-11-14: the 0-HP
+    // rescue row rides the hp_change heal family, amount byte retired).
     expect(addEntry).toHaveBeenCalledWith(campaignName, {
-      type: 'healing',
+      type: 'hp_change',
       targetName: 'GloryPaladin',
       delta: 46,
-      amount: 46,
       currentHp: 46,
       maxHp: 150,
       isHealing: true,

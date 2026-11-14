@@ -67,12 +67,13 @@ function makeAction(automation = {}) {
   };
 }
 
-// Runtime-store router: FP on caster, HP + conditions on any target name.
-function mockRuntime({ fp = 5, hp = 0, conditions = [] } = {}) {
+// Runtime-store router: FP on caster, HP + max + conditions on any target name.
+function mockRuntime({ fp = 5, hp = 0, conditions = [], maxHp = null } = {}) {
   useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
     if (key === 'focusPoints') return fp;
     if (key === 'currentHitPoints') return hp;
     if (key === 'activeConditions') return conditions;
+    if (key === 'hitPoints') return maxHp;
     return null;
   });
 }
@@ -81,12 +82,12 @@ function mockRoll(total) {
   diceRoller.rollExpression.mockReturnValue({ total, rolls: [total] });
 }
 
-function mockPlayerTarget(name = 'DownedAlly') {
-  resolveTarget.mockResolvedValue({ target: { name, type: 'player' } });
+function mockPlayerTarget(name = 'DownedAlly', csMaxHp = undefined) {
+  resolveTarget.mockResolvedValue({ target: { name, type: 'player', maxHp: csMaxHp } });
 }
 
-function setupSuccessPath(healAmount = 12, targetName = 'DownedAlly') {
-  mockRuntime();
+function setupSuccessPath(healAmount = 12, targetName = 'DownedAlly', maxHp = 112) {
+  mockRuntime({ maxHp });
   mockRoll(healAmount);
   mockPlayerTarget(targetName);
 }
@@ -424,7 +425,12 @@ describe('handOfUltimateMercyHandler.handle', () => {
   });
 
   describe('Logging', () => {
-    it('should call addEntry with correct heal data on success', async () => {
+    it('should commit exactly ONE hp_change heal-family row with the resurrection discriminator', async () => {
+      // Log-family parity (2026-11-14 resurrection log-family split): the
+      // corpse-resurrection audit rides the hp_change family (positive delta =
+      // actual bucket lift, currentHp/maxHp frame, isHealing per the sign-stamp
+      // law) instead of the old type:'healing' outlier, so hp_change-keyed
+      // HP audits see resurrections. resurrection:true is retained.
       setupSuccessPath(7);
 
       const now = Date.now();
@@ -432,17 +438,69 @@ describe('handOfUltimateMercyHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+      expect(logPoster.addEntry).toHaveBeenCalledTimes(1);
       expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'healing',
+        type: 'hp_change',
         characterName: 'TestCleric',
         targetName: 'DownedAlly',
-        amount: 7,
-        sourceName: 'Hand of Ultimate Mercy',
-        abilityName: 'Hand of Ultimate Mercy',
-        resurrection: true,
+        delta: 7,
+        currentHp: 7,
+        maxHp: 112,
+        isHealing: true,
+        sourceName: 'TestCleric',
+        note: 'Hand of Ultimate Mercy',
         timestamp: now,
+        resurrection: true,
       });
       dateSpy.mockRestore();
+    });
+
+    it('should resolve maxHp from the combat-summary row when the bucket max is missing', async () => {
+      mockRuntime({ maxHp: null });
+      mockRoll(9);
+      mockPlayerTarget('DownedAlly', 90);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const [, entry] = logPoster.addEntry.mock.calls[0];
+      expect(entry.maxHp).toBe(90);
+    });
+
+    it('should stamp isHealing:false on a zero-delta commit (sign-stamp law, never literal true)', async () => {
+      mockRuntime();
+      diceRoller.rollExpression.mockReturnValue({ total: 0, rolls: [] });
+      mockPlayerTarget();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const [, entry] = logPoster.addEntry.mock.calls[0];
+      expect(entry.type).toBe('hp_change');
+      expect(entry.delta).toBe(0);
+      expect(entry.isHealing).toBe(false);
+      expect(entry.resurrection).toBe(true);
+    });
+
+    it('should log the hp_change row for NPC revives with the summary-row maxHp', async () => {
+      mockRuntime();
+      mockRoll(11);
+      const cs = { creatures: [{ name: 'Goblin', type: 'npc', currentHp: 0, maxHp: 21 }] };
+      resolveTarget.mockResolvedValue({ target: cs.creatures[0], cs });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'hp_change',
+        characterName: 'TestCleric',
+        targetName: 'Goblin',
+        delta: 11,
+        currentHp: 11,
+        maxHp: 21,
+        isHealing: true,
+        sourceName: 'TestCleric',
+        note: 'Hand of Ultimate Mercy',
+        timestamp: expect.any(Number),
+        resurrection: true,
+      });
     });
 
     it('should not call addEntry on early returns', async () => {

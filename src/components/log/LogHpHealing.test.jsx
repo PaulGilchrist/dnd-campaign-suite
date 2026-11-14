@@ -73,6 +73,33 @@ describe('Log > healing lane (LogHpHealingEntry)', () => {
     expect(name.includes('Healed')).toBe(overrides.delta > 0);
   });
 
+  // Resurrection arm (2026-11-14 resurrection log-family split): HoUoM's audit
+  // row moved from type:'healing' into the hp_change family, retaining its
+  // resurrection:true discriminator. The lane must carry the 'Brought Back to
+  // Life' chrome (dove icon + Resurrection badge + log-resurrection class) the
+  // old HealingEntry rows rendered, beside the family delta/current-max bytes.
+  it('renders HpChangeEntry resurrection rows with the dove + badge face', () => {
+    setup(Log, [hp({
+      timestamp: FIXED_TS, delta: 31, currentHp: 31, maxHp: 112,
+      sourceName: 'Disciplined_Monk', note: 'Hand of Ultimate Mercy', resurrection: true,
+    })]);
+    expect(q('.log-entry')).toHaveClass('log-entry', 'log-hp-change', 'log-healing', 'log-resurrection');
+    expect(q('.log-icon i')).toHaveClass('fa-dove');
+    expect(q('.log-character').textContent).toBe('Gimli');
+    expect(q('.log-name').textContent).toBe('Brought Back to LifeHand of Ultimate Mercy');
+    expect([...document.querySelectorAll('.log-resurrection-badge')].map((n) => n.textContent))
+      .toEqual(['Resurrection']);
+    expect(q('.log-hp-details').textContent).toBe('+31 HP 31/112 remaining');
+  });
+
+  it('keeps plain hp_change heal rows out of the resurrection chrome', () => {
+    setup(Log, [hp({ timestamp: FIXED_TS, delta: 8, sourceName: 'Cleric', note: 'Cure Wounds' })]);
+    expect(q('.log-entry')).not.toHaveClass('log-resurrection');
+    expect(q('.log-icon i')).toHaveClass('fa-heart');
+    expect(q('.log-name').textContent).toBe('Healed (Cleric)Cure Wounds');
+    expect(document.querySelector('.log-resurrection-badge')).toBeNull();
+  });
+
   // HealingEntry (type healing): plain-heal bytes, healingName fallback when
   // sourceName is falsy, and the resurrection variant (Hand of Ultimate Mercy
   // produces resurrection+popupText) folded into one row.

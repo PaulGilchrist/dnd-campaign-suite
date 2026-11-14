@@ -155,12 +155,12 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
     // Combat-summary creature mirror updated so the card renders the revival.
     expect(cs.creatures[0].currentHp).toBe(91);
 
-    // Healing log entry verbatim.
+    // Healing log entry verbatim (log-family parity 2026-11-14: the 0-HP
+    // rescue row rides the hp_change heal family, amount byte retired).
     expect(addEntry).toHaveBeenCalledWith(campaignName, {
-      type: 'healing',
+      type: 'hp_change',
       targetName: 'BoonChar',
       delta: 91,
-      amount: 91,
       currentHp: 91,
       maxHp: 180,
       isHealing: true,

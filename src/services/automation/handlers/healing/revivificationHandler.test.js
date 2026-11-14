@@ -338,12 +338,19 @@ describe('revivificationHandler', () => {
         null,
       );
 
+      // Log-family parity (2026-11-14 resurrection log-family split): the old
+      // unregistered type:'heal' row escaped every hp_change-keyed audit and
+      // rendered via GenericEntry; revive writers ride the hp_change family.
       expect(logPoster.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'heal',
+        type: 'hp_change',
         characterName: playerName,
         targetName: 'Ally',
-        amount: 5,
-        abilityName: 'Revivification',
+        delta: 5,
+        currentHp: 5,
+        maxHp: undefined,
+        isHealing: true,
+        sourceName: playerName,
+        note: 'Revivification',
         timestamp: now,
       });
       dateSpy.mockRestore();

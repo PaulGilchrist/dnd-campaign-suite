@@ -155,7 +155,7 @@ describe('undyingSentinelHandler', () => {
           .mockReturnValueOnce(false)
           .mockImplementation((name, key) => {
             if (key === 'currentHitPoints' && name === targetName) return 0;
-            if (key === 'hitPoints' && name === 'TestCleric') return maxHp;
+            if (key === 'hitPoints') return maxHp;
             return null;
           });
         getCombatContext.mockResolvedValue({});
@@ -210,17 +210,24 @@ describe('undyingSentinelHandler', () => {
         );
       });
 
-      it('posts a heal log entry and dispatches combat-summary-updated event', async () => {
+      it('posts an hp_change heal-family log entry and dispatches combat-summary-updated event', async () => {
         setupPlayerHeal();
 
         await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+        // Log-family parity (2026-11-14 resurrection log-family split): the
+        // 0-HP rescue row rides the hp_change family instead of the
+        // type:'healing' outlier, so hp_change-keyed audits see the revive.
         expect(addEntry).toHaveBeenCalledWith(campaignName, {
-          type: 'healing',
+          type: 'hp_change',
           characterName: 'TestCleric',
           targetName: 'DownedAlly',
-          amount: 16,
-          sourceName: 'Undying Sentinel',
+          delta: 16,
+          currentHp: 16,
+          maxHp: 50,
+          isHealing: true,
+          sourceName: 'TestCleric',
+          note: 'Undying Sentinel',
           timestamp: 1700000000000,
         });
         expect(dispatchEventSpy).toHaveBeenCalledWith(

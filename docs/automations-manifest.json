@@ -3116,7 +3116,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS 2026-10-05: kill Bandit->arm corpse->'Hand of Ultimate Mercy:' -> revive 31=4d10(24)+WIS7 numeric, FP 20->15 EXACT, log {healing,resurrection:true}; living target refused 'not at 0 HP' zero-delta. No diamond gate (advisory text is Revivify-lane only).)",
+      "verified": "verified (PASS 2026-10-05: kill Bandit->arm corpse->'Hand of Ultimate Mercy:' -> revive 31=4d10(24)+WIS7 numeric, FP 20->15 EXACT, log {hp_change,resurrection:true} (CORRECTED IN PLACE 2026-11-14 improve resurrection-log-family-split: row realigned from the old `healing` outlier to the hp_change heal family); living target refused 'not at 0 HP' zero-delta. No diamond gate (advisory text is Revivify-lane only).)",
       "class": "Monk",
       "triggerConditions": "Action: 1 action",
       "expectedBehavior": "Action, touch corpse of creature that died within 24 hours, expend 5 Focus Points. Creature returns to life with 4d10 + Wisdom modifier Hit Points. Conditions removed: Blinded, Deafened, Paralyzed, Poisoned, Stunned."

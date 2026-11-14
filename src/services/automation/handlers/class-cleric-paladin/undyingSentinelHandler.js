@@ -6,6 +6,15 @@ import storage from '../../../ui/storage.js';
 
 const UNDYING_SENTINEL_KEY = 'undyingSentinelUsed';
 
+// Canonical max frame for the audit row — same precedence as
+// revivifyService.js (bucket max first, combat-summary row max as fallback).
+function resolveTargetMaxHp(target, campaignName) {
+    if (target.type === 'player') {
+        return getRuntimeValue(target.name, 'hitPoints', campaignName) ?? target.maxHp;
+    }
+    return target.maxHp;
+}
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -83,12 +92,20 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
+    // Log-family parity (2026-11-14 resurrection log-family split): a 0-HP
+    // rescue rides the hp_change heal family (revivificationHandler/revivify
+    // sibling shape) instead of the type:'healing' outlier, so hp_change-keyed
+    // audits see it. delta is the honest bucket lift (target gated at ≤0 HP).
     addEntry(campaignName, {
-        type: 'healing',
+        type: 'hp_change',
         characterName: playerName,
         targetName: target.name,
-        amount: newHp,
-        sourceName: action.name,
+        delta: newHp - targetHp,
+        currentHp: newHp,
+        maxHp: resolveTargetMaxHp(target, campaignName),
+        isHealing: (newHp - targetHp) > 0,
+        sourceName: playerName,
+        note: action.name,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[undyingSentinel] Error:", e); });
 
