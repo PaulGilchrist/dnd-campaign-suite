@@ -281,15 +281,24 @@ describe('computeTrackedResources — additional seed lanes', () => {
   });
 
   // :227-229 — "Pool of d6s (number = 1 + Warlock level)" (disk).
-  it('healinglightPool: 1+level Celestial via major or subclass, level-missing -> 1, gated off others', () => {
+  // improve tracked-resource-ghost-keys: gate flipped from `: 0` seed to
+  // owned-only (CLA-364 idiom) — non-owners now carry NO key at all.
+  it('healinglightPool: 1+level Celestial via major or subclass, level-missing -> 1, gated OFF others (key ABSENT)', () => {
     const rows = [
       ['major Celestial lv5 = 6', basePlayerStats({ class: warlock({ major: { name: 'Celestial Patron' } }), level: 5 }), { current: 6, max: 6 }],
       ['subclass Celestial lv3 = 4', basePlayerStats({ class: warlock({ subclass: { name: 'Celestial Patron' } }), level: 3 }), { current: 4, max: 4 }],
       ['major Celestial level undefined = 1', basePlayerStats({ class: warlock({ major: { name: 'Celestial Patron' } }), level: undefined }), { current: 1, max: 1 }],
-      ['Fiend warlock -> 0', basePlayerStats({ class: warlock({ major: { name: 'Fiend' } }) }), { current: 0, max: 0 }],
-      ['non-warlock -> 0', basePlayerStats({ class: { name: 'Cleric' } }), { current: 0, max: 0 }],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['healinglightPool'], expected, label);
+
+    // ABSENT arms (was present-at-0): unowned = the key is never seeded.
+    const absentRows = [
+      ['Fiend warlock -> key ABSENT', basePlayerStats({ class: warlock({ major: { name: 'Fiend' } }) })],
+      ['non-warlock -> key ABSENT', basePlayerStats({ class: { name: 'Cleric' } })],
+    ];
+    for (const [label, stats] of absentRows) {
+      expect(computeTrackedResources(stats), label).not.toHaveProperty('healinglightPool');
+    }
   });
 
   // :288-290 — exact-level class_levels row wins; floor 1 otherwise.

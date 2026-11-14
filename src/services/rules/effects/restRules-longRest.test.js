@@ -160,8 +160,18 @@ describe('applyLongRest', () => {
       expect(data.spell_slots_level_3).toBe(3)
       // Unset slot levels are skipped, not fabricated
       expect(data).not.toHaveProperty('spell_slots_level_4')
-      // Full-set registration membership: every LONG_REST_RESOURCES key -> null
+      // Full-set registration membership: every LONG_REST_RESOURCES key ->
+      // null. EXCEPTION (improve tracked-resource-ghost-keys): the three
+      // gated pool keys are seeded owned-only in computeTrackedResources
+      // (CLA-364 idiom), so the batch re-arm skips them for this
+      // unregistered-fixture Fighter — owner re-arm is pinned in the lane
+      // below; every other latch keeps the unconditional CLA-130 fan-out.
+      const GATED_POOLS = ['layOnHandsPool', 'preserveLifePool', 'healinglightPool']
       for (const key of getLongRestResources()) {
+        if (GATED_POOLS.includes(key)) {
+          expect(data, `${key} must NOT fan into an unowned bucket`).not.toHaveProperty(key)
+          continue
+        }
         expect(data, `${key} must be null-re-armed in the batch`).toHaveProperty(key, null)
       }
       // Badges/conditions cleared inside the SAME atomic write (SSE echo correctness)
@@ -180,6 +190,32 @@ describe('applyLongRest', () => {
       expect(vet.currentHitPoints).toBe(50)
       expect(vet).not.toHaveProperty('hasInspiration')
       expect(vet).not.toHaveProperty('spell_slots_level_1')
+    })
+
+    it('gated pool keys (improve tracked-resource-ghost-keys): owner re-arms to null, unowned keys stay absent', async () => {
+      // Owner lane: a pool registered in the character's _trackedResources
+      // (computeTrackedResources seeded it — e.g. Paladin's layOnHandsPool)
+      // keeps its exact null re-arm byte in the batch.
+      const owner = makeStats({
+        name: 'PaladinOwner',
+        _trackedResources: { layOnHandsPool: { current: 5, max: 25 } },
+      })
+      await applyLongRest(owner, CAMPAIGN)
+      expect(batchFor('PaladinOwner')).toHaveProperty('layOnHandsPool', null)
+      // …while pools this owner does not carry stay out of the batch.
+      expect(batchFor('PaladinOwner')).not.toHaveProperty('preserveLifePool')
+      expect(batchFor('PaladinOwner')).not.toHaveProperty('healinglightPool')
+
+      // Non-owner lane: none of the three gated pools is registered — the
+      // batch must reintroduce NO ghost rows (null or otherwise), while the
+      // unconditional latch fan-out still fires (CLA-130 safety net).
+      await applyLongRest(makeStats({ name: 'PlainFighter' }), CAMPAIGN)
+      const plain = batchFor('PlainFighter')
+      for (const key of ['layOnHandsPool', 'preserveLifePool', 'healinglightPool']) {
+        expect(plain, `${key} ghost row must not be fanned into an unowned bucket`).not.toHaveProperty(key)
+      }
+      expect(plain).toHaveProperty('tranceOfOrderUses', null)
+      expect(plain).toHaveProperty('warriorofthegodsPool', null)
     })
   })
 

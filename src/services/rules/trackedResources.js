@@ -238,10 +238,18 @@ function addPactAndArcanum(resources, { features, classLevel, is2024, isWarlock 
 }
 
 function addPatronPoolResources(resources, { playerStats, isWarlock, charisma, is2024 }) {
-  // Healing Light: Celestial Patron dice pool (1 + warlock level dice)
+  // Healing Light: Celestial Patron dice pool (1 + warlock level dice).
+  // improve tracked-resource-ghost-keys (CLA-364 idiom, :411-417): the key is
+  // seeded ONLY when owned. The old unconditional seed fan-ed
+  // `healinglightPool: 0` into every non-Celestial bucket (persisted by the
+  // first full-store POST after campaign-select). Key absence is a
+  // first-class state in every read path (useTrackedResource.resolveCurrent
+  // store → _trackedResources → maxGetter; resourceCheck null-tolerant).
   const isCelestialPatron = isWarlock && matchesPatron(playerStats, ['Celestial Patron'])
-  const maxHealingLight = isCelestialPatron ? (1 + (playerStats.level || 0)) : 0
-  resources.healinglightPool = { current: maxHealingLight, max: maxHealingLight }
+  if (isCelestialPatron) {
+    const maxHealingLight = 1 + (playerStats.level || 0)
+    resources.healinglightPool = { current: maxHealingLight, max: maxHealingLight }
+  }
 
   const isWarlockArchfey = isWarlock && matchesPatron(playerStats, ['Archfey Patron'])
   const hasStepsOfTheFey = (playerStats.automation?.bonusActions ?? []).some(a => a.type === 'steps_of_the_fey')
@@ -278,8 +286,12 @@ function addChannelAndInspiration(resources, { playerStats, features, charisma }
 
 function addPaladinDivineResources(resources, { playerStats, charisma }) {
   const isPaladin = playerStats.class?.name === 'Paladin'
-  const maxLoH = isPaladin ? (5 * (playerStats.level || 0)) : 0
-  resources.layOnHandsPool = { current: maxLoH, max: maxLoH }
+  // improve tracked-resource-ghost-keys (CLA-364 idiom): owned-only seed —
+  // non-paladins no longer fan `layOnHandsPool: 0` into their buckets.
+  if (isPaladin) {
+    const maxLoH = 5 * (playerStats.level || 0)
+    resources.layOnHandsPool = { current: maxLoH, max: maxLoH }
+  }
 
   const maxGD = isPaladin ? Math.max(charisma?.bonus || 0, 1) : 0
   resources.gloriousDefenseUses = { current: maxGD, max: maxGD }
@@ -291,8 +303,12 @@ function addClericDivineResources(resources, { playerStats }) {
   resources.divineInterventionUses = { current: maxDI, max: maxDI }
 
   const isLifeDomain = (playerStats.class?.major?.name === 'Life Domain') || (playerStats.class?.subclass?.name === 'Life Domain')
-  const maxPL = isCleric && isLifeDomain ? (5 * (playerStats.level || 0)) : 0
-  resources.preserveLifePool = { current: maxPL, max: maxPL }
+  // improve tracked-resource-ghost-keys (CLA-364 idiom): owned-only seed —
+  // non-Life-clerics no longer fan `preserveLifePool: 0` into their buckets.
+  if (isCleric && isLifeDomain) {
+    const maxPL = 5 * (playerStats.level || 0)
+    resources.preserveLifePool = { current: maxPL, max: maxPL }
+  }
 
   const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
   // War Priest is a cleric domain resource — gate like sibling pools above

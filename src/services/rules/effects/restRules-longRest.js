@@ -45,6 +45,17 @@ function resetFlags(name, campaignName, entries) {
   }
 }
 
+// Gated pool keys (improve tracked-resource-ghost-keys): seeded ONLY for
+// owners by computeTrackedResources (CLA-364 idiom — trackedResources.js
+// addPatronPoolResources/addPaladinDivineResources/addClericDivineResources),
+// mirroring the UI absence gates in CharClassFeatures.jsx. Their LONG_REST
+// re-arm must not fan `key: null` rows into non-owner buckets — unowned =
+// nothing to re-arm. Every OTHER LONG_REST_RESOURCES key keeps the
+// unconditional null fan-out: it is the CLA-130 batch safety net that
+// re-arms handler-owned latches (tranceOfOrderUses etc.) which are
+// deliberately never registered in `_trackedResources`.
+const GATED_POOL_KEYS = ['layOnHandsPool', 'preserveLifePool', 'healinglightPool']
+
 function buildLongRestCharData(playerStats) {
   const charData = {}
 
@@ -63,7 +74,9 @@ function buildLongRestCharData(playerStats) {
 
   charData.shortRestHitDice = playerStats.level
 
+  const tracked = playerStats._trackedResources || {}
   getLongRestResources().forEach((key) => {
+    if (GATED_POOL_KEYS.includes(key) && !(key in tracked)) return
     charData[key] = null
   })
 

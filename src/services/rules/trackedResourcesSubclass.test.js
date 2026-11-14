@@ -218,12 +218,19 @@ describe('disk census (both rulesets, existence-first)', () => {
 // ── subclass-absent golden + executable channel census ──
 
 describe('subclass channel golden + census', () => {
-  it('subclass-absent rows seed every owned key at {0,0}, console untouched, pools fresh; _Star_Map_freeCastCount stays computed-not-registered (gap pinned)', () => {
+  it('subclass-absent rows seed every owned key at {0,0} (preserveLifePool ABSENT — gated pool, CLA-364 idiom), console untouched, pools fresh; _Star_Map_freeCastCount stays computed-not-registered (gap pinned)', () => {
     const err = vi.spyOn(console, 'error');
     for (const className of ['Druid', 'Ranger', 'Cleric']) {
       // kitchen-sink-absent form: no major/subclass/class_levels keys at all
       const result = computeTrackedResources(basePlayerStats({ class: { name: className } }));
       for (const key of OWNED_KEYS) {
+        // improve tracked-resource-ghost-keys: preserveLifePool is a gated
+        // pool — unowned (none of these fixtures is a Life-domain cleric)
+        // means the key is ABSENT, not {0,0}.
+        if (key === 'preserveLifePool') {
+          expect({ [`${className}:${key}`]: result[key] }).toEqual({ [`${className}:${key}`]: undefined });
+          continue;
+        }
         expect({ [`${className}:${key}`]: result[key] }).toEqual({ [`${className}:${key}`]: { current: 0, max: 0 } });
       }
       // deterministic + fresh object pool per compute (shared-reference mutants)
@@ -236,12 +243,15 @@ describe('subclass channel golden + census', () => {
     err.mockRestore();
 
     // Executable subclass-channel Venn (direction: produced vs registry):
-    // all 8 owned keys seed on every compute; 7 of 8 registered — the gap is
-    // exactly _Star_Map_freeCastCount (#1531/#1532 confirmed — computed-not-
-    // in-registry). Consequence: the extra override arm (:419) cannot re-add
-    // it once absent — pinned in the override table below.
+    // 7 of 8 owned keys seed on every compute; 6 of those 7 are registered —
+    // the gap is exactly _Star_Map_freeCastCount (#1531/#1532 confirmed —
+    // computed-not-in-registry). Consequence: the extra override arm (:419)
+    // cannot re-add it once absent — pinned in the override table below.
+    // improve tracked-resource-ghost-keys: the 8th key, preserveLifePool, is
+    // now CONDITIONALLY seeded (owned-only, CLA-364 idiom) — a Druid compute
+    // omits it entirely.
     const venn = computeTrackedResources(basePlayerStats({ class: { name: 'Druid' } }));
-    expect(OWNED_KEYS.filter((k) => k in venn)).toEqual(OWNED_KEYS);
+    expect(OWNED_KEYS.filter((k) => k in venn)).toEqual(OWNED_KEYS.filter((k) => k !== 'preserveLifePool'));
     expect(OWNED_KEYS.filter((k) => !ALL_TRACKED_RESOURCES.includes(k)))
       .toEqual(['_Star_Map_freeCastCount']);
     // Registered half, exact: the other seven of the owned eight.
@@ -333,7 +343,7 @@ describe('subclass-gated seeds', () => {
     for (const [label, stats, expected] of rows) expectPools(stats, both, expected, label);
   });
 
-  it('preserveLifePool :268-270 — cleric+Life Domain 5*level; non-cleric gate; 5e near-miss 0', () => {
+  it('preserveLifePool :268-270 — cleric+Life Domain 5*level; non-owner gate arms ABSENT (improve tracked-resource-ghost-keys, CLA-364 idiom); 5e near-miss absent', () => {
     const cle = (majorName, level, viaSubclass = false, rules = '2024') => basePlayerStats({
       rules,
       level,
@@ -342,13 +352,20 @@ describe('subclass-gated seeds', () => {
     const rows = [
       ['major Life lv5 -> 25 (disk 5*cleric_level)', cle(LIFE.name, 5), { current: 25, max: 25 }],
       ['subclass Life lv8 -> 40', cle(LIFE.name, 8, true), { current: 40, max: 40 }],
-      ['major War lv10 -> 0', cle(WAR.name, 10), { current: 0, max: 0 }],
-      ['GATE: druid major Life Domain -> 0 (isCleric gate)', basePlayerStats({ rules: '2024', level: 5, class: cls('Druid', LIFE.name) }), { current: 0, max: 0 }],
-      ['level undefined -> 0 (|| 0)', cle(LIFE.name, undefined), { current: 0, max: 0 }],
+      // Owner with level undefined still seeds {0,0}: ownership decides presence.
+      ['level undefined -> 0 (|| 0, owner keeps key)', cle(LIFE.name, undefined), { current: 0, max: 0 }],
       ['lv1 -> 5 (no lv gate; channel cost gated in handler)', cle(LIFE.name, 1), { current: 5, max: 5 }],
-      ['5e near-miss disk name Life -> 0 (gates are 2024 names; drift reported)', basePlayerStats({ rules: '5e', level: 8, class: cls('Cleric', 'Life') }), { current: 0, max: 0 }],
     ];
     for (const [label, stats, expected] of rows) expectPools(stats, ['preserveLifePool'], expected, label);
+    // Non-owner arms: flipped from present-at-0 to ABSENT.
+    const absentRows = [
+      ['major War lv10 -> key ABSENT (was {0,0})', cle(WAR.name, 10)],
+      ['GATE: druid major Life Domain -> key ABSENT (was {0,0}, isCleric gate)', basePlayerStats({ rules: '2024', level: 5, class: cls('Druid', LIFE.name) })],
+      ['5e near-miss disk name Life -> key ABSENT (gates are 2024 names; drift reported)', basePlayerStats({ rules: '5e', level: 8, class: cls('Cleric', 'Life') })],
+    ];
+    for (const [label, stats] of absentRows) {
+      expect(computeTrackedResources(stats), label).not.toHaveProperty('preserveLifePool');
+    }
   });
 
   it('ancestral trait gates :319-333 — disk trait bytes, subrace placement flag, automation truthiness, proficiency formula, exact-name match', () => {

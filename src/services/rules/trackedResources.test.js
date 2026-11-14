@@ -196,7 +196,9 @@ describe('computeTrackedResources', () => {
 
   it('registry Venn both directions: every adder seeds a registry key; declared exceptions are the documented latch sets', () => {
     // Kitchen-sink fixture exercises every adder (class-agnostic adders seed 0
-    // unconditionally, so one warlock-with-arcanum fixture reaches all of them).
+    // unconditionally — except the three gated pool keys, seeded owned-only per
+    // the CLA-364 idiom — so one warlock-with-arcanum fixture reaches all of
+    // them).
     getClassFeatures.mockReturnValue({ arcanumLevels: { level6: 1, level7: 1, level8: 1, level9: 1 } });
     const result = computeTrackedResources(basePlayerStats({
       class: wizardClass({ name: 'Warlock', major: { name: 'Fiend' } }),
@@ -212,16 +214,53 @@ describe('computeTrackedResources', () => {
     // applyServerOverride only consults the registry for server-only keys):
     expect(computedOnly).toEqual(['_Star_Map_freeCastCount', 'darkOnesLuckUses']);
     // Registry keys never seeded here — handler/exec-owned latches, restored by
-    // restRules seams, not by this registry:
+    // restRules seams, plus the conditionally-seeded pool keys (improve
+    // tracked-resource-ghost-keys: healinglightPool/preserveLifePool/
+    // layOnHandsPool are now owned-only, CLA-364 idiom; this fixture is a
+    // Fiend-patron Warlock, so none of the three is owned):
     expect(registryOnly).toEqual([
       'actionSurgeUsedThisRound',
       'dreadambushUses',
+      'healinglightPool',
       'isDead',
+      'layOnHandsPool',
+      'preserveLifePool',
       'rageOfTheGodsUses',
       'tamedSurgeUses',
     ]);
     // CLA-364: never seeded.
     expect(result.tranceOfOrderUses).toBeUndefined();
+  });
+
+  it('gated pool keys (improve tracked-resource-ghost-keys): ABSENT for non-owners, seeded for owners', () => {
+    // The three class-pool keys follow the CLA-364 tranceOfOrderUses idiom:
+    // key absence is the unowned state — no `: 0` ghost rows fan into
+    // non-owner buckets via the first full-store POST.
+    const POOL_KEYS = ['healinglightPool', 'preserveLifePool', 'layOnHandsPool'];
+    for (const stats of [
+      basePlayerStats(), // Wizard
+      basePlayerStats({ class: wizardClass({ name: 'Cleric', major: { name: 'War Domain' } }) }),
+      basePlayerStats({ class: wizardClass({ name: 'Warlock', major: { name: 'Fiend' } }) }),
+    ]) {
+      const result = computeTrackedResources(stats);
+      for (const key of POOL_KEYS) expect(result, key).not.toHaveProperty(key);
+    }
+
+    // Owner lanes still seed with correct current/max (byte-identical values).
+    expect(computeTrackedResources(basePlayerStats({
+      class: wizardClass({ name: 'Paladin' }), level: 5,
+    })).layOnHandsPool).toEqual({ current: 25, max: 25 });
+    expect(computeTrackedResources(basePlayerStats({
+      class: wizardClass({ name: 'Warlock', major: { name: 'Celestial Patron' } }), level: 5,
+    })).healinglightPool).toEqual({ current: 6, max: 6 });
+    expect(computeTrackedResources(basePlayerStats({
+      class: wizardClass({ name: 'Cleric', major: { name: 'Life Domain' } }), level: 8,
+    })).preserveLifePool).toEqual({ current: 40, max: 40 });
+    // Owner with undefined level still seeds the key (at 0) — ownership, not
+    // the value, decides presence.
+    expect(computeTrackedResources(basePlayerStats({
+      class: wizardClass({ name: 'Paladin' }), level: undefined,
+    })).layOnHandsPool).toEqual({ current: 0, max: 0 });
   });
 
   it('feature-driven seeds (incl. sorceryPoints :120 anchor) map 1:1 from getClassFeatures; absent features seed 0', () => {
@@ -400,7 +439,9 @@ describe('computeTrackedResources', () => {
       ['bard gate: non-bard with CHA', basePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }] }), 'bardicInspirationUses', { current: 0, max: 0 }],
       ['paladin lvl 5 = 25', basePlayerStats({ class: wizardClass({ name: 'Paladin' }), level: 5 }), 'layOnHandsPool', { current: 25, max: 25 }],
       ['paladin level undefined = 0', basePlayerStats({ class: wizardClass({ name: 'Paladin' }), level: undefined }), 'layOnHandsPool', { current: 0, max: 0 }],
-      ['paladin gate: non-paladin lvl 5', basePlayerStats({ class: wizardClass({ name: 'Sorcerer' }) }), 'layOnHandsPool', { current: 0, max: 0 }],
+      // Gated (improve tracked-resource-ghost-keys, CLA-364 idiom): the key is
+      // ABSENT for non-paladins — no `layOnHandsPool: 0` ghost row.
+      ['paladin gate: non-paladin lvl 5 -> key ABSENT', basePlayerStats({ class: wizardClass({ name: 'Sorcerer' }) }), 'layOnHandsPool', undefined],
       ['cleric lvl 10 boundary = 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), level: 10 }), 'divineInterventionUses', { current: 1, max: 1 }],
       ['cleric lvl 9 = 0', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), level: 9 }), 'divineInterventionUses', { current: 0, max: 0 }],
       ['cleric gate: wizard lvl 15', basePlayerStats({ level: 15 }), 'divineInterventionUses', { current: 0, max: 0 }],
