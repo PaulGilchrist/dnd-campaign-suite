@@ -1,6 +1,6 @@
  
 import React from 'react'
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import { setRuntimeBatch, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import { addEntry } from '../../../services/ui/logService.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
@@ -23,7 +23,23 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
           if (Number.isNaN(numValue)) return;
           const oldHp = currentHitPoints;
           const delta = numValue - oldHp;
-          setRuntimeValue(playerStats.name, 'currentHitPoints', numValue, campaignName);
+          // Merged full-store write (backlog 2026-11-14 MM): ONE
+          // setRuntimeBatch POST replaces the old four separate
+          // setRuntimeValue calls (currentHitPoints + deathSaves +
+          // deathFailures + isDead), each of which POSTed the whole
+          // bucket and broadcast its own SSE echo on every >0 commit.
+          // Functional semantics are unchanged: the death-bucket reset
+          // still rides EVERY value>0 commit face (not only the 0→>0
+          // revive transition), and setRuntimeBatch's valuesEqual
+          // self-skip mirrors the four individual calls — nothing POSTs
+          // when no property differs from the mirror.
+          const writes = { currentHitPoints: numValue };
+          if (numValue > 0) {
+              writes.deathSaves = [false, false, false];
+              writes.deathFailures = [false, false, false];
+              writes.isDead = 0;
+          }
+          setRuntimeBatch(playerStats.name, writes, campaignName);
 
           if (delta !== 0) {
               addEntry(campaignName, {
@@ -41,10 +57,10 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
               }).catch((e) => { console.error("[CharHitPoints] Error:", e); });
           }
 
+          // The bucket reset above already covers this face; only the
+          // mirror-gated prompt evict stays (DELETE lane, never a char
+          // POST — evict laws 4015d88d4 / 3a99fd08a).
           if (value > 0) {
-              setRuntimeValue(playerStats.name, 'deathSaves', [false, false, false], campaignName);
-              setRuntimeValue(playerStats.name, 'deathFailures', [false, false, false], campaignName);
-              setRuntimeValue(playerStats.name, 'isDead', 0, campaignName);
               clearDeathSavePrompt(campaignName, playerStats.name);
           }
       };

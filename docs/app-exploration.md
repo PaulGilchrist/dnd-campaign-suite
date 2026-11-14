@@ -71,8 +71,6 @@ change-data `{}` + log `[]` + overlays `[]` (tabs CLOSED before clears; pass 1 c
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 MM — the sheet-revive lane writes 3–4 separate POSTs in one user action** (hp value, deathSaves, deathFailures, isDead as individual `POST /<Char>` full-bucket writes): each broadcasts its own SSE echo; a single merged full-store POST would halve the chatter on every revive. `CharHitPoints.jsx handleValueChangeCurrentHitPoints`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - `3a99fd08a` non-confirming-response face (403/423/5xx keeps the mirror, retries the evict) — live-unreachable without a response-poison rig; unit-pinned `savePromptService.death-save-evict-mirror.test.js`.

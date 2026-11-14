@@ -5,6 +5,7 @@ import CharHitPoints from './CharHitPoints.jsx';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
   useRuntimeValue: vi.fn(),
 }));
 
@@ -22,7 +23,7 @@ vi.mock('./DeathSavingThrows.jsx', () => ({
   )),
 }));
 
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, setRuntimeBatch, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../services/ui/logService.js';
 
@@ -98,7 +99,15 @@ describe('CharHitPoints', () => {
       renderCharHitPoints();
       commitHp(newValue);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'currentHitPoints', newValue, CAMPAIGN);
+      // Merged full-store write (backlog 2026-11-14 MM): the commit is ONE
+      // setRuntimeBatch; the >0 face carries the death-bucket reset inside
+      // the same batch instead of three extra setRuntimeValue POSTs.
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+      expect(setRuntimeBatch).toHaveBeenCalledWith(
+        NAME,
+        expect.objectContaining({ currentHitPoints: newValue }),
+        CAMPAIGN
+      );
 
       if (delta !== 0) {
         expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
@@ -116,14 +125,19 @@ describe('CharHitPoints', () => {
       }
 
       if (resets) {
-        expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'deathSaves', [false, false, false], CAMPAIGN);
-        expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'deathFailures', [false, false, false], CAMPAIGN);
-        expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'isDead', 0, CAMPAIGN);
+        const writes = vi.mocked(setRuntimeBatch).mock.calls[0][1];
+        expect(writes.deathSaves).toEqual([false, false, false]);
+        expect(writes.deathFailures).toEqual([false, false, false]);
+        expect(writes.isDead).toBe(0);
         expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, NAME);
       } else {
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(NAME, 'deathSaves', [false, false, false], CAMPAIGN);
+        const writes = vi.mocked(setRuntimeBatch).mock.calls[0][1];
+        expect(writes).not.toHaveProperty('deathSaves');
+        expect(writes).not.toHaveProperty('deathFailures');
+        expect(writes).not.toHaveProperty('isDead');
         expect(clearDeathSavePrompt).not.toHaveBeenCalled();
       }
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
   // Regression (bug-hidden-input-empty-commit): an abandoned edit (cleared
@@ -145,6 +159,7 @@ describe('CharHitPoints', () => {
     else fireEvent.keyDown(input, { key: 'Escape' });
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
   });
@@ -154,7 +169,7 @@ describe('CharHitPoints', () => {
     renderCharHitPoints();
     commitHp('0');
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'currentHitPoints', 0, CAMPAIGN);
+    expect(setRuntimeBatch).toHaveBeenCalledWith(NAME, { currentHitPoints: 0 }, CAMPAIGN);
     expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
       type: 'hp_change',
       targetName: NAME,
