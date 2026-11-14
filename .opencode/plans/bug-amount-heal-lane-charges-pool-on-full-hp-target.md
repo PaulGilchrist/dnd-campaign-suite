@@ -1,0 +1,41 @@
+# Healing-pool AMOUNT lane (`Apply Heal`) has no heal-capacity gate — on a full-HP target it spends pool HP anyway and the audit row is dishonest: `amount: 0` for a board target, a FABRICATED full-`amount` row for an off-board/self target
+
+## Summary
+Every non-dice healing pool (`!isDicePool` — the tier every Lay On Hands rides, 2024 AND 5e paladins, since the pool is an HP pool where YOU choose the amount) renders the `Heal — <Target>` section with an Amount input and an `Apply Heal` button. Unlike the dice lane, this lane has NO capacity check at all: `applyHeal` deducts `amount = min(healAmount, safePool)` from the pool and persists it, then applies the heal — and on a target already at max HP nothing restores. The ledger outcome then depends on which commit branch fires: the **board branch** (`targetCreature` found in `combatSummary`) logs `result.actualHeal` → a `healing_pool` row claiming `amount: 0` while the pool silently lost the full `amount` (pool/ledger mismatch); the **off-board/self branch** logs the RAW `healAmount` → a fabricated row claiming `amount: 10` of healing that NEVER happened (target HP unchanged). The sibling dice lane already obeys the honesty law twice over (render gate `X is already at full HP. No die spent.` + `88daae2be` commit-time re-read with refund), the Hand of Healing picker refuses with `No focus spent.` (`f3950317c`), and the single-cure tier was just made honest the same way (`615a7580a`) — the amount lane is the last unelected healing lane that can silently drain a limited long-rest resource for nothing and poison the campaign log.
+
+## Steps to reproduce
+Proven live 2026-11-13 (fix-queue verify pass, run after `615a7580a`) in test-campaign on :5173. Rig is pure change-data — no fixture surgery, no classes.json synthesis:
+
+1. Seed a board + full-HP victim BEFORE opening a tab:
+   - `POST /api/campaigns/test-campaign/combatSummary` `{"value":{"round":1,"creatures":[{"name":"ElderPaladin","type":"player","initiative":15,"currentHp":100,"maxHp":100,"ac":18,"saveBonuses":[],"targetName":null},{"name":"EvasiveFighter","type":"player","initiative":10,"currentHp":112,"maxHp":112,"ac":18,"saveBonuses":[],"targetName":null}]}}`
+   - `POST /api/campaigns/test-campaign/EvasiveFighter` `{"value":{"name":"EvasiveFighter","hitPoints":112,"currentHitPoints":112,"activeConditions":[]}}`
+2. Select test-campaign, open the **ElderPaladin** sheet → Bonus Actions `Lay On Hands:` row → chooser (`#healing-pool-target-modal-title`) shows `EvasiveFighter 112/112 HP (100%)` → select it → `Heal`.
+3. Observe the modal: header `Pool: 100 / 100 HP`, section `Heal — EvasiveFighter (112 / 112 HP)`, Amount input, and `Apply Heal` **enabled** — no `.healing-restriction-note` anywhere (the LoH pool is an HP pool, so the gated dice section never renders here).
+4. Type Amount `10` → press `Apply Heal`.
+5. Observe: modal log row `Heal | EvasiveFighter | 0 | 90` (Pool Used **0**), header pool drops to 90.
+   `GET change-data`: `ElderPaladin.layOnHandsPool = 90` (disk), `EvasiveFighter.currentHitPoints` still `112`; `GET /log`:
+   `{"type":"healing_pool","sourceName":"ElderPaladin","featureName":"Lay On Hands","targetName":"EvasiveFighter","amount":0,"poolAfter":90,...}` — 10 pool HP gone, zero healed, a row that admits it.
+6. **Fabricated-row face:** re-POST `combatSummary` WITHOUT the ElderPaladin row (EvasiveFighter only), reopen `Lay On Hands:` → press `Skip` (self; EP is off-board so the else branch commits) → Amount `10` → `Apply Heal`.
+7. Observe: modal row `Heal | ElderPaladin | 10 | 80` and log
+   `{"type":"healing_pool","sourceName":"ElderPaladin","featureName":"Lay On Hands","targetName":"ElderPaladin","amount":10,"poolAfter":80,...}` — while `ElderPaladin.currentHitPoints` is STILL `224` = `hitPoints`. The log asserts a 10 HP heal that never occurred, on a full target, and the pool lost 10.
+
+## Expected behavior
+Same honesty law the sibling lanes already ship: nothing that restores zero HP may cost a limited resource or write a success row.
+- Zero-capacity commit (target at max at COMMIT time — reuse the `88daae2be` commit-time re-read; the modal dwells across external fills): refuse with **zero pool spend, zero target write, zero audit row** plus an inline `.healing-restriction-note` on the f3950317c/615a7580a seam, e.g. `<Target> is already at full HP. No pool spent.` The `Apply Heal` button may additionally be disabled when `noHealCapacity` at render (mirroring the dice button's `disabled={... || noHealCapacity}`), but the commit-time guard is the honesty law.
+- Both branches must make pool-spend == actual HP restored and the ledger row carry the actual healed amount (board branch already passes `result.actualHeal` to the row — charge THAT, not `amount`; the else branch must compute the clamped heal and log THAT, not the raw `healAmount`). If RAW "waste the overflow on a partial heal" is kept for the partial face, the row must still state the true healed amount — the fabricated-`amount` row is never acceptable.
+
+## Actual behavior
+`applyHeal` runs `const newPool = safePool - amount; setPoolRemaining(newPool)` BEFORE any capacity consideration. Board branch: charges `amount`, logs `result.actualHeal` (0) → pool 100→90 with an `amount: 0` row. Else branch: charges `amount`, logs `amount` → pool 90→80 with a row claiming a 10 HP heal on an untouched 224/224 bucket. Bonus code-read face (not lived): if `applyHealingToTarget` returns null (`result` falsy — creature row present but bucket write fails) the `if (result)` leg skips the row entirely while the pool charge already landed — charged with zero ledger at all.
+
+## Likely location
+Confident (code read matches live behavior 1:1):
+- `src/components/char-sheet/modals/divine/HealingPoolModal.jsx` → `applyHeal` (~L487–527): unconditional `setPoolRemaining(safePool - amount)` before both branches; else-branch `addEntry`/`setLog` pass raw `amount` (~L516–524) instead of the clamped actual heal.
+- Same file → `HealingApplySection` (~L139): `disabled={safePool <= 0 || healAmount <= 0 || (bloodiedOnly && !isTargetBloodied)}` — no `noHealCapacity` (which the component already receives context for; the dice section at ~L190 uses it).
+- Commit-time truth helpers already in the file: `resolveTargetCurrentHp` (L156), `resolveHealCapacity`/`resolveDiceActualHeal` — the dice commit `applyAccumulatedHealing` (~L545+) is the pattern to mirror (re-read, clamp, refund/zero-log when `actualHeal === 0`).
+- `src/services/rules/combat/applyHealing.js` `applyHealingToTarget` already returns `{ actualHeal }` — no service change needed for the board branch.
+
+## Suggested fix
+In `applyHeal`: re-read live HP via `resolveTargetCurrentHp` at commit; compute capacity = `targetMax - freshCurrent`; if capacity <= 0 → set the `cureRefusal`-style inline note (reuse the sibling note seam added by 615a7580a, remembering it must render as a SIBLING of the section) and RETURN with no pool write, no target write, no `addEntry`. Otherwise clamp the effective charge to the actual heal: board branch `const cost = result.actualHeal` (skip everything when 0, e.g. race between the capacity check and the write); else branch compute `actual = Math.min(amount, targetMax - freshCurrent)`, write `freshCurrent + actual`, charge and log `actual`. Log rows and modal rows both carry the true healed amount and the post-charge pool. Optionally also disable the button on `noHealCapacity` for parity with the dice lane. Regression home: `HealingPoolModal.curing.test.jsx` family (or a sibling `HealingPoolModal.amount.test.jsx`) pinning: full-HP board press = zero writes + note; full-HP self press = zero writes + note (no fabricated row); partial-capacity press = row states the clamped heal; damaged-target control heals honestly. Dual-ruleset: the 5e LoH twin rides the SAME modal (HP pool) — one fix covers both, but re-check `healingPoolHandler.js` payload for the 5e ruleset before assuming.
+
+## Severity
+Data integrity + resource destruction — every paladin (both rulesets, every level) can lose real pool HP to a no-op click, and the self/off-board face writes rows that ASSERT healing that never happened (downstream consumers — rest-seam bystanders, log audit trails, any HP-reconciliation reads of `healing_pool` rows — treat those rows as truth).
