@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import CharSheet from './CharSheet';
+import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import rulesFactory from '../../services/rules/rulesFactory.js';
 import { activateWildShape } from '../../services/automation/handlers/class-druid/wildShapeCreatureBuilder.js';
 import { confirmPolymorphTransform } from '../../services/automation/handlers/spells/polymorphService.js';
@@ -224,7 +225,11 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn((_key, _prop, _val, _camp) => mockStore.set(`${_key}:${_prop}`, _val)),
   useRuntimeValue: vi.fn((key, prop) => {
     if (prop === 'exhaustionLevel') return 0;
-    if (prop === 'activeConditions' || prop === 'activeBuffs' || prop === 'targetEffects') return [];
+    if (prop === 'activeConditions' || prop === 'targetEffects') return [];
+    // activeBuffs reads the store (with the same [] fallback) so tests can arm
+    // the raging lane (a damageBonusExpression buff -> isRaging) when pinning
+    // the fanaticalFocusUsed latch reset gate.
+    if (prop === 'activeBuffs') return mockStore.get(`${key}:activeBuffs`) ?? [];
     const defaults = {
       bardicInspirationGrantedBy: 'unknown',
       indomitableUses: 0,
@@ -507,13 +512,37 @@ describe('handleTogglePreparedSpells', () => {
 // ---------------------------------------------------------------------------
 
 describe('runtime sync on load', () => {
-  it('publishes hitPoints to the runtime store and resets fanaticalFocusUsed when not raging', async () => {
+  it('publishes hitPoints to the runtime store and writes ZERO latch reset when fanaticalFocusUsed was never consumed', async () => {
     await renderSheet();
 
     await waitFor(() => {
       expect(mockStore.get(`${CHARACTER}:hitPoints`)).toEqual({ current: 40, max: 40 });
     });
+    // Write-only-if-changed gate: absence already means "latch unused" to every
+    // reader, so opening a fresh sheet must NOT seed the paladin-flavored key
+    // into the bucket (the old unconditional false POST ghosted it onto every
+    // non-barbarian character — improve fanatical-focus-latch-reset-gate).
+    expect(mockStore.get(`${CHARACTER}:fanaticalFocusUsed`)).toBeUndefined();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'fanaticalFocusUsed', false, CAMPAIGN);
+  });
+
+  it('clears a consumed fanaticalFocusUsed latch when the sheet opens outside rage (rearms the reroll lane)', async () => {
+    mockStore.set(`${CHARACTER}:fanaticalFocusUsed`, true);
+    await renderSheet();
+
+    await waitFor(() => {
+      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'fanaticalFocusUsed', false, CAMPAIGN);
+    });
     expect(mockStore.get(`${CHARACTER}:fanaticalFocusUsed`)).toBe(false);
+  });
+
+  it('holds a consumed fanaticalFocusUsed latch while raging (once-per-rage)', async () => {
+    mockStore.set(`${CHARACTER}:fanaticalFocusUsed`, true);
+    mockStore.set(`${CHARACTER}:activeBuffs`, [{ damageBonusExpression: '2d6' }]);
+    await renderSheet();
+
+    expect(mockStore.get(`${CHARACTER}:fanaticalFocusUsed`)).toBe(true);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'fanaticalFocusUsed', false, CAMPAIGN);
   });
 });
 

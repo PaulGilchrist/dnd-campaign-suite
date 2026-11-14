@@ -597,12 +597,31 @@ function CharSheetContent({
         return () => window.removeEventListener('spell-result', handler);
     }, [playerStats, setPopupHtml]);
 
+    // Reroll-latch reset (Fanatical Focus / Disciplined Survivor / Living Legend):
+    // write-only-if-changed (mirrors the ee3c3e7a7 ownership-gating intent without
+    // touching the key name). Every reader of `fanaticalFocusUsed` defaults
+    // absent/false to "latch unused" (SavePromptModal readRerollResourceState,
+    // CharSheet.conditionEffects.js applyRerollKillSwitches,
+    // handlePlayerSaveDamage.js), so the reset POST now fires ONLY when the latch
+    // was actually consumed — the old unconditional false write seeded this
+    // paladin-flavored ghost key into every non-barbarian bucket on every sheet
+    // open. Subscribed via useRuntimeValue (not an effect-time one-shot read) so
+    // a consumed latch that hydrates/echoes in AFTER an un-hydrated mount is
+    // still cleared the moment the sheet is open and not raging. Premature-clear
+    // safety: all three true-writers are rage-gated (handleReroll 'raging'
+    // branch, useSaveRerollHandlers/savePromptHandlers Fanatical Focus handlers
+    // behind fanaticalFocusAvailable = isRaging && !used), and the rage buff
+    // rides the same bucket echo, so a freshly consumed latch never reads
+    // truthy while isRaging is false — the once-per-rage hold is intact and
+    // rage-off still rearms exactly as before (isRaging dep). The wrapper
+    // mounts CharSheetContent only with a real playerStats (:402) and a truthy
+    // latch only ever exists under a real character key, so no null guard is
+    // needed here.
+    const fanaticalFocusLatchUsed = useRuntimeValue(playerStats.name, 'fanaticalFocusUsed', campaignName);
     React.useEffect(() => {
-        if (!playerStats) return;
-        if (!isRaging) {
-            setRuntimeValue(playerStats.name, 'fanaticalFocusUsed', false, campaignName);
-        }
-    }, [isRaging, playerStats, campaignName]);
+        if (isRaging || !fanaticalFocusLatchUsed) return;
+        setRuntimeValue(playerStats.name, 'fanaticalFocusUsed', false, campaignName);
+    }, [isRaging, playerStats, campaignName, fanaticalFocusLatchUsed]);
 
     const [auraComboEffects, setAuraComboEffects] = React.useState(null);
     React.useEffect(() => {

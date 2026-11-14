@@ -76,8 +76,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before the admin clears 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (IZ 2026-11-14) `fanaticalFocusUsed: false` per-sheet-open latch-reset write is class-agnostic (`CharSheet.jsx:603`) — rides Fighter/Warlock/every non-paladin buckets too; semantically honest ('latch unused', LR nulls it per `restRules-longRest.js:193`) but the paladin-flavored key on non-paladins is exactly the naming ghost-shape `ee3c3e7a7` retired for the `:0`/pool family, and it's one unconditional POST per sheet open. Candidates: gate the reset to the lanes that read it, or rename to a lane-neutral latch key.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Designer TRIM-DROPPED live face — accept the unit pin (`designer.plan-scope.test.js`) unless a scripted-model rig ships (carried).
