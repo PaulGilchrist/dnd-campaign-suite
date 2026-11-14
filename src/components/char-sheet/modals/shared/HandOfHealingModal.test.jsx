@@ -271,7 +271,7 @@ describe('HandOfHealingModal', () => {
   });
 
   describe('condition log entry', () => {
-    it('posts a condition log entry with complete sourceName label', async () => {
+    it('posts a condition log entry with the display label and complete sourceName label', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
       await waitFor(() => {

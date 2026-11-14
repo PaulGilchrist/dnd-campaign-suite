@@ -35,9 +35,11 @@ import HealingPoolModal from './HealingPoolModal.jsx';
 // they re-read the just-written value and re-ran an identical predicate
 // (conditionMatches lowercases internally), producing a byte-identical second
 // setRuntimeValue write. Pinned below by exact single-write assertions.
-// Flagged product quirk (asserted as-is): individual cures log the label
-// ("Blinded") while batch cures log the key ("blinded") in the campaign log.
-// Batch modal log rows show the RUNNING pool after each condition's own cost
+// Flagged product quirk RESOLVED (backlog 2026-11-13 FX cure-casing split,
+// stale pins inverted same-pass): individual AND batch cures both log the
+// CONDITIONS-catalog DISPLAY LABEL ("Blinded") in the campaign log, matching
+// the Physician's Touch reference lane (HandOfHealingModal.test.jsx). Batch
+// modal log rows show the RUNNING pool after each condition's own cost
 // (backlog 2026-11-13 FX fix) while the store keeps one full-batch pool write.
 
 // ── Mocked modules ──
@@ -378,12 +380,12 @@ describe('HealingPoolModal - Curing', () => {
     expect(poolUpdate).toHaveBeenCalledWith(14);
     expect(poolStore.current).toBe(14);
     expect(logService.addEntry.mock.calls).toEqual([
-      [CAMPAIGN, conditionLog('Paladin1', 'blinded')],
-      [CAMPAIGN, conditionLog('Paladin1', 'charmed')],
+      [CAMPAIGN, conditionLog('Paladin1', 'Blinded')],
+      [CAMPAIGN, conditionLog('Paladin1', 'Charmed')],
     ]);
     expect(logRows()).toEqual([
-      ['Cure blinded', 'Paladin1', '3', '17'],
-      ['Cure charmed', 'Paladin1', '3', '14'],
+      ['Cure Blinded', 'Paladin1', '3', '17'],
+      ['Cure Charmed', 'Paladin1', '3', '14'],
     ]);
     // Live store is empty and the summary carries no self conditions — the
     // whole cure section (and its stale selection) must unmount.
@@ -404,8 +406,8 @@ describe('HealingPoolModal - Curing', () => {
     fireEvent.click(cureBtn('Cure Selected (2 for 10 HP)'));
 
     expect(logRows()).toEqual([
-      ['Cure blinded', 'Paladin1', '5', '95'],
-      ['Cure poisoned', 'Paladin1', '5', '90'],
+      ['Cure Blinded', 'Paladin1', '5', '95'],
+      ['Cure Poisoned', 'Paladin1', '5', '90'],
     ]);
     expect(poolUpdate).toHaveBeenCalledTimes(1);
     expect(poolUpdate).toHaveBeenCalledWith(90);
@@ -445,9 +447,51 @@ describe('HealingPoolModal - Curing', () => {
       expect(rendered.container.textContent).toContain('Pool: 90 / 100');
     });
     expect(logRows()).toEqual([
-      ['Cure blinded', 'Paladin1', '5', '95'],
-      ['Cure poisoned', 'Paladin1', '5', '90'],
+      ['Cure Blinded', 'Paladin1', '5', '95'],
+      ['Cure Poisoned', 'Paladin1', '5', '90'],
     ]);
+  });
+
+  // ── Unified display-label audit casing (backlog 2026-11-13 FX cure-casing split) ──
+  // Both LoH cure tiers must write the CONDITIONS-catalog DISPLAY LABEL in the
+  // audit row's condition field — the same convention the Physician's Touch
+  // reference lane emits (HandOfHealingModal.test.jsx 'condition log entry').
+
+  describe('unified display-label audit casing', () => {
+    it('single cure from raw-key alsoCures against a label-cased store logs "Blinded"', async () => {
+      store.Paladin1.activeConditions = ['Blinded'];
+
+      await renderModal({ alsoCures: ['blinded'], cureCost: 5 }, { current: 100, max: 100 });
+      // The single tier renders the raw catalog string on its button.
+      fireEvent.click(cureBtn('blinded'));
+
+      expect(logService.addEntry).toHaveBeenCalledTimes(1);
+      expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, conditionLog('Paladin1', 'Blinded'));
+      expect(logRows()).toEqual([['Cure Blinded', 'Paladin1', '5', '95']]);
+      // Commit semantics untouched: conditionMatches stays key-insensitive and
+      // removes the label-cased store entry with one write.
+      expect(cureWrites()).toEqual([['Paladin1', 'activeConditions', [], CAMPAIGN]]);
+    });
+
+    it('batch cure from raw-key restoringTouchConditions against a mixed-casing store logs labels', async () => {
+      store.Paladin1.activeConditions = ['Poisoned', 'blinded'];
+
+      await renderModal(
+        { alsoCures: [], restoringTouchConditions: ['poisoned', 'blinded'], cureCost: 5 },
+        { current: 100, max: 100 },
+      );
+      selectConditions(['Poisoned', 'Blinded']);
+      fireEvent.click(cureBtn('Cure Selected (2 for 10 HP)'));
+
+      expect(logService.addEntry.mock.calls).toEqual([
+        [CAMPAIGN, conditionLog('Paladin1', 'Poisoned')],
+        [CAMPAIGN, conditionLog('Paladin1', 'Blinded')],
+      ]);
+      expect(store.Paladin1.activeConditions).toEqual([]);
+      // One full-batch pool write, unchanged.
+      expect(poolUpdate).toHaveBeenCalledTimes(1);
+      expect(poolUpdate).toHaveBeenCalledWith(90);
+    });
   });
 
   // ── Batch gating and shortfall warnings ──

@@ -579,17 +579,22 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const filtered = conditions.filter(c => !conditionMatches(c, condition));
         setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
 
+        // Unified audit convention (backlog 2026-11-13 FX cure-casing split): the
+        // condition field carries the CONDITIONS-catalog display label
+        // ("Poisoned"), matching the Physician's Touch reference lane — never the
+        // raw key. The filter above stays conditionMatches (key-insensitive).
+        const label = conditionLabel(condition);
         addEntry(campaignName, {
             type: 'condition',
             characterName: resolvedTargetName,
-            condition: condition,
+            condition: label,
             action: 'broken',
             sourceName: playerStats.name,
             featureName,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
-        setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter: newPool }]);
+        setLog(prev => [...prev, { action: `Cure ${label}`, target: resolvedTargetName, amount: cureCost, poolAfter: newPool }]);
         setHealAmount(Math.min(healAmount, newPool));
     };
 
@@ -613,10 +618,14 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             const filtered = conditions.filter(c => !conditionMatches(c, condition));
             setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
 
+            // selectedConditions entries are raw catalog keys; the audit row
+            // carries the display label ("Poisoned") — same unified convention
+            // as applyCure and the Physician's Touch lane (see note there).
+            const label = conditionLabel(condition);
             addEntry(campaignName, {
                 type: 'condition',
                 characterName: resolvedTargetName,
-                condition: condition,
+                condition: label,
                 action: 'broken',
                 sourceName: playerStats.name,
                 featureName,
@@ -624,7 +633,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
             const poolAfter = safePool - cureCost * (index + 1);
-            setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter }]);
+            setLog(prev => [...prev, { action: `Cure ${label}`, target: resolvedTargetName, amount: cureCost, poolAfter }]);
         });
 
         setSelectedConditions([]);

@@ -65,8 +65,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass: pass-1 clear +
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 FX — cure audit casing split:** Physician's Touch writes `condition:"Poisoned"` (display label) while the LoH/Restoring-Touch batch rows write `condition:"poisoned"` (raw key) — one "broken condition" log view/filter now needs to match both spellings; pick one convention in the writers (`HandOfHealingModal.jsx` `removeCondition` vs `HealingPoolModal.jsx` `applyCure`/`applyBatchCure`).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Designer TRIM-DROPPED live face — accept the unit pin (`designer.plan-scope.test.js`) unless a scripted-model rig ships (carried).
