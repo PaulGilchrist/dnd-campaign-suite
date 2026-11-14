@@ -172,11 +172,22 @@ describe('HiddenInput', () => {
       const input = screen.getByRole('spinbutton');
 
       fireEvent.change(input, { target: { value: '12' } });
-      fireEvent.keyDown(input, { key: 'Escape' });
       fireEvent.keyDown(input, { key: 'ArrowUp' });
+      fireEvent.keyDown(input, { key: 'Tab' });
 
       expect(handleValueChange).not.toHaveBeenCalled();
       expect(handleInputToggle).not.toHaveBeenCalled();
+    });
+
+    it('cancels on Escape without committing the typed value', () => {
+      const { handleValueChange, handleInputToggle } = setup({ showInput: true, value: 5 });
+      const input = screen.getByRole('spinbutton');
+
+      fireEvent.change(input, { target: { value: '12' } });
+      fireEvent.keyDown(input, { key: 'Escape' });
+
+      expect(handleValueChange).not.toHaveBeenCalled();
+      expect(handleInputToggle).toHaveBeenCalledTimes(1);
     });
 
     it('clamps values above max on commit', () => {
@@ -203,10 +214,25 @@ describe('HiddenInput', () => {
       expect(handleValueChange).toHaveBeenCalledWith(500);
     });
 
-    it('commits 0 when the input is cleared', () => {
-      const { handleValueChange } = commitByBlur({}, '');
+    it('cancels without committing when the input is cleared and blurred', () => {
+      const { handleValueChange, handleInputToggle } = commitByBlur({}, '');
+
+      expect(handleValueChange).not.toHaveBeenCalled();
+      expect(handleInputToggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancels without committing when the input is cleared and Enter is pressed', () => {
+      const { handleValueChange, handleInputToggle } = commitByEnter({}, '');
+
+      expect(handleValueChange).not.toHaveBeenCalled();
+      expect(handleInputToggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('still commits an explicitly typed 0', () => {
+      const { handleValueChange, handleInputToggle } = commitByBlur({}, '0');
 
       expect(handleValueChange).toHaveBeenCalledWith(0);
+      expect(handleInputToggle).toHaveBeenCalledTimes(1);
     });
   });
 

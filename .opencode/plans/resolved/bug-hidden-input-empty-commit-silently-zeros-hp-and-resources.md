@@ -40,3 +40,21 @@ In `commit()`: if `String(localValue).trim() === ''` → close without committin
 ## Severity
 
 Data integrity risk — a plausible accidental keystroke sequence (open, clear, tab away) silently overwrites canonical game state; zeroed HP means a downed character with an audit row attesting a change nobody intended, and there is no visible undo.
+
+## Resolution
+
+FIXED 2026-11-14 — diagnosis from the bug file confirmed exactly: `HiddenInput.commit()` computed `Number('') === 0` and pushed it through the normal save lane, and `handleKeyDown` branched only on Enter (Escape inert). Fixed at the shared editor (cancel-on-empty for ALL consumers, per the Expected section — an empty draft is never a value; explicit `0` stays the only way to zero).
+
+**Changes:**
+- `src/components/common/HiddenInput.jsx` — added a `cancel()` helper (restores the displayed `value` into the draft so a reopen never shows a stale empty edit, then `handleInputToggle()`); `commit()` now cancels when `String(localValue).trim() === ''`; `handleKeyDown` gained an `Escape` branch calling `cancel()` (keydown already `stopPropagation`s, no parent double-handling).
+- `src/components/common/HiddenInput.test.jsx` — flipped the `commits 0 when the input is cleared` pin to cancel-on-empty (blur AND Enter variants, no `handleValueChange`, toggle once); pinned explicit `0` still commits; added an Escape-cancel pin; the old `does not commit on other keys` pin (which relied on Escape being inert) now uses ArrowUp/Tab only.
+- `src/components/char-sheet/char-summary/CharHitPoints.test.jsx` — consumer-face regression pins: cleared editor committed by blur/Enter/Escape writes NO runtime value and NO `hp_change` log row and closes the editor; explicitly typed `0` still writes HP 0 + the unconscious `hp_change` row.
+
+No consumer-side prop was needed — all four consumers (`CharHitPoints`, `CharGold`, `TrackedResourceInput`, plus the comment-only `MoonlightStepResourceModal` reference) want the same semantics; `CharHitPoints`' own `committing 0 (unconscious)` pin passes a literal `'0'` string and is unaffected. `HiddenInput` is ruleset-agnostic (no 2024 sibling).
+
+**Verified live (test-campaign, :5173, post-fix):**
+- Repro BEFORE fix: clear + Enter on the HP badge → `Hit Points: 0/224`, bucket `currentHitPoints: 0`, one `hp_change` row (`delta:-224, isUnconscious:true`); clear + Escape → editor stayed open holding `''`.
+- AFTER fix: clear + Enter, clear + Tab, clear + Escape all CLOSE the editor with badge still `224/224` (bucket never re-zeroed); reopen shows real value `224` (no stale empty draft); Lay On Hands Pool clear+blur stays `100/100`.
+- Adjacent sanity: explicit `0` + Enter → `0/224` committed; normal edit-and-save `224` restored; pool explicit `90` committed and restored to `100`. Console clean except the pre-existing `deathSavePrompt-ElderPaladin` 404 evict-probe (Improvement Backlog item, fired by the transient HP-0 in the explicit-0 check).
+- Tests: `npx vitest run` on `HiddenInput.test.jsx` + `CharHitPoints.test.jsx` → 41 passed; touched folders `src/components/common` + `src/components/char-sheet/char-summary` → 117 files / 1348 passed. `npm run lint` clean (zero warnings).
+- Cleanup: tab closed, admin clear-change-data + clear-log via curl, GET-verified `{}`/`[]`; char files on disk untouched (HP/pool churn lived only in change-data).

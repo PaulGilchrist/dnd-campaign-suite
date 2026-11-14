@@ -18,7 +18,18 @@ function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, d
         if (!isEditingRef.current) setLocalValue(value);
       }, [value]);
 
+    // Abandoning an edit (Escape, or committing a blank field) writes nothing:
+    // an empty draft is not a value the user typed — committing Number('') === 0
+    // would silently zero HP or a class resource. Explicitly typed 0 still commits.
+    const cancel = () => {
+        setLocalValue(value ?? '');
+        handleInputToggle();
+     };
     const commit = () => {
+        if (String(localValue).trim() === '') {
+            cancel();
+            return;
+          }
         const numVal = Number(localValue);
         const clamped = max != null ? Math.min(Math.max(numVal, 0), max) : Math.max(numVal, 0);
         handleValueChange(clamped);
@@ -31,6 +42,8 @@ function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, d
         event.stopPropagation();
         if (event.key === "Enter") {
             commit();
+          } else if (event.key === "Escape") {
+            cancel();
           }
       };
     const handleStopPropagation = (event) => {

@@ -123,6 +123,43 @@ describe('CharHitPoints', () => {
       }
     });
 
+  // Regression (bug-hidden-input-empty-commit): an abandoned edit (cleared
+  // field blurred/Enter'd, or Escape) must CANCEL — never silently write 0
+  // (a downed character) or log an hp_change row nobody intended.
+  it.each([
+    ['blur', 'blur'],
+    ['Enter', 'enter'],
+    ['Escape', 'escape'],
+  ])('cancels without writing HP or logging when the editor is committed by %s while empty', (_label, mode) => {
+    mockRuntimeValues({ currentHitPoints: 10 });
+    renderCharHitPoints();
+
+    fireEvent.click(screen.getByText(/Hit Points:/).parentElement);
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '' } });
+    if (mode === 'blur') fireEvent.blur(input);
+    else if (mode === 'enter') fireEvent.keyDown(input, { key: 'Enter' });
+    else fireEvent.keyDown(input, { key: 'Escape' });
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+  });
+
+  it('still writes an explicitly typed 0 (down state) with an hp_change row', () => {
+    mockRuntimeValues({ currentHitPoints: 10 });
+    renderCharHitPoints();
+    commitHp('0');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'currentHitPoints', 0, CAMPAIGN);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'hp_change',
+      targetName: NAME,
+      delta: -10,
+      isUnconscious: true,
+    }));
+  });
+
   it('restores current HP from a matching death-save-result event', () => {
     renderCharHitPoints();
 
