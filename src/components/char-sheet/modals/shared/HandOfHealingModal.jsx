@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 import utils from '../../../../services/ui/utils.js'
 import { addEntry } from '../../../../services/ui/logService.js'
 import { getCombatSummary } from '../../../../services/encounters/combatData.js'
@@ -85,11 +85,38 @@ function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, r
 
 function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, hasPhysiciansTouch }) {
     const [curedCondition, setCureCondition] = React.useState(null);
+    const [cureRefusal, setCureRefusal] = React.useState(null);
     const curedOnMount = React.useRef(false);
+
+    // Display echo subscription (82f517b26 cure-conditions-echo parity with
+    // HealingPoolModal): the cureableConditions read below is imperative, so
+    // without this subscription the option list snapshotted at open — an
+    // externally-cured condition left a stale clickable button (whose press
+    // wrote a zero-delta bucket re-POST plus a phantom `condition broken`
+    // audit row) and a newly-arrived curable condition never surfaced.
+    // Subscribing re-renders on every activeConditions echo so the list
+    // recomputes; the commit-time guard in removeCondition keeps the audit
+    // ledger honest for the click-before-echo race.
+    useRuntimeValue(targetName, 'activeConditions', campaignName)
 
     const removeCondition = useCallback((conditionName) => {
         const conditions = getTargetConditions(targetName, campaignName);
         const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), conditionName.toLowerCase()));
+        // Commit-time presence guard (615a7580a cureRefusal parity): re-read
+        // the live bucket and refuse when the condition is already gone —
+        // zero write, zero log row, an inline note in the
+        // `<Target> is not affected by <Label>.` copy family. `condition
+        // broken` may only ever be recorded for a condition that actually
+        // broke.
+        if (filtered.length === conditions.length) {
+            setCureRefusal(`${targetName} is not affected by ${conditionName}.`);
+            return;
+        }
+        setCureRefusal(null);
+        // Touch spent — latch even on the clicked (non-mount) path so a live
+        // echo surfacing a single condition afterwards cannot auto-grant a
+        // second free cure (one Physician's Touch per HoH use).
+        curedOnMount.current = true;
         setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 
         addEntry(campaignName, {
@@ -104,12 +131,15 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
         setCureCondition(conditionName);
     }, [campaignName, targetName, healName, monkName]);
 
-    const cureableConditions = React.useMemo(() => {
+    // Recomputed every render (HealingPoolModal parity: targetConditions is a
+    // plain per-render read there too) — the useRuntimeValue subscription
+    // above is the wake-deps, so no memo cache to invalidate.
+    const cureableConditions = (() => {
         const conditions = getTargetConditions(targetName, campaignName);
         return Array.isArray(conditions)
             ? CUREABLE_CONDITIONS.filter(cc => conditions.some(c => conditionMatches(c, cc)))
             : [];
-    }, [targetName, campaignName]);
+    })();
 
     React.useEffect(() => {
         if (!curedOnMount.current && cureableConditions.length === 1 && hasPhysiciansTouch) {
@@ -131,21 +161,30 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
 
     if (cureableConditions.length > 1) {
         return (
-            <div className="short-rest-section">
-                <h4><i className="fas fa-shield-virus"></i> Physician&apos;s Touch</h4>
-                <p>Target has multiple conditions. Select one to remove:</p>
-                <div className="healing-cure-options">
-                    {[...new Set(cureableConditions)].map((condition, i) => (
-                        <button key={`${condition}-${i}`} className="char-btn" onClick={() => removeCondition(condition)}>
-                            <i className="fas fa-check-circle"></i> Remove {condition}
-                        </button>
-                    ))}
+            <>
+                <div className="short-rest-section">
+                    <h4><i className="fas fa-shield-virus"></i> Physician&apos;s Touch</h4>
+                    <p>Target has multiple conditions. Select one to remove:</p>
+                    <div className="healing-cure-options">
+                        {[...new Set(cureableConditions)].map((condition, i) => (
+                            <button key={`${condition}-${i}`} className="char-btn" onClick={() => removeCondition(condition)}>
+                                <i className="fas fa-check-circle"></i> Remove {condition}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
+                {/* Sibling of the section (HealingPoolModal cureRefusal placement):
+                    after a refusal the echo re-render can filter the whole
+                    section away — the note must still surface why nothing
+                    happened. */}
+                {cureRefusal && (
+                    <p className="healing-restriction-note">{cureRefusal}</p>
+                )}
+            </>
         );
     }
 
-    return null;
+    return cureRefusal ? <p className="healing-restriction-note">{cureRefusal}</p> : null;
 }
 
 function HandOfHealingResultStage({ healName, result, monkName, campaignName, hasPhysiciansTouch, onClose }) {

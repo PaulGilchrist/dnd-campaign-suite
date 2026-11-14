@@ -36,3 +36,25 @@ Mirror the HealingPoolModal recipe 1:1 into `PhysiciansTouchSection`: subscribe 
 ## Severity
 
 Data integrity risk — the campaign ledger permanently records a `condition broken` event that never happened, and the GM/player see a success message for a no-op; the display-stale half is the same class already ruled fixable in the LoH lane.
+
+## Resolution
+
+FIXED 2026-11-14. Root cause confirmed exactly as diagnosed: `PhysiciansTouchSection` in `src/components/char-sheet/modals/shared/HandOfHealingModal.jsx` rendered its cure options from a snapshot (`useMemo` deps `[targetName, campaignName]` — the store module was imported without `useRuntimeValue`) and `removeCondition` wrote + logged unconditionally with no commit-time presence guard.
+
+Fix — the `82f517b26`/`615a7580a` HealingPoolModal recipe mirrored 1:1:
+
+- **Echo subscription**: `useRuntimeValue(targetName, 'activeConditions', campaignName)` added to the section (display-wake only, same as the LoH seam). The `useMemo` became a plain per-render recompute (exact LoH parity — `HealingPoolModal` also reads `getTargetConditions()` per render; keeping the memo would have needed the subscription value as a lint-flagged "unnecessary" dep). Externally-cured options now retire mid-dwell; newly-arrived curable options surface mid-dwell.
+- **Commit-time presence guard** in `removeCondition`: re-read first; if the filter removes nothing, set the inline `.healing-restriction-note` refusal `${targetName} is not affected by ${conditionName}.` and RETURN before `setRuntimeValue`/`addEntry` — zero write, zero log row, no false success panel. Note renders as a sibling of the section (LoH placement) so it survives the section filtering itself away.
+- **Auto-cure latch hardened (Priority Target #4)**: `curedOnMount.current` is now also set on the CLICKED cure path (previously only on the mount path), so once the touch is spent — by click or by a live-surfacing auto-cure — a later echo surfacing a single condition can never grant a second free cure. Multi→single mid-dwell DOES auto-cure the survivor exactly once with an honest row (same law as a fresh open with one curable); the latch pins it to one per HoH use.
+- The combat-summary condition merge read stays as-is (per the fix brief); the guard's commit-time re-read covers it (witnessed live: a stale cs-sourced `Remove Deafened` press refused honestly).
+- Dual-ruleset: `HandOfHealingModal.jsx` is the single shared component for both 5e and 2024 monk lanes (the handler only swaps ki/Focus wording) — no sibling module needed the fix.
+
+Files changed:
+- `src/components/char-sheet/modals/shared/HandOfHealingModal.jsx` (fix)
+- `src/components/char-sheet/modals/shared/HandOfHealingModal.live-conditions-echo.test.jsx` (NEW regression test, 6 legs: echo-retire live, echo-surface live, multi→single auto-cure-once + honest row + post-cure latch, zero→single surface + no second free cure, stale cs-press commit-guard refusal zero-write/zero-row, still-present control cures honestly)
+
+Verification:
+- Live repro on the ORIGINAL code confirmed both faces (stale `Remove Blinded` button after external cure; press → `Condition Cleared — Blinded removed` panel + phantom `condition|broken|Blinded` row with bucket byte-identical `["stunned"]`).
+- Live re-verification post-fix (Mercy-swap rig, :5173): external cure mid-dwell retired `Remove Blinded` within one SSE tick (zero writes); externally APPLIED `paralyzed` surfaced `Remove Paralyzed` live; cure-down-to-single auto-cured the surviving `Stunned` with a GENUINE single broken row (bucket `["stunned"]`→`[]`); a genuinely stale cs-lane press (`Remove Deafened`, which the section never subscribes to) refused with `EvasiveFighter is not affected by Deafened.` — bucket untouched, zero new condition rows, no success panel; control press on a present condition cured honestly (write + exactly one broken row).
+- `npx vitest run src/components/char-sheet/modals/shared/` → 102 files / 579 tests passed; `npm run lint` → zero warnings. The 6 pre-existing HoH test files (which already mock `useRuntimeValue: () => null`) pass untouched.
+- Cleanup: Disciplined_Monk subclass restored byte-exact (md5 `ba4d456c4ab7605d7ca4246a17cfe58f`, Hand rows vanish live re-proved); closed-tab admin clears → change-data `{}` + log `[]` + overlays `[]`, disk cd/log files absent; `git status --porcelain public/campaigns/ public/data/` empty.
