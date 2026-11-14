@@ -37,6 +37,8 @@ import HealingPoolModal from './HealingPoolModal.jsx';
 // setRuntimeValue write. Pinned below by exact single-write assertions.
 // Flagged product quirk (asserted as-is): individual cures log the label
 // ("Blinded") while batch cures log the key ("blinded") in the campaign log.
+// Batch modal log rows show the RUNNING pool after each condition's own cost
+// (backlog 2026-11-13 FX fix) while the store keeps one full-batch pool write.
 
 // ── Mocked modules ──
 
@@ -380,12 +382,72 @@ describe('HealingPoolModal - Curing', () => {
       [CAMPAIGN, conditionLog('Paladin1', 'charmed')],
     ]);
     expect(logRows()).toEqual([
-      ['Cure blinded', 'Paladin1', '3', '14'],
+      ['Cure blinded', 'Paladin1', '3', '17'],
       ['Cure charmed', 'Paladin1', '3', '14'],
     ]);
     // Live store is empty and the summary carries no self conditions — the
     // whole cure section (and its stale selection) must unmount.
     expect(screen.queryByRole('button', { name: /^Cure Selected/ })).not.toBeInTheDocument();
+  });
+
+  it('batch cure log rows show the RUNNING pool after each condition cost, one pool write for the total', async () => {
+    // Backlog 2026-11-13 FX: the batch rows used to all print the post-BATCH
+    // pool (both 90). Display-layer only — the store still gets the single
+    // full-batch write.
+    store.Paladin1.activeConditions = ['blinded', 'poisoned'];
+
+    await renderModal(
+      { alsoCures: [], restoringTouchConditions: ['Blinded', 'Poisoned'], cureCost: 5 },
+      { current: 100, max: 100 },
+    );
+    selectConditions(['Blinded', 'Poisoned']);
+    fireEvent.click(cureBtn('Cure Selected (2 for 10 HP)'));
+
+    expect(logRows()).toEqual([
+      ['Cure blinded', 'Paladin1', '5', '95'],
+      ['Cure poisoned', 'Paladin1', '5', '90'],
+    ]);
+    expect(poolUpdate).toHaveBeenCalledTimes(1);
+    expect(poolUpdate).toHaveBeenCalledWith(90);
+    expect(poolStore.current).toBe(90);
+  });
+
+  it('deferred setLog updaters still capture each row own pool value (live React behavior)', async () => {
+    // Live regression pin: in the real app setPoolRemaining schedules a state
+    // update BEFORE the log pushes, so React defers the functional setLog
+    // updaters to the re-render. A mutable per-loop counter captured by the
+    // updaters read its FINAL value in every row (both showed 90 live). The
+    // mock's update() dispatches a real render here to reproduce that face.
+    store.Paladin1.activeConditions = ['blinded', 'poisoned'];
+    setupPoolStore(100, 100);
+    const React = await import('react');
+    useTrackedResource.mockImplementation(() => {
+      const [, forceRender] = React.useReducer((c) => c + 1, 0);
+      return {
+        current: poolStore.current,
+        max: poolStore.max,
+        update: (v) => { poolStore.current = v; forceRender(); },
+      };
+    });
+
+    const rendered = render(<HealingPoolModal {...makeProps({
+      alsoCures: [], restoringTouchConditions: ['Blinded', 'Poisoned'], cureCost: 5,
+    })} />);
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+    });
+    selectConditions(['Blinded', 'Poisoned']);
+    fireEvent.click(cureBtn('Cure Selected (2 for 10 HP)'));
+
+    // The pool update flushes through the real render — once the header shows
+    // the new pool, the deferred log updaters have committed too.
+    await waitFor(() => {
+      expect(rendered.container.textContent).toContain('Pool: 90 / 100');
+    });
+    expect(logRows()).toEqual([
+      ['Cure blinded', 'Paladin1', '5', '95'],
+      ['Cure poisoned', 'Paladin1', '5', '90'],
+    ]);
   });
 
   // ── Batch gating and shortfall warnings ──

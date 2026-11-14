@@ -601,7 +601,14 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const newPool = safePool - totalCost;
         setPoolRemaining(newPool);
 
-        selectedConditions.forEach((condition) => {
+        // Display-layer running pool: each modal log row shows the pool after
+        // ITS OWN cost (mirroring the amount lane's per-commit poolAfter), while
+        // the store write stays the single full-batch setPoolRemaining above.
+        // Computed per-index — the setLog functional updaters run deferred at
+        // re-render, so a mutable captured counter would read its final value
+        // in every row (witnessed live: React's eager-state path only fires for
+        // the first updater, leaving the rest stale).
+        selectedConditions.forEach((condition, index) => {
             const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
             const filtered = conditions.filter(c => !conditionMatches(c, condition));
             setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
@@ -616,7 +623,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 timestamp: Date.now(),
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
-            setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter: newPool }]);
+            const poolAfter = safePool - cureCost * (index + 1);
+            setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter }]);
         });
 
         setSelectedConditions([]);
