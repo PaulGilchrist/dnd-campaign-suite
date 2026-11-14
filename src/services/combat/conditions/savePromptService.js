@@ -1,3 +1,5 @@
+import { getAllStoreKeys, hasRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+
 // Save prompts key per promptId (mirrors the concentration lane's multi-hit
 // collapse fix): back-to-back saves on one target stack as separate keys
 // instead of every POST overwriting the same `savePrompt-<Target>` key — a
@@ -73,8 +75,26 @@ export function clearSavePrompt(campaignName, keySuffix) {
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
+function deathSavePromptKey(targetName) {
+  return `deathSavePrompt-${targetName}`;
+}
+
+// Mirror-existence probe for the target-wide death-save prompt key. The key
+// reaches this client's synced runtime store on exactly two lanes: the
+// campaign-select seed (every top-level change-data key copies into the
+// 'campaign' store, App.jsx seedCampaignRuntimeData) and the live
+// `change-<campaign>-deathSavePrompt-<Name>` value echo (not registered as a
+// campaign key, App.jsx applyStoreUpdate dispatches it to a character-style
+// bucket store named after the full key). Present on either lane ⇒ the server
+// holds (or held) the key; a stale survivor (the shared null-echo lane drops
+// non-campaign-key clears, so an evicted ghost bucket is not swept) only ever
+// replays today's honest double-sweep 404 — never a missed real evict.
+function deathSavePromptInMirror(key) {
+  return hasRuntimeValue('campaign', key) || getAllStoreKeys().includes(key);
+}
+
 export function sendDeathSavePrompt(campaignName, promptData) {
-  const key = `deathSavePrompt-${promptData.targetName}`;
+  const key = deathSavePromptKey(promptData.targetName);
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -82,8 +102,17 @@ export function sendDeathSavePrompt(campaignName, promptData) {
   }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
+// Mirror-gated evict (backlog 2026-11-14 death-save-prompt-evict-404-noise):
+// the recovery clear-legs (CharHitPoints/DeathSavingThrows sheet lanes,
+// createCreatureHandlers.writePlayerHp revival, DeathSavePromptModal roll/void)
+// previously DELETEd unconditionally, so an HP-0 seeded without ever arming a
+// prompt (external full-store POST, sheet-editor drop) probed a key that was
+// never created — the wildcard DELETE's honest 404 (campaigns-changedata.js)
+// surfaced as console noise on every recovery. Same has()-guard doctrine as
+// deleteRuntimeKey's drain-to-evict ("no second DELETE, no honest-404 churn").
 export function clearDeathSavePrompt(campaignName, targetName) {
-  const key = `deathSavePrompt-${targetName}`;
+  const key = deathSavePromptKey(targetName);
+  if (!deathSavePromptInMirror(key)) return;
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'DELETE',
   }).catch((e) => { console.error("[savePromptService] Error:", e); });

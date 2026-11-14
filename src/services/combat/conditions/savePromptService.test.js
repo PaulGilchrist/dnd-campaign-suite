@@ -16,6 +16,7 @@
 // Verified.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { getStore } from '../../../hooks/runtime/useRuntimeState.js';
 import {
   sendSavePrompt,
   sendSaveResult,
@@ -90,9 +91,15 @@ const ALL_SENDERS = [
 describe('savePromptService', () => {
   beforeEach(() => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    // clearDeathSavePrompt is mirror-gated (backlog 2026-11-14): seed the
+    // prompt key into the campaign mirror so the transport rows below exercise
+    // the DELETE as if the prompt lane had materialized the key. The gate's
+    // own faces are pinned in savePromptService.death-save-evict-mirror.test.js.
+    getStore('campaign').set('deathSavePrompt-Fighter', { promptId: 'seed', targetName: 'Fighter' });
   });
 
   afterEach(() => {
+    getStore('campaign').delete('deathSavePrompt-Fighter');
     vi.restoreAllMocks();
   });
 
