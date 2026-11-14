@@ -194,7 +194,9 @@ const hpLog = (name, delta, currentHp, maxHp) => ({
     delta,
     currentHp,
     maxHp,
-    isHealing: true,
+    // Sign-stamp law (healingRoll.js:88, 2026-11-14 MM): isHealing mirrors the
+    // written delta — the honest zero-clamp row never claims healing.
+    isHealing: delta > 0,
     sourceName: 'Cleric',
     note: 'Prayer of Healing',
     formula: '2d8',

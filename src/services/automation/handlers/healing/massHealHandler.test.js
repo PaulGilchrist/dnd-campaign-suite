@@ -237,6 +237,30 @@ describe('massHealHandler', () => {
             expect(hpLogs[0][1].sourceName).toBe('Cleric');
         });
 
+        // Audit hygiene (2026-11-14 MM, healingRoll.js:88 sign-stamp law): Mass
+        // Heal's min(userAmount, missingHp, totalPool) clamps to 0 for a target
+        // already at max — the honest delta-0 row must NEVER stamp isHealing:true.
+        it('stamps isHealing:false on the delta-0 row for a full-HP target', async () => {
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (name === 'Fighter' && prop === 'currentHitPoints') return 45; // at max (row maxHp 45)
+                if (prop === 'currentHitPoints') return 20;
+                if (prop === 'activeConditions') return [];
+                return null;
+            });
+
+            await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution: { Fighter: 50, Rogue: 30 }, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
+
+            const hpLogs = addEntry.mock.calls.filter(call => call[1].type === 'hp_change');
+            const fighterRow = hpLogs.find(call => call[1].targetName === 'Fighter');
+            expect(fighterRow[1].delta).toBe(0);
+            expect(fighterRow[1].isHealing).toBe(false);
+            expect(applyHealingToTarget).not.toHaveBeenCalledWith(expect.anything(), 'Fighter', expect.anything(), campaignName);
+            // positive-delta twin on the same click keeps the honest true stamp
+            const rogueRow = hpLogs.find(call => call[1].targetName === 'Rogue');
+            expect(rogueRow[1].delta).toBe(10); // 30 requested, missingHp 10 (max 30 - current 20)
+            expect(rogueRow[1].isHealing).toBe(true);
+        });
+
         it('removes default conditions on each target', async () => {
             getRuntimeValue.mockImplementation((_name, prop) => {
                 if (prop === 'activeConditions') return ['blinded', 'poisoned'];

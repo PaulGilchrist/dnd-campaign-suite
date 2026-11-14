@@ -235,7 +235,10 @@ describe('prayerOfHealingService results lane (5e twin outcome shape)', () => {
         expect(rows).toEqual([
             { type: 'hp_change', targetName: 'Ally1', delta: 5, currentHp: 50, maxHp: 50, isHealing: true, sourceName: 'Cleric', note: 'Prayer of Healing', formula: '2d8 + 3', bonusDetails: undefined, timestamp: FIXED_TS },
             { type: 'hp_change', targetName: 'Ally2', delta: 15, currentHp: 25, maxHp: 30, isHealing: true, sourceName: 'Cleric', note: 'Prayer of Healing', formula: '2d8 + 3', bonusDetails: undefined, timestamp: FIXED_TS },
-            { type: 'hp_change', targetName: 'Ally3', delta: 0, currentHp: 40, maxHp: 40, isHealing: true, sourceName: 'Cleric', note: 'Prayer of Healing', formula: '2d8 + 3', bonusDetails: undefined, timestamp: FIXED_TS },
+            // Ally3 delta-0 row: the over-log stays, but the isHealing stamp
+            // follows the delta SIGN (healingRoll.js:88 law, 2026-11-14 MM) —
+            // a row that healed nothing never claims isHealing:true.
+            { type: 'hp_change', targetName: 'Ally3', delta: 0, currentHp: 40, maxHp: 40, isHealing: false, sourceName: 'Cleric', note: 'Prayer of Healing', formula: '2d8 + 3', bonusDetails: undefined, timestamp: FIXED_TS },
         ]);
         // 5e twin: zero automation-envelope logs (refused/short-rest/range-advisory
         // are enforcement-only; base+handler lanes own those bytes).

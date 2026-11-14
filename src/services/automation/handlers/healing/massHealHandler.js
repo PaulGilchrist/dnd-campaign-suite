@@ -141,7 +141,10 @@ async function healMassHealTarget({ combatSummary, targetName, userAmount, total
         delta: actualHeal,
         currentHp: newHp,
         maxHp,
-        isHealing: true,
+        // Sign-stamp law (healingRoll.js:88, 2026-11-14 MM): min(userAmount,
+        // missingHp, totalPool) is 0 for a full-HP target or an exhausted pool —
+        // never stamp isHealing:true on a delta that healed nothing.
+        isHealing: actualHeal > 0,
         sourceName: playerName,
         note: MASS_HEAL_NAME,
         formula: `${distributionSize} targets`,

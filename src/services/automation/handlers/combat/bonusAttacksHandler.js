@@ -44,7 +44,9 @@ async function applyHealingStrike({ featureName, playerName, playerStats, campai
         delta: actualHeal,
         currentHp: newHp,
         maxHp: healTargetStats.hitPoints || healTargetStats.maxHitPoints || newHp,
-        isHealing: true,
+        // Sign-stamp law (healingRoll.js:88, 2026-11-14 MM): a HoH rider whose
+        // heal clamps to 0 at the target's cap must not stamp isHealing:true.
+        isHealing: actualHeal > 0,
         isUnconscious: false,
         sourceName: playerName,
         note: `${featureName} — Hand of Healing`,

@@ -159,7 +159,13 @@ export function createMassHealHandler(config) {
             delta: actualHeal,
             currentHp: newHp,
             maxHp,
-            isHealing: true,
+            // Audit hygiene (2026-11-14 MM follow-up to bug-hoh-negative-heal-
+            // stale-snapshot-clamp): the sign of the written delta is the truth —
+            // a full-HP target clamps actualHeal to 0 (and an over-cap stored
+            // row can even go negative), and must never stamp isHealing:true.
+            // The delta-0 over-log quirk itself stays (renderer 'No HP Change'
+            // fourth arm); only the flag follows the sign. healingRoll.js:88 law.
+            isHealing: actualHeal > 0,
             sourceName: playerName,
             note: spellName,
             formula: buildHealFormula(healExpression, bonusDetails),

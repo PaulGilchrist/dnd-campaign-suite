@@ -182,7 +182,10 @@ async function healPrayerTarget(target, ctx) {
         delta: actualHeal,
         currentHp: newHp,
         maxHp,
-        isHealing: true,
+        // Sign-stamp law (healingRoll.js:88, 2026-11-14 MM): the honest 0 stays
+        // in the log ('No HP Change' fourth arm), but a delta that healed
+        // nothing must never carry isHealing:true.
+        isHealing: actualHeal > 0,
         sourceName: casterName,
         note: 'Prayer of Healing',
         formula: buildHealFormula(healExpression, bonusDetails),

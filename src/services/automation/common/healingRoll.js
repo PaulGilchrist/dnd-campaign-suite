@@ -33,10 +33,16 @@ export function rollHealingForAction(auto, playerStats, campaignName, isSelf = f
               addEntry(campaignName, {
                   type: 'hp_change',
                   targetName,
-                  delta: result.delta,
+                  // applyHealingToTarget returns actualHeal (there is no `delta`
+                  // key) — the old `result.delta` byte would have logged an
+                  // undefined delta. Sign-stamp law (healingRoll.js:88) applies
+                  // to this lane too: a heal clamped to 0 at full HP stamps
+                  // isHealing:false. (Zero call sites repo-wide — see
+                  // healingRoll.test.js header — but the bytes stay law-clean.)
+                  delta: result.actualHeal,
                   currentHp: result.newHp,
                   maxHp: result.maxHp,
-                  isHealing: true,
+                  isHealing: result.actualHeal > 0,
                   isUnconscious: false,
               }).catch((e) => { console.error("[healingRoll] Error:", e); });
          }

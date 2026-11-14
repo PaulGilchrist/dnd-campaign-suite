@@ -126,7 +126,10 @@ export function createMassHealSpellTrigger(config) {
             delta: actualHeal,
             currentHp: newHp,
             maxHp,
-            isHealing: true,
+            // Sign-stamp law (healingRoll.js:88, 2026-11-14 MM): the pinned
+            // delta-0/negative over-log quirk keeps its bytes, but isHealing now
+            // follows the delta sign — zero-or-worse never claims healing.
+            isHealing: actualHeal > 0,
             sourceName: casterName,
             note: spellName,
             formula: buildHealFormula(healExpression, bonusDetails),

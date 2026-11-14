@@ -178,6 +178,23 @@ describe('CLA-144 Hand of Healing — numeric formula resolution', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Disciplined_Monk', 'flurryHealingHarmUses', 6, campaignName);
   });
 
+  // Audit hygiene (2026-11-14 MM, healingRoll.js:88 sign-stamp law): a HoH
+  // flurry rider clamped to 0 at the target's cap logs its honest delta-0 row
+  // but must NEVER stamp isHealing:true.
+  it('stamps isHealing:false on the hp_change row when the rider heal clamps to 0', async () => {
+    rollExpression.mockImplementation(f => (/^\d+d\d+ [+-] \d+$/.test(f) ? { total: 15, rolls: [8], modifier: 7 } : null));
+    applyHealingDirectly.mockReturnValue({ newHp: 30, actualHeal: 0 }); // target already at max
+
+    await applyFlurryOfBlows({
+      action: flurryAction, playerStats: makeMercyMonk(), campaignName,
+      _mapName: mapName, distribution: { 'Bandit 1': 1 }, numAttacks: 1, healingTarget: 'AasimarTest',
+    });
+
+    const healHp = addEntry.mock.calls.find(c => c[1].type === 'hp_change' && String(c[1].note).includes('Hand of Healing'));
+    expect(healHp[1].delta).toBe(0);
+    expect(healHp[1].isHealing).toBe(false);
+  });
+
   // Absorbed from main bonusAttacksHandler.test.js integration block: the
   // per-strike threading of the uses counter (2→1→0, never re-read) is
   // pinned ONLY here — single-strike 7→6 above does not cover it.
