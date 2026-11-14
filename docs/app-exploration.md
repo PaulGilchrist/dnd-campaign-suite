@@ -71,7 +71,6 @@ change-data `{}` + log `[]` + overlays `[]` (tabs CLOSED before clears; pass 1 c
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 MM — HoH picker mount snapshot can render an inverted fraction** (`Select EvasiveFighter, 60 of 1 HP`): the open-moment row is a fan-out placeholder (maxHp 1) while the bucket carries real HP; the next echo re-anchors (9c3ec68ea) but the first paint is confusing. Suggest: at `collectTouchTargets`/snapshot time, prefer the target's own max (`hitPoints` from char data/bucket) over a placeholder row maxHp — pairs with the PT#3 owner decision. `src/services/automation/handlers/healing/healingHandler.js collectTouchTargets` + `liveTargetHp.js`.
 - **2026-11-14 MM — the ability_use audit description and the write can contradict** (same click produced `= 16 (Already at full HP)` AND a −59 `hp_change` row with `isHealing:true`): even beyond the filed bug's clamp fix, stamp `isHealing` from the delta SIGN and suppress the `(Already at full HP)` clause on any path that still wrote/spent (the bug fix should route it to the refuse path — this bullet pins the audit-hygiene half). `healingHandler.js healDesc`/row builders.
 - **2026-11-14 MM — the sheet-revive lane writes 3–4 separate POSTs in one user action** (hp value, deathSaves, deathFailures, isDead as individual `POST /<Char>` full-bucket writes): each broadcasts its own SSE echo; a single merged full-store POST would halve the chatter on every revive. `CharHitPoints.jsx handleValueChangeCurrentHitPoints`.
 

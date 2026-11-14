@@ -12,8 +12,20 @@ function targetKeyOf(target) {
     return isOptionTarget(target) ? target.value : target.name;
 }
 
+// Never render current > max (backlog 2026-11-14 MM HoH mount-snapshot improve):
+// the picker's mount row resolves `N` bucket-first but `M` may still fall back
+// to a stale combatSummary max — the campaign-select re-seed (App.jsx) bakes
+// 1/1 player placeholder rows, and a third-party currentHitPoints write from a
+// tab whose mirror hydrated before party stats settle (the async
+// seedCharacterRuntimeData window, or a stats-computation failure) creates a
+// thin bucket {currentHitPoints} with no hitPoints — so the first paint read
+// `Select EvasiveFighter, 60 of 1 HP (6000%)`. A current>max pair ALWAYS means
+// the two halves came from different truths: no displayable HP fact exists, so
+// skip the chip, the percent lane and the aria HP segment rather than
+// fabricate a max. Honest pairs (bucket hitPoints first via resolveLiveTargetHp
+// — `60 of 112`) render byte-identically to before.
 function hasHpValues(target) {
-    return target.currentHp != null && target.maxHp != null;
+    return target.currentHp != null && target.maxHp != null && target.currentHp <= target.maxHp;
 }
 
 function hpPercent(target) {
