@@ -707,11 +707,18 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         // re-render, so a mutable captured counter would read its final value
         // in every row (witnessed live: React's eager-state path only fires for
         // the first updater, leaving the rest stale).
-        selectedConditions.forEach((condition, index) => {
-            const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
-            const filtered = conditions.filter(c => !conditionMatches(c, condition));
-            setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
+        //
+        // One merged target write (backlog 2026-11-13 GZ batch-cure-single-write):
+        // re-read the live bucket ONCE at commit time and remove every selected
+        // condition in a single setRuntimeValue — mirroring the pool side's one
+        // full-batch write above. The old per-condition loop POSTed the whole
+        // bucket once PER cured condition (N full-store writes where one merged
+        // write yields byte-identical final state).
+        const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
+        const filtered = conditions.filter(c => !selectedConditions.some(sel => conditionMatches(c, sel)));
+        setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
 
+        selectedConditions.forEach((condition, index) => {
             // selectedConditions entries are raw catalog keys; the audit row
             // carries the display label ("Poisoned") — same unified convention
             // as applyCure and the Physician's Touch lane (see note there).

@@ -372,7 +372,11 @@ describe('HealingPoolModal - Curing', () => {
     expect(screen.queryByText(/Pool after/)).not.toBeInTheDocument();
   });
 
-  it('batch cure writes filtered conditions once per selection in click order, deducts the total, logs each cure, and unmounts the section when the store empties', async () => {
+  it('batch cure writes the merged filtered conditions ONCE (single full-bucket write), deducts the total, logs each cure, and unmounts the section when the store empties', async () => {
+    // Backlog 2026-11-13 GZ batch-cure-single-write: the old loop POSTed the
+    // whole bucket once PER cured condition. The merged write must be exactly
+    // ONE setRuntimeValue carrying the all-selections-removed result — the same
+    // value the N sequential writes converged on.
     store.Paladin1.activeConditions = ['blinded', 'charmed'];
 
     await renderModal(
@@ -383,7 +387,6 @@ describe('HealingPoolModal - Curing', () => {
     fireEvent.click(cureBtn('Cure Selected (2 for 6 HP)'));
 
     expect(cureWrites()).toEqual([
-      ['Paladin1', 'activeConditions', ['charmed'], CAMPAIGN],
       ['Paladin1', 'activeConditions', [], CAMPAIGN],
     ]);
     expect(store.Paladin1.activeConditions).toEqual([]);
@@ -401,6 +404,33 @@ describe('HealingPoolModal - Curing', () => {
     // Live store is empty and the summary carries no self conditions — the
     // whole cure section (and its stale selection) must unmount.
     expect(screen.queryByRole('button', { name: /^Cure Selected/ })).not.toBeInTheDocument();
+  });
+
+  it('batch cure of 2 keeps surviving conditions and untouched bucket keys intact in the single merged write', async () => {
+    store.Paladin1.activeConditions = ['blinded', 'frightened', 'charmed', 'poisoned'];
+
+    await renderModal(
+      { alsoCures: [], restoringTouchConditions: ['Blinded', 'Charmed', 'Poisoned', 'Frightened'] },
+      { current: 100, max: 100 },
+    );
+    selectConditions(['Blinded', 'Poisoned']);
+    fireEvent.click(cureBtn('Cure Selected (2 for 6 HP)'));
+
+    // Exactly one write — survivors (frightened, charmed) keep order.
+    expect(cureWrites()).toEqual([
+      ['Paladin1', 'activeConditions', ['frightened', 'charmed'], CAMPAIGN],
+    ]);
+    expect(store.Paladin1.activeConditions).toEqual(['frightened', 'charmed']);
+    // Every other bucket key byte-intact.
+    expect(store.Paladin1.currentHitPoints).toBe(15);
+    expect(store.Paladin1.hitPoints).toBe(40);
+    // One pool write for the total, per-cure audit rows unchanged.
+    expect(poolUpdate).toHaveBeenCalledTimes(1);
+    expect(poolUpdate).toHaveBeenCalledWith(94);
+    expect(logService.addEntry.mock.calls).toEqual([
+      [CAMPAIGN, conditionLog('Paladin1', 'Blinded')],
+      [CAMPAIGN, conditionLog('Paladin1', 'Poisoned')],
+    ]);
   });
 
   it('batch cure log rows show the RUNNING pool after each condition cost, one pool write for the total', async () => {

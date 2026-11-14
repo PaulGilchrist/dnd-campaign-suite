@@ -62,7 +62,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass: clear → re-e
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 GZ — batch-cure writes the target bucket once PER cured condition:** two sequential full-store `POST /:c/AasimarTest` bodies (100-key bucket each) where one merged write would do (the pool side already batches to ONE write — mirror it). Chatty-save pattern only; final state was correct both rides. File: `HealingPoolModal.jsx applyBatchCure`.
 - **2026-11-13 GZ — unrelated-class pool keys fan out at 0 on sheet-open:** ElderPaladin's change-data bucket gained `healinglightPool: 0` + `preserveLifePool: 0` (Warlock/Life-cleric resources he doesn't own) via the tracked-resource fan-out — zero-consumer ghosts today but they inflate buckets and could mislead a future per-key validator or the Admin change-data viewer. Investigate `useTrackedResource`/`seedTrackedResources` fan-out scope.
 
 ## Blocked / Not Verified (fold-gate ledger)
