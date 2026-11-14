@@ -4,6 +4,7 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes, markFortifiedHealthUsed, hasTacticalShift } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -208,8 +209,23 @@ function applyMonkHeal({ cs, targetName, healAmount, playerStats, campaignName }
 // runs at confirm, not only at render). Mirrors the Healing-Light noHealCapacity
 // gate (d595cff2c). Without HP truth (no row, no bucket, no stats) the gate
 // stays open — selfHealingHpRefusal's hasHpTruth idiom.
+// LC 2026-11-14 (picker-stage echo, gate leg): the picker CAN dwell across
+// mid-dwell board writes, and `cs` is the combat context captured when the
+// feature click dispatched — gating on its rows let a stale max/current refuse
+// a legitimate heal (or wave through a target the live board now calls full).
+// Resolve the row from the SSE-adopted combatData cache first (App.jsx
+// syncCombatSummaryCache keeps it current on every echo), falling back to the
+// caller's captured board when no cache is adopted (the never-loaded /
+// out-of-combat lanes keep their pre-fix bytes).
+function resolveMonkHealGateRow(targetName, cs, campaignName) {
+    const liveRow = getCombatSummary(campaignName)?.creatures?.find(c => c.name === targetName);
+    return liveRow ?? cs?.creatures?.find(c => c.name === targetName);
+}
+
 function monkHealTargetAtFullHp(targetName, cs, playerStats, campaignName) {
-    const row = cs?.creatures?.find(c => c.name === targetName);
+    // Bucket-first precedence via resolveLiveTargetHp is UNCHANGED — the live
+    // row only refreshes the fallback source; currentHitPoints stays canonical.
+    const row = resolveMonkHealGateRow(targetName, cs, campaignName);
     if (row) {
         const { currentHp, maxHp } = resolveLiveTargetHp(row);
         return Number.isFinite(currentHp) && Number.isFinite(maxHp) && maxHp > 0 && currentHp >= maxHp;

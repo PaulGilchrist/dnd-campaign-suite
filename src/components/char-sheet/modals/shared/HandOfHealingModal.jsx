@@ -3,6 +3,7 @@ import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../../h
 import utils from '../../../../services/ui/utils.js'
 import { addEntry } from '../../../../services/ui/logService.js'
 import { getCombatSummary } from '../../../../services/encounters/combatData.js'
+import { resolveLiveTargetHp } from '../../../../services/automation/handlers/healing/liveTargetHp.js'
 import SecondaryTargetModal from './SecondaryTargetModal.jsx'
 import '../../CharSheet.css'
 
@@ -53,7 +54,42 @@ function getTargetConditions(targetName, campaignName) {
 // refused a zero-capacity target with ZERO Focus spent — the picker stays open
 // with the note inline, mirroring the d595cff2c noHealCapacity copy placement
 // (.healing-restriction-note, same global class Healing-Light uses).
+// LC 2026-11-14 (picker-stage echo): re-anchor each mount-time row's HP pair on
+// the LIVE combat-summary row, bucket-first via resolveLiveTargetHp — the exact
+// precedence collectTouchTargets used to build the snapshot, so the display read
+// is just re-taken against the current board. The mount snapshot froze the cs-row
+// fallbacks (bucket currentHitPoints stays canonical for `N`; the live row supplies
+// `M`), so a mid-dwell scoped PATCH / full-store POST on combatSummary.creatures
+// now lands in the `N of M HP` text and radio aria-label within one echo instead
+// of stranding the chooser on the open-moment values (stale max once made the
+// honest commit-time full-HP gate refuse a legitimate heal). Roster membership
+// (range/liveness) stays the open-moment snapshot — collectTouchTargets ran at
+// dispatch and is the feature's range law, not display state. Targets with no
+// live row (cache absent, left the board) keep their snapshot values byte-
+// identically, so every snapshot-consumer face renders unchanged.
+function reanchorTargetsToLiveBoard(creatureTargets, campaignName) {
+    let cs = null;
+    try { cs = getCombatSummary(campaignName); } catch { /* no board — snapshot stands */ }
+    const rows = cs?.creatures;
+    if (!Array.isArray(rows)) return creatureTargets;
+    return creatureTargets.map(target => {
+        const row = rows.find(c => utils.getName(c.name) === utils.getName(target.name));
+        if (!row) return target;
+        const { currentHp, maxHp } = resolveLiveTargetHp(row);
+        return { ...target, currentHp: currentHp ?? target.currentHp, maxHp: maxHp ?? target.maxHp };
+    });
+}
+
 function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, refusalNote, campaignName }) {
+    // Same wake-vs-read order as the result-stage subscription below (and the
+    // fe3e5eece cs-row echo law it implemented): App.jsx handleChangeKeyEvent
+    // runs syncCombatSummaryCache BEFORE the store notify, so when this echo
+    // wakes the render the getCombatSummary source above already carries the
+    // new board. Recomputed every render (no memo — the subscription IS the
+    // wake-dep, mirroring cureableConditions below).
+    useRuntimeValue('combatSummary', 'creatures', campaignName)
+    const liveCreatureTargets = reanchorTargetsToLiveBoard(creatureTargets, campaignName)
+
     return (
         <div className="short-rest-overlay no-print">
             <div
@@ -68,7 +104,7 @@ function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, r
                 <SecondaryTargetModal
                     title={`Choose target for ${healName}`}
                     titleId="hand-of-healing-target-modal-title"
-                    targets={creatureTargets}
+                    targets={liveCreatureTargets}
                     onTargetSelected={onPick}
                     onSkip={onSkip}
                     featureDescription={`Choose a creature you can touch to heal with ${healName}.`}

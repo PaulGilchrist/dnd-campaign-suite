@@ -64,7 +64,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before the admin clears;
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (LC 2026-11-14) HoH picker chooser is a mount snapshot: mid-dwell board writes never refresh the target radios' `N of M HP` labels or the full-HP eligibility gate (result stage echoes live since `fe3e5eece` but the picker doesn't subscribe) — stale max made an honest control refuse a legitimate heal; subscribe the chooser to `combatSummary.creatures` or reopen-on-echo, mirroring the result-stage wake order.
 - (LC 2026-11-14) HoH picker `Skip` button semantics are a misread trap: it does NOT dismiss — it self-heals the monk (`onSkip={() => runHeal(monkName)}`, real focus spend when the monk is damaged); Escape is the only close. Relabel (`Heal self`/`Skip & heal self`) or add a distinct Close/Cancel, and note the `DeathSavePromptModal` shares its roll-button class `.dsp-roll-btn` for Roll/Done/Next (text-anchor future test locators).
 - (LC 2026-11-14) `hp_change` from the GM initiative card carries `sourceName:"GM HP override"` but the sheet-editor lane writes `hp_change` with NO sourceName — two indistinguishable manual-edit row families in the log; stamp a source (`"sheet editor"`) on the CharHitPoints lane.
 
