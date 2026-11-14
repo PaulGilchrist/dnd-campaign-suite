@@ -5,6 +5,7 @@ import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules
 import { addEntry } from '../../services/ui/logService.js';
 import Subscriber from './Subscriber.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { isGmHost } from '../../services/ui/gmHost.js';
 import './DeathSavePromptModal.css';
 
 function isSuccessResult(result) {
@@ -213,6 +214,25 @@ function DeathSavePromptModal({ campaignName }) {
     resolvedPromptIdsRef.current.add(current.promptId);
   }, [advance, campaignName, current]);
 
+  // GM-only Cancel for an accidentally armed prompt (backlog 2026-11-14
+  // death-save-dismiss-for-accidental-arms): a GM card mistype to 0 HP arms a
+  // prompt whose only pre-roll exit used to be spending a real save. Cancel
+  // rides the #1400 void-guard's zero-write lane verbatim — clearDeathSavePrompt
+  // (mirror-gated DELETE, both mirror lanes evicted on any server-confirmed
+  // 2xx/404) + advance, NO roll, NO counter/HP/isDead writes, NO log row.
+  // The DELETE's null echo retires every other client's dwelled prompt live
+  // (same cross-tab lane the void-guard dance uses). Gated by isGmHost() —
+  // the established client-side GM convention (gmHost.js, mirror of the
+  // server's refuseUnlessGm hostname law): a player must never dismiss their
+  // own death save. Absent the moment a result stage is reached — Cancel can
+  // never undo a rolled save. No timer, no auto-resolve: prompts still wait
+  // indefinitely (No Game Timers rule).
+  const handleCancel = useCallback(() => {
+    if (!current || current.result) return;
+    clearDeathSavePrompt(campaignName, current.targetName);
+    advance();
+  }, [advance, campaignName, current]);
+
   const handleNext = useCallback(() => {
     advance();
   }, [advance]);
@@ -245,9 +265,16 @@ function DeathSavePromptModal({ campaignName }) {
             </div>
             <div className="dsp-actions">
               {!hasResult ? (
-                <button className="dsp-roll-btn" onClick={handleRoll} type="button">
-                  <i className="fa-solid fa-dice-d20"></i> Roll Death Save
-                </button>
+                <>
+                  <button className="dsp-roll-btn" onClick={handleRoll} type="button">
+                    <i className="fa-solid fa-dice-d20"></i> Roll Death Save
+                  </button>
+                  {isGmHost() && (
+                    <button className="dsp-cancel-btn" onClick={handleCancel} type="button">
+                      Cancel
+                    </button>
+                  )}
+                </>
               ) : (
                 <button className="dsp-roll-btn" onClick={handleNext} type="button">
                   {queueCount > 1 ? 'Next' : 'Done'}

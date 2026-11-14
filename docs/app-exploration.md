@@ -63,8 +63,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before clears; pass 1 cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 NP — DeathSavePromptModal offers no dismiss for accidental arms:** button census is [Roll Death Save] (pre-roll) — a GM card mistype to 0 can only be exited by actually pressing Roll (or the documented restore-then-Roll void-guard dance); a GM-only Cancel riding the existing zero-write void lane would close the friction. Files: `DeathSavePromptModal.jsx`, `savePromptService.js` clear lane.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - healingRoll zero/negative-delta sign face — post-fix unreachable outside the already-carried bucket-side race; unit-pinned (and §44's improve-run lived the face pre-fix).
