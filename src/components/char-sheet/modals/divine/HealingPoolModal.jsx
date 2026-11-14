@@ -452,6 +452,15 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     // commit-time re-reads (88daae2be) remain the integrity gate.
     useRuntimeValue(resolvedTargetName, 'currentHitPoints', campaignName)
     useRuntimeValue(resolvedTargetName, 'hitPoints', campaignName)
+    // Same wake seam for the Cure Conditions sections (both tiers, backlog
+    // 2026-11-14 HZ cure-conditions-echo): targetConditions below is an
+    // imperative getRuntimeValue read feeding buildCurableEntries, so without
+    // this subscription the sections snapshotted the bucket at open — an
+    // externally applied condition stayed invisible mid-dwell and an
+    // externally cured one left a stale clickable button. Subscribing re-runs
+    // getTargetConditions on every activeConditions echo; the selection-
+    // pruning effect keeps selectedConditions in step with the live entries.
+    useRuntimeValue(resolvedTargetName, 'activeConditions', campaignName)
 
     const targetMaxHp = (() => {
         const creature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
