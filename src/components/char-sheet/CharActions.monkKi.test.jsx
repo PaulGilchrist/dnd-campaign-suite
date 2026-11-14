@@ -6,7 +6,9 @@
 // component can prove: a real row click wires playerStats.specialActions, the
 // cloak_of_shadows activeBuff, and the runtime store focusPoints write together.
 //
-// CLA-159: standalone 'Hand of Healing' ALWAYS charges 1 FP — the FP-free HoH
+// CLA-159 (as amended by the HoH pre-spend-at-full-HP improve): standalone
+// 'Hand of Healing' STILL charges 1 FP — at COMMIT inside healingHandler (sole FP
+// writer); the row-click seam only gates pool exhaustion. The FP-free HoH
 // exemption is only for HoH used AS PART of Flurry (bonusAttacksHandler lane,
 // CLA-144/CLA-158). CLA-166: the row-click skip list is flurry rows only
 // ('Flurry of Blows', 'Heightened Flurry of Blows').
@@ -217,12 +219,16 @@ describe('CharActions monk focus point lane (row-click integration)', () => {
   });
 
   // CLA-166 skip list vs CLA-159 charge: FP-free exemptions apply to flurry rows
-  // ONLY; standalone Hand of Healing always charges 1 FP (from 2 to 1).
+  // ONLY. HoH pre-spend-at-full-HP improve moved the standalone Hand of Healing
+  // spend to the COMMIT lane (healingHandler.performMonkHeal — sole FP writer, so
+  // a full-HP target can be refused with zero spend): the row-click seam still
+  // GATES pool exhaustion but no longer writes focusPoints itself. Exempted and
+  // non-exempted HoH clicks both just dispatch now.
   it.each([
     { actionName: 'Flurry of Blows', exemption: 'Flurry of Healing and Harm', expectation: 'skips the focus point spend', specialActions: ['Flurry of Healing and Harm'], buffs: [], spendsFP: false },
     { actionName: 'Flurry of Blows', exemption: 'Cloak of Shadows', expectation: 'skips the focus point spend', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }], spendsFP: false },
-    { actionName: 'Hand of Healing', exemption: 'Flurry of Healing and Harm', expectation: 'still spends 1 focus point (CLA-159)', specialActions: ['Flurry of Healing and Harm'], buffs: [], spendsFP: true },
-    { actionName: 'Hand of Healing', exemption: 'Cloak of Shadows', expectation: 'still spends 1 focus point', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }], spendsFP: true },
+    { actionName: 'Hand of Healing', exemption: 'Flurry of Healing and Harm', expectation: 'never pre-spends (commit lane owns the spend)', specialActions: ['Flurry of Healing and Harm'], buffs: [], spendsFP: false },
+    { actionName: 'Hand of Healing', exemption: 'Cloak of Shadows', expectation: 'never pre-spends (commit lane owns the spend)', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }], spendsFP: false },
   ])('clicking $actionName with $exemption active $expectation but always executes the action', async ({ actionName, specialActions, buffs, spendsFP }) => {
     mountCharActions({ actionName, specialActions, buffs });
 

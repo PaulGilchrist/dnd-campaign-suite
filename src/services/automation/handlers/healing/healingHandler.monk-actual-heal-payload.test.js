@@ -65,6 +65,7 @@ import * as classFeatures from '../../../character/classFeatures.js';
 import * as healingRoll from '../../common/healingRoll.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as logService from '../../../ui/logService.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'TestCampaign';
 
@@ -94,6 +95,10 @@ function makeMonkAction() {
 describe('healingHandler monk payload carries the clamped actualHeal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The commit lane (performMonkHeal) is now the sole Focus writer — a readable
+    // pool is required for the spend leg; no bucket HP truth (null) keeps the
+    // self-heal capacity check on the makePlayerStats 10/20 face below.
+    getRuntimeValue.mockImplementation((_name, key) => (key === 'focusPoints' ? 4 : null));
     diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7], modifier: 0 });
     classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 12 });
     automationService.resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [] });

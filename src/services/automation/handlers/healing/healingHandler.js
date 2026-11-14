@@ -201,10 +201,80 @@ function applyMonkHeal({ cs, targetName, healAmount, playerStats, campaignName }
     return applyHealingDirectly(playerStats, targetName, healAmount, campaignName);
 }
 
+// HoH pre-spend-at-full-HP improve (owner decision: REFUSE PRE-SPEND) — confirm-
+// time capacity truth. The combatSummary row is re-resolved bucket-first via
+// resolveLiveTargetHp on EVERY call, so a target healed to max between picker
+// render and the commit click is still refused (no stale-enable hole; the check
+// runs at confirm, not only at render). Mirrors the Healing-Light noHealCapacity
+// gate (d595cff2c). Without HP truth (no row, no bucket, no stats) the gate
+// stays open — selfHealingHpRefusal's hasHpTruth idiom.
+function monkHealTargetAtFullHp(targetName, cs, playerStats, campaignName) {
+    const row = cs?.creatures?.find(c => c.name === targetName);
+    if (row) {
+        const { currentHp, maxHp } = resolveLiveTargetHp(row);
+        return Number.isFinite(currentHp) && Number.isFinite(maxHp) && maxHp > 0 && currentHp >= maxHp;
+    }
+    if (targetName !== playerStats.name) return false;
+    const gateMaxHp = playerStats.maxHitPoints ?? playerStats.hitPoints ?? 0;
+    if (!(gateMaxHp > 0)) return false;
+    const storedCurrentHp = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+    const gateCurrentHp = (storedCurrentHp != null && storedCurrentHp !== '')
+        ? Number(storedCurrentHp)
+        : (playerStats.currentHitPoints ?? NaN);
+    return Number.isFinite(gateCurrentHp) && gateCurrentHp >= gateMaxHp;
+}
+
+// Same precedence as the dispatch-lane resolveCurrentFocusPoints: stored
+// focusPoints bucket → _trackedResources → class-level focus_points ladder →
+// class-feature cap. Hand of Healing's pre-dispatch spend was retired by this
+// improve (useCharActionsAutomation.spendMonkFocusPoint keeps only the
+// FP-exhausted click refusal); performMonkHeal is now the SOLE Focus writer for
+// this lane — the Hand of Ultimate Mercy resolveFocusPoints precedent.
+function resolveMonkFocusPoints(playerStats, campaignName) {
+    const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
+    if (storedFP != null) return Number(storedFP);
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+    return playerStats._trackedResources?.focusPoints?.current ?? maxFP;
+}
+
+// The two zero-side-effect commit gates + the Focus write, hoisted from
+// performMonkHeal (complexity ceiling). Refusals spend NOTHING: no roll, no
+// heal, no ability_use row — only a visible popup the picker turns into an
+// inline note (mirrors the Healing-Light noHealCapacity copy, d595cff2c).
+// Returns { refusal }, or spends 1 Focus and returns { currentFP }.
+async function gateMonkHealCommit({ action, playerStats, campaignName, targetName, cs }) {
+    const focusShort = playerStats.rules === '2024' ? 'focus' : 'ki';
+    const focusPlural = playerStats.rules === '2024' ? 'Focus Points' : 'ki points';
+
+    if (monkHealTargetAtFullHp(targetName, cs, playerStats, campaignName)) {
+        return { refusal: infoPopup(action, `${targetName} is already at full HP. No ${focusShort} spent.`) };
+    }
+    const currentFP = resolveMonkFocusPoints(playerStats, campaignName);
+    if (currentFP <= 0) {
+        return { refusal: infoPopup(action, `No ${focusPlural} remaining.`) };
+    }
+    await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
+    window.dispatchEvent(new CustomEvent('focus-points-updated'));
+    return { currentFP };
+}
+
 // CLA-159: standalone Hand of Healing heals a CHOSEN target (armed initiative-card
 // target honored, CLA-160 lane; picker otherwise, CLA-163 seam) via the canonical
 // applyHealingToTarget choke (CLA-092), and logs the Focus Point spend (§5).
+// HoH pre-spend-at-full-HP improve: this lane is also the SOLE Focus writer —
+// a target at max HP (bucket-first live read) is refused BEFORE the spend with
+// a zero-side-effect popup, mirroring the Healing-Light noHealCapacity gate.
 async function performMonkHeal({ action, playerStats, campaignName, targetName, cs, slotLevel }) {
+    const focusLabel = playerStats.rules === '2024' ? 'Focus Point' : 'ki point';
+
+    // Refuse-before-spend (gateMonkHealCommit): a full-HP target or an
+    // exhausted pool returns an automation_info popup with ZERO Focus spent,
+    // zero roll, zero heal and no ability_use row; only on a passed gate does
+    // the 1 Focus Point spend (this lane's first and only FP write) land.
+    const commit = await gateMonkHealCommit({ action, playerStats, campaignName, targetName, cs });
+    if (commit.refusal) return commit.refusal;
+
     const monkFeatures = getClassFeatures(playerStats);
     const martialArtsDie = monkFeatures?.martialArtsDie || 4;
     const wisdom = playerStats.abilities?.find(a => a.name === 'Wisdom');
@@ -238,7 +308,6 @@ async function performMonkHeal({ action, playerStats, campaignName, targetName, 
         bonusDetails,
     });
 
-    const focusLabel = playerStats.rules === '2024' ? 'Focus Point' : 'ki point';
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
@@ -293,7 +362,19 @@ async function handleMonkHealing(action, playerStats, campaignName, isSelf, slot
                 monkName: playerStats.name,
                 creatureTargets,
                 hasPhysiciansTouch: playerStats.specialActions?.some(f => f.name === "Physician's Touch") || false,
-                confirmHeal: async (targetName) => (await heal(targetName, cs))?.payload || null,
+                // HoH pre-spend-at-full-HP improve: performMonkHeal re-resolves the
+                // target's bucket-first HP at CONFIRM time; a refusal (capacity full,
+                // pool drained mid-dwell, or a null resolution) arrives as an
+                // automation_info popup — surface its description as a refusal note so
+                // the picker renders it inline (zero spend, zero row, heal not applied).
+                confirmHeal: async (targetName) => {
+                    const result = await heal(targetName, cs);
+                    if (!result) return null;
+                    if (result.type === 'popup') {
+                        return { refusal: result.payload?.description || `${targetName} could not be healed. No ${playerStats.rules === '2024' ? 'focus' : 'ki'} spent.` };
+                    }
+                    return result.payload || null;
+                },
             },
         };
     }

@@ -65,7 +65,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass: pass-1 clear +
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-13 FX — HoH pre-spend-at-full-HP warning (explicitly deferred by `e7fb36ef0`, tracker'd here per ownership law):** the monk picker commits + spends 1 Focus before the result modal can see the target is at max (`10 (Already at full HP)` row, zero restored). The deferral rationale ("picker rows carry stale combatSummary HP") is now largely moot — `7dca2c6d3` made choosers bucket-first — so a cheap fix exists: gate `confirmHeal` on `resolveLiveTargetHp` capacity (warn/clamp pre-spend, monk-lane refusal pattern), mirroring the Healing-Light `noHealCapacity` gate that `d595cff2c` shipped.
 - **2026-11-13 FX — batch-cure log rows share the final pool value:** in `HealingPoolModal.applyBatchCure` the per-condition modal log entries all print the post-BATCH `poolAfter` (witnessed `Cure poisoned|5|90` + `Cure blinded|5|90` — first should read 95). Per-condition pool-running in the modal table would mirror the amount lane.
 - **2026-11-13 FX — cure audit casing split:** Physician's Touch writes `condition:"Poisoned"` (display label) while the LoH/Restoring-Touch batch rows write `condition:"poisoned"` (raw key) — one "broken condition" log view/filter now needs to match both spellings; pick one convention in the writers (`HandOfHealingModal.jsx` `removeCondition` vs `HealingPoolModal.jsx` `applyCure`/`applyBatchCure`).
 

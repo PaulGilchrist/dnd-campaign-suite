@@ -203,10 +203,13 @@ describe('useCharActionsAutomation', () => {
         // Mirrors MONK_KI_FEATURES in the source. 'Stunning Strike' here carries no
         // automation.trigger, so the CLA-342 gate stays inert — the armed/blocked
         // branches live in useCharActionsAutomation.stunning-strike.test.js.
+        // 'Hand of Healing' is in MONK_KI_FEATURES for the exhausted-pool GATE but
+        // never pre-spends: the commit lane (healingHandler.performMonkHeal) is the
+        // sole FP writer (HoH pre-spend-at-full-HP improve) — pinned separately.
         const monkActions = [
             'Flurry of Blows', 'Patient Defense', 'Step of the Wind',
             'Heightened Flurry of Blows', 'Heightened Patient Defense',
-            'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike',
+            'Heightened Step of the Wind', 'Stunning Strike',
         ];
 
         it.each(monkActions)('spends exactly 1 focus point for %s when FP is available', async (actionName) => {
@@ -311,11 +314,15 @@ describe('useCharActionsAutomation', () => {
             );
         });
 
-        // CLA-159 INVERTED: the old pin "standalone Hand of Healing is free when
-        // holding Flurry of Healing and Harm" was the bug — the FP-free exemption is
-        // only for HoH used AS PART of Flurry, which lives in bonusAttacksHandler
-        // (CLA-144/CLA-158). The standalone sheet lane always charges 1 Focus Point.
-        it('spends FP for standalone Hand of Healing even when Flurry of Healing and Harm is active (CLA-159)', async () => {
+        // CLA-159 INVERTED (then re-seamed by the HoH pre-spend-at-full-HP improve):
+        // the old pin "standalone Hand of Healing is free when holding Flurry of
+        // Healing and Harm" was the bug — the FP-free exemption is only for HoH used
+        // AS PART of Flurry (bonusAttacksHandler, CLA-144/CLA-158). The standalone
+        // sheet lane STILL always charges 1 Focus Point, but the write moved to the
+        // commit lane (performMonkHeal, sole FP writer) so a full-HP target can be
+        // refused zero-spend. Row click: no pre-spend, exemptions never change that,
+        // dispatch always proceeds.
+        it('never pre-spends for standalone Hand of Healing, even with Flurry of Healing and Harm active (CLA-159 + commit-lane spend)', async () => {
             const playerStats = {
                 ...basePlayerStats,
                 specialActions: [{ name: 'Flurry of Healing and Harm' }],
@@ -326,8 +333,8 @@ describe('useCharActionsAutomation', () => {
 
             await handleAutomationAction(action);
 
-            expect(deps.setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter', 'focusPoints', 1, campaignName
+            expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
+                'TestFighter', 'focusPoints', expect.any(Number), campaignName
             );
             expect(deps.executeHandler).toHaveBeenCalled();
         });

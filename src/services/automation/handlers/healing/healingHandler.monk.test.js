@@ -100,6 +100,7 @@ import * as healingRoll from '../../common/healingRoll.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as automationService from '../../../combat/automation/automationService.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -135,6 +136,10 @@ function makeMonkAction(automation = {}) {
 describe('healingHandler monk lane (self_healing martial_arts_die + WIS)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The commit lane (performMonkHeal) is now the sole Focus writer for this
+    // feature — the lane needs a readable pool (and no bucket HP truth, so the
+    // self_healing stats face below is the capacity source).
+    getRuntimeValue.mockImplementation((_name, key) => (key === 'focusPoints' ? 4 : null));
     diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
     diceRoller.rollExpressionMaximized.mockReturnValue({ total: 8, rolls: [8], modifier: 0 });
     classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 6 });

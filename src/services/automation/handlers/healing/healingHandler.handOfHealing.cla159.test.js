@@ -14,7 +14,9 @@
 //     heal before confirmHeal, self remains selectable, 5ft range filter via
 //     isWithinRange
 //   - picker confirm path: d12+WIS roll, choke application, SSE log, Focus
-//     Point spend addEntry; self-at-cap honest zero-delta 'Already at full HP'
+//     Point spend addEntry; full-HP targets REFUSED at confirm time with zero
+//     spend/zero row (HoH pre-spend-at-full-HP improve — commit lane owns the
+//     Focus write; the row-click lane only gates pool exhaustion)
 //   - CLA-092 out-of-combat fallback (no combatSummary → applyHealingDirectly
 //     to self, choke NOT called)
 //
@@ -99,6 +101,7 @@ import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'test-campaign';
 
@@ -130,6 +133,10 @@ const combatCs = { creatures: [monkCsEntry, woundedBandit], round: 1, activeCrea
 describe('CLA-159 standalone Hand of Healing lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Focus pool readable (the commit lane is the sole FP writer now): stored
+    // focusPoints wins, everything else falls through to the cs-row/HP-truth
+    // precedence the bucket-first law pins.
+    getRuntimeValue.mockImplementation((_name, key) => (key === 'focusPoints' ? 3 : null));
     // 2024 lv20 Martial Arts die is d12 (classes.json ladder verified)
     classFeatures.getClassFeatures.mockReturnValue({ martialArtsDie: 12 });
     diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
@@ -213,10 +220,31 @@ describe('CLA-159 standalone Hand of Healing lane', () => {
     }));
   });
 
-  it('self-heal remains selectable: picker skip heals the monk at HP cap with honest zero delta', async () => {
+  // HoH pre-spend-at-full-HP improve: the pre-fix face ("skip spends 1 Focus and
+  // logs '= 12 (Already at full HP)'") is DEAD. A target resolved at max HP at
+  // CONFIRM time is refused with zero spend/zero roll/zero row; the skip lane only
+  // heals when the monk is actually damaged.
+  it('picker skip on a full-HP self is REFUSED before spend: zero roll, zero row, refusal note payload', async () => {
     targetResolver.resolveTarget.mockResolvedValue(null);
     damageUtils.getCombatContext.mockResolvedValue(combatCs);
-    applyHealing.applyHealingToTarget.mockReturnValue({ actualHeal: 0, oldHp: 183, newHp: 183, maxHp: 183 });
+
+    const result = await handle(hohAction, monkStats, campaignName, null, []);
+    const payload = await result.payload.confirmHeal('Disciplined_Monk');
+
+    expect(payload).toEqual({ refusal: 'Disciplined_Monk is already at full HP. No focus spent.' });
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+    expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+
+  it('picker skip self-heals the damaged monk: spend + choke + honest row', async () => {
+    targetResolver.resolveTarget.mockResolvedValue(null);
+    const damagedCs = {
+      ...combatCs,
+      creatures: [{ ...monkCsEntry, currentHp: 150 }, woundedBandit],
+    };
+    damageUtils.getCombatContext.mockResolvedValue(damagedCs);
 
     const result = await handle(hohAction, monkStats, campaignName, null, []);
     const payload = await result.payload.confirmHeal('Disciplined_Monk');
@@ -224,15 +252,15 @@ describe('CLA-159 standalone Hand of Healing lane', () => {
     expect(payload.targetName).toBe('Disciplined_Monk');
     expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       type: 'ability_use',
-      description: expect.stringContaining('Already at full HP'),
+      description: expect.stringContaining('expended 1 Focus Point to use Hand of Healing on Disciplined_Monk'),
     }));
   });
 
-  it('outside combat (no combat context) falls back to self via applyHealingDirectly', async () => {
+  it('outside combat (no combat context) falls back to the damaged self via applyHealingDirectly', async () => {
     targetResolver.resolveTarget.mockResolvedValue(null);
     damageUtils.getCombatContext.mockResolvedValue(null);
 
-    const result = await handle(hohAction, monkStats, campaignName, null, []);
+    const result = await handle(hohAction, { ...monkStats, currentHitPoints: 150 }, campaignName, null, []);
 
     expect(result.type).toBe('modal');
     expect(result.payload.pending).toBeUndefined();

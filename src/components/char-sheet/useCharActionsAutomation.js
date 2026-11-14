@@ -75,7 +75,9 @@ async function gateStunningStrike({ action, auto, playerStats, playerName, campa
 
 // CLA-159: 'Hand of Healing' removed — the FP-free Hand of Healing exemption is
 // only for HoH used AS PART of Flurry, which lives entirely in bonusAttacksHandler
-// (CLA-144/CLA-158). The standalone sheet lane always charges 1 Focus Point.
+// (CLA-144/CLA-158). The standalone sheet lane still always charges 1 Focus Point,
+// but spends it at COMMIT inside healingHandler (HoH pre-spend-at-full-HP improve),
+// never as a pre-spend here.
 const FOCUS_COST_SKIP_FEATURES = ['Flurry of Blows', 'Heightened Flurry of Blows'];
 
 function shouldSkipFocusPointCost(action, hasFlurryHealingHarm, cloakActive) {
@@ -123,6 +125,15 @@ async function spendMonkFocusPoint({ action, auto, playerStats, playerName, camp
             reasonToken: 'no_focus_points' });
         return false;
     }
+    // HoH pre-spend-at-full-HP improve (owner decision: REFUSE PRE-SPEND): 'Hand of
+    // Healing' no longer pre-spends here. Its target is only known when the CLA-163
+    // picker commits — one click AFTER this seam — so the pre-spend burned 1 Focus
+    // on targets the commit-time resolveLiveTargetHp capacity gate then had to
+    // refuse at zero heal. healingHandler.performMonkHeal is the SOLE Focus writer
+    // for this lane now (Hand of Ultimate Mercy precedent — absent from
+    // MONK_KI_FEATURES for the same reason). This seam keeps only the exhausted-
+    // pool refusal above (CLA-159, §5 zero-spend refusal on click).
+    if (action.name === 'Hand of Healing') return true;
     await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
     window.dispatchEvent(new CustomEvent('focus-points-updated'));
     if (stunningStrikeArmed) {

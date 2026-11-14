@@ -162,7 +162,10 @@ describe('collectTouchTargets — bucket-first displayed HP', () => {
 
   it('write lane unchanged: picker confirm still applies via the CLA-092 cs choke', async () => {
     damageUtils.getCombatContext.mockResolvedValue({ creatures: [monkCsRow, fighterCsRow] });
+    // focusPoints readable: the CONFIRM lane (performMonkHeal) is the sole Focus
+    // writer and refuses a zero/unresolvable pool before healing.
     getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'focusPoints') return 3;
       if (name !== 'Fighting_Rogue') return null;
       if (key === 'currentHitPoints') return 134;
       if (key === 'hitPoints') return 143;

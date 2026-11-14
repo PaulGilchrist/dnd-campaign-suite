@@ -49,7 +49,11 @@ function getTargetConditions(targetName, campaignName) {
 // Dialog tier (backlog 2026-11-10 HD, ShortRestModal bc409413d pattern): the
 // borrowed .short-rest-modal shell IS the dialog root — role + aria-modal +
 // aria-labelledby → SecondaryTargetModal's visible .sp-header title (via titleId).
-function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip }) {
+// refusalNote (HoH pre-spend-at-full-HP improve): the commit-time capacity gate
+// refused a zero-capacity target with ZERO Focus spent — the picker stays open
+// with the note inline, mirroring the d595cff2c noHealCapacity copy placement
+// (.healing-restriction-note, same global class Healing-Light uses).
+function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, refusalNote }) {
     return (
         <div className="short-rest-overlay no-print">
             <div
@@ -58,6 +62,9 @@ function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip })
                 aria-modal="true"
                 aria-labelledby="hand-of-healing-target-modal-title"
             >
+                {refusalNote && (
+                    <p className="healing-restriction-note">{refusalNote}</p>
+                )}
                 <SecondaryTargetModal
                     title={`Choose target for ${healName}`}
                     titleId="hand-of-healing-target-modal-title"
@@ -187,10 +194,18 @@ function HandOfHealingResultStage({ healName, result, monkName, campaignName, ha
 function HandOfHealingModal({ healName, formula, rolls, bonus, actualHeal, monkName, targetName, targetCurrentHp, targetMaxHp, hasPhysiciansTouch, campaignName, pending, creatureTargets, confirmHeal, onClose }) {
     const [result, setResult] = React.useState(pending ? null : { targetName, formula, rolls, bonus, actualHeal, targetCurrentHp, targetMaxHp });
     const [healError, setHealError] = React.useState(null);
+    const [refusalNote, setRefusalNote] = React.useState(null);
 
     const runHeal = useCallback(async (name) => {
         try {
             const payload = await confirmHeal?.(name);
+            // Pre-spend refusal (target at max HP / pool drained at commit): no
+            // Focus was spent and no row was logged — keep the picker open with an
+            // inline note so another target can still be chosen.
+            if (payload?.refusal) {
+                setRefusalNote(payload.refusal);
+                return;
+            }
             if (!payload) {
                 setHealError('Healing failed to resolve.');
                 return;
@@ -239,6 +254,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, actualHeal, monkN
                 creatureTargets={creatureTargets || []}
                 onPick={runHeal}
                 onSkip={() => runHeal(monkName)}
+                refusalNote={refusalNote}
             />
         );
     }
