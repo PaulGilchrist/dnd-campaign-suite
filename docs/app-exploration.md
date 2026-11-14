@@ -101,7 +101,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before the admin clears 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 KB — external cure can auto-SPEND the unspent Physician's Touch.** With a multi-option result modal dwelling and the free touch unspent, a FOREIGN client write that shrinks the curable set to exactly ONE fires the auto-cure effect on the echo render (patient loses the condition nobody chose to cure, one honest audit row). RAW-defensible (the touch grants one cure; single-curable auto-cure is the mount law), but surprising as a side effect of someone else's write — candidate for "auto-cure only on MOUNT, echo-renders show the picker instead". `HandOfHealingModal.jsx` `curedOnMount` effect.
 - **2026-11-14 KB — death-save prompt evict probe GETs never-created keys → console 404 noise.** After a transient HP-0 → recovery, `GET /api/campaigns/test-campaign/deathSavePrompt-ElderPaladin` 404s (the clear-leg probes a key that was never written when the prompt never mounted). Prefer existence-blind 200s on single-key GETs, or skip the probe when the key is absent from the mirror. `src/services/combat/conditions/savePromptService.js` / `server/routes/campaigns-changedata.js` (guess).
 
 ## Blocked / Not Verified (fold-gate ledger)

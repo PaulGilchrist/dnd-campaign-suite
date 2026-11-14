@@ -133,9 +133,9 @@ describe('HandOfHealingModal - Physician\'s Touch combatSummary-row echo (+ latc
   describe('cs-row display echo (mid-dwell adoption, no reopen)', () => {
     it('cs-row CURE retires the cs-sourced button within one echo, bucket-sourced option untouched', async () => {
       // Blinded lives in the bucket; Stunned + Poisoned only on the cs row —
-      // the exact merge face the KB rode. ≥2 curables at all times: the
-      // current auto-cure law (fires on shrink to exactly one) is a separate
-      // backlog item, so these pins avoid that leg deliberately.
+      // the exact merge face the KB rode. ≥2 curables at all times (the
+      // shrink-to-one leg is pinned separately below, post 2026-11-14
+      // mount-only-auto-cure decision).
       echoBucket({ currentHitPoints: 96, activeConditions: ['blinded'] });
       externalCsWrite(csBoard(['stunned', 'poisoned']));
       renderModal();
@@ -199,6 +199,51 @@ describe('HandOfHealingModal - Physician\'s Touch combatSummary-row echo (+ latc
       expect(hasRemoveBtn('Poisoned')).toBe(true);
       expect(victimWrites()).toHaveLength(0);
       expect(logService.addEntry).not.toHaveBeenCalled();
+    });
+
+    // CS-ROW twin of the flipped bucket-lane pin in
+    // HandOfHealingModal.live-conditions-echo.test.jsx (owner decision
+    // 2026-11-14: auto-cure is the MOUNT law only). This file previously
+    // steered its pins around the shrink-to-one leg as "a separate backlog
+    // item" — that item is now decided: the echo shows the picker instead of
+    // spending the free touch.
+    it('cs-row shrink to exactly one curable mid-dwell does NOT auto-cure: single button remains, press cures honestly', async () => {
+      // Two curables at mount: Blinded in the bucket, Stunned only on the cs row.
+      echoBucket({ currentHitPoints: 96, activeConditions: ['blinded'] });
+      externalCsWrite(csBoard(['stunned']));
+      renderModal();
+
+      expect(hasRemoveBtn('Blinded')).toBe(true);
+      expect(hasRemoveBtn('Stunned')).toBe(true);
+
+      // Foreign cs write clears the cs row — the merge shrinks to exactly one.
+      externalCsWrite({ creatures: [{ name: MONK }, { name: VICTIM, conditions: [] }] });
+
+      await waitFor(() => {
+        expect(hasRemoveBtn('Stunned')).toBe(false);
+      });
+      // The survivor stays a choice: one button, no auto-cure, no spend.
+      expect(hasRemoveBtn('Blinded')).toBe(true);
+      expect(screen.queryByText(/Condition Cleared/)).not.toBeInTheDocument();
+      expect(getRuntimeValue(VICTIM, 'activeConditions')).toEqual(['blinded']);
+      expect(victimWrites()).toHaveLength(0);
+      expect(logService.addEntry).not.toHaveBeenCalled();
+
+      // The surfaced button is still pressable and cures honestly.
+      fireEvent.click(removeBtn('Blinded'));
+      await waitFor(() => {
+        expect(screen.getByText(/Blinded removed from EvasiveFighter \(Physician/)).toBeInTheDocument();
+      });
+      expect(victimWrites()).toHaveLength(1);
+      expect(getRuntimeValue(VICTIM, 'activeConditions')).toEqual([]);
+      expect(logService.addEntry).toHaveBeenCalledTimes(1);
+      expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+        type: 'condition',
+        characterName: VICTIM,
+        condition: 'Blinded',
+        action: 'broken',
+        sourceName: `${MONK} (Hand of Healing)`,
+      }));
     });
   });
 

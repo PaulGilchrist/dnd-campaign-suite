@@ -10,9 +10,10 @@
 // HealingPoolModal: a useRuntimeValue(target, 'activeConditions') display
 // echo (options retire/appear mid-dwell) + a commit-time re-read that
 // refuses with the `<Target> is not affected by <Label>.` note, zero write
-// and zero log row. The curedOnMount latch now also sets on the CLICKED cure
-// path, so one Physician's Touch per HoH use holds even when a live echo
-// surfaces a fresh single condition afterwards (Priority Target #4).
+// and zero log row. Auto-cure is the MOUNT law only (owner decision
+// 2026-11-14, backlog KB external-cure-auto-spend): echo renders never spend
+// the free touch — they re-render the picker, so one Physician's Touch per
+// HoH use holds with no spent-latch needed at all (priority target #4).
 //
 // Like HealingPoolModal.live-conditions-echo.test.jsx this file runs the
 // REAL useRuntimeState module: echoes are driven through
@@ -142,22 +143,41 @@ describe('HandOfHealingModal - Physician\'s Touch activeConditions echo + commit
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('multi → single mid-dwell auto-cures the surviving condition exactly once with an honest broken row', async () => {
+    // FLIPPED 2026-11-14 (owner decision, backlog KB "external cure can
+    // auto-SPEND the unspent Physician's Touch"): this face previously pinned
+    // the KB-recorded law that the auto-cure effect fires on the ECHO re-render
+    // (544b9cbe2). It no longer does — auto-cure is the MOUNT law only, so a
+    // foreign write shrinking the curable set to one re-renders the picker and
+    // leaves the choice with the user.
+    it('multi → single mid-dwell does NOT auto-cure: the surviving option stays a picker button', async () => {
       echoBucket({ currentHitPoints: 96, activeConditions: ['blinded', 'stunned'] });
       renderModal();
       expect(hasRemoveBtn('Blinded')).toBe(true);
 
-      // Externally curing Blinded leaves a single curable condition — the
-      // same law as a fresh open with one curable: it auto-cures.
+      // Externally curing Blinded leaves a single curable condition. Unlike a
+      // fresh open with one curable (which still auto-cures — see the mount
+      // pin below), the echo render must NOT spend the free touch.
       echoBucket({ currentHitPoints: 96, activeConditions: ['stunned'] });
 
       await waitFor(() => {
+        expect(hasRemoveBtn('Blinded')).toBe(false);
+      });
+      // The single survivor is surfaced as its own button…
+      expect(hasRemoveBtn('Stunned')).toBe(true);
+      // …and nothing was cured by the echo: no panel, no bucket write, no row.
+      expect(screen.queryByText(/Condition Cleared/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Stunned removed/)).not.toBeInTheDocument();
+      expect(getRuntimeValue(VICTIM, 'activeConditions')).toEqual(['stunned']);
+      expect(victimWrites()).toHaveLength(0);
+      expect(logService.addEntry).not.toHaveBeenCalled();
+
+      // Surfaced button is still pressable and cures honestly (write + one row).
+      fireEvent.click(removeBtn('Stunned'));
+      await waitFor(() => {
         expect(screen.getByText(/Stunned removed from EvasiveFighter \(Physician/)).toBeInTheDocument();
       });
-      // One real bucket write (the cure commit), removing the condition…
       expect(victimWrites()).toHaveLength(1);
       expect(getRuntimeValue(VICTIM, 'activeConditions')).toEqual([]);
-      // …and exactly one truthful audit row for the condition that ACTUALLY broke.
       expect(logService.addEntry).toHaveBeenCalledTimes(1);
       const [campaign, entry] = logService.addEntry.mock.calls[0];
       expect(campaign).toBe(CAMPAIGN);
@@ -177,21 +197,50 @@ describe('HandOfHealingModal - Physician\'s Touch activeConditions echo + commit
       expect(logService.addEntry).toHaveBeenCalledTimes(1);
       expect(victimWrites()).toHaveLength(1);
       expect(screen.getByText(/Stunned removed/)).toBeInTheDocument();
+      expect(hasRemoveBtn('Poisoned')).toBe(false);
     });
 
-    it('no curable condition at open: a mid-dwell-applied single condition surfaces and auto-cures ONCE, and a later one never does', async () => {
+    // MOUNT law (regression pin for the flip above): a result stage that opens
+    // on a target with exactly ONE curable condition still auto-cures.
+    it('mount with exactly one curable condition still auto-cures (mount law unchanged)', async () => {
+      echoBucket({ currentHitPoints: 96, activeConditions: ['stunned'] });
+      renderModal();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Stunned removed from EvasiveFighter \(Physician/)).toBeInTheDocument();
+      });
+      expect(victimWrites()).toHaveLength(1);
+      expect(getRuntimeValue(VICTIM, 'activeConditions')).toEqual([]);
+      expect(logService.addEntry).toHaveBeenCalledTimes(1);
+      expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+        condition: 'Stunned',
+        action: 'broken',
+      }));
+      expect(hasRemoveBtn('Stunned')).toBe(false);
+    });
+
+    it('no curable condition at open: a mid-dwell-applied single condition surfaces as a button and never auto-cures', async () => {
       echoBucket({ currentHitPoints: 96, activeConditions: [] });
       renderModal();
       expect(screen.queryByText(/Physician/i)).not.toBeInTheDocument();
 
       echoBucket({ currentHitPoints: 96, activeConditions: ['poisoned'] });
       await waitFor(() => {
+        expect(hasRemoveBtn('Poisoned')).toBe(true);
+      });
+      // Echo-arrived single: picker, not a free spend (owner decision 2026-11-14).
+      expect(screen.queryByText(/Condition Cleared/)).not.toBeInTheDocument();
+      expect(getRuntimeValue(VICTIM, 'activeConditions')).toEqual(['poisoned']);
+      expect(victimWrites()).toHaveLength(0);
+      expect(logService.addEntry).not.toHaveBeenCalled();
+
+      // Pressing it cures once; a later arrival finds the touch spent.
+      fireEvent.click(removeBtn('Poisoned'));
+      await waitFor(() => {
         expect(screen.getByText(/Poisoned removed from EvasiveFighter \(Physician/)).toBeInTheDocument();
       });
       expect(logService.addEntry).toHaveBeenCalledTimes(1);
 
-      // Second condition arriving post-cure: touch already spent — no second
-      // cure, no second write, no second row.
       echoBucket({ currentHitPoints: 96, activeConditions: ['paralyzed'] });
       await waitFor(() => {
         expect(getRuntimeValue(VICTIM, 'activeConditions')).toEqual(['paralyzed']);

@@ -167,7 +167,7 @@ describe('HandOfHealingModal', () => {
       });
       // Message always shows the canonical condition name from CUREABLE_CONDITIONS.
       expect(screen.getByText(new RegExp(`${canonical} removed from Goblin \\(Physician`))).toBeInTheDocument();
-      // Exactly once — pins the curedOnMount guard against re-curing.
+      // Exactly once — pins the mount-only auto-cure guard against re-curing.
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin', 'activeConditions', expectedStored, 'test-campaign'

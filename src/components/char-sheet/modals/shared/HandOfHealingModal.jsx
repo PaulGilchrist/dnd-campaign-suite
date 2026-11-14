@@ -86,7 +86,13 @@ function HandOfHealingPickerStage({ healName, creatureTargets, onPick, onSkip, r
 function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, hasPhysiciansTouch }) {
     const [curedCondition, setCureCondition] = React.useState(null);
     const [cureRefusal, setCureRefusal] = React.useState(null);
-    const curedOnMount = React.useRef(false);
+    // Auto-cure is the MOUNT law only (owner decision 2026-11-14, backlog KB
+    // external-cure-auto-spend): the free Physician's Touch may be spent
+    // automatically ONLY by the curable set computed from mount-time data.
+    // Every later render — an echo from a foreign write or otherwise — shows
+    // the picker instead, so an external cure shrinking the set to exactly
+    // ONE never spends the touch on a condition nobody chose to cure.
+    const isFirstRender = React.useRef(true);
 
     // Display echo subscription (82f517b26 cure-conditions-echo parity with
     // HealingPoolModal): the cureableConditions read below is imperative, so
@@ -123,10 +129,6 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
             return;
         }
         setCureRefusal(null);
-        // Touch spent — latch even on the clicked (non-mount) path so a live
-        // echo surfacing a single condition afterwards cannot auto-grant a
-        // second free cure (one Physician's Touch per HoH use).
-        curedOnMount.current = true;
         setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 
         addEntry(campaignName, {
@@ -152,9 +154,15 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
     })();
 
     React.useEffect(() => {
-        if (!curedOnMount.current && cureableConditions.length === 1 && hasPhysiciansTouch) {
+        // Mount-only auto-cure (see isFirstRender note): the first effect run
+        // cures from the MOUNT-time curable set; every later render — echo or
+        // otherwise — short-circuits here so the choice stays with the user.
+        if (!isFirstRender.current) {
+            return;
+        }
+        isFirstRender.current = false;
+        if (cureableConditions.length === 1 && hasPhysiciansTouch) {
             removeCondition(cureableConditions[0]);
-            curedOnMount.current = true;
         }
     }, [cureableConditions, hasPhysiciansTouch, removeCondition]);
 
@@ -169,12 +177,20 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
         );
     }
 
-    if (cureableConditions.length > 1) {
+    // Picker tier: multi → full option list (unchanged); exactly ONE curable
+    // with the touch still unspent reaches here only via an ECHO (a mount-time
+    // single was already auto-cured by the effect above) — surface the single
+    // `Remove <Label>` button instead of spending the free touch (owner
+    // decision 2026-11-14).
+    if (cureableConditions.length > 1 ||
+        (cureableConditions.length === 1 && hasPhysiciansTouch)) {
         return (
             <>
                 <div className="short-rest-section">
                     <h4><i className="fas fa-shield-virus"></i> Physician&apos;s Touch</h4>
-                    <p>Target has multiple conditions. Select one to remove:</p>
+                    <p>{cureableConditions.length > 1
+                        ? 'Target has multiple conditions. Select one to remove:'
+                        : 'Select the condition to remove with the free Physician\u2019s Touch:'}</p>
                     <div className="healing-cure-options">
                         {[...new Set(cureableConditions)].map((condition, i) => (
                             <button key={`${condition}-${i}`} className="char-btn" onClick={() => removeCondition(condition)}>
