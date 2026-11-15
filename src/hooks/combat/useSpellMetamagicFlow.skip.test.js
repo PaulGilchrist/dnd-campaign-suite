@@ -1,17 +1,21 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai: 2026-11-15
 //
-// SKIP/ROLLBACK AUTHORITY — metamagic gate lane.
+// SKIP AUTHORITY — metamagic gate lane.
 // Owns the gate → pending → skip contract for the gated spells below (simple-handlers.test.js
-// cites this file as owner of Web/Revivify skip + general skip-rollback semantics).
-// Upcast-specific refund (CLA-086, level stamped from pending.spell.upcastLevel) lives in
-// the cla086 lane; rows here pin BASE-level behavior with RAW levels per public/data/spells.json.
+// cites this file as owner of Web/Revivify skip + general skip semantics).
+// Upcast-level REFUND bytes (CLA-086) live on the PAID lane, pinned by
+// useConfirmableFlow.skip-paid-gate.test.js and the cla086 lane.
 //
-// Two skip lanes (per useConfirmableFlow.js / useCustomHandlers.js / useComplexSpellHandlers.js):
-//  - lane 'refund': createSkipHandler — clears pending, logs the cast entry, and rolls back
-//    the slot at pending.spellLevel. Free-cast spells (FREE_CAST_SPELLS) refund the free-cast
-//    resource via incrementFreeCastResource instead of the slot.
-//  - lane 'clear': pay-at-confirm chooser family (§CLA-208, SP-085/SP-095/SP-125) — the gate
-//    never spends the slot, so skip clears pending with NO log and NO refund.
+// 2026-11-15 INVERSION (bug-revivify-chooser-skip-rollback-inflates-unspent-slot):
+// the old 'refund'/'free' lanes (createSkipHandler logs + rolls back / credits the
+// free-cast resource) ENshrined an UNPAID refund — every gate in this table arms its
+// chooser via spellGates → makePending WITHOUT spending anything (the slot is paid at
+// CONFIRM by createConfirmHandler → prepareSpellCast), so a skip refunded money that
+// was never paid, drifting spell_slots_level_N above the class max (Revivify observed
+// live 3→4 on a lv8 cleric) and logging a phantom cast row. Per the §11 unpaid-lane
+// law, EVERY pay-at-confirm chooser skip in this table now clears pending with NO log
+// and NO refund — the pay-at-confirm 'clear' semantics that already governed Magic
+// Missile / Pass Without Trace / Barkskin / True Polymorph is now the whole lane.
 // Every row also asserts the no-pending face: skip before any gate is a zero-side-effect no-op.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -216,31 +220,30 @@ function renderFlow() {
 }
 
 // ── Authority table ────────────────────────────────────────────────────────────
-// Levels are RAW, verified against public/data/spells.json — the refund lane
-// asserts the exact slot key, so a wrong level here would pin a wrong refund.
-// lane: 'refund' (createSkipHandler) | 'free' (refund = free-cast resource) |
-//       'clear' (pay-at-confirm chooser: no log, no refund).
+// Levels are RAW, verified against public/data/spells.json (kept for row identity).
+// Every lane is 'clear': a pay-at-confirm chooser skip dismisses with zero writes
+// (2026-11-15 pay-state gate — see file header).
 // Hold Person / Charm Person / Animal Friendship / Animal Shapes are excluded:
 // their gates filter creatures by type and the mock summary carries only goblins.
 const skipCases = [
-  { spell: 'Magic Missile', level: 1, time: '1 Action', range: '150 ft.', pending: 'pendingMagicMissile', handler: 'handleMagicMissileSkip', lane: 'clear' },
-  { spell: 'Healing Word', level: 1, time: '1 Bonus Action', range: '60 ft.', pending: 'pendingHealingWord', handler: 'handleHealingWordSkip', lane: 'refund' },
-  { spell: 'Cure Wounds', level: 1, time: '1 Action', range: 'Touch', pending: 'pendingCureWounds', handler: 'handleCureWoundsSkip', lane: 'refund' },
-  { spell: 'Web', level: 2, time: '1 Action', range: '60 ft.', pending: 'pendingWeb', handler: 'handleWebSkip', lane: 'refund' },
-  { spell: 'Pass Without Trace', level: 2, time: '1 Bonus Action', range: 'Self', pending: 'pendingPassWithoutTrace', handler: 'handlePassWithoutTraceSkip', lane: 'clear' },
-  { spell: 'Barkskin', level: 2, time: '1 Bonus Action', range: 'Touch', pending: 'pendingBarkskin', handler: 'handleBarkskinSkip', lane: 'clear' },
-  { spell: 'Revivify', level: 3, time: '1 Action', range: 'Touch', pending: 'pendingRevivify', handler: 'handleRevivifySkip', lane: 'refund' },
-  { spell: 'Stinking Cloud', level: 3, time: '1 Action', range: '90 ft.', pending: 'pendingStinkingCloud', handler: 'handleStinkingCloudSkip', lane: 'refund' },
-  { spell: 'Polymorph', level: 4, time: '1 Action', range: '60 ft.', pending: 'pendingPolymorph', handler: 'handlePolymorphSkip', lane: 'refund' },
-  { spell: 'Charm Monster', level: 4, time: '1 Action', range: '30 ft.', pending: 'pendingCharmMonster', handler: 'handleCharmMonsterSkip', lane: 'refund' },
-  { spell: 'Confusion', level: 4, time: '1 Action', range: '90 ft.', pending: 'pendingConfusion', handler: 'handleConfusionSkip', lane: 'refund' },
-  { spell: 'Greater Restoration', level: 5, time: '1 Action', range: 'Touch', pending: 'pendingGreaterRestoration', handler: 'handleGreaterRestorationSkip', lane: 'free' },
-  { spell: 'Hold Monster', level: 5, time: '1 Action', range: '60 ft.', pending: 'pendingHoldMonster', handler: 'handleHoldMonsterSkip', lane: 'refund' },
-  { spell: 'Globe of Invulnerability', level: 6, time: '1 Action', range: 'Self', pending: 'pendingGlobe', handler: 'handleGlobeSkip', lane: 'refund' },
-  { spell: 'Prismatic Spray', level: 7, time: '1 Action', range: '60 ft.', pending: 'pendingPrismaticSpray', handler: 'handlePrismaticSpraySkip', lane: 'refund' },
-  { spell: 'Forcecage', level: 7, time: '1 Action', range: '100 ft.', pending: 'pendingForcecage', handler: 'handleForcecageSkip', lane: 'refund' },
-  { spell: 'True Polymorph', level: 7, time: '1 Action', range: '30 ft.', pending: 'pendingTruePolymorph', handler: 'handleTruePolymorphSkip', lane: 'clear' },
-  { spell: 'Antimagic Field', level: 8, time: '1 Action', range: 'Self', pending: 'pendingAntimagicField', handler: 'handleAntimagicFieldSkip', lane: 'refund' },
+  { spell: 'Magic Missile', level: 1, time: '1 Action', range: '150 ft.', pending: 'pendingMagicMissile', handler: 'handleMagicMissileSkip' },
+  { spell: 'Healing Word', level: 1, time: '1 Bonus Action', range: '60 ft.', pending: 'pendingHealingWord', handler: 'handleHealingWordSkip' },
+  { spell: 'Cure Wounds', level: 1, time: '1 Action', range: 'Touch', pending: 'pendingCureWounds', handler: 'handleCureWoundsSkip' },
+  { spell: 'Web', level: 2, time: '1 Action', range: '60 ft.', pending: 'pendingWeb', handler: 'handleWebSkip' },
+  { spell: 'Pass Without Trace', level: 2, time: '1 Bonus Action', range: 'Self', pending: 'pendingPassWithoutTrace', handler: 'handlePassWithoutTraceSkip' },
+  { spell: 'Barkskin', level: 2, time: '1 Bonus Action', range: 'Touch', pending: 'pendingBarkskin', handler: 'handleBarkskinSkip' },
+  { spell: 'Revivify', level: 3, time: '1 Action', range: 'Touch', pending: 'pendingRevivify', handler: 'handleRevivifySkip' },
+  { spell: 'Stinking Cloud', level: 3, time: '1 Action', range: '90 ft.', pending: 'pendingStinkingCloud', handler: 'handleStinkingCloudSkip' },
+  { spell: 'Polymorph', level: 4, time: '1 Action', range: '60 ft.', pending: 'pendingPolymorph', handler: 'handlePolymorphSkip' },
+  { spell: 'Charm Monster', level: 4, time: '1 Action', range: '30 ft.', pending: 'pendingCharmMonster', handler: 'handleCharmMonsterSkip' },
+  { spell: 'Confusion', level: 4, time: '1 Action', range: '90 ft.', pending: 'pendingConfusion', handler: 'handleConfusionSkip' },
+  { spell: 'Greater Restoration', level: 5, time: '1 Action', range: 'Touch', pending: 'pendingGreaterRestoration', handler: 'handleGreaterRestorationSkip' },
+  { spell: 'Hold Monster', level: 5, time: '1 Action', range: '60 ft.', pending: 'pendingHoldMonster', handler: 'handleHoldMonsterSkip' },
+  { spell: 'Globe of Invulnerability', level: 6, time: '1 Action', range: 'Self', pending: 'pendingGlobe', handler: 'handleGlobeSkip' },
+  { spell: 'Prismatic Spray', level: 7, time: '1 Action', range: '60 ft.', pending: 'pendingPrismaticSpray', handler: 'handlePrismaticSpraySkip' },
+  { spell: 'Forcecage', level: 7, time: '1 Action', range: '100 ft.', pending: 'pendingForcecage', handler: 'handleForcecageSkip' },
+  { spell: 'True Polymorph', level: 7, time: '1 Action', range: '30 ft.', pending: 'pendingTruePolymorph', handler: 'handleTruePolymorphSkip' },
+  { spell: 'Antimagic Field', level: 8, time: '1 Action', range: 'Self', pending: 'pendingAntimagicField', handler: 'handleAntimagicFieldSkip' },
 ];
 
 describe('useSpellMetamagicFlow — skip lane authority', () => {
@@ -249,13 +252,7 @@ describe('useSpellMetamagicFlow — skip lane authority', () => {
   });
 
   for (const tc of skipCases) {
-    const semantics = {
-      refund: 'logs the cast and refunds the lv' + tc.level + ' slot',
-      free: 'logs the cast and refunds the free-cast resource, not the slot',
-      clear: 'clears unpaid: no log, no refund (pay-at-confirm chooser)',
-    }[tc.lane];
-
-    it(`${tc.spell} skip — ${semantics}`, async () => {
+    it(`${tc.spell} skip — clears unpaid: no log, no refund (pay-at-confirm chooser)`, async () => {
       const { result } = renderFlow();
       const spell = { name: tc.spell, level: tc.level, casting_time: tc.time, range: tc.range };
 
@@ -266,36 +263,17 @@ describe('useSpellMetamagicFlow — skip lane authority', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(incrementFreeCastResource).not.toHaveBeenCalled();
 
-      // Gate arms pending for the sorcerer.
+      // Gate arms pending for the sorcerer — UNPAID (makePending spends nothing).
       await act(async () => { await result.current.gateMetamagic(spell); });
       expect(result.current[tc.pending]).not.toBeNull();
 
-      // Face 2: skip clears pending and pays the lane's exact money.
+      // Face 2: skip dismisses with a byte-empty write census — nothing was paid,
+      // so nothing is refunded and no cast row is stamped.
       act(() => { result.current[tc.handler](); });
       expect(result.current[tc.pending]).toBeNull();
-
-      if (tc.lane === 'clear') {
-        expect(addEntry).not.toHaveBeenCalled();
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(incrementFreeCastResource).not.toHaveBeenCalled();
-      } else {
-        expect(addEntry).toHaveBeenCalledTimes(1);
-        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-          type: 'spell',
-          characterName: CASTER,
-          spellName: tc.spell,
-          spellLevel: tc.level,
-        }));
-        if (tc.lane === 'free') {
-          // FREE_CAST_SPELLS refund the free-cast resource, never a slot.
-          expect(incrementFreeCastResource).toHaveBeenCalledWith(CASTER, tc.spell, tc.level, expect.anything(), CAMPAIGN);
-          expect(setRuntimeValue).not.toHaveBeenCalled();
-        } else {
-          // Mocked available = 3 → refund lands as available + 1 at the RAW slot level.
-          expect(setRuntimeValue).toHaveBeenCalledWith(CASTER, `spell_slots_level_${tc.level}`, 4, CAMPAIGN);
-          expect(incrementFreeCastResource).not.toHaveBeenCalled();
-        }
-      }
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(incrementFreeCastResource).not.toHaveBeenCalled();
     });
   }
 

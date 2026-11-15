@@ -256,6 +256,12 @@ function refundGreaterRestorationNoEffects(d) {
   const pending = d.getPending('greaterRestoration')
   if (!pending) return
   d.cfClearPending('greaterRestoration')
+  // Paid-state gate (2026-11-15 unpaid-skip law, see useConfirmableFlow
+  // createSkipHandler): the "No effects to restore" picker button fires while the
+  // chooser is still UNPAID (the slot is only consumed by createConfirmHandler),
+  // so the old unconditional refund+log credited a slot never spent. The
+  // refund+log pair stays byte-identical for a genuinely paid pending.
+  if (!pending.slotConsumed) return
   const slotKey = `spell_slots_level_${pending.spellLevel || 0}`
   const current = getRuntimeValue(d.playerStats.name, slotKey, d.campaignName)
   const max = (d.playerStats.spellAbilities && d.playerStats.spellAbilities[slotKey]) || 0

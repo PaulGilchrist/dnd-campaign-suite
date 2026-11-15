@@ -1,8 +1,10 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai: 2026-11-15
 // Special-path skip lanes for useSpellMetamagicFlow — branches no sibling suite pins:
-// - Foresight skip: default allTargets lane stamps EVERY combatant (exact payload).
-// - Protection from Evil and Good skip: the SIMPLE_SPELL_SPECS skipTargets override
-//   (useSimpleSpellHandlers.js) must log ONLY the caster — unique in the registry.
+// - Foresight / Protection from Evil and Good skip: UNPAID dismisses — zero writes,
+//   zero log (2026-11-15 pay-state gate, bug-revivify-chooser-skip-rollback-
+//   inflates-unspent-slot inverted the byte-exact phantom-cast-row pins this file
+//   carried; the allTargets default and the skipTargets override in
+//   useSimpleSpellHandlers.js stay in place for genuinely paid pendings).
 // - True Polymorph skip AFTER path-select: the multi-stage machine clears unpaid.
 // Owned elsewhere and removed as duplicates: Animal Shapes target-confirm popup +
 // lv8 CR gate (complex-handlers.spells.test.js), beast-picker stage-2→3 handoff
@@ -216,14 +218,17 @@ async function gateSpell(result, spell) {
   });
 }
 
-describe('useSpellMetamagicFlow — skip lanes with spell-specific target lists', () => {
+describe('useSpellMetamagicFlow — unpaid skip lanes dismiss with zero writes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('Foresight skip: default allTargets lane logs EVERY combatant, then clears pending', async () => {
+  it('Foresight skip: UNPAID dismiss — zero writes, no cast row, pending cleared', async () => {
     const { result } = renderFlow();
-    // spells.json: lv9, 1 minute, Touch (no casting-time branch in the lane — pure echo).
+    // spells.json: lv9, 1 minute, Touch. 2026-11-15 pay-state gate
+    // (bug-revivify-chooser-skip-rollback-inflates-unspent-slot): the gate armed
+    // this chooser UNPAID, so skip logs NOTHING — the byte-exact phantom
+    // allTargets cast row this pin used to enshrine is dead.
     await gateSpell(result, { name: 'Foresight', level: 9, casting_time: '1 minute', range: 'Touch' });
     expect(result.current.pendingForesight).not.toBeNull();
 
@@ -232,22 +237,14 @@ describe('useSpellMetamagicFlow — skip lanes with spell-specific target lists'
     });
 
     expect(result.current.pendingForesight).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
-      type: 'spell',
-      characterName: CASTER,
-      targetName: CASTER,
-      targets: [CASTER, 'Goblin A', 'Goblin B', 'Goblin C'],
-      spellName: 'Foresight',
-      spellLevel: 9,
-      castingTime: '1 minute',
-      timestamp: expect.any(Number),
-    });
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('Protection from Evil and Good skip: skipTargets override logs ONLY the caster', async () => {
+  it('Protection from Evil and Good skip: UNPAID dismiss — zero writes, pending cleared', async () => {
     const { result } = renderFlow();
-    // spells.json: lv1, 1 action, Touch. The gate includes the caster in creatureTargets,
-    // and the spec's skipTargets override picks it out — goblins must NOT be stamped.
+    // spells.json: lv1, 1 action, Touch. Same pay-state gate as the Foresight
+    // row: an unpaid skip logs nothing, so the skipTargets override has nothing
+    // to stamp (its caster-only byte-shape survives only on a paid pending).
     await gateSpell(result, { name: 'Protection from Evil and Good', level: 1, casting_time: '1 action', range: 'Touch' });
     expect(result.current.pendingProtectionFromEvilAndGood).not.toBeNull();
 
@@ -256,16 +253,7 @@ describe('useSpellMetamagicFlow — skip lanes with spell-specific target lists'
     });
 
     expect(result.current.pendingProtectionFromEvilAndGood).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
-      type: 'spell',
-      characterName: CASTER,
-      targetName: CASTER,
-      targets: [CASTER],
-      spellName: 'Protection from Evil and Good',
-      spellLevel: 1,
-      castingTime: '1 action',
-      timestamp: expect.any(Number),
-    });
+    expect(addEntry).not.toHaveBeenCalled();
   });
 });
 

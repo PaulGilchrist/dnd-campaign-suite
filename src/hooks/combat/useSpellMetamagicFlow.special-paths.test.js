@@ -3,8 +3,8 @@
 // SPECIAL PATHS — gate-lane branches with no owner in the sibling lanes.
 // Owns:
 //  - Greater Restoration skip-with-no-effects: the ONLY happy-path coverage of
-//    handleGreaterRestorationNoEffects (refund current+1 at the exact slot key,
-//    cancelled-cast log with targetName:null / targets:[], no onExecute).
+//    handleGreaterRestorationNoEffects (2026-11-15 pay-state gate: the picker
+//    dismisses UNPAID ⇒ zero refund, zero log, pending cleared).
 //    Guards (no pending ⇒ no-op) are owned by handler-guards.test.js:288.
 //  - Non-Sorcerer lane MATERIAL side: consumeMaterial on the auto-level cantrip
 //    branch and prepareSpellCast routing of a non-damage cantrip. The auto-level
@@ -181,29 +181,23 @@ describe('useSpellMetamagicFlow — initial state', () => {
 });
 
 describe('useSpellMetamagicFlow — greater restoration skip with no effects', () => {
-  it('refunds the spell slot and logs the cancelled cast', async () => {
+  it('UNPAID no-effects dismiss: no refund, no log, pending cleared', async () => {
     const { result, onExecute } = await renderAndGate(makeSpell({ name: 'Greater Restoration', level: 5 }));
 
     // Greater Restoration has a spell gate, so pendingGreaterRestoration is set
+    // — and UNPAID: the slot is only consumed by createConfirmHandler at effect
+    // selection. 2026-11-15 pay-state gate (bug-revivify-chooser-skip-rollback-
+    // inflates-unspent-slot) inverted this pin's old refund+log: the NoEffects
+    // dismiss was crediting a slot that was never spent.
     expect(result.current.pendingGreaterRestoration).not.toBeNull();
 
     await act(async () => {
       result.current.handleGreaterRestorationNoEffects();
     });
 
-    // Slot refunded: getRuntimeValue mock returns 3 → 3 + 1 = 4
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestSorcerer', 'spell_slots_level_5', 4, CAMPAIGN);
-
-    // A log entry records the cancelled cast with no targets
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: null,
-      targets: [],
-      spellName: 'Greater Restoration',
-      spellLevel: 5,
-      castingTime: '1 Action',
-    }));
+    // Zero money movement, zero rows.
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
 
     // The spell was cancelled, not cast
     expect(onExecute).not.toHaveBeenCalled();

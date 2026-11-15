@@ -5,7 +5,8 @@
 // keyed to enhanceAbilityHandler.applyEnhanceAbility({action, playerStats, campaignName,
 // targetNames, ability}) — the old positional call sent targetNames/ability as undefined,
 // the handler silently returned null and the targetEffect was never stamped.
-// Also owns: confirm target normalization, ability-guard parking, skip slot rollback, popup pass-through.
+// Also owns: confirm target normalization, ability-guard parking, skip pay-state
+// gate (unpaid ⇒ zero-write dismiss, paid ⇒ byte-identical lv2 rollback), popup pass-through.
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useTwoStageHandlers } from './useTwoStageHandlers.js'
@@ -63,6 +64,20 @@ function renderEA() {
   let cleared = false
   const cfClearPending = vi.fn(() => { cleared = true })
   const getPending = (type) => (type === 'enhanceAbility' && !cleared ? makePending() : null)
+  const setPopupHtml = vi.fn()
+  const { result } = renderHook(() =>
+    useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending, setPopupHtml })
+  )
+  return { result, playerStats, cfClearPending, setPopupHtml }
+}
+
+// Paid-rig twin: same lane with a pending stamped slotConsumed (the money-state
+// flag createConfirmHandler's pay seam produces) — the skip refund must survive.
+function renderEAPaid() {
+  const playerStats = { name: CASTER, class: { name: 'Druid' }, level: 20, spellAbilities: { saveDc: 17, spell_slots_level_2: 4 } }
+  let cleared = false
+  const cfClearPending = vi.fn(() => { cleared = true })
+  const getPending = (type) => (type === 'enhanceAbility' && !cleared ? { ...makePending(), slotConsumed: true } : null)
   const setPopupHtml = vi.fn()
   const { result } = renderHook(() =>
     useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending, setPopupHtml })
@@ -142,8 +157,26 @@ describe('handleEnhanceAbilityConfirm — object call-shape into applyEnhanceAbi
     expect(result.current.enhanceAbilityStage).toBe('ability')
   })
 
-  it('skip rolls back the unspent slot, clears pending, and never applies', () => {
-    const { result, playerStats, cfClearPending } = renderEA()
+  it('skip on an UNPAID pending dismisses with zero writes — clears pending, no rollback (2026-11-15 pay-state gate)', () => {
+    // The old pin title read "rolls back the unspent slot" — that WAS the bug
+    // (bug-revivify-chooser-skip-rollback-inflates-unspent-slot): the gate arms
+    // this pending unpaid, so the unconditional rollback credited lv2 above max.
+    const { result, cfClearPending } = renderEA()
+
+    act(() => {
+      result.current.handleEnhanceAbilitySkip()
+    })
+
+    expect(rollbackSpellSlot).not.toHaveBeenCalled()
+    expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
+    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
+    expect(result.current.enhanceAbilityStage).toBeNull()
+  })
+
+  it('skip on a PAID pending keeps the byte-identical lv2 rollback', () => {
+    // laneScope for genuinely paid pendings: the refund pair survives behind the
+    // slotConsumed stamp (pinned producer: useConfirmableFlow pay seam).
+    const { result, playerStats, cfClearPending } = renderEAPaid()
 
     act(() => {
       result.current.handleEnhanceAbilitySkip()

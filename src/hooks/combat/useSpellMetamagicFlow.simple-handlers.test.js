@@ -1,8 +1,10 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai: 2026-11-15
 // Flow-wiring lane for SIMPLE_SPELL_SPECS (useSimpleSpellHandlers.js): one shared
 // table drives both sweeps of the createConfirmHandler/createSkipHandler contract:
 //   gate → pending armed → confirm dispatches the spec's apply/trigger fn exactly
-//   once, logs one spell entry, clears pending; skip clears + logs WITHOUT dispatch.
+//   once, logs one spell entry, clears pending; skip clears WITHOUT dispatch and
+//   WITHOUT any write (2026-11-15 pay-state gate — the armed pending is unpaid;
+//   see useConfirmableFlow.skip-paid-gate.test.js for the paid-lane refund pair).
 // Owned elsewhere — do not duplicate here:
 //   - no-pending misfire guards:        useSpellMetamagicFlow.handler-guards.test.js
 //   - complex/area/custom skip clears:  useSpellMetamagicFlow.skip.test.js
@@ -241,9 +243,9 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
     }
   });
 
-  describe('skip clears pending and logs without dispatching', () => {
+  describe('skip clears pending with zero writes without dispatching', () => {
     for (const tc of SPELL_ROWS.filter(r => !r.skipOwnedElsewhere)) {
-      it(`${tc.spell}: handle${tc.key}Skip clears pending, logs, dispatches nothing`, async () => {
+      it(`${tc.spell}: handle${tc.key}Skip clears pending, writes nothing, dispatches nothing`, async () => {
         const { result } = renderFlow();
         await armPending(result, tc);
 
@@ -251,11 +253,11 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
           result.current[`handle${tc.key}Skip`]();
         });
 
+        // 2026-11-15 pay-state gate (bug-revivify-chooser-skip-rollback-inflates-
+        // unspent-slot): the gate armed UNPAID (createConfirmHandler pays at
+        // CONFIRM), so skip dismisses with NO phantom cast row and NO refund.
         expect(tc.fn).not.toHaveBeenCalled();
-        expect(addEntry).toHaveBeenCalledTimes(1);
-        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-          spellName: tc.spell,
-        }));
+        expect(addEntry).not.toHaveBeenCalled();
         expect(result.current[`pending${tc.key}`]).toBeNull();
       });
     }

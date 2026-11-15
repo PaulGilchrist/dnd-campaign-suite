@@ -1,16 +1,20 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai: 2026-11-15
 //
-// ROLLBACK EDGE PATHS — spell-specific custom lanes NOT in the skip.test.js authority table.
+// SKIP/DISMISS EDGE PATHS — spell-specific custom lanes NOT in the skip.test.js authority table.
 // Owns the money/log semantics of the two custom confirm lanes that bypass
 // createSkipHandler (useCustomHandlers.js):
-//  - Protection from Poison (SP-095): gate arms UNPAID → skip LOGS but refunds NO slot
-//    ("logged-but-unpaid", a third shape between skip.test.js 'refund' and 'clear' lanes);
-//    confirm guards BEFORE the log, so an empty payload moves no money and leaves no entry.
-//  - Stone Skin: skipped AFTER the gate armed paid → rolls back the RAW lv4 slot
-//    (2024 Essentials: not in 5e spells.json) at the exact key, and consumes no material.
-//  - Revivify confirm with no target (RAW lv3): the createConfirmHandler wrapper logs
-//    BEFORE the inner runRevivify guard — log fires, spell never applies. Pinned against
-//    revivifyRefusal.test.js (refusal refund) and skip.test.js (revivify skip refund).
+//  - Protection from Poison (SP-095): gate arms UNPAID → skip is a ZERO-WRITE
+//    dismiss (no log, no refund) — 2026-11-15 pay-state gate retired the old
+//    "logged-but-unpaid" third shape (bug-revivify-chooser-skip-rollback-inflates-
+//    unspent-slot); confirm guards BEFORE the log, so an empty payload moves no
+//    money and leaves no entry.
+//  - Stone Skin: gateStoneSkin arms via makePending WITHOUT paying (the old
+//    "gate armed paid" premise was never true) → skip dismisses with no log and
+//    no lv4 rollback; unconditional refund would inflate slots above max.
+//  - Revivify confirm with no target (RAW lv3): the createConfirmHandler wrapper
+//    pays the slot, then the deferred cast row still stamps (the payment was
+//    real) while the inner runRevivify guard skips the spell. Pinned against
+//    revivifyRefusal.test.js (refusal refund) and skip.test.js (unpaid skip clear).
 // Owned elsewhere and removed as duplicates here: two-stage initial stages + Enhance Ability
 // ability guard (gate-two-stage.test.js, useTwoStageHandlers.enhanceAbility.test.js),
 // Sanctuary / Sleet Storm confirm + skip dispatch (simple-handlers.test.js SPELL_ROWS),
@@ -151,11 +155,12 @@ describe('useSpellMetamagicFlow — custom-lane skip money semantics', () => {
     vi.clearAllMocks();
   });
 
-  it('Protection from Poison skip: logs the cast but refunds no slot (SP-095 pay-at-confirm)', async () => {
+  it('Protection from Poison skip: UNPAID dismiss — no log, no refund, pending cleared (SP-095 pay-at-confirm)', async () => {
     const { result } = renderFlow();
     // spells.json: lv2, 1 action, Touch. The gate never spends the slot —
-    // consumeProtectionFromPoisonSlot pays it at confirm — so skip must not
-    // write any spell_slots rollback (that would inflate slots above max).
+    // consumeProtectionFromPoisonSlot pays it at confirm. 2026-11-15 pay-state
+    // gate (bug-revivify-chooser-skip-rollback-inflates-unspent-slot): the skip's
+    // old phantom cast row is dead too — an unpaid dismiss is a ZERO-WRITE lane.
     const spell = { name: 'Protection from Poison', level: 2, casting_time: '1 action', range: 'Touch' };
     await gateSpell(result, spell);
     expect(result.current.pendingProtectionFromPoison).not.toBeNull();
@@ -165,23 +170,19 @@ describe('useSpellMetamagicFlow — custom-lane skip money semantics', () => {
     });
 
     expect(result.current.pendingProtectionFromPoison).toBeNull();
-    expect(addEntry).toHaveBeenCalledTimes(1);
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-      type: 'spell',
-      characterName: CASTER,
-      spellName: 'Protection from Poison',
-      spellLevel: 2,
-      castingTime: '1 action',
-    }));
+    expect(addEntry).not.toHaveBeenCalled();
     expect(slotWrites()).toHaveLength(0);
     expect(applyProtectionFromPoisonHandler).not.toHaveBeenCalled();
   });
 
-  it('Stone Skin skip: logs the cast and refunds the lv4 slot at the exact key', async () => {
+  it('Stone Skin skip: UNPAID dismiss — no log, no refund, pending cleared', async () => {
     const { result } = renderFlow();
     // 2024 Essentials spells.json: lv4, Action, Touch (Stone Skin is not in 5e data).
-    // This custom handler pays its own money, so skip rolls back — unlike the
-    // SP-095 lane above. Mocked available = 3 → refund lands as level_4 = 4.
+    // INVERTED 2026-11-15: this pin's old premise ("the gate armed paid") was never
+    // true — gateStoneSkin arms via makePending WITHOUT paying, so the unconditional
+    // lv4 rollback credited spell_slots_level_4 above max on every skip. The
+    // refund pair survives only behind the pending.slotConsumed stamp (see
+    // useConfirmableFlow.skip-paid-gate.test.js).
     const spell = { name: 'Stone Skin', level: 4, casting_time: 'Action', range: 'Touch' };
     await gateSpell(result, spell);
     expect(result.current.pendingStoneSkin).not.toBeNull();
@@ -193,15 +194,8 @@ describe('useSpellMetamagicFlow — custom-lane skip money semantics', () => {
     });
 
     expect(result.current.pendingStoneSkin).toBeNull();
-    expect(addEntry).toHaveBeenCalledTimes(1);
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-      type: 'spell',
-      characterName: CASTER,
-      spellName: 'Stone Skin',
-      spellLevel: 4,
-      castingTime: 'Action',
-    }));
-    expect(setRuntimeValue).toHaveBeenCalledWith(CASTER, 'spell_slots_level_4', 4, CAMPAIGN);
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(applyStoneSkinHandler).not.toHaveBeenCalled();
   });
 });

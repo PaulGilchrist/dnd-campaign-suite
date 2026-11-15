@@ -75,6 +75,14 @@ export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending,
     setResistanceStage(null)
     setResistanceSelectedTargets([])
 
+    // Paid-state gate (2026-11-15 unpaid-skip law, see useConfirmableFlow
+    // createSkipHandler): the two-stage gate arms UNPAID (this lane pays nothing
+    // at confirm either — Resistance is a FREE_CAST_SPELLS cantrip), so the old
+    // unconditional log+rollback credited a free-cast resource that was never
+    // spent. Skip is now a zero-write dismiss; the refund pair stays
+    // byte-identical for a genuinely paid pending.
+    if (!pending.slotConsumed) return
+
     rollbackSpellSlot(playerStats.name, pending.spellName, pending.spellLevel || 0, playerStats, campaignName)
 
     addEntry(campaignName, {
@@ -144,7 +152,12 @@ export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending,
 
   const handleProtectionFromEnergySkip = React.useCallback(() => {
     const pending = getPending('protectionFromEnergy')
-    if (pending) {
+    if (pending && pending.slotConsumed) {
+      // Paid-state gate (2026-11-15 unpaid-skip law, see useConfirmableFlow
+      // createSkipHandler): the two-stage gate arms UNPAID (SP-093 pays at
+      // type-select confirm), so this lane's old unconditional cast row was a
+      // phantom for a cast that never happened. Row bytes stay byte-identical
+      // for a genuinely paid pending.
       const targets = pending.creatureTargets
       addEntry(campaignName, {
         type: 'spell',
@@ -214,6 +227,12 @@ export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending,
     cfClearPending('enhanceAbility')
     setEnhanceAbilityStage(null)
     setEnhanceAbilitySelectedAbility(null)
+    // Paid-state gate (2026-11-15 unpaid-skip law, see useConfirmableFlow
+    // createSkipHandler): the gate arms UNPAID and this lane's confirm pays no
+    // slot, so the old unconditional rollback credited a slot above max
+    // ("rolls back the unspent slot" — the pin even named the inflation). Refund
+    // survives only for a genuinely paid pending.
+    if (!pending.slotConsumed) return
     rollbackSpellSlot(playerStats.name, pending.spellName, pending.spellLevel || 0, playerStats, campaignName)
   }, [cfClearPending, getPending, playerStats, campaignName])
 

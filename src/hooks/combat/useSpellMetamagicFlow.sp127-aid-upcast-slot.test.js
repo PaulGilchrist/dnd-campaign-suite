@@ -225,6 +225,10 @@ describe('SP-127 Aid — confirm lane threads the paid slot + exact target log',
     await act(async () => {
       await result.current.gateMetamagic(makeAid({ isUpcast: true, upcastLevel: 3 }));
     });
+    // 2026-11-15 pay-state gate: gates arm UNPAID (createConfirmHandler pays at
+    // confirm), so the PAID refund bytes are pinned on a rig that stamps the
+    // money-state flag the pay seam produces. Refund bytes unchanged.
+    result.current.pendingAid.slotConsumed = true;
     act(() => {
       result.current.handleAidSkip();
     });

@@ -144,6 +144,13 @@ export function useConfirmableFlow(playerStats, campaignName) {
           upcastLevel,
           freeCastAuthorized,
         });
+        // 2026-11-15 (bug-revivify-chooser-skip-rollback-inflates-unspent-slot):
+        // canonical PAID stamp — this seam is where the gated chooser lanes actually
+        // consume the slot (gates arm UNPAID via makePending). Mirrors the
+        // pending.castRefused precedent (82b66bdef): money-state flags live on the
+        // pending itself, and the Skip lane reads pending.slotConsumed instead of
+        // assuming pay-at-arm.
+        pending.slotConsumed = true;
       }
 
       // applyFn is present on every deferCastLog lane (revivify spec); the
@@ -171,6 +178,20 @@ export function useConfirmableFlow(playerStats, campaignName) {
         delete next[type];
         return next;
       });
+
+      // 2026-11-15 (bug-revivify-chooser-skip-rollback-inflates-unspent-slot):
+      // pay-state gate. Every gated chooser pending arms UNPAID (spellGates →
+      // makePending never spends; the slot is consumed at CONFIRM by
+      // createConfirmHandler → prepareSpellCast), so this lane's old unconditional
+      // log+rollback refunded a slot that was never paid — spell_slots_level_N
+      // drifting ABOVE the class max (Revivify chooser observed live: 3→4 on a
+      // lv8 cleric, repeatable) plus a type:'spell' cast row for a cast that never
+      // happened. §11 unpaid-lane law: "Skip on an unpaid chooser must NOT
+      // rollbackSpellSlot" — the zero-spend dismiss family (HoH-picker Cancel,
+      // heal-chooser refusals, SP-093 PfE skip) is the sibling precedent. Only a
+      // pending actually stamped paid (pending.slotConsumed, the castRefused
+      // precedent's money-state twin) keeps the byte-identical refund pair below.
+      if (!pending.slotConsumed) return;
 
       const targets = getTargets ? getTargets(pending, {}) : null;
       addEntry(campaignName, {

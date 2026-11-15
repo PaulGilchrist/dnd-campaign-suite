@@ -248,6 +248,12 @@ describe('useSpellMetamagicFlow — gated upcast heals resolve at the paid slot 
     await act(async () => {
       await result.current.gateMetamagic({ ...CURE_WOUNDS, isUpcast: true, upcastLevel: 3 });
     });
+    // 2026-11-15 pay-state gate (bug-revivify-chooser-skip-rollback-inflates-
+    // unspent-slot): gates arm UNPAID — this refund pair is the PAID lane's
+    // bytes, so the rig stamps the money-state flag the confirm pay seam
+    // produces (pending.slotConsumed) before skipping. The refund bytes are
+    // unchanged.
+    result.current.pendingCureWounds.slotConsumed = true;
     act(() => {
       result.current.handleCureWoundsSkip();
     });
@@ -261,6 +267,7 @@ describe('useSpellMetamagicFlow — gated upcast heals resolve at the paid slot 
     await act(async () => {
       await result.current.gateMetamagic(CURE_WOUNDS);
     });
+    result.current.pendingCureWounds.slotConsumed = true;
     act(() => {
       result.current.handleCureWoundsSkip();
     });

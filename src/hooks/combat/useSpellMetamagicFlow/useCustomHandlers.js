@@ -225,7 +225,10 @@ export function useCustomHandlers({ playerStats, campaignName, cfClearPending, g
 
   const handleProtectionFromPoisonSkip = React.useCallback(() => {
     const pending = getPending('protectionFromPoison')
-    if (pending) {
+    if (pending && pending.slotConsumed) {
+      // PAID lane only: this gate arms UNPAID (SP-095 pays at confirm), so a skip
+      // today never reaches the log — zero-write dismiss per the 2026-11-15
+      // unpaid-skip law (bug-revivify-chooser-skip-rollback-inflates-unspent-slot).
       const targets = pending.creatureTargets
       addEntry(campaignName, {
         type: 'spell',
@@ -275,7 +278,12 @@ export function useCustomHandlers({ playerStats, campaignName, cfClearPending, g
 
   const handleStoneSkinSkip = React.useCallback(() => {
     const pending = getPending('stoneSkin')
-    if (pending) {
+    // Paid-state gate (2026-11-15 unpaid-skip law, see useConfirmableFlow
+    // createSkipHandler): gateStoneSkin arms UNPAID, so the old unconditional
+    // log+rollback credited a slot this lane never spent (special-paths.rollback's
+    // "gate armed paid" premise was never true in the gate). Refund pair stays
+    // byte-identical for a genuinely paid pending.
+    if (pending && pending.slotConsumed) {
       const targetName = pending.creatureTargets?.[0] || null
       addEntry(campaignName, {
         type: 'spell',

@@ -240,8 +240,9 @@ const twoStageFlows = [
     confirmArg: { targetName: 'Goblin A' },
     target: 'Goblin A',
     skip: 'handleEnhanceAbilitySkip',
-    skipLogs: false, // Enhance Ability skip rolls back the slot silently —
-                    // unlike PfE/Resistance it emits no cast log
+    skipLogs: false, // 2026-11-15 pay-state gate: the unpaid skip now writes
+                    // nothing at all (no cast log AND no slot rollback — see
+                    // useConfirmableFlow.skip-paid-gate.test.js)
   },
   {
     spell: 'Protection from Energy',
@@ -256,7 +257,8 @@ const twoStageFlows = [
     confirmArg: 'cold',
     target: 'Goblin B',
     skip: 'handleProtectionFromEnergySkip',
-    skipLogs: true,
+    skipLogs: false, // SP-093 no rollback; 2026-11-15 pay-state gate also retires
+                     // the unpaid skip's phantom cast row — zero writes
   },
   {
     spell: 'Resistance',
@@ -271,7 +273,8 @@ const twoStageFlows = [
     confirmArg: 'fire',
     target: 'Goblin C',
     skip: 'handleResistanceSkip',
-    skipLogs: true,
+    skipLogs: false, // 2026-11-15 pay-state gate: unpaid skip dismisses with zero
+                     // writes (no log, no free-cast resource credit)
   },
 ];
 
