@@ -89,7 +89,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab clears ×3 — re-entry 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-15 QY: **Stale death-save prompt mounts blind** — the `.dsp-overlay` replayed after reload+re-select for an 18-HP ally ("must make a Death Saving Throw") and intercepted clicks until dismissed; a mount-side re-check of the target's bucket `currentHitPoints` (auto-evict, or swap the copy to a "target already revived — Dismiss" notice) would make undrained keys self-healing instead of blocking. `DeathSavePromptModal.jsx`, `savePromptService.js`.
 - 2026-11-15 QY: **Revivify chooser confirm gives no why-disabled hint** — `Cast Revivify` sits disabled until a corpse radio is checked (correct gate), while sibling heal choosers show the selected count on the button (`Heal (N)`); a `Select a creature first.` affordance (or the count pattern) would close the "is this button dead?" UX question the harness hit live.
 
 ## Blocked / Not Verified (fold-gate ledger)

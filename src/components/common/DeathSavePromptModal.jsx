@@ -1,10 +1,10 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
 import { addEntry } from '../../services/ui/logService.js';
 import Subscriber from './Subscriber.jsx';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { isGmHost } from '../../services/ui/gmHost.js';
 import './DeathSavePromptModal.css';
 
@@ -94,7 +94,7 @@ function DeathSaveResult({ result }) {
   );
 }
 
-function DeathSavePromptModal({ campaignName }) {
+function DeathSavePromptModal({ campaignName, characters }) {
   const [prompts, setPrompts] = useState([]);
   // PromptIds already adjudicated — rolled on this client or resolved by
   // another client's deathSaveResult-<Target> echo. One save per down event:
@@ -107,6 +107,49 @@ function DeathSavePromptModal({ campaignName }) {
   const advance = useCallback(() => {
     setPrompts(prev => prev.slice(1));
   }, []);
+
+  // Mount-side stale re-verdict (backlog 2026-11-15 QY
+  // death-save-prompt-stale-selfheal): an undrained deathSavePrompt-<Target>
+  // key — e.g. a Cancel whose evaluate-dispatched click silently no-oped the
+  // DELETE — replays on every SSE-connect snapshot seed / campaign-select
+  // reload as an actionable Roll prompt over a target whose bucket has since
+  // revived, and the .dsp-overlay intercepts clicks until dismissed. This is
+  // the #1400 void-guard's bucket-canonical law (see handleRoll) applied at
+  // the MOUNT seam, not just at Roll time: if the head prompt's target is a
+  // PLAYER whose runtime-bucket currentHitPoints is > 0, self-evict via the
+  // mirror-gated clearDeathSavePrompt lane (the DELETE's null echo also
+  // retires the same stale key on every other tab) and advance the queue —
+  // a brief flash is the accepted face (auto-evict), with ZERO roll,
+  // counter/HP/isDead writes, or log rows. The read rides useRuntimeValue so
+  // a bucket that seeds AFTER the prompt echo (reload + re-select lands the
+  // SSE snapshot before the char-store seed) re-verdicts when the HP value
+  // lands instead of staying blind. Conservative gates — never evict on:
+  // an absent/non-numeric HP key (fresh or unloaded bucket must keep the
+  // prompt), HP <= 0 (genuine arm: zero requests here, face unchanged), a
+  // result-stage head (its panel survives until Done; a nat20 stamping HP=1
+  // must not evict a rolled save), or a target outside the player roster
+  // (monster/NPC prompts keep the existing face — scope is the player lane).
+  // The hook value is only the RE-RUN TRIGGER (its useState carries the
+  // previous head's read for one render after a queue advance); the verdict
+  // itself re-reads the head's bucket imperatively, exactly like the #1400
+  // void-guard does at Roll time.
+  const leadIsPlayerPrompt = !!current && !current.result
+    && Array.isArray(characters)
+    && characters.some(c => c && c.name === current.targetName);
+  const leadHp = useRuntimeValue(
+    leadIsPlayerPrompt ? current.targetName : 'campaign',
+    'currentHitPoints',
+    campaignName
+  );
+
+  useEffect(() => {
+    if (!leadIsPlayerPrompt || !current) return;
+    const hpRaw = getRuntimeValue(current.targetName, 'currentHitPoints');
+    const hp = Number(hpRaw);
+    if (hpRaw == null || !Number.isFinite(hp) || hp <= 0) return;
+    clearDeathSavePrompt(campaignName, current.targetName);
+    advance();
+  }, [advance, campaignName, current, leadHp, leadIsPlayerPrompt]);
 
   const handleEvent = useCallback((event) => {
     if (!event.key) return;

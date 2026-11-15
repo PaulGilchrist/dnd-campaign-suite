@@ -28,6 +28,10 @@ vi.mock('../../services/ui/logService.js', () => ({
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  // Mount-side stale re-verdict's bucket subscription (no characters roster
+  // is passed in this file, so the verdict stays gated off — the hook reads
+  // the inert campaign fallback and never fires the evict lane).
+  useRuntimeValue: vi.fn(() => null),
 }));
 
 // Capture the modal's SSE handler so tests can emit events directly,
