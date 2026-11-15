@@ -3,8 +3,9 @@
 // - getRealMaxHp runtime-truth: combatSummary player entries are 1/1 placeholders,
 //   runtime hitPoints is max-HP truth; healAmount = floor(maxHp/2); targetMaxHp payload pin.
 // - confirm-time heal through the REAL applyHealingToTarget chokepoint (both sibling
-//   suites mock it): modifyHitPoints runtime write, canonical 0→positive deathSaves/
-//   deathFailures/isDead reset, hp_change heal log.
+//   suites mock it): modifyHitPoints runtime write, canonical 0→positive revive folded
+//   into ONE merged setRuntimeBatch (HP + deathSaves/deathFailures/isDead, CLA-092),
+//   hp_change heal log.
 // - burst gate centered on the healed target, not the caster (source-keyed isWithinRange
 //   mock — Handler.test.js 'filters creatures by ally range and attack range' keys by
 //   target name only and cannot catch a caster-centred regression).
@@ -16,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(async () => {}),
+  setRuntimeBatch: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -178,20 +180,26 @@ describe('searingVengeance CLA-304 heal math', () => {
           payload,
       });
 
-    // real HP written through runtime store (modifyHitPoints inside applyHealingToTarget)
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'LightfootHalfling', 'currentHitPoints', 6, campaignName
+    // CLA-092 revive fold (2026-11-15): the 0→positive transition commits HP +
+    // death-state reset in ONE merged setRuntimeBatch (one POST / one SSE echo);
+    // zero separate setRuntimeValue churn on this lane.
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'LightfootHalfling',
+      {
+        currentHitPoints: 6,
+        deathSaves: [false, false, false],
+        deathFailures: [false, false, false],
+        isDead: 0,
+      },
+      campaignName
     );
-    // canonical 0→positive convention: pending death saves cleared
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'LightfootHalfling', 'deathSaves', [false, false, false], campaignName
-    );
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'LightfootHalfling', 'deathFailures', [false, false, false], campaignName
-    );
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'LightfootHalfling', 'isDead', 0, campaignName
-    );
+    // No per-field revive churn: the only setRuntimeValue calls are the
+    // handler's own lanes (uses consumption + condition clear), never the
+    // four merged revive keys.
+    for (const call of useRuntimeState.setRuntimeValue.mock.calls) {
+      expect(['currentHitPoints', 'deathSaves', 'deathFailures', 'isDead']).not.toContain(call[1]);
+    }
     expect(result.payload.description).toContain('regains 6 HP');
     expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       type: 'hp_change',

@@ -78,6 +78,21 @@ const fake = vi.hoisted(() => ({
         return Promise.resolve();
     },
 
+    // CLA-092 revive fold: the merged HP + death-reset commit arrives as ONE
+    // arity-3 batch; same owner/key strictness as rtSet.
+    rtBatch(owner, properties, campaign) {
+        if (campaign !== CAMPAIGN) {
+            throw new Error(`runtime fake: unexpected campaign "${campaign}"`);
+        }
+        const entry = this.owners[owner];
+        if (!entry) throw new Error(`runtime fake: unknown owner "${owner}"`);
+        for (const [key, value] of Object.entries(properties)) {
+            if (!(key in entry)) throw new Error(`runtime fake: unknown key "${owner}.${key}"`);
+            entry[key] = value;
+        }
+        return Promise.resolve();
+    },
+
     addEntry(campaign, entry) {
         if (campaign !== CAMPAIGN) {
             throw new Error(`log fake: unexpected campaign "${campaign}"`);
@@ -120,6 +135,7 @@ const fake = vi.hoisted(() => ({
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn((owner, key, campaign) => fake.rtGet(owner, key, campaign)),
     setRuntimeValue: vi.fn((owner, key, value, campaign) => fake.rtSet(owner, key, value, campaign)),
+    setRuntimeBatch: vi.fn((owner, properties, campaign) => fake.rtBatch(owner, properties, campaign)),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -133,7 +149,7 @@ vi.mock('../spells/materialComponents.js', () => ({
 // ── Imports ──────────────────────────────────────────────────────
 
 import { triggerRevivify } from './revivifyService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { consumeMaterial } from '../spells/materialComponents.js';
 
@@ -171,6 +187,7 @@ describe('triggerRevivify - log bytes', () => {
         fake.reset();
         vi.mocked(getRuntimeValue).mockImplementation((owner, key, campaign) => fake.rtGet(owner, key, campaign));
         vi.mocked(setRuntimeValue).mockImplementation((owner, key, value, campaign) => fake.rtSet(owner, key, value, campaign));
+        vi.mocked(setRuntimeBatch).mockImplementation((owner, properties, campaign) => fake.rtBatch(owner, properties, campaign));
         vi.mocked(addEntry).mockImplementation((campaign, entry) => fake.addEntry(campaign, entry));
         vi.mocked(consumeMaterial).mockImplementation((stats, item, campaign) => fake.consume(stats, item, campaign));
         vi.mocked(global.fetch).mockImplementation((url, init) => fake.fetch(url, init));

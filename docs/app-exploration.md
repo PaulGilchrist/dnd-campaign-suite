@@ -83,7 +83,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before pass 1 — clean 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(PX 2026-11-15) Revivify player-success revive does 4 sequential full-store POSTs (currentHitPoints + 3 death-reset):** `applyHealing.js:22-27` fires `deathSaves`/`deathFailures`/`isDead` as separate `setRuntimeValue` POSTs on top of the HP write — the same 4-POST churn the sheet-revive lane collapsed to ONE merged `setRuntimeBatch` (`db0ad4cf8`) and the interceptors just folded (`fcd155ebe`). Worth folding the revive into one batched POST for the same 1-echo benefit (CLA-092 write-batching law).
 - **(PX 2026-11-15) `clampHpLadder` heal-never-drains floor only guards `delta > 0`:** any revive/heal that computes `target - currentHp` from a desynced state can emit a NEGATIVE delta and silently become damage (this is the mechanism behind `bug-revivify-stale-isdead-negative-heal.md`). The floor is correct for its stated cause (stale row max < current), but the revive family should assert `oldHp <= 0` before paying — a cheap invariant shared by HoUoM/Revivify/Revivification rather than each re-deriving it.
 
 ## Blocked / Not Verified (fold-gate ledger)

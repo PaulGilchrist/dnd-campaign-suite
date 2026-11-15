@@ -84,6 +84,26 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
         entry[key] = value;
         return Promise.resolve();
     }),
+    // CLA-092 revive fold: one arity-3 batch call commits HP + death-reset
+    // together. Emits the SAME ordered write tuples as the old four sequential
+    // setRuntimeValue calls (batch key order = commit object key order), so the
+    // census below pins the merged-POST contract, not the old churn.
+    setRuntimeBatch: vi.fn((owner, properties, campaign) => {
+        if (campaign !== 'TestCampaign') {
+            throw new Error(`runtime fake: unexpected campaign "${campaign}"`);
+        }
+        if (Object.values(properties).some((v) => v === undefined)) {
+            throw new Error('runtime fake: batch payload carries undefined');
+        }
+        const entry = rt.owners[owner];
+        if (!entry) throw new Error(`runtime fake: unknown owner "${owner}"`);
+        for (const [key, value] of Object.entries(properties)) {
+            if (!(key in entry)) throw new Error(`runtime fake: unknown key "${owner}.${key}"`);
+            rt.writes.push([owner, key, value, campaign, undefined]); // skipSync slot: batch has no 4th arg
+            entry[key] = value;
+        }
+        return Promise.resolve();
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
@@ -139,7 +159,7 @@ global.fetch = vi.fn((url, init) => {
 // ── Imports ──────────────────────────────────────────────────────
 
 import { triggerRevivify } from './revivifyService.js';
-import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 import { consumeMaterial } from '../spells/materialComponents.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -196,8 +216,10 @@ describe('triggerRevivify', () => {
         vi.useRealTimers();
     });
 
-    it('sets all four runtime values in correct order on PC revival: full-set write census (skipSync position audited), call order fetch<consume<writes, fetch census, full success envelope', async () => {
-        // :504 owner face (folded #1407 rec #1: the ≡ field-level rows collapse here).
+    it('revives the PC in ONE merged setRuntimeBatch (CLA-092 fold): exact four-key write census, zero separate setRuntimeValue, call order fetch<consume<batch, fetch census, full success envelope', async () => {
+        // :504 owner face (folded #1407 rec #1) + 2026-11-15 write-batching law:
+        // the old four sequential POSTs (HP + 3 resets = 4 SSE echoes) collapse
+        // into ONE full-store batch POST carrying the same four merged keys.
         // Death detected by the HP arm (isDead null) — edge seeds isDead 1 instead.
         const caster = makeCaster('Brother Aldous');
         seedDeadPC('Dorn', 0, null, 26); // hitPoints 26 != summary placeholder maxHp 19
@@ -206,7 +228,17 @@ describe('triggerRevivify', () => {
         const result = await triggerRevivify(makeSpell('Revivify'), {}, caster, CAMPAIGN, 'Dorn');
         await flush();
 
-        // Exact 4-write ordered tuples, skipSync undefined at every slot (#1341).
+        // Exactly ONE batch call with the full merged payload, zero field calls.
+        expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+        expect(setRuntimeBatch).toHaveBeenCalledWith('Dorn', {
+            currentHitPoints: 1,
+            deathSaves: [false, false, false],
+            deathFailures: [false, false, false],
+            isDead: 0,
+        }, CAMPAIGN);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        // Exact 4-key ordered tuple census (skipSync slot audited — batch never
+        // carries one; #1341), budget: no fifth key.
         expect(rt.writes).toEqual([
             ['Dorn', 'currentHitPoints', 1, CAMPAIGN, undefined],
             ['Dorn', 'deathSaves', [false, false, false], CAMPAIGN, undefined],
@@ -222,13 +254,13 @@ describe('triggerRevivify', () => {
             deathSaves: [false, false, false],
             deathFailures: [false, false, false],
         });
-        // Call order: canonical fetch -> diamond -> runtime writes.
+        // Call order: canonical fetch -> diamond -> merged runtime commit.
         expect(global.fetch).toHaveBeenCalledTimes(1);
         expect(global.fetch).toHaveBeenCalledWith(CHANGE_DATA_URL);
         expect(consumeMaterial).toHaveBeenCalledTimes(1);
         expect(consumeMaterial).toHaveBeenCalledWith(caster, 'Diamond (300 gp)', CAMPAIGN); // identity, not objectContaining
         expect(consumeMaterial.mock.invocationCallOrder[0])
-            .toBeLessThan(setRuntimeValue.mock.invocationCallOrder[0]);
+            .toBeLessThan(setRuntimeBatch.mock.invocationCallOrder[0]);
         // Players never POST the summary (runtime-canonical): the only fetch is the GET.
         expect(global.fetch.mock.calls.map(([url]) => url)).toEqual([CHANGE_DATA_URL]);
         // Full success envelope + exact key set (#1400 order, folded ≡ result rows).
@@ -333,9 +365,9 @@ describe('triggerRevivify', () => {
         expect(consumeMaterial.mock.calls).toEqual([[caster, 'Diamond (300 gp)', CAMPAIGN]]);
         expect(net.diamondChecks).toEqual([['Alvina', 'Diamond (300 gp)']]);
         expect(consumeMaterial.mock.invocationCallOrder[0])
-            .toBeLessThan(setRuntimeValue.mock.invocationCallOrder[0]);
+            .toBeLessThan(setRuntimeBatch.mock.invocationCallOrder[0]);
         expect(result.payload.finalHeal).toBe(1);
-        expect(rt.writes).toHaveLength(4);
+        expect(rt.writes).toHaveLength(4); // one batch, four merged keys
         expect(consoleError).not.toHaveBeenCalled();
     });
 

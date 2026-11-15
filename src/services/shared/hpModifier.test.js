@@ -249,6 +249,47 @@ describe('modifyHitPoints — player lane (runtime canonical)', () => {
   });
 });
 
+describe('modifyHitPoints — opt-in deferPlayerHpWrite seam (CLA-092 revive fold)', () => {
+  it('player leg: zero runtime writes, zero dispatch; result carries deferredHpWrite (applyHealing owns the commit)', () => {
+    seedRuntime({ hitPoints: 10, currentHitPoints: 0 });
+    const target = makePlayer();
+
+    const result = modifyHitPoints(summary(target), 'Thorin', 5, CAMPAIGN, { deferPlayerHpWrite: true });
+
+    expect(result).toStrictEqual({
+      oldHp: 0, newHp: 5, delta: 5, isPlayer: true, creature: target, maxHp: 10, deferredHpWrite: 5,
+    });
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    // write-before-event law: the commit owner dispatches AFTER writing, so
+    // listeners never read a stale currentHitPoints.
+    expect(window.dispatchEvent).not.toHaveBeenCalled();
+    expect(target.currentHp).toBeUndefined(); // placeholder purity preserved on the defer leg too
+  });
+
+  it('deferred newHp 0 is still carried (0 is data — the caller\'s != null commit gate must fire)', () => {
+    seedRuntime({ hitPoints: 10, currentHitPoints: 0 });
+
+    const result = modifyHitPoints(summary(makePlayer()), 'Thorin', -3, CAMPAIGN, { deferPlayerHpWrite: true });
+
+    expect(result.deferredHpWrite).toBe(0);
+    expect(result.delta).toBe(0);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(window.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('monster leg ignores the option entirely: in-place mutation + dispatch, no deferredHpWrite key', () => {
+    const target = makeNpc({ currentHp: 7, maxHp: 15 });
+
+    const result = modifyHitPoints(summary(target), 'Goblin', -4, CAMPAIGN, { deferPlayerHpWrite: true });
+
+    expect(result).toStrictEqual({
+      oldHp: 7, newHp: 3, delta: -4, isPlayer: false, creature: target, maxHp: 15,
+    });
+    expect(target.currentHp).toBe(3);
+    expect(window.dispatchEvent).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('isCreatureDead — canonical truth table', () => {
   it.each([
     // monster arm: reads ONLY the summary entry's currentHp (:14)

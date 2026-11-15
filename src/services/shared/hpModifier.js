@@ -42,7 +42,30 @@ function clampHpLadder(oldHp, delta, maxHp) {
   return newHp;
 }
 
-export function modifyHitPoints(combatSummary, targetName, delta, campaignName) {
+// Player leg of the ladder (extracted to keep modifyHitPoints within the
+// complexity budget): resolves oldHp/newHp from runtime truth and either
+// DEFERS the write (opt-in CLA-092 seam — value returned as deferredHpWrite
+// for the commit owner) or performs the historical setRuntimeValue in place.
+function resolvePlayerHp(creature, delta, maxHp, campaignName, deferWrite) {
+  const oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
+  const newHp = clampHpLadder(oldHp, delta, maxHp);
+  if (deferWrite) {
+    return { oldHp, newHp, deferredHpWrite: newHp };
+  }
+  setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+  return { oldHp, newHp, deferredHpWrite: null };
+}
+
+// options (all opt-in — every existing caller/shape stays byte-identical):
+//   deferPlayerHpWrite: the player leg SKIPS its setRuntimeValue('currentHitPoints')
+//     and instead carries the resolved value on the result as `deferredHpWrite`
+//     (also suppressing the 'combat-summary-updated' dispatch — the commit owner
+//     dispatches AFTER writing, preserving write-before-event order). Used ONLY by
+//     applyHealingToTarget's choke so a revive (oldHp<=0 -> newHp>0) can fold the
+//     HP + death-state reset into ONE setRuntimeBatch POST (CLA-092 write-batching,
+//     handOfUltimateMercy/CharHitPoints one-POST idiom) instead of HP-POST + three
+//     sequential reset-POSTs (4 SSE echoes -> 1).
+export function modifyHitPoints(combatSummary, targetName, delta, campaignName, options = {}) {
   if (!combatSummary || !combatSummary.creatures) {
     return null;
   }
@@ -58,10 +81,10 @@ export function modifyHitPoints(combatSummary, targetName, delta, campaignName) 
     : creature.maxHp;
 
   let oldHp, newHp;
+  let deferredHpWrite = null;
   if (isPlayer) {
-    oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
-    newHp = clampHpLadder(oldHp, delta, maxHp);
-    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+    ({ oldHp, newHp, deferredHpWrite } =
+      resolvePlayerHp(creature, delta, maxHp, campaignName, options.deferPlayerHpWrite));
   } else {
     // fix#352(a): twin-byte parity with the player leg — '?? 0' (absent HP is a
     // zero: this file's zero-is-data stance, the pin at hpModifier.test.js
@@ -81,9 +104,17 @@ export function modifyHitPoints(combatSummary, targetName, delta, campaignName) 
 
   const actualDelta = newHp - oldHp;
 
-  if (actualDelta !== 0) {
+  // Deferred lane: the commit owner (applyHealingToTarget) dispatches once the
+  // write has landed, so listeners never read a stale currentHitPoints.
+  if (actualDelta !== 0 && deferredHpWrite === null) {
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
   }
 
-  return { oldHp, newHp, delta: actualDelta, isPlayer, creature, maxHp };
+  const result = { oldHp, newHp, delta: actualDelta, isPlayer, creature, maxHp };
+  // Only present on the opt-in defer lane (hpModifier.test.js toStrictEqual
+  // pins keep the default result shape byte-identical for every other caller).
+  if (deferredHpWrite !== null) {
+    result.deferredHpWrite = deferredHpWrite;
+  }
+  return result;
 }

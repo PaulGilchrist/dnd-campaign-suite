@@ -72,6 +72,21 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
         entry[key] = value;
         return Promise.resolve();
     }),
+    // CLA-092 revive fold: one arity-3 batch commits HP + death-reset; emits
+    // the same ordered tuples as the old four sequential setRuntimeValue calls.
+    setRuntimeBatch: vi.fn((owner, properties, campaign) => {
+        if (campaign !== CAMPAIGN) {
+            throw new Error(`runtime fake: unexpected campaign "${campaign}"`);
+        }
+        const entry = rt.owners[owner];
+        if (!entry) throw new Error(`runtime fake: unknown owner "${owner}"`);
+        for (const [key, value] of Object.entries(properties)) {
+            if (!(key in entry)) throw new Error(`runtime fake: unknown key "${owner}.${key}"`);
+            rt.writes.push([owner, key, value, campaign, undefined]);
+            entry[key] = value;
+        }
+        return Promise.resolve();
+    }),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
