@@ -17,7 +17,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }));
 
-import { resolveReviveTargetHp, reviveTargetIsLiving } from './reviveTargetHp.js';
+import { resolveReviveTargetHp, reviveTargetIsLiving, stripUnconsciousOnRevive } from './reviveTargetHp.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 describe('resolveReviveTargetHp — pre-payment HP truth', () => {
@@ -72,5 +72,41 @@ describe('reviveTargetIsLiving — verdict table (hp > 0 refuses)', () => {
     [-3, false],
   ])('resolved HP %s -> refuses=%s', (hp, refuses) => {
     expect(reviveTargetIsLiving(hp)).toBe(refuses);
+  });
+});
+
+describe('stripUnconsciousOnRevive — death→life crossing strip', () => {
+  const CAMPAIGN = 'TestCampaign';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('reads the victim bucket once, campaign-threaded', () => {
+    getRuntimeValue.mockReturnValue(['unconscious']);
+    expect(stripUnconsciousOnRevive('Ally', CAMPAIGN)).toEqual([]);
+    expect(getRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(getRuntimeValue).toHaveBeenCalledWith('Ally', 'activeConditions', CAMPAIGN);
+  });
+
+  it('sheds ONLY unconscious (interceptor parity): prone and the rest ride through, order preserved', () => {
+    getRuntimeValue.mockReturnValue(['prone', 'unconscious', 'poisoned']);
+    expect(stripUnconsciousOnRevive('Ally', CAMPAIGN)).toEqual(['prone', 'poisoned']);
+  });
+
+  it('case-folds the member test (the interceptor String(c).toLowerCase() predicate)', () => {
+    getRuntimeValue.mockReturnValue(['Unconscious', 'UNCONSCIOUS', 'stunned']);
+    expect(stripUnconsciousOnRevive('Ally', CAMPAIGN)).toEqual(['stunned']);
+  });
+
+  it('returns null when there is nothing to shed so callers keep their exact batch bytes', () => {
+    // absent bucket key (real getRuntimeValue -> null)
+    getRuntimeValue.mockReturnValue(null);
+    expect(stripUnconsciousOnRevive('Ally', CAMPAIGN)).toBeNull();
+    // empty / non-array / condition-free arrays never materialise a write
+    for (const raw of [[], ['prone'], 'unconscious', {}]) {
+      getRuntimeValue.mockReturnValue(raw);
+      expect(stripUnconsciousOnRevive('Ally', CAMPAIGN)).toBeNull();
+    }
   });
 });

@@ -183,6 +183,11 @@ function seedDeadPC(name, currentHitPoints, isDead, hitPoints) {
         hitPoints,
         deathSaves: [true, true, false],
         deathFailures: [true, false, true],
+        // 2026-11-15 improve (revive-crossing-unconscious-strip): the CLA-092
+        // revive branch now reads the victim bucket's conditions at the
+        // death→life crossing (stripUnconsciousOnRevive). Empty array = the
+        // helper sheds nothing, the batch keeps its exact four-key bytes.
+        activeConditions: [],
     };
 }
 
@@ -253,6 +258,7 @@ describe('triggerRevivify', () => {
             hitPoints: 26,
             deathSaves: [false, false, false],
             deathFailures: [false, false, false],
+            activeConditions: [], // seeded-untouched (no strip material) — see seedDeadPC
         });
         // Call order: canonical fetch -> diamond -> merged runtime commit.
         expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -287,6 +293,11 @@ describe('triggerRevivify', () => {
 
     it('revives a dead monster summary-canonical: zero runtime writes, exactly one summary POST, dead bystander byte-identical, full envelope', async () => {
         const caster = makeCaster('Brother Aldous');
+        // 2026-11-15 improve (revive-crossing-unconscious-strip): the monster
+        // revive crossing now CONSULTS the victim's condition bucket (one read,
+        // zero writes when nothing is shed). Hrolg is seeded-empty; Vex stays
+        // UNSEEDED — any stray owner access of the bystander still THROWS.
+        rt.owners.Hrolg = { activeConditions: [] };
         queueSummary(2, [
             { name: 'Hrolg', maxHp: 13, currentHp: 0, type: 'monster' },
             { name: 'Vex', maxHp: 23, currentHp: 0, type: 'monster' },
@@ -295,8 +306,8 @@ describe('triggerRevivify', () => {
         const result = await triggerRevivify(makeSpell('Restore the Fallen'), {}, caster, CAMPAIGN, 'Hrolg');
         await flush(); // drain the queued storage.set('combatSummary') POST
 
-        // Monster lane writes NOTHING to the runtime store (empty owners map = every
-        // stray owner access would have THROWN); persistence is the summary POST.
+        // Monster lane writes NOTHING to the runtime store (the seeded-empty
+        // strip read sheds nothing); persistence is the summary POST.
         expect(rt.writes).toEqual([]);
         expect(net.summaryPosts).toHaveLength(1);
         expect(net.summaryPosts[0].creatures).toEqual([
@@ -483,6 +494,9 @@ describe('triggerRevivify', () => {
     it('a creature entry with no type field rides the monster lane: dead revives summary-canonical, alive refuses', async () => {
         // Type-gate split (#1406 form): service :44 `type === 'player'` — absent type
         // falls to the monster arm in BOTH directions, folded into one row.
+        // Seeded-empty condition bucket: the monster revive crossing READS it
+        // (stripUnconsciousOnRevive) and sheds nothing — still zero writes.
+        rt.owners.Mosslump = { activeConditions: [] };
         queueSummary(1, [{ name: 'Mosslump', maxHp: 17, currentHp: 0 }]);
         queueSummary(1, [{ name: 'Mosslump', maxHp: 17, currentHp: 9 }]);
 

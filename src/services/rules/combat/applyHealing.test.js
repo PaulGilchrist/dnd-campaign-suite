@@ -24,7 +24,7 @@ vi.mock('../features/infernalWoundService.js', () => ({
 }));
 
 import { modifyHitPoints } from '../../shared/hpModifier.js';
-import { setRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, setRuntimeBatch, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../ui/storage.js';
 import { removeInfernalWoundOnHeal } from '../features/infernalWoundService.js';
 
@@ -61,6 +61,9 @@ describe('applyHealingToTarget', () => {
     modifyHitPoints.mockReset();
     setRuntimeValue.mockReset();
     setRuntimeBatch.mockReset();
+    // Keep the factory default (null everywhere: no heal-block te, no crossing
+    // conditions); the strip pins below override per-test.
+    getRuntimeValue.mockReset().mockReturnValue(null);
     storage.set.mockReset();
     removeInfernalWoundOnHeal.mockReset().mockResolvedValue(false);
   });
@@ -206,5 +209,139 @@ describe('applyHealingToTarget', () => {
     );
     applyHealingToTarget({}, 'Cleric', 5, CAMPAIGN);
     expect(removeInfernalWoundOnHeal).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Revive-crossing `unconscious` strip (improve 2026-11-15, QY backlog) ──
+// A corpse carrying `unconscious` (the interceptor lanes' strip condition —
+// undyingSentinelService/relentlessEnduranceService shed exactly this member)
+// must never be resurrected into positive HP still Unconscious. The strip is
+// folded INTO the ONE merged revive POST (CLA-092 batch) — never a second
+// victim write — and fires ONLY on the oldHp<=0 -> newHp>0 crossing: every
+// heal onto an already-living creature (even one carrying unconscious) keeps
+// byte-identical pre-improve behaviour.
+describe('applyHealingToTarget — death→life crossing strips unconscious', () => {
+  const stubConditions = (conditions) => {
+    getRuntimeValue.mockImplementation((owner, key) =>
+      key === 'activeConditions' ? conditions : null);
+  };
+
+  beforeEach(() => {
+    modifyHitPoints.mockReset();
+    setRuntimeValue.mockReset();
+    setRuntimeBatch.mockReset();
+    getRuntimeValue.mockReset().mockReturnValue(null);
+    storage.set.mockReset();
+    removeInfernalWoundOnHeal.mockReset().mockResolvedValue(false);
+  });
+
+  it('player revive folds activeConditions into the ONE merged batch: unconscious shed, prone rides through', () => {
+    stubConditions(['unconscious', 'prone']);
+    modifyHitPoints.mockReturnValue(
+      makeDeferredPlayerResult({ name: 'Fighter', oldHp: 0, newHp: 1 })
+    );
+    applyHealingToTarget({}, 'Fighter', 1, CAMPAIGN);
+
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch).toHaveBeenCalledWith('Fighter', {
+      currentHitPoints: 1,
+      deathSaves: [false, false, false],
+      deathFailures: [false, false, false],
+      isDead: 0,
+      activeConditions: ['prone'],
+    }, CAMPAIGN);
+    // No second victim write of any kind: the strip rode the same batch POST.
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('player revive with an unconscious-free or absent bucket keeps the exact four-key batch bytes', () => {
+    for (const raw of [null, [], ['prone'], ['poisoned']]) {
+      setRuntimeBatch.mockClear();
+      getRuntimeValue.mockImplementation((owner, key) =>
+        key === 'activeConditions' ? raw : null);
+      modifyHitPoints.mockReturnValue(
+        makeDeferredPlayerResult({ name: 'Fighter', oldHp: -3, newHp: 2 })
+      );
+      applyHealingToTarget({}, 'Fighter', 5, CAMPAIGN);
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+      const writes = setRuntimeBatch.mock.calls[0][1];
+      expect(Object.keys(writes)).toEqual([
+        'currentHitPoints', 'deathSaves', 'deathFailures', 'isDead',
+      ]);
+      expect('activeConditions' in writes).toBe(false);
+    }
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('living heal NEVER strips: oldHp>0 keeps the exact single HP write even on an unconscious-at-positive-HP bucket', () => {
+    // Criterion 2 face: the gate is the CROSSING, not the condition presence.
+    stubConditions(['unconscious']);
+    modifyHitPoints.mockReturnValue(
+      makeDeferredPlayerResult({ name: 'Paladin', oldHp: 4, newHp: 9 })
+    );
+    const returned = applyHealingToTarget({}, 'Paladin', 5, CAMPAIGN);
+
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Paladin', 'currentHitPoints', 9, CAMPAIGN);
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+    // …and the bucket was never even consulted (zero stray condition reads).
+    const condReads = getRuntimeValue.mock.calls.filter(([, key]) => key === 'activeConditions');
+    expect(condReads).toEqual([]);
+    expect(returned).toEqual({ actualHeal: 5, oldHp: 4, newHp: 9, maxHp: 10 });
+  });
+
+  it('zero-to-zero and below-zero stays below zero: no crossing, no condition read, no strip', () => {
+    stubConditions(['unconscious']);
+    modifyHitPoints.mockReturnValue(
+      makeDeferredPlayerResult({ name: 'Rogue', oldHp: 0, newHp: 0 })
+    );
+    applyHealingToTarget({}, 'Rogue', 0, CAMPAIGN);
+    modifyHitPoints.mockReturnValue(
+      makeDeferredPlayerResult({ name: 'Barbarian', oldHp: -5, newHp: -2 })
+    );
+    applyHealingToTarget({}, 'Barbarian', 3, CAMPAIGN);
+
+    const condReads = getRuntimeValue.mock.calls.filter(([, key]) => key === 'activeConditions');
+    expect(condReads).toEqual([]);
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+    for (const call of setRuntimeValue.mock.calls) {
+      expect(call[1]).toBe('currentHitPoints');
+    }
+  });
+
+  it('monster revive crossing sheds unconscious from its condition bucket (single write, summary persists as before)', () => {
+    stubConditions(['unconscious', 'prone']);
+    const cs = { creatures: [] };
+    modifyHitPoints.mockReturnValue(
+      makeResult({ isPlayer: false, oldHp: 0, newHp: 1, delta: 1, creature: { name: 'Goblin' } })
+    );
+    applyHealingToTarget(cs, 'Goblin', 1, CAMPAIGN);
+
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['prone'], CAMPAIGN);
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, CAMPAIGN);
+  });
+
+  it('monster revive with nothing to shed (and monster living heals) write ZERO condition bytes', () => {
+    for (const raw of [null, [], ['prone']]) {
+      setRuntimeValue.mockClear();
+      storage.set.mockClear();
+      getRuntimeValue.mockImplementation((owner, key) =>
+        key === 'activeConditions' ? raw : null);
+      // crossing leg
+      modifyHitPoints.mockReturnValue(
+        makeResult({ isPlayer: false, oldHp: 0, newHp: 1, delta: 1, creature: { name: 'Goblin' } })
+      );
+      applyHealingToTarget({}, 'Goblin', 1, CAMPAIGN);
+      // living-heal leg
+      modifyHitPoints.mockReturnValue(
+        makeResult({ isPlayer: false, oldHp: 3, newHp: 8, delta: 5, creature: { name: 'Goblin' } })
+      );
+      applyHealingToTarget({}, 'Goblin', 5, CAMPAIGN);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    }
+    // the last iteration's two HP commits persisted the summary (both deltas non-zero)
+    expect(storage.set).toHaveBeenCalledTimes(2);
   });
 });

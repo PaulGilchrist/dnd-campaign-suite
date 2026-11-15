@@ -9,7 +9,7 @@ import { hasHealingMaximization, resolveDiceExpression } from '../../../combat/a
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { resolveLiveTargetHp } from '../healing/liveTargetHp.js';
-import { resolveReviveTargetHp, reviveTargetIsLiving } from '../../../shared/reviveTargetHp.js';
+import { resolveReviveTargetHp, reviveTargetIsLiving, stripUnconsciousOnRevive } from '../../../shared/reviveTargetHp.js';
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
 
@@ -49,6 +49,14 @@ function resolveTargetMaxHp(targetInfo, targetName, campaignName, characters) {
 }
 
 async function applyResurrectionHeal(targetInfo, targetName, healAmount, campaignName) {
+    // commitResurrection's gate refused any living target before payment, so
+    // this commit IS the death→life crossing: fold the interceptor-parity
+    // `unconscious` strip (reviveTargetHp.stripUnconsciousOnRevive) into the
+    // ONE merged POST below. null (nothing shed) keeps the historical four-key
+    // bytes, and the mirror sheds the condition synchronously — the later
+    // cureConditionsFor read (and its full-mirror POST, when it fires) can
+    // never re-echo the stripped `unconscious`.
+    const strippedConditions = stripUnconsciousOnRevive(targetName, campaignName);
     if (targetInfo.target.type === 'player') {
         // Resurrection always lifts the bucket from 0 to positive, so it must
         // carry the app-wide death-state reset — the same one the sheet-revive
@@ -63,11 +71,18 @@ async function applyResurrectionHeal(targetInfo, targetName, healAmount, campaig
             deathSaves: [false, false, false],
             deathFailures: [false, false, false],
             isDead: 0,
+            ...(strippedConditions ? { activeConditions: strippedConditions } : null),
         }, campaignName);
     } else {
         targetInfo.target.currentHp = healAmount;
         if (targetInfo.cs) {
             storage.set('combatSummary', targetInfo.cs, campaignName);
+        }
+        // Monster revive crossing: the condition bucket is a separate channel
+        // from the summary row, so it gets its own (only-when-something-shed)
+        // bucket write — see applyHealing.js's monster leg.
+        if (strippedConditions) {
+            setRuntimeValue(targetName, 'activeConditions', strippedConditions, campaignName);
         }
     }
 }

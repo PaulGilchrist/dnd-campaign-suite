@@ -166,6 +166,11 @@ function seedPlayer(name, currentHitPoints, isDead, hitPoints) {
         hitPoints,
         deathSaves: [false, false, true], // pre-existing failures cleared by revival
         deathFailures: [true, false, false],
+        // 2026-11-15 improve (revive-crossing-unconscious-strip): the CLA-092
+        // revive branch reads the victim bucket's conditions at the death→life
+        // crossing (stripUnconsciousOnRevive). Seeded-empty = nothing shed, the
+        // batch keeps its exact four-key bytes.
+        activeConditions: [],
     };
 }
 
@@ -231,9 +236,11 @@ describe('triggerRevivify - edge cases', () => {
         });
         // Exact read-order census: isCreatureDead gate -> hoisted oldHp+maxHp
         // validation reads (#1407a/b validate-before-consume, pre-diamond) ->
-        // heal-block seam -> modifyHitPoints (maxHp, oldHp) -> infernal-wound
-        // seam. Zero time-key reads. The extra ['Ally','hitPoints'] here vs the
-        // pre-fix 7-row census is the validate-before-consume hoist's read.
+        // heal-block seam -> modifyHitPoints (maxHp, oldHp) -> revive-crossing
+        // condition strip read (2026-11-15 improve, activeConditions read once
+        // on the oldHp<=0 -> newHp>0 crossing) -> infernal-wound seam. Zero
+        // time-key reads. The extra ['Ally','hitPoints'] here vs the pre-fix
+        // 7-row census is the validate-before-consume hoist's read.
         expect(rt.reads).toEqual([
             ['Ally', 'isDead'],
             ['Ally', 'currentHitPoints'],
@@ -242,6 +249,7 @@ describe('triggerRevivify - edge cases', () => {
             ['campaign', 'targetEffects'],
             ['Ally', 'hitPoints'],
             ['Ally', 'currentHitPoints'],
+            ['Ally', 'activeConditions'],
             ['campaign', 'targetEffects'],
         ]);
         // Dead->alive latch flip in the canonical store; player summary placeholder
@@ -252,6 +260,7 @@ describe('triggerRevivify - edge cases', () => {
             hitPoints: null,
             deathSaves: [false, false, false],
             deathFailures: [false, false, false],
+            activeConditions: [], // seeded-untouched (no strip material) — see seedPlayer
         });
         expect(envelope.combatSummary.creatures[0].currentHp).toBe(0);
         expect(consumeMaterial).toHaveBeenCalledTimes(1);
@@ -267,6 +276,9 @@ describe('triggerRevivify - edge cases', () => {
     it('boundary compose: revive from -8 (finalHeal 9 vs literal total 1), retry refused post-revive without second diamond, monster -3 flips summary in place', async () => {
         const caster = makeCaster('Cleric');
         seedPlayer('Ally', -8, 1, 30);
+        // Stage C's monster revive crossing reads Goblin's condition bucket
+        // (stripUnconsciousOnRevive) — seeded-empty, sheds nothing, zero writes.
+        rt.owners.Goblin = { activeConditions: [] };
         const allyEntry = { name: 'Ally', maxHp: 30, currentHp: 0, type: 'player' };
         const goblinEntry = { name: 'Goblin', maxHp: 7, currentHp: -3, type: 'monster' };
         queueCombat(4, [allyEntry, goblinEntry]);

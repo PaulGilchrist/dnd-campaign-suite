@@ -9,8 +9,8 @@
 // handOfUltimateMercyHandler.commitResurrection, revivificationHandler.handle —
 // the same HP-truth pair as isCreatureDead, hpModifier.js:9-21); it lives here
 // once now. Refusal COPY, payload shape, console.error text and the surrounding
-// read ORDER stay with each lane — this module owns only the HP read and the
-// predicate.
+// read ORDER stay with each lane — this module owns the HP read, the predicate
+// and the death→life crossing strip below.
 //
 // Absent-HP-key law per lane (all three pinned byte-identical pre-extraction):
 // an absent bucket/row HP key DEFAULTS TO ZERO (treated as a corpse), it never
@@ -35,4 +35,25 @@ export function resolveReviveTargetHp(creature) {
 // to perform — the lane must refuse BEFORE it pays or consumes.
 export function reviveTargetIsLiving(targetHp) {
     return targetHp > 0;
+}
+
+// Death→life crossing strip (improve 2026-11-15, QY backlog): a corpse that was
+// carrying `unconscious` must not be resurrected into 1-18 HP still Unconscious.
+// The zero-HP interceptor lanes already strip exactly this condition at their
+// life-preserving crossing (undyingSentinelService.js:37-39,
+// relentlessEnduranceService.js:44-47 — same case-folded predicate; PRONE and
+// every other condition ride through untouched), so the three revive lanes
+// (applyHealingToTarget's CLA-092 revive branch, revivificationHandler,
+// handOfUltimateMercyHandler.applyResurrectionHeal) fold the filtered array
+// into the ONE setRuntimeBatch / bucket POST they already own. Callers invoke
+// this ONLY on the death→life crossing — a heal onto an already-living creature
+// never strips anything. Returns null when there is nothing to shed (absent,
+// empty or non-array bucket, or no `unconscious` member): callers then keep
+// their pre-improve bytes (materialising an absent key as [] would rewrite the
+// full-mirror POST of every plain revive).
+export function stripUnconsciousOnRevive(targetName, campaignName) {
+    const rawConditions = getRuntimeValue(targetName, 'activeConditions', campaignName);
+    if (!Array.isArray(rawConditions) || rawConditions.length === 0) return null;
+    const filtered = rawConditions.filter(c => String(c).toLowerCase() !== 'unconscious');
+    return filtered.length < rawConditions.length ? filtered : null;
 }

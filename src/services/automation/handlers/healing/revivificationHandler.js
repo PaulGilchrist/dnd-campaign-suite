@@ -3,7 +3,7 @@ import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/d
 import { addEntry } from '../../../ui/logService.js';
 
 import storage from '../../../ui/storage.js';
-import { resolveReviveTargetHp, reviveTargetIsLiving } from '../../../shared/reviveTargetHp.js';
+import { resolveReviveTargetHp, reviveTargetIsLiving, stripUnconsciousOnRevive } from '../../../shared/reviveTargetHp.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -70,6 +70,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     await setRuntimeValue(playerName, 'ragePoints', currentRage - 1, campaignName);
 
+    // The gate above already refused any living target, so reaching the commit
+    // IS the death→life crossing: fold the interceptor-parity `unconscious`
+    // strip (reviveTargetHp.stripUnconsciousOnRevive) into the ONE merged POST
+    // below — null (nothing shed) keeps the historical four-key bytes.
+    const strippedConditions = stripUnconsciousOnRevive(target.name, campaignName);
+
     if (target.type === 'player') {
         // Resurrection always lifts the bucket from 0 to positive, so it must
         // carry the app-wide death-state reset — the same merged one-POST idiom
@@ -87,12 +93,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             deathSaves: [false, false, false],
             deathFailures: [false, false, false],
             isDead: 0,
+            ...(strippedConditions ? { activeConditions: strippedConditions } : null),
         }, campaignName);
     } else {
         target.currentHp = healAmount;
         const summary = cs;
         if (summary) {
             storage.set('combatSummary', summary, campaignName);
+        }
+        // Monster revive crossing: the condition bucket is a separate channel
+        // from the summary row, so it gets its own (only-when-something-shed)
+        // bucket write — see applyHealing.js's monster leg.
+        if (strippedConditions) {
+            setRuntimeValue(target.name, 'activeConditions', strippedConditions, campaignName);
         }
     }
 

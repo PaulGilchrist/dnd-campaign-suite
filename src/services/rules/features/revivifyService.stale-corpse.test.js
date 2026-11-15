@@ -150,6 +150,10 @@ function seedDivergent(name, currentHitPoints) {
         hitPoints: 30,
         deathSaves: [false, false, true],
         deathFailures: [true, false, false],
+        // 2026-11-15 improve (revive-crossing-unconscious-strip): the classic
+        // 0-HP success crossing reads the victim's conditions (seeded-empty —
+        // nothing shed, the four-write merged-batch census below stays exact).
+        activeConditions: [],
     };
 }
 

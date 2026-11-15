@@ -355,6 +355,98 @@ describe('revivificationHandler', () => {
     });
   });
 
+  // ── Death→life crossing `unconscious` strip (improve 2026-11-15, QY backlog) ──
+  // The pre-payment gate refuses any living target, so reaching the commit IS
+  // the crossing: the interceptor-parity strip (stripUnconsciousOnRevive sheds
+  // exactly `unconscious`, case-folded; prone rides through) must fold into the
+  // ONE merged batch, never a second victim write. A living target refuses
+  // pre-spend with zero reads of the condition bucket.
+
+  describe('revive-crossing condition strip', () => {
+    function stubCombatWithConditions(rage, conditions) {
+      useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
+        if (key === 'ragePoints') return rage;
+        if (key === 'currentHitPoints') return 0;
+        if (key === 'activeConditions') return conditions;
+        return null;
+      });
+      damageUtils.getCombatContext.mockResolvedValue({});
+    }
+
+    it('player corpse carrying unconscious+prone: the merged batch sheds unconscious and keeps prone', async () => {
+      stubCombatWithConditions(1, ['unconscious', 'prone']);
+      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
+
+      await handle(makeAction(), makePlayerStats({ level: 18 }), campaignName, null);
+
+      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+        'Ally',
+        {
+          currentHitPoints: 18,
+          deathSaves: [false, false, false],
+          deathFailures: [false, false, false],
+          isDead: 0,
+          activeConditions: ['prone'],
+        },
+        campaignName,
+      );
+      // No second victim POST: only the rage spend rides setRuntimeValue.
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        playerName, 'ragePoints', 0, campaignName);
+    });
+
+    it('player corpse with an unconscious-free bucket keeps the exact four-key batch (nothing materialised)', async () => {
+      for (const raw of [null, [], ['prone']]) {
+        useRuntimeState.setRuntimeBatch.mockClear();
+        stubCombatWithConditions(1, raw);
+        damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        const writes = useRuntimeState.setRuntimeBatch.mock.calls[0][1];
+        expect(Object.keys(writes)).toEqual([
+          'currentHitPoints', 'deathSaves', 'deathFailures', 'isDead',
+        ]);
+      }
+    });
+
+    it('monster corpse crossing sheds unconscious from its condition bucket', async () => {
+      stubCombatWithConditions(1, ['unconscious']);
+      const combatCtx = { creatures: [] };
+      damageUtils.getCombatContext.mockResolvedValue(combatCtx);
+      damageUtils.getTargetFromAttacker.mockReturnValue(makeNPCTarget('Goblin'));
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin', 'activeConditions', [], campaignName);
+      expect(storage.set).toHaveBeenCalledWith('combatSummary', combatCtx, campaignName);
+    });
+
+    it('living-target refusal pays nothing and NEVER reads the condition bucket (no strip off-crossing)', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((target, key) => {
+        if (key === 'ragePoints') return 1;
+        if (key === 'currentHitPoints') return 5; // alive despite the seed trap
+        if (key === 'activeConditions') return ['unconscious'];
+        return null;
+      });
+      damageUtils.getCombatContext.mockResolvedValue({});
+      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.description).toBe('Ally is not at 0 Hit Points.');
+      expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      const condReads = useRuntimeState.getRuntimeValue.mock.calls
+        .filter(([, key]) => key === 'activeConditions');
+      expect(condReads).toEqual([]);
+    });
+  });
+
   // ── Logging ──────────────────────────────────────────────────
 
   describe('logging', () => {

@@ -170,6 +170,10 @@ function seedPlayer(name, currentHitPoints, isDead, hitPoints) {
         hitPoints,
         deathSaves: [true, false, false],
         deathFailures: [false, true, false],
+        // 2026-11-15 improve (revive-crossing-unconscious-strip): the CLA-092
+        // revive branch reads the victim bucket's conditions at the death→life
+        // crossing (stripUnconsciousOnRevive). Seeded-empty = nothing shed.
+        activeConditions: [],
     };
 }
 
@@ -257,6 +261,11 @@ describe('triggerRevivify - log bytes', () => {
             { name: 'Hesketh', maxHp: 44, currentHp: 0, type: 'player' },
             { name: 'Snarl', maxHp: 14, currentHp: 7, type: 'monster' },
         ], 2);
+        // 2026-11-15 improve (revive-crossing-unconscious-strip): Gribble's revive
+        // crossing READS its condition bucket (seeded-empty — sheds nothing);
+        // Hesketh/Snarl stay UNSEEDED, their stray-read traps intact (Hesketh is
+        // never the crossing victim, Snarl refuses before any heal).
+        fake.owners.Gribble = { activeConditions: [] };
 
         await triggerRevivify(spell, {}, caster, CAMPAIGN, 'Gribble');
         await triggerRevivify(spell, {}, caster, CAMPAIGN, 'Snarl');

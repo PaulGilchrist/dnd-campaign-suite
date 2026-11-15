@@ -824,3 +824,125 @@ describe('handOfUltimateMercyHandler.handle', () => {
     });
   });
 });
+
+// ── Death→life crossing `unconscious` strip (improve 2026-11-15, QY backlog) ──
+// A corpse resurrected by Hand of Ultimate Mercy must shed `unconscious` at
+// the crossing (interceptor-lane parity: exactly that member, case-folded;
+// prone and everything else ride through), folded into the ONE merged
+// resurrection batch — never a second victim POST, never a stale re-echo.
+// Off-crossing (a living armed target) refuses with zero condition reads.
+describe('handOfUltimateMercyHandler — revive-crossing condition strip', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  // Stateful mirror: getRuntimeValue reads the store, setRuntimeBatch/
+  // setRuntimeValue write it — so the LATER cureConditionsFor read observes
+  // the stripped array exactly like a live client mirror does.
+  function mockRuntimeStateful({ fp = 10, conditions = [] } = {}) {
+    const store = {
+      TestCleric: { focusPoints: fp },
+      DownedAlly: { currentHitPoints: 0, hitPoints: 112, activeConditions: [...conditions] },
+    };
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => store[name]?.[key] ?? null);
+    useRuntimeState.setRuntimeBatch.mockImplementation((name, props) => {
+      store[name] = { ...(store[name] || {}), ...props };
+    });
+    useRuntimeState.setRuntimeValue.mockImplementation((name, key, value) => {
+      store[name] = { ...(store[name] || {}), [key]: value };
+    });
+    return store;
+  }
+
+  it('corpse carrying unconscious+prone: the merged batch sheds unconscious, keeps prone', async () => {
+    mockRuntime({ maxHp: 112, conditions: ['unconscious', 'prone'] });
+    mockRoll(12);
+    mockPlayerTarget();
+
+    await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('DownedAlly', {
+      currentHitPoints: 12,
+      deathSaves: [false, false, false],
+      deathFailures: [false, false, false],
+      isDead: 0,
+      activeConditions: ['prone'],
+    }, campaignName);
+    // No second victim condition POST (prone is not a CUREABLE member).
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+      'DownedAlly', 'activeConditions', expect.anything(), campaignName);
+  });
+
+  it('stateful mirror: the later cure leg reads the STRIPPED array and can never re-echo unconscious', async () => {
+    const store = mockRuntimeStateful({ conditions: ['unconscious', 'poisoned'] });
+    mockRoll(12);
+    mockPlayerTarget();
+
+    await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    // Crossing batch carries the stripped snapshot (unconscious gone, poisoned
+    // still awaiting its cure)…
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith('DownedAlly', {
+      currentHitPoints: 12,
+      deathSaves: [false, false, false],
+      deathFailures: [false, false, false],
+      isDead: 0,
+      activeConditions: ['poisoned'],
+    }, campaignName);
+    // …the cure leg then writes the CURED array…
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'DownedAlly', 'activeConditions', [], campaignName);
+    // …and NOTHING ever wrote an array containing unconscious: final mirror truth:
+    expect(store.DownedAlly.activeConditions).toEqual([]);
+    const arrays = [
+      ...useRuntimeState.setRuntimeBatch.mock.calls.map(([, props]) => props.activeConditions),
+      ...useRuntimeState.setRuntimeValue.mock.calls
+        .filter(([, key]) => key === 'activeConditions').map(([, , value]) => value),
+    ].filter(Array.isArray);
+    expect(arrays.every(a => !a.some(c => String(c).toLowerCase() === 'unconscious'))).toBe(true);
+  });
+
+  it('corpse with an unconscious-free or absent bucket keeps the exact four-key batch', async () => {
+    for (const raw of [null, [], ['prone']]) {
+      useRuntimeState.setRuntimeBatch.mockClear();
+      mockRuntime({ maxHp: 112, conditions: raw });
+      mockRoll(12);
+      mockPlayerTarget();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const writes = useRuntimeState.setRuntimeBatch.mock.calls[0][1];
+      expect(Object.keys(writes)).toEqual([
+        'currentHitPoints', 'deathSaves', 'deathFailures', 'isDead',
+      ]);
+    }
+  });
+
+  it('monster corpse crossing sheds unconscious from its condition bucket', async () => {
+    mockRuntime({ conditions: ['unconscious', 'prone'] });
+    mockRoll(12);
+    const cs = { creatures: [{ name: 'Goblin', type: 'npc', currentHp: 0 }] };
+    resolveTarget.mockResolvedValue({ target: cs.creatures[0], cs });
+
+    await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Goblin', 'activeConditions', ['prone'], campaignName);
+  });
+
+  it('living armed target: zero-spend refusal NEVER touches the condition bucket', async () => {
+    mockRuntime({ hp: 5, conditions: ['unconscious'] });
+    mockPlayerTarget();
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(result.payload.description).toBe('DownedAlly is not at 0 Hit Points.');
+    expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+    const condReads = useRuntimeState.getRuntimeValue.mock.calls
+      .filter(([, key]) => key === 'activeConditions');
+    expect(condReads).toEqual([]);
+  });
+});
