@@ -185,7 +185,10 @@ async function runRevivify(d, pending, result) {
   )
   // SP-100: createConfirmHandler spends the slot before applyFn — refund it
   // when the trigger refuses (target no longer dead / material gone).
+  // PX 2026-11-15: flag the refusal so the lane's deferred cast row is
+  // suppressed too — a refunded cast must not log as if it fired.
   if (popup?.payload?.type === 'automation_info') {
+    pending.castRefused = true
     rollbackSpellSlot(d.playerStats.name, pending.spellName, pending.spellLevel || 0, d.playerStats, d.campaignName)
   }
   showPopupIfPresent(d, popup)
@@ -338,7 +341,9 @@ const SIMPLE_SPELL_SPECS = [
   { name: 'banishment', key: 'Banishment', run: triggerSpell(() => triggerBanishment, (p, r) => ({ banishmentTargets: toArray(r) }), showPopupIfPayload) },
   { name: 'prismatic_spray', key: 'PrismaticSpray', run: async (d, pending, result) => d.onExecute(pending.spell, { selectedTargets: toArray(result) }) },
   { name: 'hex', key: 'Hex', run: runHex },
-  { name: 'revivify', key: 'Revivify', run: runRevivify, confirmTargets: (d, pending, sel) => (sel?.targetName ? [sel.targetName] : pending.creatureTargets) },
+  // PX 2026-11-15: deferCastLog — the refusal+refund lane must not stamp a
+  // type:'spell' cast row for a cast that did nothing (see runRevivify).
+  { name: 'revivify', key: 'Revivify', run: runRevivify, deferCastLog: true, confirmTargets: (d, pending, sel) => (sel?.targetName ? [sel.targetName] : pending.creatureTargets) },
   { name: 'stinkingCloud', key: 'StinkingCloud', run: areaExecute('stinking_cloud', 'CON') },
   { name: 'confusion', key: 'Confusion', run: runConfusion },
   { name: 'healingWord', key: 'HealingWord', run: runHealingWord },
@@ -351,7 +356,7 @@ export function useSimpleSpellHandlers({ createConfirmHandler, createSkipHandler
   for (const spec of SIMPLE_SPELL_SPECS) {
     const confirmTargets = spec.confirmTargets || allTargets
     const skipTargets = spec.skipTargets || allTargets
-    handlers[`handle${spec.key}Confirm`] = createConfirmHandler(spec.name, (pending, result) => spec.run(deps, pending, result), (pending, sel) => confirmTargets(deps, pending, sel))
+    handlers[`handle${spec.key}Confirm`] = createConfirmHandler(spec.name, (pending, result) => spec.run(deps, pending, result), (pending, sel) => confirmTargets(deps, pending, sel), { deferCastLog: !!spec.deferCastLog })
     handlers[`handle${spec.key}Skip`] = createSkipHandler(spec.name, (pending) => skipTargets(deps, pending))
   }
   handlers.handleGreaterRestorationNoEffects = () => refundGreaterRestorationNoEffects(deps)

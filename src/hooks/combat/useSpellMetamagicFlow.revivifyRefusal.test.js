@@ -1,10 +1,13 @@
-// @maintained-by-ai: 2026-10-15
+// @maintained-by-ai: 2026-11-15
 // SP-100 confirm-stage refusal lane: gate-stage arming is covered by
 // useSpellMetamagicFlow.gate.test.js (breadth) and .console-error.test.js
 // (null-creatures); this file owns the confirm-stage refusal seam —
 // runRevivify refunding the paid slot (rollbackSpellSlot → setRuntimeValue)
 // when triggerRevivify answers with an automation_info popup, and NOT
-// refunding on a successful revive.
+// refunding on a successful revive. PX 2026-11-15 audit-honesty: the refusal
+// leg ALSO pins that no type:'spell' cast row is stamped (deferred-stamp
+// lane, useConfirmableFlow options.deferCastLog + pending.castRefused) while
+// the success leg pins the cast row still lands with identical bytes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
@@ -124,7 +127,7 @@ describe('SP-100 Revivify confirm refusal — slot rollback + spell log target',
     expect(result.current.pendingRevivify.creatureTargets).toEqual(['Goblin C']);
   });
 
-  it('rolls the slot back and logs the chosen target when the trigger refuses', async () => {
+  it('refusal: rolls the slot back, shows the popup, and stamps NO spell cast row', async () => {
     const { setPopupHtml } = await confirmAgainst({
       type: 'popup',
       payload: {
@@ -135,17 +138,35 @@ describe('SP-100 Revivify confirm refusal — slot rollback + spell log target',
       },
     });
 
+    // Slot pay-then-refund unchanged (2 → pay → 3 refund).
     expect(prepareSpellCast).toHaveBeenCalled();
     expect(setRuntimeValue).toHaveBeenCalledWith('Cleric', 'spell_slots_level_3', 3, 'test-campaign');
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+    // PX 2026-11-15 audit-honesty: nothing happened → no type:'spell' row.
+    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'spell',
-      targetName: 'Goblin C',
-      spellName: 'Revivify',
     }));
     expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'automation_info' }));
   });
 
-  it('does NOT roll the slot back on a successful revive', async () => {
+  it('refusal (material vanished): the same automation_info refund path also suppresses the spell row', async () => {
+    const { setPopupHtml } = await confirmAgainst({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Revivify',
+        automationType: 'revivify',
+        description: 'Revivify requires a diamond worth 300+ GP, which the spell consumes.',
+      },
+    });
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('Cleric', 'spell_slots_level_3', 3, 'test-campaign');
+    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'spell',
+    }));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'automation_info' }));
+  });
+
+  it('success: does NOT roll the slot back and still stamps the spell cast row', async () => {
     const { setPopupHtml } = await confirmAgainst({
       type: 'popup',
       payload: { type: 'heal', name: 'Revivify', targetName: 'Goblin C', finalHeal: 1, total: 1, formula: '1 HP (revived)', rolls: [], rawTotal: 1 },
@@ -153,9 +174,15 @@ describe('SP-100 Revivify confirm refusal — slot rollback + spell log target',
 
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Cleric', 'spell_slots_level_3', 3, 'test-campaign');
     expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'heal' }));
+    // Deferred stamp carries the SAME bytes as the shared writer: chooser
+    // selection as targetName/targets, paid level, caster name.
     expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'spell',
+      characterName: 'Cleric',
       targetName: 'Goblin C',
+      targets: ['Goblin C'],
+      spellName: 'Revivify',
+      spellLevel: 3,
     }));
   });
 });

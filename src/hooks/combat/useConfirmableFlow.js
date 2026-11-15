@@ -95,7 +95,13 @@ export function useConfirmableFlow(playerStats, campaignName) {
 
   const getPending = useCallback((type) => pendingOps[type] || null, [pendingOps]);
 
-  const createConfirmHandler = useCallback((type, applyFn, getTargets) => {
+  // options.deferCastLog (PX 2026-11-15 audit-honesty): refund-capable lanes
+  // (Revivify) must NOT stamp a type:'spell' cast row for a cast that refused
+  // and rolled the slot back — nothing happened → no spell row (refuse-must-log
+  // family: the refusal popup is the audit). The row bytes are identical, only
+  // the stamp moves to AFTER applyFn, skipped when the runner flags
+  // pending.castRefused alongside its rollbackSpellSlot refund.
+  const createConfirmHandler = useCallback((type, applyFn, getTargets, options = {}) => {
     return async (result) => {
       const pending = pendingOpsRef.current[type];
       if (!pending) return;
@@ -111,7 +117,7 @@ export function useConfirmableFlow(playerStats, campaignName) {
       stampPaidSlotLevel(pending);
 
       const targets = getTargets ? getTargets(pending, result) : null;
-      addEntry(campaignName, {
+      const stampCastRow = () => addEntry(campaignName, {
         type: 'spell',
         characterName: playerStats.name,
         targetName: targets?.[0] || null,
@@ -121,6 +127,7 @@ export function useConfirmableFlow(playerStats, campaignName) {
         castingTime: pending.castingTime,
         timestamp: Date.now(),
       }).catch((e) => { console.error("[useConfirmableFlow:log-error]", e); });
+      if (!options.deferCastLog) stampCastRow();
 
       const isCantrip = (pending.spell?.level === 0);
       if (!isCantrip && pending.spell) {
@@ -139,8 +146,15 @@ export function useConfirmableFlow(playerStats, campaignName) {
         });
       }
 
-      if (applyFn) {
-        await applyFn(pending, result);
+      // applyFn is present on every deferCastLog lane (revivify spec); the
+      // finally-stamp covers success, refusal (suppressed) and throw alike.
+      try {
+        await applyFn?.(pending, result);
+      } finally {
+        // Deferred lanes stamp the cast row only once applyFn has answered;
+        // a refused+refunded cast (pending.castRefused) logs nothing. A throw
+        // still stamps (the slot WAS paid) — the pre-deferral behaviour.
+        if (options.deferCastLog && !pending.castRefused) stampCastRow();
       }
 
       await fireConfirmLaneRider(pending, playerStats, campaignName);
