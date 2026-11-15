@@ -7,9 +7,16 @@ export function isCreatureDead(combatSummary, creatureName) {
   const creature = combatSummary?.creatures?.find(c => c.name === creatureName);
   if (!creature) return false;
   if (creature.type === 'player') {
+    // HP-consistent corpse (HoUoM collectCorpseTargets precedent): the bucket's
+    // currentHitPoints is canonical and DECIDES — a stale isDead latch left by a
+    // desynced writer must not invert a positive-HP bucket into a corpse
+    // (bug-revivify-stale-isdead-negative-heal: Revivify's `1 - oldHp` delta went
+    // negative and a revive drained a living ally). The isDead flag only
+    // corroborates when the bucket carries no HP to check against.
     const isDead = getRuntimeValue(creature.name, 'isDead');
     const currentHp = getRuntimeValue(creature.name, 'currentHitPoints');
-    return !!isDead || (currentHp != null && Number(currentHp) <= 0);
+    if (currentHp != null) return Number(currentHp) <= 0;
+    return !!isDead;
   }
   return creature.currentHp != null && Number(creature.currentHp) <= 0;
 }

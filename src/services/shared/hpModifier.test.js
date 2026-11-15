@@ -257,8 +257,12 @@ describe('isCreatureDead — canonical truth table', () => {
     { desc: 'monster at null HP is alive (guard != null)', type: 'npc', currentHp: null, expectDead: false },
     { desc: 'monster HP key absent is alive', type: 'npc', currentHp: undefined, expectDead: false },
     { desc: 'monster at 5 HP is alive', type: 'npc', currentHp: 5, expectDead: false },
-    // player arm: reads ONLY the runtime store (:10-12) — isDead latch OR HP<=0
-    { desc: 'player with isDead latch set is dead despite 7 HP', type: 'player', isDead: 1, runtimeHp: 7, expectDead: true },
+    // player arm: reads ONLY the runtime store (:10-16) — HP-consistent corpse:
+    // bucket currentHitPoints DECIDES (dead only at <= 0); the isDead latch only
+    // corroborates when no HP key exists (bug-revivify-stale-isdead-negative-heal
+    // inverted the old `isDead OR HP<=0` into a negative-heal drain)
+    { desc: 'player with stale isDead latch but 7 HP is ALIVE (HP is canonical — no negative-heal corpse)', type: 'player', isDead: 1, runtimeHp: 7, expectDead: false },
+    { desc: 'player with isDead latch and no HP key is dead (flag corroborates absent HP)', type: 'player', isDead: 1, runtimeHp: null, expectDead: true },
     { desc: 'player at runtime 0 HP is dead even with latch false (falsy-zero survives)', type: 'player', isDead: 0, runtimeHp: 0, expectDead: true },
     { desc: 'player at runtime string "0" HP is dead', type: 'player', isDead: null, runtimeHp: '0', expectDead: true },
     { desc: 'player with both HP and latch null is alive', type: 'player', isDead: 0, runtimeHp: null, expectDead: false },

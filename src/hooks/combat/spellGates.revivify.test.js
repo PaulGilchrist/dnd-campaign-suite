@@ -63,6 +63,14 @@ describe('SP-100 gateRevivify — dead-target picker gate', () => {
     expect(cfSetPending).toHaveBeenCalledWith('revivify', expect.objectContaining({ creatureTargets: expected }));
   });
 
+  it('never offers a desynced player bucket — isDead:1 with positive runtime HP is not a corpse (HP-consistent census, bug-revivify-stale-isdead-negative-heal)', () => {
+    getRuntimeValue.mockImplementation((_n, k) => (k === 'isDead' ? 1 : k === 'currentHitPoints' ? 18 : null));
+    const { handled, cfSetPending } = gate();
+    expect(handled).toBe(true);
+    // Only the honest monster corpse is offered; the 18-HP zombie is excluded.
+    expect(cfSetPending).toHaveBeenCalledWith('revivify', expect.objectContaining({ creatureTargets: ['Thug 1'] }));
+  });
+
   it.each([
     { desc: 'no creature is dead', runtime: () => null, creatures: [{ name: 'Cleric', type: 'player' }, { name: 'Goblin 1', type: 'npc', currentHp: 7 }] },
     { desc: 'only the caster is dead (self-resurrection excluded)', runtime: (_n, k) => (k === 'currentHitPoints' ? 0 : null), creatures: [{ name: 'Cleric', type: 'player', currentHp: 1 }] },
