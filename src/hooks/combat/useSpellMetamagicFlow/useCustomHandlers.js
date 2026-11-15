@@ -91,6 +91,42 @@ async function consumePassWithoutTraceSlot(pending, playerStats, campaignName) {
   })
 }
 
+async function consumeStoneSkinSlot(pending, playerStats, campaignName) {
+  // Slot-owe fix (bug-enhance-ability-stone-skin-confirms-never-pay, owner ruling
+  // 2026-11-15): Stone Skin previously paid ONLY its Diamond Dust material — RAW is
+  // slot AND dust. Mirrors consumeBarkskinSlot/consumeProtectionFromPoisonSlot
+  // (SP-013/SP-095): pay via prepareSpellCast at confirm + ability_use audit row.
+  const isCantrip = (pending.spell?.level === 0)
+  if (isCantrip || !pending.spell) return
+  const upcastLevel = pending.spell.upcastLevel
+  const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
+  // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
+  const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+  const slotResult = await prepareSpellCast(pending.spell, {}, {
+    playerName: playerStats.name,
+    playerStats,
+    campaignName,
+    isUpcast,
+    upcastLevel,
+    freeCastAuthorized,
+  })
+  // Canonical PAID stamp (73bc0c5e7 money-flag law, mirrors createConfirmHandler's
+  // pay block): only the leveled-cast leg reaches it; a cantrip/no-spell pending
+  // stays unstamped so the skip gate can never inherit a false paid flag.
+  pending.slotConsumed = true
+  if (slotResult && slotResult.slotConsumed) {
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: playerStats.name,
+      abilityName: pending.spellName,
+      spellName: pending.spellName,
+      description: `${pending.spellName}: Expended a level ${(slotResult.modifiedSpell && slotResult.modifiedSpell.level) || pending.spellLevel || 0} spell slot.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
+  }
+}
+
 export function useCustomHandlers({ playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters }) {
   const handleBarkskinConfirm = React.useCallback(async (result) => {
     const pending = getPending('barkskin')
@@ -263,6 +299,12 @@ export function useCustomHandlers({ playerStats, campaignName, cfClearPending, g
       castingTime: pending.castingTime,
       timestamp: Date.now(),
     }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
+
+    // Slot AND dust (owner ruling 2026-11-15): the material leg above is unchanged;
+    // the lv4 slot is consumed here at confirm via the canonical seam (mirrors
+    // SP-013/SP-095 — helper owns the pending.slotConsumed stamp) — payment never
+    // fires at gate arm, so the unpaid-skip gate below stays a zero-write dismiss.
+    await consumeStoneSkinSlot(pending, playerStats, campaignName)
 
     const popup = await applyStoneSkinHandler(
       { name: pending.spellName, spell: pending.spell, automation: { type: 'protection_from_energy', damageTypes: ['Bludgeoning', 'Piercing', 'Slashing'], duration: 'Concentration, up to 1 hour', target: 'willing_creature' } },

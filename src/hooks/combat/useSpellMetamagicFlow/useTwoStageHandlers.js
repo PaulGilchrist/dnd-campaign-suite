@@ -6,6 +6,40 @@ import { applyProtectionFromEnergyHandler } from '../../../services/automation/i
 import { applyResistanceEffect } from '../../../services/automation/index.js'
 import { isFreeCastAuthorized, prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js'
 
+// Slot-owe fix (bug-enhance-ability-stone-skin-confirms-never-pay, owner ruling
+// 2026-11-15): the EA confirm previously consumed NOTHING — a 2nd-level
+// concentration spell was castable unbounded per rest. Pay exactly one casting
+// resource through the canonical seam at the FINAL confirm only (ability-select
+// stays pay-free), mirroring the SP-093 PFEG leg (handleProtectionFromEnergyTypeSelect)
+// + createConfirmHandler's pay block (useConfirmableFlow.js): same options shape,
+// CLA-312 effective-level
+// free-cast-authorization gate, upcast level paid via prepareSpellCast (CLA-086:
+// pending.spell.upcastLevel when carried). A zero-slot caster writes nothing here
+// (consumeBaseSlot/consumeUpcastSlot floor-guard) — same precedent answer as
+// PFEG/Revivify: the resource refusal face lives in SpellDetailPopup's canCast
+// gate ("No spell slots available for this level."), not in the confirm lane.
+async function consumeEnhanceAbilitySlot(pending, playerStats, campaignName) {
+  const isCantrip = (pending.spell?.level === 0)
+  if (isCantrip || !pending.spell) return
+  const upcastLevel = pending.spell.upcastLevel
+  const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
+  // CLA-312: gate free-cast authorization on the EFFECTIVE cast level.
+  const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+  await prepareSpellCast(pending.spell, {}, {
+    playerName: playerStats.name,
+    playerStats,
+    campaignName,
+    isUpcast,
+    upcastLevel,
+    freeCastAuthorized,
+  })
+  // Canonical PAID stamp (73bc0c5e7 money-flag law, mirrors createConfirmHandler):
+  // the skip gates read pending.slotConsumed; payment only runs at confirm, so a
+  // pre-confirm Skip never inherits the flag and stays the zero-write dismiss.
+  pending.slotConsumed = true
+}
+
 export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending, getPending, setPopupHtml }) {
   const [resistanceStage, setResistanceStage] = React.useState(null)
   const [resistanceSelectedTargets, setResistanceSelectedTargets] = React.useState([])
@@ -205,6 +239,13 @@ export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending,
       timestamp: Date.now(),
     }).catch((e) => { console.error("[useTwoStageHandlers:log-error]", e); })
 
+    // Slot-owe fix (2026-11-15): pay exactly one casting resource through the
+    // canonical seam (consumeEnhanceAbilitySlot above — mirrors the SP-093 PFEG
+    // leg + createConfirmHandler's pay block), AFTER the byte-identical cast row
+    // and BEFORE the effect legs (PFEG ordering). Payment never fires at
+    // ability-select.
+    await consumeEnhanceAbilitySlot(pending, playerStats, campaignName)
+
     // SP-039: applyEnhanceAbility destructures a SINGLE object argument —
     // the positional call sent targetNames/ability as undefined and the
     // handler silently returned null (te never stamped). Match the signature.
@@ -228,10 +269,11 @@ export function useTwoStageHandlers({ playerStats, campaignName, cfClearPending,
     setEnhanceAbilityStage(null)
     setEnhanceAbilitySelectedAbility(null)
     // Paid-state gate (2026-11-15 unpaid-skip law, see useConfirmableFlow
-    // createSkipHandler): the gate arms UNPAID and this lane's confirm pays no
-    // slot, so the old unconditional rollback credited a slot above max
-    // ("rolls back the unspent slot" — the pin even named the inflation). Refund
-    // survives only for a genuinely paid pending.
+    // createSkipHandler): the gate arms UNPAID and payment only happens at CONFIRM
+    // (prepareSpellCast stamp above), so a pre-confirm skip has consumed nothing and
+    // the old unconditional rollback credited a slot above max ("rolls back the
+    // unspent slot" — the pin even named the inflation). Refund survives only for a
+    // genuinely paid pending (the slotConsumed-stamped paid-rig twin).
     if (!pending.slotConsumed) return
     rollbackSpellSlot(playerStats.name, pending.spellName, pending.spellLevel || 0, playerStats, campaignName)
   }, [cfClearPending, getPending, playerStats, campaignName])
