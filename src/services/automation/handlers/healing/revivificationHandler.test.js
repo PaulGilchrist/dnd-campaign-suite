@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -207,7 +208,7 @@ describe('revivificationHandler', () => {
   // ── Player target lane ─────────────────────────────────────
 
   describe('player target healing', () => {
-    it('sets player currentHitPoints to level and spends 1 rage via setRuntimeValue', async () => {
+    it('sets player currentHitPoints to level in the merged death-state batch and spends 1 rage via setRuntimeValue', async () => {
       stubCombatReady(3);
       damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
 
@@ -218,10 +219,14 @@ describe('revivificationHandler', () => {
         null,
       );
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
         'Ally',
-        'currentHitPoints',
-        5,
+        {
+          currentHitPoints: 5,
+          deathSaves: [false, false, false],
+          deathFailures: [false, false, false],
+          isDead: 0,
+        },
         campaignName,
       );
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
@@ -244,12 +249,41 @@ describe('revivificationHandler', () => {
         null,
       );
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
         'Ally',
-        'currentHitPoints',
-        1,
+        expect.objectContaining({ currentHitPoints: 1 }),
         campaignName,
       );
+    });
+
+    it('clears the death-state keys on resurrect (isDead-stuck regression)', async () => {
+      // bug-revivification-handler-leaves-isdead-stuck: the old lane wrote only
+      // currentHitPoints, leaving isDead:1 on a living 18-HP ally so every
+      // downstream death gate (isCreatureDead, the Revivify corpse census)
+      // still read it as a corpse. The resurrect commit must carry the full
+      // CLA-092 death-state reset — the same write set as the HoUoM twin
+      // (7d64885e3) and the sheet-revive lane (db0ad4cf8).
+      stubCombatReady();
+      damageUtils.getTargetFromAttacker.mockReturnValue(makePlayerTarget('Ally'));
+
+      await handle(
+        makeAction(),
+        makePlayerStats({ level: 18 }),
+        campaignName,
+        null,
+      );
+
+      expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
+      const [target, writes, campaign] = useRuntimeState.setRuntimeBatch.mock.calls[0];
+      expect(target).toBe('Ally');
+      expect(campaign).toBe(campaignName);
+      expect(writes.currentHitPoints).toBe(18);
+      expect(writes.isDead).toBe(0);
+      expect(writes.deathSaves).toEqual([false, false, false]);
+      expect(writes.deathFailures).toEqual([false, false, false]);
+      // HP must NOT ride a separate single-key write — that was the leak face.
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'Ally', 'currentHitPoints', expect.anything(), campaignName);
     });
 
     it('returns success popup with full description', async () => {

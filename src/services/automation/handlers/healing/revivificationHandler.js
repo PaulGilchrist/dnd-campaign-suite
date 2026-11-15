@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -69,7 +69,23 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, 'ragePoints', currentRage - 1, campaignName);
 
     if (target.type === 'player') {
-        await setRuntimeValue(target.name, 'currentHitPoints', healAmount, campaignName);
+        // Resurrection always lifts the bucket from 0 to positive, so it must
+        // carry the app-wide death-state reset — the same merged one-POST idiom
+        // the HoUoM resurrection commit (handOfUltimateMercyHandler
+        // .applyResurrectionHeal, 7d64885e3) and the sheet-revive lane commit,
+        // and the CLA-092 heal choke (applyHealing.js) performs for its
+        // oldHp<=0 -> newHp>0 transition. The old currentHitPoints-only write
+        // left isDead:1 + stale death-save arrays on a living creature
+        // (bug-revivification-handler-leaves-isdead-stuck), so every downstream
+        // death gate (isCreatureDead, Revivify corpse census) still read the
+        // resurrected ally as a corpse. One setRuntimeBatch POST writes the
+        // whole set.
+        setRuntimeBatch(target.name, {
+            currentHitPoints: healAmount,
+            deathSaves: [false, false, false],
+            deathFailures: [false, false, false],
+            isDead: 0,
+        }, campaignName);
     } else {
         target.currentHp = healAmount;
         const summary = cs;
