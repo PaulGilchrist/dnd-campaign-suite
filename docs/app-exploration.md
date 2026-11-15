@@ -69,8 +69,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before clears; pass 1 cl
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-14 OV:** resurrection audit row's `maxHp` frame silently falls back to the stale select-baked combat-summary row when the bucket's mirror lost `hitPoints` (thin-echo evict) — observed `maxHp:1` on a real 112-max resurrection (`handOfUltimateMercyHandler.js` `resolveTargetMaxHp` L35-40; sibling revive/heal frames share the precedence). Options: stamp the row's `maxHp` in the resurrect commit (the write already owns the bucket), or read the fresh `maxHp` from the picker row instead of the fallback chain, or annotate the row as bucket-thin. Non-blocking cosmetic honesty face of the PT#3 owner-ruling family.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - HoUoM chooser mid-dwell faces (revived-mid-dwell inline refusal, focus-drain-at-commit, no-corpse `No target at 0 Hit Points.` picker-open refusal) — unit-pinned by `adb85b54b` (handler tests 224 + chooser tests 141 + automation 100 lines); live rig needs concurrent lanes.

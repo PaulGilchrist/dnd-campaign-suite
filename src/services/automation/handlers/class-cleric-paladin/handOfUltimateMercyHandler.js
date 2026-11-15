@@ -30,11 +30,26 @@ function resolveTargetHp(targetInfo, targetName, campaignName) {
     return targetInfo.target.currentHp ?? 0;
 }
 
-// Canonical HP frame for the audit row — same precedence as revivifyService.js
-// (bucket max first, combat-summary row max as fallback).
-function resolveTargetMaxHp(targetInfo, targetName, campaignName) {
+// Canonical HP frame for the audit row — bucket max first (the same
+// hitPoints-first law as liveTargetHp.js/resolveLiveTargetHp). Backlog
+// 2026-11-14: a thin full-store POST echo-REPLACEs the mirror and EVICTS its
+// hitPoints, and the select-baked combat-summary rows can sit at a stale 1/1
+// (App.jsx campaign re-seed bakes `|| 1`), so the old bucket→row-only chain
+// silently framed `maxHp:1` on a real 112-max resurrection. Between the two
+// sits the loaded character data: `computedStats.hitPoints` (rules.js
+// getHitPoints) is the EXACT value seedCharacterRuntimeData seeds the bucket's
+// hitPoints from (trackedResources.js:235-236), so it re-derives the bucket
+// truth the eviction lost. The combat-summary row stays the last-resort frame
+// (monsters are summary-canonical per CLA-303; players genuinely missing both
+// live sources get a loud console.error, never a silent stale value).
+function resolveTargetMaxHp(targetInfo, targetName, campaignName, characters) {
     if (targetInfo.target.type === 'player') {
-        return getRuntimeValue(targetName, 'hitPoints', campaignName) ?? targetInfo.target.maxHp;
+        const bucketMax = getRuntimeValue(targetName, 'hitPoints', campaignName);
+        if (bucketMax != null) return bucketMax;
+        const charMax = (characters || []).find(c => c.name === targetName)?.computedStats?.hitPoints;
+        if (charMax != null) return charMax;
+        console.error(`[handOfUltimateMercy] ${targetName} has no bucket hitPoints and no loaded character max — framing the audit row with the combat-summary row maxHp (${String(targetInfo.target.maxHp)}).`);
+        return targetInfo.target.maxHp;
     }
     return targetInfo.target.maxHp;
 }
@@ -97,7 +112,7 @@ function collectCorpseTargets(cs, playerName) {
 // deathFailures + isDead:0) → one hp_change|resurrection:true row → success
 // popup. Shared verbatim by the armed direct lane and the picker commit — a
 // refusal returns refused:true with ZERO spend, ZERO writes, ZERO log rows.
-async function commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo }) {
+async function commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo, characters }) {
     const targetName = targetInfo.target.name;
 
     // Re-read Focus at commit: the click-time gate above only pre-screens the
@@ -109,7 +124,7 @@ async function commitResurrection({ action, auto, playerStats, playerName, campa
     }
 
     const targetHp = resolveTargetHp(targetInfo, targetName, campaignName);
-    const targetMaxHp = resolveTargetMaxHp(targetInfo, targetName, campaignName);
+    const targetMaxHp = resolveTargetMaxHp(targetInfo, targetName, campaignName, characters);
 
     if (targetHp > 0) {
         return { refused: true, popup: infoPopup(action.name, `${targetName} is not at 0 Hit Points.`, auto) };
@@ -167,7 +182,7 @@ async function commitResurrection({ action, auto, playerStats, playerName, campa
     };
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+export async function handle(action, playerStats, campaignName, _mapName, characters) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
@@ -185,7 +200,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // `<Target> is not at 0 Hit Points.` zero-spend refusal.
     const armedTarget = await resolveTarget(campaignName, playerName);
     if (armedTarget?.target) {
-        const { popup } = await commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo: armedTarget });
+        const { popup } = await commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo: armedTarget, characters });
         return popup;
     }
 
@@ -227,7 +242,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 if (!target) {
                     return { refusal: `${targetName} is no longer on the combat board. No Focus Points spent.` };
                 }
-                const { refused, popup } = await commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo: { target, cs } });
+                const { refused, popup } = await commitResurrection({ action, auto, playerStats, playerName, campaignName, costAmount, targetInfo: { target, cs }, characters });
                 return refused ? { refusal: popup.payload.description } : { popup: popup.payload };
             },
         },

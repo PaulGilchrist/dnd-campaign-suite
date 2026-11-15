@@ -738,4 +738,89 @@ describe('handOfUltimateMercyHandler.handle', () => {
       });
     });
   });
+
+  // Backlog 2026-11-14: thin-echo evict honesty for the audit frame. A thin
+  // full-store POST echo-REPLACEs the mirror and EVICTS its hitPoints, and the
+  // select-baked combat-summary rows can sit at a stale 1/1 (App.jsx re-seed
+  // bakes `|| 1`) — the old bucket→row-only chain then silently framed
+  // maxHp:1 on a real 112-max resurrection. The commit must fall through to the
+  // loaded character data (computedStats.hitPoints — the exact value
+  // seedCharacterRuntimeData seeds the bucket hitPoints from), and only reach
+  // the combat-summary row (loudly) when BOTH live sources are gone.
+  describe('Audit maxHp source (thin-echo evict law)', () => {
+    // Caster tab state per AC1's rig: bucket has NO hitPoints (evicted), the cs
+    // row is the stale select-baked 1/1, the loaded character data holds the
+    // true 112.
+    const EVICTED_BUCKETS = { hpByName: { TestCleric: 50, CorpseAlly: 0 }, maxHpByName: {} };
+    const STALE_ROW_BOARD = {
+      creatures: [
+        { name: 'TestCleric', type: 'player', currentHp: 50, maxHp: 112 },
+        { name: 'CorpseAlly', type: 'player', currentHp: 1, maxHp: 1 },
+      ],
+    };
+    const LOADED_CHARACTERS = [{ name: 'CorpseAlly', computedStats: { hitPoints: 112 } }];
+
+    it('armed-direct lane: frames the true char-file max (112), not the stale row (1), on a thinned bucket', async () => {
+      mockRuntimeByName(EVICTED_BUCKETS);
+      mockRoll(31);
+      const cs = STALE_ROW_BOARD;
+      resolveTarget.mockResolvedValue({ target: cs.creatures[1], cs });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null, LOADED_CHARACTERS);
+
+      const [, entry] = logPoster.addEntry.mock.calls[0];
+      expect(entry.type).toBe('hp_change');
+      expect(entry.resurrection).toBe(true);
+      expect(entry.maxHp).toBe(112);
+      expect(entry.currentHp).toBe(31);
+      expect(entry.delta).toBe(31);
+      expect(entry.isHealing).toBe(true);
+    });
+
+    it('picker commit lane: frames the true char-file max (112), not the stale row (1), on a thinned bucket', async () => {
+      mockRuntimeByName(EVICTED_BUCKETS);
+      resolveTarget.mockResolvedValue(null);
+      getCombatContext.mockResolvedValue(STALE_ROW_BOARD);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, LOADED_CHARACTERS);
+      expect(result.modalName).toBe('handOfUltimateMercy');
+      mockRoll(31);
+      getCombatSummary.mockReturnValue(STALE_ROW_BOARD);
+
+      const committed = await result.payload.confirmResurrect('CorpseAlly');
+
+      expect(committed.refusal).toBeUndefined();
+      const [, entry] = logPoster.addEntry.mock.calls[0];
+      expect(entry.maxHp).toBe(112);
+    });
+
+    it('bucket live max still beats the character data when the mirror holds hitPoints', async () => {
+      mockRuntimeByName({
+        hpByName: { TestCleric: 50, CorpseAlly: 0 },
+        maxHpByName: { TestCleric: 112, CorpseAlly: 90 },
+      });
+      mockRoll(12);
+      resolveTarget.mockResolvedValue({ target: STALE_ROW_BOARD.creatures[1], cs: STALE_ROW_BOARD });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null, LOADED_CHARACTERS);
+
+      const [, entry] = logPoster.addEntry.mock.calls[0];
+      expect(entry.maxHp).toBe(90);
+    });
+
+    it('last-resort combat-summary frame is LOUD (console.error), never a silent stale fallback', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockRuntimeByName(EVICTED_BUCKETS);
+      mockRoll(12);
+      // No character data for the target at all — only the stale row remains.
+      resolveTarget.mockResolvedValue({ target: STALE_ROW_BOARD.creatures[1], cs: STALE_ROW_BOARD });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+
+      const [, entry] = logPoster.addEntry.mock.calls[0];
+      expect(entry.maxHp).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('CorpseAlly has no bucket hitPoints'));
+      errorSpy.mockRestore();
+    });
+  });
 });
