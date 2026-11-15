@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // AreaEffectSaveFlow.utils.rollNpcSave — saveBonus key-contract regression.
 // Confirmed defect (test-maintain-bugs ledger): combatSummary saveBonuses
 // carry lowercase-abbreviation keys (getMonsterSaveBonuses / CLA-303), but
@@ -23,6 +24,9 @@ describe('rollNpcSave saveBonus key normalization (CLA-303 key-mismatch family)'
     const result = rollNpcSave(target, saveType, 15, false);
     expect(result.saveBonus).toBe(7);
     expect(result.saveTotal).toBe(result.saveRoll + 7);
+    // DC comparison contract: success iff total >= DC (tie succeeds),
+    // checked relationally so the random roll stays irrelevant.
+    expect(result.success).toBe(result.saveTotal >= 15);
   });
 
   it('still defaults missing abilities to an honest 0', () => {

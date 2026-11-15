@@ -1983,3 +1983,9 @@ files/166.**
 - 📌 near-identical-inline-styles-sighting (fix#327 census, out-of-lane): MultiResistanceSelectionModal — same shape family as SingleResistance just migrated: batch at own turn with fix#313 recipe.**
   **DISPOSITIONED-by fix#332(c) (MultiResistanceSelectionModal:inline-0-residual-own-CSS-mirror-not-cross-import-over-reach-defense-coupling-plus-existing-and-capped-modifier-classes-ternaries-byte-preserved-precedence-structure).**
 - 🔴 OWNER-ARBITRATION REQUIRED (fix#338b): BI-offense hit ownership — popup-lane substitute LIVE today (handlePlainDamage:321->DiceRollResult.handlers:86->CharSheet.handlers:147 spends uses+applies damage; modal BardicInspirationReactionModal mounted App:694 but consumes NO uses). Shape-fix attackRollRiders:167 arms BOTH = 2 dice 2 spends one hit. DECIDE: modal-owns-hit (retire popup button when biPrompt settled) vs popup-owns-hit (dead-code the pipeline step attackRollDamageSteps:13). Full quotes in fix#338 lane report.**
+
+## RUN3 flush (2026-11-14, run2#1550-#1564, Batch #221)
+- 📌 SpellOverlayControls.test.jsx:179-182 ("hides placement hint when not active") — subsumed by strengthened unarmed-params render-face test (run2#1556); remove row when that file is next processed (it is already @maintained-by-ai, so needs a follow-up lane, not an auto-pass queue hit).
+- 📌 SpellOverlayControls.test.jsx:1 dated marker '// @maintained-by-ai: 2026-10-14' — normalize to exact canonical '// @maintained-by-ai' per #1361 variants-VOID canon (run2#1556 report).
+- ⚠ MonsterCardModal.rage-aura.test.jsx:1 legacy '// @maintained-by-e2e' stamp REPLACED by '// @maintained-by-ai' (run2#1551, exactly-one-marker rule). If the e2e pass is marker-gated on the e2e stamp, this file re-enters that queue / its e2e completion record is lost — owner check.
+- RUN3 SOURCE BUGS: none (zero across all 15 lanes).

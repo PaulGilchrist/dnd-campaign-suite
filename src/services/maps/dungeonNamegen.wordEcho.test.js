@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // dungeonNamegen.wordEcho.test.js — dedupe pass for prefix/suffix word echoes.
 //
 // Premise (QA backlog 2026-11-03 CK): the pools overlap on whole words —
@@ -7,12 +8,16 @@
 //
 // Contract pinned here:
 //  1. generateName never repeats the prefix word in the suffix slot
-//     (case-insensitive, singular/plural-insensitive stem).
+//     (case-insensitive, singular/plural-insensitive stem) — for historical
+//     collision seeds AND across a 400-seed sweep.
 //  2. Non-colliding seeds stay byte-identical to the pre-dedupe generator
 //     (suffix drawn exactly once; no gratuitous reshuffle).
 //  3. Determinism WITH dedupe: a collision re-rolls the suffix, and each
-//     re-roll consumes one extra RNG draw — same seed → same collision →
-//     same result, so seeded runs (initial seed AND regenerate) reproduce.
+//     re-roll consumes exactly one extra draw from the same stream, so
+//     seeded runs reproduce (proven by the scripted draw-count test).
+//  4. Even under an adversarial rng that re-draws the echo forever, the
+//     bounded re-roll loop falls through to the '' escape hatch — no echo
+//     leaks, no unbounded draws.
 
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from './rng.js';
@@ -54,6 +59,19 @@ const echoesPrefix = (name) => {
   return suffix.split(' ').some((w) => wordStem(w) === stem);
 };
 
+// Scripted rng: values consumed one per draw; overrunning the script means
+// the generator drew more than expected (proves bounded, exact draw counts).
+const scripted = (values) => {
+  const state = { i: 0 };
+  state.rng = () => {
+    const v = values[state.i];
+    if (v === undefined) throw new Error(`extra RNG draw #${state.i + 1}`);
+    state.i++;
+    return v;
+  };
+  return state;
+};
+
 describe('dungeonNamegen — prefix/suffix word-echo dedupe', () => {
   it('forces the historical "Shadow…Shadows" echo: seed 57 re-rolls the suffix, prefix+type untouched', () => {
     // Pre-fix, mulberry32(57) emitted "The Shadow Tomb of Shadows".
@@ -63,15 +81,6 @@ describe('dungeonNamegen — prefix/suffix word-echo dedupe', () => {
     expect(prefix).toBe('Shadow'); // only the colliding suffix got re-rolled
     expect(type).toBe('Tomb');
     expect(echoesPrefix(name)).toBe(false);
-  });
-
-  it('dedupes every historical collision seed (Shadow/Ancient/Forgotten/Dark)', () => {
-    // Seeds that reproduced all four colliding word pairs pre-fix.
-    const collisionSeeds = [19, 23, 57, 62, 65, 87, 104, 144, 218, 220, 268];
-    for (const seed of collisionSeeds) {
-      const name = generateName(mulberry32(seed));
-      expect(echoesPrefix(name), `seed ${seed} -> "${name}"`).toBe(false);
-    }
   });
 
   it('non-colliding seeds keep their exact pre-dedupe bytes (one suffix draw, no reshuffle)', () => {
@@ -84,27 +93,10 @@ describe('dungeonNamegen — prefix/suffix word-echo dedupe', () => {
     expect(generateName(mulberry32(123))).toBe('The Iron Tomb of the Ancients');
   });
 
-  it('stays deterministic for a given seed, including collision re-rolls', () => {
-    for (const seed of [57, 19, 23, 104, 42, 7]) {
-      expect(generateName(mulberry32(seed))).toBe(generateName(mulberry32(seed)));
-    }
-  });
-
-  it('collision re-roll consumes exactly the next RNG draw (scripted compose-step proof)', () => {
+  it('re-roll consumes exactly the next draw, and endless collisions fall through to the escape hatch', () => {
     // pick(arr, rng) = arr[floor(rng()*len)]. Scripted values force the exact
     // old echo path: 'Shadow' (idx 8/12) + 'Temple' (idx 7/12) + 'of Shadows'
     // (idx 1/10) — the pre-fix "The Shadow Temple of Shadows".
-    const scripted = (values) => {
-      const state = { i: 0 };
-      state.rng = () => {
-        const v = values[state.i];
-        // Overrunning the script means the generator drew more than expected.
-        if (v === undefined) throw new Error(`extra RNG draw #${state.i + 1}`);
-        state.i++;
-        return v;
-      };
-      return state;
-    };
     // Re-roll draw lands on 'of Doom' (idx 0/10): 4 draws total, no echo.
     let s = scripted([0.7, 0.625, 0.15, 0.05]);
     expect(generateName(s.rng)).toBe('The Shadow Temple of Doom');
@@ -117,16 +109,19 @@ describe('dungeonNamegen — prefix/suffix word-echo dedupe', () => {
     s = scripted([0.7, 0.625, 0.05]);
     expect(generateName(s.rng)).toBe('The Shadow Temple of Doom');
     expect(s.i).toBe(3);
+    // Adversarial rng: every suffix draw re-lands on 'of Shadows' (idx 1/10).
+    // The loop is bounded at 1 initial + 10 re-rolls, then the '' escape
+    // hatch fires — 13 draws total, no echo, no infinite stream.
+    s = scripted([0.7, 0.625, ...Array(11).fill(0.15)]);
+    expect(generateName(s.rng)).toBe('The Shadow Temple');
+    expect(s.i).toBe(13);
   });
 
-  it('sweep: 400 seeds (superset of the required 200) produce zero word-echo names', () => {
-    const names = [];
+  it('sweep: 400 seeds (superset of the historical collision seeds 19/23/57/62/65/87/104/144/218/220/268) produce zero word-echo names, all parsing into known prefix+type slots', () => {
     for (let seed = 0; seed < 400; seed++) {
       const name = generateName(mulberry32(seed));
+      // splitName inside echoesPrefix also pins the "The <prefix> <type>" shape.
       expect(echoesPrefix(name), `seed ${seed} -> "${name}"`).toBe(false);
-      names.push(name);
     }
-    // Shape stays as authored: every name parses into known prefix+type slots.
-    expect(names.every((n) => n.startsWith('The '))).toBe(true);
   });
 });

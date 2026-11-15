@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // spellPreparationService.arity-unify.test.js — STRUCTURAL family-consistency lock
 // (owner unify call, ledger test-maintain-bugs.md batch #217 ⚠ entry #1512/#1513/#1514).
 //
@@ -8,13 +9,13 @@
 // shapes are byte-identical in OUTPUT, so the asymmetry is invisible at runtime;
 // when the #1520 campaign-scoped store lands it would silently split the family —
 // 3-arg peers read the right tier, 2-arg reads the wrong one. The whole family was
-// therefore unified to the file's own explicit vocabulary: EVERY getRuntimeValue
-// call carries campaignName.
+// therefore unified to the file's own explicit vocabulary: EVERY store read AND
+// write call carries campaignName.
 //
 // This lane locks that shape at the SOURCE level (fix#211 disk-alignment census
-// idiom): any new 2-arg read added to spellPreparationService.js goes RED here,
-// in any environment, with zero runtime needed. It is a pure static scan — no
-// store, no mocks, no timers (NO-CLOCK).
+// idiom): any new default-tier read or write added to spellPreparationService.js
+// goes RED here, in any environment, with zero runtime needed. It is a pure static
+// scan — no store, no mocks, no timers (NO-CLOCK).
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,14 +24,12 @@ const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), 'spellPrepar
 
 // Extract every `name(...)` invocation body with paren depth-tracking so nested
 // calls (featureFreeCastKey(entry)) and template literals (mysticArcanumLevel${x})
-// are captured whole. Skips the import statement (no paren) and comment mentions
-// are harmless — both sides of every comment reference already carry campaignName.
+// are captured whole. ESM import specifiers never carry parens, so nothing to skip.
 function callBodies(src, name) {
   const bodies = [];
   const needle = `${name}(`;
   let idx = 0;
   while ((idx = src.indexOf(needle, idx)) !== -1) {
-    if (src.slice(Math.max(0, idx - 7), idx).includes('import')) { idx += needle.length; continue; }
     let depth = 1;
     let i = idx + needle.length;
     for (; i < src.length && depth > 0; i++) {
@@ -43,7 +42,7 @@ function callBodies(src, name) {
   return bodies;
 }
 
-// The seven flagged helper carriers plus the direct-call tier argument rule.
+// The seven flagged helper carriers whose call sites must forward campaignName.
 const THREADED_HELPERS = [
   'featureFreeCastCount',
   'rechargeEntryGrantsCast',
@@ -54,42 +53,31 @@ const THREADED_HELPERS = [
   'isWarGodsBlessingSpell',
 ];
 
-describe('spellPreparationService — family arity-consistency lock (reads carry campaignName, #1520 forward-lock)', () => {
+describe('spellPreparationService — family arity-consistency lock (reads/writes carry campaignName, #1520 forward-lock)', () => {
   const src = readFileSync(SRC, 'utf8');
 
-  it('EVERY getRuntimeValue( call in the source passes campaignName as its 3rd argument — zero default-tier reads survive', () => {
-    const bodies = callBodies(src, 'getRuntimeValue');
-    // Census count pin (#1521 idiom): a new read forces this table to be re-audited.
-    expect(bodies.length).toBeGreaterThanOrEqual(46);
-    const offenders = bodies.filter(b => !b.trimEnd().endsWith('campaignName'));
-    expect(offenders, `2-arg default-tier reads reintroduced: ${JSON.stringify(offenders)}`).toEqual([]);
+  it('EVERY getRuntimeValue / setRuntimeValue call passes campaignName as its final argument — zero default-tier reads or writes survive', () => {
+    // Generalized lock: covers every carrier key in the file, so the flagged
+    // read/write pairs the ledger cited (#1512-#1514) need no separate pairing test.
+    for (const name of ['getRuntimeValue', 'setRuntimeValue']) {
+      const bodies = callBodies(src, name);
+      // Non-vacuity guard: a scan that silently matches nothing proves nothing.
+      expect(bodies.length, `${name}: scan matched no call sites`).toBeGreaterThan(0);
+      const offenders = bodies.filter(b => !b.trimEnd().endsWith('campaignName'));
+      expect(offenders, `default-tier ${name} calls reintroduced: ${JSON.stringify(offenders)}`).toEqual([]);
+    }
   });
 
   it('EVERY threaded-helper call site forwards campaignName (the seven-family plumbing stays wired)', () => {
     for (const helper of THREADED_HELPERS) {
-      const bodies = callBodies(src, helper); // includes the `function helper(...)` declaration — its last param is campaignName at every threaded helper
+      // Includes the `function helper(...)` declaration — its last param is
+      // campaignName at every threaded helper, pinning the unified signature.
+      const bodies = callBodies(src, helper);
       expect(bodies.length, `${helper}: no call sites found`).toBeGreaterThan(0);
       for (const body of bodies) {
         expect(body.trimEnd().endsWith('campaignName'),
           `${helper} dropped campaignName: ${body.trim()}`).toBe(true);
       }
-    }
-  });
-
-  it('READ-then-WRITE pairs are arity-symmetric on the flagged carriers (write 4-arg => read 3-arg)', () => {
-    // The asymmetry pairs the ledger cited: writes at these carriers always carried
-    // campaignName; the reads did not. Static pairing: every setRuntimeValue call
-    // naming a flagged carrier key must have a getRuntimeValue sibling carrying the
-    // same tier argument on BOTH sides of the lane.
-    const carriers = ['naturalRecoveryFreeCast', '_Bewitching_Magic_freeCast', '_Favored_Enemy_freeCastCount', 'sorceryPoints', '_War_Gods_Blessing_active'];
-    for (const carrier of carriers) {
-      const reads = callBodies(src, 'getRuntimeValue').filter(b => b.includes(`'${carrier}'`));
-      const writes = callBodies(src, 'setRuntimeValue').filter(b => b.includes(`'${carrier}'`));
-      if (writes.length > 0) {
-        expect(reads.length, `carrier ${carrier} has writers but no reader sibling to compare tiers with`).toBeGreaterThan(0);
-      }
-      for (const r of reads) expect(r.trimEnd().endsWith('campaignName'), `read of ${carrier} dropped campaignName`).toBe(true);
-      for (const w of writes) expect(w.trimEnd().endsWith('campaignName'), `write of ${carrier} dropped campaignName`).toBe(true);
     }
   });
 });

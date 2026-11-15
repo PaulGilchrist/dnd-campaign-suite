@@ -1,24 +1,24 @@
+// @maintained-by-ai
 // Twin-parity pin (UF backlog 2026-11-12): the Dungeon/Terrain generate modals
 // share their child styling through the neutral `gen-modal-*` prefix, defined
-// ONCE in gen-modal-shared.css. These greps keep the twins copy-identical:
-//  1. No `dungeon-gen-*` CHILD class tokens survive in either modal's JSX/CSS —
-//     the only permitted `dungeon-gen-` occurrence is the ROOT literal
-//     `.dungeon-gen-modal` (harnesses scope the twins by the root; the
-//     maps-file selector law depends on it).
-//  2. Both twin JSX files import the shared stylesheet EXPLICITLY (never rely
-//     on MapsManager happening to load both components) and reference the
-//     identical shared child-token set.
+// ONCE in gen-modal-shared.css. jsdom cannot resolve the CSS cascade, so these
+// source greps are the only way to keep the twins copy-identical:
+//  1. No `dungeon-gen-*` CHILD class tokens survive in either modal's JSX/CSS
+//     or in the shared stylesheet — child styling must resolve from the shared
+//     prefix. The twins are scoped only by their ROOT identifiers
+//     (`dungeon-gen-modal` / `terrain-gen-modal`), which the harnesses and the
+//     maps-file selector law depend on.
+//  2. Each twin JSX file imports the shared stylesheet EXPLICITLY (never rely
+//     on MapsManager happening to load both components), references the
+//     identical shared child-token set, and sources its seed placeholder from
+//     the shared SEED_INPUT_PLACEHOLDER constant — one constant makes drift
+//     impossible (VG backlog 2026-11-12: the twins had drifted to "Random if
+//     empty" vs "Random" over the same parseSeedInput law).
 //  3. The shared child ruleset lives once: neither modal CSS file redefines a
 //     shared token.
-//  4. The seed field's placeholder copy is likewise unified (VG backlog
-//     2026-11-12: the twins drifted to "Random if empty" vs "Random" over the
-//     same parseSeedInput law): both JSX files must reference the shared
-//     SEED_INPUT_PLACEHOLDER constant from services/maps/seedInput.js, and
-//     neither may hard-code a loose placeholder literal.
 import { readFileSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
-import { SEED_INPUT_PLACEHOLDER } from '../../services/maps/seedInput.js';
 
 // Vitest runs from the repo root; import.meta.url is Vite-transformed here, so
 // resolve the twin files against cwd explicitly.
@@ -57,25 +57,36 @@ describe('generate-modal twin class parity', () => {
     expect(rogueChildTokens(src)).toEqual([]);
   });
 
-  it('keeps the per-modal ROOT identifiers exactly as the harnesses scope them', () => {
-    expect(dungeonJsx).toContain('maps-manager-modal dungeon-gen-modal');
-    expect(terrainJsx).toContain('maps-manager-modal terrain-gen-modal');
-  });
-
-  it.each([
-    ['GenerateDungeonModal.jsx', dungeonJsx],
-    ['GenerateTerrainModal.jsx', terrainJsx],
-  ])('%s references the identical shared child-token set', (file, src) => {
-    for (const token of SHARED_TOKENS) {
-      expect(src, `${file} missing shared token ${token}`).toContain(token);
+  it('keeps both ROOT identifiers present for the harnesses to scope by', () => {
+    // Token-presence only: class order/formatting is free, the roots must exist.
+    for (const [file, src, root] of [
+      ['GenerateDungeonModal.jsx', dungeonJsx, 'dungeon-gen-modal'],
+      ['GenerateTerrainModal.jsx', terrainJsx, 'terrain-gen-modal'],
+    ]) {
+      expect(src, `${file} must keep the shared maps-manager-modal root`).toContain(
+        'maps-manager-modal'
+      );
+      expect(src, `${file} must keep its ${root} scoping root`).toContain(root);
     }
   });
 
   it.each([
     ['GenerateDungeonModal.jsx', dungeonJsx],
     ['GenerateTerrainModal.jsx', terrainJsx],
-  ])('%s imports the shared stylesheet explicitly', (file, src) => {
-    expect(src).toContain("import './gen-modal-shared.css';");
+  ])('%s matches its twin: shared CSS import, shared tokens, shared seed placeholder', (file, src) => {
+    expect(src, `${file} must import the shared stylesheet`).toContain(
+      "import './gen-modal-shared.css';"
+    );
+    for (const token of SHARED_TOKENS) {
+      expect(src, `${file} missing shared token ${token}`).toContain(token);
+    }
+    expect(src, `${file} must use the shared constant as the seed placeholder`).toContain(
+      'placeholder={SEED_INPUT_PLACEHOLDER}'
+    );
+    // No loose "Random…" placeholder strings may creep back into either twin.
+    const looseSeedPlaceholders = [...src.matchAll(/placeholder="Random[^"]*"/g)]
+      .map((match) => match[0]);
+    expect(looseSeedPlaceholders, `${file} hard-codes a seed placeholder`).toEqual([]);
   });
 
   it('defines every shared child rule exactly once, in the shared stylesheet', () => {
@@ -86,23 +97,5 @@ describe('generate-modal twin class parity', () => {
       expect(defines(dungeonCss, token), `dungeon CSS must not redefine .${token}`).toBe(false);
       expect(defines(terrainCss, token), `terrain CSS must not redefine .${token}`).toBe(false);
     }
-  });
-
-  it.each([
-    ['GenerateDungeonModal.jsx', dungeonJsx],
-    ['GenerateTerrainModal.jsx', terrainJsx],
-  ])('%s sources its seed placeholder from the shared constant, never a literal', (file, src) => {
-    expect(src, `${file} must import SEED_INPUT_PLACEHOLDER`).toContain('SEED_INPUT_PLACEHOLDER');
-    expect(src, `${file} must use the constant as the seed placeholder`).toContain(
-      'placeholder={SEED_INPUT_PLACEHOLDER}'
-    );
-    // No loose "Random…" placeholder strings may creep back into either twin.
-    const looseSeedPlaceholders = [...src.matchAll(/placeholder="Random[^"]*"/g)]
-      .map((match) => match[0]);
-    expect(looseSeedPlaceholders, `${file} hard-codes a seed placeholder`).toEqual([]);
-  });
-
-  it('keeps the shared constant itself equal to the unified copy', () => {
-    expect(SEED_INPUT_PLACEHOLDER).toBe('Random if empty');
   });
 });

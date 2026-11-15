@@ -1,10 +1,14 @@
-// Pins the unarmed param face (backlog 2026-11-09 ER): zones on the board
-// mount the controls panel in manage-only mode, but with the spell tool NOT
+// @maintained-by-ai
+// Pins the unarmed param face (backlog 2026-11-09 ER): with zones on the board
+// the controls panel mounts in manage-only mode, but with the spell tool NOT
 // armed (isActive=false) nothing may invite a placement click — the shape
-// picker and param inputs render disabled/dimmed and both placement-inviting
-// hints are absent — while the chip list, per-chip remove and Clear All stay
-// fully usable. Arming restores the live param bar immediately.
-import { render, fireEvent } from '@testing-library/react';
+// picker and param inputs render disabled and both placement-inviting hints
+// are absent. Arming the tool re-enables the param controls.
+// Complementary coverage lives in the sibling files: active-mode hints, the
+// Cancel button, and remove/Clear-All wiring on the active list are pinned in
+// SpellOverlayControls.test.jsx; chip identity and per-chip id binding in
+// SpellOverlayControls.chip-label.test.jsx.
+import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SpellOverlayControls from './SpellOverlayControls.jsx';
 import { OverlayShape } from '../../models/SpellOverlay.js';
@@ -18,57 +22,33 @@ const sphereAt = (id, x, y) => ({
     color: 'rgba(255,80,60,0.07)',
 });
 
-const renderControls = (props = {}) => {
-    const handlers = {
-        setSelectedShape: vi.fn(),
-        setShapeParams: vi.fn(),
-        onRemoveOverlay: vi.fn(),
-        onClearAll: vi.fn(),
-        onCancelMode: vi.fn(),
-    };
-    const view = render(<SpellOverlayControls
-        selectedShape={OverlayShape.SPHERE}
-        overlays={[sphereAt('o1', 3, 4), sphereAt('o2', 12, 8)]}
-        shapeParams={{}}
-        isActive={false}
-        {...handlers}
-        {...props}
-    />);
-    return { ...view, handlers };
-};
+const renderControls = (props = {}) => render(<SpellOverlayControls
+    selectedShape={OverlayShape.SPHERE}
+    overlays={[sphereAt('o1', 3, 4), sphereAt('o2', 12, 8)]}
+    shapeParams={{}}
+    setSelectedShape={vi.fn()}
+    setShapeParams={vi.fn()}
+    onRemoveOverlay={vi.fn()}
+    onClearAll={vi.fn()}
+    onCancelMode={vi.fn()}
+    isActive={false}
+    {...props}
+/>);
 
 describe('SpellOverlayControls unarmed param face', () => {
-    it('disables the shape picker and every param input while zones exist unarmed', () => {
-        const { getByRole, getAllByRole } = renderControls();
+    it('with zones present but the tool unarmed, param controls are disabled and no placement copy shows', () => {
+        const { getByRole, getAllByRole, queryByText } = renderControls();
         expect(getByRole('combobox')).toBeDisabled();
         const inputs = getAllByRole('spinbutton');
-        expect(inputs).toHaveLength(1); // sphere → radiusFt
+        expect(inputs).toHaveLength(1); // sphere → radiusFt only
         inputs.forEach((input) => expect(input).toBeDisabled());
-    });
-
-    it('shows no placement-inviting copy while unarmed', () => {
-        const { queryByText } = renderControls();
         expect(queryByText(/Click map to place/)).not.toBeInTheDocument();
         expect(queryByText('Params apply to the next placement only')).not.toBeInTheDocument();
-        // Cancel is active-mode chrome — still absent unarmed.
-        expect(queryByText(/cancel/i)).not.toBeInTheDocument();
     });
 
-    it('keeps the management face usable unarmed: chips, per-chip remove, Clear All', () => {
-        const { container, getByRole, handlers } = renderControls();
-        expect(container.querySelectorAll('.spell-overlay-item')).toHaveLength(2);
-        fireEvent.click(container.querySelector('.spell-overlay-item button'));
-        expect(handlers.onRemoveOverlay).toHaveBeenCalledWith('o1');
-        fireEvent.click(getByRole('button', { name: 'Clear All' }));
-        expect(handlers.onClearAll).toHaveBeenCalledTimes(1);
-    });
-
-    it('arming restores the full interactive param bar: live controls and both hints', () => {
-        const { getByRole, getAllByRole, queryByText } = renderControls({ isActive: true });
+    it('arming the tool re-enables the shape picker and param inputs', () => {
+        const { getByRole, getAllByRole } = renderControls({ isActive: true });
         expect(getByRole('combobox')).toBeEnabled();
         getAllByRole('spinbutton').forEach((input) => expect(input).toBeEnabled());
-        expect(queryByText('Click map to place')).toBeInTheDocument();
-        expect(queryByText('Params apply to the next placement only')).toBeInTheDocument();
-        expect(getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 });

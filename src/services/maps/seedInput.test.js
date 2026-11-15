@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // seedInput.test.js — shared seed-field parsing for the twin map generate
 // modals (SD backlog 2026-11-12): a typed seed must be a real whole number;
 // NaN from a bad parseInt used to flow into the generators and silently
@@ -7,11 +8,12 @@ import { describe, it, expect } from 'vitest';
 import { parseSeedInput, SEED_ERROR } from './seedInput.js';
 
 describe('parseSeedInput', () => {
-  it('empty/whitespace/missing input means random (seed: null, no error)', () => {
-    for (const raw of ['', '   ', null, undefined]) {
+  it.each(['', '   ', null, undefined])(
+    'empty/whitespace/missing input (%#) means random (seed: null, no error)',
+    (raw) => {
       expect(parseSeedInput(raw)).toEqual({ seed: null });
     }
-  });
+  );
 
   it.each([
     ['42', 42],

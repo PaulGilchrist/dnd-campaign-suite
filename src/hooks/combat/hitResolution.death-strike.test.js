@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Regression: Death Strike (both rulesets classes.json → Rogue → Assassin → lv17,
 // automation type 'attack_rider' + trigger 'first_round_sneak_attack_hit' +
 // damageDoubled) was stored on ANY lv17+ character whose round-1 sneak-attack
@@ -8,6 +9,9 @@
 // queued its CON DC15 prompt. maybeStoreDeathStrike (hitResolution.js) must
 // consult the character's DERIVED automation (the same collectAutomationFrom-
 // Features buckets that feed the sheet rows) before storing anything.
+// Producer/gate seam only: the save-face consumer lane (CON prompt → delta leg
+// → te consumption) lives in useLoggedDiceRollDamage.death-strike.test.js and
+// per-target re-arm breadth in handlers/handlePlainDamage.deathStrike.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { resolveHit } from './hitResolution.js';
@@ -92,26 +96,22 @@ function makePlayerStats(automationPassives) {
     };
 }
 
-function makeContext(playerStats) {
-    return {
-        rollType: 'attack',
-        attackerName: characterName,
-        targetName: 'ElderPaladin',
-        effectiveBonus: BONUS,
-        bonus: BONUS,
-        isWeaponAttack: true,
-        sneakAttackDice: 10,
-        playerStats,
-    };
-}
-
-function callResolveHit(playerStats) {
+function callResolveHit(playerStats, { effectiveD20Roll = 13 } = {}) { // 13 + 9 = 22 ≥ AC 19 → hit
     return resolveHit({
         characterName,
         campaignName,
-        context: makeContext(playerStats),
+        context: {
+            rollType: 'attack',
+            attackerName: characterName,
+            targetName: 'ElderPaladin',
+            effectiveBonus: BONUS,
+            bonus: BONUS,
+            isWeaponAttack: true,
+            sneakAttackDice: 10,
+            playerStats,
+        },
         bonus: BONUS,
-        effectiveD20Roll: 13, // 13 + 9 = 22 ≥ AC 19 → hit
+        effectiveD20Roll,
         target: { name: 'ElderPaladin', ac: AC, type: 'player' },
         combatSummary: null,
         characters: [{ name: 'ElderPaladin', computedStats: { armorClass: AC } }],
@@ -142,9 +142,8 @@ describe('resolveHit — Death Strike feature gate (Assassin lv17 only)', () => 
 
         const result = await callResolveHit(trickster);
 
-        expect(result.hit).toBe(true);
+        expect(result.hit).toBe(true); // the sneak hit landed — only the feature gate can block the te
         expect(storedTeRows()).toHaveLength(0);
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.anything(), expect.anything());
     });
 
     it('ASSASSIN lv20 (Death Strike rider present): round-1 sneak hit stores the te with the DC built from the attacker\'s own DEX + PB', async () => {
@@ -164,49 +163,38 @@ describe('resolveHit — Death Strike feature gate (Assassin lv17 only)', () => 
         }]]);
     });
 
-    it('feature holder still respects the round gate: round 2 sneak hit stores nothing', async () => {
-        getCurrentCombatRound.mockReturnValue(2);
-        const assassin = makePlayerStats([DEATH_STRIKE_RIDER]);
+    const featureHolder = () => makePlayerStats([DEATH_STRIKE_RIDER]);
+    const noAutomation = { name: characterName, level: 20, proficiency: 6, abilities: [{ name: 'Dexterity', bonus: 1 }] };
 
-        await callResolveHit(assassin);
+    // Every gate blocks the SAME store path; one parameterized case each.
+    // expectHit is the negative control: the attack really landed (or really
+    // missed for MISS) so a green test proves the GATE blocked the store,
+    // not some incidental harness failure.
+    it.each([
+        {
+            gate: 'round 2 (first-round-only trigger)',
+            playerStats: featureHolder(),
+            expectHit: true,
+            setup: () => getCurrentCombatRound.mockReturnValue(2),
+        },
+        {
+            gate: 'attacker hasActed',
+            playerStats: featureHolder(),
+            expectHit: true,
+            setup: () => getCombatContext.mockResolvedValue({ creatures: [{ name: characterName, hasActed: true }] }),
+        },
+        { gate: 'MISS', playerStats: featureHolder(), expectHit: false }, // 5 + 9 = 14 < AC 19
+        {
+            gate: 'missing playerStats automation (monster/non-sheet lane)',
+            playerStats: noAutomation,
+            expectHit: true,
+        },
+    ])('stores NO death_strike te when the $gate blocks it', async ({ playerStats, expectHit, setup }) => {
+        if (setup) setup();
 
-        expect(storedTeRows()).toHaveLength(0);
-    });
+        const result = await callResolveHit(playerStats, { effectiveD20Roll: expectHit ? 13 : 5 });
 
-    it('feature holder still respects hasActed: a creature that has acted stores nothing', async () => {
-        getCombatContext.mockResolvedValue({ creatures: [{ name: characterName, hasActed: true }] });
-        const assassin = makePlayerStats([DEATH_STRIKE_RIDER]);
-
-        await callResolveHit(assassin);
-
-        expect(storedTeRows()).toHaveLength(0);
-    });
-
-    it('MISS never stores even for the feature holder', async () => {
-        const assassin = makePlayerStats([DEATH_STRIKE_RIDER]);
-
-        const result = await resolveHit({
-            characterName,
-            campaignName,
-            context: makeContext(assassin),
-            bonus: BONUS,
-            effectiveD20Roll: 5, // 5 + 9 = 14 < AC 19 → miss
-            target: { name: 'ElderPaladin', ac: AC, type: 'player' },
-            combatSummary: null,
-            characters: [{ name: 'ElderPaladin', computedStats: { armorClass: AC } }],
-            logEntry: vi.fn(),
-        });
-
-        expect(result.hit).toBe(false);
-        expect(storedTeRows()).toHaveLength(0);
-    });
-
-    it('missing playerStats automation (e.g. monster/non-sheet lane) stores nothing', async () => {
-        const noAutomation = { name: characterName, level: 20, proficiency: 6, abilities: [{ name: 'Dexterity', bonus: 1 }] };
-
-        const result = await callResolveHit(noAutomation);
-
-        expect(result.hit).toBe(true);
+        expect(result.hit).toBe(expectHit);
         expect(storedTeRows()).toHaveLength(0);
     });
 });

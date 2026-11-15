@@ -2563,3 +2563,25 @@ run2#1549: ui/youtubePlayer -> maintained (13->14) SDK stub-completeness exact-o
 ## Fix-pass MILESTONE: TIDY QUEUE CLOSED — LEDGER FINAL HONEST STATE (fix#359-#366, 2026-10-24)
 - Tidy execution: ITS-turn batch1 (fix#359, 52 rows: 10 executed/32 stale/10 held), batch2 (fix#360, 8x DISCHARGED — folds pre-landed), cite-drift (fix#361, 83 cites refreshed / 39 files, 7 lanes fixed 3 refuted), judgment-split (fix#362, 4 executed incl keydown-lane+RitualMasterModal+attackWeaponUtils new lanes, 2 architecture reconfirmed), attack/rules hygiene (fix#363, 30/30 incl turnState clamp + constrictGrapple reorder production fixes), maps/UI/fixtures (fix#364, 5 executed incl 2 grep-proven dead-file removals, kit-holds reconfirmed), duplicate-resolution (fix#365/366: audits revealed stamp-greedy false-opens; 44-row disposition: 5 DUPLICATE-OF-RESOLVED, 1 DISCHARGED, 2 VERIFIED-CLOSED-disk-authority, 1 FIXED, 35 QUEUED-OWNER-CONFIRMED across sanctioned categories: disk-data 8, mock-kit 8, arbitration 10, architecture 3, server 1, a11y 1, store-#1520 1, NO-CLOCK-#174 1, BI-frozen 1).
 - FINAL STATE: 0 un-annotated rows, 0 dedup misses, exactly 35 open-by-design owner holds (each bytes-cited). fixcheck364 EXIT:0 x57 (30,894+3xf). Lint clean post-#366. ALL work UNCOMMITTED (owner-only).
+
+## RUN3 (2026-11-14) — fresh queue: 15 files new since run2 close (total 3138)
+run2#1550: char-sheet/modals/shared/AreaEffectSaveFlow.utils -> maintained (2T/5c->2T/5c) CLA-303 key-contract strengthened w/ DC tie-succeeds relational pin; d20-math lanes belong to sibling npc-saves seam tests; SOURCE BUGS none.
+run2#1551: encounter/MonsterCardModal.rage-aura -> maintained (29->20) render/measured-lane consolidations; internal fork pins removed; copy faces/stacking/cancellation retained. NOTE: replaced legacy '// @maintained-by-e2e' marker (e2e queue flag).
+run2#1552: initiative/victoryLines -> maintained (9->5) singular/plural folds; NEW branch coverage: defeated??0 default, partySize=0 omission, wipe/survived exclusivity; byte-pins kept.
+run2#1553: map/PlacedItems.token-stacking -> maintained (8->5) subsumed fade/rect pins removed; circle-hit+right-click merged; per-token + re-stack revert strengthened; sibling re-run green.
+run2#1554: map/Players.token-stacking -> maintained (6->3) prop-presence short-circuit + full-cell faces into one saturated render; re-stack reactivity both phases strengthened.
+run2#1555: map/SpellOverlayControls.chip-label -> maintained (3->2) label/tooltip/aria merged dual-zone render; second-chip id binding + once-only removal pinned; trio re-run 28/28.
+run2#1556: map/SpellOverlayControls.unarmed-params -> maintained (4->2) unarmed disabled face merged; management lane REMOVED (redundant main file); arming lane = enabled-state pin only. CROSS-FILE: SpellOverlayControls.test.jsx:179-182 subsumed (remove on its turn); dated marker ':2026-10-14' to normalize.
+run2#1557: maps-manager/generateModalParity -> maintained (14c/7b->9c/4b) twin-parity blocks merged; token-presence replaces brittle exact-className; verbatim placeholder-constant dup removed.
+run2#1558: maps-manager/MapsManager.row-badge-separation -> maintained (5->3) text-based regression catch replaces parent/class pins; main-file affordance dup trimmed; typeless-row negative kept; folder green 203.
+run2#1559: hooks/combat/hitResolution.death-strike -> maintained (6->3 defs/6 runs) gate lanes it.each'd w/ per-row expectHit negative controls (vacuous-pass hole closed); seam split documented.
+run2#1560: maps/dungeonNamegen.wordEcho -> maintained (6->4) subsumed seed sweep + tautological determinism pin removed; bounded 13-draw escape hatch pinned via adversarial rng.
+run2#1561: maps/gridInput -> maintained (15->9) subsumed bound-copy test + duplicate branch rows removed; full-branch matrix incl Number("")===0 law; unit/modal partition documented.
+run2#1562: maps/seedInput -> maintained (18 runs) floor verified; loop->named it.each; all rejects proven to discriminate old parseInt bug; SEED_ERROR copy pin kept.
+run2#1563: maps/tokenStackOffsets -> maintained (12->6) stack-order lanes into one paint-order test; tautological determinism removed; non-finite layers strengthened; isStackedToken owned by PlacedItems lane.
+run2#1564: rules/spells/spellPreparationService.arity-unify -> maintained (3->2) static lock generalized: reads+writes all carriers (strictly stronger); backwards >=46 census pin replaced by non-vacuity guards; dead import-skip branch deleted.
+RUN3 SOURCE BUGS: none across all 15 lanes.
+
+## Batch #221 GREEN — RUN3 run2#1550-#1564 (15 lanes; queue-3 complete)
+## Batch #221 — PROGRESS: completed 3138 / remaining 0 (total 3138)
+- Suite: lint clean; 3304 files, 35,491 passed, ZERO failures, EXIT:0 (154s). Evidence /tmp/batch221.log. RUN3 SOURCE BUGS: none. Follow-ups recorded in bugs ledger (SpellOverlayControls.test.jsx :179-182 + dated-marker normalize; rage-aura e2e-stamp owner check).
