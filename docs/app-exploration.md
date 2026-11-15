@@ -73,8 +73,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before pass 1 — clean 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-15 PW — Undying Sentinel/Last Stand intercept writes a 7-POST full-store chain:** `undyingSentinelService.js` fires six-plus sequential `setRuntimeValue` calls (`currentHitPoints`, `undyingSentinelUsed`, `deathSaves`, `deathFailures`, `isDead`, `activeConditions`), each POSTing the WHOLE char mirror (network census: 7× `POST /ElderPaladin` per intercept, matching `boonOfRecoveryService.js` shape) — the sheet-revive lane already improved this family to ONE `setRuntimeBatch` merged POST (`db0ad4cf8` precedent + CLA-092 write-batching law); fold both services to a single batched write (log row + lastAttack legs stay).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Revivify success-leg + refusal-leg live rides — War_Cleric's `Revivify` row is INERT (2024 prepared-caster prep lane unwalked; fixture holds no `Diamond (300 gp)`); the lane is a surgery+prep-walk away but the session budget went to the fix-verify + interceptors; parity-twin row STAYS owed (see PT#1).

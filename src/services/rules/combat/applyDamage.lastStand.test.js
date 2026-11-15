@@ -2,7 +2,8 @@
 // Lane: Boon of Recovery (Last Stand) zero-HP interception through applyDamageToTarget.
 // Owns the last-stand-unique contract: the drop-to-0 intercept return bytes (incl.
 // interceptedFeature identity from the ZERO_HP_INTERCEPTORS dispatch order), the full
-// stamped write-set (heal, latch, stabilise, unconscious-filter), the 'healing' log entry,
+// stamped write-set (heal, latch, stabilise, unconscious-filter) — folded into ONE merged
+// setRuntimeBatch POST (backlog 2026-11-15 PW, CLA-092 write-batching), the 'healing' log entry,
 // and the gate legs proving the guard fires on lethal damage and stays silent otherwise.
 // Generic resistance/save/evasion arithmetic lives in applyDamage.helpers.test.js — not re-driven here.
 // Handler-lane ('hp_change' logs via survive_and_heal) lives in boonOfRecoveryHandler.test.js — not duplicated here.
@@ -12,13 +13,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyDamageToTarget } from './applyDamage.js';
 import { addEntry } from '../../ui/logService.js';
 import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'TestCampaign';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
   getStore: vi.fn(() => ({ keys: () => [] })),
 }));
 
@@ -144,13 +146,25 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
     });
 
     // Stamped bytes: heal, one-shot latch, death-save stabilise,
-    // unconscious stripped while other conditions are preserved.
-    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'currentHitPoints', 91, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'deathSaves', [false, false, false], campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'deathFailures', [false, false, false], campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'isDead', 0, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'activeConditions', ['poisoned'], campaignName);
+    // unconscious stripped while other conditions are preserved — all SIX
+    // keys in ONE merged setRuntimeBatch POST (backlog 2026-11-15 PW,
+    // CLA-092 write-batching; CharHitPoints db0ad4cf8 precedent).
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch).toHaveBeenCalledWith('BoonChar', {
+      currentHitPoints: 91,
+      boonOfRecoveryLastStandUsed: true,
+      deathSaves: [false, false, false],
+      deathFailures: [false, false, false],
+      isDead: 0,
+      activeConditions: ['poisoned'],
+    }, campaignName);
+    // No residual per-key interceptor legs: only the damage flow's own
+    // interim currentHitPoints commit may use setRuntimeValue.
+    const INTERCEPTOR_KEYS = ['boonOfRecoveryLastStandUsed', 'deathSaves', 'deathFailures', 'isDead', 'activeConditions'];
+    const interceptorWrites = setRuntimeValue.mock.calls.filter(
+      ([name, key]) => name === 'BoonChar' && INTERCEPTOR_KEYS.includes(key)
+    );
+    expect(interceptorWrites).toHaveLength(0);
 
     // Combat-summary creature mirror updated so the card renders the revival.
     expect(cs.creatures[0].currentHp).toBe(91);
@@ -193,6 +207,7 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
     // Guard stays silent: no latch stamp, no stabilise bytes, no healing log.
     expect(setRuntimeValue).not.toHaveBeenCalledWith('BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName);
     expect(setRuntimeValue).not.toHaveBeenCalledWith('BoonChar', 'isDead', 0, campaignName);
+    expect(setRuntimeBatch).not.toHaveBeenCalledWith('BoonChar', expect.objectContaining({ boonOfRecoveryLastStandUsed: true }), campaignName);
     expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({ sourceName: 'Boon Of Recovery - Last Stand' }));
   });
 

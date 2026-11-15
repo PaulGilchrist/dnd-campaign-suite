@@ -4,8 +4,9 @@
 // identity from the ZERO_HP_INTERCEPTORS dispatch order, applyDamage.js :595-614), the heal formula
 // min(1 + 3 x paladin level, runtime-store max HP) (undyingSentinelService.js :26-35), the full
 // stamped write-set (currentHitPoints, once-per-long-rest latch, death-save stabilise, isDead,
-// unconscious-filter), the verbatim 'healing' log entry (undyingSentinelService.js :54-64), and the
-// loud throw when stored max HP is missing.
+// unconscious-filter) — folded into ONE merged setRuntimeBatch POST (backlog 2026-11-15 PW,
+// CLA-092 write-batching / CharHitPoints db0ad4cf8 precedent), and the verbatim 'healing' log
+// entry (undyingSentinelService.js :54-64), and the loud throw when stored max HP is missing.
 // Not re-driven here:
 // - Generic resistance/save/HP arithmetic: applyDamage.helpers.test.js :53-196; entry guards and
 //   player HP bookkeeping: applyDamage.test.js :146-155 / :157-177; DC recalc: :334-366.
@@ -19,13 +20,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyDamageToTarget } from './applyDamage.js';
 import { addEntry } from '../../ui/logService.js';
 import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'TestCampaign';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
   getStore: vi.fn(() => ({ keys: () => [] })),
 }));
 
@@ -154,13 +156,24 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
 
     // Stamped bytes: HP lifted to 46 (over the flow's interim 0 write), once-per-long-rest
     // latch, death-save stabilise, isDead cleared, unconscious stripped while other
-    // conditions are preserved.
-    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'currentHitPoints', 46, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'undyingSentinelUsed', true, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'deathSaves', [false, false, false], campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'deathFailures', [false, false, false], campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'isDead', 0, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'activeConditions', ['blinded'], campaignName);
+    // conditions are preserved — all SIX keys in ONE merged setRuntimeBatch POST
+    // (backlog 2026-11-15 PW, CLA-092 write-batching; CharHitPoints db0ad4cf8 precedent).
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch).toHaveBeenCalledWith('GloryPaladin', {
+      currentHitPoints: 46,
+      undyingSentinelUsed: true,
+      deathSaves: [false, false, false],
+      deathFailures: [false, false, false],
+      isDead: 0,
+      activeConditions: ['blinded'],
+    }, campaignName);
+    // No residual per-key interceptor legs: only the damage flow's own
+    // interim currentHitPoints commit may use setRuntimeValue.
+    const INTERCEPTOR_KEYS = ['undyingSentinelUsed', 'deathSaves', 'deathFailures', 'isDead', 'activeConditions'];
+    const interceptorWrites = setRuntimeValue.mock.calls.filter(
+      ([name, key]) => name === 'GloryPaladin' && INTERCEPTOR_KEYS.includes(key)
+    );
+    expect(interceptorWrites).toHaveLength(0);
 
     // Combat-summary creature mirror updated so the card renders the revival.
     expect(cs.creatures[0].currentHp).toBe(46);
@@ -197,7 +210,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
     const result = await applyLethal(makeSummary('GloryPaladin'), 'GloryPaladin', { level });
 
     expect(result).toMatchObject({ intercepted: true, interceptedFeature: 'Undying Sentinel', finalDamage: 0, newHp: expectedHp });
-    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'currentHitPoints', expectedHp, campaignName);
+    expect(setRuntimeBatch).toHaveBeenCalledWith('GloryPaladin', expect.objectContaining({
+      currentHitPoints: expectedHp,
+    }), campaignName);
   });
 
   it.each([
@@ -221,6 +236,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
 
     // Guard stays silent: no latch stamp, no Sentinel healing log.
     expect(setRuntimeValue).not.toHaveBeenCalledWith('GloryPaladin', 'undyingSentinelUsed', true, campaignName);
+    expect(setRuntimeBatch).not.toHaveBeenCalledWith('GloryPaladin', expect.objectContaining({ undyingSentinelUsed: true }), campaignName);
     expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({ sourceName: 'Undying Sentinel' }));
 
     if (expectedHp === 0) {

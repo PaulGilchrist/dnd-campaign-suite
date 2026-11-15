@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 
 export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
@@ -34,17 +34,25 @@ export function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignN
     const healAmount = Math.floor(maxHp / 2);
     const newHp = Math.min(1 + healAmount, maxHp);
 
-    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-    setRuntimeValue(creature.name, 'boonOfRecoveryLastStandUsed', true, campaignName);
-
-    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
-    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
-    setRuntimeValue(creature.name, 'isDead', 0, campaignName);
-
     const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
     const conditions = rawConditions || [];
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
-    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+
+    // Merged full-store write (backlog 2026-11-15 PW): ONE setRuntimeBatch
+    // POST replaces the old six separate setRuntimeValue calls
+    // (currentHitPoints, boonOfRecoveryLastStandUsed, deathSaves,
+    // deathFailures, isDead, activeConditions) — the undyingSentinelService
+    // twin's precedent, mirroring the CharHitPoints.jsx merged-revive lane
+    // (db0ad4cf8) / CLA-092 write-batching law. Functional bytes unchanged;
+    // valuesEqual self-skip mirrors the six individual calls.
+    setRuntimeBatch(creature.name, {
+        currentHitPoints: newHp,
+        boonOfRecoveryLastStandUsed: true,
+        deathSaves: [false, false, false],
+        deathFailures: [false, false, false],
+        isDead: 0,
+        activeConditions: filtered,
+    }, campaignName);
 
     if (creature.type === 'player') {
         creature.currentHp = newHp;
