@@ -3,6 +3,7 @@ import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/d
 import { addEntry } from '../../../ui/logService.js';
 
 import storage from '../../../ui/storage.js';
+import { resolveReviveTargetHp, reviveTargetIsLiving } from '../../../shared/reviveTargetHp.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -48,11 +49,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const targetHp = target.type === 'player'
-        ? (getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? 0)
-        : (target.currentHp ?? 0);
+    // Pre-payment revive invariant (shared family law, reviveTargetHp.js): the
+    // commit delta is `healAmount - targetHp`, so a positive targetHp would bill
+    // a Rage point to resurrect a living creature — refuse BEFORE spending.
+    const targetHp = resolveReviveTargetHp(target);
 
-    if (targetHp > 0) {
+    if (reviveTargetIsLiving(targetHp)) {
         return {
             type: 'popup',
             payload: {

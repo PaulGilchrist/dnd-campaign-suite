@@ -4,6 +4,7 @@ import { consumeMaterial } from '../spells/materialComponents.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { isCreatureDead } from '../../shared/hpModifier.js';
+import { resolveReviveTargetHp, reviveTargetIsLiving } from '../../shared/reviveTargetHp.js';
 
 function refusalPopup(spell, description) {
     return {
@@ -37,14 +38,14 @@ function validateBeforeConsume(spellName, casterName, playerStats, targetCreatur
     // `applied ? applied.maxHp : (targetCreature.maxHp ?? 0)` let the TRUTHY
     // arm ship undefined because `?? 0` only guarded the (dead) else arm.
     const isPlayer = targetCreature.type === 'player';
-    const oldHp = isPlayer ? (getRuntimeValue(targetName, 'currentHitPoints') ?? 0) : (targetCreature.currentHp ?? 0);
-    // Revive invariant (HoUoM commit-gate precedent, handOfUltimateMercyHandler
-    // `targetHp > 0` refusal): the heal delta is `1 - oldHp`, so a positive
-    // oldHp would INVERT the resurrection into damage (the divergent-bucket drain
-    // in bug-revivify-stale-isdead-negative-heal — clampHpLadder's heal-never-
-    // drains floor only guards delta > 0). There is no resurrection to perform on
-    // a creature above 0 HP — refuse BEFORE the diamond is consumed.
-    if (oldHp > 0) {
+    // Revive invariant (shared family law, reviveTargetHp.js): the heal delta is
+    // `1 - oldHp`, so a positive oldHp would INVERT the resurrection into damage
+    // (the divergent-bucket drain in bug-revivify-stale-isdead-negative-heal —
+    // clampHpLadder's heal-never-drains floor only guards delta > 0). There is
+    // no resurrection to perform on a creature above 0 HP — refuse BEFORE the
+    // diamond is consumed.
+    const oldHp = resolveReviveTargetHp(targetCreature);
+    if (reviveTargetIsLiving(oldHp)) {
         console.error(`[revivify] ${targetName} sits at ${String(oldHp)} HP despite the dead gate — refused, no diamond consumed`);
         return { description: `${targetName} is not at 0 Hit Points. ${spellName} was refused and no diamond was consumed.` };
     }

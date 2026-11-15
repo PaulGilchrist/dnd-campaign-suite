@@ -9,6 +9,7 @@ import { hasHealingMaximization, resolveDiceExpression } from '../../../combat/a
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { resolveLiveTargetHp } from '../healing/liveTargetHp.js';
+import { resolveReviveTargetHp, reviveTargetIsLiving } from '../../../shared/reviveTargetHp.js';
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
 
@@ -21,13 +22,6 @@ function resolveFocusPoints(playerName, campaignName, playerStats) {
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
     const maxFP = classLevel?.focus_points || 0;
     return storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
-}
-
-function resolveTargetHp(targetInfo, targetName, campaignName) {
-    if (targetInfo.target.type === 'player') {
-        return getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? 0;
-    }
-    return targetInfo.target.currentHp ?? 0;
 }
 
 // Canonical HP frame for the audit row — bucket max first (the same
@@ -97,8 +91,9 @@ function cureConditionsFor(targetName, auto, campaignName) {
 // healingHandler.collectTouchTargets): every board creature whose BUCKET-
 // CANONICAL HP (resolveLiveTargetHp — `currentHitPoints` first, cs row only as
 // fallback for bucket-less rows like monsters) is 0, caster excluded. The same
-// precedence the commit gate (resolveTargetHp) re-checks at confirm, so the
-// picker never offers a target its own gate would call living.
+// precedence the commit gate (resolveReviveTargetHp, shared/reviveTargetHp.js)
+// re-checks at confirm, so the picker never offers a target its own gate would
+// call living.
 function collectCorpseTargets(cs, playerName) {
     if (!cs?.creatures?.length) return [];
     return cs.creatures
@@ -123,10 +118,14 @@ async function commitResurrection({ action, auto, playerStats, playerName, campa
         return { refused: true, popup: infoPopup(action.name, `Not enough Focus Points. Need ${costAmount}, have ${currentFP}.`, auto) };
     }
 
-    const targetHp = resolveTargetHp(targetInfo, targetName, campaignName);
+    // Pre-payment revive invariant (shared family law, reviveTargetHp.js): the
+    // commit delta is `healAmount - targetHp`, so a positive targetHp would pay
+    // to resurrect a living creature — refuse zero-spend BEFORE the roll/focus
+    // ladder commits anything.
+    const targetHp = resolveReviveTargetHp(targetInfo.target);
     const targetMaxHp = resolveTargetMaxHp(targetInfo, targetName, campaignName, characters);
 
-    if (targetHp > 0) {
+    if (reviveTargetIsLiving(targetHp)) {
         return { refused: true, popup: infoPopup(action.name, `${targetName} is not at 0 Hit Points.`, auto) };
     }
 

@@ -83,8 +83,6 @@ change-data `{}` + log `[]` + overlays `[]` (tab CLOSED before pass 1 — clean 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(PX 2026-11-15) `clampHpLadder` heal-never-drains floor only guards `delta > 0`:** any revive/heal that computes `target - currentHp` from a desynced state can emit a NEGATIVE delta and silently become damage (this is the mechanism behind `bug-revivify-stale-isdead-negative-heal.md`). The floor is correct for its stated cause (stale row max < current), but the revive family should assert `oldHp <= 0` before paying — a cheap invariant shared by HoUoM/Revivify/Revivification rather than each re-deriving it.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - `DeathSavePromptModal` resolved-id-guard RACE face + nat20 `Restored to 1 HP` live face — unit-pinned (carried, unchanged).
