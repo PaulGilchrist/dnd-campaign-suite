@@ -69,6 +69,7 @@ const TOUCH_TARGET_MODAL_SPECS = [
         pending: 'actionPendingRevivify', onConfirm: 'actionHandleRevivifyConfirm', onSkip: 'actionHandleRevivifySkip',
         title: 'Revivify', confirmLabel: 'Cast Revivify', confirmIcon: 'fa-heart', pick: 'object',
         description: 'Choose a creature to revive. The target must have 0 Hit Points. A diamond worth 300+ GP is consumed.',
+        selectHint: 'Select a creature first.',
     },
     {
         pending: 'actionPendingRemoveCurse', onConfirm: 'actionHandleRemoveCurseConfirm', onSkip: 'actionHandleRemoveCurseSkip',

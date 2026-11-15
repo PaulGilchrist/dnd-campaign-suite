@@ -374,6 +374,7 @@ const TARGET_SPELL_POPUP_RENDERERS = [
             description="Choose a creature to revive. The target must have 0 Hit Points. A diamond worth 300+ GP is consumed."
             confirmLabel="Cast Revivify"
             confirmIcon="fa-heart"
+            selectHint="Select a creature first."
         />
     ),
     (p) => p.pendingGreaterRestoration && !p.pendingGreaterRestorationTarget && (

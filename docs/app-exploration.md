@@ -89,8 +89,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab clears ×3 — re-entry 
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-15 QY: **Revivify chooser confirm gives no why-disabled hint** — `Cast Revivify` sits disabled until a corpse radio is checked (correct gate), while sibling heal choosers show the selected count on the button (`Heal (N)`); a `Select a creature first.` affordance (or the count pattern) would close the "is this button dead?" UX question the harness hit live.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - `revivifyService.validateBeforeConsume`'s dedicated pre-`consumeMaterial` refusal copy ("… is not at 0 Hit Points. Revivify was refused and no diamond was consumed.") did NOT land live — on the mid-dwell path the earlier `isCreatureDead` refusal ("X is not dead. …") fires first and the second lock is unreachable without a bucket-mid-echo race; ordering unit-pinned (QY).

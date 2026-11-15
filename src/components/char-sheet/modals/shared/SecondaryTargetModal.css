@@ -69,6 +69,15 @@
     margin-top: 8px;
 }
 
+/* Why-disabled hint beside the confirm (sp-actions footer lane): center it on
+   the button row and drop the body-lane top margin. Scoped to this component's
+   hint class — the .secondary-target-note body lane is untouched. */
+.sp-actions .secondary-target-select-hint {
+    display: flex;
+    align-items: center;
+    margin-top: 0;
+}
+
 .secondary-target-dist {
     margin-left: 8px;
     font-size: 0.8em;

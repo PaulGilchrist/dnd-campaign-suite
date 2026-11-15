@@ -120,6 +120,60 @@ describe('SecondaryTargetModal', () => {
         expect(onTargetSelected).toHaveBeenCalledTimes(1);
     });
 
+    // Backlog 2026-11-15 QY (Revivify chooser why-disabled hint): a consumer that
+    // passes selectHint gets visible copy beside the disabled confirm while no
+    // radio is checked; checking a radio enables the confirm AND retires the
+    // hint in the same render. Gate semantics stay byte-unchanged (disabled
+    // confirm still no-ops). Consumers that omit selectHint render the unchanged
+    // default face — no hint lane anywhere.
+    it('shows the selectHint affordance beside the disabled confirm and retires it on selection', () => {
+        const onTargetSelected = vi.fn();
+        const { unmount } = render(
+            <SecondaryTargetModal
+                {...baseProps}
+                onTargetSelected={onTargetSelected}
+                confirmLabel="Cast Revivify"
+                selectHint="Select a creature first."
+            />
+        );
+
+        const confirm = screen.getByRole('button', { name: /Cast Revivify/ });
+        expect(confirm).toBeDisabled();
+        const hint = screen.getByText('Select a creature first.');
+        expect(hint).toBeInTheDocument();
+        // The affordance rides the footer lane beside the confirm button.
+        expect(hint.closest('.sp-actions')).not.toBeNull();
+        expect(hint).toHaveClass('secondary-target-note');
+
+        fireEvent.click(confirm);
+        expect(onTargetSelected).not.toHaveBeenCalled();
+
+        const radios = document.querySelectorAll('input[name="secondaryTarget"]');
+        fireEvent.click(radios[0]);
+        expect(confirm).not.toBeDisabled();
+        expect(screen.queryByText('Select a creature first.')).not.toBeInTheDocument();
+
+        unmount();
+
+        // Default face unchanged (no selectHint): nothing selected, no hint lane.
+        const plain = render(<SecondaryTargetModal {...baseProps} />);
+        expect(screen.getByRole('button', { name: /Attack/ })).toBeDisabled();
+        expect(plain.container.querySelector('.secondary-target-select-hint')).toBeNull();
+        plain.unmount();
+
+        // Empty roster with a hint configured: nothing can be selected, so the
+        // affordance stays out (the confirm is disabled for the no-targets reason).
+        const empty = render(
+            <SecondaryTargetModal
+                {...baseProps}
+                targets={[]}
+                selectHint="Select a creature first."
+            />
+        );
+        expect(screen.queryByText('Select a creature first.')).not.toBeInTheDocument();
+        empty.unmount();
+    });
+
     it('renders option targets by label and forwards their value on confirm', () => {
         const onTargetSelected = vi.fn();
         render(

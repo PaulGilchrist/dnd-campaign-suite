@@ -116,13 +116,30 @@ function LiveHpTargetRow({ campaignName, ...rowProps }) {
     return <SecondaryTargetRow {...rowProps} target={{ ...rowProps.target, ...resolveLiveTargetHp(rowProps.target) }} />;
 }
 
+// Why-disabled affordance beside the confirm (see selectHint note below).
+// Module-level so the picker's own branch complexity stays unchanged; renders
+// NOTHING for consumers that omit selectHint, once a radio is checked,
+// or when there is nothing to select.
+function SelectTargetHint({ text, selected, targetCount }) {
+    if (!text || selected || targetCount === 0) return null;
+    return <span className="secondary-target-note secondary-target-select-hint">{text}</span>;
+}
+
 // skipLabel / onDismiss / dismissLabel are per-consumer props (improve LC 2026-11-14
 // hoh-picker-skip-semantics): the HoH picker's onSkip is NOT a dismiss — it
 // self-heals the monk through the same commit lane as a target pick (real focus
 // spend), so that consumer relabels the button (`Heal self`) and passes a
 // distinct zero-spend Cancel via onDismiss. Every consumer that omits these
 // props renders the unchanged `Skip` face — no global rename.
-function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt, liveHp, skipLabel, onDismiss, dismissLabel }) {
+// selectHint is the why-disabled affordance (backlog 2026-11-15 QY Revivify
+// chooser improve): consumers whose confirm gate is "no radio checked yet" pass
+// visible copy (e.g. `Select a creature first.`) that rides the established
+// .secondary-target-note chrome while the confirm sits disabled and vanishes
+// the moment a row is selected — the single-radio sibling of the multi-select
+// choosers' `Label (N)` count face (MassHealModal/CreatureSelectionModal),
+// which is uninformative on a 0/1 radio list. Consumers that omit the prop
+// render the unchanged default face.
+function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt, liveHp, skipLabel, onDismiss, dismissLabel, selectHint }) {
     const [selected, setSelected] = useState(null);
     const [mapStatuses, setMapStatuses] = useState(null);
 
@@ -214,6 +231,12 @@ function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSki
                             <i className={`fa-solid ${iconClass}`}></i> {label}
                         </button>
                     ) : null}
+                    {/* Why-disabled affordance (see SelectTargetHint above): shown ONLY
+                        while the gate that disables the confirm is "nothing checked",
+                        so it disappears the moment a radio is selected. The confirm's
+                        own disabled expression and handleConfirm guard are untouched —
+                        pressing the disabled button still no-ops zero-write. */}
+                    <SelectTargetHint text={selectHint} selected={selected} targetCount={targets.length} />
                     <button className="sp-dismiss-btn" onClick={onSkip} type="button">
                         {skipLabel || 'Skip'}
                     </button>
