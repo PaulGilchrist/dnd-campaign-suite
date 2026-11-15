@@ -12,6 +12,11 @@ vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
 }));
 
+// Refusal writes a revivify_refused audit row (refuse-must-log law) — stub the lane.
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 // PCs canonical via runtime store (pitfall 37); monsters via combatSummary.
 vi.mock('../runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),

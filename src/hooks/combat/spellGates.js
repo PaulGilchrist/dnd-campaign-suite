@@ -685,6 +685,22 @@ function gateRevivify({ spell, campaignName, cfSetPending, playerStats, setPopup
       description: 'No creature has died within the last minute. Revivify can only target a creature that has died.',
     });
   }
+  // PX 2026-11-15 improve (gate-revive refusal asymmetry): the zero-corpse clean
+  // denial now writes a revivify_refused audit row — the same refuse-must-log law as
+  // refuseMissingMaterial's material_refused row and the maze_refused /
+  // warding_bond_refused / mage_armor_refused family (the material gate runs FIRST in
+  // gateMetamagic, so a missing diamond still refuses with ONLY its own row). The
+  // row is the sole server write on this path — no slot, no diamond, no HP change.
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'revivify_refused',
+    reason: 'no_corpse',
+    characterName: playerStats.name,
+    abilityName: spell.name,
+    spellName: spell.name,
+    description: `${spell.name} refused: no creature has died within the last minute. Nothing spent.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[gateRevivify:revivify_refused]', e); });
   return true;
 }
 
