@@ -35,7 +35,19 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
   // on the delete leg, which blocks all keydown/click while shown, so there is
   // no custom nested dialog to guard against here.
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen) {
+      // The modal hides without unmounting (:if-guard below), so every dismiss
+      // lane (Escape / × / backdrop / post-action onClose) must reset the
+      // transient rename state here. The pen sets modal-local renameTarget
+      // while the parent's mode prop stays 'load', and only a SUCCESSFUL
+      // rename cleared it — cancelling stranded the target and the next Load
+      // reopened straight into the Rename Encounter form with the list
+      // unreachable. Mirrors the mode-transition form-field reset above.
+      setRenameTarget(null);
+      setNewName('');
+      setError('');
+      return undefined;
+    }
     const handleKey = (e) => {
       if (e.key === 'Escape') onClose();
     };
