@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel } from '../../services/maps/hexMapUtils';
 import * as mapsService from '../../services/maps/mapsService.js';
+import MenuOption from '../common/MenuOption.jsx';
 
 const MENU_WIDTH = 160;
 const PICKER_ITEM_HEIGHT = 20;
@@ -13,34 +14,9 @@ function getLinkPickerLayout(showLinkPicker, indoorMaps) {
     return { count, offset: count * PICKER_ITEM_HEIGHT, extraHeight: count * PICKER_ITEM_HEIGHT + 8 };
 }
 
-// Keyboard-activatable option row (improvement 2026-11-13): options used to
-// be bare SVG <text> nodes — no .click() method, no focus, no keyboard/AT
-// activation. Each option's <text> label keeps its exact position/attrs and
-// its onClick (mouse face unchanged); the wrapping <g role="menuitem"
-// tabIndex={0}> makes the row focusable and fires the SAME onActivate
-// closure on Enter/Space. A keypress never synthesises a click event on an
-// SVG <g> (only native controls do), so the keydown handler cannot
-// double-fire the onClick. Escape is NOT an activation key here (it never
-// reaches onActivate); the menu-level Escape DISMISS law lives in
-// POIContextMenu below (replaces the adc78327f "Escape inert" law —
-// backlog 2026-11-13: Escape = dismiss-zero-write, mirroring the
-// 3f41dc16b modal family).
-function MenuOption({ x, y, fill, fontSize = '11', className = 'menu-option', onActivate, children }) {
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            e.stopPropagation();
-            onActivate();
-        }
-    };
-    return (
-        <g role="menuitem" tabIndex={0} className="menu-option-item" onKeyDown={handleKeyDown}>
-            <text x={x} y={y} fill={fill} fontSize={fontSize} className={className} onClick={onActivate}>
-                {children}
-            </text>
-        </g>
-    );
-}
+// MenuOption (keyboard-activatable role=menuitem row) now lives in
+// ../common/MenuOption.jsx — shared with the indoor ItemContextMenu
+// (backlog 2026-11-16 XC) so both SVG menus keep ONE activation seam.
 
 // Inline rename editor (backlog 2026-11-13, replaces the "no cancel face"
 // law): three faces — Enter/blur COMMIT (unchanged laws), Escape REVERTS-AND-

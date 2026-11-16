@@ -444,6 +444,18 @@
     fill: #fff;
 }
 
+/* Keyboard focus ring for the SVG context menus (backlog 2026-11-16 XC):
+   every ItemContextMenu row is a focusable role=menuitem now (shared
+   common/MenuOption.jsx); the highlighted fill mirrors the hover face and
+   the outline marks the focused row for the keyboard lane. */
+.map .item-context-menu .menu-option-item:focus {
+    outline: 1px solid #6ab0f0;
+}
+
+.map .item-context-menu .menu-option-item:focus text {
+    fill: #fff;
+}
+
 .map .menu-close {
     cursor: pointer;
     pointer-events: all;

@@ -61,7 +61,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-16 XC — Placed-item context menu is pointer-only SVG chrome:** `ItemContextMenu` entries are bare `<text onClick>` nodes (no role, no tabIndex, no keyboard path) and a trusted right-click at the hit-rect centre didn't open the menu live while a synthetic `contextmenu` on `rect.placed-hit-area` did — hide/delete/door-toggle/rename are unreachable for keyboard users and the pointer path is capture-fragile. Suggest role=menu/menuitem + keydown activation + a focus-trapped dismissal (mirrors the `3f41dc16b` modal-family semantics); revisit why native contextmenu routing needs the synthetic dispatch. `src/components/map/ItemContextMenu.jsx`.
 - **2026-11-16 XC — Admin typed-name campaign delete is case-sensitive with zero feedback:** typing `QA-ARENA` for campaign `qa-arena` leaves `Delete "qa-arena"` silently disabled — a destructive confirm whose one affordance fails without telling you why. Suggest case-insensitive comparison (the name is already displayed verbatim in the label) or an inline "names don't match yet" hint. `src/components/admin/` delete lane.
 
 ## Blocked / Not Verified (fold-gate ledger)

@@ -7,6 +7,11 @@ function useWallDrawing({ isLocalhost, tool, getGridFromEvent, svgRef }) {
     const handleGridPointerDown = useCallback((e, setMapData) => {
         if (!isLocalhost) return;
         if (tool !== TOOL_PAINT && tool !== TOOL_ERASE) return;
+        // Primary button only (backlog 2026-11-16 XC, house law from
+        // useZoomPan.js:52 / useItemDragging.js:54): right-button capture here
+        // retargeted the trusted `contextmenu` to the svg root, away from the
+        // placed-item hit-rect handler (see useSelectMove.js for the full law).
+        if (e.button !== 0) return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;

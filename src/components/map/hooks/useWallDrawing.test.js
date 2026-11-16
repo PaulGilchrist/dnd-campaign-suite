@@ -113,6 +113,27 @@ describe('useWallDrawing', () => {
     expect(svgRef.current.setPointerCapture).toHaveBeenCalledTimes(captured ? 1 : 0);
   });
 
+  // Backlog 2026-11-16 XC: right-button presses must not arm a wall stroke or
+  // capture the pointer — capture retargets the trusted `contextmenu` away
+  // from the placed-item hit-rect handler (see useSelectMove.test.js twin).
+  it('pointer down refuses to write for a right-button press (no capture)', () => {
+    const result = getHook();
+    const { setMapData, getWalls } = createMapData();
+
+    const event = new PointerEvent('pointerdown', { pointerId: 7, clientX: 96, clientY: 112, button: 2 });
+    const preventedSpy = watchPreventDefault(event);
+
+    act(() => {
+      result.current.handleGridPointerDown(event, setMapData);
+    });
+
+    expect(setMapData).not.toHaveBeenCalled();
+    expect(getWalls()).toEqual(new Set());
+    expect(result.current.painting).toBeNull();
+    expect(preventedSpy).not.toHaveBeenCalled();
+    expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
+  });
+
   // Real captured gesture: down anchors the stroke, each move extends it,
   // up releases. Cells are binary-exact: (96,112)->1,1 (160,112)->2,1 (160,192)->2,3.
   it.each([

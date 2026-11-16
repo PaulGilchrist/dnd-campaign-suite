@@ -87,6 +87,15 @@ function buildMovedWalls(prev, selWalls, dstBounds, offset) {
     return { ...prev, walls: newWalls };
 }
 
+// Cell-inside-marquee-bounds test (complexity hoist for the #883 down lane;
+// backlog 2026-11-16 XC added the primary-button guard to that lane, so the
+// bounds chain moved out to keep it under the cap 15 — behavior identical).
+function isWithinSelectionBounds(selBounds, gx, gy) {
+    return !!selBounds &&
+        gx >= selBounds.minX && gx <= selBounds.maxX &&
+        gy >= selBounds.minY && gy <= selBounds.maxY;
+}
+
 function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName, characters, setPopupHtml }) {
     const [selectionRect, setSelectionRect] = useState(null);
     const [selectedWalls, setSelectedWalls] = useState(new Set());
@@ -105,6 +114,14 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
 
     const handleSelectPointerDown = useCallback((e, _placedItems, _mapData) => {
         if (!isLocalhost || tool !== TOOL_SELECT) return;
+        // Primary button only (backlog 2026-11-16 XC, house law from
+        // useZoomPan.js:52 / useItemDragging.js:54): a RIGHT-button press that
+        // reaches this lane used to setPointerCapture on the svg, and an
+        // active capture retargets the trusted `contextmenu` event to the
+        // capture target — away from the child `rect.placed-hit-area` /
+        // poi-hit-area handlers, so the placed-item menu never opened
+        // (only synthetic dispatches, which bypass capture, worked).
+        if (e.button !== 0) return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
@@ -130,9 +147,7 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
             it => curSelItems.has(it.id) && it.gridX === gx && it.gridY === gy
         );
         const selBounds = selectionBoundsRef.current;
-        const withinBounds = selBounds &&
-            gx >= selBounds.minX && gx <= selBounds.maxX &&
-            gy >= selBounds.minY && gy <= selBounds.maxY;
+        const withinBounds = isWithinSelectionBounds(selBounds, gx, gy);
 
         if ((onSelectedWall || onSelectedItem || withinBounds) && (curSelWalls.size > 0 || curSelItems.size > 0)) {
             moveStartGrid.current = { gridX: gx, gridY: gy };

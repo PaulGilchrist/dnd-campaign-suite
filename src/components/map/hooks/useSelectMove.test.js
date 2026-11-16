@@ -56,6 +56,10 @@ describe('useSelectMove', () => {
   const createMockEvent = (pointerId = 1) => ({
     preventDefault: vi.fn(),
     pointerId,
+    // Real PointerEvents default button:0; the lane now guards
+    // `e.button !== 0` (backlog 2026-11-16 XC right-button capture fix),
+    // so the mock must carry the byte.
+    button: 0,
   });
 
   // Faithful pointer-capture ledger (real Element.prototype semantics, house faithful-mock
@@ -178,6 +182,27 @@ describe('useSelectMove', () => {
       expect(result.current.moveOffset).toBeNull();
       expect(result.current.moveStartGrid.current).toBeNull();
       expect(result.current.selectionBoundsRef.current).toBeNull();
+    });
+
+    // Backlog 2026-11-16 XC: a right-button press must never arm the select
+    // lane or capture the pointer — an active capture retargets the trusted
+    // `contextmenu` to the svg root, away from the placed-item hit-rect
+    // handler (that is why the placed-item menu only opened on synthetic
+    // dispatches). The primary-button guard is the source fix.
+    it('is inert on a right-button press (no capture — trusted contextmenu reaches the item)', () => {
+      mockGetGridFromEvent.mockReturnValue({ gridX: 5.2, gridY: 3.8 });
+      createSvgWithPointerCapture();
+      const { result } = renderHook(() => useSelectMove(baseArgs()));
+      const event = { ...createMockEvent(), button: 2 };
+
+      act(() => {
+        result.current.handleSelectPointerDown(event, [], null);
+      });
+
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(mockSvgRef.current.setPointerCapture).not.toHaveBeenCalled();
+      expect(result.current.selectStart.current).toBeNull();
+      expect(result.current.moveStartGrid.current).toBeNull();
     });
 
     it('begins a group move when pressing a selected wall, a selected item, or empty bounds with a selection live', () => {
