@@ -39,8 +39,21 @@ export function computePlayerAc(creature, stats, lookupName) {
 export function buildPlayerDisplayFields(creature, lookupName, characters) {
     const character = characters.find(ch => utils.getName(ch.name) === lookupName)
     const stats = character?.computedStats || character
-    const maxHp = getRuntimeValue(lookupName, 'hitPoints') ?? stats?.hitPoints ?? 0
-    const currentHp = getRuntimeValue(lookupName, 'currentHitPoints') ?? maxHp
+    const runtimeMaxHp = getRuntimeValue(lookupName, 'hitPoints')
+    const runtimeCurrentHp = getRuntimeValue(lookupName, 'currentHitPoints')
+    // Fresh-mount settle gate (improvement 2026-11-16 XB): a player row's HP
+    // truth is the per-character runtime bucket or the roster's own stats —
+    // neither exists yet when an SSE-replayed/stored board paints before the
+    // rules-engine enrichment resolves, so the `?? 0` below is a FABRICATED
+    // value. Flag the row as still settling (presentational only — merge logic
+    // and store writes untouched) and let CreatureHp render a disabled
+    // placeholder input instead of a misleading live 0. Data-derived: the flag
+    // flips exactly when the bake lands real numbers; never a timer. A baked
+    // 1/1 creation placeholder IS data (runtime hitPoints=1) and stays
+    // enabled normally (pitfall 37 lane unchanged).
+    const hpPending = runtimeMaxHp == null && stats?.hitPoints == null
+    const maxHp = runtimeMaxHp ?? stats?.hitPoints ?? 0
+    const currentHp = runtimeCurrentHp ?? maxHp
     return {
         imagePath: character?.imagePath || '',
         ac: computePlayerAc(creature, stats, lookupName),
@@ -48,6 +61,7 @@ export function buildPlayerDisplayFields(creature, lookupName, characters) {
         immunities: stats?.immunities || [],
         currentHp,
         maxHp,
+        hpPending,
     }
 }
 

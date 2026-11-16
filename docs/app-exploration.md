@@ -57,8 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-16 XB: fresh-tab Initiative renders cards with `0/""` HP inputs during the roster-settle window before the additive merge/bake paints real values (cosmetic flash, thin-bucket §46(c) family) — a mount-skeleton or `disabled` settle state on the HP inputs would stop the misleading 0s. `src/components/initiative/`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Fog closed-DOOR occlusion + `hidden-item-ring` amber face — open since WK (PT1).

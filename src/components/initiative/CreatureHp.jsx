@@ -14,15 +14,28 @@ function HpStatusBadges({ isDead, isBloodied }) {
     )
 }
 
-function CurrentHpInput({ creature, currentHp, effectiveMaxHp, onChange }) {
+function CurrentHpInput({ creature, currentHp, effectiveMaxHp, onChange, hpPending = false }) {
     const isPlayer = creature.type === 'player'
     return (
         <input
+            // Fresh-mount settle face (improvement 2026-11-16 XB): while a player
+            // row's HP truth (runtime bucket / roster stats) is still baking, show
+            // a disabled em-dash placeholder instead of the fabricated 0 — and
+            // flip the key on settle so the UNCONTROLLED defaultValue re-syncs
+            // to the baked value (same presence-keyed remount idiom as
+            // InitiativeControl in CreatureCard.jsx) rather than lingering on 0.
+            key={hpPending ? 'hp-settling' : 'hp-live'}
             className="hp-inline-input"
             type="number"
             min={0}
-            defaultValue={currentHp}
+            disabled={hpPending}
+            defaultValue={hpPending ? '' : currentHp}
+            placeholder={hpPending ? '—' : undefined}
             onBlur={(e) => {
+                // Settle-window belt: a disabled input never receives real
+                // focus, but a synthetic blur must never commit the
+                // fabricated window either.
+                if (hpPending) return
                 let value = parseInt(e.target.value) || 0
                 if (!isPlayer) {
                     // bug-initiative-hp-input-no-range-clamp: monster commits clamp
@@ -99,8 +112,32 @@ function TvHpRow({ currentHp, effectiveMaxHp, isDead, isBloodied, hideNumbers })
     )
 }
 
+// Fresh-mount settle gate (improvement 2026-11-16 XB): player rows only —
+// buildPlayerDisplayFields flags the window where neither the runtime HP
+// bucket nor the roster's own stats has baked yet. Monster rows carry real HP
+// on the combatSummary row itself, so they never settle. Module scope: the
+// CreatureHp component sits at the eslint complexity ceiling (Initiative.jsx
+// isActiveEconomyRowGmDriven precedent).
+function isPlayerHpPending(creature) {
+    return creature.type === 'player' && creature.hpPending === true
+}
+
+// GM/localhost player row: editable current HP + static max. Extracted to a
+// sibling lane component (TvHpRow precedent) to keep CreatureHp under its
+// eslint complexity ceiling while the settle gate lives in it (XB 2026-11-16).
+function PlayerLocalhostHpRow({ creature, currentHp, effectiveMaxHp, onChange, hpPending }) {
+    return (
+        <>
+            <CurrentHpInput creature={creature} currentHp={currentHp} effectiveMaxHp={effectiveMaxHp} onChange={onChange} hpPending={hpPending} />
+            <span className="hp-sep">/</span>
+            <span className="hp-max-val">{hpPending ? '—' : effectiveMaxHp}</span>
+        </>
+    )
+}
+
 function CreatureHp({ creature, isLocalhost, onChange, isPlayerSummoned, tvMode = false }) {
     const { currentHp: rawCurrentHp, maxHp: rawMaxHp, type, name } = creature
+    const hpPending = isPlayerHpPending(creature)
     const currentHp = rawCurrentHp ?? 0
     const maxHp = rawMaxHp ?? 1
     const aidIncrease = useRuntimeValue(name, 'aidHpMaxIncrease', null)
@@ -173,11 +210,7 @@ function CreatureHp({ creature, isLocalhost, onChange, isPlayerSummoned, tvMode 
             <div className="hp-inline-row">
                 <span className="hp-label">HP</span>
                 {isLocalhost ? (
-                    <>
-                        <CurrentHpInput creature={creature} currentHp={currentHp} effectiveMaxHp={effectiveMaxHp} onChange={onChange} />
-                        <span className="hp-sep">/</span>
-                        <span className="hp-max-val">{effectiveMaxHp}</span>
-                    </>
+                    <PlayerLocalhostHpRow creature={creature} currentHp={currentHp} effectiveMaxHp={effectiveMaxHp} onChange={onChange} hpPending={hpPending} />
                 ) : (
                     <span className="hp-max-val">{currentHp}/{effectiveMaxHp}</span>
                 )}

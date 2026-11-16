@@ -13,6 +13,10 @@
 //     never mutated — #854 removed direct creature.maxHp/currentHp writes (frozen-pin below) (jsx:40-49)
 //   defaults: currentHp ?? 0, maxHp ?? 1 reflected in bytes (jsx:61-62)
 //   runtime aid/heroesFeast sum into effective max display + bloodied threshold (jsx:63-67)
+//   fresh-mount settle gate (improvement 2026-11-16 XB): player rows flagged hpPending by
+//     buildPlayerDisplayFields render a disabled em-dash-placeholder HP input (no fabricated
+//     live 0, no commit lane); the settle flip remounts keyed → uncontrolled defaultValue
+//     re-syncs to the baked value; monster rows never gate — settle-gate block
 // NOT owned here (do not duplicate):
 //   card-level HP blur seam → CreatureCard.interactions.test.jsx (#851)
 //   TempHpDisplay gate + byte → CreatureCard.rendering.test.jsx (:138-148) (#853)
@@ -239,5 +243,56 @@ describe('CreatureHp', () => {
 
         render(<CreatureHp {...props} creature={{ ...npc, currentHp: 3 }} isLocalhost={false} isPlayerSummoned tvMode />);
         expect(screen.getByText('3/7')).toBeInTheDocument();
+    });
+
+    // Improvement 2026-11-16 XB: fresh-mount settle gate. buildPlayerDisplayFields
+    // flags the pre-bake window (runtime bucket AND roster stats absent) with
+    // hpPending — during it the HP input is a disabled em-dash placeholder (no
+    // misleading fabricated 0, no commit lane), and the settle flip REMOUNTS the
+    // input (presence-keyed idiom from InitiativeControl) so the uncontrolled
+    // defaultValue paints the real baked value instead of lingering on 0.
+    describe('fresh-mount settle gate (hpPending)', () => {
+        const settling = { ...player, currentHp: 0, maxHp: 0, hpPending: true };
+
+        it('player HP input is disabled with a neutral placeholder during settle — no live 0, no commit', () => {
+            render(<CreatureHp {...props} creature={settling} />);
+            const input = currentInput('Alice');
+            expect(input).toBeDisabled();
+            expect(input.value).toBe('');
+            expect(input).toHaveAttribute('placeholder', '—');
+            expect(screen.getByText('—')).toBeInTheDocument(); // max span, not a fabricated 0
+            input.value = '5';
+            fireEvent.blur(input);
+            expect(props.onChange).not.toHaveBeenCalled();
+        });
+
+        it('bake-complete flip re-enables and re-syncs the input to the real baked value (never a lingering 0)', () => {
+            const { rerender } = render(<CreatureHp {...props} creature={settling} />);
+            expect(currentInput('Alice')).toBeDisabled();
+            rerender(<CreatureHp {...props} creature={{ ...player, hpPending: false }} />);
+            const input = currentInput('Alice');
+            expect(input).toBeEnabled();
+            expect(input.value).toBe('15');
+            expect(input).not.toHaveAttribute('placeholder');
+            expect(screen.getByText('20')).toBeInTheDocument();
+            // Commit behavior unchanged post-settle.
+            input.value = '12';
+            fireEvent.blur(input);
+            expect(props.onChange).toHaveBeenCalledWith('Alice', 12);
+        });
+
+        it('player rows without the flag (baked 1/1 placeholders included) render enabled exactly as before', () => {
+            render(<CreatureHp {...props} creature={{ name: 'Alice', type: 'player', currentHp: 1, maxHp: 1 }} />);
+            const input = currentInput('Alice');
+            expect(input).toBeEnabled();
+            expect(input.value).toBe('1');
+            expect(screen.getByText('1')).toBeInTheDocument();
+        });
+
+        it('monster rows never settle-gate — their HP rides the combatSummary row', () => {
+            render(<CreatureHp {...props} creature={{ ...npc, hpPending: true }} />);
+            expect(currentInput('Goblin')).toBeEnabled();
+            expect(maxInput('Goblin')).toBeEnabled();
+        });
     });
 });

@@ -11,7 +11,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
 }));
 
-import { buildRuntimeConditions, buildDisplayCreature } from './displayCreatureUtils.js';
+import { buildRuntimeConditions, buildDisplayCreature, buildPlayerDisplayFields } from './displayCreatureUtils.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 const LOOKUP = 'ElderPaladin';
@@ -86,5 +86,55 @@ describe('buildRuntimeConditions — malformed rows (crash-proof face)', () => {
         expect(() => { displayed = buildDisplayCreature(creature, []); }).not.toThrow();
         expect(displayed.conditions).toHaveLength(1);
         expect(typeof displayed.conditions[0].label).toBe('string');
+    });
+});
+
+// Improvement 2026-11-16 XB: the fresh-mount settle gate. A player row's HP
+// truth is the runtime hitPoints bucket or the roster character's own
+// hitPoints — while BOTH are absent (SSE-replayed board paints before the
+// rules-engine enrichment resolves) the `?? 0` fallback is fabricated and
+// buildPlayerDisplayFields must flag the row hpPending so CreatureHp can
+// disable the HP input instead of showing a misleading live 0. Data-derived
+// flip, never a timer; a baked 1/1 creation bucket is real data (pitfall 37)
+// and settles enabled.
+describe('buildPlayerDisplayFields — hpPending fresh-mount settle flag', () => {
+    const row = { name: LOOKUP, type: 'player' };
+
+    it('pending while neither the runtime hitPoints bucket nor roster stats carry a max', () => {
+        stubRuntime({});
+        const fields = buildPlayerDisplayFields(row, LOOKUP, []);
+        expect(fields.hpPending).toBe(true);
+        // The fabricated fallback still rides the object — the gate consumes
+        // the flag, not the number.
+        expect(fields).toMatchObject({ currentHp: 0, maxHp: 0, hpPending: true });
+    });
+
+    it('settles when the roster character arrives with its own hitPoints', () => {
+        stubRuntime({});
+        const characters = [{ name: LOOKUP, hitPoints: 143 }];
+        const fields = buildPlayerDisplayFields(row, LOOKUP, characters);
+        expect(fields.hpPending).toBe(false);
+        expect(fields).toMatchObject({ maxHp: 143, currentHp: 143 });
+    });
+
+    it('settles on the runtime bucket alone (1/1 creation-bake placeholder stays enabled)', () => {
+        stubRuntime({ hitPoints: 1, currentHitPoints: 1 });
+        const fields = buildPlayerDisplayFields(row, LOOKUP, []);
+        expect(fields.hpPending).toBe(false);
+        expect(fields).toMatchObject({ currentHp: 1, maxHp: 1 });
+    });
+
+    it('a real 0-valued runtime max is data, not a pending gap', () => {
+        stubRuntime({ hitPoints: 0 });
+        expect(buildPlayerDisplayFields(row, LOOKUP, []).hpPending).toBe(false);
+    });
+
+    it('buildDisplayCreature stamps hpPending only on player rows — monster rows ride their own HP', () => {
+        stubRuntime({});
+        const goblin = buildDisplayCreature({ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 7 }, []);
+        expect(goblin.hpPending).toBeUndefined();
+        expect(goblin.currentHp).toBe(5);
+        const pc = buildDisplayCreature(row, []);
+        expect(pc.hpPending).toBe(true);
     });
 });
