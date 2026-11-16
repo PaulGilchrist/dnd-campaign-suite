@@ -10,6 +10,7 @@ import { isLairRowClickable, lairRowAffordance } from '../../services/encounters
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses, legendarySpellCastMaster } from './MonsterCardHelpers.js';
 import { useSpellNameIndex } from '../../hooks/ui/useSpellNameIndex.js';
 import { useMonsterPendingOa } from './useMonsterPendingOa.js';
+import TargetSelect from '../initiative/TargetSelect.jsx';
 
 // MA-1883: legendary child render-stamp (mirrors the MA-0051 checkBonus
 // stamp at the same seam) — a child delegating to a live Spellcasting master
@@ -23,7 +24,21 @@ function stampLegendaryChildRow(monster, action) {
   return spellRow ? { ...row, legendarySpellRow: spellRow } : row;
 }
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {}, creatures = null }) {
+// Mirror of the initiative card's target-arm select into the modal header
+// (improvement 2026-11-16 XD): the SAME shared TargetSelect component, fed the
+// live combatSummary row + the host's handleTargetChange — arming here writes
+// the same combatSummary targetName lane, so card ⇄ modal stay in sync via the
+// existing SSE echo. Monsters never surface overlay options (TargetSelect
+// gates those to the PC cast lane), so overlays=[] is exact. Hosts without the
+// initiative lane (EncounterBuilder preview, Map) pass no onTargetChange/
+// creatures — the header renders no arm there.
+function buildTargetArm({ onTargetChange, creatures, creature, isLocalhost, isPlayerSummoned }) {
+  if (!onTargetChange || !Array.isArray(creatures) || !creature) return null;
+  return <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} allCreatures={creatures} overlays={[]} onTargetChange={onTargetChange} />;
+}
+
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {}, creatures = null, onTargetChange, isLocalhost, isPlayerSummoned }) {
+
   // MA-1014: spells.json name index for the spell_save_dc-only utility-row
   // chip arm (Ice Devil "Ice Wall") — resolved here so every card gets it
   // without threading state through the modal (§158 resolvable-name guard).
@@ -65,6 +80,10 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
       { key: 'legendary_actions', title: 'Legendary Actions', actions: monster.legendary_actions, blocked: attackerActionBlocked },
     ].filter(s => s.actions?.length > 0 || s.sectionRow);
 
+    // Header target-arm mirror (see buildTargetArm) — built inside the memo so
+    // the select repaints with every live combatSummary echo (card→modal sync).
+    const targetArm = buildTargetArm({ onTargetChange, creatures, creature, isLocalhost, isPlayerSummoned });
+
     const lairActions = getLairActions(monster);
     const regionalEffects = getRegionalEffects(monster);
     // MA-1451: drained-ability overlay — the ability_score_drain te ledger
@@ -84,7 +103,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
 
     return (
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
-        <MonsterCardHeader monster={monster} monsterName={monsterName} onClose={onClose} />
+        <MonsterCardHeader monster={monster} monsterName={monsterName} onClose={onClose} targetArm={targetArm} />
         <div className="mc-body">
           <MonsterCardStats monster={monster} creatureTempHp={creatureTempHp} shieldOfFaithBonus={shieldOfFaithBonus} condEffects={condEffects} handleInitiative={handleInitiative} />
           {monsterConditions.length > 0 && (
@@ -119,7 +138,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
         </div>
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack, onTargetChange, creatures, isLocalhost, isPlayerSummoned]);
 
   return content;
 }
@@ -154,7 +173,7 @@ function getRegionalEffects(monster) {
   return monster.regional_effects?.effects?.length > 0 ? monster.regional_effects.effects : null;
 }
 
-function MonsterCardHeader({ monster, monsterName, onClose }) {
+function MonsterCardHeader({ monster, monsterName, onClose, targetArm = null }) {
   return (
     <div className="mc-header" onClick={onClose}>
       <div className="mc-header-info">
@@ -164,6 +183,12 @@ function MonsterCardHeader({ monster, monsterName, onClose }) {
           {monster.subtype ? ` (${monster.subtype})` : ''}, {monster.alignment}
         </div>
       </div>
+      {/* Header click closes the overlay — the arm wrapper stops propagation so
+          operating the mirrored target select (or opening its dropdown) never
+          closes the modal out from under the GM (improvement 2026-11-16 XD). */}
+      {targetArm && (
+        <div className="mc-header-arm no-print" onClick={(e) => e.stopPropagation()}>{targetArm}</div>
+      )}
       <button className="mc-close" onClick={onClose} aria-label="Close">&times;</button>
     </div>
   );

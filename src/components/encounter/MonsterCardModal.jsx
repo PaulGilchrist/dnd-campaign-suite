@@ -2408,7 +2408,7 @@ function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml
   );
 }
 
-function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters }) {
+function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters, onTargetChange, isLocalhost, isPlayerSummoned }) {
   const monsterName = creatureName || monster?.name || 'Monster';
   const creatureTempHp = getRuntimeValue(monsterName, 'tempHp', campaignName) || 0;
   const fallbackCsRef = useRef(null);
@@ -3183,6 +3183,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         // routes the record-only advisory seam (popup + ability_use log, zero
         // rolls, zero lastAttack writes); relocation stays GM-enforced (CLA-320).
         handleAdvisoryRow={(action) => resolveMonsterActionAdvisoryRow({ action, monsterName, campaignName, setPopupHtml })}
+        // Mirror of the card's target-arm select in the modal header (improvement
+        // 2026-11-16 XD): initiative host wires onTargetChange to the SAME
+        // handleTargetChange the card select uses (combatSummary runtime-store
+        // lane); hosts without a board (EncounterBuilder preview, Map) leave it
+        // undefined and the header renders no arm.
+        onTargetChange={onTargetChange}
+        isLocalhost={isLocalhost}
+        isPlayerSummoned={isPlayerSummoned}
       />
       {popupHtml && (
         <MonsterAttackPopup

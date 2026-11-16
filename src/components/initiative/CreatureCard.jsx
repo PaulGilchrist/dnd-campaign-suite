@@ -22,21 +22,13 @@ import { isUnbreakableMajestyActive, getUnbreakableMajestySaveDc, clearUnbreakab
 import { sendFleshToStoneResult, sendPrismaticSprayIndigoResult, sendPrismaticSprayVioletResult } from '../../services/combat/conditions/savePromptService.js'
 import { isResilientSphereActive, getResilientSphereSource } from '../../services/combat/automation/automationPassives.js'
 import { getCreatureController } from '../../services/encounters/creatureControl.js'
-import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { cleanupWildShape } from '../../services/automation/handlers/class-druid/wildShapeCreatureBuilder.js'
 import { revertPolymorph } from '../../services/automation/handlers/spells/polymorphService.js'
 import { revertAnimalShapes } from '../../services/automation/handlers/spells/animalShapesService.js'
 import { revertShapechange } from '../../services/automation/handlers/spells/shapechangeService.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 import { resolveSpeedFeet } from '../../services/combat/turnState.js'
-
-const SHAPE_LABELS = {
-    sphere: 'Sphere',
-    cylinder: 'Cylinder',
-    cube: 'Cube',
-    cone: 'Cone',
-    line: 'Line',
-}
+import TargetSelect from './TargetSelect.jsx'
 
 const STARRY_CONSTELLATION_NOTES = {
     Archer: '; Bonus Action: Luminous Arrow attack',
@@ -233,58 +225,6 @@ function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway }
                 defaultValue={creature.initiative ?? ''}
                 placeholder="Init"
             />
-        </div>
-    )
-}
-
-function overlayLabel(o) {
-    return o.label || `${SHAPE_LABELS[o.shape] || o.shape} (${o.radiusFt || o.distanceFt || o.sizeFt || 0}ft)`
-}
-
-function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, overlays, onTargetChange }) {
-    // Overlay targets are live ONLY on the PC cast lane (CharSpells
-    // getTargetInfo SP-097 fallback → useLoggedDiceRollDamage 'overlay-'
-    // branch → handleAoeDamage area adjudication). Monster damage chips
-    // resolve their target through MonsterCardModal.getTarget()'s name
-    // lookup, which can never match `overlay-<id>` — a monster with an
-    // overlay armed rolls plain untargeted damage (targetName:undefined).
-    // Suppress the inert options on monster cards (backlog
-    // aoe-overlay-dead-lane trap fix).
-    // Uncontrolled monster rows on visitor tabs render NO select at all (backlog
-    // 2026-11-16 TA): the old permanently-disabled arm kept the card looking
-    // delegable-to-anyone after the GM released control. Mirrors InitiativeControl's
-    // visitor plain-value law (backlog 2026-11-11 LZ) — don't mount an
-    // editable-looking control that can never be enabled on this device. The
-    // predicate is verbatim the old `disabled` gate, so controlled monsters
-    // (explicit controller or derived summon/form lanes) keep the live arm lane,
-    // PC rows are untouched, and the GM sees the select in every state.
-    if (creature.type !== 'player' && !isLocalhost && !isPlayerSummoned) return null
-    const showOverlays = creature.type === 'player' && overlays.length > 0
-    return (
-        <div className='creature-target'>Target&nbsp;
-            <select
-                aria-label={`${creature.name} target`}
-                data-testid="target-select"
-                value={creature.targetName || ''}
-                onChange={(e) => onTargetChange(creature.name, e.target.value)}
-            >
-                <option value="">— No Target —</option>
-                {allCreatures
-                    .filter(c => c.name !== creature.name && !c.secondTurn && isCreaturePresent(c))
-                    .map(c => (
-                        <option key={c.name} value={c.name}>{c.name}</option>
-                    ))
-                }
-                {showOverlays && (
-                    <optgroup label="─── Overlays ───">
-                        {overlays.map(o => (
-                            <option key={`overlay-${o.id}`} value={`overlay-${o.id}`}>
-                                {overlayLabel(o)}
-                            </option>
-                        ))}
-                    </optgroup>
-                )}
-            </select>
         </div>
     )
 }

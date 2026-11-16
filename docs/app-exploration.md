@@ -67,8 +67,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-16 XD — attack prep spans two surfaces:** arming a monster's target (`<Name> target` select) and delegation picker live ONLY on the initiative card, while the attack dice chips live ONLY inside the avatar-opened `.mc-overlay` stat modal (no arm control inside it) — the full GM attack flow is card-arm → avatar-click → chip → Done → card-Close across two surfaces; consider mirroring the target select into the modal header. Non-blocking UX seam; existing rig law papers over it.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried).

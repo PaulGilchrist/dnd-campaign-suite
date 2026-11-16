@@ -125,7 +125,9 @@ describe('TA-1116 unarmed monster-card attack chip refuses loudly', () => {
     expect(typeof html).toBe('string');
     expect(html).toContain('mc-no-target-refusal');
     expect(html).toContain('Goblin 1 cannot use Scimitar');
-    expect(html).toContain('Arm a target on the initiative card first');
+    // 2026-11-16 modal-arm improve: the refusal now names the modal header's own
+    // Target select first (the full attack flow completes inside the modal).
+    expect(html).toContain('Arm a target with the Target select at the top of this card');
     expect(html).toContain('No attack rolled, nothing spent.');
     // Attack-lane copy: the save-lane AoE parenthetical never rides an attack chip.
     expect(html).not.toContain('AoE rows');

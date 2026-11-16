@@ -3078,7 +3078,7 @@ export function formatActionUsage(usage) {
 export function buildNoTargetRefusalPopup({ monsterName, actionName, rollNoun = 'save' }) {
   const isSave = rollNoun !== 'attack';
   const aoeNote = isSave ? ' (AoE rows pick their own area targets)' : '';
-  return `<div class="mc-no-target-refusal"><h3>No Target</h3><p>${monsterName} cannot use ${actionName} — no target is armed on ${monsterName}'s initiative card. Arm a target on the initiative card first${aoeNote}. No ${isSave ? 'save' : 'attack'} rolled, nothing spent.</p></div>`;
+  return `<div class="mc-no-target-refusal"><h3>No Target</h3><p>${monsterName} cannot use ${actionName} — no target is armed on ${monsterName}'s initiative card. Arm a target with the Target select at the top of this card (or on the initiative card)${aoeNote}. No ${isSave ? 'save' : 'attack'} rolled, nothing spent.</p></div>`;
 }
 
 export function buildNoTargetRefusalLog({ monsterName, actionName }) {

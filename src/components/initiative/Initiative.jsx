@@ -298,20 +298,23 @@ function ConditionSavePopup({ popup, onClose }) {
 // when the controller disappears (released, and no derived lane re-asserts),
 // the overlay unmounts — the same zero-trust face as the inert avatar click
 // after release. Re-assigning control re-mounts the card (open state kept).
-function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignName, creatures, mapName, characters, onClose }) {
+function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignName, creatures, mapName, characters, onClose, onTargetChange }) {
     // Reactive targetEffects mirror for the summoned lane — read unconditionally
     // (hook order) and only consulted by the LAN gate below.
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? []
     if (tvMode || !monster) return null
-    if (!isLocalhost) {
-        const liveRow = (creatures || []).find(c => c.name === monsterName)
-        // Same subject filter as CreatureCard's myTargetEffects (summoned lane).
-        const subjectEffects = (allTargetEffects || []).filter(te => {
-            const teTarget = Array.isArray(te.target) ? te.target[0] : te.target
-            return teTarget === monsterName
-        })
-        if (getCreatureController(liveRow, creatures, subjectEffects) === null) return null
-    }
+    // Controller resolution (hoisted 2026-11-16 from the !isLocalhost-only branch):
+    // the SAME predicate gates the LAN unmount AND decides whether the mirrored
+    // header target-arm select mounts on a visitor tab (verbatim CreatureCard
+    // TargetSelect gate parity — controlled monsters keep the live arm lane).
+    const liveRow = (creatures || []).find(c => c.name === monsterName)
+    // Same subject filter as CreatureCard's myTargetEffects (summoned lane).
+    const subjectEffects = (allTargetEffects || []).filter(te => {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target
+        return teTarget === monsterName
+    })
+    const controller = liveRow ? getCreatureController(liveRow, creatures, subjectEffects) : null
+    if (!isLocalhost && controller === null) return null
     return (
         <MonsterCardModal
             monster={monster}
@@ -321,6 +324,9 @@ function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignN
             creatureName={monsterName}
             mapName={mapName}
             characters={characters}
+            onTargetChange={onTargetChange}
+            isLocalhost={isLocalhost}
+            isPlayerSummoned={controller !== null}
         />
     )
 }
@@ -1063,6 +1069,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 creatures={combatSummary.creatures}
                 mapName={mapName}
                 characters={characters}
+                onTargetChange={handleTargetChange}
                 onClose={() => { setViewingMonster(null); setViewingMonsterName(null) }}
             />
             {effectAdderTarget && (

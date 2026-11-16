@@ -41,13 +41,13 @@ describe('MA-0049 formatActionUsage — owner truth table', () => {
 describe('MA-0049 no-target refusal builders', () => {
   it('popup names monster/action verbatim and states nothing rolled — exact template', () => {
     expect(buildNoTargetRefusalPopup({ monsterName: 'Adult Blue Dracolich 1', actionName: 'Frightful Presence' })).toBe(
-      '<div class="mc-no-target-refusal"><h3>No Target</h3><p>Adult Blue Dracolich 1 cannot use Frightful Presence — no target is armed on Adult Blue Dracolich 1\'s initiative card. Arm a target on the initiative card first (AoE rows pick their own area targets). No save rolled, nothing spent.</p></div>'
+      '<div class="mc-no-target-refusal"><h3>No Target</h3><p>Adult Blue Dracolich 1 cannot use Frightful Presence — no target is armed on Adult Blue Dracolich 1\'s initiative card. Arm a target with the Target select at the top of this card (or on the initiative card) (AoE rows pick their own area targets). No save rolled, nothing spent.</p></div>'
     );
   });
 
   it('attack-noun copy (TA-1116): same lane, "No attack rolled", no save-lane AoE parenthetical', () => {
     expect(buildNoTargetRefusalPopup({ monsterName: 'Goblin 1', actionName: 'Scimitar', rollNoun: 'attack' })).toBe(
-      '<div class="mc-no-target-refusal"><h3>No Target</h3><p>Goblin 1 cannot use Scimitar — no target is armed on Goblin 1\'s initiative card. Arm a target on the initiative card first. No attack rolled, nothing spent.</p></div>'
+      '<div class="mc-no-target-refusal"><h3>No Target</h3><p>Goblin 1 cannot use Scimitar — no target is armed on Goblin 1\'s initiative card. Arm a target with the Target select at the top of this card (or on the initiative card). No attack rolled, nothing spent.</p></div>'
     );
   });
 
