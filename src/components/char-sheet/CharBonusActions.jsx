@@ -10,6 +10,7 @@ import TargetSpellPopups from './char-spells/TargetSpellPopups.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getBonusActionSpellNames, applyPotentSpellcasting } from '../../services/ui/spellSectionUtils.js'
+import { castableRowTestId } from '../../services/shared/castableRowTestId.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { addEntry } from '../../services/ui/logService.js'
@@ -331,7 +332,7 @@ function BonusSpellRow({ spell, playerStats, campaignName, exhaustionPenalty, co
         gateMetamagic(spell, {});
     };
     return <React.Fragment>
-        <div className='left clickable' onClick={() => onSpellNameClick(spell.name)}>{spell.name}</div>
+        <div className='left clickable' data-testid={castableRowTestId(spell.name)} onClick={() => onSpellNameClick(spell.name)}>{spell.name}</div>
         <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
         <div>{formatRange(spell.range)}</div>
         <BonusSpellHitCell

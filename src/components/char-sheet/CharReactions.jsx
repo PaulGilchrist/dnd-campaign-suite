@@ -12,6 +12,7 @@ import BoonFateModal from './modals/BoonFateModal.jsx'
 import StepsOfTheFeyTauntModal from './modals/StepsOfTheFeyTauntModal.jsx'
 import SearingVengeanceModal from './modals/SearingVengeanceModal.jsx'
 import { getReactionSpellNames, applyPotentSpellcasting } from '../../services/ui/spellSectionUtils.js'
+import { castableRowTestId } from '../../services/shared/castableRowTestId.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
@@ -343,7 +344,7 @@ function ReactionSpellRow({ spell, playerStats, campaignName, cannotAct, rollAtt
     const isSpellAtk = !spell.dc;
     const hasAttackType = spell.attack_type != null && spell.attack_type !== '';
     return <React.Fragment>
-        <div className='left clickable' onClick={() => {
+        <div className='left clickable' data-testid={castableRowTestId(spell.name)} onClick={() => {
             if (isSlowed()) { refuseSlowedReaction(spell.name); return; }
             setSelectedSpell(spell);
         }}>{spell.name}</div>

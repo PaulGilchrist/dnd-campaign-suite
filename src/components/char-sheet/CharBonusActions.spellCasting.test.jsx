@@ -253,4 +253,11 @@ describe('CharBonusActions - pending popup display', () => {
     expect(screen.getByText(spell.name)).toBeInTheDocument();
     expect(screen.getByText(label)).toBeInTheDocument();
   });
+
+  it('stamps data-testid="castable-row-<slug>" on the bonus spell-name cell', () => {
+    renderWithSpells([bonusSpell({ name: 'Misty Step', level: 2, range: 'Self' })]);
+    const nameCell = screen.getByText('Misty Step');
+    expect(nameCell).toHaveClass('left', 'clickable');
+    expect(nameCell).toHaveAttribute('data-testid', 'castable-row-misty-step');
+  });
 });

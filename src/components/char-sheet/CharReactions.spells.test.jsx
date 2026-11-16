@@ -247,6 +247,16 @@ beforeEach(() => {
     useLoggedDiceRoll.mockReturnValue({ rollAttack, rollDamage: vi.fn() });
 });
 
+describe('CharReactions - castable-row testid (cross-lane discovery)', () => {
+    it('stamps data-testid="castable-row-<slug>" on the reaction spell-name cell', () => {
+        getReactionSpellNames.mockReturnValue(new Set([HELLISH_REBUKE.name]));
+        render(<CharReactions {...propsWithSpell(HELLISH_REBUKE)} />);
+        const nameCell = screen.getByText('Hellish Rebuke');
+        expect(nameCell).toHaveClass('left', 'clickable');
+        expect(nameCell).toHaveAttribute('data-testid', 'castable-row-hellish-rebuke');
+    });
+});
+
 describe('CharReactions - Reaction Spell Row Click Lanes', () => {
     // Damage cell is the SINGLE cast entry point (gateMetamagic); cannotAct must
     // short-circuit it. Heal spells ride the same lane via resolveHealExpression.

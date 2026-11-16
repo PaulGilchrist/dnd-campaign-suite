@@ -4,6 +4,7 @@ import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { getActionSpellNames, applyPotentSpellcasting } from '../../services/ui/spellSectionUtils.js'
+import { castableRowTestId } from '../../services/shared/castableRowTestId.js'
 import { formatRange, formatWeaponRange, signFormatter, getAttackSpellLevel } from '../../services/ui/formatUtils.js'
 import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from '../../services/rules/core/spellDamageUtils.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -567,7 +568,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                     {actionSpells.map((spell) => {
                         const { damageType, resolvedDamage, autoHit, isSpellAtk, hasAttackType, attackItem } = resolveActionSpellRow(spell, playerStats);
                         return <React.Fragment key={spell.name}>
-                            <div className='left clickable' title='Open spell details to cast' onClick={() => handleActionSpellClick(spell.name)}><i className="fa-solid fa-wand-magic-sparkles spell-cast-icon" aria-hidden="true"></i>{spell.name}</div>
+                            <div className='left clickable' title='Open spell details to cast' data-testid={castableRowTestId(spell.name)} onClick={() => handleActionSpellClick(spell.name)}><i className="fa-solid fa-wand-magic-sparkles spell-cast-icon" aria-hidden="true"></i>{spell.name}</div>
                             <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                             <div>{formatRange(spell.range)}</div>
                             {renderActionSpellHitCell({ autoHit, isSpellAtk, hasAttackType, cannotAct, conditionAttackMode, toHit: playerStats.spellAbilities?.toHit, exhaustionPenalty, saveDc: playerStats.spellAbilities?.saveDc, displaySaveDcBonus, dcType: spell.dc?.dc_type, attackItem, handleSpellAttackClick })}

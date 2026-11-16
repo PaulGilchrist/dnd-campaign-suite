@@ -10,6 +10,7 @@ import SpellTargetPopups from './SpellTargetPopups.jsx'
 import CreatureTargetPopups from './CreatureTargetPopups.jsx'
 import TargetSpellPopups from './TargetSpellPopups.jsx'
 import { getExcludedSpellNames, isSpellBreakerBonusActionSpell } from '../../../services/ui/spellSectionUtils.js'
+import { castableRowTestId } from '../../../services/shared/castableRowTestId.js'
 import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../../hooks/combat/useSpellUpcastFlow.js'
 import { useSpellCastExecutor } from '../../../hooks/combat/useSpellCastExecutor.js';
@@ -119,7 +120,7 @@ function SpellRow({ spell, is2024, isWizard, showPreparedColumn, setSelectedSpel
     // prepared spells, so nothing is ever grayed.
     const isGrayedNonCastable = is2024 && isWizard && !isPrepared && !spell.ritual;
     return <tr key={spell.name} className={isGrayedNonCastable ? 'spell-row-not-castable' : ''}>
-        <td className={`left spell-name ${isGrayedNonCastable ? 'not-castable' : 'clickable'}`} title={isGrayedNonCastable ? 'Not prepared' : undefined} onClick={() => { if (!isGrayedNonCastable) setSelectedSpell(spell); }}>{spell.name}</td>
+        <td className={`left spell-name ${isGrayedNonCastable ? 'not-castable' : 'clickable'}`} title={isGrayedNonCastable ? 'Not prepared' : undefined} data-testid={castableRowTestId(spell.name)} onClick={() => { if (!isGrayedNonCastable) setSelectedSpell(spell); }}>{spell.name}</td>
         <td>{spell.level === 0 ? 'Cantrip' : spell.level}</td>
         {showPreparedColumn && <SpellPreparedCell spell={spell} handleTogglePreparedSpells={handleTogglePreparedSpells} />}
         <td>{formatSpellCastingTime(playerStats, spell)}</td>

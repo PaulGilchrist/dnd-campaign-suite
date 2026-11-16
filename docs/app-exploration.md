@@ -99,8 +99,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-15 (RB): 2024 caster spell-row routing differs across fixtures with no visible rule — WC's `Revivify` rides the Actions grid (`div.left.clickable`) while WSD's same-casting-time `Enhance Ability`/`Stone Skin` land only in the Spells table (`.spell-name.clickable`); sheet-lane probes must census BOTH lanes per caster (an Actions-grid-keyed "row missing" reading is a FALSE NEGATIVE — the fix-run's EA/SS rides reached the table via the row's `title="Open spell details to cast"`). A stable `data-testid` per castable row or a documented routing rule would halve discovery cost.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - HoUoM + Revivification lanes' strip-unconscious LEGS not re-mounted live (shared `stripUnconsciousOnRevive` lived via the Revivify lane + non-revive control; 122 unit pins across the 3 lanes; the lanes' merged-batch shapes themselves byte-verified OV/NP/PW/QY).

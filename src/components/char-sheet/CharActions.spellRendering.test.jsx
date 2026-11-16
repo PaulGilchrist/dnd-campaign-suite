@@ -396,6 +396,7 @@ describe('CharActions spell rendering', () => {
     const nameCell = screen.getByText('Fire Bolt');
     expect(nameCell).toHaveClass('left', 'clickable');
     expect(nameCell).toHaveAttribute('title', 'Open spell details to cast');
+    expect(nameCell).toHaveAttribute('data-testid', 'castable-row-fire-bolt');
     const icon = nameCell.querySelector('i.fa-solid.fa-wand-magic-sparkles');
     expect(icon).toBeInTheDocument();
     expect(icon).toHaveClass('spell-cast-icon');
@@ -411,6 +412,7 @@ describe('CharActions spell rendering', () => {
     const nameCell = screen.getByText('Longsword');
     expect(nameCell.querySelector('i')).toBeNull();
     expect(nameCell).not.toHaveAttribute('title');
+    expect(nameCell).not.toHaveAttribute('data-testid');
   });
 
   it('routes a save-DC attack-row damage click to resolveSpellDamage', async () => {

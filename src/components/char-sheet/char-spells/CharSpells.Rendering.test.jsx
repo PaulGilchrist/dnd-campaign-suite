@@ -146,6 +146,25 @@ describe('CharSpells - spell row rendering', () => {
     isSpellBreakerBonusActionSpell.mockImplementation(() => false);
   });
 
+  describe('castable-row testids (cross-lane discovery)', () => {
+    it('stamps data-testid="castable-row-<slug>" on the clickable spell-name cell', () => {
+      renderWithSpells([makeSpell({ name: 'Enhance Ability' })]);
+      const cell = screen.getByText('Enhance Ability');
+      expect(cell).toHaveClass('spell-name', 'clickable');
+      expect(cell).toHaveAttribute('data-testid', 'castable-row-enhance-ability');
+    });
+
+    it('stamps grayed non-prepared wizard rows with the same slug value (class carries state)', () => {
+      renderWithSpells(
+        [makeSpell({ name: 'Stone Skin', prepared: 'Not', ritual: false })],
+        { stats: { rules: '2024', class: { name: 'Wizard' } } }
+      );
+      const cell = screen.getByText('Stone Skin');
+      expect(cell).toHaveClass('not-castable');
+      expect(cell).toHaveAttribute('data-testid', 'castable-row-stone-skin');
+    });
+  });
+
   describe('effect column', () => {
     it.each`
       dc_success   | dcType   | expected
