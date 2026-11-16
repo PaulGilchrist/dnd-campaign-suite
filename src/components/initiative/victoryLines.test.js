@@ -20,7 +20,12 @@ const stamp = (overrides) => ({
 describe('buildVictoryLines', () => {
     it('foes line: singular at 1, plural otherwise, omitted entirely at 0', () => {
         expect(buildVictoryLines(stamp({ foes: 1, defeated: 1 })))
-            .toContain('All 1 foe defeated')
+            .toContain('1 foe defeated')
+        const lone = buildVictoryLines(stamp({ foes: 1, defeated: 1 }))
+        expect(lone.some(l => l.includes('All'))).toBe(false)
+        expect(lone).toContain('13 of 13 heroes standing')
+        expect(buildVictoryLines(stamp({ foes: 2, defeated: 2 })))
+            .toContain('All 2 foes defeated')
         expect(buildVictoryLines(stamp({ foes: 3, defeated: 3 })))
             .toContain('All 3 foes defeated')
         const noFoes = buildVictoryLines(stamp({ foes: 0, defeated: 0 }))

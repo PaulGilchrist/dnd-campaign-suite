@@ -14,7 +14,9 @@ export function buildVictoryLines(result) {
         const fled = Math.max(0, result.foes - defeated)
         lines.push(fled > 0
             ? `${count(defeated, 'foe')} defeated · ${fled} drove off`
-            : `All ${count(result.foes, 'foe')} defeated`)
+            : result.foes === 1
+                ? `${count(result.foes, 'foe')} defeated`
+                : `All ${count(result.foes, 'foe')} defeated`)
     }
     if (result.partySize > 0) {
         lines.push(`${result.survivors} of ${result.partySize} heroes standing`)
