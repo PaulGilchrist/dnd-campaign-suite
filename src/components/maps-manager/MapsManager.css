@@ -75,6 +75,21 @@
     font-size: 13px;
 }
 
+/* Row activate/deactivate confirmation (backlog 2026-11-16 WK: the toggle was
+   feedback-silent). Rides the shared useEphemeralToast lane; tokens mirror the
+   .maps-manager-error banner above in the global success pair — the same
+   --background-color-success/--color-success used by CampaignSelection's
+   .success-message — so no new theme variables are introduced. */
+.maps-manager-notice {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color-success);
+    border-radius: 4px;
+    background-color: var(--background-color-success);
+    color: var(--color-success);
+    font-size: 13px;
+}
+
 /* Loading state */
 .maps-manager-loading {
     padding: 24px;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import useSSEEqualityGuard from '../../hooks/runtime/useSSEEqualityGuard.js';
+import useEphemeralToast from '../map/hooks/useEphemeralToast.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
@@ -135,6 +136,22 @@ function DescriptionEditModal({ map, description, onDescriptionChange, loading, 
     );
 }
 
+// Row activate/deactivate notice — display-only ephemeral sink mirroring the
+// shared useEphemeralToast lane's null-when-idle contract (CampaignSelection's
+// DeleteNotice / MapNoticeToast.jsx). Backlog 2026-11-16 WK: toggling active
+// status was feedback-silent — the only confirmation was the row button
+// flipping Activate↔Deactivate, which once lagged a beat behind the server.
+// The producer fires show() ONLY after the server PUT resolves, so the notice
+// reflects server truth, never local optimism.
+function MapToggleNotice({ message }) {
+    if (!message) return null;
+    return (
+        <div className="maps-manager-notice" role="status">
+            <i className="fa-solid fa-circle-check" aria-hidden="true" /> {message}
+        </div>
+    );
+}
+
 function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     const [maps, setMaps] = useState([]);
     const setMapsGuarded = useSSEEqualityGuard(setMaps);
@@ -154,6 +171,10 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     const [savingDescription, setSavingDescription] = useState(false);
     const [regeneratingMap, setRegeneratingMap] = useState(null);
     const [regenerating, setRegenerating] = useState(false);
+    // Shared ephemeral-toast lane (display-only auto-hide, benign-UI timer):
+    // fires the activate/deactivate confirmations (MapToggleNotice sink).
+    // 4000ms mirrors CampaignSelection's post-delete notice duration.
+    const { message: toggleNotice, show: showToggleNotice } = useEphemeralToast(4000);
 
     const generateModalOpeners = { indoor: setShowGenerateModal, outdoor: setShowTerrainModal };
 
@@ -243,10 +264,15 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
         }
     };
 
-    const handleActivate = async (fileName) => {
+    // Confirmation rides the shared ephemeral-toast lane and fires only AFTER
+    // the awaited server response (never optimistic) — backlog 2026-11-16 WK.
+    // Failures keep the persistent `.maps-manager-error` banner with the
+    // server's verbatim refusal copy (an honest error notice, not silence).
+    const handleActivate = async (fileName, mapName) => {
         try {
             setError(null);
             await mapsService.activateMap(campaignName, fileName);
+            showToggleNotice(`Map "${mapName || fileName}" activated`);
             await loadMapsList();
         } catch (err) {
             setError(err.message || 'Failed to activate map');
@@ -256,10 +282,11 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
     // Deactivate twin of handleActivate (backlog 2026-11-04 CQ): clears the
     // server's active map (memory + '__map__' + SSE). The awaited list reload
     // renders the flip immediately (SSE covers other tabs without a reload).
-    const handleDeactivate = async (fileName) => {
+    const handleDeactivate = async (fileName, mapName) => {
         try {
             setError(null);
             await mapsService.deactivateMap(campaignName, fileName);
+            showToggleNotice(`Map "${mapName || fileName}" deactivated`);
             await loadMapsList();
         } catch (err) {
             setError(err.message || 'Failed to deactivate map');
@@ -457,7 +484,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                 </button>
             </div>
 
-            {error && <div className="maps-manager-error">{error}</div>}
+            {error && <div className="maps-manager-error" role="status">{error}</div>}
+
+            <MapToggleNotice message={toggleNotice} />
 
             {loading && <div className="maps-manager-loading">Loading maps...</div>}
 
@@ -524,9 +553,9 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                     inactive rows keep Activate — one toggle button per row,
                                     same class/aria conventions as every sibling action. */}
                                 {map.isActive ? (
-                                    <button onClick={() => handleDeactivate(map.fileName)} aria-label={`Deactivate "${map.name}"`}>Deactivate</button>
+                                    <button onClick={() => handleDeactivate(map.fileName, map.name)} aria-label={`Deactivate "${map.name}"`}>Deactivate</button>
                                 ) : (
-                                    <button onClick={() => handleActivate(map.fileName)} aria-label={`Activate "${map.name}"`}>Activate</button>
+                                    <button onClick={() => handleActivate(map.fileName, map.name)} aria-label={`Activate "${map.name}"`}>Activate</button>
                                 )}
                                 <button onClick={() => handleStartRename(map.fileName, map.name)} aria-label={`Rename "${map.name}"`}>Rename</button>
                                 <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description" aria-label={`Edit description for "${map.name}"`}><i className="fa-solid fa-pen"></i> Description</button>
