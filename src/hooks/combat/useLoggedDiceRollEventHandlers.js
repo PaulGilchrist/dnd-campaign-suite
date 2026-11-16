@@ -259,6 +259,7 @@ function buildSavePopupData({ detail, pending, applyResult, newHp, maxHp, applie
         damageType: pending.damageType,
         targetName: detail.targetName,
         targetCurrentHp: applyResult?.newHp ?? newHp,
+        targetOldHp: applyResult?.oldHp,
         targetMaxHp: maxHp,
         saveDc: detail.saveDc,
         saveType: detail.saveType,

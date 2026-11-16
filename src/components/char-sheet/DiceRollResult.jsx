@@ -435,7 +435,13 @@ function SaveRollNotices({ props, state }) {
 
 function HitOutcomeDetails({ props, state }) {
     const { resistanceNotice, hunterLoreNotice, finalDamage, damageApplied, damageReduced,
-        targetName, targetCurrentHp, interceptedFeature } = props;
+        targetName, targetCurrentHp, targetOldHp, interceptedFeature } = props;
+    // Pre-hit HP comes from the damage applier (applyResult.oldHp). Reconstructing it as
+    // newHp + finalDamage over-reports on lethal blows: applyDamage.js clamps at 0
+    // (Math.max(0, oldHp - damage)), so overkill damage resurfaces as phantom HP.
+    // The addition fallback only covers feeds that never applied damage (immunity popups,
+    // finalDamage 0) where both sides of the transition are already the current value.
+    const preHitHp = targetOldHp ?? targetCurrentHp + finalDamage;
     return (
         <>
             {resistanceNotice && (
@@ -454,9 +460,9 @@ function HitOutcomeDetails({ props, state }) {
             {finalDamage !== undefined && damageApplied && (
               <div className="dice-roll-damage-applied">
                 {damageReduced ? (
-                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong> (reduced from {state.originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
+                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong> (reduced from {state.originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${preHitHp} → ${targetCurrentHp}` : ''}</span>
                 ) : (
-                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
+                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${preHitHp} → ${targetCurrentHp}` : ''}</span>
                 )}
               </div>
             )}
@@ -790,10 +796,13 @@ function SecondaryDamageTotalRow({ finalDamage, damageType, secondaryFinalDamage
     );
 }
 
-function SecondaryDamageAppliedRow({ finalDamage, secondaryFinalDamage, targetName, targetCurrentHp }) {
+function SecondaryDamageAppliedRow({ finalDamage, secondaryFinalDamage, targetName, targetCurrentHp, targetOldHp }) {
+    // Same clamp law as HitOutcomeDetails: prefer the applier's true pre-hit HP over
+    // reconstructing newHp + both legs (overkill on a kill resurfaces as phantom HP).
+    const preHitHp = targetOldHp ?? targetCurrentHp + finalDamage + secondaryFinalDamage;
     return (
         <div className="dice-roll-damage-applied">
-            <span><strong>{finalDamage + secondaryFinalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage + secondaryFinalDamage} → ${targetCurrentHp}` : ''}</span>
+            <span><strong>{finalDamage + secondaryFinalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${preHitHp} → ${targetCurrentHp}` : ''}</span>
         </div>
     );
 }
@@ -801,7 +810,7 @@ function SecondaryDamageAppliedRow({ finalDamage, secondaryFinalDamage, targetNa
 function SecondaryDamageSection({ props }) {
     const { secondaryFormula, secondaryRolls, secondaryModifier, secondaryTotal, secondarySaveResult,
         saveDc, secondaryFinalDamage, finalDamage, damageType, secondaryDamageType,
-        damageApplied, targetName, targetCurrentHp } = props;
+        damageApplied, targetName, targetCurrentHp, targetOldHp } = props;
     if (!secondaryFormula) return null;
     const hasTotals = secondaryFinalDamage !== undefined && finalDamage !== undefined;
     return (
@@ -812,7 +821,7 @@ function SecondaryDamageSection({ props }) {
             </div>
             {secondarySaveResult && <SecondarySaveResultRow secondarySaveResult={secondarySaveResult} saveDc={saveDc} />}
             {hasTotals && <SecondaryDamageTotalRow finalDamage={finalDamage} damageType={damageType} secondaryFinalDamage={secondaryFinalDamage} secondaryDamageType={secondaryDamageType} />}
-            {hasTotals && damageApplied && <SecondaryDamageAppliedRow finalDamage={finalDamage} secondaryFinalDamage={secondaryFinalDamage} targetName={targetName} targetCurrentHp={targetCurrentHp} />}
+            {hasTotals && damageApplied && <SecondaryDamageAppliedRow finalDamage={finalDamage} secondaryFinalDamage={secondaryFinalDamage} targetName={targetName} targetCurrentHp={targetCurrentHp} targetOldHp={targetOldHp} />}
         </div>
     );
 }

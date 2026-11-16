@@ -87,6 +87,7 @@ async function applyForcedSuccessSave({ context, combatSummary, target, characte
         damageType,
         targetName: target.name,
         targetCurrentHp: applyResult?.newHp,
+        targetOldHp: applyResult?.oldHp,
         targetMaxHp,
         saveDc,
         saveType,

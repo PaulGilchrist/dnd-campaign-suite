@@ -111,6 +111,7 @@ describe('giantAncestry Frost\'s Chill (mocked findLastAttack seam)', () => {
                 finalDamage: 5,
                 damageApplied: true,
                 targetName: 'Goblin',
+                targetOldHp: 20,
                 targetCurrentHp: 15,
                 damageType: 'Cold',
             });
@@ -304,6 +305,7 @@ describe('giantAncestry Frost\'s Chill (mocked findLastAttack seam)', () => {
                 finalDamage: 5,
                 damageApplied: true,
                 targetName: 'Goblin',
+                targetOldHp: 20,
                 targetCurrentHp: 15,
                 damageType: 'Cold',
             });

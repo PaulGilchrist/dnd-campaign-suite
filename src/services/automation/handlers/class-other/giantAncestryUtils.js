@@ -68,7 +68,7 @@ export function resolveAncestryUses(playerStats, optName, campaignName) {
 export function applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats }) {
     const characters = cs?.creatures?.filter(c => c.type === 'player') || [];
     const applyResult = applyDamageToTarget(cs, targetName, damageResult?.total ?? 0, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name });
-    return { actualDamage: applyResult?.finalDamage ?? damageResult?.total ?? 0, newHp: applyResult?.newHp };
+    return { actualDamage: applyResult?.finalDamage ?? damageResult?.total ?? 0, oldHp: applyResult?.oldHp, newHp: applyResult?.newHp };
 }
 
 export async function logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula, damageResult }) {
@@ -86,7 +86,7 @@ export async function logAncestryDamageRoll({ campaignName, playerStats, optName
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
 }
 
-export function ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName, newHp, damageType }) {
+export function ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName, oldHp, newHp, damageType }) {
     return {
         type: 'popup',
         payload: {
@@ -99,6 +99,7 @@ export function ancestryDamagePopup({ optName, formula, damageResult, actualDama
             damageApplied: true,
             targetName,
             targetCurrentHp: newHp,
+            targetOldHp: oldHp,
             damageType,
         },
     };

@@ -101,6 +101,7 @@ describe('giantAncestry Fire\'s Burn (mocked findLastAttack seam)', () => {
                 finalDamage: 5,
                 damageApplied: true,
                 targetName: 'Goblin',
+                targetOldHp: 20,
                 targetCurrentHp: 15,
                 damageType: 'Fire',
             });
@@ -237,6 +238,7 @@ describe('giantAncestry Fire\'s Burn (mocked findLastAttack seam)', () => {
                 finalDamage: 5,
                 damageApplied: true,
                 targetName: 'Goblin',
+                targetOldHp: 20,
                 targetCurrentHp: 15,
                 damageType: 'Fire',
             });

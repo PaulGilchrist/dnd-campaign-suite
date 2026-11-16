@@ -67,11 +67,11 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
+    const { actualDamage, oldHp, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
 
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
 
-    return ancestryDamagePopup({ optName, formula: opt.damage, damageResult, actualDamage, targetName, newHp, damageType });
+    return ancestryDamagePopup({ optName, formula: opt.damage, damageResult, actualDamage, targetName, oldHp, newHp, damageType });
 }
 
 export async function handleFrostsChill(action, playerStats, campaignName, option) {
@@ -95,14 +95,14 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
+    const { actualDamage, oldHp, newHp } = applyAncestryDamage({ cs, targetName, damageResult, damageType, campaignName, playerStats });
 
     await applySpeedReductionEffect(targetName, optName, speedReduction, campaignName, playerStats.name);
 
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName, damageType, actualDamage, formula: opt.damage, damageResult });
     await logSpeedReductionCondition(campaignName, playerStats, optName, targetName, speedReduction);
 
-    return ancestryDamagePopup({ optName, formula: opt.damage, damageResult, actualDamage, targetName, newHp, damageType });
+    return ancestryDamagePopup({ optName, formula: opt.damage, damageResult, actualDamage, targetName, oldHp, newHp, damageType });
 }
 
 // CLA-169: rides the shared Fire's Burn / Frost's Chill lane — attackerRollGate
@@ -266,7 +266,7 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
     const damageType = opt.damageType || 'Thunder';
 
     const cs = await getCombatContext(campaignName);
-    const { actualDamage, newHp } = applyAncestryDamage({ cs, targetName: attackerName, damageResult, damageType, campaignName, playerStats });
+    const { actualDamage, oldHp, newHp } = applyAncestryDamage({ cs, targetName: attackerName, damageResult, damageType, campaignName, playerStats });
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -277,5 +277,5 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
 
     await logAncestryDamageRoll({ campaignName, playerStats, optName, targetName: attackerName, damageType, actualDamage, formula, damageResult });
 
-    return ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName: attackerName, newHp, damageType });
+    return ancestryDamagePopup({ optName, formula, damageResult, actualDamage, targetName: attackerName, oldHp, newHp, damageType });
 }

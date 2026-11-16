@@ -482,6 +482,7 @@ function buildPlainPopupData({ name, formula, rolls, modifier, context, target, 
 function applyPopupApplyResult(popupData, { applyResult, appliedDamage, targetMaxHp, isIntercepted }) {
     if (!applyResult) return;
     popupData.targetCurrentHp = applyResult.newHp;
+    popupData.targetOldHp = applyResult.oldHp;
     popupData.targetMaxHp = targetMaxHp;
     popupData.damageApplied = true;
     popupData.finalDamage = appliedDamage || applyResult.finalDamage;

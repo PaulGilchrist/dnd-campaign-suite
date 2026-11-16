@@ -38,6 +38,7 @@ function buildPotentHalfPopup({ name, formula, damageResult, applyResult, target
         damageType,
         targetName,
         targetCurrentHp: applyResult?.newHp,
+        targetOldHp: applyResult?.oldHp,
         targetMaxHp,
         saveDc,
         saveType,

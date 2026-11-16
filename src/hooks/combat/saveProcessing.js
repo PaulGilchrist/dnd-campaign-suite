@@ -1451,6 +1451,16 @@ function buildSaveDamageLogData({ attackerName, context, damageFormula, damageRe
     };
 }
 
+// Split per the MA-0087 complexity-ceiling model: the popup builder reads the
+// player/NPC HP mirror exactly once here (graze twin: attackPostProcessing's
+// resolveGrazeTargetMaxHp).
+function resolveSavePopupTargetMaxHp({ context, targetName }) {
+    if (!targetName) return undefined;
+    return context._target?.type === 'player'
+        ? (getRuntimeValue(targetName, 'hitPoints') ?? 0)
+        : context._target?.maxHp ?? 0;
+}
+
 function buildSaveDamagePopupData({ context, damageFormula, damageResult, finalDamage, damageType, applyTarget, applyResult, targetName, effectiveD20ForSave, saveTotal, saveSuccess, saveDc, saveType }) {
     return {
         type: 'save-damage',
@@ -1463,7 +1473,8 @@ function buildSaveDamagePopupData({ context, damageFormula, damageResult, finalD
         damageType: damageType,
         targetName: applyTarget,
         targetCurrentHp: applyResult?.newHp,
-        targetMaxHp: targetName ? (context._target?.type === 'player' ? (getRuntimeValue(targetName, 'hitPoints') ?? 0) : context._target?.maxHp ?? 0) : undefined,
+        targetOldHp: applyResult?.oldHp,
+        targetMaxHp: resolveSavePopupTargetMaxHp({ context, targetName }),
         saveDc,
         saveType,
         dcSuccess: context?.dcSuccess,

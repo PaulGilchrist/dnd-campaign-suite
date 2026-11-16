@@ -220,6 +220,7 @@ function buildQuickRollSavePopup({ pending, target, saveResult, finalDamage, app
         damageType: pending.damageType,
         targetName: target.name,
         targetCurrentHp: applyResult?.newHp,
+        targetOldHp: applyResult?.oldHp,
         targetMaxHp: target.type === 'player'
             ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
             : target.maxHp,

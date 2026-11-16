@@ -232,7 +232,7 @@ async function rollAndApplySecondarySaveDamage({ context, combatSummary, target,
         endInvisibilityOnHostileAction(characterName, campaignName);
     }
     const secondaryResult = buildSecondaryResult({ secondaryName, secondaryFormula, secondaryRollResult, secondaryTotal, secondaryDamageType, secondaryFinalDamage, secondaryApplyResult, secondarySaveResult, isSoulstitchProtected, dcSuccess: context.dcSuccess });
-    return { secondaryResult, secondaryFinalDamage };
+    return { secondaryResult, secondaryFinalDamage, secondaryOldHp: secondaryApplyResult?.oldHp };
 }
 
 function applyFailedSaveConditions({ context, target, targetCharacter, combatSummary, characterName, campaignName }) {
@@ -526,6 +526,10 @@ function buildSavePopupData({ name, formula, rolls, modifier, target, saveResult
         damageType,
         targetName: target.name,
         targetCurrentHp: newHp,
+        // Pre-hit HP: primaryApplyResult.oldHp is exact for single-leg rows; the caller
+        // overrides it with the earlier secondary leg's oldHp on dual-damage rows (the
+        // secondary applies BEFORE the primary here, unlike saveProcessing's order).
+        targetOldHp: primaryApplyResult?.oldHp,
         targetMaxHp,
         saveDc,
         saveType,
@@ -688,7 +692,7 @@ export function createNpcSaveDamageHandler(deps) {
         });
         const ignoreResistance = playerStats ? hasIgnoreResistance(playerStats, damageType) : false;
 
-        const { secondaryResult, secondaryFinalDamage } = await rollAndApplySecondarySaveDamage({
+        const { secondaryResult, secondaryFinalDamage, secondaryOldHp } = await rollAndApplySecondarySaveDamage({
             context, combatSummary, target, saveResult, advantage, isSoulstitchProtected, hasPotentFlag, isCantripFlag, characters, campaignName, characterName, name,
         });
 
@@ -711,6 +715,9 @@ export function createNpcSaveDamageHandler(deps) {
         await triggerViciousMockeryOnFailedSave(saveResult, context, target, campaignName, saveDc);
 
         const popupData = buildSavePopupData({ name, formula, rolls, modifier, target, saveResult, saveDc, saveType, dcSuccess, damageType, adjustedTotal, newHp, targetMaxHp, disadvantage, advantage, isCrit, gwfBaseRolls, gwfDisplayRolls, isSoulstitchProtected, primaryFinalDamage, primaryApplyResult });
+        // Dual-damage rows: the secondary leg applied BEFORE the primary, so the true
+        // pre-hit HP for the popup's transition is the secondary leg's oldHp.
+        if (secondaryResult) popupData.targetOldHp = secondaryOldHp ?? popupData.targetOldHp;
         assignSecondaryFields(popupData, secondaryResult, SECONDARY_POPUP_SUFFIXES);
 
         storeSaveLastAttack({ context, campaignName, target, saveResult, saveType, saveDc, formula, name, damageType, adjustedTotal, isSoulstitchProtected, primaryFinalDamage, characterName });
