@@ -174,7 +174,7 @@ describe('MA-0070 MonsterCardModal brass dragon legendary gated rows', () => {
       actions: brassActions(),
       legendary_actions: brass().legendary_actions,
     });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Brass Dragon 1', creatures: CREATURES })} />);
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Brass Dragon 1', creatures: [...CREATURES, { name: 'Adult Brass Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 172, maxHp: 172, ac: 19, conditions: [] }] })} />);
   }
   function legendaryRowLink(name) {
     return Array.from(document.querySelectorAll('.mc-dice-link-legendary')).find(el => el.closest('div')?.textContent.includes(name)) || null;
@@ -276,7 +276,7 @@ describe('MA-0081 MonsterCardModal bronze dragon legendary gated rows', () => {
       actions: bronzeActions(),
       legendary_actions: bronze().legendary_actions,
     });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Bronze Dragon 1', creatures: CREATURES })} />);
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Bronze Dragon 1', creatures: [...CREATURES, { name: 'Adult Bronze Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 189, maxHp: 189, ac: 19, conditions: [] }] })} />);
   }
   function bronzeRow(name) {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
@@ -371,7 +371,7 @@ describe('MA-0092 MonsterCardModal copper dragon legendary gated rows', () => {
       actions: copperActions(),
       legendary_actions: copper().legendary_actions,
     });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Copper Dragon 1', creatures: CREATURES })} />);
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Copper Dragon 1', creatures: [...CREATURES, { name: 'Adult Copper Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 182, maxHp: 182, ac: 18, conditions: [] }] })} />);
   }
   function copperRow(name) {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
@@ -478,7 +478,7 @@ describe('MA-0103 MonsterCardModal gold dragon legendary gated rows', () => {
       actions: goldActions(),
       legendary_actions: gold().legendary_actions,
     });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Gold Dragon 1', creatures: CREATURES })} />);
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Gold Dragon 1', creatures: [...CREATURES, { name: 'Adult Gold Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 256, maxHp: 256, ac: 19, conditions: [] }] })} />);
   }
   function goldRow(name) {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));
@@ -582,7 +582,7 @@ describe('MA-0113 MonsterCardModal green dragon legendary gated rows', () => {
       actions: greenActions(),
       legendary_actions: green().legendary_actions,
     });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Green Dragon 1', creatures: CREATURES })} />);
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Green Dragon 1', creatures: [...CREATURES, { name: 'Adult Green Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 207, maxHp: 207, ac: 19, conditions: [] }] })} />);
   }
   function greenRow(name) {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes(name));

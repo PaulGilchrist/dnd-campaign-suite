@@ -965,6 +965,25 @@ function psychicStrikePreconditionFailed(name, target, allTargetEffects) {
   return false;
 }
 
+// TA-1116 unarmed-attack law (hoisted — handleAttack sits at the complexity
+// ceiling): a normal attack chip pressed with NO armed target used to roll
+// real dice, log a dangling `roll attack` row missing targetName/hit, and pop
+// a verdict-less panel (isAutoMiss:false). The press now refuses LOUD through
+// the MA-0049 no-target popup lane (the same [data-testid=popup-overlay] +
+// Done lane the sheet cannotAct gate went through in 1326072e1) with ZERO
+// roll, ZERO log rows and ZERO runtime writes. OA presses carry the pinned
+// marked-mover target and are unaffected; armed presses are byte-identical.
+// Ordered AFTER the Psychic Strike legacy-alert lane so that row's pinned
+// alert survives (interaction.test.jsx).
+function attackPressPreconditionRefused({ actionName, target, monsterName, allTargetEffects, setPopupHtml }) {
+  if (psychicStrikePreconditionFailed(actionName, target, allTargetEffects)) return true;
+  if (!target?.name) {
+    setPopupHtml(buildNoTargetRefusalPopup({ monsterName, actionName, rollNoun: 'attack' }));
+    return true;
+  }
+  return false;
+}
+
 function computeGrazeSettings(isMeleeAttack, monsterCharacter) {
   if (!isMeleeAttack || !monsterCharacter?.computedStats) return { grazeDamage: false, grazeAbilityMod: 0 };
   const weaponMastery = monsterCharacter.computedStats.automation?.passives?.find(p => p.type === 'weapon_mastery_choice');
@@ -2609,7 +2628,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     // that provoked the reaction IS the attack's occasion). Normal chip
     // presses (oaContext === null) keep resolution-time arming untouched.
     const target = resolvePressTarget(oaContext, getTarget);
-    if (psychicStrikePreconditionFailed(name, target, allTargetEffects)) return;
+    if (attackPressPreconditionRefused({ actionName: name, target, monsterName, allTargetEffects, setPopupHtml })) return;
 
     // CLA-036 lane (a): Bestial Fury double-strike economy — the Fury-stamped
     // Beast's Strike chip consumes one of the command's 2 strikes per press;

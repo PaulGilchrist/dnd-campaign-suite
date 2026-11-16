@@ -66,7 +66,7 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', async (importAct
 });
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => {
-  let _attackerReturn = { name: 'Goblin', conditions: [] };
+  let _attackerReturn = { name: 'Goblin', conditions: [], targetName: 'Player A' };
   return {
     extractDamageTypes: vi.fn(() => []),
     formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
@@ -164,7 +164,7 @@ function renderCard(characters = [SPEEDY_CHARACTER]) {
   const m = makeMonster({ actions: [SCIMITAR] });
   render(<MonsterCardModal {...makeProps(m, {
     creatures: [
-      { name: 'Goblin', conditions: [], targetName: null },
+      { name: 'Goblin', conditions: [], targetName: 'Player A' },
       { name: 'Player A', type: 'player', currentHp: 9 },
     ],
     characters,

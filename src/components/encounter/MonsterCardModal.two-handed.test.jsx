@@ -219,10 +219,8 @@ describe('MA-0325 offer forwarding at the chip press', () => {
       ? diskRow('Azer', 'Warhammer')
       : { name: 'Club', attack_bonus: 4, description: 'Melee Weapon Attack.', reach: '5 ft.', damage_dice_primary: '1d4 + 2', damage_type_primary: 'bludgeoning' };
     const m = makeMonster({ name, actions: [action] });
-    damageUtils.__setFindCreatureReturn({ name: instance, targetName: attackName === 'Warhammer' ? 'AberrantSorcerer' : null, conditions: [] });
-    const creatures = attackName === 'Warhammer'
-      ? [{ name: instance, targetName: 'AberrantSorcerer' }, { name: 'AberrantSorcerer', type: 'player' }]
-      : [{ name: instance }];
+    damageUtils.__setFindCreatureReturn({ name: instance, targetName: 'AberrantSorcerer', conditions: [] });
+    const creatures = [{ name: instance, targetName: 'AberrantSorcerer' }, { name: 'AberrantSorcerer', type: 'player' }];
     render(<MonsterCardModal {...makeProps(m, { creatures, creatureName: instance })} />);
     clickChipLink(chip);
     expect(rollAttack).toHaveBeenCalledTimes(1);

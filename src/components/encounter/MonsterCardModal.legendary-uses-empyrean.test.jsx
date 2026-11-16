@@ -112,7 +112,7 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
 const CREATURES = [
-  { name: 'Empyrean 1', type: 'npc', currentHp: 346, maxHp: 346, ac: 19, conditions: [] },
+  { name: 'Empyrean 1', type: 'npc', targetName: 'AasimarTest', currentHp: 346, maxHp: 346, ac: 19, conditions: [] },
   { name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 11, ac: 12, conditions: [] },
   { name: 'Bandit 2', type: 'npc', currentHp: 11, maxHp: 11, ac: 12, conditions: [] },
   { name: 'AasimarTest', type: 'player', currentHp: 200, maxHp: 200, ac: 20, conditions: [] },

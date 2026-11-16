@@ -45,6 +45,12 @@ describe('MA-0049 no-target refusal builders', () => {
     );
   });
 
+  it('attack-noun copy (TA-1116): same lane, "No attack rolled", no save-lane AoE parenthetical', () => {
+    expect(buildNoTargetRefusalPopup({ monsterName: 'Goblin 1', actionName: 'Scimitar', rollNoun: 'attack' })).toBe(
+      '<div class="mc-no-target-refusal"><h3>No Target</h3><p>Goblin 1 cannot use Scimitar — no target is armed on Goblin 1\'s initiative card. Arm a target on the initiative card first. No attack rolled, nothing spent.</p></div>'
+    );
+  });
+
   it('log is <action-slug>_refused — exact shape, "(no target)" zero-spend description', () => {
     const { timestamp, ...log } = buildNoTargetRefusalLog({ monsterName: 'Adult Blue Dracolich 1', actionName: 'Frightful Presence' });
     expect(timestamp).toEqual(expect.any(Number));

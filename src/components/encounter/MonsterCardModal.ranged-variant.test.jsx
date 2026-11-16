@@ -319,8 +319,8 @@ describe('MA-0436 offer forwarding at the chip press', () => {
 
   it('forwards a null offer for melee-only rows', () => {
     const m = makeMonster({ name: 'Goblin', actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Weapon Attack.', reach: '5 ft.', damage_dice_primary: '1d4 + 2', damage_type_primary: 'bludgeoning' }] });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', targetName: null, conditions: [] });
-    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin' }] })} />);
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', targetName: 'Bandit 1', conditions: [] });
+    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Bandit 1' }, { name: 'Bandit 1', type: 'npc' }] })} />);
     clickChipLink('+4');
     expect(rollAttack.mock.calls[0][2].rangedVariantOffer).toBeNull();
   });

@@ -3072,8 +3072,13 @@ export function formatActionUsage(usage) {
 
 // MA-0049: save-row safety gate — a single-target block save clicked with no
 // armed target refuses instead of degrading to a self-target roll.
-export function buildNoTargetRefusalPopup({ monsterName, actionName }) {
-  return `<div class="mc-no-target-refusal"><h3>No Target</h3><p>${monsterName} cannot use ${actionName} — no target is armed on ${monsterName}'s initiative card. Arm a target on the initiative card first (AoE rows pick their own area targets). No save rolled, nothing spent.</p></div>`;
+// TA-1116: the same loud lane now also fronts the ATTACK-chip press (rollNoun
+// 'attack'); the save copy stays byte-identical (default), the AoE parenthetical
+// is save-lane-only because attack chips never own an area picker.
+export function buildNoTargetRefusalPopup({ monsterName, actionName, rollNoun = 'save' }) {
+  const isSave = rollNoun !== 'attack';
+  const aoeNote = isSave ? ' (AoE rows pick their own area targets)' : '';
+  return `<div class="mc-no-target-refusal"><h3>No Target</h3><p>${monsterName} cannot use ${actionName} — no target is armed on ${monsterName}'s initiative card. Arm a target on the initiative card first${aoeNote}. No ${isSave ? 'save' : 'attack'} rolled, nothing spent.</p></div>`;
 }
 
 export function buildNoTargetRefusalLog({ monsterName, actionName }) {
