@@ -205,7 +205,7 @@ describe('healingHandler targeted lane (handleUsesHealing / handleFlatHeal)', ()
       expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(ps, 'Ally', 5, campaignName);
       // Quirk: this lane writes uses WITHOUT the skipSync flag (the self
       // lane writes with skipSync=true — healingHandler.test.js).
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHealer', 'healinghandsUses', 0, campaignName);
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHealer', 'healingHandsUses', 0, campaignName);
       expect(result.payload.description).toBe('Healing Hands on Ally: 3d4=5 (5) — Regained 5 HP (no uses remaining).');
       expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, {
         targetName: 'Ally',
@@ -230,7 +230,7 @@ describe('healingHandler targeted lane (handleUsesHealing / handleFlatHeal)', ()
       const result = await handle(action, ps, campaignName, null);
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHealer', 'restorativetouchUses', 2, campaignName);
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHealer', 'restorativeTouchUses', 2, campaignName);
       expect(result.payload.description).toBe('Restorative Touch on Ally: 1d8=5 (5) — Regained 5 HP (2 uses remaining).');
     });
 

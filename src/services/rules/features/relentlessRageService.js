@@ -12,10 +12,7 @@ import { addEntry } from '../../ui/logService.js';
 import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import utils from '../../ui/utils.js';
-
-function getRuntimeUsesKey(featureName) { // demoted #1402 (dead-export batch): ZERO external importers — sole caller checkRelentlessRage :152 (latch reader) + :242 (writer share the byte); test pins ride the public checkRelentlessRage surface (helpers lane, #82-class)
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-}
+import { getRuntimeUsesKey } from '../../shared/usesKey.js';
 
 function getBarbarianLevel(playerComputed) {
     return playerComputed?.class?.class_levels?.find(

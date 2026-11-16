@@ -61,7 +61,7 @@ function resetFlags(name, campaignName, entries) {
 //
 // Every OTHER LONG_REST_RESOURCES key keeps the unconditional null fan-out:
 // it is the CLA-130 batch safety net that re-arms handler-owned latches
-// (`tranceOfOrderUses`, `warriorofthegodsPool`, `warpingimplosionUses`, the
+// (`tranceOfOrderUses`, `warriorofthegodsPool`, `warpingImplosionUses`, the
 // automation-derived `*Uses` counters — see trackedResources.js
 // HANDLER_OWNED_LATCH_KEYS) which are deliberately NEVER in
 // `_trackedResources` even for their owners — gating them here by
@@ -228,7 +228,7 @@ async function resetSpellThiefTracking(name, playerStats, charData, campaignName
   )
   if (!hasSpellThief) return
 
-  charData.spellthiefUses = 1
+  charData.spellThiefUses = 1
   const blockList = getRuntimeValue(name, '_spellThiefBlockedList', campaignName)
   if (blockList) {
     const entries = JSON.parse(blockList)

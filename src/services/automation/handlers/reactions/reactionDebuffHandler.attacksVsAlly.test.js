@@ -33,7 +33,7 @@
 //      value and uses max') — this lane pins the setRuntimeValue spendUse channel instead.
 //  - .wardingFlare.test.js:            disadvantage_next_attack te-producer
 //      ('spends one use and writes te disadvantage_next_attack...' — its own
-//      wardingflareUses key; blesseddefenderUses stays this lane's).
+//      wardingFlareUses key; blessedDefenderUses stays this lane's).
 //
 // KNOWN PRODUCTION DEFECT (reported, source NOT touched per task): handleAttacksVsAlly
 // calls resolveMapPositions(campaignName, playerName) — 2 args, real signature is
@@ -339,7 +339,7 @@ describe('reactionDebuffHandler — attacks-vs-ally gate (disadvantage_on_attack
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Paladin',
-        'blesseddefenderUses',
+        'blessedDefenderUses',
         0,
         campaignName
       );

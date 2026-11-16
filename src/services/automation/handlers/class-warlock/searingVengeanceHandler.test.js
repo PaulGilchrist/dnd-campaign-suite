@@ -3,7 +3,7 @@
 // - handle() routing: exhausted-uses popup, no-combat popup (the handle() twin —
 //   ConfirmPath owns the at-confirm one), 0 HP gate table (alive / dead-flagged /
 //   out-of-range each popup, no use consumed), modal-open payload shape.
-// - use consumption at confirm: searingvengeanceUses 1→0 pin. The '2d8+3'
+// - use consumption at confirm: searingVengeanceUses 1→0 pin. The '2d8+3'
 //   rollExpression pin here is use-consumption smoke only — ConfirmPath is the
 //   canonical CHA resolution table authority.
 // - blinded expiration fanout: full-args addExpiration pin (ConfirmPath pins
@@ -100,7 +100,7 @@ function makeAction(automation = {}) {
 
 function mockRuntimeValues(values) {
   useRuntimeState.getRuntimeValue.mockImplementation((_subject, key) => {
-    if (key === 'searingvengeanceUses') return values.searingvengeanceUses;
+    if (key === 'searingVengeanceUses') return values.searingVengeanceUses;
     if (key === 'currentHitPoints') return values.currentHitPoints ?? null;
     return null;
   });
@@ -108,7 +108,7 @@ function mockRuntimeValues(values) {
 
 function mockCreatureHp(creatureName, hp) {
   useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-    if (key === 'searingvengeanceUses') return 1;
+    if (key === 'searingVengeanceUses') return 1;
     if (key === 'currentHitPoints' && subject === creatureName) return hp;
     return null;
   });
@@ -120,7 +120,7 @@ describe('searingVengeanceHandler.handle', () => {
   });
 
   it('returns a popup when uses have been exhausted', async () => {
-    mockRuntimeValues({ searingvengeanceUses: 0 });
+    mockRuntimeValues({ searingVengeanceUses: 0 });
 
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -134,7 +134,7 @@ describe('searingVengeanceHandler.handle', () => {
   });
 
   it('returns a popup when no combat is active', async () => {
-    mockRuntimeValues({ searingvengeanceUses: 1 });
+    mockRuntimeValues({ searingVengeanceUses: 1 });
     damageUtils.getCombatContext.mockResolvedValue(null);
 
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -178,7 +178,7 @@ describe('searingVengeanceHandler.handle', () => {
       },
     ])('returns a popup when $label and consumes no use', async ({ creatures, deadName, runtimeHp, inRange }) => {
       useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-        if (key === 'searingvengeanceUses') return 1;
+        if (key === 'searingVengeanceUses') return 1;
         if (key === 'isDead') return subject === deadName ? 1 : null;
         if (key === 'currentHitPoints') return runtimeHp;
         return null;
@@ -196,7 +196,7 @@ describe('searingVengeanceHandler.handle', () => {
     });
 
     it('returns a modal when a creature at 0 HP is found (NPC heal target, absorbed from NpcPath lane)', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
+      mockRuntimeValues({ searingVengeanceUses: 1 });
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'Ally', type: 'npc', currentHp: 0, maxHp: 50 },
@@ -240,7 +240,7 @@ describe('searingVengeanceHandler.handle', () => {
 
     it('includes the warlock themselves as a 0 HP heal target (RAW: you or ally)', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((subject, key, _campaign) => {
-        if (key === 'searingvengeanceUses') return 1;
+        if (key === 'searingVengeanceUses') return 1;
         if (key === 'currentHitPoints' && subject === 'TestWarlock') return 0;
         if (key === 'hitPoints' && subject === 'TestWarlock') return 70;
         return null;
@@ -299,7 +299,7 @@ describe('confirmSearingVengeance', () => {
   });
 
   it('consumes a use and applies damage to selected targets', async () => {
-    mockRuntimeValues({ searingvengeanceUses: 1 });
+    mockRuntimeValues({ searingVengeanceUses: 1 });
     damageUtils.getCombatContext.mockResolvedValue({
       creatures: [
         { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 20 },
@@ -342,7 +342,7 @@ describe('confirmSearingVengeance', () => {
     expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+3');
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'TestWarlock',
-      'searingvengeanceUses',
+      'searingVengeanceUses',
       0,
       campaignName
     );
@@ -352,7 +352,7 @@ describe('confirmSearingVengeance', () => {
   });
 
   it('logs ability_use entry with heal and burst amounts', async () => {
-    mockRuntimeValues({ searingvengeanceUses: 1 });
+    mockRuntimeValues({ searingVengeanceUses: 1 });
     damageUtils.getCombatContext.mockResolvedValue({
       creatures: [
         { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 20 },

@@ -9,7 +9,7 @@
 // twice-your-Barbarian-level → disk '2 * barbarian_level'), requests the
 // save prompt, and returns {intercepted}/{awaitingSave} bytes.
 //
-// LATCH PAIR: this predicate is the READER of 'relentlessrageUses'
+// LATCH PAIR: this predicate is the READER of 'relentlessRageUses'
 // (DC = saveDc + uses * dcScaling); the WRITER (increment after save
 // resolution, consume-even-on-fail) is pinned by the saveResults lane
 // (relentlessRageService.saveResults.test.js 'increments uses after save').
@@ -79,7 +79,7 @@ function makePlayerComputed(automation = CANON_AUTOMATION) {
 function seedRuntime({ activeBuffs, uses }) {
   runtimeState.getRuntimeValue.mockImplementation((characterKey, key) => {
     if (key === 'activeBuffs') return activeBuffs;
-    if (key === 'relentlessrageUses') return uses;
+    if (key === 'relentlessRageUses') return uses;
     throw new Error(`unexpected getRuntimeValue("${characterKey}", "${key}")`);
   });
 }
@@ -168,7 +168,7 @@ describe('relentlessRageService.checkRelentlessRage', () => {
     // is inert and the bare uses read is not a defect.
     expect(runtimeState.getRuntimeValue.mock.calls).toEqual([
       ['TestBarbarian', 'activeBuffs', campaignName],
-      ['TestBarbarian', 'relentlessrageUses'],
+      ['TestBarbarian', 'relentlessRageUses'],
     ]);
     // Reader-only contract: the predicate never writes (increment is the
     // saveResults lane's writer pin).

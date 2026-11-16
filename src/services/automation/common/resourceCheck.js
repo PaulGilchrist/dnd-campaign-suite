@@ -1,12 +1,13 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getClassFeatures } from '../../character/classFeatures.js';
+import { getRuntimeUsesKey } from '../../shared/usesKey.js';
 
 export function getResourceAmount(playerStats, resourceName) {
     if (resourceName === 'focusPoints') {
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         return classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
      }
-    const key = `${resourceName.toLowerCase().replace(/\s+/g, '')}Uses`;
+    const key = getRuntimeUsesKey(resourceName);
     const stored = getRuntimeValue(playerStats.name, key);
     return stored != null ? Number(stored) : (playerStats?._trackedResources?.[key]?.current ?? 0);
 }

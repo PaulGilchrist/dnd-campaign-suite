@@ -128,7 +128,7 @@ describe('ClericFeatures', () => {
   ])('caps Warding Flare uses at max(1, Wisdom modifier %s)', (wisBonus, expectedText) => {
     const abilities = wisBonus === undefined ? [] : [{ name: 'Wisdom', bonus: wisBonus }];
     renderCleric(clericStats(1, { abilities }));
-    expect(screen.getByTestId('tracked-resource-wardingflareUses'))
+    expect(screen.getByTestId('tracked-resource-wardingFlareUses'))
       .toHaveTextContent(`Warding Flare Uses: ${expectedText}`);
   });
 });

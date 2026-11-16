@@ -65,8 +65,8 @@ export function computeShortRestHpNewCurrent(currentHp, maxHp, recoveredAmount) 
 // CharData guard); keys NOT in that list are handler-owned latches /
 // universal lanes and keep the unconditional null fan-out BY DESIGN
 // (CLA-130: they are never in `_trackedResources`, even for their owners —
-// e.g. tranceOfOrderUses, warriorofthegodsPool, warpingimplosionUses,
-// healinghandsUses, thief'sreflexesUses — see HANDLER_OWNED_LATCH_KEYS).
+// e.g. tranceOfOrderUses, warriorofthegodsPool, warpingImplosionUses,
+// healingHandsUses, thiefsReflexesUses — see HANDLER_OWNED_LATCH_KEYS).
 //
 // INITIATIVE RESET: For once-per-turn trackers that reset when the character rolls
 // initiative, add setRuntimeValue(playerStats.name, '_TrackerName_usedRound', null, campaignName)
@@ -84,23 +84,22 @@ export const SHORT_REST_RESOURCES = [
   'focusPoints',
   'superiorityDice',
   'kiPoints',
-  // improve ghost-keys: lowercase 'actionsurgeUses' is NOT a seed ghost — the
-  // catalog twin seed was retired (trackedResources.js CASE-DUP note). This
-  // entry re-arms the RUNTIME row extraActionHandler writes when spending an
-  // automationInfoBuilder-derived extra_action (diverse.js derives
-  // feature.name.toLowerCase()+'Uses'); null-tolerant handler, so the row
-  // only exists after a press and the re-arm is load-bearing (CLA-130).
-  'actionsurgeUses',
+  // improve ghost-keys: the all-lowercase Action Surge twin was retired with the
+  // catalog case-dup seed (trackedResources.js CASE-DUP note) — the 2026-11-15
+  // uses-key convention convergence (src/services/shared/usesKey.js) makes the
+  // camelCase 'actionSurgeUses' below the ONLY casing: diverse.js now derives the
+  // extra_action resourceKey through the shared helper. Null re-arm stays
+  // load-bearing for the runtime row extraActionHandler writes (CLA-130).
   'actionSurgeUses',
   'actionSurgeUsedThisRound',
   'adrenalineRushUses',
   // CLA-048: Celestial Revelation recharge is 'long_rest' (2024 races.json) —
   // it must NOT re-arm on a Short Rest; LONG_REST_RESOURCES owns the key.
   '_War_Gods_Blessing_active',
-   'spellthiefUses',
+   'spellThiefUses',
    'strokeOfLuckUsed',
    '_Boon_of_Combat_Prowess_usedRound',
-    'encouragingsongUses',
+    'encouragingSongUses',
      'piercerPunctureUsedThisTurn',
      'poisonedWeaponsActive',
        '_Savage_Attacker_usedRound',
@@ -108,7 +107,7 @@ export const SHORT_REST_RESOURCES = [
         '_Hamstring_usedRound',
         '_friendsCastTargets',
    'illusorySelfUses',
-   'relentlessrageUses',
+   'relentlessRageUses',
    // CLA-140: Fiendish Resilience re-chooses on a Short OR Long Rest (classes.json
    // "when you finish a Short or Long Rest"). Short Rest clears ONLY the re-choose
    // latch; _Fiendish_Resilience_chosenType persists ("until you choose a different one").
@@ -120,7 +119,7 @@ export function getShortRestResources() {
 }
 
 export const LONG_REST_RESOURCES = [
-  'healinghandsUses',
+  'healingHandsUses',
   'ragePoints',
   'bardicInspirationUses',
   'channelDivinityCharges',
@@ -128,7 +127,7 @@ export const LONG_REST_RESOURCES = [
   'secondWindUses',
   'psionicEnergy',
   'focusPoints',
-  'uncannymetabolismUses',
+  'uncannyMetabolismUses',
   'sorceryPoints',
   'arcaneRecoveryLevels',
   'superiorityDice',
@@ -136,7 +135,7 @@ export const LONG_REST_RESOURCES = [
   'actionSurgeUses',
   'actionSurgeUsedThisRound',
   // CLA-360: Thief's Reflexes extra_action recharges on a long rest (null = re-armed).
-  "thief'sreflexesUses",
+  'thiefsReflexesUses',
   'layOnHandsPool',
   'preserveLifePool',
   'gloriousDefenseUses',
@@ -145,10 +144,10 @@ export const LONG_REST_RESOURCES = [
   'adrenalineRushUses',
   '_celestialRevelationUses',
   '_War_Gods_Blessing_active',
-  'spellthiefUses',
+  'spellThiefUses',
    'strokeOfLuckUsed',
    '_Boon_of_Combat_Prowess_usedRound',
-   'encouragingsongUses',
+   'encouragingSongUses',
     '_Charge_Attack_usedRound',
    '_FastHands_usedRound',
    'clockworkCavalcadeUses',
@@ -170,7 +169,7 @@ export const LONG_REST_RESOURCES = [
   'psionicEnergy',
   'focusPoints',
   'psychicWhispersFreeUsed',
-  'uncannymetabolismUses',
+  'uncannyMetabolismUses',
   'sorceryPoints',
   'arcaneRecoveryLevels',
   'superiorityDice',
@@ -182,13 +181,13 @@ export const LONG_REST_RESOURCES = [
    'gloriousDefenseUses',
    'warlockPactMagic',
   'innateSorceryUses',
-  'psychicveilUses',
+  'psychicVeilUses',
   'sorcerousRestorationUses',
   'zealousPresenceUses',
   'intimidatingPresenceUses',
   'rageOfTheGodsUses',
   'divineInterventionUses',
-  'wholenessofbodyUses',
+  'wholenessOfBodyUses',
   'wildResurgenceReversedThisRest',
   'indomitableUses',
   'warriorofthegodsPool',
@@ -198,7 +197,7 @@ export const LONG_REST_RESOURCES = [
   // CLA-050: Circle of the Land land choice is re-made after each Long Rest —
   // cleared in the atomic batch so the badge/spell grants drop and the chooser re-prompts.
   '_circleOfTheLandType',
-  'wardingflareUses',
+  'wardingFlareUses',
   '_Star_Map_freeCastCount',
   '_Dragon_Companion_freeCastCount',
   '_Contact_Patron_freeCastCount',
@@ -234,22 +233,22 @@ export const LONG_REST_RESOURCES = [
     // rule: a latch missing here dies permanently.
     '_Fey_Magic_freeCastCount',
     '_Fey_Magic_Misty_Step_freeCastCount',
-       'breathweaponUses',
+       'breathWeaponUses',
   'stonecunningUses',
   'naturesVeilUses',
   'favoredEnemyUses',
    'tirelessUses',
    'moonlightStepUses',
-   'dreadambushUses',
-   'cosmicomenUses',
-      'relentlessrageUses',
+   'dreadAmbushUses',
+   'cosmicOmenUses',
+      'relentlessRageUses',
       'persistentRageUsed',
        'aspectOfTheWildsUsedThisRest',
        'aspectOfTheWildsOption',
     'elderChampionRestUsed',
     'avengingAngelRestUsed',
-  'warpingimplosionUses',
-  'restorebalanceUses',
+  'warpingImplosionUses',
+  'restoreBalanceUses',
   'restoreBalanceArmed',
   'tranceOfOrderUses',
   'tamedSurgeUses',
@@ -261,7 +260,7 @@ export const LONG_REST_RESOURCES = [
      'beguilingDefensesUses',
      'illusorySelfUses',
      'healinglightPool',
-     'searingvengeanceUses',
+     'searingVengeanceUses',
     'darkOnesLuckUses',
     '_fiendishResilienceUsed',
     '_Boon_of_Combat_Prowess_usedRound',

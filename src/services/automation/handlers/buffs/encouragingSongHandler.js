@@ -1,13 +1,14 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../encounters/combatData.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
     const maxUses = auto.usesMax ?? 0;
-    const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
     const rawValue = getRuntimeValue(playerName, usesKey);
     const currentUses = Number(rawValue ?? maxUses);
 
@@ -49,7 +50,7 @@ export async function confirmEncouragingSong(action, playerStats, campaignName, 
     const maxUses = auto.usesMax ?? 0;
 
     if (maxUses > 0) {
-        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
         const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? maxUses);
         if (currentUses <= 0) {
             return {

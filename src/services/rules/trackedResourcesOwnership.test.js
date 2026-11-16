@@ -8,8 +8,8 @@
 //       2024 L20 Oath of Vengeance owner leg riding layOnHandsPool: 100).
 //   (b) case-insensitive duplicate collapse — neither a computed bucket nor
 //       the registry may carry two casings of the same latch idiom
-//       (the retired `actionSurgeUses`+`actionsurgeUses` /
-//       `secondWindUses`+`secondwindUses` pairs); camelCase is canonical.
+//       (the retired `actionsurgeUses`+`actionSurgeUses` /
+//       `secondwindUses`+`secondWindUses` pairs); camelCase is canonical.
 //   (c) handler-owned load-bearing latches (CLA-130 safety nets such as
 //       tranceOfOrderUses / warriorofthegodsPool) stay UNSEEDED but keep
 //       their unconditional Long-Rest null fan-out — registry-consistency
@@ -74,15 +74,15 @@ describe('(a) statically-ownable keys: non-owner buckets carry ZERO of them', ()
       'layOnHandsPool', 'preserveLifePool', 'healinglightPool',
       'gloriousDefenseUses', 'warPriestUses', 'divineInterventionUses',
       'channelDivinityCharges', 'bardicInspirationUses',
-      'wildShapeUses', 'naturalRecoverySlots', 'moonlightStepUses', 'cosmicomenUses',
+      'wildShapeUses', 'naturalRecoverySlots', 'moonlightStepUses', 'cosmicOmenUses',
       '_Star_Map_freeCastCount', '_Steps_of_the_Fey_freeCastCount',
       'warlockPactMagic', 'darkOnesLuckUses',
-      'luckyPoints', 'wholenessofbodyUses', 'featsOfChaosUses',
+      'luckyPoints', 'wholenessOfBodyUses', 'featsOfChaosUses',
       'arcaneWardHp', 'arcaneWardMax', 'arcaneRecoveryLevels',
       'psionicEnergy', 'telekineticThrustUses', 'adrenalineRushUses',
       'naturesVeilUses', 'tirelessUses', 'favoredEnemyUses',
       'stonecunningUses', 'stonesEnduranceUses', 'stormsThunderUses',
-      'uncannymetabolismUses', 'sorcerousRestorationUses',
+      'uncannyMetabolismUses', 'sorcerousRestorationUses',
       'mysticArcanumLevel6', 'mysticArcanumLevel7', 'mysticArcanumLevel8', 'mysticArcanumLevel9',
     ]) {
       expect(fighterBucket, `${key} must not exist on the non-owner Fighter`).not.toHaveProperty(key);
@@ -150,11 +150,11 @@ describe('(c) handler-owned load-bearing latches: retained fan-out, documented c
         reactions: [{ type: 'warping_implosion' }],
       },
     });
-    // tranceOfOrderUses / warpingimplosionUses / warriorofthegodsPool etc.
+    // tranceOfOrderUses / warpingImplosionUses / warriorofthegodsPool etc.
     // must stay out of `_trackedResources` for EVERY character — owners
     // included — a grant-time 0-seed there is the CLA-364 BUG-A poisoning
     // pattern (the free once-per-Long-Rest use died behind a stuck 0).
-    for (const key of ['tranceOfOrderUses', 'warpingimplosionUses', 'restorebalanceUses', 'warriorofthegodsPool']) {
+    for (const key of ['tranceOfOrderUses', 'warpingImplosionUses', 'restoreBalanceUses', 'warriorofthegodsPool']) {
       expect(withGrants, `${key} must never be seeded`).not.toHaveProperty(key);
       expect(ALL_TRACKED_RESOURCES, `${key} must stay out of the seed registry`).not.toContain(key);
     }

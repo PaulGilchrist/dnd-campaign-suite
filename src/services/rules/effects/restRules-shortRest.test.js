@@ -316,7 +316,7 @@ describe('applyShortRest', () => {
       expect(updates._Divination_Savant_See_Invisibility_used).toBeNull()
       expect(updates._Evocation_Savant_Fireball_used).toBeNull()
       expect(updates._Illusion_Savant_Major_Image_used).toBeNull()
-      expect(updates.wardingflareUses).toBeNull()
+      expect(updates.wardingFlareUses).toBeNull()
 
       // Branch bait: holder WITHOUT a stored selection fabricates no used-flag bytes.
       stubRuntime({})

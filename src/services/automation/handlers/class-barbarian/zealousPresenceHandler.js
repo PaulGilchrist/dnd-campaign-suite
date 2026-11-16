@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
@@ -28,7 +29,7 @@ async function expendUseOrRage(action, auto, playerStats, campaignName) {
     if (maxUses <= 0) return null;
 
     const usedUpPopup = infoPopup(action, auto, `${action.name} has been used and cannot be used again until a long rest.`);
-    const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
     const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
     if (currentUses > 0) {
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);

@@ -83,7 +83,7 @@ describe('CharRaceFeatures', () => {
             ['0 (falls back to default 1)', 1, { name: 'Dragonborn', traits: [{ automation: { uses: 0 } }] }, 4],
             ['race with no traits (defaults to 1)', 1, { name: 'Dragonborn' }, 4],
         ])('%s renders Breath Weapon max %i', (desc, max, race, proficiency) => {
-            expectSingleRow(dragonbornStats({ race, proficiency }), 'Breath Weapon', max, 'breathweaponUses');
+            expectSingleRow(dragonbornStats({ race, proficiency }), 'Breath Weapon', max, 'breathWeaponUses');
         });
     });
 

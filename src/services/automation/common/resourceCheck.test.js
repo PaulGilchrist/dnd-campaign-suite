@@ -88,7 +88,7 @@ describe('getResourceAmount', () => {
 
             const playerStats = {
                 name: 'Warlock',
-                _trackedResources: { pactwordUses: { current: 2 } },
+                _trackedResources: { pactWordUses: { current: 2 } },
             };
 
             const result = getResourceAmount(playerStats, 'Pact Word');

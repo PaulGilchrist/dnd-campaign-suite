@@ -15,10 +15,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { applyTeleportTokenMove } from '../../../combat/teleportService.js';
 import { rollD20, rollDie } from '../../../dice/diceRoller.js';
 import { parseMagicItemName } from '../../../rules/core/attackWeaponUtils.js';
-
-function getRuntimeUsesKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-}
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 
 // Reverse the original damage when an attack that hit is turned into a miss.
 function reverseHitDamage(combatSummary, attackResult, defenderName, nowMisses, campaignName) {

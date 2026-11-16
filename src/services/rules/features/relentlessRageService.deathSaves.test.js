@@ -19,7 +19,7 @@
 // lane never marks death (modal :103-105 / saveResults :107 own that byte).
 //
 // LATCH PAIR (#1358/#1399): relentlessRageActive does not exist as a store key
-// in this module — the latch pair is relentlessrageUses: READER :71 (arity-2
+// in this module — the latch pair is relentlessRageUses: READER :71 (arity-2
 // quirk, campaign arg omitted — pinned by check lane #1399), WRITER :194
 // (saveResults lane :159-167 pins the bump on success; every row here pins
 // consume-even-on-fail: each failing trigger bumps uses BEFORE any
@@ -145,12 +145,12 @@ function makePlayerComputed() {
 
 const READ_SPEC = {
   activeBuffs: 3,
-  relentlessrageUses: 2, // quirk byte :71 — campaign arg omitted (check lane co-pins)
+  relentlessRageUses: 2, // quirk byte :71 — campaign arg omitted (check lane co-pins)
   currentHitPoints: 3,
   deathSaves: 3,
   deathFailures: 3,
 };
-const WRITE_KEYS = new Set(['relentlessrageUses', 'deathSaves', 'deathFailures', 'currentHitPoints']);
+const WRITE_KEYS = new Set(['relentlessRageUses', 'deathSaves', 'deathFailures', 'currentHitPoints']);
 
 function makeStore(seed) {
   const state = { ...seed };
@@ -190,7 +190,7 @@ function makeStore(seed) {
 // (:146) with an exact envelope captured from the mock.
 function triggerFailingSave(store, saveRoll) {
   const creature = { name: NAME, type: 'player', currentHp: 0 };
-  const usesAtTrigger = store.state.relentlessrageUses;
+  const usesAtTrigger = store.state.relentlessRageUses;
   const wBefore = store.writes.length;
   const rBefore = store.reads.length;
 
@@ -207,10 +207,10 @@ function triggerFailingSave(store, saveRoll) {
     },
   }));
 
-  expect(store.writes.slice(wBefore)).toEqual([['relentlessrageUses', usesAtTrigger + 1]]);
+  expect(store.writes.slice(wBefore)).toEqual([['relentlessRageUses', usesAtTrigger + 1]]);
   expect(store.reads.slice(rBefore)).toEqual([
     ['activeBuffs', CAMPAIGN],
-    ['relentlessrageUses'],
+    ['relentlessRageUses'],
     ['currentHitPoints', CAMPAIGN],
   ]);
 
@@ -247,7 +247,7 @@ describe('relentlessRageService - death save slot machine', () => {
   it('composes a four-trigger chain from null seeds: accumulate, nat1 double-clamp, nat20 resurrect at canonical HP key 1', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: '-5', // string byte — pins Number() coercion at gate :144
       deathSaves: null,       // :156 default applies
       deathFailures: null,    // :157 default applies
@@ -257,7 +257,7 @@ describe('relentlessRageService - death save slot machine', () => {
     // death slots are NOT read before the first death-save-result
     expect(store.reads).toEqual([
       ['activeBuffs', CAMPAIGN],
-      ['relentlessrageUses'],
+      ['relentlessRageUses'],
       ['currentHitPoints', CAMPAIGN],
     ]);
 
@@ -299,7 +299,7 @@ describe('relentlessRageService - death save slot machine', () => {
     expect(r4.creature).toEqual({ name: NAME, type: 'player', currentHp: 0 });
 
     // four triggers, four consumed uses; four distinct prompt ids
-    expect(store.state.relentlessrageUses).toBe(4);
+    expect(store.state.relentlessRageUses).toBe(4);
     expect(new Set([r1.deathPromptId, r2.deathPromptId, r3.deathPromptId, r4.deathPromptId]).size).toBe(4);
 
     // exact death_save log bytes, one per event, in order
@@ -315,7 +315,7 @@ describe('relentlessRageService - death save slot machine', () => {
   it('holds the third-success stabilization boundary open and keeps re-writing the full set when no slot is empty', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: -1,
       deathSaves: [false, false, false],
       deathFailures: [false, false, false],
@@ -338,14 +338,14 @@ describe('relentlessRageService - death save slot machine', () => {
     }
 
     // stable does NOT heal and does NOT mark death on this lane — exact key-set
-    expect([...new Set(store.writes.map((w) => w[0]))]).toEqual(['relentlessrageUses', 'deathSaves', 'deathFailures']);
+    expect([...new Set(store.writes.map((w) => w[0]))]).toEqual(['relentlessRageUses', 'deathSaves', 'deathFailures']);
     expect(store.state.currentHitPoints).toBe(-1);
   });
 
   it('scans fail slots lowest-index-first, double-fills a nat1, clamps at the third failure, and re-writes when full', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: -1,
       deathSaves: [true, false, false],   // truthy existing arrays are consumed as-is
       deathFailures: [false, true, false],
@@ -382,7 +382,7 @@ describe('relentlessRageService - death save slot machine', () => {
   it('ignores lying modal detail arrays — recompute from store wins (chokepoint inline-dup: DeathSavePromptModal.jsx:101-102)', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: -1,
       deathSaves: [false, false, false],
       deathFailures: [false, false, false],
@@ -406,7 +406,7 @@ describe('relentlessRageService - death save slot machine', () => {
   it('#1400 consistency pin: success:false + result:"stable" fails the slot machine AND the log now agrees (was :186 divergence)', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: -1,
       deathSaves: [false, false, false],
       deathFailures: [false, false, false],
@@ -440,7 +440,7 @@ describe('relentlessRageService - death save slot machine', () => {
       for (const { seed } of malformedRows) {
         const store = makeStore({
           activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-          relentlessrageUses: 0,
+          relentlessRageUses: 0,
           currentHitPoints: -1,
           ...seed,
         });
@@ -464,7 +464,7 @@ describe('relentlessRageService - death save slot machine', () => {
   it('guards the prompt seam: mismatched promptId does nothing, the matching event consumes once, replay is inert', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: -1,
       deathSaves: [false, false, false],
       deathFailures: [false, false, false],

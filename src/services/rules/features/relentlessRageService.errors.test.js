@@ -162,7 +162,7 @@ const FAIL_LOG = {
 
 const READ_SPEC = {
   activeBuffs: 3,
-  relentlessrageUses: 2, // quirk :71 — campaign arg omitted
+  relentlessRageUses: 2, // quirk :71 — campaign arg omitted
   currentHitPoints: 3,
   activeConditions: 3,
   deathSaves: 3,
@@ -174,7 +174,7 @@ const WRITE_KEYS = new Set([
   'deathFailures',
   'isDead',
   'activeConditions',
-  'relentlessrageUses',
+  'relentlessRageUses',
 ]);
 
 function makeStore(seed, writeOverrides = {}) {
@@ -250,7 +250,7 @@ describe('relentlessRageService - error paths', () => {
   });
 
   it('trigger-log rejection is caught: exact prefix, same Error, interception stands', async () => {
-    const store = makeStore({ activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0 });
+    const store = makeStore({ activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessRageUses: 0 });
     const rejected = rejectLogsWhen(() => true, 'trigger-log-down');
 
     const ret = checkRelentlessRage(makeCreature(), makePlayerComputed(), CAMPAIGN);
@@ -270,7 +270,7 @@ describe('relentlessRageService - error paths', () => {
   it('success-path log rejection still commits every heal write and the summary event', async () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       activeConditions: null, // :110 silent-null guard fires -> [] written
     });
     const rejected = rejectLogsWhen((e) => e.saveSuccess === true, 'success-log-down');
@@ -294,9 +294,9 @@ describe('relentlessRageService - error paths', () => {
       ['deathFailures', [false, false, false]],
       ['isDead', 0],
       ['activeConditions', []],
-      ['relentlessrageUses', 1],
+      ['relentlessRageUses', 1],
     ]);
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'activeConditions']);
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses', 'activeConditions']);
     expect(combatSpy.mock.calls.length).toBe(1);
     // Both log calls attempted; only the success one rejected (#1385).
     expect(logService.addEntry.mock.calls.length).toBe(2);
@@ -310,7 +310,7 @@ describe('relentlessRageService - error paths', () => {
   it('failed save with HP>0 never spawns a death prompt even when its log rejects', async () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: 5,
     });
     const rejected = rejectLogsWhen((e) => e.saveSuccess === false, 'fail-log-down');
@@ -319,9 +319,9 @@ describe('relentlessRageService - error paths', () => {
     dispatchSaveResult(lastPromptId(), false);
     // Failure branch is synchronous up to :194's await: reads and the HP-gate
     // verdict are already settled before any microtask runs.
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'currentHitPoints']);
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses', 'currentHitPoints']);
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
-    expect(store.writes).toEqual([['relentlessrageUses', 1]]); // consume-even-on-fail co-pin
+    expect(store.writes).toEqual([['relentlessRageUses', 1]]); // consume-even-on-fail co-pin
 
     await flush();
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
@@ -333,7 +333,7 @@ describe('relentlessRageService - error paths', () => {
   it('failed save at HP<=0 still spawns the death prompt when its log rejects', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: 0,
     });
     rejectLogsWhen((e) => e.saveSuccess === false, 'fail-log-down');
@@ -350,14 +350,14 @@ describe('relentlessRageService - error paths', () => {
       promptId: expect.stringMatching(/^test-guid-\d+$/), // monotonic fake guid (#1312)
       targetName: NAME,
     });
-    expect(store.writes).toEqual([['relentlessrageUses', 1]]);
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'currentHitPoints']);
+    expect(store.writes).toEqual([['relentlessRageUses', 1]]);
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses', 'currentHitPoints']);
   });
 
   it('death-save log rejection lands writes first, logs the error late (:187)', async () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: 0,
       deathSaves: [false, false, false],
       deathFailures: [false, false, false],
@@ -376,9 +376,9 @@ describe('relentlessRageService - error paths', () => {
     // Synchronous census: :177/:178 writes are fire-and-forget and land
     // BEFORE the rejecting :180 log call is even made (uses bump :194 from
     // the earlier save-result already sits at the head).
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'currentHitPoints', 'deathSaves', 'deathFailures']);
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses', 'currentHitPoints', 'deathSaves', 'deathFailures']);
     expect(store.writes).toEqual([
-      ['relentlessrageUses', 1],
+      ['relentlessRageUses', 1],
       ['deathSaves', [false, false, false]],
       ['deathFailures', [true, false, false]],
     ]);
@@ -408,7 +408,7 @@ describe('relentlessRageService - error paths', () => {
     // underneath — both shapes now reach console or stay silent WITHOUT a leak.
     const HANG = () => new Promise(() => { });
     const store = makeStore(
-      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0, activeConditions: ['unconscious'] },
+      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessRageUses: 0, activeConditions: ['unconscious'] },
       { currentHitPoints: HANG },
     );
 
@@ -420,7 +420,7 @@ describe('relentlessRageService - error paths', () => {
     // Truncation: only the stalled heal attempt exists — no clears, no uses
     // bump, no success log (:114-era never reached), no summary event.
     expect(store.writes).toEqual([['currentHitPoints', 22]]);
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses']);
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses']);
     expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, TRIGGER_LOG(promptId)]]);
     expect(combatSpy).not.toHaveBeenCalled();
     // Stalled await never reaches the catch — console stays byte-empty (#1360/86).
@@ -439,7 +439,7 @@ describe('relentlessRageService - error paths', () => {
     // (vitest fails the file on any that did).
     const err = new Error('heal-store-down');
     const store = makeStore(
-      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0 },
+      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessRageUses: 0 },
       { currentHitPoints: () => Promise.reject(err) },
     );
 
@@ -467,8 +467,8 @@ describe('relentlessRageService - error paths', () => {
   it('failed save: uses-bump stall still logs-then-stalls, but the consumed promptId never replays (#1400 eager consume)', async () => {
     const HANG = () => new Promise(() => { });
     const store = makeStore(
-      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0, currentHitPoints: 5 },
-      { relentlessrageUses: HANG },
+      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessRageUses: 0, currentHitPoints: 5 },
+      { relentlessRageUses: HANG },
     );
 
     checkRelentlessRage(makeCreature(), makePlayerComputed(), CAMPAIGN);
@@ -482,7 +482,7 @@ describe('relentlessRageService - error paths', () => {
       [CAMPAIGN, TRIGGER_LOG(promptId)],
       [CAMPAIGN, FAIL_LOG],
     ]);
-    expect(store.writes).toEqual([['relentlessrageUses', 1]]);
+    expect(store.writes).toEqual([['relentlessRageUses', 1]]);
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
     expect(consoleError).not.toHaveBeenCalled(); // stall suspends before the catch
 
@@ -491,14 +491,14 @@ describe('relentlessRageService - error paths', () => {
     dispatchSaveResult(promptId, false);
     await flush();
     expect(logService.addEntry.mock.calls.length).toBe(2);
-    expect(store.writes).toEqual([['relentlessrageUses', 1]]);
+    expect(store.writes).toEqual([['relentlessRageUses', 1]]);
   });
 
   it('uses-bump REJECTION is surfaced once; a failed commit does not phantom-bump twice (#1401)', async () => {
     const err = new Error('uses-store-down');
     const store = makeStore(
-      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0, currentHitPoints: 5 },
-      { relentlessrageUses: () => Promise.reject(err) },
+      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessRageUses: 0, currentHitPoints: 5 },
+      { relentlessRageUses: () => Promise.reject(err) },
     );
 
     checkRelentlessRage(makeCreature(), makePlayerComputed(), CAMPAIGN);
@@ -506,7 +506,7 @@ describe('relentlessRageService - error paths', () => {
     dispatchSaveResult(promptId, false);
     await flush();
 
-    expect(store.writes).toEqual([['relentlessrageUses', 1]]); // attempt recorded, never landed
+    expect(store.writes).toEqual([['relentlessRageUses', 1]]); // attempt recorded, never landed
     expect(logService.addEntry.mock.calls).toEqual([
       [CAMPAIGN, TRIGGER_LOG(promptId)],
       [CAMPAIGN, FAIL_LOG],
@@ -517,7 +517,7 @@ describe('relentlessRageService - error paths', () => {
 
     dispatchSaveResult(promptId, false);
     await flush();
-    expect(store.writes).toEqual([['relentlessrageUses', 1]]);
+    expect(store.writes).toEqual([['relentlessRageUses', 1]]);
     expect(consoleError.mock.calls.length).toBe(1);
   });
 });

@@ -1,4 +1,5 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import * as mapsService from '../../../maps/mapsService.js';
@@ -48,7 +49,7 @@ function isWildShapeExhausted(playerStats, campaignName) {
 function isTrackedUsesExhausted(action, auto, playerStats, campaignName) {
     if (auto.uses === undefined && auto.usesMax === undefined) return false;
     const maxUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? 1;
-    const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
     return currentUses <= 0;
 }
@@ -171,7 +172,7 @@ async function consumeTrackedUses(action, auto, playerStats, campaignName) {
     const maxUses = resolvedUses > 0 ? resolvedUses : 0;
 
     if (maxUses > 0) {
-        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
         const storedValue = getRuntimeValue(playerStats.name, usesKey);
         const currentUses = Number(storedValue ?? maxUses);
         if (currentUses <= 0) {

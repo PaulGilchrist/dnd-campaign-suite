@@ -87,7 +87,7 @@ const savePromptId = () => `save-prompt-${++saveSeq}`;
 // Strict argument-keyed store fake (#1372): unknown owner/key/arity THROWS.
 const READ_SPEC = {
   activeBuffs: 3,
-  relentlessrageUses: 2, // arity-2 quirk :153 — the getRuntimeUsesKey output byte
+  relentlessRageUses: 2, // arity-2 quirk :153 — the getRuntimeUsesKey output byte
   activeConditions: 3, // success leg :202 only
 };
 const WRITE_KEYS = new Set([
@@ -96,11 +96,11 @@ const WRITE_KEYS = new Set([
   'deathFailures',
   'isDead',
   'activeConditions',
-  'relentlessrageUses',
+  'relentlessRageUses',
 ]);
 
 function makeStore(seed) {
-  const state = { relentlessrageUses: 0, ...seed };
+  const state = { relentlessRageUses: 0, ...seed };
   const reads = [];
   const writes = [];
   runtimeState.getRuntimeValue.mockImplementation((name, key, ...rest) => {
@@ -177,14 +177,14 @@ async function healCommitted(comp) {
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('getRuntimeUsesKey (demoted #1402 — rides the public latch byte)', () => {
-  it('the shared latch key of reader :152 and writer :242 is exactly relentlessrageUses — built from the literal "Relentless Rage" (multi-space/case/trim variants of that literal are internal-only; the ONE production call site passes the fixed literal)', async () => {
+  it('the shared latch key of reader :152 and writer :242 is exactly relentlessRageUses — built from the literal "Relentless Rage" (multi-space/case/trim variants of that literal are internal-only; the ONE production call site passes the fixed literal)', async () => {
     const { hp, store } = await healCommitted(computed(1, { level: 11 }));
     expect(hp).toBe(1);
-    expect(store.reads).toContain('relentlessrageUses'); // reader key byte
-    const bump = store.writes.find(([key]) => key === 'relentlessrageUses');
+    expect(store.reads).toContain('relentlessRageUses'); // reader key byte
+    const bump = store.writes.find(([key]) => key === 'relentlessRageUses');
     expect(bump).toBeDefined();
     expect(bump[1]).toBe(1); // same builder byte feeds the writer (:242)
-    expect(store.reads.filter(k => k === 'relentlessrageUses')).toHaveLength(1);
+    expect(store.reads.filter(k => k === 'relentlessRageUses')).toHaveLength(1);
   });
 });
 

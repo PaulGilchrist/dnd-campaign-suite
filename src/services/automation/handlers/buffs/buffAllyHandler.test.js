@@ -198,7 +198,7 @@ describe('buffAllyHandler.handle', () => {
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
-        'tacticalwarningUses',
+        'tacticalWarningUses',
         0,
         campaignName,
       );
@@ -237,7 +237,7 @@ describe('buffAllyHandler.handle', () => {
 
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
           'Fighter',
-          'tacticalwarningUses',
+          'tacticalWarningUses',
           2,
           campaignName,
         );

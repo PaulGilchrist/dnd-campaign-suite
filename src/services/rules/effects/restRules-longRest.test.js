@@ -135,8 +135,8 @@ describe('applyLongRest', () => {
 
   describe('atomic batch reset', () => {
     it('fully restores HP, spell slots and hit dice and null-re-arms every registered LONG_REST_RESOURCES key in one batch', async () => {
-      // CLA-050 _circleOfTheLandType, CLA-293 _RendMind_Used, psychicveilUses,
-      // wardingflareUses, naturalRecovery*, channelDivinityCharges, focusPoints,
+      // CLA-050 _circleOfTheLandType, CLA-293 _RendMind_Used, psychicVeilUses,
+      // wardingFlareUses, naturalRecovery*, channelDivinityCharges, focusPoints,
       // ragePoints, sorceryPoints, illusorySelfUses... all rest on this one
       // registration-membership proof: buildLongRestCharData nulls EVERY
       // LONG_REST_RESOURCES key, so single-key echo tests add nothing (#1301).
@@ -634,7 +634,7 @@ describe('applyLongRest', () => {
       await applyLongRest(makeStats({ automation: { reactions: [{ type: 'spell_thief' }] } }), CAMPAIGN)
       const updates = batchFor('Test Hero')
       // Override beats the generic registration null: thief starts fresh at 1 use.
-      expect(updates.spellthiefUses).toBe(1)
+      expect(updates.spellThiefUses).toBe(1)
       expect(updates.spellThiefBlocked_Caster1_Fireball).toBeNull()
       expect(updates['spellThiefStolen_Caster2_Witch Bolt']).toBeNull()
       expect(updates._spellThiefBlockedList).toBeNull()

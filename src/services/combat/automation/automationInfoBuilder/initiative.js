@@ -1,3 +1,5 @@
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
+
 export const initiativeHandlers = {
     'initiative_action': (feature, _playerStats) => {
         const auto = feature.automation
@@ -11,7 +13,7 @@ export const initiativeHandlers = {
             usesMax: auto.uses ?? 1,
             recharge: auto.recharge || 'long_rest',
             resourceCost: auto.resourceCost || '',
-            resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Uses',
+            resourceKey: getRuntimeUsesKey(feature.name),
             hasAutomation: true
         }
     }

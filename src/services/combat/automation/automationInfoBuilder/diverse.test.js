@@ -57,15 +57,15 @@ describe('diverseHandlers', () => {
         { type: 'extra_action', auto: { type: 'extra_action' },
             exp: { type: 'extra_action', name: 'Test Feature', uses: 1, recharge: 'short_rest',
                 oncePerTurn: false, oncePerCombat: false, firstRoundOnly: false,
-                resourceKey: 'testfeatureUses', hasAutomation: true } },
+                resourceKey: 'testFeatureUses', hasAutomation: true } },
         { type: 'extra_action', auto: { type: 'extra_action', uses: 0, oncePerTurn: '', oncePerCombat: 0, firstRoundOnly: '' },
             exp: { type: 'extra_action', name: 'Test Feature', uses: 1, recharge: 'short_rest',
                 oncePerTurn: false, oncePerCombat: false, firstRoundOnly: false,
-                resourceKey: 'testfeatureUses', hasAutomation: true } },
+                resourceKey: 'testFeatureUses', hasAutomation: true } },
         { type: 'extra_action', auto: { type: 'extra_action', oncePerTurn: 'yes', oncePerCombat: 1, firstRoundOnly: 0 },
             exp: { type: 'extra_action', name: 'Test Feature', uses: 1, recharge: 'short_rest',
                 oncePerTurn: true, oncePerCombat: true, firstRoundOnly: false,
-                resourceKey: 'testfeatureUses', hasAutomation: true } },
+                resourceKey: 'testFeatureUses', hasAutomation: true } },
         { type: 'font_of_magic', auto: { type: 'font_of_magic', casting_time: '' },
             exp: { type: 'font_of_magic', name: 'Test Feature', casting_time: '1 bonus action', hasAutomation: true } },
         { type: 'font_of_inspiration', auto: { type: 'font_of_inspiration', casting_time: '' },
@@ -87,7 +87,8 @@ describe('diverseHandlers', () => {
     // AND the dropped casting_time; font/meta customs are synthetic values
     // deliberately distinct from their defaults (disk never carries a custom
     // casting_time there, so a verbatim disk probe cannot discriminate);
-    // the resourceKey edges are synthetic, pinning lowercase + /\s+/g strip
+    // the resourceKey edges are synthetic, pinning the shared helper's
+    // camel-stem casing + whitespace strip (src/services/shared/usesKey.js)
     // with non-whitespace preserved.
     it.each([
         { type: 'divine_intervention', name: 'Greater Divine Intervention',
@@ -98,17 +99,17 @@ describe('diverseHandlers', () => {
             auto: { type: 'extra_action', uses: 2, recharge: 'short_rest', oncePerTurn: true, casting_time: '1 action' },
             exp: { type: 'extra_action', name: 'Action Surge', uses: 2, recharge: 'short_rest',
                 oncePerTurn: true, oncePerCombat: false, firstRoundOnly: false,
-                resourceKey: 'actionsurgeUses', hasAutomation: true } },
+                resourceKey: 'actionSurgeUses', hasAutomation: true } },
         { type: 'extra_action', name: "Thief's Reflexes",
             auto: { type: 'extra_action', uses: 1, recharge: 'long_rest', oncePerCombat: true, firstRoundOnly: true, casting_time: 'passive' },
             exp: { type: 'extra_action', name: "Thief's Reflexes", uses: 1, recharge: 'long_rest',
                 oncePerTurn: false, oncePerCombat: true, firstRoundOnly: true,
-                resourceKey: "thief'sreflexesUses", hasAutomation: true } },
+                resourceKey: "thiefsReflexesUses", hasAutomation: true } },
         { type: 'extra_action', name: '  Many   Actions 1st',
             auto: { type: 'extra_action' },
             exp: { type: 'extra_action', name: '  Many   Actions 1st', uses: 1, recharge: 'short_rest',
                 oncePerTurn: false, oncePerCombat: false, firstRoundOnly: false,
-                resourceKey: 'manyactions1stUses', hasAutomation: true } },
+                resourceKey: 'manyActions1stUses', hasAutomation: true } },
         { type: 'font_of_magic', name: 'Font of Magic',
             auto: { type: 'font_of_magic', casting_time: '1 reaction' },
             exp: { type: 'font_of_magic', name: 'Font of Magic', casting_time: '1 reaction', hasAutomation: true } },

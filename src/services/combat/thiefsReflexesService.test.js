@@ -32,7 +32,7 @@ import { addEntry } from '../ui/logService.js';
 
 const campaignName = 'test-campaign';
 // automationInfoBuilder/diverse.js emits feature.name.toLowerCase() + 'Uses'.
-const RESOURCE_KEY = "thief'sreflexesUses";
+const RESOURCE_KEY = "thiefsReflexesUses";
 
 function makeCharacters(withFeature = true) {
   const actions = withFeature

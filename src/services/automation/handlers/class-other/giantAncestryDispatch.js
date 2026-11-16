@@ -4,7 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
-import { getRuntimeUsesKey } from './giantAncestryOptions.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate, attackerRollGate, resolveAncestryUses, applyAncestryDamage, logAncestryDamageRoll, ancestryDamagePopup, applySpeedReductionEffect, logSpeedReductionCondition, stonesEnduranceDamageGate, stonesEnduranceRoundRefusal, stonesEnduranceCapNote, stormsThunderRangeRefusal, applyHillsTumbleEffect } from './giantAncestryUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';

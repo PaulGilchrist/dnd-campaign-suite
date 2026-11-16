@@ -42,7 +42,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // CLA-364 BUG-A: null/unset means the once-per-Long-Rest free use is
-    // still available (warpingimplosionUses null-as-available pattern —
+    // still available (warpingImplosionUses null-as-available pattern —
     // trackedResources no longer seeds 0 at feature grant; Long Rest
     // null-re-arm via restRules-constants LONG_REST_RESOURCES).
     const stored = getRuntimeValue(playerName, usesKey, campaignName);

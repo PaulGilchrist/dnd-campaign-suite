@@ -99,7 +99,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-15 (RB): uses-latch key casing is inconsistent across the family — `relentlessrageUses` (all-lowercase stem, `relentlessRageService.js:17` + `combatStanceHandler.js:255` share it) vs `rageOfTheGodsUses` / `boonOfRecoveryLastStandUsed` / `undyingSentinelUsed` (camel stems); a forensic script that guesses camelCase misses the RR/stance latches (this run's census briefly mis-read `relentlessrageUses:1` as ABSENT). Converge on one convention or export a single `getRuntimeUsesKey` + registry.
 - 2026-11-15 (RB): 2024 caster spell-row routing differs across fixtures with no visible rule — WC's `Revivify` rides the Actions grid (`div.left.clickable`) while WSD's same-casting-time `Enhance Ability`/`Stone Skin` land only in the Spells table (`.spell-name.clickable`); sheet-lane probes must census BOTH lanes per caster (an Actions-grid-keyed "row missing" reading is a FALSE NEGATIVE — the fix-run's EA/SS rides reached the table via the row's `title="Open spell details to cast"`). A stable `data-testid` per castable row or a documented routing rule would halve discovery cost.
 
 ## Blocked / Not Verified (fold-gate ledger)

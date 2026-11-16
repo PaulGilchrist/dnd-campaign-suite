@@ -16,7 +16,7 @@
 //   - handle() self dispatch: isSelf bypasses the requiresHealersKit kit
 //     seam (the `!isSelf &&` clause at healingHandler.js:617 — battleMedic
 //     only pins the non-self side) + the automation_info popup envelope
-//   - usesKeyFor resource keys: derived name-based 'healingtouchUses',
+//   - usesKeyFor resource keys: derived name-based 'healingTouchUses',
 //     explicit resourceKey 'customUses' override, uninitialized `?? auto.uses`
 //     default, and the 0-use refusal driven by a DERIVED-key runtime read
 //     (secondWind t7 pins the Short-Rest message via explicit resourceKey;
@@ -204,20 +204,20 @@ describe('healingHandler self_healing', () => {
     });
   });
 
-  // ── Uses tracking: healingtouchUses / customUses resource keys ──
+  // ── Uses tracking: healingTouchUses / customUses resource keys ──
 
   describe('uses tracking', () => {
-    it('should decrement derived name-based healingtouchUses with skipSync and report remaining uses', async () => {
-      runtimeMap({ healingtouchUses: 3 });
+    it('should decrement derived name-based healingTouchUses with skipSync and report remaining uses', async () => {
+      runtimeMap({ healingTouchUses: 3 });
       const ps = makePlayerStats();
       const action = makeAction({ healExpression: '1d4', uses: 3 });
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestHealer', 'healingtouchUses', campaignName);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestHealer', 'healingTouchUses', campaignName);
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'TestHealer',
-        'healingtouchUses',
+        'healingTouchUses',
         2,
         campaignName,
         true,
@@ -243,7 +243,7 @@ describe('healingHandler self_healing', () => {
         campaignName,
         true,
       );
-      expect(setCallsForKeys('healingtouchUses')).toHaveLength(0);
+      expect(setCallsForKeys('healingTouchUses')).toHaveLength(0);
     });
 
     it('should default to auto.uses when no runtime value and no _trackedResources exist', async () => {
@@ -256,7 +256,7 @@ describe('healingHandler self_healing', () => {
       expect(result.type).toBe('popup');
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'TestHealer',
-        'healingtouchUses',
+        'healingTouchUses',
         4,
         campaignName,
         true,
@@ -267,7 +267,7 @@ describe('healingHandler self_healing', () => {
       // Long-Rest ternary branch (gateTrackedUses) + refusal driven off the
       // DERIVED key. Short-Rest twin text is pinned by secondWind t7 — not
       // re-pinned here.
-      runtimeMap({ healingtouchUses: 0 });
+      runtimeMap({ healingTouchUses: 0 });
       const ps = makePlayerStats();
       const action = makeAction({
         healExpression: '1d4',
@@ -375,7 +375,7 @@ describe('healingHandler self_healing', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setCallsForKeys('healingtouchUses', 'customUses')).toHaveLength(0);
+      expect(setCallsForKeys('healingTouchUses', 'customUses')).toHaveLength(0);
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'TestHealer',
         'shortRestHitDice',

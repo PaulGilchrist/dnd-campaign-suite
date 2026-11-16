@@ -1,13 +1,14 @@
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
     const maxUses = auto.usesMax ?? auto.uses ?? 0;
     if (maxUses > 0) {
-        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
         const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
         if (currentUses <= 0) {
             return {

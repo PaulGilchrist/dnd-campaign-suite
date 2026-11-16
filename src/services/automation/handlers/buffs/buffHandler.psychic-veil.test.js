@@ -105,7 +105,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     });
   });
 
-  it('consumes the tracked use on activation, stores psychicveilUses 0, and logs the activation', async () => {
+  it('consumes the tracked use on activation, stores psychicVeilUses 0, and logs the activation', async () => {
     const ps = makeSoulknife();
     const action = makePsychicVeil();
 
@@ -113,7 +113,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       ps.name,
-      'psychicveilUses',
+      'psychicVeilUses',
       0,
       campaignName,
     );
@@ -135,7 +135,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     const ps = makeSoulknife();
     const action = makePsychicVeil();
     runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'psychicveilUses') return 0;
+      if (key === 'psychicVeilUses') return 0;
       if (key === 'psionicEnergy') return 0;
       if (key === 'activeBuffs') return [];
       return undefined;
@@ -152,7 +152,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     const ps = makeSoulknife({ _trackedResources: { psionicEnergy: { current: 3, max: 10 } } });
     const action = makePsychicVeil();
     runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'psychicveilUses') return 0;
+      if (key === 'psychicVeilUses') return 0;
       if (key === 'psionicEnergy') return 3;
       if (key === 'activeBuffs') return [];
       return undefined;
@@ -184,7 +184,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     const action = makePsychicVeil();
     buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
     runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'psychicveilUses') return 0;
+      if (key === 'psychicVeilUses') return 0;
       if (key === 'activeBuffs') return [{ name: 'Psychic Veil', effect: 'invisible' }];
       if (key === 'activeConditions') return ['invisible'];
       return undefined;
@@ -195,7 +195,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     expect(result.payload.description).toBe('Psychic Veil toggled OFF');
     expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
       ps.name,
-      'psychicveilUses',
+      'psychicVeilUses',
       expect.anything(),
       campaignName,
     );
@@ -239,7 +239,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       ps.name,
-      'multibuffUses',
+      'multiBuffUses',
       expectedWritten,
       campaignName,
     );

@@ -199,7 +199,7 @@ describe('saveAttackHandler - isExhausted', () => {
 
       expect(isExhausted(action, makePlayerStats(), campaignName)).toBe(true);
       // default uses key derived from the action name
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestCaster', 'breathweaponUses', campaignName);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestCaster', 'breathWeaponUses', campaignName);
     });
 
     it('should return false when uses are available', () => {

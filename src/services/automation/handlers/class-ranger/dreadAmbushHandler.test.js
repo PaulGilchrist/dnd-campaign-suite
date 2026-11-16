@@ -5,7 +5,7 @@
 // Distinct lanes, do not absorb here: dread_ambush_speed / dreadAmbushSpeedActive turn-start
 // latch (turnStartEffects*.test.js), dread_ambush_initiative (rules-playerStats-initiative),
 // dread_ambush_damage info-builder metadata (automationInfoBuilder/reaction.test.js),
-// dreadambushUses rest regrant (restRules / trackedResources), rogue stealthAttackHandler
+// dreadAmbushUses rest regrant (restRules / trackedResources), rogue stealthAttackHandler
 // (stealth-gated sneak dice — separate feature). Uses shared dreadAmbush.test-utils fixtures.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './dreadAmbushHandler.js';
@@ -87,7 +87,7 @@ describe('dreadAmbushHandler', () => {
                 {}, 'Goblin', 7, ['Psychic'],
                 { campaignName, characters: [], ignoreResistance: false, attackerName: playerName },
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'dreadambushUses', 1, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'dreadAmbushUses', 1, campaignName);
             // oncePerTurn absent on default action — must not mark.
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 playerName, 'dreadAmbushUsedThisTurn', expect.any(Number), campaignName,
@@ -207,7 +207,7 @@ describe('dreadAmbushHandler', () => {
     describe('guard: no uses remaining', () => {
         it('refuses with no side effects when uses are 0', async () => {
             getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 0;
+                if (key === 'dreadAmbushUses') return 0;
                 if (key === 'characters') return [];
                 return undefined;
             });
@@ -323,7 +323,7 @@ describe('dreadAmbushHandler', () => {
     });
 
     describe('uses_expression absent', () => {
-        it('deals damage but never writes dreadambushUses when uses_expression is absent', async () => {
+        it('deals damage but never writes dreadAmbushUses when uses_expression is absent', async () => {
             const action = makeAction({ automation: { type: 'dread_ambush', damageExpression: '2d6', damageType: 'Psychic' } });
 
             await handle(action, makePlayerStats(), campaignName, null);

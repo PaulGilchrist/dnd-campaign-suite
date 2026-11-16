@@ -3,10 +3,7 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
-
-function getRuntimeUsesKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-}
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 
 function resolveOmenUsesMax(auto, playerStats) {
     const usesMax = auto.usesMax ?? 0;

@@ -66,7 +66,7 @@ describe('cosmicOmenHandler', () => {
 
             for (const usesValue of zeroValues) {
                 vi.clearAllMocks();
-                setupRuntimeValues({ cosmicomenUses: usesValue });
+                setupRuntimeValues({ cosmicOmenUses: usesValue });
 
                 const action = makeAction({ automation: { usesMax: 3 } });
                 const result = await handle(action, makePlayerStats(), 'test-campaign');
@@ -83,7 +83,7 @@ describe('cosmicOmenHandler', () => {
             for (const usesValue of positiveValues) {
                 vi.clearAllMocks();
                 setupRuntimeValues({
-                    cosmicomenUses: usesValue,
+                    cosmicOmenUses: usesValue,
                     cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
                 });
                 rollExpression.mockReturnValue({ total: 4 });
@@ -100,7 +100,7 @@ describe('cosmicOmenHandler', () => {
             vi.clearAllMocks();
             evaluateAutoExpression.mockReturnValue(2);
             setupRuntimeValues({
-                cosmicomenUses: 2,
+                cosmicOmenUses: 2,
                 cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
             });
             rollExpression.mockReturnValue({ total: 3 });
@@ -140,7 +140,7 @@ describe('cosmicOmenHandler', () => {
     describe('d6 roll failure', () => {
         it('returns popup with "roll failed" when rollExpression returns falsy', async () => {
             setupRuntimeValues({
-                cosmicomenUses: 1,
+                cosmicOmenUses: 1,
                 cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
             });
             rollExpression.mockReturnValue(null);
@@ -159,7 +159,7 @@ describe('cosmicOmenHandler', () => {
             for (const d6Value of rollValues) {
                 vi.clearAllMocks();
                 setupRuntimeValues({
-                    cosmicomenUses: 1,
+                    cosmicOmenUses: 1,
                     cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
                 });
                 rollExpression.mockReturnValue({ total: d6Value });
@@ -188,7 +188,7 @@ describe('cosmicOmenHandler', () => {
     describe('Woe (Odd)', () => {
         it('generates correct popup and stores pending bonus for Woe', async () => {
             setupRuntimeValues({
-                cosmicomenUses: 1,
+                cosmicOmenUses: 1,
                 cosmicOmenEffect: JSON.stringify({ type: 'Woe', isEven: false, starMapRoll: 7 }),
             });
             rollExpression.mockReturnValue({ total: 3 });
@@ -219,7 +219,7 @@ describe('cosmicOmenHandler', () => {
             for (const { initial, expected } of scenarios) {
                 vi.clearAllMocks();
                 setupRuntimeValues({
-                    cosmicomenUses: initial,
+                    cosmicOmenUses: initial,
                     cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
                 });
                 rollExpression.mockReturnValue({ total: 5 });
@@ -227,7 +227,7 @@ describe('cosmicOmenHandler', () => {
                 await handle(makeAction({ automation: { usesMax: 3 } }), makePlayerStats(), 'test-campaign');
 
                 const usesCall = setRuntimeValue.mock.calls.find(
-                    (call) => call[1] === 'cosmicomenUses'
+                    (call) => call[1] === 'cosmicOmenUses'
                 );
                 expect(usesCall).toBeDefined();
                 expect(usesCall[2]).toBe(expected);
@@ -243,7 +243,7 @@ describe('cosmicOmenHandler', () => {
             await handle(makeAction({ automation: { usesMax: 0 } }), makePlayerStats(), 'test-campaign');
 
             let usesCalls = setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'cosmicomenUses'
+                (call) => call[1] === 'cosmicOmenUses'
             );
             expect(usesCalls).toHaveLength(0);
 
@@ -258,14 +258,14 @@ describe('cosmicOmenHandler', () => {
             await handle(action, makePlayerStats(), 'test-campaign');
 
             usesCalls = setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'cosmicomenUses'
+                (call) => call[1] === 'cosmicOmenUses'
             );
             expect(usesCalls).toHaveLength(0);
         });
 
         it('logs to campaign log with correct details', async () => {
             setupRuntimeValues({
-                cosmicomenUses: 1,
+                cosmicOmenUses: 1,
                 cosmicOmenEffect: JSON.stringify({ type: 'Woe', isEven: false, starMapRoll: 7 }),
             });
             rollExpression.mockReturnValue({ total: 3 });
@@ -287,7 +287,7 @@ describe('cosmicOmenHandler', () => {
     describe('result format', () => {
         it('returns popup with correct fields and uses feature name from action', async () => {
             setupRuntimeValues({
-                cosmicomenUses: 1,
+                cosmicOmenUses: 1,
                 cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 12 }),
             });
             rollExpression.mockReturnValue({ total: 2 });
@@ -302,7 +302,7 @@ describe('cosmicOmenHandler', () => {
 
         it('uses custom feature name when action name is provided', async () => {
             setupRuntimeValues({
-                cosmicomenUses: 1,
+                cosmicOmenUses: 1,
                 cosmicOmenEffect: JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 10 }),
             });
             rollExpression.mockReturnValue({ total: 1 });

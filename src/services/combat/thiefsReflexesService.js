@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { addEntry } from '../ui/logService.js'
+import { getRuntimeUsesKey } from '../shared/usesKey.js'
 
 // CLA-360: Thief's Reflexes (Rogue/Thief 2024) — take two turns in the first
 // round of combat, the second at initiative − 10. Produces the second
@@ -10,8 +11,9 @@ import { addEntry } from '../ui/logService.js'
 // duplicate name would make the Next-walk bounce back past the extra entry and
 // collide card keys.
 const SECOND_TURN_SUFFIX = ' (Second Turn)'
-// Matches automationInfoBuilder/diverse.js: feature.name.toLowerCase() + 'Uses'.
-const DEFAULT_RESOURCE_KEY = "thief'sreflexesUses"
+// Matches the shared uses-key helper applied to the feature name (automationInfoBuilder/diverse.js
+// derives resourceKey via src/services/shared/usesKey.js: "Thief's Reflexes" -> 'thiefsReflexesUses').
+const DEFAULT_RESOURCE_KEY = getRuntimeUsesKey("Thief's Reflexes")
 
 function isThiefsReflexesHolder(ch, characterName) {
     return ch?.name === characterName || ch?.computedStats?.name === characterName

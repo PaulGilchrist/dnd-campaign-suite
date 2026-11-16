@@ -300,7 +300,7 @@ describe('warpingImplosionHandler', () => {
             const result = await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, false);
 
             expect(result.type).toBe('confirmed');
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'warpingimplosionUses', 0, campaignName);
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'warpingImplosionUses', 0, campaignName);
             expect(teDefs.registerTargetEffect).toHaveBeenCalledWith(
                 campaignName,
                 playerName,
@@ -331,7 +331,7 @@ describe('warpingImplosionHandler', () => {
         });
 
         it('logs an ability_use entry with teleport, save and pull details', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((name, key) => (key === 'warpingimplosionUses' ? 1 : null));
+            runtimeState.getRuntimeValue.mockImplementation((name, key) => (key === 'warpingImplosionUses' ? 1 : null));
 
             await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, false);
 

@@ -3,15 +3,12 @@ import { addEntry } from '../../../ui/logService.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { findLastAttack, rollbackSpellEffects } from '../../common/damageRollback.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 const SPELL_THIEF_BLOCK_KEY = 'spellThiefBlocked';
 const SPELL_THIEF_STOLEN_KEY = 'spellThiefStolen';
 const SPELL_THIEF_BLOCKED_LIST_KEY = '_spellThiefBlockedList';
 const SPELL_THIEF_STOLEN_LIST_KEY = '_spellThiefStolenList';
 const SPELL_THIEF_CASTER_BLOCK_KEY = '_spellThiefCasterBlock';
-
-function getRuntimeUsesKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-}
 
 // CLA-325: monster-card cast stamps carry the MONSTER action label ("3. Frost Ray"),
 // not a spells.json name — strip the leading action number so block keys, the stolen

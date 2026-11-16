@@ -12,7 +12,7 @@
 //    same budget) and .cuttingWords.test.js:290 (bardicUsesMax budget early exit);
 //  - effectiveUsesKey selection: 'bardicInspirationUses' when no uses_expression
 //    but tracked bardic max > 0, else lowercase feature-name '<feature>Uses'
-//    ('cuttingwordsUses' here; blesseddefenderUses / wardingflareUses are
+//    ('cuttingWordsUses' here; blessedDefenderUses / wardingFlareUses are
 //    pinned by the attacksVsAlly / wardingFlare lanes);
 //  - currentUsesFor ?? fallback: undefined AND null stored values fall back to
 //    the budget max (0 never does — that refuses at the front door, earlyExits);
@@ -254,11 +254,11 @@ describe('reactionDebuffHandler — uses/budget accounting (default route)', () 
 
       expect(result.type).toBe('popup');
       // spend baked into the stampPatch under the feature-derived key...
-      expect(bakedPatch()).toEqual(expect.objectContaining({ cuttingwordsUses: expected }));
+      expect(bakedPatch()).toEqual(expect.objectContaining({ cuttingWordsUses: expected }));
       // ...and re-flashed byte-identical after dispatch (single economy value across both writes)
       expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledTimes(2);
       const flush = useRuntimeState.setRuntimeObject.mock.calls.find(c => c[3] === undefined);
-      expect(flush[1]).toEqual(expect.objectContaining({ cuttingwordsUses: expected }));
+      expect(flush[1]).toEqual(expect.objectContaining({ cuttingWordsUses: expected }));
       // preSpent route: the post-route spendUse channel never fires (no double-spend)
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
@@ -279,14 +279,14 @@ describe('reactionDebuffHandler — uses/budget accounting (default route)', () 
       // current 1 passes the front-door exhaustion gate (>0) and stamps 0.
       const action = setupDefaultPath({
         usesExpression: 2,
-        getRuntimeValueReturn: (charKey, key) => (key === 'cuttingwordsUses' ? 1 : undefined),
+        getRuntimeValueReturn: (charKey, key) => (key === 'cuttingWordsUses' ? 1 : undefined),
       });
 
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Bardic Inspiration die');
-      expect(bakedPatch()).toEqual(expect.objectContaining({ cuttingwordsUses: 0 }));
+      expect(bakedPatch()).toEqual(expect.objectContaining({ cuttingWordsUses: 0 }));
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
@@ -301,7 +301,7 @@ describe('reactionDebuffHandler — uses/budget accounting (default route)', () 
       // tracked max 4, unset runtime current → 4−1=3, under the BARDIC key
       const patch = bakedPatch();
       expect(patch).toEqual(expect.objectContaining({ bardicInspirationUses: 3 }));
-      expect(patch).not.toHaveProperty('cuttingwordsUses');
+      expect(patch).not.toHaveProperty('cuttingWordsUses');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
@@ -316,7 +316,7 @@ describe('reactionDebuffHandler — uses/budget accounting (default route)', () 
       expect(bakedPatch()).toEqual({
         _Cutting_Words_usedRound: expect.any(Number),
         _Cutting_Words_appliedAttack: expect.any(String),
-        cuttingwordsUses: 1,
+        cuttingWordsUses: 1,
       });
       expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledTimes(2);
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();

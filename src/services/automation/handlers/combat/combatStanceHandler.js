@@ -1,4 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 import { grantTempHpOnRage } from '../buffs/tempHpBuffHandler.js';
 import { clearExtendedFlag } from '../class-warlock/tempTeleportHandler.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -252,7 +253,7 @@ async function consumeStanceResource({ action, auto, playerStats, campaignName, 
     }
 
     if (maxUses > 0) {
-        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
         if (currentUses <= 0) {
             return stanceRefusal(action, auto, `${action.name} has been used and cannot be used again until a Long Rest.`);

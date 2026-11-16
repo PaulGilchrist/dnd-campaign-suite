@@ -4,10 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { sendDeathSavePrompt } from '../../../combat/conditions/savePromptService.js';
 import utils from '../../../ui/utils.js';
-
-function getRuntimeUsesKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-}
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 
 function barbarianLevelOf(playerStats) {
     return playerStats.class?.class_levels?.find(cl => cl.name === 'Barbarian')?.level || playerStats.level || 1;

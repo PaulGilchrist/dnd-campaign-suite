@@ -10,6 +10,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget, computeDamageAfterSave } from '../../../rules/combat/applyDamage.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { isPolearmWeapon } from '../../common/polearmUtils.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
@@ -167,10 +168,6 @@ async function gateAdjacentDamageReaction(action, auto, playerStats, lastAttackR
 function getChosenResistanceTypes(playerName, campaignName) {
     const stored = getRuntimeValue(playerName, '_Energy_Resistances_chosenTypes', campaignName);
     return Array.isArray(stored) ? stored : [];
-}
-
-function getRuntimeUsesKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
 async function consumeResourceCost(auto, playerStats, campaignName, actionName) {

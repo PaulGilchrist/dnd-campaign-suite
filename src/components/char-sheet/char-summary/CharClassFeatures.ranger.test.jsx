@@ -99,7 +99,7 @@ function renderRanger(playerStats) {
 }
 
 const WIS_GATED_RESOURCES = [
-  ['dreadambushUses', 'Dread Ambush'],
+  ['dreadAmbushUses', 'Dread Ambush'],
   ['tirelessUses', 'Tireless'],
   ['naturesVeilUses', "Nature's Veil"],
 ];
@@ -126,9 +126,9 @@ describe('RangerFeatures', () => {
     it.each([
       [1, []],
       [2, ['favoredEnemyUses']],
-      [3, ['favoredEnemyUses', 'dreadambushUses']],
-      [10, ['favoredEnemyUses', 'dreadambushUses', 'tirelessUses']],
-      [14, ['favoredEnemyUses', 'dreadambushUses', 'tirelessUses', 'naturesVeilUses']],
+      [3, ['favoredEnemyUses', 'dreadAmbushUses']],
+      [10, ['favoredEnemyUses', 'dreadAmbushUses', 'tirelessUses']],
+      [14, ['favoredEnemyUses', 'dreadAmbushUses', 'tirelessUses', 'naturesVeilUses']],
     ])('at level %i renders exactly these tracked resources: %j', (level, presentKeys) => {
       const section = renderRanger(rangerStats(level));
       const allResources = [['favoredEnemyUses', 'Favored Enemy'], ...WIS_GATED_RESOURCES];

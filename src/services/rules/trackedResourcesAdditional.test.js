@@ -347,11 +347,11 @@ describe('computeTrackedResources — additional seed lanes', () => {
   // :313-314 — same wisGatedPool helper, level>=6 gate (#1515 family;
   // _Star_Map level>=3 gate at :316 is subclass-lane-owned, not here).
   // fix#134 (#1532-b): the "cap should be 1" claim is DISPROVEN-BYTE-CITED
-  // in the census test below — disk law for cosmicomenUses is max(WIS,1);
+  // in the census test below — disk law for cosmicOmenUses is max(WIS,1);
   // the ONE-per-LR law rides the DIFFERENT key cosmicOmenEffect
   // (restRules-longRest.js resetStarMapOnLongRest). Consumers honor the
   // seed max: cosmicOmenHandler.js :11-31 + TrackedResourceInput.jsx :13.
-  it('cosmicomenUses: max(WIS,1) Stars druid at lv6 boundary, 0 below gate or off-circle', () => {
+  it('cosmicOmenUses: max(WIS,1) Stars druid at lv6 boundary, 0 below gate or off-circle', () => {
     const rows = [
       ['major Stars lv8 WIS 3', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 3 }], level: 8 }), { current: 3, max: 3 }],
       ['subclass Stars lv6 WIS 2 (gate boundary)', basePlayerStats({ class: druid({ subclass: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 2 }], level: 6 }), { current: 2, max: 2 }],
@@ -360,7 +360,7 @@ describe('computeTrackedResources — additional seed lanes', () => {
       ['Moon lv10 -> ABSENT', basePlayerStats({ class: druid({ major: { name: 'Circle of the Moon' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 10 }), ABSENT],
       ['Stars lv8 WIS no bonus -> 1', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom' }], level: 8 }), { current: 1, max: 1 }],
     ];
-    for (const [label, stats, expected] of rows) expectPool(stats, ['cosmicomenUses'], expected, label);
+    for (const [label, stats, expected] of rows) expectPool(stats, ['cosmicOmenUses'], expected, label);
   });
 
   // fix#134 (#1532-b) disk census: quote the omen law bytes this seed

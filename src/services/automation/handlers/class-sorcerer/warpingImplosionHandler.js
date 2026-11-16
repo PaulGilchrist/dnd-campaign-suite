@@ -7,6 +7,7 @@ import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../../hooks/c
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 
 const TELEPORT_RANGE_FEET = 120;
 
@@ -29,7 +30,7 @@ function getEmanationRange(auto, playerStats, playerName, campaignName) {
 }
 
 function resolveUsesKey(auto, featureName) {
-    return auto.resourceKey || (featureName.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    return auto.resourceKey || getRuntimeUsesKey(featureName);
 }
 
 function buildImplosionPayload({ action, playerStats, campaignName, mapData, attackerPos, saveDcValue, rangeFeet, canRestore, currentUses }) {

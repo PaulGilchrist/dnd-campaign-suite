@@ -3,7 +3,8 @@ import { addEntry } from '../../../ui/logService.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
-import { getRuntimeUsesKey, GIANT_ANCESTRY_KEY, GIANT_OPTIONS, getOptionByName } from './giantAncestryOptions.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
+import { GIANT_ANCESTRY_KEY, GIANT_OPTIONS, getOptionByName } from './giantAncestryOptions.js';
 
 export async function confirmGiantAncestry(playerStats, chosenOption, campaignName) {
     await setRuntimeValue(playerStats.name, GIANT_ANCESTRY_KEY, chosenOption, campaignName);

@@ -93,7 +93,7 @@ const GOBLIN = { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 20 };
 
 function mockRuntimeValues(values) {
   useRuntimeState.getRuntimeValue.mockImplementation((_subject, key, _campaign) => {
-    if (key === 'searingvengeanceUses') return values.searingvengeanceUses;
+    if (key === 'searingVengeanceUses') return values.searingVengeanceUses;
     if (key === 'activeConditions') return values.activeConditions;
     return null;
   });
@@ -123,7 +123,7 @@ function goblinConditionWrites() {
 describe('confirmSearingVengeance - confirm path', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRuntimeValues({ searingvengeanceUses: 1, activeConditions: [] });
+    mockRuntimeValues({ searingVengeanceUses: 1, activeConditions: [] });
     mockCombatCreatures([GOBLIN]);
     // this lane's MOCKED heal contract — real path is heal-lane canonical
     applyHealing.applyHealingToTarget.mockReturnValue({ actualHeal: 25, oldHp: 0, newHp: 25, maxHp: 50 });
@@ -171,7 +171,7 @@ describe('confirmSearingVengeance - confirm path', () => {
       { label: 'null stored conditions treated as empty array', stored: null, expectedWrite: ['blinded'] },
       { label: 'non-array stored conditions treated as empty array', stored: 'blinded', expectedWrite: ['blinded'] },
     ])('writes blinded exactly once for $label', async ({ stored, expectedWrite }) => {
-      mockRuntimeValues({ searingvengeanceUses: 1, activeConditions: stored });
+      mockRuntimeValues({ searingVengeanceUses: 1, activeConditions: stored });
 
       await runConfirm();
 

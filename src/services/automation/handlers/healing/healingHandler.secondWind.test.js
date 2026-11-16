@@ -243,15 +243,15 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
         type: 'self_healing',
         healExpression: '3 * monk_level',
         uses: 1,
-        resourceKey: 'wholenessofbodyUses',
+        resourceKey: 'wholenessOfBodyUses',
         recharge: 'long_rest',
       },
     };
-    runtimeMap({ wholenessofbodyUses: 1, currentHitPoints: 89 });
+    runtimeMap({ wholenessOfBodyUses: 1, currentHitPoints: 89 });
 
     await handle(action, makeFighterStats(), campaignName, null);
 
     expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(expect.anything(), 'EvasiveFighter', 54, campaignName);
-    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'wholenessofbodyUses', 0, campaignName, true);
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'wholenessOfBodyUses', 0, campaignName, true);
   });
 });

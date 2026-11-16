@@ -174,7 +174,7 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
              {isLifeDomain && (
                  <TrackedResourceInput label="Preserve Life Pool" resourceKey="preserveLifePool" playerName={playerStats.name} getMax={() => preserveLifePoolMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              )}
-             <TrackedResourceInput label="Warding Flare Uses" resourceKey="wardingflareUses" playerName={playerStats.name} getMax={() => Math.max(1, wisMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+             <TrackedResourceInput label="Warding Flare Uses" resourceKey="wardingFlareUses" playerName={playerStats.name} getMax={() => Math.max(1, wisMod)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
          </div>
     );
 };
@@ -301,7 +301,7 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                 {isCircleOfTheStars && playerStats.level >= 6 && (
                     <>
                         <CosmicOmenBadge cosmicOmenEffect={cosmicOmenEffect} />
-                        <TrackedResourceInput label="Cosmic Omen Uses" resourceKey="cosmicomenUses" playerName={playerStats.name} getMax={() => Math.max(abilityBonus(playerStats, 'Wisdom'), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                        <TrackedResourceInput label="Cosmic Omen Uses" resourceKey="cosmicOmenUses" playerName={playerStats.name} getMax={() => Math.max(abilityBonus(playerStats, 'Wisdom'), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                         <TrackedResourceInput label="Star Map Free Casts" resourceKey="_Star_Map_freeCastCount" playerName={playerStats.name} getMax={() => Math.max(abilityBonus(playerStats, 'Wisdom'), 1)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                     </>
                 )}
@@ -577,7 +577,7 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
     return (
           <div data-testid="char-class-ranger">
               {playerStats.level >= 3 && (
-                  <TrackedResourceInput label="Dread Ambush" resourceKey="dreadambushUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0))} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                  <TrackedResourceInput label="Dread Ambush" resourceKey="dreadAmbushUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0))} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               )}
               {playerStats.level >= 2 && (
                   <TrackedResourceInput label="Favored Enemy" resourceKey="favoredEnemyUses" playerName={playerStats.name} getMax={() => Math.max(1, (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0)} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />

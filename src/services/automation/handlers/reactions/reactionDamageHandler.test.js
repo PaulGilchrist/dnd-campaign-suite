@@ -621,7 +621,7 @@ describe('reactionDamageHandler', () => {
             getRuntimeValue.mockReturnValue(1);
             result = await handle(actionUses, makePlayerStats(), 'test-campaign', null);
             expect(result.payload.description).toContain('CON saving throw');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'reactionstrikeUses', 0, 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'reactionStrikeUses', 0, 'test-campaign');
 
             // Uses exhausted
             getRuntimeValue.mockReturnValue(0);

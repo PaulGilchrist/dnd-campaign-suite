@@ -69,7 +69,7 @@ function makeAction(automation = {}) {
 function mockRuntime({ uses = null, armed = false }) {
     isRestoreBalanceArmed.mockReturnValue(armed);
     getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'restorebalanceUses') return uses;
+        if (key === 'restoreBalanceUses') return uses;
         return null;
     });
 }
@@ -105,10 +105,10 @@ describe('restoreBalanceHandler.handle', () => {
         await handle(makeAction(), makePlayerStats(), campaignName);
 
         expect(getAbilityModifier).toHaveBeenCalledWith(expect.any(Array), 'CHA');
-        expect(getRuntimeValue).toHaveBeenCalledWith('TestSorcerer', 'restorebalanceUses');
+        expect(getRuntimeValue).toHaveBeenCalledWith('TestSorcerer', 'restoreBalanceUses');
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'TestSorcerer',
-            'restorebalanceUses',
+            'restoreBalanceUses',
             2,
             campaignName,
         );
@@ -124,7 +124,7 @@ describe('restoreBalanceHandler.handle', () => {
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'TestSorcerer',
-            'restorebalanceUses',
+            'restoreBalanceUses',
             0,
             campaignName,
         );
@@ -153,7 +153,7 @@ describe('restoreBalanceHandler.handle', () => {
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'TestSorcerer',
-            'restorebalanceUses',
+            'restoreBalanceUses',
             2,
             campaignName,
         );
@@ -168,7 +168,7 @@ describe('restoreBalanceHandler.handle', () => {
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'TestSorcerer',
-            'restorebalanceUses',
+            'restoreBalanceUses',
             0,
             campaignName,
         );

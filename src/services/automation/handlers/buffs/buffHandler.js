@@ -1,4 +1,5 @@
 import { toggleBuff, isBuffActive } from '../../common/buffToggle.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { handle as handleTeleport } from '../class-warlock/tempTeleportHandler.js';
 import { handle as handleVowOfEnmity } from '../class-cleric-paladin/vowOfEnmityHandler.js';
@@ -220,7 +221,7 @@ function tryRetractLongRestFlightBuff({ action, auto, playerStats, targetName, c
 async function gateTrackedBuffUses(action, auto, playerStats, campaignName) {
     if (auto?.uses == null && auto?.usesMax == null) return {};
     const usesMax = resolveBuffUsesMax(auto, playerStats);
-    const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    const usesKey = auto.resourceKey || getRuntimeUsesKey(action.name);
     const gate = await gateBuffUses({ action, auto, playerStats, campaignName, usesMax, usesKey });
     if (gate.popup) return { popup: gate.popup };
     return { usesKey, usesRemaining: gate.usesRemaining };

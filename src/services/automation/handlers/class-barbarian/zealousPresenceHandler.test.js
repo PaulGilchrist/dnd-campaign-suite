@@ -130,7 +130,7 @@ describe('zealousPresenceHandler.handle', () => {
             action.automation.uses = 1;
             useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'zealousPresenceActive') return null;
-                if (key === 'zealouspresenceUses') return 1;
+                if (key === 'zealousPresenceUses') return 1;
                 return undefined;
             });
 
@@ -139,7 +139,7 @@ describe('zealousPresenceHandler.handle', () => {
             expect(result.type).toBe('modal');
             expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
-                'zealouspresenceUses',
+                'zealousPresenceUses',
                 0,
                 campaignName,
             );
@@ -151,7 +151,7 @@ describe('zealousPresenceHandler.handle', () => {
             action.automation.uses = 1;
             useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'zealousPresenceActive') return null;
-                if (key === 'zealouspresenceUses') return 0;
+                if (key === 'zealousPresenceUses') return 0;
                 return undefined;
             });
 
@@ -167,7 +167,7 @@ describe('zealousPresenceHandler.handle', () => {
             }
             expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
                 playerName,
-                'zealouspresenceUses',
+                'zealousPresenceUses',
                 expect.any(Number),
                 campaignName,
             );
@@ -185,7 +185,7 @@ describe('zealousPresenceHandler.handle', () => {
             expect(result.type).toBe('modal');
             expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
-                'zealouspresenceUses',
+                'zealousPresenceUses',
                 1,
                 campaignName,
             );
@@ -216,7 +216,7 @@ describe('zealousPresenceHandler.handle', () => {
             action.automation.uses = 1;
             useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'zealousPresenceActive') return null;
-                if (key === 'zealouspresenceUses') return 0;
+                if (key === 'zealousPresenceUses') return 0;
                 if (key === 'ragePoints') return 3;
                 return undefined;
             });
@@ -237,7 +237,7 @@ describe('zealousPresenceHandler.handle', () => {
             action.automation.uses = 1;
             useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'zealousPresenceActive') return null;
-                if (key === 'zealouspresenceUses') return 0;
+                if (key === 'zealousPresenceUses') return 0;
                 if (key === 'ragePoints') return 0;
                 return undefined;
             });
@@ -262,7 +262,7 @@ describe('zealousPresenceHandler.handle', () => {
             action.automation.uses = 1;
             useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'zealousPresenceActive') return null;
-                if (key === 'zealouspresenceUses') return 0;
+                if (key === 'zealousPresenceUses') return 0;
                 if (key === 'ragePoints') return null;
                 return undefined;
             });

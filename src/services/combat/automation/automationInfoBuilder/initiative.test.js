@@ -45,7 +45,7 @@ describe('initiativeHandlers.initiative_action – envelope contract', () => {
             usesMax: 1,
             recharge: 'long_rest',
             resourceCost: '',
-            resourceKey: 'testfeatureUses',
+            resourceKey: 'testFeatureUses',
             hasAutomation: true,
         })
 
@@ -71,7 +71,7 @@ describe('initiativeHandlers.initiative_action – envelope contract', () => {
             usesMax: 1,
             recharge: 'long_rest',
             resourceCost: '',
-            resourceKey: 'testfeatureUses',
+            resourceKey: 'testFeatureUses',
             hasAutomation: true,
         })
     })
@@ -102,7 +102,7 @@ describe('initiativeHandlers.initiative_action – envelope contract', () => {
             resourceCost: 'luck_points',
             // derivation strips whitespace and lowercases only — punctuation
             // is preserved, so consumers must match exactly.
-            resourceKey: "watcher'sdawnUses",
+            resourceKey: "watchersDawnUses",
             hasAutomation: true,
         })
     })
@@ -142,7 +142,7 @@ const EXPECTED_DISK_ENVELOPES = {
         usesMax: 1,
         recharge: 'long_rest',                             // disk silent — builder default
         resourceCost: 'bardic_inspiration',                // verbatim (disk)
-        resourceKey: 'superiorinspirationUses',
+        resourceKey: 'superiorInspirationUses',
         hasAutomation: true,
     },
     'Tandem Footwork': {
@@ -155,7 +155,7 @@ const EXPECTED_DISK_ENVELOPES = {
         usesMax: 1,
         recharge: 'long_rest',                           // disk silent — builder default
         resourceCost: 'bardic_inspiration',              // verbatim (disk)
-        resourceKey: 'tandemfootworkUses',
+        resourceKey: 'tandemFootworkUses',
         hasAutomation: true,
         // disk's bonusExpression:'bardic_inspiration_die' and range:'30 ft'
         // are deliberately DROPPED — execution re-derives them
@@ -175,7 +175,7 @@ const EXPECTED_DISK_ENVELOPES = {
         // and derives from the name. Consumers route by effect key
         // (useInitiativeEffects/initiativeHandler lanes), so this divergence
         // is tolerated insurance, pinned honestly.
-        resourceKey: 'evergreenwildshapeUses',
+        resourceKey: 'evergreenWildShapeUses',
         hasAutomation: true,
     },
     'Uncanny Metabolism': {
@@ -189,7 +189,7 @@ const EXPECTED_DISK_ENVELOPES = {
         usesMax: 1,
         recharge: 'long_rest',                          // disk says the same — default-coincidence
         resourceCost: '',                               // disk silent despite focus-point name
-        resourceKey: 'uncannymetabolismUses',
+        resourceKey: 'uncannyMetabolismUses',
         hasAutomation: true,
     },
 }

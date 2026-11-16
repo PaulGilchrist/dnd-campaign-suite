@@ -1,4 +1,5 @@
 import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRoller.js';
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
@@ -61,7 +62,7 @@ function healDesc(actualHeal) {
 }
 
 function usesKeyFor(action, auto) {
-    return auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+    return auto.resourceKey || getRuntimeUsesKey(action.name);
 }
 
 async function markFortifiedIfHealed(playerStats, campaignName, actualHeal, bonusDetails) {

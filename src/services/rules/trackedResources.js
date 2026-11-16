@@ -12,15 +12,17 @@ export const ALL_TRACKED_RESOURCES = [
   'bardicInspirationUses',
   'wildShapeUses',
   // improve tracked-resource-ghost-keys (case-dup pass, 2026-11-14): the
-  // legacy lower-case feature-name-derived twins 'secondwindUses' /
-  // 'actionsurgeUses' are RETIRED from the catalog + seed. The camelCase
+  // legacy all-lowercase feature-name-derived twins (Second Wind / Action Surge)
+  // are RETIRED from the catalog + seed. The camelCase
   // spellings below are canonical: they are the disk automation-id casing
   // (public/data{,/2024}/classes.json "resourceKey": "secondWindUses"), the
   // TrackedResourceInput UI keys (CharClassFeatures.jsx), the short-rest
   // label keys and the direct handler lane (tacticalMindHandler,
-  // restRules-shortRest). The only lowercase consumer left is the
-  // automationInfoBuilder derivation (feature.name.toLowerCase()+'Uses',
-  // extra_action/initiative) — extraActionHandler writes that runtime row
+  // restRules-shortRest). The former lowercase consumer — the
+  // automationInfoBuilder derivation (extra_action/initiative) — now routes
+  // through the shared src/services/shared/usesKey.js helper (2026-11-15
+  // convergence), so it derives this same camelCase casing too.
+  // extraActionHandler writes that runtime row
   // itself on first press (null-tolerant `?? usesMax` gate) and
   // SHORT_REST_RESOURCES re-arms it; a seed row was never required.
   'secondWindUses',
@@ -39,12 +41,12 @@ export const ALL_TRACKED_RESOURCES = [
   'arcaneWardMax',
   'warlockPactMagic',
   'sorcerousRestorationUses',
-  'uncannymetabolismUses',
+  'uncannyMetabolismUses',
   'rageOfTheGodsUses',
   'warPriestUses',
   'luckyPoints',
   'divineInterventionUses',
-  'wholenessofbodyUses',
+  'wholenessOfBodyUses',
   'adrenalineRushUses',
   'naturesVeilUses',
   'favoredEnemyUses',
@@ -53,10 +55,10 @@ export const ALL_TRACKED_RESOURCES = [
   'stormsThunderUses',
   'tirelessUses',
   'moonlightStepUses',
-  'dreadambushUses',
-  'cosmicomenUses',
+  'dreadAmbushUses',
+  'cosmicOmenUses',
   // CLA-364 BUG-A: tranceOfOrderUses removed — handler-owned null-as-available
-  // latch (warpingimplosionUses pattern); the seed here persisted a grant-time
+  // latch (warpingImplosionUses pattern); the seed here persisted a grant-time
   // 0 that killed the free once-per-Long-Rest use (see addRestorationAndTranceResources).
   'shortRestHitDice',
   'spell_slots_level_1',
@@ -158,7 +160,7 @@ export const GATED_TRACKED_KEYS = [
   'wildShapeUses',            // features.maxWildShapeUses > 0 (Druid)
   'naturalRecoverySlots',     // Druid at/over the per-edition grant level
   'moonlightStepUses',        // Circle of the Moon Druid
-  'cosmicomenUses',           // Circle of the Stars Druid lv6+
+  'cosmicOmenUses',           // Circle of the Stars Druid lv6+
   '_Star_Map_freeCastCount',  // Circle of the Stars Druid lv3+
   'naturesVeilUses',          // 2024 Ranger lv14 (fix#134 version guard)
   'favoredEnemyUses',         // class Ranger (fix#346 gate)
@@ -168,9 +170,9 @@ export const GATED_TRACKED_KEYS = [
   'stormsThunderUses',        // subrace trait "Storm's Thunder" (Goliath)
   // misc lane — owner = automation/feat/class-boost grants
   'sorcerousRestorationUses', // resource_restoration passive present
-  'uncannymetabolismUses',    // features.uncannymetabolismUses > 0 (TotM Barbarian lv18)
+  'uncannyMetabolismUses',    // features.uncannyMetabolismUses > 0 (TotM Barbarian lv18)
   'luckyPoints',              // 'Lucky' feat present
-  'wholenessofbodyUses',      // Monk lv6+
+  'wholenessOfBodyUses',      // Monk lv6+
   'featsOfChaosUses',         // 2024 Wild Magic Sorcery OR feats_of_chaos automation
   // pool lane (03e419d35 — the reference implementation this pass mirrors)
   'healinglightPool',         // Celestial Patron Warlock
@@ -185,8 +187,8 @@ export const GATED_TRACKED_KEYS = [
 export const HANDLER_OWNED_LATCH_KEYS = [
   // null-as-available sorcery latches (CLA-364 BUG-A family): a 0-seed kills
   // the free use; null = free use available; never in `_trackedResources`:
-  'tranceOfOrderUses', 'warpingimplosionUses', 'restorebalanceUses',
-  'restoreBalanceArmed', 'healinghandsUses',
+  'tranceOfOrderUses', 'warpingImplosionUses', 'restoreBalanceUses',
+  'restoreBalanceArmed', 'healingHandsUses',
   // lazy dice-pool ledgers — healingPoolHandler derives '<lowername>Pool' at
   // first use (2024/classes.json Barbarian 'Warrior of the Gods'): even the
   // owner never seeds it, so the LR fan is the ONLY re-arm — ungateable:
@@ -194,7 +196,7 @@ export const HANDLER_OWNED_LATCH_KEYS = [
   // automation-derived uses latches written by their spending handler with the
   // `stored ?? uses` fallback (disk resourceKey or feature-name derivation):
   'rageOfTheGodsUses', 'zealousPresenceUses', 'intimidatingPresenceUses',
-  'psychicveilUses', 'dreadambushUses', 'tamedSurgeUses', 'thief\'sreflexesUses',
+  'psychicVeilUses', 'dreadAmbushUses', 'tamedSurgeUses', 'thiefsReflexesUses',
   '_celestialRevelationUses', 'indomitableUses', 'magicalCunningUsed',
   'wildResurgenceReversedThisRest', 'countercharmUses',
   'draconicFlightUsed', 'dragonWingsUses', 'memorizeSpellUsedSinceRest',
@@ -335,8 +337,8 @@ function addMartialResources(resources, { playerStats, classLevel, is2024 }) {
     resources.secondWindUses = { current: maxSW, max: maxSW }
   }
   // CASE-DUP RETIRED (2026-11-14 criteria pass): the old
-  // `resources.secondwindUses` twin seed fanned a second casing of the same
-  // latch into every bucket. No consumer reads `secondwindUses` — Second Wind
+  // all-lowercase Second Wind twin seed fanned a second casing of the same
+  // latch into every bucket. No consumer reads that twin — Second Wind
   // spends through the disk resourceKey 'secondWindUses' (classes.json 5e
   // :5560 / 2024 :4512, healingHandler, tacticalMindHandler, CharSheet
   // handlers, ShortRestModal). camelCase is canonical; twin deleted.
@@ -345,10 +347,11 @@ function addMartialResources(resources, { playerStats, classLevel, is2024 }) {
   if (maxAS > 0) {
     resources.actionSurgeUses = { current: maxAS, max: maxAS }
   }
-  // CASE-DUP RETIRED: `actionsurgeUses` (feature-name derivation casing) is
+  // CASE-DUP RETIRED: the all-lowercase Action Surge twin (feature-name derivation casing) is
   // no longer SEEDED. Its one live consumer — extraActionHandler spending the
-  // automationInfoBuilder-derived resourceKey (diverse.js:24
-  // 'Action Surge'->'actionsurgeUses') — is null-tolerant (`getRuntimeValue
+  // automationInfoBuilder-derived resourceKey (diverse.js derives through the
+  // shared helper: 'Action Surge'->'actionSurgeUses' since the 2026-11-15
+  // uses-key convergence) — is null-tolerant (`getRuntimeValue
   // ?? usesMax`) and writes its own runtime row on first press, re-armed by
   // SHORT_REST_RESOURCES. The UI/tracked lane canonicalizes on camelCase
   // 'actionSurgeUses' (CharClassFeatures TrackedResourceInput).
@@ -610,7 +613,7 @@ function addDruidPrimalResources(resources, { playerStats, features, wis, is2024
   const isMoonCircle = isDruid && matchesPatron(playerStats, ['Circle of the Moon'])
   seedOwnedPool(resources, isMoonCircle, 'moonlightStepUses', wisGatedPool(wis))
 
-  // #1532-b DISPROVEN-BYTE-CITED: disk law for cosmicomenUses IS the WIS
+  // #1532-b DISPROVEN-BYTE-CITED: disk law for cosmicOmenUses IS the WIS
   // gate — 2024/classes.json Circle of the Stars lv6 'Cosmic Omen': "You can
   // use this Reaction a number of times equal to your Wisdom modifier
   // (minimum of once), and you regain all expended uses when you finish a
@@ -621,7 +624,7 @@ function addDruidPrimalResources(resources, { playerStats, features, wis, is2024
   // contradict the disk; consumers honor max (cosmicOmenHandler.js :11-31,
   // TrackedResourceInput.jsx max={max} :13).
   const isStarsCircle = isDruid && matchesPatron(playerStats, ['Circle of the Stars'])
-  seedOwnedPool(resources, isStarsCircle && playerStats.level >= 6, 'cosmicomenUses', wisGatedPool(wis))
+  seedOwnedPool(resources, isStarsCircle && playerStats.level >= 6, 'cosmicOmenUses', wisGatedPool(wis))
 
   // Star Map free-cast latch: owned-only like cosmicomen (the disk grant is
   // lv3; resetStarMapOnLongRest re-writes the owner's value at LR anyway).
@@ -674,11 +677,11 @@ function addRestorationAndTranceResources(resources, { playerStats, features }) 
   // by every full-store POST; applyServerOverride re-applied the stuck 0), so
   // the first-press null-as-available fallback in tranceOfOrderHandler never
   // fired and the free once-per-Long-Rest use cost 5 SP. Mirrors the
-  // warpingimplosionUses pattern.
+  // warpingImplosionUses pattern.
 
-  const maxUM = (features?.uncannymetabolismUses || 0)
+  const maxUM = (features?.uncannyMetabolismUses || 0)
   if (maxUM > 0) {
-    resources.uncannymetabolismUses = { current: maxUM, max: maxUM }
+    resources.uncannyMetabolismUses = { current: maxUM, max: maxUM }
   }
 }
 
@@ -695,7 +698,7 @@ function addLuckyAndMonkResources(resources, { playerStats }) {
 
   const isMonk = playerStats.class?.name === 'Monk'
   if (isMonk && playerStats.level >= 6) {
-    resources.wholenessofbodyUses = { current: 1, max: 1 }
+    resources.wholenessOfBodyUses = { current: 1, max: 1 }
   }
 }
 

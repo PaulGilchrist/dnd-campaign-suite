@@ -1,3 +1,5 @@
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
+
 export const diverseHandlers = {
     'divine_intervention': (feature, _playerStats) => {
         const auto = feature.automation
@@ -21,7 +23,7 @@ export const diverseHandlers = {
             oncePerTurn: !!auto.oncePerTurn,
             oncePerCombat: !!auto.oncePerCombat,
             firstRoundOnly: !!auto.firstRoundOnly,
-            resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Uses',
+            resourceKey: getRuntimeUsesKey(feature.name),
             hasAutomation: true
         }
     },

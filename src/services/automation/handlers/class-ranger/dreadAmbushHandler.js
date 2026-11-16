@@ -7,7 +7,7 @@ import { loadCombatSummary, getCurrentCombatRound } from '../../../encounters/co
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const DREAD_AMBUSH_USED_THIS_TURN_KEY = 'dreadAmbushUsedThisTurn';
-const DREAD_AMBUSH_USES_KEY = 'dreadambushUses';
+const DREAD_AMBUSH_USES_KEY = 'dreadAmbushUses';
 
 // Resolve damage expression with scaling
 function resolveDreadAmbushDamageExpr(auto, playerStats) {

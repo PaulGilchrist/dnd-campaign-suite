@@ -12,7 +12,7 @@ const DragonbornFeatures = function DragonbornFeatures({ playerStats, campaignNa
         <div className="race-features">
             <TrackedResourceInput
                 label="Breath Weapon"
-                resourceKey="breathweaponUses"
+                resourceKey="breathWeaponUses"
                 playerName={playerStats.name}
                 getMax={() => maxUses}
                 deps={[playerStats.level]}

@@ -80,7 +80,7 @@ function spellCastStamp(overrides = {}) {
 
 function mockUses(uses, lastAttack) {
     getRuntimeValue.mockImplementation((name, key, _campaign) => {
-        if (key === 'spellthiefUses') return uses;
+        if (key === 'spellThiefUses') return uses;
         if (name === 'campaign' && key === 'lastAttack') return lastAttack !== undefined ? lastAttack : spellCastStamp();
         return null;
     });
@@ -122,7 +122,7 @@ describe('spellThiefHandler', () => {
             expect(result.payload.description).toContain('INT save');
             expect(result.payload.description).toContain('DC 13');
             // the defaulted use is consumed
-            expect(setRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellthiefUses', 0, 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellThiefUses', 0, 'test-campaign');
         });
     });
 
@@ -299,7 +299,7 @@ describe('spellThiefHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellthiefUses', 0, 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellThiefUses', 0, 'test-campaign');
         });
     });
 
@@ -315,7 +315,7 @@ describe('spellThiefHandler', () => {
             const result = await handle(action, makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.name).toBe('Custom Feature');
-            expect(getRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'customfeatureUses');
+            expect(getRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'customFeatureUses');
         });
     });
 
@@ -324,7 +324,7 @@ describe('spellThiefHandler', () => {
             mockUses(1);
             buildSaveDc.mockReturnValue(13);
             getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
+                if (_key === 'spellThiefUses') return 1;
                 if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp({ attackerName: 'HiddenAttacker' });
                 return null;
             });
@@ -346,7 +346,7 @@ describe('spellThiefHandler', () => {
             mockUses(1);
             buildSaveDc.mockReturnValue(13);
             getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
+                if (_key === 'spellThiefUses') return 1;
                 if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp({ attackerName: 'HiddenAttacker', attackName: 'Hidden Spell' });
                 return null;
             });
@@ -390,7 +390,7 @@ describe('spellThiefHandler', () => {
 
         it('does not rewrite any blocked/stolen list when the entry is already present', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'spellthiefUses') return 1;
+                if (key === 'spellThiefUses') return 1;
                 if (name === 'campaign' && key === 'lastAttack') return spellCastStamp();
                 if (name === 'FighterRogue' && key === '_spellThiefBlockedList') return JSON.stringify([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
                 if (name === 'FighterRogue' && key === '_spellThiefStolenList') return JSON.stringify([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
@@ -407,7 +407,7 @@ describe('spellThiefHandler', () => {
 
         it('creates from null, parses "[]", and appends to existing — one per stored-state branch', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'spellthiefUses') return 1;
+                if (key === 'spellThiefUses') return 1;
                 if (name === 'campaign' && key === 'lastAttack') return spellCastStamp();
                 if (name === 'FighterRogue' && key === '_spellThiefBlockedList') return '[]';
                 if (name === 'Goblin' && key === '_spellThiefCasterBlock') return JSON.stringify([{ thiefName: 'OtherThief', spellName: 'Other Spell' }]);
@@ -590,7 +590,7 @@ describe('spellThiefHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no recent spell cast');
             expect(createSaveListener).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('FighterRogue', 'spellthiefUses', 0, 'test-campaign');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('FighterRogue', 'spellThiefUses', 0, 'test-campaign');
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'automation',
                 automationType: 'spell_thief_refused',

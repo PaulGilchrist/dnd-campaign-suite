@@ -460,7 +460,7 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
 
   const hasImprovedWardingFlare = playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare')
   if (hasImprovedWardingFlare) {
-    updates.wardingflareUses = null
+    updates.wardingFlareUses = null
   }
 
   // fix#354(a) REFUTED-VERIFIED (fix#337S stamp ledger :1813 adjudicated by

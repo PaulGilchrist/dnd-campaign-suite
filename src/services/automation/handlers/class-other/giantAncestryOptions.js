@@ -52,11 +52,6 @@ export const GIANT_OPTIONS = [
     },
 ];
 
-export function getRuntimeUsesKey(featureName) {
-    const cleaned = featureName.toLowerCase().replace(/'/g, '');
-    return cleaned.replace(/ (\w)/g, (_, c) => c.toUpperCase()) + 'Uses';
-}
-
 export function getOptionByName(name) {
     return GIANT_OPTIONS.find(o => o.name === name);
 }

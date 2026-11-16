@@ -56,7 +56,7 @@ export function defaultBeforeEach(imports) {
     findLastAttack.mockResolvedValue(makeHitAttack());
     loadCombatSummary.mockResolvedValue({});
     getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-        if (key === 'dreadambushUses') return 2;
+        if (key === 'dreadAmbushUses') return 2;
         if (key === 'dreadAmbushUsedThisTurn') return undefined;
         if (key === 'characters') return [];
         return undefined;

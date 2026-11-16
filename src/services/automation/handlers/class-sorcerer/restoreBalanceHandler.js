@@ -2,10 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { armRestoreBalance, isRestoreBalanceArmed } from '../../../combat/restoreBalanceState.js';
-
-function getRuntimeUsesKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-}
+import { getRuntimeUsesKey } from '../../../shared/usesKey.js';
 
 export async function handle(action, playerStats, campaignName) {
     const featureName = action.name || 'Restore Balance';

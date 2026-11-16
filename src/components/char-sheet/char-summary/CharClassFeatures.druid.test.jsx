@@ -185,7 +185,7 @@ describe('DruidFeatures', () => {
       [20, true],
     ])('at level %i renders cosmic omen tracked resources: %s', (level, expected) => {
       renderDruid(starsStats(level));
-      for (const resourceKey of ['cosmicomenUses', '_Star_Map_freeCastCount']) {
+      for (const resourceKey of ['cosmicOmenUses', '_Star_Map_freeCastCount']) {
         const tracker = screen.queryByTestId(`tracked-resource-${resourceKey}`);
         if (expected) expect(tracker).toBeInTheDocument();
         else expect(tracker).not.toBeInTheDocument();
@@ -198,7 +198,7 @@ describe('DruidFeatures', () => {
       [-2, '1/1'],
     ])('caps cosmic omen and star map max at max(WIS,1) for WIS %i', (wisBonus, expected) => {
       renderDruid(starsStats(6, { abilities: [{ name: 'Wisdom', bonus: wisBonus }] }));
-      expect(screen.getByTestId('tracked-resource-cosmicomenUses'))
+      expect(screen.getByTestId('tracked-resource-cosmicOmenUses'))
         .toHaveTextContent(`Cosmic Omen Uses: ${expected}`);
       expect(screen.getByTestId('tracked-resource-_Star_Map_freeCastCount'))
         .toHaveTextContent(`Star Map Free Casts: ${expected}`);

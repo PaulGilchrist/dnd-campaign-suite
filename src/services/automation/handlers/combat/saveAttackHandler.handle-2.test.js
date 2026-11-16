@@ -138,7 +138,7 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'TestCaster',
-        'breathweaponUses',
+        'breathWeaponUses',
         0,
         campaignName,
       );

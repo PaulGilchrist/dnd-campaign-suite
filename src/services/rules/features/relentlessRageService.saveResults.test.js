@@ -7,7 +7,7 @@
 // (header :24 cites this file's former :159-167 uses-bump; :7 cites former
 // :169 HP=0-spawn — new ranges reported in the maintenance summary).
 //
-// WRITER RECONCILIATION (#1399 ':159-167' vs #1400 ':194'): relentlessrageUses
+// WRITER RECONCILIATION (#1399 ':159-167' vs #1400 ':194'): relentlessRageUses
 // has EXACTLY ONE writer line in this module — :194, inside handleSaveResult
 // AFTER the if/else, so it consumes on BOTH branches (this lane pins the
 // bump-on-success half; consume-even-on-fail is pinned by every deathSaves
@@ -207,7 +207,7 @@ function makeComputed(barbarianLevel = 13, healExpression = '2 * barbarian_level
 // monotonic guid keeps it permanently inert).
 const READ_SPEC = {
   activeBuffs: 3,
-  relentlessrageUses: 2, // quirk :71 — campaign arg omitted (check lane co-pin)
+  relentlessRageUses: 2, // quirk :71 — campaign arg omitted (check lane co-pin)
   currentHitPoints: 3, // failure-branch gate :143 only — success never reads HP
   activeConditions: 3, // success-branch :109 only
 };
@@ -217,7 +217,7 @@ const WRITE_KEYS = new Set([
   'deathFailures',
   'isDead',
   'activeConditions',
-  'relentlessrageUses',
+  'relentlessRageUses',
 ]);
 
 function makeStore(seed) {
@@ -268,7 +268,7 @@ describe('relentlessRageService - save result handling', () => {
   it('success writes the full heal/clear/bump budget once with expression-driven HP and exact log bytes', async () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       activeConditions: ['Unconscious', 'blinded'], // case bait :111 — lowercased match filters only unconscious
     });
     const creature = makeCreature();
@@ -293,9 +293,9 @@ describe('relentlessRageService - save result handling', () => {
       ['deathFailures', [false, false, false]],
       ['isDead', 0],
       ['activeConditions', ['blinded']],
-      ['relentlessrageUses', 1],
+      ['relentlessRageUses', 1],
     ]);
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'activeConditions']);
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses', 'activeConditions']);
     expect(store.state.currentHitPoints).toBe(26);
     expect(creature.currentHp).toBe(26); // :103 mutates the caller's creature by design
     // Exact log census — trigger + success entries, byte-identical, em-dash
@@ -326,7 +326,7 @@ describe('relentlessRageService - save result handling', () => {
     // with cleared death saves. Log bytes mirror the CLAMPED committed value.
     const zeroStore = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       activeConditions: ['stunned'], // filter targets ONLY unconscious — survivor unchanged
     });
     const zeroCreature = makeCreature();
@@ -340,21 +340,21 @@ describe('relentlessRageService - save result handling', () => {
       ['deathFailures', [false, false, false]],
       ['isDead', 0],
       ['activeConditions', ['stunned']],
-      ['relentlessrageUses', 1],
+      ['relentlessRageUses', 1],
     ]);
     expect(zeroCreature.currentHp).toBe(1);
     expect(logService.addEntry.mock.calls.slice(2)).toEqual([
       [CAMPAIGN, TRIGGER_LOG(zeroPromptId, 10)],
       [CAMPAIGN, SUCCESS_LOG(1, 10)],
     ]);
-    expect(zeroStore.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'activeConditions']);
+    expect(zeroStore.reads).toEqual(['activeBuffs', 'relentlessRageUses', 'activeConditions']);
     expect(consoleError).not.toHaveBeenCalled();
 
     // #1348 clamp arm: negative evaluation floors at 1 too (distinguishable
     // from the 0 arm only via the store — both commit the identical lawful 1).
     const negStore = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       activeConditions: [],
     });
     const negCreature = makeCreature();
@@ -372,7 +372,7 @@ describe('relentlessRageService - save result handling', () => {
   it('increments uses after save', async () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       activeConditions: [],
     });
     const computed = makeComputed();
@@ -382,8 +382,8 @@ describe('relentlessRageService - save result handling', () => {
     checkRelentlessRage(makeCreature(), computed, CAMPAIGN);
     window.dispatchEvent(new CustomEvent('save-result', { detail: SUCCESS_DETAIL(lastPromptId()) }));
     await flush();
-    expect(store.writes.filter((w) => w[0] === 'relentlessrageUses')).toEqual([['relentlessrageUses', 1]]);
-    expect(store.state.relentlessrageUses).toBe(1);
+    expect(store.writes.filter((w) => w[0] === 'relentlessRageUses')).toEqual([['relentlessRageUses', 1]]);
+    expect(store.state.relentlessRageUses).toBe(1);
 
     // Second fresh trigger after consume (#1307 stateful compose): the
     // reader :71 now sees 1, so DC 15 mirrors into THIS lane's log byte
@@ -393,11 +393,11 @@ describe('relentlessRageService - save result handling', () => {
     const p2 = lastPromptId();
     window.dispatchEvent(new CustomEvent('save-result', { detail: SUCCESS_DETAIL(p2) }));
     await flush();
-    expect(store.writes.filter((w) => w[0] === 'relentlessrageUses')).toEqual([
-      ['relentlessrageUses', 1],
-      ['relentlessrageUses', 2],
+    expect(store.writes.filter((w) => w[0] === 'relentlessRageUses')).toEqual([
+      ['relentlessRageUses', 1],
+      ['relentlessRageUses', 2],
     ]);
-    expect(store.state.relentlessrageUses).toBe(2);
+    expect(store.state.relentlessRageUses).toBe(2);
     expect(logService.addEntry.mock.calls.filter(([, e]) => e?.saveSuccess === true).map(([, e]) => e)).toEqual([
       SUCCESS_LOG(26, 10),
       SUCCESS_LOG(26, 15),
@@ -408,7 +408,7 @@ describe('relentlessRageService - save result handling', () => {
   it('failed save pair: HP>0 spawns nothing, HP<=0 spawns the death prompt once, logs settled', async () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       currentHitPoints: 7, // >0 half; errors lane owns the rejection twins at 5/0 (#1401)
     });
     const computed = makeComputed();
@@ -418,8 +418,8 @@ describe('relentlessRageService - save result handling', () => {
     window.dispatchEvent(new CustomEvent('save-result', { detail: FAIL_DETAIL(p1) }));
     // Failure branch is synchronous up to :194's await: gate read and
     // consume-even-on-fail write are settled before any microtask runs.
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'currentHitPoints']);
-    expect(store.writes).toEqual([['relentlessrageUses', 1]]); // no heal, no clears, no isDead
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses', 'currentHitPoints']);
+    expect(store.writes).toEqual([['relentlessRageUses', 1]]); // no heal, no clears, no isDead
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
 
     await flush();
@@ -440,10 +440,10 @@ describe('relentlessRageService - save result handling', () => {
     expect(dsCall[1]).toEqual({ promptId: dsCall[1].promptId, targetName: NAME }); // exact key set
 
     await flush();
-    expect(store.writes).toEqual([['relentlessrageUses', 1], ['relentlessrageUses', 2]]);
+    expect(store.writes).toEqual([['relentlessRageUses', 1], ['relentlessRageUses', 2]]);
     expect(store.reads).toEqual([
-      'activeBuffs', 'relentlessrageUses', 'currentHitPoints',
-      'activeBuffs', 'relentlessrageUses', 'currentHitPoints',
+      'activeBuffs', 'relentlessRageUses', 'currentHitPoints',
+      'activeBuffs', 'relentlessRageUses', 'currentHitPoints',
     ]);
     // p2 rides uses=1: DC escalates to 15 and mirrors through BOTH failure
     // log bytes (check lane pins DC only on the trigger path pre-resolution).
@@ -459,7 +459,7 @@ describe('relentlessRageService - save result handling', () => {
   it('foreign promptIds are ignored by the guard :93 and the matching id still commits', async () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
-      relentlessrageUses: 0,
+      relentlessRageUses: 0,
       activeConditions: ['unconscious'],
     });
 
@@ -470,7 +470,7 @@ describe('relentlessRageService - save result handling', () => {
     // traffic beyond the two trigger reads, no second log, no prompt.
     window.dispatchEvent(new CustomEvent('save-result', { detail: SUCCESS_DETAIL('not-my-prompt') }));
     expect(store.writes).toEqual([]);
-    expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses']);
+    expect(store.reads).toEqual(['activeBuffs', 'relentlessRageUses']);
     expect(logService.addEntry.mock.calls.length).toBe(1);
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
     expect(combatSpy).not.toHaveBeenCalled();
@@ -484,7 +484,7 @@ describe('relentlessRageService - save result handling', () => {
       ['deathFailures', [false, false, false]],
       ['isDead', 0],
       ['activeConditions', []],
-      ['relentlessrageUses', 1],
+      ['relentlessRageUses', 1],
     ]);
     expect(store.state.currentHitPoints).toBe(26);
 

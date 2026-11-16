@@ -6,7 +6,7 @@
 // round (per-trigger/round latch), and never re-fire unlimited times on one
 // resolved lastAttack. Seam map lives in reactionDebuffHandler.attacksVsAlly.test.js
 // header; this lane owns: wardingFlare te-production (te write + addExpiration +
-// latch stamp), the wardingflareUses setRuntimeValue spendUse post-route channel
+// latch stamp), the wardingFlareUses setRuntimeValue spendUse post-route channel
 // (one of the two TRUE spendUse routes), latch refusal, no-attack/self-attack
 // refusals, and latch re-arm on round wrap.
 // NOT owned here (removed as duplicates / do not re-add): the out-of-range gate
@@ -184,7 +184,7 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
 
   it('spends one use and writes te disadvantage_next_attack on the attacker — no fake second d20', async () => {
     const data = store({
-      'War_Cleric.wardingflareUses': 4,
+      'War_Cleric.wardingFlareUses': 4,
       'campaign.targetEffects': [],
     });
     setupThugAttack();
@@ -206,7 +206,7 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
     ]);
     expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'War_Cleric', targetName: 'Thug 1', effects: [{ type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: 'War_Cleric' }], campaignName, rounds: undefined, expireOnCreatureName: 'War_Cleric' });
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('War_Cleric', '_Warding_Flare_usedRound', 1, campaignName);
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'wardingflareUses', 3, campaignName);
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'wardingFlareUses', 3, campaignName);
 
     const logged = logService.addEntry.mock.calls.map(c => c[1]);
     expect(logged).toEqual(expect.arrayContaining([
@@ -217,7 +217,7 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
 
   it('refuses without spending once it has reacted this round (per-trigger latch)', async () => {
     const data = store({
-      'War_Cleric.wardingflareUses': 3,
+      'War_Cleric.wardingFlareUses': 3,
       'War_Cleric._Warding_Flare_usedRound': 1,
       'campaign.targetEffects': [],
     });
@@ -227,9 +227,9 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('already been used this round');
-    expect(data['War_Cleric.wardingflareUses']).toBe(3);
+    expect(data['War_Cleric.wardingFlareUses']).toBe(3);
     expect(data['campaign.targetEffects']).toEqual([]);
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith('War_Cleric', 'wardingflareUses', expect.anything(), campaignName);
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith('War_Cleric', 'wardingFlareUses', expect.anything(), campaignName);
     expect(expirations.addExpiration).not.toHaveBeenCalled();
 
     const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'warding_flare_refused');
@@ -239,7 +239,7 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
   });
 
   it('refuses and logs with no spend when no recent attack roll exists', async () => {
-    store({ 'War_Cleric.wardingflareUses': 4 });
+    store({ 'War_Cleric.wardingFlareUses': 4 });
     damageUtils.getCombatContext.mockResolvedValue({ round: 1, creatures: [] });
     damageRollback.findLastAttack.mockResolvedValue({ attackEvent: null, attackerName: null, totalDamage: 0 });
 
@@ -247,27 +247,27 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('No recent attack roll');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith('War_Cleric', 'wardingflareUses', expect.anything(), campaignName);
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith('War_Cleric', 'wardingFlareUses', expect.anything(), campaignName);
     const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'warding_flare_refused');
     expect(refusal).toBeTruthy();
   });
 
   it('refuses without spending when the triggering attack is your own', async () => {
-    const data = store({ 'War_Cleric.wardingflareUses': 4 });
+    const data = store({ 'War_Cleric.wardingFlareUses': 4 });
     setupThugAttack({ attackerName: 'War_Cleric' });
 
     const result = await handle(makeWardingFlareAction(), makeCleric(), campaignName, mapName);
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('your own attack');
-    expect(data['War_Cleric.wardingflareUses']).toBe(4);
+    expect(data['War_Cleric.wardingFlareUses']).toBe(4);
     const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'warding_flare_refused');
     expect(refusal).toBeTruthy();
   });
 
   it('re-arms next round: fresh round after spent latch reacts again (one te, one spend)', async () => {
     const data = store({
-      'War_Cleric.wardingflareUses': 2,
+      'War_Cleric.wardingFlareUses': 2,
       'War_Cleric._Warding_Flare_usedRound': 1,
       'campaign.targetEffects': [],
     });
@@ -277,7 +277,7 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
     const result = await handle(makeWardingFlareAction(), makeCleric(), campaignName, mapName);
 
     expect(result.type).toBe('popup');
-    expect(data['War_Cleric.wardingflareUses']).toBe(1);
+    expect(data['War_Cleric.wardingFlareUses']).toBe(1);
     expect(data['War_Cleric._Warding_Flare_usedRound']).toBe(2);
     expect(data['campaign.targetEffects']).toHaveLength(1);
   });

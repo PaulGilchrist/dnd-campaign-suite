@@ -98,7 +98,7 @@ describe('searingVengeance CLA-304 heal math', () => {
 
   it('heals from runtime real maxHp when combatSummary player entry is a 1/1 placeholder', async () => {
     useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
+      if (key === 'searingVengeanceUses') return 1;
       if (subject === 'LightfootHalfling' && key === 'currentHitPoints') return 0;
       if (subject === 'LightfootHalfling' && key === 'hitPoints') return 12;
       return null;
@@ -120,7 +120,7 @@ describe('searingVengeance CLA-304 heal math', () => {
 
   it('burst range gate centers on the healed target, not the caster', async () => {
     useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
+      if (key === 'searingVengeanceUses') return 1;
       if (subject === 'LightfootHalfling' && key === 'currentHitPoints') return 0;
       if (subject === 'LightfootHalfling' && key === 'hitPoints') return 12;
       return null;
@@ -155,7 +155,7 @@ describe('searingVengeance CLA-304 heal math', () => {
       ],
     };
     useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
+      if (key === 'searingVengeanceUses') return 1;
       if (subject === 'LightfootHalfling' && key === 'currentHitPoints') return 0;
       if (subject === 'LightfootHalfling' && key === 'hitPoints') return 12;
       return null;

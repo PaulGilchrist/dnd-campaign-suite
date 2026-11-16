@@ -135,7 +135,7 @@ describe('encouragingSongHandler', () => {
       const result = await handle(makeAction({ usesMax: 0 }), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('modal');
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingsongUses');
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingSongUses');
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
@@ -158,7 +158,7 @@ describe('encouragingSongHandler', () => {
       const action = makeAction();
       const result = await confirmEncouragingSong(action, makePlayerStats(), campaignName, ['Ally1', 'Ally2']);
 
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingsongUses', 0, campaignName);
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingSongUses', 0, campaignName);
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'hasInspiration', true, campaignName);
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally2', 'hasInspiration', true, campaignName);
       expect(result.type).toBe('popup');

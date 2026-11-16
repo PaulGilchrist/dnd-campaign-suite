@@ -101,7 +101,7 @@ describe('ALL_TRACKED_RESOURCES (registry golden)', () => {
       'bardicInspirationUses',
       'wildShapeUses',
       // improve ghost-keys (case-dup pass): the legacy lower-case twins
-      // 'secondwindUses'/'actionsurgeUses' are RETIRED (were intentional
+      // 'secondWindUses'/'actionSurgeUses' are RETIRED (were intentional
       // under the old seed; camelCase is the single canonical casing —
       // see trackedResources.js catalog note).
       'secondWindUses',
@@ -120,12 +120,12 @@ describe('ALL_TRACKED_RESOURCES (registry golden)', () => {
       'arcaneWardMax',
       'warlockPactMagic',
       'sorcerousRestorationUses',
-      'uncannymetabolismUses',
+      'uncannyMetabolismUses',
       'rageOfTheGodsUses',
       'warPriestUses',
       'luckyPoints',
       'divineInterventionUses',
-      'wholenessofbodyUses',
+      'wholenessOfBodyUses',
       'adrenalineRushUses',
       'naturesVeilUses',
       'favoredEnemyUses',
@@ -134,8 +134,8 @@ describe('ALL_TRACKED_RESOURCES (registry golden)', () => {
       'stormsThunderUses',
       'tirelessUses',
       'moonlightStepUses',
-      'dreadambushUses',
-      'cosmicomenUses',
+      'dreadAmbushUses',
+      'cosmicOmenUses',
       // CLA-364 BUG-A: tranceOfOrderUses is NOT here (handler-owned
       // null-as-available latch; a 0-seed killed the free first use).
       'shortRestHitDice',
@@ -226,7 +226,7 @@ describe('computeTrackedResources', () => {
     // Mystic Arcanum levels (Fiend grants no arcanum-free cast here).
     const UNSEEDED_LATCHES = [
       'actionSurgeUsedThisRound',
-      'dreadambushUses',
+      'dreadAmbushUses',
       'isDead',
       'rageOfTheGodsUses',
       'tamedSurgeUses',
@@ -282,7 +282,7 @@ describe('computeTrackedResources', () => {
       maxChannelDivinity: 2,
       maxWildShapeUses: 2,
       arcaneRecoveryLevels: 3,
-      uncannymetabolismUses: 2,
+      uncannyMetabolismUses: 2,
     });
     const result = computeTrackedResources(basePlayerStats());
     expect({
@@ -291,14 +291,14 @@ describe('computeTrackedResources', () => {
       channelDivinityCharges: result.channelDivinityCharges,
       wildShapeUses: result.wildShapeUses,
       arcaneRecoveryLevels: result.arcaneRecoveryLevels,
-      uncannymetabolismUses: result.uncannymetabolismUses,
+      uncannyMetabolismUses: result.uncannyMetabolismUses,
     }).toEqual({
       sorceryPoints: { current: 5, max: 5 },
       innateSorceryUses: { current: 3, max: 3 },
       channelDivinityCharges: { current: 2, max: 2 },
       wildShapeUses: { current: 2, max: 2 },
       arcaneRecoveryLevels: { current: 3, max: 3 },
-      uncannymetabolismUses: { current: 2, max: 2 },
+      uncannyMetabolismUses: { current: 2, max: 2 },
     });
 
     // features undefined (getClassFeatures returns undefined) -> the
@@ -348,8 +348,8 @@ describe('computeTrackedResources', () => {
     // level-3 row must NOT satisfy a level-7 query — unowned data -> ABSENT,
     // not a 0-ghost (owned-only pass).
     const miss = computeTrackedResources(fighter([{ level: 3, second_wind: 1, class_specific: { action_surges: 2 } }]));
-    expect(miss).not.toHaveProperty('secondWindUses');
-    expect(miss).not.toHaveProperty('actionSurgeUses');
+    expect(miss).not.toHaveProperty('secondwindUses');
+    expect(miss).not.toHaveProperty('actionsurgeUses');
   });
 
   it('fighter 2024: actionSurge ladder 17->2, 2->1, <2 ABSENT; non-fighter ABSENT', () => {
@@ -468,8 +468,8 @@ describe('computeTrackedResources', () => {
       ['cleric lvl 10 boundary = 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), level: 10 }), 'divineInterventionUses', { current: 1, max: 1 }],
       ['cleric lvl 9 -> ABSENT (feature grant is lv10)', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), level: 9 }), 'divineInterventionUses', undefined],
       ['cleric gate: wizard lvl 15 -> ABSENT', basePlayerStats({ level: 15 }), 'divineInterventionUses', undefined],
-      ['monk lvl 6 boundary = 1', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 6 }), 'wholenessofbodyUses', { current: 1, max: 1 }],
-      ['monk lvl 5 -> ABSENT (feature grant is lv6)', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 5 }), 'wholenessofbodyUses', undefined],
+      ['monk lvl 6 boundary = 1', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 6 }), 'wholenessOfBodyUses', { current: 1, max: 1 }],
+      ['monk lvl 5 -> ABSENT (feature grant is lv6)', basePlayerStats({ class: wizardClass({ name: 'Monk' }), level: 5 }), 'wholenessOfBodyUses', undefined],
       ['warPriest WIS 3', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), abilities: [{ name: 'Wisdom', bonus: 3 }] }), 'warPriestUses', { current: 3, max: 3 }],
       ['warPriest WIS -2 clamps to 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }), abilities: [{ name: 'Wisdom', bonus: -2 }] }), 'warPriestUses', { current: 1, max: 1 }],
       ['warPriest cleric no WIS entry -> 1', basePlayerStats({ class: wizardClass({ name: 'Cleric' }) }), 'warPriestUses', { current: 1, max: 1 }],

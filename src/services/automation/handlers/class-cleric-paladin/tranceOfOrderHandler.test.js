@@ -218,7 +218,7 @@ describe('Trance of Order Handler', () => {
         });
 
         // CLA-364 BUG-A: null/unset stored uses mean the once-per-Long-Rest
-        // free use is still available (warpingimplosionUses null-as-available
+        // free use is still available (warpingImplosionUses null-as-available
         // pattern — trackedResources no longer seeds 0 at feature grant; Long
         // Rest null-re-arm via restRules-constants LONG_REST_RESOURCES). Even
         // when the player could afford the 5 SP restore, the press is free.

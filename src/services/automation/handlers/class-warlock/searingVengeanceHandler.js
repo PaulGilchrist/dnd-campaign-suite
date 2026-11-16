@@ -8,7 +8,7 @@ import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 
-const USES_KEY = 'searingvengeanceUses';
+const USES_KEY = 'searingVengeanceUses';
 
 function getRealMaxHp(creature, campaignName) {
     if (creature.type === 'player') {

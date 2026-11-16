@@ -129,7 +129,7 @@ describe('reactionSaveHealHandler', () => {
     runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
       if (key === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
       if (key === 'currentHitPoints') return 0;
-      if (key === 'relentlessrageUses') return 0;
+      if (key === 'relentlessRageUses') return 0;
       if (key === 'deathSaves') return [false, false, false];
       if (key === 'deathFailures') return [false, false, false];
       return 0;
@@ -148,7 +148,7 @@ describe('reactionSaveHealHandler', () => {
         if (key === 'ragePoints') return 5;
         if (key === 'activeBuffs') return [];
         if (key === 'currentHitPoints') return 0;
-        if (key === 'relentlessrageUses') return 0;
+        if (key === 'relentlessRageUses') return 0;
         return 0;
       });
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -163,7 +163,7 @@ describe('reactionSaveHealHandler', () => {
         if (key === 'ragePoints') return 0;
         if (key === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
         if (key === 'currentHitPoints') return 0;
-        if (key === 'relentlessrageUses') return 0;
+        if (key === 'relentlessRageUses') return 0;
         return 0;
       });
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -194,7 +194,7 @@ describe('reactionSaveHealHandler', () => {
       runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
         if (key === 'currentHitPoints') return 5;
-        if (key === 'relentlessrageUses') return 0;
+        if (key === 'relentlessRageUses') return 0;
         return 0;
       });
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -206,7 +206,7 @@ describe('reactionSaveHealHandler', () => {
     it('returns popup when uses are exhausted', async () => {
       runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
-        if (key === 'relentlessrageUses') return 1;
+        if (key === 'relentlessRageUses') return 1;
         return 0;
       });
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -333,7 +333,7 @@ describe('reactionSaveHealHandler', () => {
 
       expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
         'TestBarbarian',
-        'specialrageUses',
+        'specialRageUses',
       );
     });
   });
@@ -360,9 +360,9 @@ describe('reactionSaveHealHandler', () => {
       await vi.waitFor(() => {
         const calls = runtimeState.setRuntimeValue.mock.calls;
         const usesCall = calls.find(
-          (call) => call[1] === 'relentlessrageUses',
+          (call) => call[1] === 'relentlessRageUses',
         );
-        expect(usesCall).toEqual(['TestBarbarian', 'relentlessrageUses', 1, campaignName]);
+        expect(usesCall).toEqual(['TestBarbarian', 'relentlessRageUses', 1, campaignName]);
       });
     });
 
@@ -518,7 +518,7 @@ describe('reactionSaveHealHandler', () => {
       runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
         if (key === 'currentHitPoints') return 0;
-        if (key === 'relentlessrageUses') return 0;
+        if (key === 'relentlessRageUses') return 0;
         if (key === 'deathSaves') return [true, true, false];
         if (key === 'deathFailures') return [false, false, false];
         return 0;
