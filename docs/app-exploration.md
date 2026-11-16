@@ -16,10 +16,11 @@
 
 ## Priority Targets (next descent)
 
-1. **Two-tab CONCURRENT full-store write-behind boundary** (open since XB): build the deterministic two-rider rig on `combatSummary`/character buckets (last-writer-wins law already documented; spend a run only if you can propose a NEW boundary worth proving, e.g. PATCH-vs-POST interleaving).
-2. **DeathSavePromptModal resolved-id-guard RACE face** (unchanged — deterministic rig unknown; unit-pinned; carried).
-3. Post-TB improve-tail re-ride (optional; see fold note; carried).
-4. **Hex-POI context-menu post-`77ef39387` keyboard face** — indoor twin lived by XD, hex face blocked (see Blocked ledger); cheap IF a zero-write hex mount rig can avoid the owner-fixture doc-PUT flush.
+1. **Post-TB improve-tail trio re-ride** (OWNER-RATIFIED 2026-11-16: spend a descent — no longer optional): re-live `ec66cb726` save-attribution, `b149b2977` fall-damage row, `b9bae456f` lethal popup — each today carries ONLY fix-run-owned self-verify claims; the RR §11 rig can re-live all three.
+2. **Hex-POI context-menu post-`77ef39387` keyboard face** (OWNER-RATIFIED 2026-11-16: UNBLOCKED): the indoor twin lived by XD and 293 lines of unit pins exist; mounting the owner outdoor fixture (doc-PUT flush) is now SANCTIONED as a dirty→restore rig — exit MUST prove disk byte-restore of all four md5 map pins in Baseline Fingerprints (law recorded in playbook §POI context-menu). Re-live the `g[role=menuitem]` focus/rove/Enter/Escape legs live.
+3. **DeathSavePromptModal resolved-id-guard RACE face** (unchanged — deterministic rig unknown; unit-pinned; carried).
+
+*Retired: the Two-tab CONCURRENT full-store write-behind boundary PT (open since XB) — OWNER ACCEPTED-PER-LAW 2026-11-16: the documented last-writer-wins/stale-tab write-behind law is the durable verdict; never spend a descent on the race rig (playbook §changeData).*
 
 ## Depth Seeds (live 2026-11-16 XE unless noted)
 
@@ -70,7 +71,7 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried).
-- Two-tab CONCURRENT write-behind boundary — no deterministic rig built (see PT#1).
 - `hpPending` PLACEHOLDER positive-face (em-dash render) — unreachable live through the mount-merge defer; fix verified by absence; unit-pinned (carried XC).
-- Post-TB improve-tail trio re-ride — optional, carried unchanged.
-- Hex-POI context-menu post-`77ef39387` keyboard face NOT re-lived live — the refactor shares the exact `MenuOption` seam whose INDOOR twin XD verified end-to-end, plus 293 lines of new unit pins; live re-drive avoided because mounting an owner outdoor fixture fires its debounced whole-doc `PUT /maps` flush (§30 pitfall) — would dirty baseline map bytes.
+- Post-TB improve-tail trio — fix-run self-verify only, not yet re-lived by a descent; OWNER DECISION 2026-11-16: DESCENT APPROVED → Priority Target #1 (no longer "optional").
+- Hex-POI context-menu post-`77ef39387` keyboard face NOT re-lived live — the refactor shares the exact `MenuOption` seam whose INDOOR twin XD verified end-to-end, plus 293 lines of new unit pins; the owner-fixture doc-PUT-flush blocker is RETIRED by OWNER DECISION 2026-11-16: transiently dirtying an owner map is acceptable WITH disk byte-restore to the md5 pin proven at exit → Priority Target #2 (unblocked, still not verified).
+- Two-tab CONCURRENT write-behind boundary — CLOSED 2026-11-16 by OWNER DECISION: accepted-by-law (last-writer-wins documented; do not spend a descent building a race rig).
