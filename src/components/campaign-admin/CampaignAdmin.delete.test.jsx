@@ -5,8 +5,9 @@
  * Lane migrated off the native prompt→confirm→confirm→alert chain to the
  * shared DeleteConfirmModal role="dialog" tier (backlog 2026-11-04 CO):
  * the typed-name gate lives INSIDE the dialog, there is ONE confirm button
- * that renders DISABLED until the exact name is typed (owner decision
- * 2026-11-11 — flipped from the old enabled-until-click gate), and failure
+ * that renders DISABLED until the typed name matches (owner decision
+ * 2026-11-11 — flipped from the old enabled-until-click gate; match is
+ * trimmed + case-insensitive per backlog 2026-11-16 XC), and failure
  * copy is inline (role="alert") — never a native prompt/confirm/alert.
  * OWNED here: arm → type → disabled-gate → DELETE semantics;
  * the dialog chrome/focus trap itself stays pinned by
@@ -158,14 +159,15 @@ describe('CampaignAdmin - Delete Campaign', () => {
         });
     });
 
-    describe('exact-name gate', () => {
+    describe('typed-name gate', () => {
         // Owner decision 2026-11-11: the gate lives IN the button — the
-        // confirm renders disabled until the typed name EXACTLY matches
-        // (raw ===, no trim, case-sensitive; the sibling rename gate only
-        // trims for its empty check, while delete demands an exact match).
-        // The old click-then-scold inline mismatch copy is retired as the
-        // primary gate; the handler guard stays as a fallback that a real
-        // click can no longer reach.
+        // confirm renders disabled until the typed name matches. Backlog
+        // 2026-11-16 XC: the match is trimmed + case-insensitive (the confirm
+        // label already displays the true name verbatim, so a caps-lock slip
+        // must not silently disable the one affordance); empty/whitespace-only
+        // input and names differing by more than case stay disabled. The
+        // handler guard stays as a fallback that a real click can no longer
+        // reach.
         const confirmButton = (name = CAMPAIGN) =>
             screen.getByRole('button', { name: `Delete "${name}"` });
 
@@ -179,9 +181,10 @@ describe('CampaignAdmin - Delete Campaign', () => {
 
         it.each([
             { typed: '', label: 'left empty' },
-            { typed: 'Test-Campaign', label: 'typed with different casing' },
-            { typed: ` ${CAMPAIGN} `, label: 'padded with spaces' },
+            { typed: '   ', label: 'only whitespace' },
+            { typed: 'wrong-name', label: 'a different name' },
             { typed: CAMPAIGN.slice(0, -1), label: 'missing the final character' },
+            { typed: `${CAMPAIGN}x`, label: 'carrying an extra character' },
         ])('keeps the confirm disabled while the name is $label', ({ typed }) => {
             openDeleteModal();
             type(typed);
@@ -191,13 +194,28 @@ describe('CampaignAdmin - Delete Campaign', () => {
             expectNoNativeDialogs();
         });
 
-        it('enables the confirm only on an exact match and re-disables on an edit back to a mismatch', () => {
+        it.each([CAMPAIGN, CAMPAIGN.toUpperCase(), 'Test-Campaign', `  ${CAMPAIGN}  `])(
+            'enables the confirm for "%s" and fires the DELETE against the TRUE name',
+            async (typed) => {
+                openDeleteModal();
+                type(typed);
+                // Label shows the true campaign name verbatim regardless of
+                // what was typed (criterion for the case-insensitive fix).
+                expect(confirmButton()).toBeEnabled();
+                clickConfirm();
+                await waitForDeletion();
+            }
+        );
+
+        it('enables on a case-flipped or padded match and re-disables on an edit back to a mismatch', () => {
             openDeleteModal();
             type(CAMPAIGN.toUpperCase());
-            expect(confirmButton()).toBeDisabled();
-            type(CAMPAIGN);
             expect(confirmButton()).toBeEnabled();
-            type(`${CAMPAIGN} `);
+            type('wrong-name');
+            expect(confirmButton()).toBeDisabled();
+            type(`  ${CAMPAIGN}  `);
+            expect(confirmButton()).toBeEnabled();
+            type('   ');
             expect(confirmButton()).toBeDisabled();
             type('');
             expect(confirmButton()).toBeDisabled();

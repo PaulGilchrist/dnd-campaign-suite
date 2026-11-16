@@ -266,18 +266,27 @@ function buildRollbackLatestModal(campaignName, snapshots, snapshotsState, onCon
     };
 }
 
+// Typed-name match (backlog 2026-11-16 XC): trimmed, case-insensitive — the
+// confirm label already displays the true name verbatim, so a caps-lock or
+// Shift slip must not leave the one affordance silently disabled. An
+// empty/whitespace-only input still keeps the gate closed. Shared by the
+// button gate and the handleDeleteConfirm fallback below so button and
+// handler never disagree.
+const typedNameMatches = (typed, campaignName) => {
+    const trimmed = typed.trim();
+    return trimmed.length > 0 && trimmed.toLowerCase() === campaignName.trim().toLowerCase();
+};
+
 // Named-delete copy wrapper over the shared DeleteConfirmModal role="dialog"
 // tier (the same one the map/POI/overlay lanes ride). Replaces the old native
 // prompt→confirm→confirm→alert chain for campaign deletion (backlog
 // 2026-11-04 CO): ONE confirm button, the exact-name gate typed INSIDE the
 // dialog. The gate now lives IN the button — the confirm renders `disabled`
-// until the typed name exactly matches (owner decision 2026-11-11, retiring
+// until the typed name matches (owner decision 2026-11-11, retiring
 // the old enabled-until-click design); the handler-level guard + inline
 // mismatch copy remain as a belt-and-braces fallback.
 function DeleteCampaignModal({ campaignName, typedName, onTypedNameChange, error, onCancel, onConfirm }) {
-    // Exact-match semantics: no trim, case-sensitive (identical to the
-    // handleDeleteConfirm guard below, so button and handler never disagree).
-    const confirmDisabled = typedName !== campaignName;
+    const confirmDisabled = !typedNameMatches(typedName, campaignName);
     return (
         <DeleteConfirmModal
             titleId="delete-campaign-title"
@@ -598,14 +607,15 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     };
 
     // Delete-Campaign gate: the dialog's Confirm renders disabled until the
-    // typed name exactly matches (owner decision 2026-11-11), so this handler
+    // typed name matches (owner decision 2026-11-11, match semantics via
+    // typedNameMatches), so this handler
     // guard + inline mismatch copy is a belt-and-braces fallback that a real
-    // click can no longer reach — kept deliberately. The exact name fires the
-    // single DELETE. Success reloads onto the refreshed campaign selection —
+    // click can no longer reach — kept deliberately. The matched name fires the
+    // single DELETE against the TRUE campaign name (never the typed variant) —
     // the same hand-off the old success alert + reload had, with zero native
     // dialogs anywhere in the flow (backlog 2026-11-04 CO).
     const handleDeleteConfirm = async () => {
-        if (deleteTypedName !== campaignName) {
+        if (!typedNameMatches(deleteTypedName, campaignName)) {
             setDeleteError('Campaign name did not match. Deletion cancelled.');
             return;
         }

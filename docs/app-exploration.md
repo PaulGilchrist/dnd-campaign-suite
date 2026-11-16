@@ -61,7 +61,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-16 XC — Admin typed-name campaign delete is case-sensitive with zero feedback:** typing `QA-ARENA` for campaign `qa-arena` leaves `Delete "qa-arena"` silently disabled — a destructive confirm whose one affordance fails without telling you why. Suggest case-insensitive comparison (the name is already displayed verbatim in the label) or an inline "names don't match yet" hint. `src/components/admin/` delete lane.
 
 ## Blocked / Not Verified (fold-gate ledger)
 
