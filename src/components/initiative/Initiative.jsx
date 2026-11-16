@@ -1009,7 +1009,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   bug-player-clients-can-hijack-initiative. */}
               {isLocalhost && (
               <div className='combat-controls'>
-                  <button className='clear-button' onClick={handleClear}>Clear</button>
+                  <button className='clear-button' onClick={handleClear} title='Clear Initiative Board' aria-label='Clear Initiative Board'>Clear</button>
                   <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats'>+ NPC</button>
                   <PartyPresenceButton
                       creatures={combatSummary.creatures}

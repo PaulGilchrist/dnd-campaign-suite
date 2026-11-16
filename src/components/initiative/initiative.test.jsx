@@ -172,7 +172,13 @@ describe('Initiative', () => {
         expect(screen.getAllByTestId('subscriber')).toHaveLength(1);
         // GM controls present, with the + NPC button's exact auto-naming/10-HP contract tooltip.
         const npcButton = screen.getByText('+ NPC');
-        expect(screen.getByText('Clear')).toBeInTheDocument();
+        // Backlog 2026-11-16 TB: the bare "Clear" trigger mirrors its dialog name
+        // via title + aria-label (visible text unchanged — ARIA-is-not-text).
+        const clearButton = screen.getByRole('button', { name: 'Clear Initiative Board' });
+        expect(clearButton).toBeInTheDocument();
+        expect(clearButton.getAttribute('title')).toBe('Clear Initiative Board');
+        expect(clearButton.getAttribute('aria-label')).toBe('Clear Initiative Board');
+        expect(clearButton).toHaveTextContent('Clear');
         expect(screen.getByText('← Prev')).toBeInTheDocument();
         expect(screen.getByText('Next →')).toBeInTheDocument();
         expect(npcButton.getAttribute('title')).toBe('Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats');
