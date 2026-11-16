@@ -36,7 +36,8 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "id": "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+    "id": "b1a2c3d4-e5f6-7890-abcd-ef1234567890",
+    "updatedAt": 1794787200000
   },
   {
     "id": "c2b3d4e5-f6a7-8901- bcde-f12345678901",
@@ -73,7 +74,8 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   },
   {
     "id": "d4e5f6a7-b890-1234-cdef-123456789012",
@@ -110,7 +112,8 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   },
   {
     "id": "e5f6a7b8-c901-2345-defa-234567890123",
@@ -147,7 +150,8 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   },
   {
     "id": "f6a7b8c9-d012-3456-efab-345678901234",
@@ -184,6 +188,7 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   }
 ]

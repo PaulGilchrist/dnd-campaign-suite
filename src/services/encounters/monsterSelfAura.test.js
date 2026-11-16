@@ -82,7 +82,8 @@ afterEach(() => vi.restoreAllMocks());
 describe('MA-0554 darkmantle disk data shape (base owns these bytes)', () => {
   it('Darkness Aura carries the self-origin MA-0043 zone dict, numeric uses, save-less; the Crush row stays out of the lane', () => {
     expect(AURA_ROW.name).toBe('Darkness Aura');
-    expect(AURA_ROW.uses).toBe('1/Day');
+    expect(AURA_ROW.uses).toBe(1);
+    expect(AURA_ROW.usage).toBe('1/Day');
     expect(AURA_ROW.maxUses).toBe(1);
     expect(AURA_ROW.range).toBe('15-foot Emanation');
     expect(AURA_ROW.duration).toBe('Concentration, up to 10 minutes');

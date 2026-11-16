@@ -20,7 +20,12 @@ const ARMOR_PROFICIENCY_MAP = {
     'Light, Medium, and Heavy armor and Shields': ['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields']
 };
 
-// Handle major (subclass in 2024) — check for both 'major' (2024) and 'subclass' (legacy) naming
+// The PERSISTED major/subclass field is `class.subclass` for BOTH rulesets
+// (the wizard authors it; 2024 "Majors" ride the same key). `class.major` is
+// never persisted — it is the RESOLVED 2024 object this function attaches to
+// the merged class (consumers read playerStats.class.major). Resolution-only
+// here since the no-legacy sweep retired the persisted-`class.major` read
+// (no writer ever emitted it).
 function resolveMajor(characterClass, majorName) {
     if (!majorName) {
         return null;
@@ -96,7 +101,7 @@ const classRules = {
            // Restore class_levels after merge (they may have been overwritten)
         characterClass.class_levels = classLevels;
 
-        characterClass.major = resolveMajor(characterClass, playerSummary.class.major?.name || playerSummary.class.subclass?.name);
+        characterClass.major = resolveMajor(characterClass, playerSummary.class.subclass?.name);
 
         delete characterClass.majors;
 
@@ -118,7 +123,7 @@ const classRules = {
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         let maxWildShapeChallengeRating = classLevel?.beast_max_cr || 0;
 
-        const isMoonDruid = playerStats.class?.major?.name === 'Circle of the Moon' || playerStats.class?.subclass?.name === 'Circle of the Moon';
+        const isMoonDruid = playerStats.class?.major?.name === 'Circle of the Moon';
         if (isMoonDruid && playerStats.level > 1) {
             maxWildShapeChallengeRating = 1;
             if (playerStats.level > 5) {
@@ -169,7 +174,7 @@ const classRules = {
                    });
                }
 
-            const major = playerStats.class.major || playerStats.class.subclass;
+            const major = playerStats.class.major; // resolved object — features live ONLY here
               if (major) {
                           // 2024 majors have features directly with level property, not class_levels
                   const majorFeaturesList = major.features?.filter(feature => feature.level <= playerStats.level) || [];
@@ -185,7 +190,7 @@ const classRules = {
     getHighestMajorLevel: (playerStats) => {
         let highestLevel = 0;
 
-        const major = playerStats.class.major || playerStats.class.subclass;
+        const major = playerStats.class.major; // resolved object — feature levels live ONLY here
         if (major) {
                // 2024 majors have features directly with level property, not class_levels
              const majorFeatures = major.features || [];

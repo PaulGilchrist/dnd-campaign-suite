@@ -268,8 +268,9 @@ export default function useTravelManagement({
     fileResumeAppliedRef.current = true;
     if (hasRuntimeValue('campaign', 'travel-mode')) return;
     // init = resolveInitialTravelState(initialTravelState): every field is
-    // concrete, so a legacy file missing keys still materializes complete
-    // live state. The mode goes through the RAW setter: this is materializing
+    // concrete, so a file whose travelState omits keys (the publisher persists
+    // per-lane subsets) still materializes complete live state. The mode goes
+    // through the RAW setter: this is materializing
     // an existing trip, not travel starting — the §10.1 phase arm (wrapper)
     // must stay reserved for user-initiated transitions
     // (bug-autoencounter-travel-phase-clobber contract).

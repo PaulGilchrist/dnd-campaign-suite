@@ -49,7 +49,7 @@ function buildCreatureEntry(name, monster, initiativeValue) {
         targetName: null,
         ac: typeof monster.armor_class === 'number' ? monster.armor_class : 10,
         resistances: monster.damage_resistances || [],
-        immunities: monster.damage_immunities || monster.immunities || [],
+        immunities: monster.damage_immunities || [],
         concentration: null,
         maxHp: npcHp,
         currentHp: npcHp,

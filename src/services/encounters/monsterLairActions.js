@@ -14,9 +14,10 @@
 //                     "different lair action each round" stay GM-adjudicated
 //                     prose (no illusion engine / initiative lair seam).
 //   - unresolvable  → refusal popup + lair_action_refused log, zero effect.
-// Legacy plain-string rows (and nameless dicts, MV-24) never become
-// clickable — isLairRowClickable returns false so ~600 other monsters keep
-// rendering their lair rows statically.
+// Nameless dicts (MV-24) never become clickable — isLairRowClickable
+// returns false so a row without a name keeps rendering statically. Raw
+// string rows are not a disk shape (no-legacy sweep 2026-11-16 migrated the
+// last carrier, Lich, to named advisory rows).
 import { canRollExpression } from '../dice/diceRoller.js';
 import { addEntry } from '../ui/logService.js';
 

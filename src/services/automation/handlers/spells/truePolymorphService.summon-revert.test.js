@@ -161,9 +161,10 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
 
   it('spawns the DISK wolf row byte-clean into combat (canonical stats, no slot scaling, 43g)', async () => {
     const wolfRow = monstersData.find(m => m.index === 'wolf');
-    // Data lock: disk bytes summon reads (:282-310). Shape truth (flag 4): the row has
-    // NO special_abilities/damage_immunities/damage_resistances keys — only traits/
-    // immunities/resistances, so te-save prof and resistances read as empty here.
+    // Data lock: disk bytes summon reads (:282-310). Shape truth after the
+    // no-legacy sweep (2026-11-16): the wolf's empty legacy `immunities`/
+    // `resistances` keys became canonical empty damage_* keys; the row still
+    // has NO special_abilities, so te-save prof reads as empty here.
     expect({
       index: wolfRow.index, armor_class: wolfRow.armor_class, hit_points: wolfRow.hit_points,
       type: wolfRow.type, size: wolfRow.size, speed: wolfRow.speed, proficiency_bonus: wolfRow.proficiency_bonus,
@@ -172,8 +173,8 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     }).toEqual({
       index: 'wolf', armor_class: 12, hit_points: 11, type: 'Beast', size: 'Medium',
       speed: { walk: '40 ft.' }, proficiency_bonus: 2,
-      special_abilities: undefined, damage_immunities: undefined, damage_resistances: undefined,
-      immunities: [], resistances: [],
+      special_abilities: undefined, damage_immunities: [], damage_resistances: [],
+      immunities: undefined, resistances: undefined,
     });
     loadMonsters.mockResolvedValue([wolfRow]);
 
@@ -229,9 +230,10 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     expect(addConcentration).not.toHaveBeenCalled();
   });
 
-  it('applies defaults and || fallbacks for a minimal monster (hp 0 → 10, immunities chain, speed/type)', async () => {
+  it('applies defaults for a minimal monster (hp 0 → 10, retired legacy immunities ignored, speed/type)', async () => {
     // honest: :283 `hit_points || 10` turns an authored 0-HP into 10;
-    // :302 damage_immunities wins, monster.immunities is the fallback.
+    // the retired legacy `immunities` key is dead bytes — damage_immunities
+    // is the only channel (no-legacy sweep 2026-11-16).
     loadMonsters.mockResolvedValue([{
       index: 'empty',
       name: 'Empty',
@@ -248,7 +250,7 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     const creature = cs.creatures.find(c => c.name === 'Empty');
     expect(creature.maxHp).toBe(10);
     expect(creature.currentHp).toBe(10);
-    expect(creature.immunities).toEqual(['poison']);
+    expect(creature.immunities).toEqual([]);
     expect(creature.resistances).toEqual([]);
     expect(creature.type).toBe('npc');
     expect(creature.monsterType).toBeUndefined();
@@ -257,11 +259,14 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     expect(creature.actions).toEqual([]);
   });
 
-  it('spawns the DISK fire-elemental row: immunities via :302 fallback (capitalised bytes), resistances DROPPED (flag 4)', async () => {
+  it('spawns the DISK fire-elemental row: immunities AND resistances ride the canonical damage_* keys (flag-4 drop fixed by the no-legacy sweep)', async () => {
     const row = monstersData.find(m => m.index === 'fire-elemental');
-    // Data lock: disk exposes immunities/resistances; summon only reads damage_*.
-    expect({ armor_class: row.armor_class, hit_points: row.hit_points, immunities: row.immunities, resistances: row.resistances })
-      .toEqual({ armor_class: 13, hit_points: 93, immunities: ['Fire', 'Poison'], resistances: ['Bludgeoning', 'Piercing', 'Slashing'] });
+    // Data lock: the sweep renamed this row's legacy immunities/resistances
+    // lists to damage_immunities/damage_resistances — the exact bytes the
+    // summon lane reads. The old ":302 fallback + resistances DROPPED" quirk
+    // is gone: damage_resistances now EXISTS, so the authored resist survive.
+    expect({ armor_class: row.armor_class, hit_points: row.hit_points, damage_immunities: row.damage_immunities, damage_resistances: row.damage_resistances, immunities: row.immunities, resistances: row.resistances })
+      .toEqual({ armor_class: 13, hit_points: 93, damage_immunities: ['Fire', 'Poison'], damage_resistances: ['Bludgeoning', 'Piercing', 'Slashing'], immunities: undefined, resistances: undefined });
     loadMonsters.mockResolvedValue([row]);
 
     await summonCreatureFromObject(summonArgs({ monsterIndex: 'fire-elemental' }));
@@ -269,8 +274,8 @@ describe('truePolymorphService.summonCreatureFromObject', () => {
     const creature = cs.creatures.find(c => c.name === 'Fire Elemental');
     expect({ ac: creature.ac, maxHp: creature.maxHp, currentHp: creature.currentHp, size: creature.size, speed: creature.speed, monsterType: creature.monsterType })
       .toEqual({ ac: 13, maxHp: 93, currentHp: 93, size: 'Large', speed: { walk: '50 ft.' }, monsterType: 'Elemental' });
-    expect(creature.immunities).toEqual(['Fire', 'Poison']); // || monster.immunities (:302)
-    expect(creature.resistances).toEqual([]); // damage_resistances absent → authored resistances lost
+    expect(creature.immunities).toEqual(['Fire', 'Poison']); // damage_immunities (:302)
+    expect(creature.resistances).toEqual(['Bludgeoning', 'Piercing', 'Slashing']); // damage_resistances (:301)
     // saveBonuses pure ability math — saving_throws ignored, no special_abilities on disk:
     expect(creature.saveBonuses).toEqual({ str: 0, dex: 3, con: 3, int: -2, wis: 0, cha: -2 });
     expect(creature.actions).toBe(row.actions);

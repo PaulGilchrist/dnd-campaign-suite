@@ -150,11 +150,10 @@ describe('MA-0024 MonsterCardModal lair rows — modal seams', () => {
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 
-  it('static branches (bare string, nameless dict, named-inert) render prose with zero affordance and no orphan leading "."', () => {
+  it('static branches (nameless dict, named-inert) render prose with zero affordance and no orphan leading "."', () => {
     const m = makeMonster({
       name: 'Static Monster',
       lair_actions: [
-        'The lich animates a long-dead sprite.',
         { description: 'Pools of water surge outward.', save_dc: 15, save_type: 'Constitution' },
         { name: 'Keeping Row', description: 'prose only' },
       ],
@@ -162,9 +161,6 @@ describe('MA-0024 MonsterCardModal lair rows — modal seams', () => {
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Static Monster 1', creatures: CREATURES })} />);
     expect(lairLinks()).toHaveLength(0);
     const rows = Array.from(document.querySelectorAll('.mc-section .mc-action'));
-    const stringRow = rows.find(el => el.textContent.includes('animates a long-dead sprite'));
-    expect(stringRow).toBeTruthy();
-    expect(stringRow.querySelectorAll('span[role="button"]')).toHaveLength(0);
     const namelessRow = rows.find(el => el.textContent.includes('Pools of water surge outward.'));
     expect(namelessRow.querySelector('strong')).toBeNull();
     expect(namelessRow.textContent.trim().startsWith('.')).toBe(false);

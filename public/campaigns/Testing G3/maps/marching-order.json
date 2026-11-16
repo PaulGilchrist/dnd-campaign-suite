@@ -28,5 +28,6 @@
   "walls": [],
   "gridSize": 7,
   "placedItems": [],
-  "displayName": "Marching Order"
+  "displayName": "Marching Order",
+  "name": "marching-order"
 }

@@ -150,14 +150,14 @@ describe('campaignsBasic - GET /api/campaigns', () => {
         expect(res.body.folders).not.toContain('.hidden-campaign');
     });
 
-    it('maps every folder to its type (meta file, starter-seed inference, else standard)', async () => {
+    it('maps every folder to its type (meta file is the only channel, else standard default)', async () => {
         setupReaddir('/mock/campaigns/root', [
             dirEntry('Arena One', true),
             dirEntry('Starter One', true),
             dirEntry('Plain One', true),
         ]);
         MOCK_FILES.set('/mock/campaigns/root/Arena One/data/campaign-meta.json', JSON.stringify({ type: 'arena' }));
-        MOCK_FILES.set('/mock/campaigns/root/Starter One/data/starter-seed.json', JSON.stringify({ version: 1 }));
+        MOCK_FILES.set('/mock/campaigns/root/Starter One/data/campaign-meta.json', JSON.stringify({ type: 'starter' }));
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns');

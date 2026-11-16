@@ -505,5 +505,6 @@
   "panX": 0,
   "panY": 0,
   "displayName": "Crypt of Fallen Wardens",
-  "rooms": []
+  "rooms": [],
+  "name": "crypt-of-fallen-wardens"
 }

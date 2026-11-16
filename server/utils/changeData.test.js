@@ -979,17 +979,19 @@ describe('changeData - removeChangeDataKey', () => {
         expect(data).toHaveProperty('character2');
     });
 
-    it('should remove entries using first word as name split by non-alphanumeric', () => {
+    it('does NOT remove a different bucket sharing the first token (legacy first-token leg retired)', () => {
         characterChangeData.set('test-campaign', {
             Bob: { hp: 25 },
+            'Bob-Jr': { hp: 30 },
             character2: { hp: 10 },
         });
 
         removeChangeDataKey('test-campaign', 'Bob-Jr');
 
         const data = characterChangeData.get('test-campaign');
-        // firstName from 'Bob-Jr' is 'Bob', so 'Bob' key should be removed
-        expect(data).not.toHaveProperty('Bob');
+        // Full-name matching only: 'Bob-Jr' leaves the live 'Bob' bucket intact.
+        expect(data).toHaveProperty('Bob');
+        expect(data).not.toHaveProperty('Bob-Jr');
         expect(data).toHaveProperty('character2');
     });
 
@@ -1071,7 +1073,7 @@ describe('changeData - removeChangeDataKey', () => {
             character2: { hp: 10 },
         });
 
-        // When firstName falls back to characterName (no alphanumeric chars found)
+        // Full-name exact match (special-character names are their own bucket key)
         removeChangeDataKey('test-campaign', '!@#$');
 
         const data = characterChangeData.get('test-campaign');
@@ -1121,21 +1123,21 @@ describe('changeData - removeChangeDataKey', () => {
         expect(data).toHaveProperty('character2');
     });
 
-    it('should remove full-name and legacy first-token buckets for a renamed character', () => {
+    it('removes full-name buckets for a renamed character, never first-token neighbours', () => {
         characterChangeData.set('test-campaign', {
             'Cadet One': { hitPoints: 7 },
             Bob: { hp: 25 },
             character2: { hp: 10 },
         });
 
-        // rename cleanup passes the FULL old name; the first-token leg stays
-        // for the legacy "Bob-Jr" → "Bob" cleanup semantics
+        // rename cleanup passes the FULL old name; matching is full-name only
+        // since the no-legacy sweep (2026-11-16) retired the first-token leg.
         removeChangeDataKey('test-campaign', 'Cadet One');
         removeChangeDataKey('test-campaign', 'Bob-Jr');
 
         const data = characterChangeData.get('test-campaign');
         expect(data).not.toHaveProperty('Cadet One');
-        expect(data).not.toHaveProperty('Bob');
+        expect(data).toHaveProperty('Bob');
         expect(data).toHaveProperty('character2');
     });
 

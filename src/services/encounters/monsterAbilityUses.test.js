@@ -85,20 +85,22 @@ describe('MA-0020 use-key strip ladder + store key', () => {
   });
 });
 
-describe('MA-0020 abilitySaveMaxUses coercion census (#959)', () => {
+describe('MA-0020 abilitySaveMaxUses parse census (no-legacy sweep 2026-11-16)', () => {
   it.each([
     ['maxUses wins over uses', { maxUses: 2, uses: 1 }, 2],
     ['?? falls back to uses when maxUses absent', { uses: 2 }, 2],
     ['?? preserves authored 0 (|| would wrongly fall through to uses)', { maxUses: 0, uses: 2 }, 0],
-    ['numeric-string coerced by Number()', { maxUses: '2' }, 2],
     ['unlimited rows → null', {}, null],
     ['absent action → null', undefined, null],
   ])('%s', (_title, action, expected) => {
     expect(abilitySaveMaxUses(action)).toBe(expected);
   });
 
-  it('honest NaN leg: legacy uses-STRING stays NaN here — the gate nulls it below', () => {
-    expect(Number.isNaN(abilitySaveMaxUses({ uses: '1/Day' }))).toBe(true);
+  it('non-numeric bytes answer null — no Number() coercion, no NaN (string-uses disk rows migrated numeric)', () => {
+    expect(abilitySaveMaxUses({ uses: '1/Day' })).toBeNull();
+    expect(abilitySaveMaxUses({ maxUses: '2' })).toBeNull();
+    expect(abilitySaveMaxUses({ maxUses: NaN })).toBeNull();
+    expect(monsterAbilitySaveUsesGate({ uses: '1/Day' }, {})).toBeNull();
   });
 });
 

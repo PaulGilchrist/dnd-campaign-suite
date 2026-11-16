@@ -230,8 +230,8 @@ describe('confirmAnimateDead - spawn details and popup composition', () => {
         expect(skeleton.immunities).toEqual(['poison']);
     });
 
-    it('falls back to immunities when damage_immunities is missing', async () => {
-        const legacyMonster = {
+    it('ignores the retired legacy `immunities` key — damage_immunities is the only channel', async () => {
+        const staleMonster = {
             index: 'skeleton',
             name: 'Skeleton',
             type: 'Undead',
@@ -241,7 +241,7 @@ describe('confirmAnimateDead - spawn details and popup composition', () => {
             immunities: ['poison'],
             saving_throws: {},
         };
-        loadMonsters.mockResolvedValue([legacyMonster, mockZombie]);
+        loadMonsters.mockResolvedValue([staleMonster, mockZombie]);
         const cs = summary();
 
         await confirmAnimateDead(
@@ -252,6 +252,6 @@ describe('confirmAnimateDead - spawn details and popup composition', () => {
         );
 
         const skeleton = spawnsOf(cs, 'skeleton')[0];
-        expect(skeleton.immunities).toEqual(['poison']);
+        expect(skeleton.immunities).toEqual([]);
     });
 });

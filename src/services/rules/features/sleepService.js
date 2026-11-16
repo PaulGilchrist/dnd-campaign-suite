@@ -59,7 +59,9 @@ function playerSleepImmunity(csCreature, characters) {
 }
 
 function monsterDataSleepImmunity(monster) {
-    const conditionImmunities = (monster.condition_immunities || monster.immunities || []).map(lower);
+    // condition_immunities is the canonical split key on every row since the
+    // no-legacy sweep (2026-11-16) — the mixed-`immunities` fallback is gone.
+    const conditionImmunities = (monster.condition_immunities || []).map(lower);
     return conditionImmunities.includes('exhaustion');
 }
 

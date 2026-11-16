@@ -71,9 +71,9 @@ afterEach(() => vi.clearAllMocks());
 
 describe('MA-0024 classification contract — isLairRowClickable / lairRowAffordance', () => {
   it.each([
-    ['legacy raw string (live carrier: lich[0])', monstersData.find(m => m.index === 'lich').lair_actions[0]],
     ['null', null],
-    ['nameless dict WITH save_dc (live carrier: lich[2], DC 18)', monstersData.find(m => m.index === 'lich').lair_actions[2]],
+    ['raw string (defensive shape — no disk carrier since the lich migration)', 'The lich rolls a d8 and regains a spell slot.'],
+    ['nameless dict WITH save_dc (defensive shape — no disk carrier post-migration)', { description: 'Slot recovery', save_dc: 18, save_type: 'Constitution' }],
     ['named row with no mechanic keys (live carrier: vampire-nightbringer[0])', monstersData.find(m => m.index === 'vampire-nightbringer').lair_actions[0]],
     ['named row whose only dice is the unparseable letter-O typo', { name: 'Spew', damage_dice_primary: '1dlO' }],
   ])('%s is never clickable and unresolvable', (_label, row) => {
@@ -146,7 +146,7 @@ describe('resolveLairRow — one click, one adjudicated effect', () => {
 
   it.each([
     ['named row with no mechanic (vampire-nightbringer[0])', monstersData.find(m => m.index === 'vampire-nightbringer').lair_actions[0], 'Children of the Night'],
-    ['legacy raw string (lich[0])', monstersData.find(m => m.index === 'lich').lair_actions[0], 'Lair Action'],
+    ['raw string (defensive shape — lich[0] migrated to a named advisory row)', 'The lich rolls a d8 and regains a spell slot.', 'Lair Action'],
   ])('unresolvable %s: refusal popup + lair_action_refused log, zero handlers', async (_label, row, expectedAbility) => {
     const logs = [];
     const h = handlers();
@@ -199,12 +199,13 @@ describe('monsters.json lair census — whole-DB tripwires (replaces per-ticket 
       counts[String(aff)] = (counts[String(aff)] || 0) + 1;
       if (!aff) inert.push(key);
     }
-    expect(counts).toEqual({ save: 63, zone: 13, attack: 3, advisory: 14, null: 5 });
+    expect(counts).toEqual({ save: 63, zone: 13, attack: 3, advisory: 16, null: 2 });
     expect(inert.sort()).toEqual([
-      'lich[0]', 'lich[1]', 'lich[2]', 'vampire-nightbringer[0]', 'vampire-nightbringer[1]',
+      'vampire-nightbringer[0]', 'vampire-nightbringer[1]',
     ].sort());
-    // invariants: raw strings and nameless dicts never clickable; every
-    // clickable row has a name and a non-null lane.
+    // invariants: nameless dicts never clickable; every clickable row has a
+    // name and a non-null lane. (Raw-string lair rows retired with the
+    // lich migration — no-legacy sweep 2026-11-16.)
     for (const { la } of ALL_ROWS) {
       if (typeof la === 'string' || (la && !la.name)) expect(isLairRowClickable(la)).toBe(false);
       if (la && isLairRowClickable(la)) expect(lairRowAffordance(la)).not.toBeNull();

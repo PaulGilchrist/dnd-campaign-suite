@@ -135,15 +135,16 @@ describe('expandMonstersToCreatures', () => {
     await expect(initiativeFor('-3')).resolves.toBe('7');
   });
 
-  it('wires resolved dual-schema IRV onto the creature — vulnerabilities included (CLA-173)', async () => {
-    // Legacy capitalized schema with conditions mixed into immunities;
-    // resolution nuance is covered by monsterIrvUtils.test.js, wiring is ours.
+  it('wires resolved canonical IRV onto the creature — vulnerabilities included (CLA-173)', async () => {
+    // Canonical split-key schema (the CLA-207 mixed shape retired with the
+    // no-legacy sweep 2026-11-16); resolution reads are monsterIrvUtils.test.js,
+    // wiring is ours.
     const monster = {
       name: 'Shadow', qty: 1, hit_points: 45, armor_class: 12,
-      damage_resistances: null, damage_immunities: null, damage_vulnerabilities: null,
-      resistances: ['Acid', 'Cold'],
-      immunities: ['Necrotic', 'Poison', 'Exhaustion', 'Frightened'],
-      vulnerabilities: ['Radiant'],
+      damage_resistances: ['Acid', 'Cold'],
+      damage_immunities: ['Necrotic', 'Poison'],
+      damage_vulnerabilities: ['Radiant'],
+      condition_immunities: ['Exhaustion', 'Frightened'],
     };
 
     const { creatures } = await expandMonstersToCreatures([monster], [], 'TestCampaign');
@@ -360,9 +361,10 @@ describe('addMonstersToInitiative', () => {
     const monster = {
       index: 'shadow', name: 'Shadow', type: 'aberration', size: 'Medium', qty: 1,
       hit_points: 45, initiative_details: '+1',
-      resistances: ['Acid', 'Cold'],
-      immunities: ['Necrotic', 'Poison', 'Exhaustion'],
-      vulnerabilities: ['Radiant'],
+      damage_resistances: ['Acid', 'Cold'],
+      damage_immunities: ['Necrotic', 'Poison'],
+      damage_vulnerabilities: ['Radiant'],
+      condition_immunities: ['Exhaustion'],
     };
 
     const result = await addMonstersToInitiative([monster], [], 'TestCampaign');

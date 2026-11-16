@@ -82,7 +82,8 @@ describe('MA-0813 giant octopus disk data shape', () => {
     expect(REACTION_ROW.name).toBe('Ink Cloud');
     expect(REACTION_ROW.trigger).toBe('The octopus takes damage while underwater.');
     expect(REACTION_ROW.description).toBe('The octopus releases ink that fills a 10-foot <strong>Cube</strong> centered on itself, and the octopus moves up to its Swim Speed. The Cube is <strong>Heavily Obscured</strong> for 1 minute or until a strong current or similar effect disperses the ink.');
-    expect(REACTION_ROW.uses).toBe('1/Day');
+    expect(REACTION_ROW.uses).toBe(1);
+    expect(REACTION_ROW.usage).toBe('1/Day');
     expect(REACTION_ROW.maxUses).toBe(1);
     expect(REACTION_ROW.range).toBe('10-foot Cube');
     expect(REACTION_ROW.duration).toBe('1 minute (advisory)');

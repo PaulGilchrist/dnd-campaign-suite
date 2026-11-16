@@ -16,9 +16,11 @@ const FIENDISH_LEGACY_RESISTANCE_MAP = {
     'Infernal': 'Fire',
 };
 
-// CLA-139: subrace is the authoritative legacy channel (races.json:9); the
-// sheet-chooser runtime _fiendishLegacySelection refines when no subrace is
-// set, so the modal choice actually drives the resistance (CLA-118 resolve shape).
+// CLA-139: subrace is the authoritative Fiendish-Legacy channel (races.json:9
+// — "legacy" is the 2024 rules name for the Tiefling subspecies, not a
+// compat lane); the sheet-chooser runtime _fiendishLegacySelection refines
+// when no subrace is set, so the modal choice actually drives the resistance
+// (CLA-118 resolve shape).
 function resolveFiendishLegacyName(playerSummary) {
     const raceName = playerSummary.race?.name;
     if (raceName !== 'Tiefling') return null;

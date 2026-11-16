@@ -53,7 +53,8 @@ describe('MA-0830 giant squid disk data shape', () => {
     expect(REACTION_ROW.name).toBe('Ink Cloud');
     expect(REACTION_ROW.trigger).toBe('The squid takes damage while underwater.');
     expect(REACTION_ROW.description).toBe('The squid releases ink that fills a 15-foot <strong>Cube</strong> centered on itself, and the squid moves up to its Swim Speed. The Cube is <strong>Heavily Obscured</strong> for 1 minute or until a strong current or similar effect disperses the ink.');
-    expect(REACTION_ROW.uses).toBe('1/Day');
+    expect(REACTION_ROW.uses).toBe(1);
+    expect(REACTION_ROW.usage).toBe('1/Day');
     expect(REACTION_ROW.maxUses).toBe(1);
     expect(REACTION_ROW.range).toBe('15-foot Cube');
     expect(REACTION_ROW.duration).toBe('1 minute (advisory)');

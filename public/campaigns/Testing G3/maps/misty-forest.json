@@ -1921,5 +1921,6 @@
     "encounterMod": -10,
     "description": "Thick fog — visibility limited to adjacent hexes"
   },
-  "travelState": null
+  "travelState": null,
+  "name": "misty-forest"
 }

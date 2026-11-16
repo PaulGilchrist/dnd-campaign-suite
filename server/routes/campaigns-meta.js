@@ -12,10 +12,11 @@ import { Router } from 'express';
 // standard campaigns AFTER creation, so the type is recorded once at seed
 // time and read cheaply by the campaign list + selection screens.
 //
-// Legacy inference: an older starter campaign with no meta file is still a
-// starter if its starter-seed.json exists (the seed document predates this
-// lane). Arenas left no marker pre-meta, so legacy arena folders read as
-// standard (owner ruling 2026-11-02: acceptable, throwaways get deleted).
+// The meta file is the ONLY type channel: every campaign folder carries one
+// (the four shipped campaigns were stamped in-disk by the no-legacy sweep
+// 2026-11-16, which retired the older starter-seed-existence inference).
+// A missing/corrupt file — e.g. a standard campaign created before its meta
+// write lands — resolves to the plain default 'standard'.
 //
 // GET stays open (every tab, LAN included, needs the badge); PUT is GM-only
 // (localhost), mirroring the starter-seed doctrine. Missing/corrupt files
@@ -30,25 +31,19 @@ import { Router } from 'express';
 const router = Router();
 
 const META_FILE = 'campaign-meta.json';
-const SEED_FILE = 'starter-seed.json';
 
 export const CAMPAIGN_TYPES = ['standard', 'arena', 'starter'];
 
 const metaPath = (campaign) => campaignDataFile(campaign, META_FILE);
 
-/** Resolve a campaign's type: explicit meta file first, then the legacy
- *  starter-seed inference, else standard. Never throws. */
+/** Resolve a campaign's type: explicit meta file, else the 'standard'
+ *  default. Never throws. */
 export function resolveCampaignType(campaign) {
     try {
         const meta = JSON.parse(fs.readFileSync(metaPath(campaign), 'utf-8'));
         if (CAMPAIGN_TYPES.includes(meta?.type)) return meta.type;
     } catch {
-        // Missing or corrupt meta file → fall through to inference.
-    }
-    try {
-        if (fs.existsSync(campaignDataFile(campaign, SEED_FILE))) return 'starter';
-    } catch {
-        // Unreadable campaign dir → treat as standard.
+        // Missing or corrupt meta file → standard default.
     }
     return 'standard';
 }

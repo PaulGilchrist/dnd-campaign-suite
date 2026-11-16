@@ -56,10 +56,30 @@ No `normalizePlayers`-style row-repair function survives (grep zero, 2026-11-16)
 
 ## Outstanding one-offs from the encounter migration (Paul's call)
 
-- `test-campaign` pool row **`SP034Test`**: its only monster snapshot is `SP034Goblin`,
-  a hand-renamed fixture that cannot be honestly resolved to a bestiary entry — left
-  with the legacy shape (loads as an empty draft). Delete the row, or decide its real
-  bestiary content.
-- `test-campaign` pool row **`CleaveTest`**: body was an accidental nested
-  whole-document snapshot (contentless) — normalized to an empty canonical row. Deletion
-  candidate.
+- `test-campaign` pool row **`SP034Test`**: ~~Delete the row, or decide its real bestiary content.~~ **DELETED 2026-11-16** (owner call: delete) — `encounters.json` 31→29 rows.
+- `test-campaign` pool row **`CleaveTest`**: ~~Deletion candidate.~~ **DELETED 2026-11-16** (owner call) — same write.
+
+## EXECUTION — dedicated sweep session, 2026-11-16 (this file implemented in full)
+
+Owner sign-off for the Batch-C gates arrived with the run instruction ("only
+one-time adjust public/campaigns to match the new code expectations"), and the
+policy is now durable in **AGENTS.md → "No Backward Compatibility (MANDATORY)"**.
+
+| # | Verdict | What landed |
+|---|---|---|
+| 1 | **Migrated + branch removed** | `monsters.json`: every legacy `immunities`/`resistances`/`vulnerabilities` key normalized to the canonical `damage_*` + `condition_immunities` split (615 rows touched, 241 mixed lists split, decoys dropped); verified byte-equivalent `resolveMonsterIRV` output for all 636 rows pre/post. `monsterIrvUtils.js` is now a plain 4-key read; the five `damage_immunities \|\| immunities` dual-reads (animateDead/createUndead/truePolymorph/summonSpirit/primalCompanion) + `sleepService` fallback removed. Side effect (good): fire-elemental-summon resistances-DROPPED flag-4 quirk fixed by the data. |
+| 2 | **Naming inverted** (persisted field = `class.subclass` for BOTH rulesets — nothing ever wrote a persisted `class.major`, so that read was the dead side) | `classRules2024.js`: `getClass` resolves `class.major` from `class.subclass.name` only; `major \|\| subclass` fallbacks removed from `getDruidMaxWildShapeChallengeRating`/`getFeatures`/`getHighestMajorLevel` (disk `class.subclass` carries identity-only bytes — verified across all 32 char files, no data migration needed). Shared cross-ruleset `major?.name \|\| subclass?.name` reads stay: those resolve per-ruleset DERIVED state (5e canonical resolved channel IS `subclass`), not compat. |
+| 3 | **Branches removed** | `automationPassives.js` :173/:234 accept `fortified_health` only. `max_hp_increase` itself REMAINS — it is the live Tough-feat effect (`feats.json`); only its legacy Fortified-Health aliasing retired. Stale runtime bytes flush via admin-clear (ephemeral lane, per plan). |
+| 4 | **False positive** | The legacy raw/numeric-string residue walks were already gone; :93/:137 were comments only. De-labelled the "legacy" wording; the degenerate-board full-list fallback + presence sort are live design. |
+| 5 | **False positive (kept)** | Verified: NO campaign map carries a partial `travelState` (none carries travelState data at all); the key-materialization is the normal open-a-fresh-map path (`buildTravelInit(existing.travelState \|\| {})`). Not compat. Comment corrected. |
+| 6 | **Terminology only** | "Legacy" there is the 2024 RULES name (Fiendish Legacy). Comment rewritten to say so; no code/data change. |
+| 7 | **Migrated + branch removed** | 20 string-`uses` rows → numeric `uses`/`maxUses` + `usage` prose (Frost Giant War Cry "5-6" → canonical `recharge: "5-6"`). `abilitySaveMaxUses` answers only a finite number or null — no `Number()` coercion, no NaN-tolerance; roarService's fix#347 NaN fail-safe arm deleted as dead. |
+| 8 | **Migrated + branch removed** | Lich `lair_actions[0]` raw-string duplicate deleted; the two nameless dicts became named canonical rows (`Spell Slot Recovery` advisory, `Negative Energy Tether` advisory keeping its authored save_dc record). `getLairActions` `.actions` dict-shape branch (zero disk carriers) and the string render leg in `MonsterCardBody` removed. Full-DB lair census re-pinned: {save:63, zone:13, attack:3, advisory:16, null:2}. Raw-string WHOLE-FIELD `lair_actions` (Unicorn/Vampire regional-effect prose) is a separate live render-lane and stays. |
+| 9 | **Dead code deleted** | "No location" fallback + `.notes-list-no-location` CSS removed (all notes rows carry `partyLocation`; the form gate makes it unsavable-empty). |
+| 10 | **Stamped + inference removed** | `data/campaign-meta.json` `{"type":"standard"}` stamped into all 5 campaign folders (none carries `starter-seed.json`, so `standard` is the honest one-time value); `resolveCampaignType` lost the seed-file inference; missing meta now just means the `standard` default (creation flow stamps meta for presets via PUT). |
+| 11 | **Stamped + re-labelled** | 52 entity rows (npcs/quests/settlements/factions/notes across Frostfall/G1/G2/G3) got the one-time `updatedAt` stamp (fixed 2026-11-16 epoch); test-campaign rows already stamped by the live lane. Code-wise the unstamped-accept path is NEW-ROW semantics (clients never stamp creates), so only the "legacy/bootstrap" wording changed. (Census "createdBy" wording was a mis-cite — the stamp field is `updatedAt`; `createdBy` appears nowhere in server code.) |
+| 12 | **False positive (kept) + stamped** | Re-verified: battle-arena/test-map DO carry `name`/`displayName`/`players` — the erasure guards protect LIVE bodies (both lanes were live-hit bugs per their comments), not legacy docs. One-time `name` stamp added to the 7 map docs genuinely missing it (G1/G3); guards kept. |
+| 13 | **Leg removed** | `removeChangeDataKey` matches full display name only; the "Bob-Jr → Bob" first-token leg deleted (rename-residue is ephemeral change-data). |
+
+Verification: lint 0 warnings, `guard:no-timers` clean, full `vitest run` green
+(counts recorded in the session report); data migrations all ran on cold disk.

@@ -96,14 +96,11 @@ describe('Notes', () => {
       expect(screen.getByText(/loading notes/i)).toBeInTheDocument();
     });
 
-    it('shows location text when present and no-location placeholder when absent', () => {
+    it('shows the party location on the row label', () => {
       mockHook({ items: [makeNote({ partyLocation: 'Dungeon' })] });
       renderNotes();
       expect(screen.getByText('Dungeon')).toBeInTheDocument();
-
-      mockHook({ items: [makeNote({ id: '2', partyLocation: '' })] });
-      renderNotes();
-      expect(screen.getByText(/no location/i)).toBeInTheDocument();
+      expect(screen.queryByText(/no location/i)).not.toBeInTheDocument();
     });
   });
 
@@ -314,8 +311,7 @@ describe('Notes', () => {
 
     // Validation-by-disable harmonization (improve 2026-11-12 NN backlog):
     // Notes mirrors the Sessions empty-Name gate — an empty/whitespace party
-    // location keeps Save disabled so a row can never silently save as
-    // "No location".
+    // location keeps Save disabled so every stored row carries a location.
     it.each(['', ' ', '\n\t '])(
       'disables save when party location is %j even with a filled description',
       (partyLocation) => {

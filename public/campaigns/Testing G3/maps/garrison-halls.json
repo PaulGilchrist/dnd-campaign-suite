@@ -767,5 +767,6 @@
   "zoom": 1,
   "panX": 0,
   "panY": 0,
-  "displayName": "Garrison Halls"
+  "displayName": "Garrison Halls",
+  "name": "garrison-halls"
 }

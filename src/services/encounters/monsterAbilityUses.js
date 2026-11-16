@@ -27,13 +27,15 @@ export function abilitySaveUseKey(action) {
 }
 
 export function abilitySaveMaxUses(action) {
+  // Numeric canonical shape (monsters.json authors uses/maxUses as numbers +
+  // a `usage` prose string); anything non-numeric is no limit, not a parse target.
   const max = action?.maxUses ?? action?.uses ?? null;
-  return max == null ? null : Number(max);
+  return typeof max === 'number' && Number.isFinite(max) ? max : null;
 }
 
 export function monsterAbilitySaveUsesGate(action, storedUses) {
   const maxUses = abilitySaveMaxUses(action);
-  if (maxUses == null || !Number.isFinite(maxUses) || maxUses <= 0) return null;
+  if (maxUses == null || maxUses <= 0) return null;
   const useKey = abilitySaveUseKey(action);
   const used = Number(storedUses?.[useKey]) || 0;
   return { useKey, maxUses, used, remaining: Math.max(0, maxUses - used), exhausted: used >= maxUses };

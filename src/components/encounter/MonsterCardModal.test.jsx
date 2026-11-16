@@ -405,15 +405,18 @@ describe('MonsterCardModal', () => {
             expect(screen.queryByText('Description')).not.toBeInTheDocument();
         });
 
-        it('renders Lair Actions for array and object shapes, and hides when absent', () => {
-            renderMonster({ ...baseMonster, lair_actions: ['The goblin hides in the shadows.'] });
+        it('renders Lair Actions for dict-row arrays, and hides for absent/junk shapes (raw strings and the object .actions shape retired 2026-11-16)', () => {
+            renderMonster({ ...baseMonster, lair_actions: [{ name: 'Shadow Hide', description: 'The goblin hides in the shadows.' }] });
             expect(screen.getByText('Lair Actions')).toBeInTheDocument();
             expect(screen.getByText('The goblin hides in the shadows.')).toBeInTheDocument();
 
             cleanup();
+            renderMonster({ ...baseMonster, lair_actions: ['The goblin hides in the shadows.'] });
+            expect(screen.queryByText(/lair actions/i)).not.toBeInTheDocument();
+
+            cleanup();
             renderMonster({ ...baseMonster, lair_actions: { actions: ['The lair is cursed.'] } });
-            expect(screen.getByText('Lair Actions')).toBeInTheDocument();
-            expect(screen.getByText('The lair is cursed.')).toBeInTheDocument();
+            expect(screen.queryByText(/lair actions/i)).not.toBeInTheDocument();
 
             cleanup();
             const monsterNoLair = { ...baseMonster };

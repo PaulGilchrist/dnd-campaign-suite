@@ -90,7 +90,7 @@ function removeNpc(combatSummary, creatureName) {
 // creature itself is away or unknown (GM split mid-its-turn), the seam moves
 // to its nearest present neighbour WITHOUT a round increment — the round was
 // never completed. A fully degenerate board (nobody present) falls back to
-// the legacy full-list walk so the tracker never stalls on `undefined`.
+// the degenerate-board full-list walk so the tracker never stalls on `undefined`.
 function getNextCreatureName(combatSummary, activeCreatureName) {
     const all = combatSummary.creatures
     const present = all.filter(isCreaturePresent)
@@ -134,7 +134,7 @@ function isPreviousDisabled(combatSummary, activeCreatureName) {
 // refused outright (the card input is already disabled — this keeps the service
 // honest for any caller, bug-away-card-initiative-input-resurrects-slot), and
 // the re-sort goes through sortCreaturesForBoard (present-first, away-last)
-// instead of the legacy raw initiative sort that could un-park an away row to
+// instead of a raw initiative sort that could un-park an away row to
 // mid-board (same law as the mount-merge lane below).
 function setInitiative(combatSummary, creatureName, value) {
     const creature = combatSummary.creatures.find(c => c.name === creatureName)

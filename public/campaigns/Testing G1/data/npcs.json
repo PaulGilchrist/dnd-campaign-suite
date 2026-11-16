@@ -43,7 +43,8 @@
     ],
     "traits": "",
     "reactions": "",
-    "id": "n1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6"
+    "id": "n1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
+    "updatedAt": 1794787200000
   },
   {
     "id": "n2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
@@ -80,7 +81,8 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   },
   {
     "id": "n3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
@@ -117,7 +119,8 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   },
   {
     "id": "n4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8f9",
@@ -154,7 +157,8 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   },
   {
     "id": "n5e6f7-a8b9-c0d1-e2f3-a4b5c6d7e8f9",
@@ -191,6 +195,7 @@
     "actions": [],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "armorClass": null,
+    "updatedAt": 1794787200000
   }
 ]

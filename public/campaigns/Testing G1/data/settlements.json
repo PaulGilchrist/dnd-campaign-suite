@@ -86,7 +86,8 @@
     ],
     "tags": "city, human-culture, tailor, many-services",
     "notes": "",
-    "threat": "A serial arsonist has been targeting warehouses, and the merchant guild is offering a reward."
+    "threat": "A serial arsonist has been targeting warehouses, and the merchant guild is offering a reward.",
+    "updatedAt": 1794787200000
   },
   {
     "name": "Grimstrike Vault",
@@ -135,7 +136,8 @@
     ],
     "tags": "town, dwarven-culture, temple",
     "notes": "",
-    "threat": "The town's isolation has bred suspicion of outsiders, making trade and diplomacy nearly impossible."
+    "threat": "The town's isolation has bred suspicion of outsiders, making trade and diplomacy nearly impossible.",
+    "updatedAt": 1794787200000
   },
   {
     "name": "Petranwe Prime",
@@ -224,6 +226,7 @@
     ],
     "tags": "city, elven-culture, butcher, many-services",
     "notes": "",
-    "threat": "A serial arsonist has been targeting warehouses, and the merchant guild is offering a reward."
+    "threat": "A serial arsonist has been targeting warehouses, and the merchant guild is offering a reward.",
+    "updatedAt": 1794787200000
   }
 ]

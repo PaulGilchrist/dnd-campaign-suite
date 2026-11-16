@@ -1,9 +1,11 @@
 // @maintained-by-ai
 // ─── Lane: campaign-type meta route ──────────────────────────────────────────
-// GET always answers a resolved type (explicit meta file → legacy starter-seed
-// inference → standard); PUT is GM-only (localhost) with an enum guard so only
+// GET always answers a resolved type (explicit meta file → 'standard' default;
+// the meta file is the ONLY type channel since the no-legacy sweep 2026-11-16
+// retired the starter-seed-existence inference and stamped every campaign
+// folder); PUT is GM-only (localhost) with an enum guard so only
 // known badge types ever land on disk. A corrupt meta file must degrade to
-// inference, never 500.
+// the standard default, never 500.
 import express from 'express';
 import fs from 'fs';
 import { request } from '../test-utils/localhostSupertest.js';
@@ -69,22 +71,22 @@ describe('campaign meta GET', () => {
         expect(res.body).toEqual({ type: 'arena' });
     });
 
-    it('infers starter from a legacy starter-seed document (no meta file)', async () => {
+    it('a starter-seed document does NOT type the campaign (meta file is the only channel)', async () => {
         mockFsState.exists.add(SEED_FILE);
-        expect(resolveCampaignType('test-campaign')).toBe('starter');
+        expect(resolveCampaignType('test-campaign')).toBe('standard');
         const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
-        expect(res.body).toEqual({ type: 'starter' });
+        expect(res.body).toEqual({ type: 'standard' });
     });
 
-    it('reads a corrupt meta file as absent and still infers', async () => {
+    it('reads a corrupt meta file as absent and still answers a type', async () => {
         mockFsState.files.set(META_FILE, '{not json');
         mockFsState.exists.add(SEED_FILE);
         const res = await request(createTestApp()).get('/api/campaigns/test-campaign/meta');
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({ type: 'starter' });
+        expect(res.body).toEqual({ type: 'standard' });
     });
 
-    it('ignores an unknown stored type (inference wins)', () => {
+    it('ignores an unknown stored type (standard default wins)', () => {
         mockFsState.files.set(META_FILE, JSON.stringify({ type: 'chess-match' }));
         expect(resolveCampaignType('test-campaign')).toBe('standard');
     });

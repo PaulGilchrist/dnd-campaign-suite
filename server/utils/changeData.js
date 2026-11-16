@@ -278,23 +278,21 @@ export const publish = (key, data, campaignName) => {
  *
  * Bucket keys are the character's FULL display name (e.g. "QA Space Cadet"),
  * so the full name must match case-insensitively — matching only the first
- * token orphaned every multi-word character's bucket on delete/rename.
- * The first-token leg is kept for legacy rename cleanup (e.g. "Bob-Jr" → "Bob").
+ * token orphaned every multi-word character's bucket on delete/rename. The
+ * legacy first-token leg was retired by the no-legacy sweep (2026-11-16):
+ * buckets are keyed by full name, so a full-name match is complete.
  */
 export const removeChangeDataKey = (campaign, characterName) => {
     if (!characterChangeData.has(campaign)) return;
 
-    const normalized = normalizeCharacterName(characterName);
-    const fullName = normalized.toLowerCase();
-    const firstName = (normalized.split(/[^a-zA-Z0-9]/)[0] || normalized).toLowerCase();
+    const fullName = normalizeCharacterName(characterName).toLowerCase();
 
     const data = characterChangeData.get(campaign);
     const reservedKeys = ['combatSummary', 'activeCreatureId', 'log', 'positioning'];
      /* Clean up any entry that matches the old name (case-insensitive) */
     Object.keys(data).forEach(key => {
         if (reservedKeys.includes(key)) return;
-        const lower = key.toLowerCase();
-        if (lower === fullName || lower === firstName) {
+        if (key.toLowerCase() === fullName) {
             delete data[key];
           }
       });

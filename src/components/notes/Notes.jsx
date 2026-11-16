@@ -67,14 +67,8 @@ function NoteListItem({ note, onEdit }) {
     >
       <div className="ct-list-item-header">
         <span className="notes-list-location">
-          {note.partyLocation ? (
-            <>
-              <i className="fa-solid fa-location-dot" />{' '}
-              {note.partyLocation}
-            </>
-          ) : (
-            <span className="notes-list-no-location">No location</span>
-          )}
+          <i className="fa-solid fa-location-dot" />{' '}
+          {note.partyLocation}
         </span>
         <div className="notes-list-meta">
           <span className="notes-list-date">

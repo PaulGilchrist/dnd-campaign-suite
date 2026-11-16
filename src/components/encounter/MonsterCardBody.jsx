@@ -140,8 +140,13 @@ function buildCondEffectBadges(condEffects, { inspiringMoveNoOA, remarkableNoOA,
 }
 
 function getLairActions(monster) {
-  if (Array.isArray(monster.lair_actions)) return monster.lair_actions.length > 0 ? monster.lair_actions : null;
-  return monster.lair_actions?.actions?.length > 0 ? monster.lair_actions.actions : null;
+  // Canonical shape: a dict-row array. Non-dict rows are normalized out at
+  // this single seam (the raw-string lair schema — whole field prose, e.g.
+  // the unicorn block — and in-array string rows both retired with the
+  // no-legacy sweep; a junk row reaching here renders nothing).
+  if (!Array.isArray(monster.lair_actions)) return null;
+  const rows = monster.lair_actions.filter(r => r && typeof r === 'object');
+  return rows.length > 0 ? rows : null;
 }
 
 function getRegionalEffects(monster) {
@@ -436,23 +441,17 @@ function MonsterCardDefenses({ monster, monsterName, campaignName, handleSaveThr
   );
 }
 
-// MA-0024: legacy plain-string rows (and nameless dicts, MV-24) keep the
-// static render untouched (~600 monsters regression-protected). Structured
-// rows with an authored mechanic route through the SAME gated affordance as
-// legendary rows — one click = one adjudicated effect (save prompt at the
-// authored DC/type, damage chip, or CLA-325 advisory record).
+// MA-0024: rows with no authored mechanic (nameless dicts, MV-24) keep the
+// static render. Structured rows with an authored mechanic route through
+// the SAME gated affordance as legendary rows — one click = one adjudicated
+// effect (save prompt at the authored DC/type, damage chip, or CLA-325
+// advisory record).
 function MonsterLairAction({ la, attackerCannotAct, handleLairRow }) {
-  if (typeof la === 'string' || !isLairRowClickable(la)) {
+  if (!isLairRowClickable(la)) {
     return (
       <div className="mc-action">
-        {typeof la === 'string' ? (
-          <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la) }} />
-        ) : (
-          <>
-            {la.name ? <><strong>{la.name}.</strong>{' '}</> : null}
-            <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
-          </>
-        )}
+        {la.name ? <><strong>{la.name}.</strong>{' '}</> : null}
+        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
       </div>
     );
   }

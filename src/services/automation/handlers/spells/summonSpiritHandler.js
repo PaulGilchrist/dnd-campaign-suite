@@ -180,7 +180,7 @@ function buildSpiritCreature({ monster, displayName, casterName, initiativeValue
         targetName: null,
         ac,
         resistances: monster.damage_resistances || [],
-        immunities: monster.damage_immunities || monster.immunities || [],
+        immunities: monster.damage_immunities || [],
         concentration: null,
         maxHp: hp,
         currentHp: hp,

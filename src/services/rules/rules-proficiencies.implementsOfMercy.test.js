@@ -38,7 +38,7 @@ function makeMercyMonk() {
     name: 'MercyMonk',
     level: 17,
     rules: '2024',
-    class: { name: 'Monk', major: { name: 'Warrior of Mercy' } },
+    class: { name: 'Monk', subclass: { name: 'Warrior of Mercy' } },
     background: 'Acolyte',
     skillProficiencies: ['Religion'],
     abilities: [

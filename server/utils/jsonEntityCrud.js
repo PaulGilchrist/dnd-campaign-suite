@@ -19,8 +19,10 @@ function singularize(name) {
 // another tab/session already persisted. A whole-array POST that omits a
 // disk row likewise dropped an entity created elsewhere — also 409 — and the
 // symmetric leg holds too: a re-sent row (with an echoed stamp) that disk no
-// longer has would resurrect an entity deleted elsewhere — also 409. Legacy
-// rows without any stamp stay writable (bootstrap), and get stamped on write.
+// longer has would resurrect an entity deleted elsewhere — also 409. A row
+// the client has never saved carries no stamp yet (the client never sets
+// updatedAt); it is accepted and stamped on its first write — every disk row
+// carries a stamp since the 2026-11-16 one-time data stamp.
 // The per-entity PUT-upsert lanes (npcs, sessions, settlements) share the
 // same 'modified' (hasUpdateConflict) and 'created or deleted'
 // (isResurrectionAttempt) discriminators so the two write paths can never
@@ -57,7 +59,8 @@ export function sameEntityContent(a, b) {
  *  whole-array POST (findConcurrentWrite) and the per-entity PUT-upsert lanes
  *  (npcs/sessions/settlements) so the two can never drift apart again. A
  *  brand-new row carries no echoed stamp (the client never sets updatedAt), so
- *  genuine creates never trip it; legacy un-stamped rows stay bootstrap-writable.
+ *  genuine creates never trip it; unstamped first-write rows likewise carry
+ *  no echo to match a deleted row's stamp.
  *  The array lane layers ONE exception on top: a stamped row disk doesn't know
  *  may still be a verbatim clone of a LIVE row (see isVerbatimClone) — the PUT
  *  lanes keep this discriminator strict (their pinned create contract). */
@@ -99,7 +102,7 @@ export function hasUpdateConflict(existing, incoming) {
 
 /** Stamp a row for writing: unchanged content on an already-stamped row
  *  keeps its stamp (so tabs editing OTHER rows never false-conflict); every
- *  other write (new/changed/legacy-unstamped rows) gets a fresh stamp, forced
+ *  other write (new/changed/first-write-unstamped rows) gets a fresh stamp, forced
  *  strictly greater than the previous one so same-millisecond saves can never
  *  produce an ambiguous (equal) stamp. */
 export function stampForSave(incoming, existing, now = Date.now()) {

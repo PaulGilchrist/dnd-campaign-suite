@@ -28,14 +28,11 @@
 // minutes×10 recipe is NOT executed in roarService.js: verified).
 // Dice census: ZERO dice on this lane (pure data swap — rollers belong to
 // the modal/saveProcessing lanes), so no fixed-stub queue is seeded.
-// fix#347 flipped the honest NaN quirk pin (former MA-1502 residual class):
-// `?? STAGED_ROAR_MAX_DEFAULT` used to pass NaN THROUGH — a legacy
-// uses:"3/Day" string row (gate side: monsterAbilityUses.js:26
-// Number.isFinite → null; BY-name disk shape 'Darkness Aura'
-// "uses": "1/Day", monsters.json:16790, Number('1/Day') = NaN) walked the
-// resolver as silent "Roar 1 of NaN" and never exhausted. stagedRoarMaxUses
-// now guards Number.isFinite: loud console.error, fail-SAFE to the
-// exhaustion-capable default 3 — never toward infinite uses.
+// fix#347 retired by the no-legacy-compat sweep (2026-11-16): string-uses
+// rows were the last non-numeric shape on disk (gate side:
+// monsterAbilityUses.abilitySaveMaxUses now answers only a finite number or
+// null), so the NaN fail-safe arm is gone — a non-numeric `uses` simply
+// means "no authored limit" and folds silently to STAGED_ROAR_MAX_DEFAULT.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import monstersData from '../../../../public/data/monsters.json';
@@ -285,40 +282,35 @@ describe('MA-0268 loud-vs-silent split (base row) — resolve is loud, build is 
     });
 });
 
-describe('MA-0268 fix#347 NaN pin flip (MA-1502 class, generic parser — Number.isFinite hardening)', () => {
-    it('uses:"3/Day" STRING row: stagedRoarMaxUses NaN now LOUD + fails safe to the exhaustion-capable default 3 — parser labels "Roar 1 of 3" and exhausts at 3; numeric uses stay honored silently', () => {
-        // synthetic legacy shape — no such row survives on disk post-MA-1502
-        // (Valor was the last carrier, fixed there; androsphinx was numeric);
-        // the string-uses shape itself is real disk BY-name: Darkmantle
-        // 'Darkness Aura' "uses": "1/Day" (monsters.json:16790).
-        const legacyRow = { name: 'Roar', staged_roar: true, uses: '3/Day' };
-        expect(monsterAbilitySaveUsesGate(legacyRow, {})).toBeNull();
+describe('MA-0268 fix#347 retired — no-legacy sweep (2026-11-16): string-uses rows are gone from disk, abilitySaveMaxUses answers only finite numbers or null', () => {
+    it('uses:"3/Day" STRING row now reads as NO authored limit: silent STAGED_ROAR_MAX_DEFAULT 3 (null side of ??), no NaN arm, no loud; numeric uses stay honored silently', () => {
+        // The string-uses disk carriers (last one cited: Darkmantle
+        // 'Darkness Aura' "uses": "1/Day") were migrated to the numeric
+        // uses/maxUses/usage triple by the no-legacy-compat sweep, and
+        // abilitySaveMaxUses no longer Number()-coerces — non-numeric is
+        // simply no limit. A synthetic string row therefore behaves exactly
+        // like a row that authors no uses at all: silent default cap.
+        const stringRow = { name: 'Roar', staged_roar: true, uses: '3/Day' };
+        expect(monsterAbilitySaveUsesGate(stringRow, {})).toBeNull();
         const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-        // NaN-side arm: loud + default cap, never 'of NaN', never infinite.
-        expect(stagedRoarMaxUses(legacyRow)).toBe(3);
-        expect(err).toHaveBeenCalledTimes(1);
-        expect(err.mock.calls[0][0]).toContain('NaN maxUses would never exhaust');
-        expect(roarStageNumber(legacyRow, {})).toBe(1);
-        expect(roarStageNumber(legacyRow, { Roar: 2 })).toBe(3);
-        expect(roarStageNumber(legacyRow, { Roar: 3 })).toBeNull(); // exhausts NOW
-        expect(roarStageNumber(legacyRow, { Roar: 5 })).toBeNull();  // old NaN pin: was 6
-        expect(err).toHaveBeenCalledTimes(5); // one loud per NaN reader call
-        const before = err.mock.calls.length;
-        const s = resolveRoarStageAction({ action: legacyRow, usesGate: null });
+        expect(stagedRoarMaxUses(stringRow)).toBe(3);
+        expect(roarStageNumber(stringRow, {})).toBe(1);
+        expect(roarStageNumber(stringRow, { Roar: 2 })).toBe(3);
+        expect(roarStageNumber(stringRow, { Roar: 3 })).toBeNull(); // exhausts at cap
+        const s = resolveRoarStageAction({ action: stringRow, usesGate: null });
         expect(s.name).toBe('Roar 1 of 3');
         expect(s.save_dc).toBeUndefined();
-        expect(err).toHaveBeenCalledTimes(before + 2); // resolver :169 + label :151 fallbacks
-        expect(buildRoarStageAction(legacyRow, 4)).toBeNull(); // stage 4 has no mech — returns before the label, silent
-        expect(err).toHaveBeenCalledTimes(before + 2);
+        expect(buildRoarStageAction(stringRow, 4)).toBeNull(); // stage 4 has no mech — silent
         // STAGED_ROAR_MAX_DEFAULT fallback stays LIVE on the null side of ??:
         expect(stagedRoarMaxUses({})).toBe(3);
         expect(stagedRoarMaxUses(rawRoarRow())).toBe(3);
-        // Numeric-uses arm: finite numbers (and numeric strings the Number()
-        // parse honors) pass through untouched and SILENT.
+        // Numeric-uses arm: finite numbers pass through untouched. Numeric
+        // STRINGS are not a disk shape and no longer parse — they fold to
+        // the silent default like any non-numeric value.
         expect(stagedRoarMaxUses({ name: 'Roar', uses: 2, staged_roar: true })).toBe(2);
-        expect(stagedRoarMaxUses({ name: 'Roar', uses: '2', staged_roar: true })).toBe(2);
+        expect(stagedRoarMaxUses({ name: 'Roar', uses: '2', staged_roar: true })).toBe(3);
         expect(stagedRoarMaxUses({ name: 'Roar', maxUses: 5, staged_roar: true })).toBe(5);
-        expect(err).toHaveBeenCalledTimes(before + 2); // zero extra loud noise on finite shapes
+        expect(err).not.toHaveBeenCalled(); // zero loud noise on every shape now
         err.mockRestore();
     });
 });

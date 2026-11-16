@@ -73,6 +73,15 @@ Read-only inspection only: `git log`, `git show`, `git diff`, `git status`, `git
 - **File naming** — services use camelCase, components use PascalCase folders, hooks start with `use`
 - **Test files** — co-located with source, matching `*.test.{js,jsx}` pattern
 
+## No Backward Compatibility (MANDATORY — every future change)
+
+This application has **never been released** — we want no legacy code. When adding or changing application functionality, NEVER add backward-compatibility: no legacy-format fallbacks (`newKey ?? legacyKey` dual-readers), no alias/effect-name tolerance, no inference or repair branches for older data shapes, no "legacy row" leniency in guards.
+
+- Keep exactly ONE canonical data shape per concept in the code.
+- When a change alters what the code expects from stored data, adjust `public/campaigns/**` (and any repo-tracked JSON the code owns) **once, in the same change**, to match the new code expectations — migrate on COLD disk (no server running), then delete (never write) the compat branch.
+- Test fixtures that pin a legacy shape are updated with the migration, not kept as regression-protectors of the removed branch.
+- Origin + worked examples: `.opencode/plans/no-legacy-compat-sweep.md` (owner policy 2026-11-16).
+
 ## Key Gotchas
 
 - **Server-first state:** All game state flows through the runtime store (`useRuntimeState` / `useSyncedState`). Never use localStorage for game data. ESLint rules enforce this (`no-window-access`, `no-local-game-state` = ERROR; `require-synced-state` = WARN).

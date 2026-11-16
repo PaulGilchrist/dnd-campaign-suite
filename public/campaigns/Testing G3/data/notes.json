@@ -6,7 +6,8 @@
     "dateCreated": "2026-05-23T00:00:00Z",
     "dateModified": "2026-05-23T00:00:00Z",
     "partyLevel": 3,
-    "partyLocation": "Misty Forest"
+    "partyLocation": "Misty Forest",
+    "updatedAt": 1794787200000
   },
   {
     "id": "a0000000-0000-4000-a000-000000000002",
@@ -15,7 +16,8 @@
     "dateCreated": "2026-05-23T00:00:00Z",
     "dateModified": "2026-05-23T00:00:00Z",
     "partyLevel": 3,
-    "partyLocation": "Thornfast Keep"
+    "partyLocation": "Thornfast Keep",
+    "updatedAt": 1794787200000
   },
   {
     "id": "a0000000-0000-4000-a000-000000000003",
@@ -24,6 +26,7 @@
     "dateCreated": "2026-05-23T00:00:00Z",
     "dateModified": "2026-05-23T00:00:00Z",
     "partyLevel": 3,
-    "partyLocation": "Thornfast Keep"
+    "partyLocation": "Thornfast Keep",
+    "updatedAt": 1794787200000
   }
 ]

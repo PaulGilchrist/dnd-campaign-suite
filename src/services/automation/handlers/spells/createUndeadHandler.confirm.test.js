@@ -285,8 +285,8 @@ describe('createUndeadHandler - confirmCreateUndead', () => {
                   expectFields: { resistances: ['bludgeoning', 'piercing'] } },
                 { label: 'damage_immunities ride through', monster: { ...mockGhoul, damage_immunities: ['cold'] },
                   expectFields: { immunities: ['cold'] } },
-                { label: 'immunities only serve as fallback', monster: { ...mockGhoul, damage_immunities: undefined, immunities: ['poison'] },
-                  expectFields: { immunities: ['poison'] } },
+                { label: 'retired legacy immunities key is ignored (no-legacy sweep)', monster: { ...mockGhoul, damage_immunities: undefined, immunities: ['poison'] },
+                  expectFields: { immunities: [] } },
             ];
 
             for (const { label, monster, expectFields } of table) {

@@ -99,7 +99,7 @@ const diskMonsters = rosterOf('public/data/monsters.json');
 const sleep2024 = rosterOf('public/data/2024/spells.json').find(s => s.name === 'Sleep');
 const sleep5eText = rosterOf('public/data/spells.json').find(s => s.name === 'Sleep').description.join(' ');
 const monsterRow = (name) => diskMonsters.find(m => m.name === name) || null;
-const ciHas = (row, cond) => ((row?.condition_immunities || row?.immunities || []).map(s => String(s).toLowerCase()).includes(cond));
+const ciHas = (row, cond) => ((row?.condition_immunities || []).map(s => String(s).toLowerCase()).includes(cond));
 
 // Strictly turn-based: no wall-clock in this service — seams only (#1285/1332/1405).
 const src = readFileSync('src/services/rules/features/sleepService.js', 'utf8');
@@ -330,22 +330,30 @@ describe('sleepService — SP-107 Sleep spell face (base lane)', () => {
         expect(writes).toHaveLength(0);
     });
 
-    it('isSleepImmune consults NOTHING that a short-circuit can answer: disk-driven type gate (real mixed-case rows Zombie "Undead"/Dracolich "undead"/Iron Golem "Construct" — all WITHOUT condition_immunities on disk, so the TYPE gate is what implements the 5e text), cs-level Exhaustion/Magical-Sleep immunity pre-gate, exact-match monsterType (the real "humanoid (any race)" variant is NOT gated), and the exhaustion oracle answered from disk in BOTH key shapes (condition_immunities AND the live immunities-fallback)', async () => {
+    it('isSleepImmune consults NOTHING that a short-circuit can answer: disk-driven type gate (real mixed-case rows Zombie "Undead"/Dracolich "undead"/Iron Golem "Construct" — the TYPE gate implements the 5e text), cs-level Exhaustion/Magical-Sleep immunity pre-gate, exact-match monsterType (the real "humanoid (any race)" variant is NOT gated), and the exhaustion oracle answered from disk on the canonical condition_immunities key (no-legacy sweep 2026-11-16 retired the mixed-`immunities` fallback)', async () => {
         // Disk canaries — invented nothing (#1362).
         const zombieRow = monsterRow('Zombie');
         expect(zombieRow.type).toBe('Undead');
-        expect(monsterRow('Zombie').condition_immunities).toBeUndefined();
+        expect(monsterRow('Zombie').condition_immunities).toContain('Exhaustion');
         expect(monsterRow('Iron Golem').type).toBe('Construct');
         expect(monsterRow('Adult Blue Dracolich').type).toBe('undead');
         expect(ciHas(monsterRow('Adult Blue Dracolich'), 'exhaustion')).toBe(true);
         expect(monsterRow('Thug').type).toBe('humanoid');
         expect(ciHas(monsterRow('Thug'), 'exhaustion')).toBe(false);
         expect(sleep5eText).toContain('Undead and creatures immune to being charmed');
-        // 5e charm-clause vs the service's exhaustion check: no disk collision —
-        // every charmed-immune fey here is ALSO exhaustion-immune (census).
+        // 5e charm-clause vs the service's exhaustion check: the charmed-immune
+        // FEY census, keyed on the canonical condition_immunities the service
+        // reads. Arch-hag (the sole pre-sweep member) carries BOTH; the sweep
+        // made the four Fey Spirit rows' mixed `immunities: ["charmed"]` visible
+        // on this key — charmed-only, so the RAW charm clause is GM-adjudicated
+        // for them (identical isSleepImmune bytes before and after the sweep:
+        // their old empty-`condition_immunities` array already shadowed the
+        // fallback in every service-side read).
         const charmedFey = diskMonsters.filter(m => /fey/i.test(m.type || '') && ciHas(m, 'charmed'));
-        expect(charmedFey.length).toBeGreaterThan(0);
-        expect(charmedFey.every(m => ciHas(m, 'exhaustion'))).toBe(true);
+        expect(charmedFey.map(m => m.name).sort()).toEqual([
+            'Arch-hag', 'Fey Spirit', 'Fey Spirit (Guide)', 'Fey Spirit (Trickster)', 'Fey Spirit (Warrior)',
+        ]);
+        expect(charmedFey.filter(m => ciHas(m, 'exhaustion')).map(m => m.name)).toEqual(['Arch-hag']);
 
         expect(await isSleepImmune(campaignName, { name: 'Zombie 1', type: 'npc', monsterType: monsterRow('Zombie').type })).toBe(true);
         expect(await isSleepImmune(campaignName, { name: 'Adult Blue Dracolich 1', type: 'npc', monsterType: monsterRow('Adult Blue Dracolich').type })).toBe(true);
@@ -366,10 +374,10 @@ describe('sleepService — SP-107 Sleep spell face (base lane)', () => {
         expect(await isSleepImmune(campaignName, { name: 'Thug 1', type: 'npc' })).toBe(false);
         expect(await isSleepImmune(campaignName, { name: 'Not A Monster', type: 'npc' })).toBe(false);
 
-        // Disk carries TWO immunity key shapes: Dracolich uses condition_immunities,
-        // Zombie/Iron Golem use a plain `immunities` key — the monster.immunities
-        // fallback (:42) is the LIVE disk path, not dead code (no text divergence).
-        expect(zombieRow.immunities.map(s => s.toLowerCase())).toContain('exhaustion');
+        // Canonical single-shape: the sweep split Zombie's mixed `immunities`
+        // into damage_immunities + condition_immunities, so the exhaustion
+        // oracle answers from condition_immunities for every row.
+        expect(zombieRow.condition_immunities.map(s => s.toLowerCase())).toContain('exhaustion');
         expect(await isSleepImmune(campaignName, { name: 'Zombie', type: 'npc' })).toBe(true);
         expect(await isSleepImmune(campaignName, null)).toBe(false);
         expect(consulted).toEqual(['Bard', 'Adult Blue Dracolich', 'Thug 1', 'Not A Monster', 'Zombie']);

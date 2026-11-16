@@ -8,11 +8,11 @@
 // exemplar; landResistance / stormbornResistance / wm008-kindgate own their effects.
 // Builder cite #952: automationInfoBuilder/passive.js emits the current envelope
 // { type:'passive_rule', effect:'fortified_health', name } with no range byte;
-// this lane consumes those bytes and pins legacy 'max_hp_increase' acceptance
-// once (source line: effect === 'max_hp_increase' || 'fortified_health') without
-// re-pinning envelope bytes. #966 FIXED: markFortifiedHealthUsedIfGranted's
-// ownership now carries the SAME dual-literal set as the read lane
-// (accept-if-read ⇒ mark-if-applied) — legacy holders latch on first grant. Consumer cite: index.genericHealFortified.test.js
+// this lane consumes those bytes. The legacy 'max_hp_increase' acceptance
+// (#966 dual-literal accept-if-read) was RETIRED by the no-legacy sweep
+// (2026-11-16): read and mark lanes both carry the single 'fortified_health'
+// literal, and legacy-byte pins flipped to DEAD (no contribution, no latch).
+// Consumer cite: index.genericHealFortified.test.js
 // MOCKS resolve/mark here and pins only the call seam; HP application (+40 max
 // HP, CON-based) is owned by featBuffService.computeFeatBuffs / abilityCalc
 // lanes. Turn-based latch: no wall-clock, no timers. These branches never log —
@@ -127,11 +127,11 @@ describe('resolveHealingBonusesWithDetails — fortified contribution and latch'
     expect(resolveHealingBonusesWithDetails(makeChar(), { slotLevel: 3 }).totalBonus).toBe(2)
   })
 
-  // #966 FLIPPED (was honest latch-dark: legacy contributed every resolution,
-  // once-per-turn latch never engaged because the mark lane's ownership matched
-  // only 'fortified_health'). Now: contribute once, latch marks, second same-
-  // round application refused. Current-name legs above are byte-intact.
-  it('legacy max_hp_increase bytes contribute, mark the latch, refuse re-application same round', async () => {
+  // #966 dual-literal acceptance retired by the no-legacy sweep (2026-11-16):
+  // Boon Of Fortitude authors 'fortified_health' and stale runtime bytes with
+  // effect:'max_hp_increase'+alsoSelfHealing are flushed by the admin clear.
+  // Such legacy bytes now contribute nothing and never mark the latch.
+  it('legacy max_hp_increase bytes are DEAD: contribute nothing, never mark the latch', async () => {
     const legacy = { ...FORTIFIED, effect: 'max_hp_increase' }
     const holder = makeChar('Legacy_Round_966', [legacy])
     const stamps = {}
@@ -139,20 +139,9 @@ describe('resolveHealingBonusesWithDetails — fortified contribution and latch'
       key === FH_KEY ? stamps[charName] ?? null : null)
     getCombatSummary.mockReturnValue({ round: 2 })
 
-    // Application 1: read lane grants CON bonus under the honest name.
-    expect(resolveHealingBonuses(holder, 5, 3, 3, CAMPAIGN)).toBe(2)
-    await markFortifiedHealthUsedIfGranted([{ name: 'Fortified Health', amount: 2 }], holder, null, CAMPAIGN)
-    expect(markOncePerTurn).toHaveBeenCalledTimes(1)
-    expect(markOncePerTurn.mock.calls[0]).toEqual(['Fortified Health', FH_KEY, expect.objectContaining({ name: 'Legacy_Round_966' }), CAMPAIGN])
-    stamps.Legacy_Round_966 = { round: 2, activeCreature: 'Legacy_Round_966' }
-
-    // Application 2, same round: latch stamped on the holder's own store —
-    // read lane refuses; no second heal.
     expect(resolveHealingBonuses(holder, 5, 3, 3, CAMPAIGN)).toBe(0)
-
-    // Round-wrap re-arm (turn seam, no wall-clock): next round grants again.
-    getCombatSummary.mockReturnValue({ round: 3 })
-    expect(resolveHealingBonuses(holder, 5, 3, 3, CAMPAIGN)).toBe(2)
+    await markFortifiedHealthUsedIfGranted([{ name: 'Fortified Health', amount: 2 }], holder, null, CAMPAIGN)
+    expect(markOncePerTurn).not.toHaveBeenCalled()
   })
 
   it('details lane requires positive bonuses; plain lane sums negatives and drops NaN', () => {
@@ -190,15 +179,13 @@ describe('markFortifiedHealthUsedIfGranted — owner-store latch writes', () => 
     expect(markOncePerTurn).not.toHaveBeenCalled()
   })
 
-  // #966 FLIPPED: this table's owners were pinned current-name only — a
-  // legacy-byte holder healed every time with the latch never engaging.
-  // Ownership now mirrors the read lane's dual literals (:173, house alias
-  // idiom per carryingCapacity.js:16): accept-if-read ⇒ mark-if-applied.
-  it('marks a legacy max_hp_increase byte owner (exact latch bytes)', async () => {
+  // No-legacy sweep (2026-11-16): the ownership match carries the single
+  // 'fortified_health' literal — a legacy-byte owner is never marked (it can
+  // never be granted either; see the read-lane DEAD pin above).
+  it('refuses to mark a legacy max_hp_increase byte owner', async () => {
     const legacyOwner = makeChar('Legacy_Owner_966', [{ ...FORTIFIED, effect: 'max_hp_increase' }])
     await markFortifiedHealthUsedIfGranted([{ name: 'Fortified Health', amount: 7 }], legacyOwner, makeChar('Plain_Targee', []), CAMPAIGN)
-    expect(markOncePerTurn).toHaveBeenCalledTimes(1)
-    expect(markOncePerTurn.mock.calls[0]).toEqual(['Fortified Health', FH_KEY, expect.objectContaining({ name: 'Legacy_Owner_966' }), CAMPAIGN])
+    expect(markOncePerTurn).not.toHaveBeenCalled()
   })
 
   it('refuses to mark a non-Fortified Health owner even on a legacy byte', async () => {

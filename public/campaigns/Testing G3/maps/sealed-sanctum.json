@@ -897,5 +897,6 @@
   "panX": 0,
   "panY": 0,
   "displayName": "Sealed Sanctum",
-  "rooms": []
+  "rooms": [],
+  "name": "sealed-sanctum"
 }

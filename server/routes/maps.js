@@ -128,8 +128,8 @@ router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
     // row's Regenerate face is known at list-render time — no per-row whole-doc GET
     // (the old lazy stamp-probe fetched 1800-cell terrain docs just for a tooltip,
     // once per row per mount — VX backlog 2026-11-12). Large doc fields (walls/
-    // placedItems/terrain/rivers) stay in the per-slug GET lane. Docs without the
-    // key (legacy fixtures, hand-authored maps) honestly omit it.
+    // placedItems/terrain/rivers) stay in the per-slug GET lane. Hand-authored
+    // maps (never generated) honestly omit the key.
     let generationOpts;
     try {
       const mapContent = JSON.parse(fs.readFileSync(path.join(mapsDir, f), 'utf-8'));
@@ -165,7 +165,7 @@ const clampGridSize = (gridSize) => Math.max(5, Math.min(100, gridSize ?? 20));
 // revealed[] entries are "gx,gy" strings (see useFogOfWar / mergeNewlyRevealed).
 // Cells outside the current grid can never be rendered or matched by fog math
 // (fog iterates 0..gridSize-1), but they balloon the document when gridSize is
-// shrunk or a legacy larger-grid file is re-opened — every save/SSE payload
+// shrunk — every save/SSE payload
 // then ships the stale tail (31,200-entry case, 2026-10-13). Prune at this
 // single server seam so disk writes, broadcasts and every client load
 // (mapsService.loadMapData → GET) only ever carry in-bounds cells.
@@ -201,9 +201,10 @@ export function pruneRevealedToGrid(mapData) {
 // restore). Renames legitimately belong to the /rename route; here, when the
 // target file already exists, the stored document's authored `name` /
 // `displayName` win over the body. Stored field missing/null/blank → the body
-// value is kept (nothing authoritative on disk to protect; a legacy doc that
-// never carried `name` is back-filled by the client's echo, not rejected).
-// Unreadable stored bytes fail open to the body. New-file create-via-PUT (the
+// value is kept (nothing authoritative on disk to protect — every stored doc
+// carries both keys since the 2026-11-16 one-time name stamp, so this arm
+// only fires on hand-edited docs). Unreadable stored bytes fail open to the
+// body. New-file create-via-PUT (the
 // auto-encounter spawn lane in useEncounterGeneration.js authors readable
 // names in the body) is untouched — body verbatim, as today.
 // Returns the SAME object when nothing is overridden.
@@ -240,8 +241,8 @@ function readStoredMapDocument(filePath) {
 // object → strip players → PUT → reopen crashes the editor). A stored outdoor
 // document never carries a players array, so the Array.isArray(stored) test
 // keeps the hex travelState lane byte-identical without a type check. Create-
-// via-PUT (no stored doc) and legacy stored docs that never had players stay
-// untouched — this rejects only an ERASE, never over-validates.
+// via-PUT (no stored doc) and stored docs that never carry players (outdoor
+// hex maps) stay untouched — this rejects only an ERASE, never over-validates.
 export function erasesStoredPlayers(storedData, incomingData) {
   return !!storedData
     && Array.isArray(storedData.players)

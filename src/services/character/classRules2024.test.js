@@ -56,8 +56,8 @@ import classes2024 from '../../../public/data/2024/classes.json';
 //    at exactly L11/13/15/17, matching the >10 / >=11/13/15/17 formula).
 //  - Quirks pinned: getRogueSneakAttack/getEldritchInvocations use positional
 //    [level-1] indexing (not find-by-level); getEnergy required_major check
-//    reads only class.major.name (legacy subclass shape → null); getClass drops
-//    runtime major customProp (disk clone wins).
+//    reads only class.major.name (raw subclass shape → null); getClass drops
+//    the runtime subclass customProp on the resolved major (disk clone wins).
 
 const diskClass = (name) => classes2024.find((c) => c.name === name);
 const diskLevels = (name) => diskClass(name).class_levels;
@@ -142,15 +142,15 @@ describe('classRules2024 (2024)', () => {
       expect(result.proficiencies).toContain('Medium Armor');
     });
 
-    it('resolves disk major by name as a disk clone (runtime major customProp is dropped — quirk)', () => {
+    it('resolves disk major by persisted subclass.name as a disk clone (runtime customProp never rides the resolved major — quirk)', () => {
       const lifeDomain = diskClass('Cleric').majors.find((m) => m.name === 'Life Domain');
-      const result = classRules.getClass(classes2024, { class: { name: 'Cleric', major: { name: 'Life Domain', customProp: 'x' } } });
+      const result = classRules.getClass(classes2024, { class: { name: 'Cleric', subclass: { name: 'Life Domain', customProp: 'x' } } });
       expect(result.major).toEqual(lifeDomain); // verbatim disk clone: Disciple of Life, Preserve Life, Blessed Healer, Supreme Healing
       expect(result.major.customProp).toBeUndefined();
       expect(result.majors).toBeUndefined();
     });
 
-    it('resolves legacy subclass.name against disk majors (2024 disk name, not 5e short name)', () => {
+    it('resolves the persisted subclass.name against disk majors (2024 disk name, not 5e short name)', () => {
       const land = diskClass('Druid').majors.find((m) => m.name === 'Circle of the Land');
       const result = classRules.getClass(classes2024, { class: { name: 'Druid', subclass: { name: 'Circle of the Land' } } });
       expect(result.major).toEqual(land);
@@ -211,9 +211,9 @@ describe('classRules2024 (2024)', () => {
       expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(expected);
     });
 
-    it('applies the Moon formula via legacy subclass.name shape at level 8', () => {
+    it('ignores the raw persisted subclass shape for the Moon boost — resolved class.major is the only channel (level 8 falls back to disk CR)', () => {
       const playerStats = { class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, class_levels: diskLevels('Druid') }, level: 8 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(2);
+      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(1);
     });
 
     it('does not override for other disk majors (Circle of the Stars at level 8 → disk 1)', () => {
@@ -373,8 +373,8 @@ describe('classRules2024 (2024)', () => {
       expect(classRules.getHighestMajorLevel(moonStats(level))).toBe(expected);
     });
 
-    it('falls back to legacy subclass shape at level 6', () => {
-      expect(classRules.getHighestMajorLevel(moonStats(6, 'subclass'))).toBe(6);
+    it('ignores the raw subclass shape — resolved major only (no persisted-subclass fallback)', () => {
+      expect(classRules.getHighestMajorLevel(moonStats(6, 'subclass'))).toBe(0);
     });
 
     it('returns 0 when major is missing or empty', () => {
