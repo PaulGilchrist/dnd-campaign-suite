@@ -51,6 +51,20 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
   // `saveDisabled`). The blank guards in handleSave/handleRename below stay
   // live as the Enter-key lane's honest refusal (same backstop role the
   // siblings keep in their handlers) — never a silent no-op.
+  // QA backlog 2026-11-16 XB: editing the name clears the inline error,
+  // mirroring the maps generate-modal change lane (GenerateDungeonModal.jsx
+  // `editName = (event) => { setError(null); ... }`) — a stale red refusal
+  // must not linger once the user is fixing the very field it names.
+  const editName = (event) => {
+    setError('');
+    setName(event.target.value);
+  };
+
+  const editNewName = (event) => {
+    setError('');
+    setNewName(event.target.value);
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       setError('Encounter name is required');
@@ -148,7 +162,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                 id="encounter-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={editName}
                 placeholder="e.g., Goblin Ambush"
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 autoFocus
@@ -168,7 +182,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                 id="encounter-rename"
                 type="text"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                onChange={editNewName}
                 onKeyDown={(e) => e.key === 'Enter' && handleRename()}
                 autoFocus
               />
