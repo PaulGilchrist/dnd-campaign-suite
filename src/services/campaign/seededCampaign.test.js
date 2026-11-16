@@ -210,14 +210,21 @@ describe('arena preset', () => {
     expect(mapsService.saveMapData.mock.calls[1][2].description).toContain('fighting pit');
   });
 
-  it('seeds three sparring encounters with bestiary-resolved creature rows', () => {
+  it('seeds three sparring encounters in the canonical builder-preset shape', () => {
     expect(saveEncounter).toHaveBeenCalledTimes(3);
     const [campaign, name, data] = saveEncounter.mock.calls[0];
     expect(campaign).toBe('qa-arena');
     expect(name).toBe('Sparring — Goblin Pack');
     expect(data.selectedMonsters.map(m => m.name)).toEqual(['Goblin', 'Kobold']);
-    const goblin = data.creatures.find(c => c.name === 'Goblin 1');
-    expect(goblin).toMatchObject({ type: 'monster', ac: 15, hp: 7, maxHp: 7, speed: 30, initBonus: 2 });
+    // Canonical shape only (legacy-snapshot migration 2026-11-16): the seeder
+    // writes the same {description, selectedMonsters, effectiveXP} document
+    // the Save lane writes — no creatures[]/round/activeCreatureName preview
+    // keys, and refs are the exact {index, name, qty} triple.
+    expect(Object.keys(data).sort()).toEqual(
+      ['description', 'effectiveXP', 'selectedMonsters']
+    );
+    expect(data.selectedMonsters[0]).toEqual({ index: 'goblin', name: 'Goblin', qty: 3 });
+    expect(data.effectiveXP).toBe(5 * 50); // 3 goblins + 2 kobolds, placeholder XP
     // Every creature name is a CLASSIC_MONSTERS base (Encounter Builder resolves real stats).
     for (const call of saveEncounter.mock.calls) {
       for (const ref of call[2].selectedMonsters) {

@@ -547,7 +547,9 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
 
       setDescription(data.description || '');
 
-      const monsterRefs = data.selectedMonsters || [];
+      // Post-migration 2026-11-16 every saved row carries selectedMonsters —
+      // the one source the load path reads (no snapshot-key fallbacks).
+      const monsterRefs = data.selectedMonsters;
        const resolvedMonsters = resolveMonsterRefs(monsterRefs, monsters);
 
        setSelectedMonsters(resolvedMonsters);

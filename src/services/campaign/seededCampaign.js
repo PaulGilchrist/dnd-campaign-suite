@@ -79,22 +79,6 @@ function pickN(rng, list, count) {
   return out;
 }
 
-/** Parse "30 ft." walk speed into the numeric speed the saved-encounter lane uses. */
-function monsterSpeed(monster) {
-  const walk = monster.speed?.walk ?? monster.speed;
-  const n = parseInt(String(walk), 10);
-  return Number.isFinite(n) ? n : 30;
-}
-
-/** Initiative modifier: explicit field first, Dex modifier as the rules-lawful
- *  fallback (both present in monsters.json rows); the join lane re-rolls real
- *  initiative, so this only fills the saved `creatures` preview rows. */
-function monsterInitBonus(monster) {
-  if (Number.isFinite(monster.initiative)) return monster.initiative;
-  if (Number.isFinite(monster.ability_score_modifiers?.dex)) return monster.ability_score_modifiers.dex;
-  return 0;
-}
-
 /** Sentence-article assembly helper for flavor copy that prefixes "The" onto a
  *  generated service/business name (backlog 2026-11-03: shop/guild banks ship
  *  ~1400 names already leading with "The ", so a blind `The ${name}` produced
@@ -117,35 +101,19 @@ async function findBestiaryRows(names) {
   });
 }
 
-/** Build one saved-encounter document from bestiary picks: `selectedMonsters`
- *  refs (what Join consumes) + §1 `creatures` preview rows (real stats). */
+/** Build one saved-encounter document from bestiary picks in the canonical
+ *  builder-preset shape (what the Save lane writes and Load/Join consume). */
 function buildEncounterData(description, picks) {
-  const creatures = [];
-  const selectedMonsters = [];
-  for (const { monster, qty } of picks) {
-    selectedMonsters.push({ index: monster.index, name: monster.name, qty });
-    for (let i = 0; i < qty; i++) {
-      creatures.push({
-        name: qty === 1 ? monster.name : `${monster.name} ${i + 1}`,
-        type: 'monster',
-        ac: typeof monster.armor_class === 'number' ? monster.armor_class : 10,
-        hp: monster.hit_points || 10,
-        maxHp: monster.hit_points || 10,
-        speed: monsterSpeed(monster),
-        initBonus: monsterInitBonus(monster),
-        conditions: [],
-        effects: [],
-        notes: '',
-      });
-    }
-  }
+  const selectedMonsters = picks.map(({ monster, qty }) => ({
+    index: monster.index,
+    name: monster.name,
+    qty,
+  }));
+  const monsterCount = selectedMonsters.reduce((sum, m) => sum + m.qty, 0);
   return {
     description,
-    round: 1,
-    activeCreatureName: creatures[0]?.name || null,
-    creatures,
     selectedMonsters,
-    effectiveXP: creatures.length * 50, // rough pool placeholder; EB recomputes on load
+    effectiveXP: monsterCount * 50, // rough pool placeholder; EB recomputes on load
   };
 }
 
