@@ -647,14 +647,20 @@ const ZERO_HP_INTERCEPTORS = [
   { check: checkDeathWard, name: 'Death Ward' },
 ];
 
-function interceptZeroHitPoints({ creature, playerComputed, options, finalDamage, oldHp, campaignName }) {
+function interceptZeroHitPoints({ creature, playerComputed, options, finalDamage, oldHp, newHp, campaignName }) {
   for (const interceptor of ZERO_HP_INTERCEPTORS) {
     const result = interceptor.check(creature, playerComputed, campaignName);
     if (result.intercepted) {
       if (interceptor.name === 'Relentless Endurance' && options?.damageSequenceId) {
         _reTriggeredSequenceIds.add(options.damageSequenceId);
       }
-      return { ...result, damageDealt: finalDamage, oldHp, interceptedFeature: interceptor.name };
+      // Ledger honesty: the HP leg has already stored newHp. Synchronous interceptors
+      // (Undying Sentinel, Boon of Recovery, Relentless Endurance, Death Ward) carry
+      // their own post-interception newHp and the spread keeps it. Relentless Rage's
+      // async contract ({ awaitingSave: true }) has no post-save HP at trigger time,
+      // so it falls back to the stored bucket truth — every consumer row (fall_damage,
+      // popups, targetCurrentHp feeds) then renders an honest number, never undefined.
+      return { newHp, ...result, damageDealt: finalDamage, oldHp, interceptedFeature: interceptor.name };
     }
   }
   return null;
@@ -878,9 +884,9 @@ function concentrationDamagePending(options, creature, damageTaken) {
 // Player drop-to-0 interception + death-save prompt + concentration prompt.
 // Returns { interception, combatSummaryChanged } — the interception (when non-null)
 // must be returned verbatim from applyDamageToTarget.
-function handlePlayerZeroHpAndConcentration({ creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName }) {
+function handlePlayerZeroHpAndConcentration({ creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, newHp, finalDamage, actualDamageTaken, attackerName, campaignName }) {
   if (wasAlive && isNowUnconscious) {
-    const interception = interceptZeroHitPoints({ creature, playerComputed, options, finalDamage, oldHp, campaignName });
+    const interception = interceptZeroHitPoints({ creature, playerComputed, options, finalDamage, oldHp, newHp, campaignName });
     if (interception) {
       return { interception, combatSummaryChanged: false };
     }
@@ -954,9 +960,9 @@ function handleSummonVanishAndConcentrationDc({ creature, combatSummary, isPlaye
 // Zero-HP/concentration outcomes, player vs NPC. A player interception is
 // returned verbatim by applyDamageToTarget; NPC concentration breaks fold
 // into combatSummaryChanged (both only ever feed the summary persist).
-function resolveTargetDamageOutcome({ creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName }) {
+function resolveTargetDamageOutcome({ creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, newHp, finalDamage, actualDamageTaken, attackerName, campaignName }) {
   if (isPlayer) {
-    return handlePlayerZeroHpAndConcentration({ creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName });
+    return handlePlayerZeroHpAndConcentration({ creature, characters, playerComputed, options, wasAlive, isNowUnconscious, oldHp, newHp, finalDamage, actualDamageTaken, attackerName, campaignName });
   }
   if (concentrationDamagePending(options, creature, finalDamage)) {
     handleNpcConcentrationBreak(creature, characters, attackerName, combatSummary, campaignName);
@@ -1111,7 +1117,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
 
   checkDarkOnesBlessing({ characters, creature, finalDamage, isPlayer, wasAlive, isNowUnconscious, campaignName, attackerName });
 
-  const outcome = resolveTargetDamageOutcome({ creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, finalDamage, actualDamageTaken, attackerName, campaignName });
+  const outcome = resolveTargetDamageOutcome({ creature, combatSummary, characters, isPlayer, playerComputed, options, wasAlive, isNowUnconscious, oldHp, newHp, finalDamage, actualDamageTaken, attackerName, campaignName });
   if (outcome.interception) {
     return outcome.interception;
   }
