@@ -215,6 +215,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                           className="encounter-btn encounter-btn-sm encounter-btn-secondary"
                           onClick={() => setRenameTarget(enc)}
                           aria-label={`Rename "${enc.name}"`}
+                          title={`Rename "${enc.name}"`}
                           disabled={loading}
                         >
                           <i className="fa-solid fa-pen" />
@@ -223,6 +224,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                           className="encounter-btn encounter-btn-sm encounter-btn-danger"
                           onClick={() => handleDelete(enc.name)}
                           aria-label={`Delete "${enc.name}"`}
+                          title={`Delete "${enc.name}"`}
                           disabled={loading}
                         >
                           <i className="fa-solid fa-trash-can" />
