@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel } from '../../services/maps/hexMapUtils';
 import * as mapsService from '../../services/maps/mapsService.js';
+import { useMenuRoving } from '../../hooks/ui/useMenuRoving.js';
 import MenuOption from '../common/MenuOption.jsx';
 
 const MENU_WIDTH = 160;
@@ -14,9 +15,11 @@ function getLinkPickerLayout(showLinkPicker, indoorMaps) {
     return { count, offset: count * PICKER_ITEM_HEIGHT, extraHeight: count * PICKER_ITEM_HEIGHT + 8 };
 }
 
-// MenuOption (keyboard-activatable role=menuitem row) now lives in
-// ../common/MenuOption.jsx — shared with the indoor ItemContextMenu
-// (backlog 2026-11-16 XC) so both SVG menus keep ONE activation seam.
+// MenuOption (keyboard-activatable role=menuitem row) and the open-focus +
+// Arrow/Home/End rove tier (useMenuRoving) both live in the shared seams —
+// ../common/MenuOption.jsx and ../../hooks/ui/useMenuRoving.js — so the
+// indoor ItemContextMenu and this hex menu keep ONE keyboard contract
+// (bug-hex-poi-menu-no-keyboard-rove-or-focus-first closed the outdoor gap).
 
 // Inline rename editor (backlog 2026-11-13, replaces the "no cancel face"
 // law): three faces — Enter/blur COMMIT (unchanged laws), Escape REVERTS-AND-
@@ -132,7 +135,9 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
     // The listener lives on window rather than as a menu-root onKeyDown
     // because acceptance covers focus anywhere — menu root, a menuitem, or
     // the board/svg behind the menu. Escape inside the inline rename input
-    // stays inert (its cancel face is a separate backlog item).
+    // is owned by RenameInput's own revert-and-close handler; the
+    // `.context-menu-input` guard below keeps this listener from
+    // double-handling that keydown.
     useEffect(() => {
         if (!selectedPoi) return undefined;
         const handleKeyDown = (e) => {
@@ -144,6 +149,19 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedPoi, onClose]);
+
+    // Open-focus (first entry) + Arrow/Home/End rove with wrap live in the
+    // shared useMenuRoving seam — the same tier the indoor ItemContextMenu
+    // shipped in 77ef39387 (bug-hex-poi-menu-no-keyboard-rove-or-focus-first:
+    // this menu advertised role=menu but never honored the arrow contract).
+    // The key nulls while the inline rename editor is armed so the input's
+    // autoFocus is never stolen (openKey null → no focus pull; arrows inside
+    // the input keep native caret behavior via the hook's guard).
+    const menuRef = useRef(null);
+    const handleMenuKeyDown = useMenuRoving(
+        menuRef,
+        selectedPoi && showRename !== selectedPoi.id ? selectedPoi.id : null
+    );
 
     if (!selectedPoi) return null;
 
@@ -179,7 +197,10 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
     };
 
     return (
-        <g className="poi-context-menu" role="menu" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+        <g className="poi-context-menu" role="menu" ref={menuRef}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={handleMenuKeyDown}>
             <g>
                 <rect x={menuX} y={menuY} width={MENU_WIDTH} height={menuHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
 
