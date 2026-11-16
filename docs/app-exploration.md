@@ -57,8 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-16 WK: NPC form enables Save for bestiary names (Goblin…) and pays the 400 round-trip before the inline refusal, while the AI draft lane enforces the same name-law CLIENT-side ("Not approved — name \"npc\" is a kind word"). Candidate: reuse `isBestiaryMonsterName` client-side (fetch a name-set once) to gate Save like the dup-quest block does.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - EB Update-overwrite NATIVE confirm firm leg (`Overwrite encounter "X"?` not fired) — the zero-draft gate legitimately intercepts first, and firing it live means rewriting an owner pool row; code-located (EncounterBuilder.jsx:495) + unit-pinned (`update-save-confirm.test.jsx`).

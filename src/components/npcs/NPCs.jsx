@@ -9,6 +9,7 @@ import Subscriber from '../common/Subscriber.jsx';
 import { getDefaultFormData, cleanNPCData } from '../../services/npcs/npcFormUtils.js';
 import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
 import { generateNPC } from '../../services/npcs/npcGenerator.js';
+import { loadBestiaryMonsterNames, isBestiaryMonsterName, bestiaryNameError } from '../../services/npcs/bestiaryNameGuard.js';
 import './NPCs.css';
 
 function NPCs({ campaignName, onViewInitiative }) {
@@ -28,6 +29,18 @@ function NPCs({ campaignName, onViewInitiative }) {
   const [errorIsConflict, setErrorIsConflict] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState('roleplay');
   const [modalKey, setModalKey] = useState(0);
+  // Bestiary-name client gate (2026-11-16 QA backlog): the lower-cased
+  // monsters.json name-set, fetched ONCE (module memo) and non-blocking.
+  // null = still loading or the load failed → gate inert, the server 400
+  // stays the authoritative backstop with its verbatim inline refusal.
+  const [bestiaryNames, setBestiaryNames] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    loadBestiaryMonsterNames().then((nameSet) => {
+      if (alive) setBestiaryNames(nameSet);
+    });
+    return () => { alive = false; };
+  }, []);
   // Skipped-while-editing SSE list broadcasts and rejected (409) saves prove
   // the on-screen list is stale: a reopened editor would re-seed the old row
   // (stale updatedAt) and its next save would repeat the SAME 409 forever.
@@ -143,8 +156,30 @@ function NPCs({ campaignName, onViewInitiative }) {
     n.name !== editingNPC?.name && n.name.toLowerCase() === formData.name.trim().toLowerCase()
   );
 
+  /**
+   * Bestiary-name law, DERIVED live while typing (mirrors the dup-quest block
+   * in Quests.jsx and its getDuplicateState shape): a published-monster name
+   * disables Save and shows the server guard's copy verbatim inline, so the
+   * doomed 400 round-trip is never paid. Only fires once the loaded name-set
+   * proves the match; while the set is null (loading/failed) the gate is
+   * inert and the server 400 stays the authoritative backstop.
+   */
+  const getBestiaryGateState = () => {
+    if (!modalOpen || !formData) return null;
+    const bestiaryError = isBestiaryMonsterName(formData.name, bestiaryNames)
+      ? bestiaryNameError(formData.name)
+      : null;
+    return {
+      visibleError: bestiaryError || error,
+      visibleConflict: !bestiaryError && errorIsConflict,
+      saveDisabled: saving || !formData.name.trim() || !!bestiaryError,
+    };
+  };
+  const gateState = getBestiaryGateState();
+
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
+    if (isBestiaryMonsterName(formData.name, bestiaryNames)) return; // button disabled + live hint
     if (hasDuplicateName()) {
       showError('An NPC with that name already exists');
       return;
@@ -203,6 +238,7 @@ function NPCs({ campaignName, onViewInitiative }) {
 
   const handleSaveAndAddToInitiative = async () => {
     if (!formData || !formData.name.trim()) return;
+    if (isBestiaryMonsterName(formData.name, bestiaryNames)) return; // button disabled + live hint
     if (hasDuplicateName()) {
       showError('An NPC with that name already exists');
       return;
@@ -324,7 +360,7 @@ function NPCs({ campaignName, onViewInitiative }) {
         </ul>
       )}
 
-      {modalOpen && formData && (
+      {gateState && (
         <NPCFormModal
           key={modalKey}
           formData={formData}
@@ -334,9 +370,12 @@ function NPCs({ campaignName, onViewInitiative }) {
           initialTab={modalInitialTab}
           saving={saving}
           deleting={deleting}
-          error={error}
-          errorConflict={errorIsConflict}
-          disabled={saving || !formData.name.trim()}
+          /* Live-gate hint (never a server error) shadows the banner while
+             it stands; the server-copy lane below it stays byte-unchanged
+             for every non-gated save (fail-open backstop included). */
+          error={gateState.visibleError}
+          errorConflict={gateState.visibleConflict}
+          disabled={gateState.saveDisabled}
           onClose={handleRequestClose}
           onReloadList={handleReloadList}
           onSave={handleSave}
