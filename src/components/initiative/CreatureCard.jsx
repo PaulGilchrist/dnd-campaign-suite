@@ -212,8 +212,9 @@ function InitiativeControl({ creature, onInitiativeChange, isLocalhost, isAway }
                 min="0"
                 // GM-only bookkeeping: blur-stamps initiative into combatSummary and
                 // flips the session phase (bug-player-clients-can-hijack-initiative).
-                // Disabled keeps the read value visible with the card's own styling,
-                // mirroring TargetSelect's disabled gate. Split-party law: an AWAY row
+                // Disabled keeps the read value visible with the card's own styling
+                // (TargetSelect goes further and hides an unarmable visitor select —
+                // backlog 2026-11-16 TA). Split-party law: an AWAY row
                 // holds NO initiative slot (initiative is wiped on split), so the input
                 // is read-only there too — the GM rejoins the hero first
                 // (bug-away-card-initiative-input-resurrects-slot). The presence-keyed
@@ -249,6 +250,15 @@ function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, o
     // overlay armed rolls plain untargeted damage (targetName:undefined).
     // Suppress the inert options on monster cards (backlog
     // aoe-overlay-dead-lane trap fix).
+    // Uncontrolled monster rows on visitor tabs render NO select at all (backlog
+    // 2026-11-16 TA): the old permanently-disabled arm kept the card looking
+    // delegable-to-anyone after the GM released control. Mirrors InitiativeControl's
+    // visitor plain-value law (backlog 2026-11-11 LZ) — don't mount an
+    // editable-looking control that can never be enabled on this device. The
+    // predicate is verbatim the old `disabled` gate, so controlled monsters
+    // (explicit controller or derived summon/form lanes) keep the live arm lane,
+    // PC rows are untouched, and the GM sees the select in every state.
+    if (creature.type !== 'player' && !isLocalhost && !isPlayerSummoned) return null
     const showOverlays = creature.type === 'player' && overlays.length > 0
     return (
         <div className='creature-target'>Target&nbsp;
@@ -257,7 +267,6 @@ function TargetSelect({ creature, isLocalhost, isPlayerSummoned, allCreatures, o
                 data-testid="target-select"
                 value={creature.targetName || ''}
                 onChange={(e) => onTargetChange(creature.name, e.target.value)}
-                disabled={creature.type !== 'player' && !isLocalhost && !isPlayerSummoned}
             >
                 <option value="">— No Target —</option>
                 {allCreatures

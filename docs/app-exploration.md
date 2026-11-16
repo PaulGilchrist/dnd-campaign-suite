@@ -86,7 +86,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass clears GET-veri
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-16 TA: after delegation release, the LAN visitor's monster card keeps rendering the DISABLED target-select (value cleared) instead of the pre-delegation plain card face — honest (inert) but visually suggests the arm lane is theirs. Consider hiding `[data-testid=target-select]` on non-GM rows when `controller===null` (`[data-testid=target-select]`, visitor card render in initiative cards).
 
 ## Blocked / Not Verified (fold-gate ledger)
 

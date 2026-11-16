@@ -166,10 +166,10 @@ describe('CreatureCard', () => {
                 expectDisabled: false,
             },
             {
-                label: 'NPC on non-localhost is disabled',
+                label: 'NPC on non-localhost with no controller hides the select entirely (plain pre-delegation face — backlog 2026-11-16 TA)',
                 creature: { ...defaultNpcCreature, targetName: 'Bob' },
                 isLocalhost: false,
-                expectDisabled: true,
+                expectAbsent: true,
             },
             {
                 label: 'player-summoned creature on non-localhost is re-enabled',
@@ -177,9 +177,13 @@ describe('CreatureCard', () => {
                 isLocalhost: false,
                 expectDisabled: false,
             },
-        ])('target select: $label and shows creature.targetName', ({ creature, isLocalhost, expectDisabled }) => {
+        ])('target select: $label', ({ creature, isLocalhost, expectDisabled, expectAbsent }) => {
             const allCreatures = [defaultPlayerCreature, { name: 'Bob', type: 'player' }];
             render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} allCreatures={allCreatures} />);
+            if (expectAbsent) {
+                expect(screen.queryByTestId('target-select')).not.toBeInTheDocument();
+                return;
+            }
             const targetSelect = screen.getByTestId('target-select');
             if (expectDisabled) {
                 expect(targetSelect).toBeDisabled();

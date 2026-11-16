@@ -175,6 +175,34 @@ describe('LAN card opening via controller resolution', () => {
         expect(select).toBeEnabled();
     });
 
+    // Backlog 2026-11-16 TA: after delegation release (controller deleted on the
+    // release write) the visitor card must fall back to the PLAIN pre-delegation
+    // face — the old permanently-disabled, value-cleared select made the arm lane
+    // look like every visitor's. Same law as the visitor initiative-value span.
+    it('LAN uncontrolled-monster card renders no target-select (plain face, post-release)', () => {
+        renderCard({ isLocalhost: false });
+        expect(screen.queryByTestId('target-select')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Zombie target')).not.toBeInTheDocument();
+    });
+
+    it('a visitor who is NOT the controller still sees no target-select on a delegated row (LAN-trust: any device may run it)', () => {
+        // creatureControl LAN-trust model: control is per-party, not per-device —
+        // the row is enabled on every visitor tab while controlled; only the
+        // controller ABSENT entirely hides the select.
+        renderCard({ isLocalhost: false, creature: { ...uncontrolledZombie, controller: 'Bob' } });
+        expect(screen.getByTestId('target-select')).toBeEnabled();
+    });
+
+    it('GM row keeps the target-select when uncontrolled', () => {
+        renderCard({ isLocalhost: true });
+        expect(screen.getByTestId('target-select')).toBeEnabled();
+    });
+
+    it('GM row keeps the target-select when controlled', () => {
+        renderCard({ isLocalhost: true, creature: { ...uncontrolledZombie, controller: 'Alice' } });
+        expect(screen.getByTestId('target-select')).toBeEnabled();
+    });
+
     it('no turn cue for the GM view, inactive cards, or uncontrolled creatures', () => {
         renderCard({ isActive: true, creature: { ...uncontrolledZombie, controller: 'Alice' } });
         expect(screen.queryByText('Your turn!')).not.toBeInTheDocument();
