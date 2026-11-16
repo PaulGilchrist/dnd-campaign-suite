@@ -13,6 +13,7 @@ import { hasAutomation } from '../../services/combat/automation/automationServic
 import { executeHandler } from '../../services/automation/index.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 const _syncedStore = new Map();
 
@@ -221,7 +222,7 @@ describe('CharActions feature-row click wiring (integration)', () => {
     });
   });
 
-  it('clicking an automation row while cannotAct blocks everything — no handler, popup, or log', async () => {
+  it('clicking an automation row while cannotAct blocks the effect but pops the reason — no handler or log (RB-1115)', async () => {
     hasAutomation.mockReturnValue(true);
     executeHandler.mockResolvedValue({ type: 'popup', payload: 'Should not reach' });
 
@@ -232,7 +233,10 @@ describe('CharActions feature-row click wiring (integration)', () => {
     await clickActionRow('Test Action');
 
     expect(executeHandler).not.toHaveBeenCalled();
-    expect(setPopupHtml).not.toHaveBeenCalled();
+    // RB-1115: the silent-gate press now surfaces the shared canTakeAction copy
+    // through the assertCanAct setPopupHtml lane (UI-only feedback).
+    expect(setPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
+    expect(setPopupHtml).not.toHaveBeenCalledWith('Should not reach');
     expect(addEntry).not.toHaveBeenCalled();
     expect(onBuffsChange).not.toHaveBeenCalled();
   });

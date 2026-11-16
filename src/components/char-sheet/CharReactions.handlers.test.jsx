@@ -138,6 +138,7 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
 
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 const campaignName = 'test-campaign';
 
@@ -225,7 +226,7 @@ describe('CharReactions - Stand (Power Word Heal) click', () => {
         expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('stand up'));
     });
 
-    it('does nothing when cannotAct — no runtime writes, no popup', () => {
+    it('blocks a cannotAct press with zero runtime writes but pops the shared reason (RB-1115)', () => {
         runtimeWith({ powerWordHealStandPermission: true });
         getRuntimeValue.mockReturnValue(null);
 
@@ -233,6 +234,8 @@ describe('CharReactions - Stand (Power Word Heal) click', () => {
         fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
 
         expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(mockSetPopupHtml).not.toHaveBeenCalled();
+        // RB-1115: the silent gate now routes through the assertCanAct popup
+        // lane with the canTakeAction copy (UI-only).
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
     });
 });

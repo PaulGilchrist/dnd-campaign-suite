@@ -260,9 +260,9 @@ function BonusAttackRow({ attack, playerStats, campaignName, exhaustionPenalty, 
             onAttackClick,
         })}
         <div className={attack.damage ? "clickable" : ""} onClick={() => {
-            if (cannotAct) return;
-            // L5-001: enforcement gate (no-op while enforcement off).
-            if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'bonus-attack-damage-cell' }).allowed) return;
+            // L5-001/RB-1115: enforcement gate fed the legacy cannotAct flag —
+            // a blocked press pops the shared canTakeAction reason (UI-only).
+            if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'bonus-attack-damage-cell' }).allowed) return;
             if (isHbRow) { hbClick(); return; }
             if (attack.saveDc) { onResolveSpellDamage(attackItem); return; }
             handleSimpleDamageRoll(attackItem);
@@ -307,7 +307,7 @@ function buildBonusSpellAttackItem(spell, playerStats, resolvedDamage, damageTyp
     };
 }
 
-function BonusSpellRow({ spell, playerStats, exhaustionPenalty, conditionAttackMode, cannotAct, is2024Rules, hasWeaponMastery, displaySaveDcBonus, onAttackClick, onResolveSpellDamage, gateMetamagic, getBonusSpellDamageDisplay, onSpellNameClick }) {
+function BonusSpellRow({ spell, playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, is2024Rules, hasWeaponMastery, displaySaveDcBonus, onAttackClick, onResolveSpellDamage, gateMetamagic, getBonusSpellDamageDisplay, onSpellNameClick, setPopupHtml }) {
     const damageType = bonusSpellDamageType(spell);
     const resolvedDamage = spell.heal_at_slot_level
         ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
@@ -318,7 +318,11 @@ function BonusSpellRow({ spell, playerStats, exhaustionPenalty, conditionAttackM
     const isUtilityConc = spell.concentration && !spell.dc;
     const attackItem = buildBonusSpellAttackItem(spell, playerStats, resolvedDamage, damageType);
     const handleDamageClick = () => {
-        if (cannotAct || isUtilityConc) return;
+        if (isUtilityConc) return;
+        // L5-001/RB-1115: the cannotAct press routes through assertCanAct's
+        // popup lane (shared reason copy, UI-only denial) instead of returning
+        // silently.
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'bonus-spell-damage-cell' }).allowed) return;
         // SINGLE ENTRY POINT for bonus action spell casting:
         // - Save DC spells: onResolveSpellDamage handles AoE modals + prepareSpellCast (from parent)
         // - Non-save-DC spells: gateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
@@ -388,6 +392,7 @@ function BonusAttacksSection({ displayedBonusAttacks, bonusActionSpells, playerS
                     key={spell.name}
                     spell={spell}
                     playerStats={playerStats}
+                    campaignName={campaignName}
                     exhaustionPenalty={exhaustionPenalty}
                     conditionAttackMode={conditionAttackMode}
                     cannotAct={cannotAct}
@@ -399,6 +404,7 @@ function BonusAttacksSection({ displayedBonusAttacks, bonusActionSpells, playerS
                     gateMetamagic={gateMetamagic}
                     getBonusSpellDamageDisplay={getBonusSpellDamageDisplay}
                     onSpellNameClick={handleBonusSpellClick}
+                    setPopupHtml={setPopupHtml}
                 />
             ))}
             <div className='half-line'></div>
@@ -612,9 +618,9 @@ function SpiritualWeaponMoveRow({ playerStats, activeBuffs, campaignName, cannot
     return (
         <div>
             <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={async () => {
-                if (cannotAct) return;
-                // L5-001: enforcement gate (no-op while enforcement off).
-                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'spiritual-weapon-move' }).allowed) return;
+                // L5-001/RB-1115: cannotAct fed into the gate — blocked press
+                // pops the shared reason (UI-only denial).
+                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'spiritual-weapon-move' }).allowed) return;
                 const res = await resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName);
                 if (res.refused) { setPopupHtml({ type: 'automation_info', name: 'Spiritual Weapon', description: res.message }); return; }
                 // L5-002: the bonus attack fires here — charge the bonus slot.
@@ -632,7 +638,7 @@ function SpiritualWeaponMoveRow({ playerStats, activeBuffs, campaignName, cannot
     );
 }
 
-function InvokeDuplicityMoveRow({ activeBuffs, cannotAct, onAutomationAction }) {
+function InvokeDuplicityMoveRow({ activeBuffs, playerStats, campaignName, cannotAct, onAutomationAction, setPopupHtml }) {
     // CLA-366: Invoke Duplicity "Move" bonus action — while the
     // illusion is active, surface the move row (GM adjudicates the
     // illusion position; no illusion token exists). Trickster's
@@ -643,7 +649,9 @@ function InvokeDuplicityMoveRow({ activeBuffs, cannotAct, onAutomationAction }) 
     return (
         <div>
             <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
-                if (cannotAct) return;
+                // L5-001/RB-1115: cannotAct fed into the gate — blocked press
+                // pops the shared reason (UI-only denial).
+                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'invoke-duplicity-move' }).allowed) return;
                 onAutomationAction({
                     name: 'Trickster\'s Transposition',
                     description: 'Move the Invoke Duplicity illusion up to 30 feet, swapping places with it.',
@@ -662,7 +670,7 @@ function InvokeDuplicityMoveRow({ activeBuffs, cannotAct, onAutomationAction }) 
     );
 }
 
-function ExpeditiousRetreatDashRow({ playerStats, expeditiousRetreatActive, cannotAct, onAutomationAction }) {
+function ExpeditiousRetreatDashRow({ playerStats, campaignName, expeditiousRetreatActive, cannotAct, onAutomationAction, setPopupHtml }) {
     // SP-128: Expeditious Retreat (2024) — while the concentration stamp is
     // active ("until the spell ends, you can take that action again as a
     // Bonus Action"), surface the Dash grant row (mirror Wrath of the Sea /
@@ -674,7 +682,9 @@ function ExpeditiousRetreatDashRow({ playerStats, expeditiousRetreatActive, cann
     return (
         <div>
             <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
-                if (cannotAct) return;
+                // L5-001/RB-1115: cannotAct fed into the gate — blocked press
+                // pops the shared reason (UI-only denial).
+                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'expeditious-retreat-dash' }).allowed) return;
                 onAutomationAction({
                     name: 'Dash (Expeditious Retreat)',
                     description: `Take the Dash action — your Speed doubles ${speed} → ${speed * 2} ft until the end of the turn. Available on each of your turns until Concentration ends.`,
@@ -696,7 +706,7 @@ function fleetStepRowVisible(playerStats, fleetStepGrantRound, campaignName) {
         && Number(fleetStepGrantRound) === getCurrentCombatRound(campaignName);
 }
 
-function FleetStepRow({ playerStats, campaignName, cannotAct, onAutomationAction }) {
+function FleetStepRow({ playerStats, campaignName, cannotAct, onAutomationAction, setPopupHtml }) {
     // CLA-405: Fleet Step (Warrior of the Open Hand lv11, 2024) — after a
     // Bonus Action other than Step of the Wind, the fleetStepGrantRound latch
     // (fleetStepService, SP-128 flag-lane shape) offers this row. Click
@@ -708,7 +718,10 @@ function FleetStepRow({ playerStats, campaignName, cannotAct, onAutomationAction
     return (
         <div>
             <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={async () => {
-                if (cannotAct) return;
+                // L5-001/RB-1115: cannotAct fed into the gate BEFORE consume —
+                // a blocked press pops the shared reason (UI-only denial) and
+                // burns no grant / writes nothing.
+                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'fleet-step' }).allowed) return;
                 const consumed = await consumeFleetStep(playerStats, campaignName);
                 if (!consumed) return;
                 onAutomationAction({
@@ -794,9 +807,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const showPsychicTeleportation = !!psychicTeleportationAuto && !cannotAct;
 
     const handleApplyPoison = React.useCallback(async () => {
-        if (cannotAct) return;
-        // L5-001: enforcement gate (no-op while enforcement off).
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'apply-poison' }).allowed) return;
+        // L5-001/RB-1115: cannotAct fed into the gate — blocked press pops the
+        // shared reason (UI-only denial, zero dose/state writes, zero logs).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'apply-poison' }).allowed) return;
         const currentDoses = Number(getRuntimeValue(playerStats.name, 'poisonDoses', campaignName) ?? 0);
         if (currentDoses <= 0) return;
         // L5-002: the poison is applied here — charge the bonus slot.
@@ -820,9 +833,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     }, [cannotAct, campaignName, setPopupHtml, playerStats.abilities, playerStats.name, playerStats.proficiency]);
 
     const handleEatBolsteringTreat = React.useCallback(async () => {
-        if (cannotAct) return;
-        // L5-001: enforcement gate (no-op while enforcement off).
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'eat-bolstering-treat' }).allowed) return;
+        // L5-001/RB-1115: cannotAct fed into the gate — blocked press pops the
+        // shared reason (UI-only denial, zero temp-HP/state writes, zero logs).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'eat-bolstering-treat' }).allowed) return;
         const isChef = hasChefBolsteringTreats;
         const usesKey = isChef ? 'chefBolsteringTreats' : 'bolsteringTreat';
         const current = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
@@ -922,10 +935,10 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const handleHordeBreakerClick = React.useCallback(async () => {
         if (!hordeBreakerAttackItem || !hordeBreakerReady) return;
-        // L5-001: enforcement gate (no-op while enforcement off) — arming must not
-        // consume attention reserved for a spent bonus-action budget.
-        if (cannotAct) return;
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'horde-breaker' }).allowed) return;
+        // L5-001/RB-1115: cannotAct fed into the gate — arming must not
+        // consume attention reserved for a spent bonus-action budget, and a
+        // blocked press now pops the shared reason (UI-only denial).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', cannotAct, setPopupHtml, source: 'horde-breaker' }).allowed) return;
         const cs = await getCombatContext(campaignName);
         const creatures = cs?.creatures || [];
         const validTargets = [];
@@ -1028,11 +1041,11 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
                 <SpiritualWeaponMoveRow playerStats={playerStats} activeBuffs={activeBuffs} campaignName={campaignName} cannotAct={cannotAct} exhaustionPenalty={exhaustionPenalty} rollAttack={rollAttack} setPopupHtml={setPopupHtml} />
 
-                <InvokeDuplicityMoveRow activeBuffs={activeBuffs} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />
+                <InvokeDuplicityMoveRow activeBuffs={activeBuffs} playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} onAutomationAction={onAutomationAction} setPopupHtml={setPopupHtml} />
 
-                <ExpeditiousRetreatDashRow playerStats={playerStats} expeditiousRetreatActive={expeditiousRetreatActive} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />
+                <ExpeditiousRetreatDashRow playerStats={playerStats} campaignName={campaignName} expeditiousRetreatActive={expeditiousRetreatActive} cannotAct={cannotAct} onAutomationAction={onAutomationAction} setPopupHtml={setPopupHtml} />
 
-                {showFleetStepRow && <FleetStepRow playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} onAutomationAction={onAutomationAction} />}
+                {showFleetStepRow && <FleetStepRow playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} onAutomationAction={onAutomationAction} setPopupHtml={setPopupHtml} />}
 
                 {showEatTreat && <EatTreatRow handleEatBolsteringTreat={handleEatBolsteringTreat} />}
 

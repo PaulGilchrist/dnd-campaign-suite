@@ -17,6 +17,7 @@ import CharSpecialActions from './CharSpecialActions.jsx';
 import { mockRuntimeStore } from './CharSpecialActions.modalMocks.jsx';
 import { executeHandler } from '../../services/automation/index.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 const basePlayerStats = {
   name: 'AasimarTest',
@@ -119,14 +120,16 @@ describe('CharSpecialActions - Use Magic Device row (CLA-374)', () => {
     expect(mockRuntimeStore).toEqual({});
   });
 
-  it('stays inert when cannotAct: no dispatch, no popup, no runtime writes', async () => {
+  it('blocks the row when cannotAct but pops the shared reason — no dispatch, no runtime writes (RB-1115)', async () => {
     render(<CharSpecialActions playerStats={playerStats} campaignName="test-campaign" cannotAct />);
 
     fireEvent.click(rowLabel());
     await waitFor(() => expect(screen.getByText('Use Magic Device:')).toBeInTheDocument());
 
     expect(executeHandler).not.toHaveBeenCalled();
-    expect(capturedPopup).toBeNull();
+    // RB-1115: the silent-gate press routes through the assertCanAct popup lane
+    // with the canTakeAction copy (UI-only feedback).
+    expect(capturedPopup).toBe(CANNOT_ACT_REASON);
     expect(mockRuntimeStore).toEqual({});
   });
 });

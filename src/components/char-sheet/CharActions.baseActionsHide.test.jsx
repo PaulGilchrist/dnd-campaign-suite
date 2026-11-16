@@ -15,6 +15,7 @@ import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { toggleBuff } from '../../services/automation/common/buffToggle.js';
 import { addExpiration } from '../../services/rules/effects/expirations.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 const _syncedStore = new Map();
 
@@ -362,7 +363,7 @@ describe('CharActions Hide/Dodge click lane', () => {
     });
   });
 
-  it('cannotAct gates both Hide and Dodge — clicks produce no rolls, buffs, popups, state writes, or logs', async () => {
+  it('cannotAct gates both Hide and Dodge — clicks produce no rolls, buffs, state writes, or logs, and pop the shared reason (RB-1115)', async () => {
     const { setPopupHtml, rollSkillCheck } = stubRollLane();
 
     await renderCharActions({ playerStats: makeStealthStats(5), cannotAct: true }, setPopupHtml);
@@ -372,10 +373,11 @@ describe('CharActions Hide/Dodge click lane', () => {
     await waitFor(() => {
       expect(rollSkillCheck).not.toHaveBeenCalled();
       expect(toggleBuff).not.toHaveBeenCalled();
-      expect(setPopupHtml).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
       expect(addExpiration).not.toHaveBeenCalled();
+      // RB-1115: the reason lane pops once per press — UI-only feedback.
+      expect(setPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
     });
   });
 

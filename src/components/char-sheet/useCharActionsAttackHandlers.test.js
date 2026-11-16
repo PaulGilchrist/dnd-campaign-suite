@@ -167,7 +167,7 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             expect(deps.rollAttack).not.toHaveBeenCalled();
         });
 
-        it('stays silent when blocked by something other than Stinking Cloud', () => {
+        it('routes a non-cloud cannotAct press through the assertCanAct popup lane (RB-1115)', () => {
             const deps = createDeps({
                 cannotAct: true,
                 getRuntimeValue: makeRuntimeStore({
@@ -179,7 +179,14 @@ describe('useCharActionsAttackHandlers — handleAttackClick', () => {
             handlers.handleAttackClick(makeAttack());
 
             expect(logService.addEntry).not.toHaveBeenCalled();
-            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+            // RB-1115: the non-cloud cannotAct face no longer returns silently —
+            // it feeds cannotAct + the popup sink into assertCanAct (the shared
+            // lane renders the canTakeAction copy; asserted in assertCanAct.test.js).
+            expect(assertCanActModule.assertCanAct).toHaveBeenCalledWith(expect.objectContaining({
+                cannotAct: true,
+                setPopupHtml: deps.setPopupHtml,
+                source: 'useCharActionsAttackHandlers',
+            }));
         });
 
         it('stops before rolling when the action economy denies the click', () => {

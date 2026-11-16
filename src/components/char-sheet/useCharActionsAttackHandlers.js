@@ -47,7 +47,7 @@ export default function useCharActionsAttackHandlers({
 
     function handleAttackClick(attack) {
         if (cannotAct) {
-            reportCannotActAttack(attack);
+            refuseCannotActAttack(attack);
             return;
         }
         // L5-003 §8.2: line-of-sight pre-check for enforced RANGED rows.
@@ -121,6 +121,23 @@ export default function useCharActionsAttackHandlers({
         }).catch((e) => { console.error("[CharActions] Error:", e); });
     }
 
+    // RB-1115: the cannotAct press is loud in BOTH faces — the Stinking Cloud
+    // refusal keeps its dedicated popup+log lane; any other blocking condition
+    // routes through assertCanAct's shared popup lane (canTakeAction reason
+    // copy, UI-only: zero rolls/writes).
+    function refuseCannotActAttack(attack) {
+        if (reportCannotActAttack(attack)) return;
+        assertCanAct({
+            campaignName,
+            creatureName: playerName,
+            bucket: attack?.type === 'Bonus Action' ? 'bonusAction' : 'action',
+            cannotAct,
+            setPopupHtml,
+            source: 'useCharActionsAttackHandlers',
+        });
+    }
+
+    // Returns true when the Stinking Cloud refusal face handled the press.
     function reportCannotActAttack(attack) {
         const cloudBlock = (getRuntimeValue('campaign', 'targetEffects', campaignName) || [])
             .some(te => te && te.effect === 'no_action_and_bonus_action' && te.target === playerName);
@@ -134,6 +151,7 @@ export default function useCharActionsAttackHandlers({
             }).catch((e) => { console.error("[useCharActionsAttackHandlers:log-error]", e); });
             setPopupHtml('<b>Stinking Cloud</b><br/>You are Poisoned by Stinking Cloud and can\'t take an Action or a Bonus Action until the end of your current turn.<br/><span class="dice-roll-hint">click to dismiss</span>');
         }
+        return cloudBlock;
     }
 
     // CLA-274: returns true when the click was refused (popup shown, no roll).

@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import { createHooks, mockToggleBuff, mockAddExpiration, mockSetPopupHtml, mockAddEntry, campaignName, basePlayerStats } from './useCharActionsBaseActions.test-utils.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 describe('useCharActionsBaseActions - handleDodgeAction (generic/5e)', () => {
     beforeEach(() => {
@@ -14,7 +15,7 @@ describe('useCharActionsBaseActions - handleDodgeAction (generic/5e)', () => {
         mockToggleBuff.mockReturnValue({ wasActive: false });
     });
 
-    it('returns early without side effects when cannotAct is true', async () => {
+    it('returns early without side effects when cannotAct is true, popping the shared reason (RB-1115)', async () => {
         const hooks = createHooks({ cannotAct: true });
         const actions = useCharActionsBaseActions(hooks);
         await actions.handleDodgeAction();
@@ -22,7 +23,8 @@ describe('useCharActionsBaseActions - handleDodgeAction (generic/5e)', () => {
         expect(mockToggleBuff).not.toHaveBeenCalled();
         expect(mockAddExpiration).not.toHaveBeenCalled();
         expect(mockAddEntry).not.toHaveBeenCalled();
-        expect(mockSetPopupHtml).not.toHaveBeenCalled();
+        // RB-1115: silent gate → assertCanAct reason popup (UI-only feedback).
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
     });
 
     it.each(['TestFighter', 'RogueOne'])(

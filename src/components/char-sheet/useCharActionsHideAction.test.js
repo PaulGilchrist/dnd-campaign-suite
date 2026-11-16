@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import { createHooks, mockSetPopupHtml, mockRollSkillCheck, mockAddEntry, campaignName, basePlayerStats } from './useCharActionsBaseActions.test-utils.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 // Fresh channels stub per test (no fixture aliasing between mounts).
 function grv({ conditions = [], lastAttack = null, buffs = [] } = {}) {
@@ -41,14 +42,15 @@ describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () =
         vi.clearAllMocks();
     });
 
-    it('cannotAct gate refuses without reading state, rolling, popping, writing, or logging', async () => {
+    it('cannotAct gate refuses without reading state, rolling, writing, or logging — and pops the shared reason (RB-1115)', async () => {
         const hooks = createHooks({ cannotAct: true });
         await useCharActionsBaseActions(hooks).handleHideAction();
 
         expect(hooks.getRuntimeValue).not.toHaveBeenCalled();
         expect(hooks.setRuntimeValue).not.toHaveBeenCalled();
         expect(mockRollSkillCheck).not.toHaveBeenCalled();
-        expect(mockSetPopupHtml).not.toHaveBeenCalled();
+        // RB-1115: silent gate → assertCanAct reason popup (UI-only feedback).
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
         expect(mockAddEntry).not.toHaveBeenCalled();
     });
 

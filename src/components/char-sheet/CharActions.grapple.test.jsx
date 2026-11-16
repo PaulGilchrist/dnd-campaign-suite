@@ -14,6 +14,7 @@ import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 const _syncedStore = new Map();
 
@@ -273,18 +274,14 @@ describe('CharActions grapple click integration', () => {
   });
 
   it.each([
-    { label: 'cannotAct prop silently blocks the click', cannotAct: true, target: npcTarget('Goblin', 1), expectedPopup: null },
+    { label: 'cannotAct prop blocks the click and pops the shared reason (RB-1115)', cannotAct: true, target: npcTarget('Goblin', 1), expectedPopup: CANNOT_ACT_REASON },
     { label: 'no selected target prompts to select one', cannotAct: false, target: null, expectedPopup: { type: 'automation_info', name: 'Grapple', description: 'No target selected. Select a target in combat first.' } },
   ])('guard: $label', async ({ cannotAct, target, expectedPopup }) => {
     const { setPopupHtml, rollAbilityCheck } = await renderGrappleAndClick({ cannotAct, target });
 
-    if (expectedPopup) {
-      await waitFor(() => {
-        expect(setPopupHtml).toHaveBeenCalledWith(expectedPopup);
-      });
-    } else {
-      expect(setPopupHtml).not.toHaveBeenCalled();
-    }
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledWith(expectedPopup);
+    });
     expect(rollAbilityCheck).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeConditions', expect.arrayContaining(['grappled']), 'test-campaign');
   });

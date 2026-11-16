@@ -16,6 +16,21 @@
 
 const ACTION_BUCKETS = new Set(['action', 'bonusAction']);
 
+/**
+ * RB-1115 (2026-11-15): single source of the condition-gate denial copy.
+ * conditionDenial below and assertCanAct's legacy `cannotAct` branch share
+ * these strings so sheet lanes never hand-roll their own reason text —
+ * use `cannotActReason(cannotActReason)` (or the action/bonus variant) when
+ * you need the fallback for a denied press.
+ */
+export const CANNOT_ACT_REASON = 'You cannot take actions while incapacitated.';
+export const CANNOT_ACT_ACTIONS_REASON = 'Your condition blocks this action.';
+
+/** Shared builder: caller-authored reason wins; otherwise the pinned fallback. */
+export function cannotActReason(authored, fallback = CANNOT_ACT_REASON) {
+    return authored || fallback;
+}
+
 export const ENFORCEMENT_DEFAULTS = Object.freeze({
     mode: 'off',
     turnLock: false,
@@ -59,10 +74,10 @@ function awayDenial({ isAway, creatureName }) {
 /** Step 2 — condition gate (existing primitives, unchanged semantics). */
 function conditionDenial({ bucket, cannotAct, cannotActActions, cannotActReason }) {
     if (cannotAct) {
-        return { allowed: false, reason: cannotActReason || 'You cannot take actions while incapacitated.' };
+        return { allowed: false, reason: cannotActReason || CANNOT_ACT_REASON };
     }
     if (ACTION_BUCKETS.has(bucket) && cannotActActions) {
-        return { allowed: false, reason: cannotActReason || 'Your condition blocks this action.' };
+        return { allowed: false, reason: cannotActReason || CANNOT_ACT_ACTIONS_REASON };
     }
     return null;
 }

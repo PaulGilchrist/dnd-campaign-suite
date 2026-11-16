@@ -2,7 +2,8 @@
 /**
  * PAIR CORE — general enforcement lane of the assertCanAct pair (closer #2069):
  *  - THIS file: turn-lock, enforcement fast path (off/missing both shapes),
- *    economy-exhaustion denial, cannotAct pass-through (silent off / loud on),
+ *    economy-exhaustion denial, cannotAct pass-through (popup in both modes —
+ *    UI-only off / popup+audit on, RB-1115),
  *    blocker targetEffects, and the popup + enforcement_denied audit-log sinks.
  *  - assertCanAct.charge.test.js (#2068): chargeSlot economy + race backstop —
  *    'No actions left this turn.' is pinned THERE; this file pins the distinct
@@ -25,6 +26,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 import { assertCanAct } from './assertCanAct.js';
+import { CANNOT_ACT_REASON } from './canTakeAction.js';
 import { getRuntimeValue, setRuntimeValue, getStore } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { spend } from './turnState.js';
@@ -120,17 +122,19 @@ describe('assertCanAct (L5-001 enforcement core)', () => {
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('cannotAct denies in BOTH enforcement modes — silent off, popup+audit on; default reason pinned', () => {
+    it('cannotAct denies in BOTH enforcement modes — popup always, audit only on; shared reason pinned', () => {
         mockStore({});
         const offPopup = vi.fn();
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', cannotAct: true, cannotActReason: 'Stunned', setPopupHtml: offPopup }))
             .toEqual({ allowed: false, reason: 'Stunned' });
-        // L1–4 UX stays silent when enforcement is off.
-        expect(offPopup).not.toHaveBeenCalled();
+        // RB-1115 (2026-11-15): enforcement-off pops the click-time reason —
+        // UI-only (zero audit rows, zero runtime-store writes).
+        expect(offPopup).toHaveBeenCalledWith('Stunned');
         expect(addEntry).not.toHaveBeenCalled();
-        // Missing caller reason ⇒ assertCanAct's own default string.
+        // Missing caller reason ⇒ shared canTakeAction builder copy (AC2: one
+        // source — never an assertCanAct-local string).
         expect(assertCanAct({ campaignName: 'test-campaign', creatureName: 'Rakan', cannotAct: true }))
-            .toEqual({ allowed: false, reason: 'You cannot take actions right now.' });
+            .toEqual({ allowed: false, reason: CANNOT_ACT_REASON });
         expect(addEntry).not.toHaveBeenCalled();
 
         mockStore({

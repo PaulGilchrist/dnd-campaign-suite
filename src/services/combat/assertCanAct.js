@@ -14,7 +14,7 @@
  *   if (!assertCanAct({ campaignName, creatureName, bucket, cannotAct, setPopupHtml, source }).allowed) return;
  */
 import { getRuntimeValue, getStore } from '../../hooks/runtime/useRuntimeState.js';
-import { canTakeAction } from './canTakeAction.js';
+import { canTakeAction, cannotActReason } from './canTakeAction.js';
 import { hasBudget } from './turnState.js';
 import { addEntry } from '../ui/logService.js';
 import { classifyBucket, isChargeableBucket } from './automation/classifyBucket.js';
@@ -140,12 +140,16 @@ export function assertCanAct(input) {
     const ctx = { bucket: 'action', cannotAct: false, source: 'action', ...input };
     const { enforcement, enforcementOn } = readEnforcement();
 
-    // Legacy silent condition gate — cannotAct denies regardless of enforcement.
-    // Off-table UX stays silent (visual disabled state); enforcement-on adds the
-    // reason popup + audit log.
+    // Legacy condition gate — cannotAct denies regardless of enforcement.
+    // RB-1115 (2026-11-15): a blocked press is LOUD in both modes. Enforcement
+    // ON keeps the full reportDenial lane (popup + enforcement_denied audit);
+    // enforcement OFF pops the reason via setPopupHtml only — UI feedback with
+    // ZERO runtime-store writes and ZERO campaign-log rows. Reason copy is the
+    // shared canTakeAction builder (never an ad-hoc string at the call site).
     if (ctx.cannotAct) {
-        const reason = ctx.cannotActReason || 'You cannot take actions right now.';
+        const reason = cannotActReason(ctx.cannotActReason);
         if (enforcementOn) reportDenial(ctx, reason);
+        else if (typeof ctx.setPopupHtml === 'function') ctx.setPopupHtml(reason);
         return { allowed: false, reason };
     }
 

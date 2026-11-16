@@ -21,6 +21,7 @@ import { applyChoice as applyHunterPreyChoice } from '../../services/automation/
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 let capturedPopup = null;
 
@@ -109,7 +110,7 @@ describe('CharSpecialActions - Feature Choice Modal', () => {
     }
   );
 
-  it('cannotAct blocks the feature-choice prompt entirely', async () => {
+  it('cannotAct blocks the feature-choice prompt but pops the shared reason (RB-1115)', async () => {
     const playerStats = createPlayerStats({
       specialActions: [{ name: 'Defensive Tactics', description: 'Choose a defensive option.', automation: { type: 'defensive_tactics' } }],
     });
@@ -120,7 +121,8 @@ describe('CharSpecialActions - Feature Choice Modal', () => {
     });
     expect(applyChoice).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(capturedPopup).toBeNull();
+    // RB-1115: silent gate replaced by the assertCanAct reason popup (UI-only).
+    expect(capturedPopup).toBe(CANNOT_ACT_REASON);
   });
 
   it('CLA-116 damage_bonus regression: Elemental Fury prompts its string options, stores, logs, and lets the choice be changed', async () => {

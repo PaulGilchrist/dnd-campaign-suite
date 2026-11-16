@@ -17,6 +17,7 @@ import {
     campaignName,
     basePlayerStats,
 } from './useCharActionsBaseActions.test-utils.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 // Fighter (TestFighter lv5, STR +4, no Athletics proficiency): grapple check
 // bonus 4. Monk swaps to Dexterity (+2 from basePlayerStats abilities).
@@ -61,12 +62,13 @@ describe('useCharActionsBaseActions — handleGrappleAction', () => {
     });
 
     describe('gates', () => {
-        it('cannotAct silently blocks before anything loads', async () => {
+        it('cannotAct blocks before anything loads and pops the shared reason (RB-1115)', async () => {
             const hooks = createHooks({ cannotAct: true });
             await useCharActionsBaseActions(hooks).handleGrappleAction();
 
             expect(mockLoadCombatSummary).not.toHaveBeenCalled();
-            expect(mockSetPopupHtml).not.toHaveBeenCalled();
+            // RB-1115: silent gate → assertCanAct reason popup (UI-only feedback).
+            expect(mockSetPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
             expect(mockRollAbilityCheck).not.toHaveBeenCalled();
         });
 

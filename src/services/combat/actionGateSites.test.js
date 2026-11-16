@@ -51,6 +51,33 @@ describe('action gate coverage (L5-001)', () => {
         expect(src).toMatch(/\bassertCanAct\s*\(/);
     });
 
+    it('cannotAct-fed gating: no sheet lane re-adds the silent cannotAct gate; every gated file feeds cannotAct (RB-1115)', () => {
+        // Guards against silently swapping a converted call-site back to
+        // `if (cannotAct) return;` (the shape the enforcement gate was designed
+        // to replace — assertCanAct.js header). CharReactions' economy gate at
+        // handleReactionClick keeps its cannotAct-ONLY loud guard by design
+        // (pending-OA bypass law), so the feed requirement is per-file, not
+        // per-call.
+        const CANNOT_ACT_FED_FILES = [
+            'src/components/char-sheet/useCharActionsAutomation.js',
+            'src/components/char-sheet/useCharActionsAttackHandlers.js',
+            'src/components/char-sheet/useCharActionsBaseActions.js',
+            'src/components/char-sheet/CharActions.jsx',
+            'src/components/char-sheet/CharBonusActions.jsx',
+            'src/components/char-sheet/CharReactions.jsx',
+            'src/components/char-sheet/CharSpecialActions.jsx',
+            'src/components/char-sheet/char-spells/CharSpells.jsx',
+            'src/hooks/combat/useActionSpellMetamagic.js',
+        ];
+        for (const relPath of CANNOT_ACT_FED_FILES) {
+            const src = read(relPath);
+            expect(src, `${relPath}: silent cannotAct gate re-added`).not.toMatch(/if\s*\(\s*cannotAct\s*(\|\|[^)]*)?\)\s*return;/);
+            const fedCalls = [...src.matchAll(/\bassertCanAct\s*\(\s*\{([\s\S]*?)\}\s*\)/g)]
+                .filter(([, args]) => /[,{\s]cannotAct\s*[,}]/.test(args));
+            expect(fedCalls.length, `${relPath}: assertCanAct must be fed cannotAct (no silent gates)`).toBeGreaterThan(0);
+        }
+    });
+
     it('turn-state resets ride the initiative turn seams', () => {
         const src = read('src/components/initiative/navigationHandlers.js');
         // navigationHandlers must be wired to the turnState reducer…

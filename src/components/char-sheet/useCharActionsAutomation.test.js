@@ -45,6 +45,7 @@ import { onSpellSelected as mockOnDivineInterventionSpellSelected } from '../../
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
+import { CANNOT_ACT_REASON } from '../../services/combat/canTakeAction.js';
 
 const campaignName = 'test-campaign';
 
@@ -129,13 +130,15 @@ describe('useCharActionsAutomation', () => {
     });
 
     describe('handleAutomationAction', () => {
-        it('returns early without any side effects when cannotAct is true', async () => {
+        it('pops the shared reason and runs no side effects when cannotAct is true (RB-1115)', async () => {
             const deps = createDeps({ cannotAct: true });
             const { handleAutomationAction } = getHandlers(deps);
 
             await handleAutomationAction({ name: 'Test Feature', automation: { type: 'test' } });
 
-            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+            // RB-1115: the automation-row lane surfaces the canTakeAction copy
+            // through the assertCanAct setPopupHtml lane — UI-only denial.
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(CANNOT_ACT_REASON);
             expect(deps.setModalState).not.toHaveBeenCalled();
             expect(deps.executeHandler).not.toHaveBeenCalled();
             expect(deps.setRuntimeValue).not.toHaveBeenCalled();

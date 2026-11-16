@@ -163,9 +163,9 @@ function useReplenishingMeal(playerStats, campaignName, cannotAct, characters, s
     const replenishingMealMax = hasReplenishingMeal ? 4 + (playerStats.proficiency || 0) : 0;
     const [replenishingMealModal, setReplenishingMealModal] = useState(null);
     const handleReplenishingMealClick = useCallback(async () => {
-        if (cannotAct) return;
-        // L5-001: enforcement gate (no-op while enforcement off).
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'replenishing-meal' }).allowed) return;
+        // L5-001/RB-1115: cannotAct fed into the gate — blocked press pops the
+        // shared reason (UI-only denial).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', cannotAct, setPopupHtml, source: 'replenishing-meal' }).allowed) return;
         if (!hasReplenishingMeal) return;
         const current = Number(replenishingMeals ?? replenishingMealMax);
         if (current <= 0) {
@@ -207,9 +207,9 @@ function useBolsteringTreats(playerStats, campaignName, cannotAct, characters, s
     const bolsteringTreatsMax = hasBolsteringTreats ? (playerStats.proficiency || 0) : 0;
     const [bolsteringTreatsModal, setBolsteringTreatsModal] = useState(null);
     const handleBolsteringTreatsClick = useCallback(async () => {
-        if (cannotAct) return;
-        // L5-001: enforcement gate (no-op while enforcement off).
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'bolstering-treats' }).allowed) return;
+        // L5-001/RB-1115: cannotAct fed into the gate — blocked press pops the
+        // shared reason (UI-only denial).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', cannotAct, setPopupHtml, source: 'bolstering-treats' }).allowed) return;
         if (!hasBolsteringTreats) return;
         const current = Number(chefBolsteringTreats ?? bolsteringTreatsMax);
         if (current <= 0) {
@@ -795,9 +795,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         return teTarget === playerStats?.name && te.effect === 'shapechange';
     });
     const handleShapeShiftClick = useCallback(async () => {
-        if (cannotAct) return;
-        // L5-001: enforcement gate (no-op while enforcement off).
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'shapechange' }).allowed) return;
+        // L5-001/RB-1115: cannotAct fed into the gate — blocked press pops the
+        // shared reason (UI-only denial).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', cannotAct, setPopupHtml, source: 'shapechange' }).allowed) return;
         const action = {
             name: 'Shapechange',
             spell: { name: 'Shapechange', level: 9 },
@@ -808,9 +808,10 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         if (result?.type === 'popup') setPopupHtml(result.payload);
     }, [cannotAct, characters, playerStats, campaignName, mapName, setPopupHtml]);
     const handleAutomationClick = useCallback(async (action) => {
-        if (cannotAct) return;
-        // L5-001: enforcement gate (no-op while enforcement off).
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'special-action-automation' }).allowed) return;
+        // L5-001/RB-1115: cannotAct fed into the gate — a blocked feature row
+        // (Rage:, Use Magic Device, …) pops the shared canTakeAction reason via
+        // the setPopupHtml lane (UI-only: zero handler dispatch, writes, logs).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', cannotAct, setPopupHtml, source: 'special-action-automation' }).allowed) return;
         const auto = action.automation;
         if (openChoicePromptIfNeeded(action, auto, playerStats, campaignName, { setFeatureChoiceModal, setPopupHtml, setAspectOfTheWildsModal })) return;
         if (delegateAutomationClick(auto, { handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick, handleShapeShiftClick })) return;

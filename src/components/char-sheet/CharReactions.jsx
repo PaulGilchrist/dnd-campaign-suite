@@ -318,13 +318,14 @@ function ReactionModals({ modalState, playerStats, campaignName, mapName, charac
 // fix#344(a): the hit chip dispatches through the SAME SP-109 gate the canonical
 // paths use — isSlowed/refuseSlowedReaction (:456-469, threaded in via props :878-879,
 // name-cell precedent :345, handleReactionClick precedent :478-481). cannotAct folds
-// silently exactly like canonical handleReactionClick:472. Reuse, no reimplementation.
-function renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack, isSlowed, refuseSlowedReaction }) {
+// through the shared assertCanAct popup lane (RB-1115: loud reason denial, zero
+// rolls). Reuse, no reimplementation.
+function renderReactionSpellHitCell({ spell, playerStats, campaignName, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack, isSlowed, refuseSlowedReaction, setPopupHtml }) {
     if (autoHit) return <div></div>;
     if (isSpellAtk) {
         if (!hasAttackType) return <div></div>;
         return <div className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={() => {
-            if (cannotAct) return;
+            if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', cannotAct, setPopupHtml, source: 'reaction-spell-hit-cell' }).allowed) return;
             if (isSlowed()) { refuseSlowedReaction(spell.name); return; }
             const attackItem = { ...spell, type: 'Reaction', hitBonus: playerStats.spellAbilities?.toHit, saveDc: null, saveType: null, saveSuccess: null, damage: resolvedDamage, damageType };
             rollAttack(attackItem.name, attackItem.hitBonus, { forcedMode: undefined });
@@ -333,7 +334,7 @@ function renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, is
     return <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc} {spell.dc?.dc_type}</div>;
 }
 
-function ReactionSpellRow({ spell, playerStats, cannotAct, rollAttack, gateMetamagic, getReactionSpellDamageDisplay, isSlowed, refuseSlowedReaction, setSelectedSpell }) {
+function ReactionSpellRow({ spell, playerStats, campaignName, cannotAct, rollAttack, gateMetamagic, getReactionSpellDamageDisplay, isSlowed, refuseSlowedReaction, setSelectedSpell, setPopupHtml }) {
     const damageType = typeof spell.damage === 'string' ? '' : (spell.damage?.damage_type || '');
     const resolvedDamage = spell.heal_at_slot_level
         ? resolveHealExpression(spell, playerStats.level, playerStats.spellAbilities?.modifier || 0)
@@ -348,11 +349,13 @@ function ReactionSpellRow({ spell, playerStats, cannotAct, rollAttack, gateMetam
         }}>{spell.name}</div>
         <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
         <div>{spell.range}</div>
-        {renderReactionSpellHitCell({ spell, playerStats, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack, isSlowed, refuseSlowedReaction })}
+        {renderReactionSpellHitCell({ spell, playerStats, campaignName, cannotAct, autoHit, isSpellAtk, hasAttackType, resolvedDamage, damageType, rollAttack, isSlowed, refuseSlowedReaction, setPopupHtml })}
         <div className={resolvedDamage ? "clickable" : ""} onClick={() => {
-            if (cannotAct) return;
+            // RB-1115: cannotAct folds through the shared assertCanAct popup lane
+            // (loud reason denial, zero cast).
             // fix#344(a): SP-109 gate parity with the name cell above — the damage chip
             // routes through the same isSlowed/refuseSlowedReaction gate, refused loudly.
+            if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', cannotAct, setPopupHtml, source: 'reaction-spell-damage-cell' }).allowed) return;
             if (isSlowed()) { refuseSlowedReaction(spell.name); return; }
             // SINGLE ENTRY POINT for reaction spell casting:
             // gateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
@@ -529,7 +532,14 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     };
 
     const handleReactionClick = async (reaction) => {
-        if (cannotAct) return;
+        if (cannotAct) {
+            // RB-1115: loud cannotAct denial via the shared assertCanAct popup
+            // lane (UI-only). Deliberately a cannotAct-ONLY guard placed BEFORE
+            // the pending-OA route: pending-trigger presses must keep bypassing
+            // the economy gate below (spent-budget self-denial law).
+            assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', cannotAct, setPopupHtml, source: 'char-reactions' });
+            return;
+        }
         // Pending-trigger OA press (bug-monster-oa-resolution-auto-missed-by-
         // melee-range-gate): the trigger already paid and adjudicated this
         // reaction — route through the marker lane BEFORE the economy gate so
@@ -1037,6 +1047,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                         key={spell.name}
                         spell={spell}
                         playerStats={playerStats}
+                        campaignName={campaignName}
                         cannotAct={cannotAct}
                         rollAttack={rollAttack}
                         gateMetamagic={gateMetamagic}
@@ -1044,6 +1055,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                         isSlowed={isSlowed}
                         refuseSlowedReaction={refuseSlowedReaction}
                         setSelectedSpell={setSelectedSpell}
+                        setPopupHtml={setPopupHtml}
                     />
                 ))}<div className='half-line'></div>
             </div>}
