@@ -7,6 +7,8 @@ import { loadFactions, saveFactions, deleteFaction } from '../../services/campai
 import utils from '../../services/ui/utils.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
+import useDeleteRequest from '../common/useDeleteRequest.js';
 import './Factions.css';
 import DraftFlag from '../common/DraftFlag.jsx';
 import AiRefineButton from '../common/AiRefineButton.jsx';
@@ -33,6 +35,26 @@ function FactionsEmptyState({ searchQuery }) {
         </>
       )}
     </div>
+  );
+}
+
+// Named-delete confirm over the shared DeleteConfirmModal role="dialog" tier
+// (backlog 2026-11-16 XD: retires the native `Delete Faction "X"?` window.confirm
+// and mirrors the MapsManager row-delete chrome). Renders null while idle so
+// the destructive copy can never linger behind the editor.
+function DeleteFactionModal({ pending, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="factions-delete-title"
+      title="Delete Faction"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      This will permanently delete the faction &apos;<strong>{pending.label}</strong>&apos;
+      from the campaign ledger. This <strong>cannot be undone</strong>.
+    </DeleteConfirmModal>
   );
 }
 
@@ -91,6 +113,9 @@ function Factions({ campaignName }) {
     openNew, openEdit, closeModal, updateFormField,
   } = useCrudList(factions, ['name']);
   const [deleting, setDeleting] = useState(false);
+  // Shared pendingDelete staging for the role="dialog" delete tier (row chip
+  // AND the form footer button arm the same dialog; cancel is fully inert).
+  const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
   const [error, setError] = useState(null);
   // True when the visible banner error is a 409 concurrent-edit conflict
   // (server body { conflict: true }) — gates the "Reload list" action button.
@@ -242,22 +267,28 @@ function Factions({ campaignName }) {
     }
   };
 
-  // Delete faction
-  const handleDelete = async () => {
-    if (!editingFaction) return;
-
-    if (!window.confirm(`Delete Faction "${editingFaction.name}"?`)) return;
-
-    setDeleting(true);
-    try {
-      await deleteFactionAction(editingFaction.id);
-      missedListBroadcast.current = false;
-      handleCloseModal();
-    } catch (error) {
-      console.error('Failed to delete faction:', error);
-    } finally {
-      setDeleting(false);
-    }
+  // Delete faction — armed from EITHER the row chip or the form footer button
+  // (backlog 2026-11-16 XD). requestDelete stages the descriptor; the shared
+  // DeleteConfirmModal is the only writer, so Cancel/Escape/backdrop fire zero
+  // requests. The editor closes on success only (mirrors the old flow), and
+  // only when it was open on the very faction being deleted.
+  const requestFactionDelete = (faction) => {
+    if (!faction) return;
+    requestDelete({
+      label: faction.name,
+      confirm: () => {
+        setDeleting(true);
+        deleteFactionAction(faction.id)
+          .then(() => {
+            missedListBroadcast.current = false;
+            if (editingFaction?.id === faction.id) handleCloseModal();
+          })
+          .catch((error) => {
+            console.error('Failed to delete faction:', error);
+          })
+          .finally(() => setDeleting(false));
+      },
+    });
   };
 
   return (
@@ -337,6 +368,20 @@ function Factions({ campaignName }) {
                       {faction.influence}
                     </span>
                   )}
+                  {/* Row-level delete affordance (mirrors the MapsManager
+                      "Delete" chip): stopPropagation keeps the click from
+                      bubbling to the row's open-editor handler. */}
+                  <button
+                    className="ct-btn ct-btn-sm ct-btn-danger factions-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      requestFactionDelete(faction);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    aria-label={`Delete "${faction.name}"`}
+                  >
+                    <i className="fa-solid fa-trash-can" />
+                  </button>
                 </div>
               </div>
               <div className="ct-list-details">
@@ -449,7 +494,7 @@ function Factions({ campaignName }) {
                   <>
                     <button
                       className="ct-btn ct-btn-danger"
-                      onClick={handleDelete}
+                      onClick={() => requestFactionDelete(editingFaction)}
                       disabled={deleting}
                     >
                       <i className="fa-solid fa-trash-can" />{' '}
@@ -485,6 +530,10 @@ function Factions({ campaignName }) {
           </div>
         </div>
       )}
+
+      {/* Rendered after the editor so the dialog stacks over the ct-modal
+          overlay (same z-index tier, later sibling wins). */}
+      <DeleteFactionModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
     </div>
   );
 }

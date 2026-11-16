@@ -67,7 +67,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-16 XD — Faction/Settlement delete affordance + confirm-tier drift:** the ONLY delete affordance is a generic `Delete` button INSIDE the opened edit form (Maps/NPCs/Quests rows carry row-level delete aria-buttons), and both lanes fire the native `window.confirm` tier (`Delete Faction "X"?` / `Delete Settlement "X"?`) while the newer modal family moved to the shared role=dialog `DeleteConfirmModal` — discoverability + consistency drift across near-identical planner CRUD screens. Non-blocking; likely `src/components/factions/`, `src/components/settlements/`.
 - **2026-11-16 XD — attack prep spans two surfaces:** arming a monster's target (`<Name> target` select) and delegation picker live ONLY on the initiative card, while the attack dice chips live ONLY inside the avatar-opened `.mc-overlay` stat modal (no arm control inside it) — the full GM attack flow is card-arm → avatar-click → chip → Done → card-Close across two surfaces; consider mirroring the target select into the modal header. Non-blocking UX seam; existing rig law papers over it.
 
 ## Blocked / Not Verified (fold-gate ledger)

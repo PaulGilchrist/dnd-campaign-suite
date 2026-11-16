@@ -5,6 +5,8 @@ import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadSettlements, saveSettlement, deleteSettlement } from '../../services/campaign/settlementsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
+import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
+import useDeleteRequest from '../common/useDeleteRequest.js';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 import './Settlements.css';
 import DraftFlag from '../common/DraftFlag.jsx';
@@ -40,6 +42,26 @@ const POPULATION_RANGES = {
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+// Named-delete confirm over the shared DeleteConfirmModal role="dialog" tier
+// (backlog 2026-11-16 XD: retires the native `Delete Settlement "X"?`
+// window.confirm and mirrors the MapsManager row-delete chrome). Renders null
+// while idle so the destructive copy can never linger behind the editor.
+function DeleteSettlementModal({ pending, onCancel, onConfirm }) {
+  if (!pending) return null;
+  return (
+    <DeleteConfirmModal
+      titleId="settlements-delete-title"
+      title="Delete Settlement"
+      confirmLabel="Yes, Delete Permanently"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    >
+      This will permanently delete the settlement &apos;<strong>{pending.label}</strong>&apos;
+      from the campaign ledger. This <strong>cannot be undone</strong>.
+    </DeleteConfirmModal>
+  );
+}
+
 const SERVICE_TYPE_LABELS = {
   inn: 'Inn',
   tavern: 'Tavern',
@@ -56,7 +78,7 @@ const SERVICE_TYPE_LABELS = {
   bank: 'Bank',
 };
 
-function SettlementListItem({ settlement, onEdit }) {
+function SettlementListItem({ settlement, onEdit, onDelete }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       onEdit(settlement);
@@ -91,6 +113,20 @@ function SettlementListItem({ settlement, onEdit }) {
               {settlement.size}
             </span>
           )}
+          {/* Row-level delete affordance (mirrors the MapsManager "Delete"
+              chip): stopPropagation keeps the click from bubbling to the
+              row's open-editor handler. */}
+          <button
+            className="ct-btn ct-btn-sm ct-btn-danger settlements-delete-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(settlement);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+            aria-label={`Delete "${settlement.name}"`}
+          >
+            <i className="fa-solid fa-trash-can" />
+          </button>
         </div>
       </div>
       <div className="ct-list-details">
@@ -422,6 +458,9 @@ function Settlements({ campaignName }) {
   } = useCrudList(settlements, ['name', 'tags', 'description']);
   const [sizeFilter, setSizeFilter] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // Shared pendingDelete staging for the role="dialog" delete tier (row chip
+  // AND the form footer button arm the same dialog; cancel is fully inert).
+  const { pendingDelete, requestDelete, cancelDelete, confirmDelete } = useDeleteRequest();
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   // True when the visible banner error is a 409 concurrent-edit conflict
@@ -704,19 +743,29 @@ function Settlements({ campaignName }) {
     }
   };
 
-  const handleDelete = async () => {
-    if (!editingSettlement) return;
-    if (!window.confirm(`Delete Settlement "${editingSettlement.name}"?`)) return;
-    setDeleting(true);
-    try {
-      await deleteSettlementAction(editingSettlement.name);
-      missedListBroadcast.current = false;
-      handleCloseModal();
-    } catch (error) {
-      console.error('Failed to delete settlement:', error);
-    } finally {
-      setDeleting(false);
-    }
+  // Delete settlement — armed from EITHER the row chip or the form footer
+  // button (backlog 2026-11-16 XD). requestDelete stages the descriptor; the
+  // shared DeleteConfirmModal is the only writer, so Cancel/Escape/backdrop
+  // fire zero requests. Settlements are keyed by name. The editor closes on
+  // success only (mirrors the old flow), and only when it was open on the
+  // very settlement being deleted.
+  const requestSettlementDelete = (settlement) => {
+    if (!settlement) return;
+    requestDelete({
+      label: settlement.name,
+      confirm: () => {
+        setDeleting(true);
+        deleteSettlementAction(settlement.name)
+          .then(() => {
+            missedListBroadcast.current = false;
+            if (editingSettlement?.name === settlement.name) handleCloseModal();
+          })
+          .catch((error) => {
+            console.error('Failed to delete settlement:', error);
+          })
+          .finally(() => setDeleting(false));
+      },
+    });
   };
 
   return (
@@ -797,6 +846,7 @@ function Settlements({ campaignName }) {
               key={settlement.name}
               settlement={settlement}
               onEdit={handleEditSettlement}
+              onDelete={requestSettlementDelete}
             />
           ))}
         </ul>
@@ -815,7 +865,7 @@ function Settlements({ campaignName }) {
           onClose={handleRequestClose}
           onReloadList={handleReloadList}
           onSave={handleSave}
-          onDelete={handleDelete}
+          onDelete={() => requestSettlementDelete(editingSettlement)}
           onFormChange={handleFormChange}
           onAddService={handleAddService}
           onServiceChange={handleServiceChange}
@@ -828,6 +878,10 @@ function Settlements({ campaignName }) {
           onRemoveRumor={handleRemoveRumor}
         />
       )}
+
+      {/* Rendered after the editor so the dialog stacks over the ct-modal
+          overlay (same z-index tier, later sibling wins). */}
+      <DeleteSettlementModal pending={pendingDelete} onCancel={cancelDelete} onConfirm={confirmDelete} />
     </div>
   );
 }

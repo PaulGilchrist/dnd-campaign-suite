@@ -8,7 +8,7 @@
 // The live duplicate-name arc (error WHILE typing, case-insensitive dup,
 // self-exempt retype) is owned by Factions.duplicate-name.test.jsx —
 // do not duplicate it here.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Factions from './Factions.jsx';
 
@@ -207,28 +207,39 @@ describe('Factions', () => {
   });
 
   describe('delete', () => {
-    it('asks for confirmation once per click, shows a disabled Deleting… state, and closes on success', async () => {
+    const dialog = () => screen.getByRole('dialog');
+    const dialogConfirm = () => within(dialog()).getByRole('button', { name: 'Yes, Delete Permanently' });
+    const dialogCancel = () => within(dialog()).getByRole('button', { name: 'Cancel' });
+
+    it('arms the shared role=dialog confirm naming the faction — Cancel is inert, confirm deletes once, shows Deleting… and closes on success', async () => {
       let resolveDelete;
       factionsState.factions = [faction({ id: 'f1', name: 'ToDelete' })];
       factionsState.deleteFactionAction = vi.fn(() => new Promise((resolve) => { resolveDelete = resolve; }));
-      window.confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+      const nativeConfirm = vi.spyOn(window, 'confirm');
       render(<Factions {...defaultProps} />);
       fireEvent.click(screen.getByLabelText('Edit faction: ToDelete'));
-      const deleteButton = screen.getByRole('button', { name: 'Delete' });
 
-      fireEvent.click(deleteButton); // cancelled
-      expect(window.confirm).toHaveBeenCalledWith('Delete Faction "ToDelete"?');
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' })); // form footer → dialog tier
+      expect(nativeConfirm).not.toHaveBeenCalled(); // native `Delete Faction "X"?` retired
+      expect(screen.getByRole('heading', { name: 'Delete Faction' })).toBeInTheDocument();
+      expect(dialog()).toHaveTextContent('ToDelete');
+
+      fireEvent.click(dialogCancel()); // cancel leg — fully inert
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(factionsState.deleteFactionAction).not.toHaveBeenCalled();
       expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' })); // confirmed
-      expect(window.confirm).toHaveBeenLastCalledWith('Delete Faction "ToDelete"?');
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' })); // re-armed
+      fireEvent.click(dialogConfirm()); // confirmed
       expect(factionsState.deleteFactionAction).toHaveBeenCalledWith('f1');
+      expect(factionsState.deleteFactionAction).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
 
       resolveDelete();
       await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Faction' })).not.toBeInTheDocument());
       expect(factionsState.deleteFactionAction).toHaveBeenCalledTimes(1);
+      nativeConfirm.mockRestore();
     });
 
     it('logs and stays in the modal when the delete fails', async () => {
@@ -238,7 +249,9 @@ describe('Factions', () => {
       render(<Factions {...defaultProps} />);
       fireEvent.click(screen.getByLabelText('Edit faction: ToDelete'));
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      fireEvent.click(dialogConfirm());
       await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to delete faction:', expect.any(Error)));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
       consoleSpy.mockRestore();
     });

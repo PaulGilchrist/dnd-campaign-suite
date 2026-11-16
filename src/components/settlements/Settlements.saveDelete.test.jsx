@@ -1,6 +1,6 @@
 // @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
 // Module-level mock store for useEntityManagement — vi.mock closure captures this object.
@@ -68,9 +68,9 @@ const openNewForm = (name = 'My Settlement') => {
   fireEvent.change(screen.getByRole('textbox', { name: /name\s?\*/i }), { target: { value: name } });
 };
 
-// Render one settlement, open its edit modal, and stub the delete-confirmation answer.
-const openEditForm = (name, confirmResult = true) => {
-  vi.spyOn(globalThis.window, 'confirm').mockReturnValue(confirmResult);
+// Render one settlement, open its edit modal.
+const openEditForm = (name) => {
+  vi.spyOn(globalThis.window, 'confirm').mockReturnValue(true);
   settlementMockStore.items = [makeSettlement(name)];
   render(<Settlements campaignName="test" />);
   fireEvent.click(screen.getByRole('button', { name: /edit settlement/i }));
@@ -168,11 +168,21 @@ describe('Settlements - save and delete behavior', () => {
   });
 
   describe('Delete', () => {
-    it('does not delete when the user cancels the confirmation dialog', () => {
-      openEditForm('Keep Me', false);
+    const dialog = () => screen.getByRole('dialog');
+    const dialogCancel = () => within(dialog()).getByRole('button', { name: 'Cancel' });
+    const dialogConfirm = () => within(dialog()).getByRole('button', { name: 'Yes, Delete Permanently' });
+
+    it('arms the shared role=dialog confirm naming the settlement — no native confirm; Cancel writes nothing', () => {
+      openEditForm('Keep Me');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-      expect(globalThis.window.confirm).toHaveBeenCalledWith('Delete Settlement "Keep Me"?');
+      // Native `Delete Settlement "X"?` tier retired (backlog 2026-11-16 XD).
+      expect(globalThis.window.confirm).not.toHaveBeenCalled();
+      expect(screen.getByRole('heading', { name: 'Delete Settlement' })).toBeInTheDocument();
+      expect(dialog()).toHaveTextContent('Keep Me');
+
+      fireEvent.click(dialogCancel());
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(settlementMockStore.deleteItem).not.toHaveBeenCalled();
       expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
     });
@@ -186,8 +196,8 @@ describe('Settlements - save and delete behavior', () => {
       openEditForm('Delete Me');
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
+      fireEvent.click(dialogConfirm());
 
-      expect(globalThis.window.confirm).toHaveBeenCalledWith('Delete Settlement "Delete Me"?');
       expect(settlementMockStore.deleteItem).toHaveBeenCalledWith('Delete Me');
       expect(deleteBtn).toBeDisabled();
       expect(screen.getByText('Deleting…')).toBeInTheDocument();
@@ -205,6 +215,7 @@ describe('Settlements - save and delete behavior', () => {
       openEditForm('Keep Me');
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
+      fireEvent.click(dialogConfirm());
 
       await waitFor(() => {
         expect(deleteBtn).not.toBeDisabled();

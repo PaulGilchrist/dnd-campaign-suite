@@ -1,5 +1,12 @@
 /* ============ Factions Unique Styles ============ */
 
+/* Row-level delete chip (backlog 2026-11-16 XD) — icon-only, rides the global
+   .ct-btn / .ct-btn-danger colors; sized down for the list header row (same
+   footprint as the .ct-btn-sm variant in the other planner lanes). */
+.factions-delete-btn {
+  padding: 4px 10px;
+}
+
 /* Influence badge in list */
 .factions-list-influence {
   display: inline-block;

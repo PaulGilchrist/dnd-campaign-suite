@@ -111,7 +111,10 @@ describe('Settlements - modal actions', () => {
       expect(screen.getByRole('textbox', { name: /name\s?\*/i })).toHaveValue('Old Town');
       expect(screen.getByRole('combobox', { name: /size/i })).toHaveValue('town');
       expect(screen.getByLabelText('Population')).toHaveValue('2,500 souls');
-      expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+      // Form-footer Delete (exact name) plus the row-level chip (backlog
+      // 2026-11-16 XD) are distinct accessible names on this screen.
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Delete "Old Town"' })).toBeInTheDocument();
     });
   });
 
