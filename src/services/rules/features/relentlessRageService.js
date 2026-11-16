@@ -10,7 +10,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.js';
-import { createSaveListener } from '../../automation/common/savePrompt.js';
+import { createSaveListener, logSaveDismissed } from '../../automation/common/savePrompt.js';
 import utils from '../../ui/utils.js';
 import { getRuntimeUsesKey } from '../../shared/usesKey.js';
 
@@ -175,6 +175,7 @@ export function checkRelentlessRage(creature, playerComputed, campaignName) {
         // one unsubscribe and no store rejection/stall can strand this listener for
         // replay — the same id variable guards and deregisters.
         window.removeEventListener('save-result', handleSaveResult);
+        window.removeEventListener('save-dismissed', handleSaveDismissed);
 
         try {
             const healAmount = evaluateHealExpression(featureAutomation.healExpression, playerComputed);
@@ -245,7 +246,32 @@ export function checkRelentlessRage(creature, playerComputed, campaignName) {
         }
     };
 
+    // Dismiss hygiene (save-dismissed sweep family, 2026-11-05): a GM Dismiss
+    // on the un-rolled prompt never dispatches save-result (dismiss doctrine —
+    // a dismissed save never resolves), so this fire-and-forget producer used
+    // to leak the window listener AND leave the ledger with a `Relentless Rage
+    // triggered` row and no resolution while the creature sat at 0 HP.
+    // Mirrors saveOnlyHandler's opt-in: detach BOTH listeners and log the
+    // refusal through the shared logSaveDismissed seam (save_dismissed row
+    // naming the feature) — zero state writes: no uses bump, no HP change, no
+    // death-save FSM (the creature stays at 0 HP for the GM to re-trigger or
+    // handle death saves manually).
+    const handleSaveDismissed = (event) => {
+        if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-dismissed', handleSaveDismissed);
+        window.removeEventListener('save-result', handleSaveResult);
+        logSaveDismissed(campaignName, {
+            casterName: creature.name,
+            abilityName: 'Relentless Rage',
+            targetName: creature.name,
+            saveDc,
+            saveType: featureAutomation.saveType || 'CON',
+            logPrefix: '[relentlessRage]',
+        });
+    };
+
     window.addEventListener('save-result', handleSaveResult);
+    window.addEventListener('save-dismissed', handleSaveDismissed);
 
     return {
         intercepted: true,
