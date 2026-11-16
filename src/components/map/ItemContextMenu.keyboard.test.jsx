@@ -10,6 +10,10 @@
 //   answers with focus on a menuitem, the menu root, or the board behind
 //   the menu, and NEVER activates the focused option
 //   Arrow/Home/End roving navigation between rows
+//   focus restore on close (XF backlog 2026-11-16): every dismissal path
+//   re-focuses the element focused before open (fallback: the board <svg>
+//   when focus was on <body>); a rename hand-off to a focus-taking popover
+//   is never fought — machinery lives in the shared useMenuRoving seam
 //   the pointer path is unchanged: a click on text.menu-option still activates
 //
 // NOT OWNED — cited to owner lanes:
@@ -18,9 +22,9 @@
 //   contextmenu selection byte on the hit-rect          → PlacedItems-event-handlers.test.jsx
 //   right-button capture guards (trusted contextmenu routing fix) → hooks tests
 //   (useSelectMove.test.js / useWallDrawing.test.js)
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ItemContextMenu from './ItemContextMenu';
 
 const gridCenterX = (gx) => gx * 40 + 20;
@@ -289,5 +293,138 @@ describe('arrow-key roving navigation', () => {
         expect(document.activeElement).toBe(rows[2]);
         fireEvent.keyDown(rows[2], { key: 'Enter' });
         expectOnlyCall(mocks, 'onRenameClicked', [undefined, SELECTED, 'Marta']);
+    });
+});
+
+describe('focus restore on close (useMenuRoving restore tier, XF backlog 2026-11-16)', () => {
+    // Anchor stands in for whatever had focus before the pointer opened the
+    // menu; appended to body, outside the svg, like real page chrome.
+    const focusAnchor = () => {
+        const anchor = document.createElement('button');
+        anchor.textContent = 'pre-open anchor';
+        anchor.dataset.focusAnchor = '';
+        document.body.appendChild(anchor);
+        anchor.focus();
+        return anchor;
+    };
+    afterEach(() => {
+        document.querySelectorAll('[data-focus-anchor]').forEach((el) => el.remove());
+    });
+
+    // Stateful parent mirrors Map.jsx: every dismissal (Escape, backdrop, ✕)
+    // nulls the selection — the single menuOpen true→false transition the
+    // shared hook keys its restore on.
+    function Board({ mocks, placed = [placedItem()] }) {
+        const [selected, setSelected] = useState(SELECTED);
+        return (
+            <svg data-testid="indoor-board">
+                <ItemContextMenu
+                    {...mocks}
+                    selectedItem={selected}
+                    placedItems={placed}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    monsterFound={false}
+                    onClose={() => setSelected(null)}
+                />
+            </svg>
+        );
+    }
+
+    const row = (name) => screen.getByRole('menuitem', { name, exact: true });
+    // Restore lands in a microtask (so same-commit autoFocus wins) — let it
+    // run before asserting.
+    const flushRestore = () => act(async () => {});
+
+    it('Escape dismiss returns focus to the pre-open anchor, not body', async () => {
+        const anchor = focusAnchor();
+        const mocks = createMocks();
+        render(<Board mocks={mocks} />);
+        expect(document.activeElement).toBe(row('Hide'));
+        fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+        await flushRestore();
+        expect(document.activeElement).toBe(anchor);
+    });
+
+    it('the ✕ close row returns focus to the pre-open anchor', async () => {
+        const anchor = focusAnchor();
+        const mocks = createMocks();
+        render(<Board mocks={mocks} />);
+        fireEvent.keyDown(row('✕'), { key: 'Enter' });
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+        await flushRestore();
+        expect(document.activeElement).toBe(anchor);
+    });
+
+    it('the indoor visibility lane keeps the menu open — focus stays inside, nothing is fought', async () => {
+        const anchor = focusAnchor();
+        const mocks = createMocks();
+        const { container } = render(<Board mocks={mocks} />);
+        fireEvent.keyDown(row('Hide'), { key: 'Enter' });
+        expect(mocks.handleToggleItemVisibility).toHaveBeenCalledTimes(1);
+        expect(container.querySelector('.item-context-menu')).toBeInTheDocument();
+        await flushRestore();
+        expect(container.querySelector('.item-context-menu')).toContainElement(document.activeElement);
+        expect(document.activeElement).not.toBe(anchor);
+    });
+
+    it('a rename hand-off to an outside popover that takes focus is never fought', async () => {
+        const anchor = focusAnchor();
+        const mocks = createMocks();
+        // Mirrors Map.jsx: Rename nulls the selection (menu unmounts) and the
+        // MonsterNameAutocomplete popover focuses itself on mount.
+        function HandoffBoard() {
+            const [selected, setSelected] = useState(SELECTED);
+            const [popoverOpen, setPopoverOpen] = useState(false);
+            const inputRef = useRef(null);
+            useEffect(() => {
+                if (popoverOpen) inputRef.current.focus();
+            }, [popoverOpen]);
+            return (
+                <>
+                    <svg>
+                        <ItemContextMenu
+                            {...mocks}
+                            selectedItem={selected}
+                            placedItems={[placedItem({ type: 'npc', name: 'Marta' })]}
+                            gridCenterX={gridCenterX}
+                            gridCenterY={gridCenterY}
+                            monsterFound={false}
+                            onRenameClicked={() => { setPopoverOpen(true); setSelected(null); }}
+                            onClose={() => setSelected(null)}
+                        />
+                    </svg>
+                    {popoverOpen && <input data-testid="rename-popover" ref={inputRef} />}
+                </>
+            );
+        }
+        render(<HandoffBoard />);
+        fireEvent.keyDown(row('Rename'), { key: 'Enter' });
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+        await flushRestore();
+        expect(document.activeElement).toBe(screen.getByTestId('rename-popover'));
+        expect(document.activeElement).not.toBe(anchor);
+    });
+
+    it('a dismiss after a body-focus open lands on the board svg fallback (tabindex=-1), never throws', async () => {
+        const mocks = createMocks();
+        const { getByTestId } = render(<Board mocks={mocks} />);
+        expect(document.activeElement).toBe(row('Hide'));
+        fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+        await flushRestore();
+        const board = getByTestId('indoor-board');
+        expect(board).toHaveAttribute('tabindex', '-1');
+        expect(document.activeElement).toBe(board);
+    });
+
+    it('a dismiss after the anchor died mid-ride falls back to the board svg instead of throwing', async () => {
+        const anchor = focusAnchor();
+        const mocks = createMocks();
+        render(<Board mocks={mocks} />);
+        fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+        anchor.remove(); // detached before the restore microtask lands
+        await flushRestore();
+        expect(document.activeElement).toBe(screen.getByTestId('indoor-board'));
     });
 });

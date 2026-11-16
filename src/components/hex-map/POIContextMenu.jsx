@@ -150,17 +150,24 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [selectedPoi, onClose]);
 
-    // Open-focus (first entry) + Arrow/Home/End rove with wrap live in the
-    // shared useMenuRoving seam — the same tier the indoor ItemContextMenu
-    // shipped in 77ef39387 (bug-hex-poi-menu-no-keyboard-rove-or-focus-first:
-    // this menu advertised role=menu but never honored the arrow contract).
-    // The key nulls while the inline rename editor is armed so the input's
-    // autoFocus is never stolen (openKey null → no focus pull; arrows inside
-    // the input keep native caret behavior via the hook's guard).
+    // Open-focus (first entry) + Arrow/Home/End rove with wrap + close focus-
+    // restore (focus returns to the element focused before open, falling back
+    // to the board <svg> when it was body) all live in the shared
+    // useMenuRoving seam — the same tier the indoor ItemContextMenu ships
+    // (bug-hex-poi-menu-no-keyboard-rove-or-focus-first: this menu advertised
+    // role=menu but never honored the arrow contract; the XF backlog added
+    // the restore so keyboard/AT users no longer land on <body> after
+    // dismiss). The key nulls while the inline rename editor is armed so the
+    // input's autoFocus is never stolen and the restore never fires mid-
+    // rename: menuOpen (the menu's mounted state) stays true until HexMap
+    // nulls selectedPoiMenu, and THAT transition is what restores — covering
+    // every dismissal path, rename-commit/revert included. Arrows inside the
+    // input keep native caret behavior via the hook's guard.
     const menuRef = useRef(null);
     const handleMenuKeyDown = useMenuRoving(
         menuRef,
-        selectedPoi && showRename !== selectedPoi.id ? selectedPoi.id : null
+        selectedPoi && showRename !== selectedPoi.id ? selectedPoi.id : null,
+        !!selectedPoi
     );
 
     if (!selectedPoi) return null;

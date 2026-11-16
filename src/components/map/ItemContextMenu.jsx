@@ -92,11 +92,17 @@ function ItemContextMenu({
     const menuRef = useRef(null);
     const menuX = selectedItem ? gridCenterX(selectedItem.gridX) + 10 : 0;
     const menuY = selectedItem ? gridCenterY(selectedItem.gridY) + 10 : 0;
-    // Open-focus (first entry) + Arrow/Home/End rove live in the shared hook;
-    // the anchor key re-arms focus when the selection moves under the menu.
+    // Open-focus (first entry) + Arrow/Home/End rove + close focus-restore all
+    // live in the shared hook (the XF-backlog restore tier: after every
+    // dismissal the hook re-focuses the element focused before open, or the
+    // board <svg> fallback when focus was on <body>; a rename hand-off to the
+    // outside autocomplete popover still wins — the hook yields to any surface
+    // that focuses itself). The anchor key re-arms focus when the selection
+    // moves under the menu.
     const handleMenuKeyDown = useMenuRoving(
         menuRef,
-        selectedItem ? `${selectedItem.id}:${menuX}:${menuY}` : null
+        selectedItem ? `${selectedItem.id}:${menuX}:${menuY}` : null,
+        !!selectedItem
     );
 
     // Escape semantics (backlog 2026-11-16 XC, mirroring the hex POI menu's

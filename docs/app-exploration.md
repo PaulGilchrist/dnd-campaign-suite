@@ -60,7 +60,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (XF 2026-11-16) The hex-POI menu rows are Tab-focusable but the OPENING interaction leaves focus on whatever was focused before (sidebar button) — even if the rove bug is fixed, consider also returning focus to a sensible anchor after dismiss (indoor twin has no focus-restore either: `ItemContextMenu.jsx` comment "No focus-restore on close" — both menus could adopt a last-focused-element restore; AT users currently land on `body`). Non-blocking.
 - (XF 2026-11-16) `browser_take_screenshot`-free verification is fine, but the top-row POIs on `poi-showcase` sit ~36 px tall hit-rects near the toolbar edge where fit-view can park them under/near the viewport edge — Playwright trusted clicks refuse "outside of the viewport". An auto-fit with a ~40 px inset margin on board mount would make every POI reliably pointer-reachable. Non-blocking, cosmetic.
 
 ## Blocked / Not Verified (fold-gate ledger)

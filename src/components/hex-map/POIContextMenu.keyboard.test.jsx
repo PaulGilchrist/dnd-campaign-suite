@@ -7,6 +7,10 @@
 // pins lock the exact broken behaviors, mirrored from the indoor twin's
 // ItemContextMenu.keyboard.test.jsx faces now that both hosts ride the
 // shared useMenuRoving seam.
+// XF-backlog restore tier (2026-11-16): EVERY dismissal path re-focuses the
+// element focused before open (fallback: the board <svg> when focus was on
+// <body>) — the restore lives in the shared hook and is pinned here through
+// both the dismissal paths and the rename-lane yield faces.
 //
 // NOT OWNED — cited to owner lanes:
 //   label census + per-option CLICK dispatch/close contract → POIContextMenu.test.jsx
@@ -14,8 +18,8 @@
 //   open-focus/rove machinery unit behavior is pinned HERE through both hosts
 //   (the indoor faces live in ../map/ItemContextMenu.keyboard.test.jsx).
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import POIContextMenu from './POIContextMenu.jsx';
 
 const BASE_POI = { id: 'poi-1', type: 'city', q: 0, r: 0, label: 'City A', visible: true, linkedMap: null };
@@ -208,6 +212,125 @@ describe('POIContextMenu keyboard tier (useMenuRoving)', () => {
             input.dispatchEvent(endEvent);
             expect(endEvent.defaultPrevented).toBe(false);
             expect(document.activeElement).toBe(input);
+        });
+    });
+
+    describe('focus restore on close (useMenuRoving restore tier, XF backlog 2026-11-16)', () => {
+        // Anchor stands in for whatever had focus before the pointer opened
+        // the menu (sidebar button, hit-area neighbour…). Appended to body,
+        // outside the svg, like real page chrome.
+        const focusAnchor = () => {
+            const anchor = document.createElement('button');
+            anchor.textContent = 'pre-open anchor';
+            anchor.dataset.focusAnchor = '';
+            document.body.appendChild(anchor);
+            anchor.focus();
+            return anchor;
+        };
+        afterEach(() => {
+            document.querySelectorAll('[data-focus-anchor]').forEach((el) => el.remove());
+        });
+
+        // Stateful parent mirrors HexMap.jsx: onClose nulls selectedPoiMenu
+        // AND showRename together — EVERY dismissal path funnels through that
+        // single menuOpen true→false transition, which is what the hook keys
+        // its restore on.
+        function Board({ poiProps = {} } = {}) {
+            const [selected, setSelected] = useState(SELECTED);
+            const [renameId, setRenameId] = useState(null);
+            return (
+                <svg data-testid="hex-board">
+                    <POIContextMenu
+                        {...defaultProps}
+                        {...poiProps}
+                        selectedPoi={selected}
+                        showRename={renameId}
+                        setShowRename={setRenameId}
+                        onClose={() => { setSelected(null); setRenameId(null); }}
+                    />
+                </svg>
+            );
+        }
+
+        const row = (name) => screen.getByRole('menuitem', { name, exact: true });
+        // Restore lands in a microtask (so same-commit autoFocus wins) — let
+        // it run before asserting.
+        const flushRestore = () => act(async () => {});
+
+        it('Escape dismiss returns focus to the pre-open anchor, not body', async () => {
+            const anchor = focusAnchor();
+            render(<Board />);
+            expect(document.activeElement).toBe(row('Hide'));
+            fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+            expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+            await flushRestore();
+            expect(document.activeElement).toBe(anchor);
+        });
+
+        it('menu-item activation (Hide closes the hex lane) returns focus to the pre-open anchor', async () => {
+            const anchor = focusAnchor();
+            render(<Board />);
+            fireEvent.keyDown(row('Hide'), { key: 'Enter' });
+            expect(defaultProps.onToggleVisibility).toHaveBeenCalledTimes(1);
+            expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+            await flushRestore();
+            expect(document.activeElement).toBe(anchor);
+        });
+
+        it('the ✕ close row returns focus to the pre-open anchor', async () => {
+            const anchor = focusAnchor();
+            render(<Board />);
+            fireEvent.keyDown(row('✕'), { key: 'Enter' });
+            expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+            await flushRestore();
+            expect(document.activeElement).toBe(anchor);
+        });
+
+        it('rename-commit (Enter in the editor) restores to the anchor and rename-arming alone does not', async () => {
+            const anchor = focusAnchor();
+            const { container } = render(<Board />);
+            fireEvent.keyDown(row('Rename'), { key: 'Enter' });
+            const input = container.querySelector('input.context-menu-input');
+            expect(document.activeElement).toBe(input);
+            // Arming the editor nulls openKey while the menu stays mounted:
+            // the restore must NOT pull focus out of the live input.
+            await flushRestore();
+            expect(document.activeElement).toBe(input);
+            fireEvent.keyDown(input, { key: 'Enter' });
+            expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+            await flushRestore();
+            expect(document.activeElement).toBe(anchor);
+        });
+
+        it('rename-revert (Escape in the editor) restores to the anchor with zero rename writes', async () => {
+            const anchor = focusAnchor();
+            const { container } = render(<Board />);
+            fireEvent.keyDown(row('Rename'), { key: 'Enter' });
+            const input = container.querySelector('input.context-menu-input');
+            fireEvent.keyDown(input, { key: 'Escape' });
+            expect(defaultProps.onRename).not.toHaveBeenCalled();
+            expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+            await flushRestore();
+            expect(document.activeElement).toBe(anchor);
+        });
+
+        it('a dismiss after a body-focus open lands on the board svg fallback (tabindex=-1), never throws', async () => {
+            const { getByTestId } = render(<Board />);
+            expect(document.activeElement).toBe(row('Hide'));
+            fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+            await flushRestore();
+            const board = getByTestId('hex-board');
+            expect(board).toHaveAttribute('tabindex', '-1');
+            expect(document.activeElement).toBe(board);
+        });
+
+        it('a dismiss after the anchor died mid-ride falls back to the board svg instead of throwing', async () => {
+            const anchor = focusAnchor();
+            render(<Board />);
+            fireEvent.keyDown(row('Hide'), { key: 'Enter' }); // menu closed in state
+            anchor.remove(); // anchor detached before the restore microtask lands
+            await flushRestore();
+            expect(document.activeElement).toBe(screen.getByTestId('hex-board'));
         });
     });
 });
