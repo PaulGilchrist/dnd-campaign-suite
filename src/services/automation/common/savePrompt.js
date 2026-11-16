@@ -83,9 +83,21 @@ function buildPromptPayload(config) {
 
 function resolveSaveOutcome(promptData, detail) {
     const pd = promptData || {};
+    const targetName = pd.targetName || detail.targetName || 'Unknown';
     return {
-        attackerName: pd.attackerName || detail.attackerName || 'Unknown',
-        targetName: pd.targetName || detail.targetName || 'Unknown',
+        // bug-save-result-rows-attribute-character-unknown (2026-11-16 TB): attacker-less
+        // self-save lanes (Relentless Rage's CON save, counterSpell, saveOnly
+        // refusals — prompts whose config carries attackerName: null) stamped the
+        // generic save_result row's characterName with the literal 'Unknown' — a
+        // phantom "Unknown" member in every ledger filter/grouping by character.
+        // The row owner is now the acting attacker when known, else the save's
+        // OWNER (the prompt's targetName — the creature who rolled; the sibling
+        // condition-save lanes stamp a real name the same way). The 'Unknown'
+        // literal survives only as the last resort when the prompt carries
+        // NEITHER attacker nor target — the same token the targetName field
+        // already reports for that malformed shape.
+        characterName: pd.attackerName || detail.attackerName || targetName,
+        targetName,
         saveType: pd.saveType || detail.saveType || 'CON',
         saveDc: pd.saveDc || detail.saveDc || 0,
         success: detail.success,
@@ -110,7 +122,7 @@ function logSaveOutcome(campaignName, config, detail) {
     const description = `${fields.targetName} ${fields.success ? 'succeeded' : 'failed'} ${fields.saveType} save (DC ${fields.saveDc}, ${rollDetail})`;
 
     const entry = buildSaveResultEntry({
-        characterName: fields.attackerName,
+        characterName: fields.characterName,
         targetName: fields.targetName,
         saveDc: fields.saveDc,
         saveType: fields.saveType,

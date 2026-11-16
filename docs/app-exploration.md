@@ -61,7 +61,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(2026-11-16 TB) `save_result` rows attribute to `characterName:"Unknown"`** when the generic dice-roll lane logs a listener save (witnessed on the RR success roll: `save_result characterName:"Unknown", targetName:"EvasiveFighter"` — the description reads honestly but ledger filters/groupings by character see a phantom "Unknown" member). The prompt payload already carries `targetName`/`attackerName(null)` — stamp the owning target (or omit the field) at the writer in `useLoggedDiceRollEventHandlers.js` instead of an "Unknown" literal.
 - **(2026-11-16 TB) Initiative header `Clear` button label is ambiguous chrome:** the button text is bare `Clear` (`Initiative.jsx:1012`) while its dialog is titled "Clear Initiative Board"; a same-screen `Remove effect` badge cluster and the sidebar's other controls give no context for what will be cleared. A `title`/`aria-label` (or full label) mirroring the dialog title would match the app's icon-button labeling conventions elsewhere (music `title=Pause`, ally `aria-label="Edit allies of <N>"`).
 
 ## Blocked / Not Verified (fold-gate ledger)

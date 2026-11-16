@@ -10,8 +10,11 @@
 //    WITHOUT attackerName — the exact broken live flow);
 //  • payload truth: the pendingSavePrompts row + sendSavePrompt payload carry
 //    attackerName (the "attackerName: null" gap was the visible source);
-//  • the documented 'Unknown' fallback still stands ONLY when nothing supplies
-//    an attacker (self-saves) — the fix must not silently erase it;
+//  • attacker-less self-save lanes (Relentless Rage CON save shape — config
+//    with attackerName absent) stamp the save's OWNER (targetName), NEVER the
+//    literal "Unknown" (2026-11-16 TB ledger-phantom follow-up: the old
+//    'Unknown' fallback made every self-save a phantom "Unknown" member in
+//    character-grouped ledger views);
 //  • config.suppressOutcomeLog skips the generic row entirely (turn-END
 //    repeat-save lanes stamp their own attributed save_result row — one roll,
 //    one row) while still resolving the promise.
@@ -129,7 +132,7 @@ describe('save_result attribution — config.attackerName stamps the acting char
         }));
     });
 
-    it("'Unknown' fallback stays ONLY for genuinely attacker-less prompts (self-save lanes)", async () => {
+    it('attacker-less self-save lane (Relentless Rage prompt shape) stamps the save OWNER — never "Unknown"', async () => {
         const { promptId, promise } = createSaveListener(CAMPAIGN, {
             targetName: 'ElderPaladin',
             saveType: 'STR',
@@ -137,6 +140,36 @@ describe('save_result attribution — config.attackerName stamps the acting char
         });
 
         dispatchSaveResult(promptId);
+        await promise;
+
+        const rows = emittedSaveResultRows();
+        expect(rows).toHaveLength(1);
+        // 2026-11-16 TB follow-up: the old 'Unknown' literal made every
+        // self-save a phantom "Unknown" member in character-grouped ledger
+        // views — the row now resolves to the prompt's targetName owner.
+        expect(rows[0].characterName).toBe('ElderPaladin');
+        expect(rows[0].characterName).not.toBe('Unknown');
+        // Sibling fields stay byte-compatible (description already named the owner).
+        expect(rows[0]).toMatchObject({
+            type: 'save_result',
+            targetName: 'ElderPaladin',
+            saveType: 'STR',
+            saveDc: 17,
+            success: false,
+            description: 'ElderPaladin failed STR save (DC 17, rolled 4 +10 = 14)',
+        });
+    });
+
+    it("'Unknown' last resort survives ONLY for unattributable prompts (neither attacker nor target)", async () => {
+        const { promptId, promise } = createSaveListener(CAMPAIGN, {
+            saveType: 'STR',
+            saveDc: 17,
+        });
+
+        // No targetName on config NOR on the dispatch detail — genuinely ownerless.
+        window.dispatchEvent(new CustomEvent('save-result', {
+            detail: { promptId, saveType: 'STR', saveDc: 17, success: true, roll: 19, total: 23, saveBonus: 4 },
+        }));
         await promise;
 
         const rows = emittedSaveResultRows();
