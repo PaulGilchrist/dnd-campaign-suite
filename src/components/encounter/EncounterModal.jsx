@@ -45,6 +45,12 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
 
   if (!isOpen) return null;
 
+  // Validation-family convergence (2026-11-16 QA backlog): the commit buttons
+  // DISABLE while the name is blank, mirroring the NPC/Quest majority pattern
+  // (NPCs.jsx `disabled={saving || !formData.name.trim()}`, Quests.jsx
+  // `saveDisabled`). The blank guards in handleSave/handleRename below stay
+  // live as the Enter-key lane's honest refusal (same backstop role the
+  // siblings keep in their handlers) — never a silent no-op.
   const handleSave = async () => {
     if (!name.trim()) {
       setError('Encounter name is required');
@@ -147,7 +153,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 autoFocus
               />
-              <button className="encounter-btn encounter-btn-primary" onClick={handleSave}>
+              <button className="encounter-btn encounter-btn-primary" onClick={handleSave} disabled={!name.trim()}>
                 <i className="fa-solid fa-floppy-disk" /> Save
               </button>
             </div>
@@ -166,7 +172,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                 onKeyDown={(e) => e.key === 'Enter' && handleRename()}
                 autoFocus
               />
-              <button className="encounter-btn encounter-btn-primary" onClick={handleRename}>
+              <button className="encounter-btn encounter-btn-primary" onClick={handleRename} disabled={!newName.trim()}>
                 <i className="fa-solid fa-pen" /> Rename
               </button>
             </div>

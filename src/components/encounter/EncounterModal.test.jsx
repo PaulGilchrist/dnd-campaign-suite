@@ -110,10 +110,15 @@ describe('EncounterModal', () => {
         expect(mockOnSave).not.toHaveBeenCalled();
     });
 
-    it.each(['', '   '])('shows an inline error for blank name "%s" and never saves or closes', (value) => {
+    // 2026-11-16 validation-family convergence: blank names DISABLE the Save
+    // button (NPC/Quest majority pattern), so the inline refusal is reached via
+    // the Enter lane — pinned here plus EncounterModal.name-gate.test.jsx.
+    it.each(['', '   '])('disables Save for blank name "%s"; Enter shows the inline error and never saves or closes', (value) => {
         render(<EncounterModal {...createProps({ mode: 'save' })} />);
-        fireEvent.change(screen.getByLabelText('Encounter Name'), { target: { value } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+        const input = screen.getByLabelText('Encounter Name');
+        fireEvent.change(input, { target: { value } });
+        expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+        fireEvent.keyDown(input, { key: 'Enter' });
         expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
         expect(mockOnSave).not.toHaveBeenCalled();
         expect(mockOnClose).not.toHaveBeenCalled();
@@ -257,12 +262,16 @@ describe('EncounterModal', () => {
             expect(screen.queryByLabelText('New Name')).not.toBeInTheDocument();
         });
 
-        it.each(['', '   '])('blank new name "%s" shows the inline error, never dispatches, form stays open', async (value) => {
+        // Blank new name DISABLES the Rename button; the inline refusal stays
+        // reachable through the Enter lane (validation-family convergence).
+        it.each(['', '   '])('blank new name "%s" disables Rename, Enter shows the inline error, never dispatches, form stays open', async (value) => {
             render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
             fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
-            fireEvent.change(screen.getByLabelText('New Name'), { target: { value } });
+            const input = screen.getByLabelText('New Name');
+            fireEvent.change(input, { target: { value } });
+            expect(screen.getByRole('button', { name: 'Rename' })).toBeDisabled();
             await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+                fireEvent.keyDown(input, { key: 'Enter' });
             });
             expect(screen.getByText('New name is required')).toBeInTheDocument();
             expect(mockOnRename).not.toHaveBeenCalled();

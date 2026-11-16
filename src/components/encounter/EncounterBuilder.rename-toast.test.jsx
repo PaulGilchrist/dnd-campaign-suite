@@ -205,13 +205,16 @@ describe('EncounterBuilder - rename feedback (2026-10-28-T backlog)', () => {
     expect(h.renameEncounterAction).not.toHaveBeenCalled();
   });
 
-  it('empty-name leg: inline "New name is required", zero network, zero toast', async () => {
+  it('empty-name leg: Rename disabled, Enter lane shows inline "New name is required", zero network, zero toast', async () => {
     mountBuilder();
     await openLoadModal();
     await armRenameForm();
 
-    fireEvent.change(screen.getByLabelText('New Name'), { target: { value: '   ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByLabelText('New Name');
+    fireEvent.change(input, { target: { value: '   ' } });
+    // Validation-family convergence (2026-11-16): blank disables the button.
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeDisabled();
+    fireEvent.keyDown(input, { key: 'Enter' });
 
     await waitFor(() => {
       expect(screen.getByText('New name is required')).toBeInTheDocument();

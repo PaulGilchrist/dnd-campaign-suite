@@ -178,14 +178,18 @@ describe('EncounterBuilder + REAL EncounterModal — rename reachable end-to-end
     expect(screen.getByText('Dragon Lair')).toBeInTheDocument();
   });
 
-  it('blank rename never reaches the service seam — form stays open with inline error', async () => {
+  it('blank rename never reaches the service seam — Rename is disabled, the Enter-lane inline error holds the form open', async () => {
     mountBuilder();
     await openLoadModal();
 
     fireEvent.click(screen.getByRole('button', { name: 'Rename "goblin-ambush"' }));
-    fireEvent.change(screen.getByLabelText('New Name'), { target: { value: '   ' } });
+    const input = screen.getByLabelText('New Name');
+    fireEvent.change(input, { target: { value: '   ' } });
+    // 2026-11-16 validation-family convergence: the button lane is disabled,
+    // the Enter lane pays the inline refusal instead.
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeDisabled();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+      fireEvent.keyDown(input, { key: 'Enter' });
     });
 
     expect(screen.getByText('New name is required')).toBeInTheDocument();

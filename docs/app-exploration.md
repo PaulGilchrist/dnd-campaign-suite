@@ -57,7 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-16 WK: validation-family drift — NPC/Quest modals DISABLE Save on empty name, while the EncounterModal name prompt leaves Save enabled and refuses inline after press. Both honest, but pick one family (the disabled form is the majority). Files: `NPCs.jsx`, `Quests.jsx`, `EncounterModal.jsx`.
 - 2026-11-16 WK: 5 legacy pool rows (incl. `test-encounter`) carry `selectedMonsters: []` and real bodies only in dead `creatures[]` snapshots — they Load into an empty builder draft with no hint, and one `Update` press (past the empty gate, with any draft) rewrites the row shape. Candidate: flag snapshot-only rows in the Load list ("creator-snapshot row — loads empty") or migrate `creatures[]`→`selectedMonsters` on save.
 - 2026-11-16 WK: NPC form enables Save for bestiary names (Goblin…) and pays the 400 round-trip before the inline refusal, while the AI draft lane enforces the same name-law CLIENT-side ("Not approved — name \"npc\" is a kind word"). Candidate: reuse `isBestiaryMonsterName` client-side (fetch a name-set once) to gate Save like the dup-quest block does.
 
