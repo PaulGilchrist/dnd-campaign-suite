@@ -24,7 +24,7 @@
 //   3. Save → modal commit → saveEncounter payload, then edit-in-place → updateEncounter
 //   4. Party add / level change / remove → target threshold recomputation end-to-end
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import EncounterBuilder from './EncounterBuilder.jsx';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import { addMonstersToInitiative } from '../../services/encounters/encounterToInitiative.js';
@@ -188,11 +188,13 @@ describe('EncounterBuilder - additional interactions', () => {
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Ambush at dawn' } });
 
     // First save: no current name → real save modal opens.
-    fireEvent.click(screen.getByRole('button', { name: 'Save encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByRole('heading', { name: 'Save Encounter' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Encounter Name'), { target: { value: 'crag-mole-lair' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    // Modal-scoped: the toolbar Save now shares the exact accessible name 'Save'.
+    fireEvent.click(within(screen.getByLabelText('Encounter Name').closest('.encounter-modal-save'))
+      .getByRole('button', { name: 'Save' }));
 
     // Stripped refs + description + effectiveXP (2x goblin = 100 XP, party of 2 → ×1.5).
     await waitFor(() => {
@@ -209,13 +211,13 @@ describe('EncounterBuilder - additional interactions', () => {
       expect(screen.getByRole('heading', { level: 2, name: /Crag Mole Lair/ })).toBeInTheDocument();
     });
     expect(screen.queryByLabelText('Encounter Name')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save encounter' })).toHaveTextContent('Update');
+    expect(screen.getByRole('button', { name: 'Update' })).toHaveTextContent('Update');
 
     // Edit-in-place: second save updates directly — no modal, no new saveEncounter —
     // but the update lane gates the PUT behind a named native overwrite confirm.
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Ambush at dawn (revised)' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Update' }));
 
     expect(confirmSpy).toHaveBeenCalledWith('Overwrite encounter "Crag Mole Lair"? This replaces the saved encounter.');
     await waitFor(() => {

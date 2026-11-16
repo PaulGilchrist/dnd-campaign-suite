@@ -713,38 +713,43 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
 
         {/* Save/Load/Generate/Reset Buttons */}
         <div className="encounter-actions">
+          {/* AT-clean toolbar (2026-11-16 backlog): decorative <i aria-hidden>
+              icons + space-free label nodes so the accessible name is exactly
+              the visible words (Save/Update, Load, Generate, Reset) — mirroring
+              the modal buttons in this family. title carries the longer
+              tooltip; icon↔label spacing rides the .encounter-actions gap. */}
           <button
             className="encounter-btn encounter-btn-secondary"
             onClick={handleSaveEncounter}
-            aria-label="Save encounter"
             title={currentEncounterName ? 'Update encounter' : 'Save encounter'}
           >
-            <i className="fa-solid fa-floppy-disk" /> {currentEncounterName ? 'Update' : 'Save'}
+            <i className="fa-solid fa-floppy-disk" aria-hidden="true" />
+            {currentEncounterName ? 'Update' : 'Save'}
           </button>
           <button
             className="encounter-btn encounter-btn-secondary"
             onClick={openLoadModal}
-            aria-label="Load encounter"
             title="Load encounter"
           >
-            <i className="fa-solid fa-folder-open" /> Load
+            <i className="fa-solid fa-folder-open" aria-hidden="true" />
+            Load
           </button>
           <button
             className="encounter-btn encounter-btn-generate"
             onClick={() => setShowGenerator(true)}
-            aria-label="Generate encounter"
             title="Generate encounter from environments"
           >
-            <i className="fa-solid fa-wand-magic-sparkles" /> Generate
+            <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" />
+            Generate
           </button>
               {currentEncounterName && (
                <button
                className="encounter-btn encounter-btn-secondary"
                onClick={handleReset}
-               aria-label="Reset encounter"
                title="Reset to blank"
                >
-                 <i className="fa-solid fa-rotate-left" /> Reset
+                 <i className="fa-solid fa-rotate-left" aria-hidden="true" />
+                 Reset
                 </button>
               )}
               {/* Saved-encounter editing surface only — an unnamed draft has no
@@ -807,7 +812,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
             onClick={handleJoinEncounter}
             title="Add monsters to initiative and navigate to combat"
           >
-              <i className="fa-solid fa-skull"></i>Join Encounter
+              <i className="fa-solid fa-skull" aria-hidden="true"></i>Join Encounter
           </button>
         </div>
       )}

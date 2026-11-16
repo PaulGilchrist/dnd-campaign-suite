@@ -165,7 +165,7 @@ const toastNode = () => document.querySelector('.encounter-toast');
 // Toggle a checkbox to force a re-render so the getter-driven modal flags refresh
 // (same trick as update-save-confirm.test.jsx).
 async function clickLoadRow() {
-  fireEvent.click(screen.getByLabelText('Load encounter'));
+  fireEvent.click(screen.getByTitle('Load encounter'));
   fireEvent.click(screen.getByTestId('monster-checkbox-goblin'));
   fireEvent.click(screen.getByTestId('monster-checkbox-goblin'));
   await waitFor(() => expect(screen.getByTestId('load-encounter-qa-update-bug')).toBeInTheDocument());
@@ -204,7 +204,7 @@ describe('EncounterBuilder — update-save onto a deleted row (404 recovery)', (
     // attached anymore).
     expect(screen.getByTitle('Save encounter')).toBeInTheDocument();
     expect(screen.queryByTitle('Update encounter')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Reset encounter')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
 
     // Single-layer logging fingerprint (c5d784d1f): this component logged
     // NOTHING — the service owns the one console.error (pinned in

@@ -71,7 +71,8 @@ function AiRefineButton({ campaignName, kind, entity, onReplaced }) {
     return (
       <button type="button" className="ct-btn" onClick={() => setOpen(true)}
         title="Describe a change and let the AI rewrite this object (you still choose to save)">
-        <i className="fa-solid fa-wand-magic-sparkles" /> Refine with AI
+        <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" />
+        Refine with AI
       </button>
     );
   }

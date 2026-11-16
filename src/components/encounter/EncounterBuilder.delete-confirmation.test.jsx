@@ -102,7 +102,7 @@ function mountBuilder() {
 }
 
 async function openLoadModal() {
-  fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'Delete "test-encounter"' })).toBeInTheDocument();
   });

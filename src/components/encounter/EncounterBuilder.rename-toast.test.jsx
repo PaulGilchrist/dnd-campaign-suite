@@ -108,7 +108,7 @@ async function expectNoToast() {
 }
 
 async function openLoadModal() {
-  fireEvent.click(screen.getByLabelText('Load encounter'));
+  fireEvent.click(screen.getByTitle('Load encounter'));
   await waitFor(() => {
     expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
   });
@@ -165,7 +165,7 @@ describe('EncounterBuilder - rename feedback (2026-10-28-T backlog)', () => {
       expect(screen.queryByRole('heading', { name: 'Rename Encounter' })).not.toBeInTheDocument();
     });
     // Re-open the list: the refresh carries the NEW name, old one gone.
-    fireEvent.click(screen.getByLabelText('Load encounter'));
+    fireEvent.click(screen.getByTitle('Load encounter'));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Rename "Renamed Encounter"' })).toBeInTheDocument();
     });

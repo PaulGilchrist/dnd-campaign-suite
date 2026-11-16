@@ -57,7 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-16 WK: Encounter-builder toolbar labels carry icon-leading spaces (` Save`/` Load`) which break `getByRole(name, exact)` and read oddly to AT; the modal buttons in the same family are clean. Candidate: icon as a separate `<i>` with a space-free label node.
 - 2026-11-16 WK: Load-pool rows' Rename/Delete icon buttons have `aria-label` but NO `title` — hover gives zero affordance, unlike Description/Regenerate icons which do have titles. Candidate: mirror the title text.
 - 2026-11-16 WK: validation-family drift — NPC/Quest modals DISABLE Save on empty name, while the EncounterModal name prompt leaves Save enabled and refuses inline after press. Both honest, but pick one family (the disabled form is the majority). Files: `NPCs.jsx`, `Quests.jsx`, `EncounterModal.jsx`.
 - 2026-11-16 WK: 5 legacy pool rows (incl. `test-encounter`) carry `selectedMonsters: []` and real bodies only in dead `creatures[]` snapshots — they Load into an empty builder draft with no hint, and one `Update` press (past the empty gate, with any draft) rewrites the row shape. Candidate: flag snapshot-only rows in the Load list ("creator-snapshot row — loads empty") or migrate `creatures[]`→`selectedMonsters` on save.

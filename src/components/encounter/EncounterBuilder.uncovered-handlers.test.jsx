@@ -114,7 +114,7 @@ function mountBuilder() {
 }
 
 async function openLoadModal() {
-  fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
   await waitFor(() => {
     // Real modal surface (EncounterModal.jsx:69): load-mode heading — replaces the
     // deleted stub's invented role="dialog" aria-label="Encounter modal" phantom.

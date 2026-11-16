@@ -160,7 +160,7 @@ describe('EncounterBuilder - empty-draft save gate', () => {
   it('blocks Save on an empty draft with a specific visible message — no modal, no save call', () => {
     const management = renderBuilder();
 
-    fireEvent.click(screen.getByLabelText('Save encounter'));
+    fireEvent.click(screen.getByTitle('Save encounter'));
     forceRender();
 
     expect(gateBanner()).toHaveTextContent(GATE_MESSAGE);
@@ -176,7 +176,7 @@ describe('EncounterBuilder - empty-draft save gate', () => {
 
     // Draft + save so the header flips to Update (currentEncounterName set).
     fireEvent.click(screen.getByTestId('monster-checkbox-goblin'));
-    fireEvent.click(screen.getByLabelText('Save encounter'));
+    fireEvent.click(screen.getByTitle('Save encounter'));
     await waitFor(() => expect(screen.getByTestId('modal-save')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('modal-save'));
     await waitFor(() => expect(screen.getByTitle('Update encounter')).toBeInTheDocument());
@@ -192,7 +192,7 @@ describe('EncounterBuilder - empty-draft save gate', () => {
   it('clears the message when a monster is drafted and the normal save flow still works end-to-end', async () => {
     const management = renderBuilder();
 
-    fireEvent.click(screen.getByLabelText('Save encounter'));
+    fireEvent.click(screen.getByTitle('Save encounter'));
     forceRender();
     expect(gateBanner()).toHaveTextContent(GATE_MESSAGE);
 
@@ -200,7 +200,7 @@ describe('EncounterBuilder - empty-draft save gate', () => {
     expect(gateBanner()).not.toBeInTheDocument();
 
     // Non-empty save flow unchanged: header Save → name modal → onSave → toast.
-    fireEvent.click(screen.getByLabelText('Save encounter'));
+    fireEvent.click(screen.getByTitle('Save encounter'));
     await waitFor(() => expect(screen.getByTestId('modal-save')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('modal-save'));
 

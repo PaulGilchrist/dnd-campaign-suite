@@ -98,7 +98,7 @@ function mountBuilder() {
 }
 
 async function openLoadModal() {
-  fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'Rename "goblin-ambush"' })).toBeInTheDocument();
   });
@@ -168,7 +168,7 @@ describe('EncounterBuilder + REAL EncounterModal — rename reachable end-to-end
     expect(container.querySelector('.encounter-modal-overlay')).not.toBeInTheDocument();
 
     // Re-opening Load lists the encounter under its NEW name with fresh row actions.
-    fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Rename "Goblin Remix"' })).toBeInTheDocument();
     });

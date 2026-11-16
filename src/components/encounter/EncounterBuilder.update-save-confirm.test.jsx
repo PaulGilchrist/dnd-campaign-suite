@@ -162,7 +162,7 @@ afterEach(() => {
 });
 
 async function clickLoadRow() {
-  fireEvent.click(screen.getByLabelText('Load encounter'));
+  fireEvent.click(screen.getByTitle('Load encounter'));
   // Management mock drives modal visibility via getters — force a re-render.
   fireEvent.click(screen.getByTestId('monster-checkbox-goblin'));
   // Undo that toggle so the draft mirrors the loaded row only.
@@ -218,7 +218,7 @@ describe('EncounterBuilder — update-save named overwrite confirm (bug-eb-updat
     const management = renderBuilder();
 
     fireEvent.click(screen.getByTestId('monster-checkbox-goblin'));
-    fireEvent.click(screen.getByLabelText('Save encounter'));
+    fireEvent.click(screen.getByTitle('Save encounter'));
 
     await waitFor(() => expect(screen.getByTestId('modal-save')).toBeInTheDocument());
     // The create path never sees the overwrite confirm.

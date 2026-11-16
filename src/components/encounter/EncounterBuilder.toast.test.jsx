@@ -146,13 +146,13 @@ function renderBuilder(overrides) {
 const toastNode = () => document.querySelector('.encounter-toast');
 
 async function clickSaveThroughModal() {
-  fireEvent.click(screen.getByLabelText('Save encounter'));
+  fireEvent.click(screen.getByTitle('Save encounter'));
   await waitFor(() => expect(screen.getByTestId('modal-save')).toBeInTheDocument());
   fireEvent.click(screen.getByTestId('modal-save'));
 }
 
 async function clickLoadRow() {
-  fireEvent.click(screen.getByLabelText('Load encounter'));
+  fireEvent.click(screen.getByTitle('Load encounter'));
   // The management mock drives modal visibility via getters, so the open flag
   // is only re-read on the next render — the checkbox toggle forces one
   // (same trick as EncounterBuilder.load-encounter.test.jsx).

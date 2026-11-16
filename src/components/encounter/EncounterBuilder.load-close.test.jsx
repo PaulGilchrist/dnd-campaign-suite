@@ -106,7 +106,7 @@ function mountBuilder() {
 }
 
 async function openLoadModal() {
-  fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
   await waitFor(() => {
     expect(overlay()).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe('EncounterBuilder — Load row closes the modal on action (generator-Ap
     await waitFor(() => {
       // (a) draft armed exactly as before: checkbox checked, Save title flips.
       expect(screen.getByRole('checkbox', { name: 'Select Goblin' })).toBeChecked();
-      expect(screen.getByRole('button', { name: 'Save encounter' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Update' })).toHaveAttribute(
         'title',
         'Update encounter'
       );
@@ -163,11 +163,11 @@ describe('EncounterBuilder — Load row closes the modal on action (generator-Ap
     expect(h.deleteEncounterAction).not.toHaveBeenCalled();
     expect(h.renameEncounterAction).not.toHaveBeenCalled();
     // Toolbar Save stays in create mode; no Reset affordance (nothing armed).
-    expect(screen.getByRole('button', { name: 'Save encounter' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute(
       'title',
       'Save encounter'
     );
-    expect(screen.queryByRole('button', { name: 'Reset encounter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Select Goblin' })).not.toBeChecked();
   });
 });

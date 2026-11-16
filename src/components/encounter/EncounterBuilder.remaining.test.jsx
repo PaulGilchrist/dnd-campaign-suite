@@ -133,7 +133,7 @@ describe('EncounterBuilder - residual interactions', () => {
     mountBuilder();
     expect(screen.queryByRole('dialog', { name: 'Encounter generator' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Generate encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
     expect(screen.getByRole('dialog', { name: 'Encounter generator' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply Suggestion' }));
@@ -149,14 +149,14 @@ describe('EncounterBuilder - residual interactions', () => {
   it('Apply over a non-empty draft toasts "Draft replaced by generator"; an empty-draft Apply stays silent', () => {
     // Empty draft: applying a suggestion is not a replacement — no toast.
     mountBuilder();
-    fireEvent.click(screen.getByRole('button', { name: 'Generate encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
     fireEvent.click(screen.getByRole('button', { name: 'Apply Suggestion' }));
     expect(document.querySelector('.encounter-toast')).toBeNull();
 
     // Non-empty draft (the Apply above left Suggested Goblin selected):
     // re-open and apply again — the prior selection is replaced, so toast.
     fireEvent.click(screen.getByRole('button', { name: 'Close generator' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Generate encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
     fireEvent.click(screen.getByRole('button', { name: 'Apply Suggestion' }));
 
     const toast = document.querySelector('.encounter-toast');
@@ -186,10 +186,10 @@ describe('EncounterBuilder - residual interactions', () => {
     mountBuilder();
 
     expect(screen.getByRole('heading', { level: 2, name: 'Encounter Builder' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save encounter' })).toHaveTextContent('Save');
-    expect(screen.getByRole('button', { name: 'Load encounter' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Generate encounter' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reset encounter' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveTextContent('Save');
+    expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull();
 
     const party = document.querySelector('.party-summary');
     expect(party).toBeTruthy();
@@ -206,6 +206,6 @@ describe('EncounterBuilder - residual interactions', () => {
     mountBuilder({ characters });
     expect(screen.getByText(/No characters in this campaign/)).toBeInTheDocument();
     expect(document.querySelectorAll('.party-member-tag')).toHaveLength(0);
-    expect(screen.getByRole('button', { name: 'Save encounter' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 });

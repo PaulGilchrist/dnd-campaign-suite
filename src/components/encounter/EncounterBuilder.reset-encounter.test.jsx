@@ -108,10 +108,10 @@ function mountBuilder() {
 // that makes the Reset button appear — hydration itself is owned by #403).
 async function loadEncounter(data) {
   h.loadEncounterData.mockResolvedValue(data);
-  fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
   fireEvent.click(screen.getByRole('button', { name: 'Load "test-encounter"' }));
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: 'Reset encounter' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument();
   });
 }
 
@@ -159,13 +159,13 @@ describe('EncounterBuilder - Reset wipes state to defaults (handleReset)', () =>
     expect(screen.getByLabelText('PC 1')).toHaveValue(20);
     expect(screen.getByLabelText('CR Min')).toHaveValue(0.5);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
 
     // Title + encounter binding wiped (setCurrentEncounterName(null) observable:
     // Reset button gone, Save reverts from "Update" to fresh "Save").
     expect(screen.getByRole('heading', { level: 2, name: 'Encounter Builder' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reset encounter' })).toBeNull();
-    const saveBtn = screen.getByRole('button', { name: 'Save encounter' });
+    expect(screen.queryByRole('button', { name: 'Reset' })).toBeNull();
+    const saveBtn = screen.getByRole('button', { name: 'Save' });
     expect(saveBtn).toHaveTextContent('Save');
     expect(saveBtn).toHaveAttribute('title', 'Save encounter');
 
@@ -217,11 +217,11 @@ describe('EncounterBuilder - Reset wipes state to defaults (handleReset)', () =>
 
     // In the loaded state a save would update in place (#399); prove the reset
     // severs that binding instead of merely hiding the Reset button.
-    fireEvent.click(screen.getByRole('button', { name: 'Reset encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
     // Re-draft a monster after the wipe — an empty draft is gated by the
     // save-validation and never reaches the name modal.
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByRole('heading', { name: 'Save Encounter' })).toBeInTheDocument();
     expect(h.openSaveModal).toHaveBeenCalledTimes(1);
