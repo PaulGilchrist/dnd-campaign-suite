@@ -117,12 +117,16 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
 
   const showsOwnDone = typeof popupHtml === 'object' && !!popupHtml?.autoDamage && !popupHtml?.isAutoMiss && (missToHitApplied || !!popupHtml?.hit);
 
-  // Staged-damage guard (2026-11-11 improve hit-popup-backdrop-void-guard):
-  // while a HIT popup stages Done-gated damage, the shared Popup backdrop is
-  // inert (no click handler since 57d68ff80) and the footer Done is suppressed,
-  // so Done (apply) and this Cancel (honest attack_cancelled log row, zero
-  // damage) are the ONLY exits — a stray click can never silently void the
-  // staged damage. Cancel closes without dispatching dice-roll-done.
+  // Staged-damage guard (2026-11-11 improve hit-popup-backdrop-void-guard,
+  // dismissal law threaded 2026-11-16): while a HIT popup stages Done-gated
+  // damage, the shared Popup is marked dismissable={false} — its backdrop and
+  // Escape stay inert and the footer Done is suppressed, so Done (apply) and
+  // this Cancel (honest attack_cancelled log row, zero damage) are the ONLY
+  // exits — a stray click or key can never silently void the staged damage.
+  // Cancel closes without dispatching dice-roll-done. Every OTHER face (string
+  // refusals, plain roll results, misses — nothing pending) rides the shared
+  // modal-family law: Escape/pure-backdrop route to onClose, exactly the same
+  // close-only handler its footer Done already uses.
   const handleCancelStagedDamage = useCallback(() => {
     const autoDamage = popupHtml?.autoDamage;
     const attackName = autoDamage?.name || popupHtml?.name || 'attack';
@@ -141,7 +145,7 @@ function AttackResultPopup({ popupHtml, onClose, campaignName, attackerName, pla
   }, [popupHtml, campaignName, attackerName, onClose]);
 
   return (
-    <Popup onClickOrKeyDown={onClose} showCloseButton={!showsOwnDone}>
+    <Popup onClickOrKeyDown={onClose} showCloseButton={!showsOwnDone} dismissable={!showsOwnDone}>
       {typeof popupHtml === 'string' ? (
         <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }} />
       ) : (

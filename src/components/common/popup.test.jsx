@@ -56,14 +56,50 @@ describe('Popup', () => {
     });
   });
 
-  // ── No click-to-dismiss behavior ──
+  // ── Modal-family dismissal law (backlog XE 2026-11-16) ──
+  // A face with a plain close handler (every consumer's onClickOrKeyDown today)
+  // answers Escape and a PURE backdrop click through the shared useModalDismiss
+  // tier — identical to pressing its Done. A drag that starts inside the panel
+  // (text selection released over the backdrop) never dismisses, and faces the
+  // caller marks dismissable={false} (staged-damage popups: the
+  // hit-popup-backdrop-void-guard) keep Escape AND backdrop fully inert.
 
-  describe('no click dismissal', () => {
-    it('does not close when the overlay background is clicked', () => {
+  const overlay = () => screen.getByTestId('popup-overlay');
+  const panel = () => overlay().querySelector('.popup-modal');
+  const pureBackdropClick = () => {
+    fireEvent.mouseDown(overlay());
+    fireEvent.click(overlay());
+  };
+
+  describe('modal-family dismissal', () => {
+    it('closes exactly once on a pure backdrop click (mousedown and click both on the overlay)', () => {
       const handleClose = vi.fn();
       renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: handleClose });
 
-      fireEvent.click(screen.getByTestId('popup-overlay'));
+      pureBackdropClick();
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes exactly once when Escape is pressed while focus lives in the panel', () => {
+      const handleClose = vi.fn();
+      renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: handleClose });
+
+      fireEvent.keyDown(panel(), { key: 'Escape' });
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('a dismissable popup pulls focus into its panel on open (Escape reachability)', () => {
+      renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: vi.fn() });
+
+      expect(document.activeElement).toBe(panel());
+    });
+
+    it('does not dismiss when the drag started inside the panel (mousedown in panel, click on backdrop)', () => {
+      const handleClose = vi.fn();
+      renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: handleClose });
+
+      fireEvent.mouseDown(panel());
+      fireEvent.click(overlay());
       expect(handleClose).not.toHaveBeenCalled();
     });
 
@@ -79,10 +115,46 @@ describe('Popup', () => {
           </>
         );
 
-        fireEvent.click(screen.getByTestId('popup-overlay').querySelector(selector));
+        const target = overlay().querySelector(selector);
+        fireEvent.mouseDown(target);
+        fireEvent.click(target);
         expect(handleClose).not.toHaveBeenCalled();
       }
     );
+  });
+
+  describe('guarded faces (dismissable={false}) stay fully inert', () => {
+    it('does not close on a pure backdrop click', () => {
+      const handleClose = vi.fn();
+      renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: handleClose, dismissable: false });
+
+      pureBackdropClick();
+      expect(handleClose).not.toHaveBeenCalled();
+    });
+
+    it('does not close on Escape', () => {
+      const handleClose = vi.fn();
+      renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: handleClose, dismissable: false });
+
+      fireEvent.keyDown(panel(), { key: 'Escape' });
+      expect(handleClose).not.toHaveBeenCalled();
+    });
+
+    it('never steals focus on open (guarded chrome unchanged)', () => {
+      renderPopup({ html: '<b>Test Content</b>', onClickOrKeyDown: vi.fn(), dismissable: false });
+
+      expect(document.activeElement).not.toBe(panel());
+    });
+  });
+
+  describe('faces without a close handler are inert', () => {
+    it('backdrop click and Escape never fire anything without onClickOrKeyDown', () => {
+      renderPopup({ html: '<b>Test Content</b>' });
+
+      pureBackdropClick();
+      fireEvent.keyDown(panel(), { key: 'Escape' });
+      expect(panel()).toBeInTheDocument();
+    });
   });
 
   // ── Footer Done button ──

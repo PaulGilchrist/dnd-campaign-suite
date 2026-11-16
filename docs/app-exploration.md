@@ -67,8 +67,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **Zero-stakes popup faces are Escape/backdrop deaf — only their Done button exits** (XE 2026-11-16): the shared `common/Popup.jsx` wires `onClickOrKeyDown` ONLY to the `.popup-close-btn` Done — a no-target `.mc-no-target-refusal` (nothing rolled, nothing spent) or a plain roll-result string face covers the whole viewport (`.popup-overlay` fixed, z-index 200) and survives Escape AND click-away; the GM must hunt the Done. The staged-damage backdrop-inert guard (hit-popup-backdrop-void-guard) is intentional for DONE-GATED damage faces — extend the modal-family Escape law (`hooks/ui/useModalDismiss.js` precedent) to the dismissal-safe faces (string-html popups with no pending apply), keeping the guard exactly where staged damage exists. Likely files: `src/components/common/Popup.jsx`, `AttackResultPopup.jsx`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried).

@@ -331,14 +331,28 @@ describe('CharSpells - spell row rendering', () => {
   });
 
   describe('spell detail popup', () => {
-    it('keeps the detail popup open when the overlay backdrop is clicked', () => {
+    it('dismisses the detail popup on a pure backdrop click (modal-family law, XE 2026-11-16)', () => {
       renderWithSpells([makeSpell({ name: 'Light' })]);
 
       fireEvent.click(screen.getByText('Light'));
       expect(screen.getByTestId('spell-detail-popup')).toHaveTextContent('Light');
 
-      // The detail popup deliberately hides its own close button; clicking
-      // the backdrop of the REAL overlay must not dismiss the spell detail.
+      // The detail popup hides the shared footer Done, but its
+      // onClickOrKeyDown is a plain setSelectedSpell(null) close with nothing
+      // pending — under the shared Popup's modal-family law a pure backdrop
+      // click (mousedown+click both on the overlay) closes it with zero side
+      // effects. Inside-panel clicks stay inert (drag guard).
+      const overlay = screen.getByTestId('popup-overlay');
+      fireEvent.mouseDown(overlay);
+      fireEvent.click(overlay);
+      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+    });
+
+    it('a drag started inside the panel never dismisses the detail popup', () => {
+      renderWithSpells([makeSpell({ name: 'Light' })]);
+
+      fireEvent.click(screen.getByText('Light'));
+      fireEvent.mouseDown(screen.getByTestId('popup-overlay').querySelector('.popup-modal'));
       fireEvent.click(screen.getByTestId('popup-overlay'));
       expect(screen.getByTestId('spell-detail-popup')).toHaveTextContent('Light');
     });
