@@ -8,7 +8,7 @@ import {
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { hexKey, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
-import { VIEW_RESET_ZOOM, HEX_FIT_INSET_PX, fitHexView } from '../../services/maps/hexViewMath.js';
+import { VIEW_RESET_ZOOM, HEX_FIT_INSET_PX, HEX_FIT_VERSION, fitHexView } from '../../services/maps/hexViewMath.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
@@ -146,26 +146,32 @@ const travelAwaitingDestination = (panelOpen, travelMode, destination) =>
     panelOpen && travelMode === 'planning' && !destination;
 
 // Mount auto-fit branch of the view-normalize layout pass (XF backlog
-// 2026-11-16): while the one-shot fit is armed and the svg has real pixel
-// dimensions, settle zoom/pan to the WHOLE-BOARD fit (hexViewMath.fitHexView,
-// HEX_FIT_INSET_PX free on every edge so no POI hit-rect parks at the
-// toolbar/viewport boundary) and consume both one-shot flags — returning true
-// so the legacy centering/clamp passes skip this commit. Armed once per mount
-// and re-armed only when the loader re-enters loading (map switch), so a fit
-// never follows pan/zoom interactions. Never fits against fake dimensions
-// (hidden mount / jsdom harness). Hoisted out of HexMap's body per the
-// rejectedNoticeName max-statements precedent.
+// 2026-11-16): ONLY an UNSTAMPED-or-stale document (heldFitVersion differs
+// from HEX_FIT_VERSION — the loader's raw stored stamp, absent reads as
+// stale-by-shape) earns the one-shot whole-board fit; a stamped document's
+// stored view is CANONICAL and every mount applies its zoom/pan VERBATIM
+// (the loader already settled those bytes, and the per-commit clamp pass is
+// an identity on them). When the fit lands, claimMountFitStamp restamps the
+// session's carried copy in the same commit as the fit's zoom/pan setters,
+// so view + fitVersion persist together in ONE write and every subsequent
+// mount is byte-neutral. Armed once per mount and re-armed only when the
+// loader re-enters loading (map switch), so a fit never follows pan/zoom
+// interactions. Never fits against fake dimensions (hidden mount / jsdom
+// harness). Hoisted out of HexMap's body per the rejectedNoticeName
+// max-statements precedent.
 function consumeMountFit({
-    loading, svgRef, hexCols, hexRows, autoFitArmedRef, needsResetViewRef,
-    setZoom, setPanX, setPanY,
+    loading, svgRef, hexCols, hexRows, heldFitVersion, claimMountFitStamp,
+    autoFitArmedRef, needsResetViewRef, setZoom, setPanX, setPanY,
 }) {
     if (loading) { autoFitArmedRef.current = true; return false; }
     if (!autoFitArmedRef.current || !svgRef.current) return false;
+    if (heldFitVersion === HEX_FIT_VERSION) return false;
     const rect = svgRef.current.getBoundingClientRect();
     if (rect.width <= 2 * HEX_FIT_INSET_PX || rect.height <= 2 * HEX_FIT_INSET_PX) return false;
     autoFitArmedRef.current = false;
     needsResetViewRef.current = false;
     const fit = fitHexView(hexCols, hexRows, rect.width, rect.height);
+    claimMountFitStamp();
     setZoom(fit.zoom);
     setPanX(fit.panX);
     setPanY(fit.panY);
@@ -176,12 +182,12 @@ function consumeMountFit({
 // the rejectedNoticeName max-statements precedent): mount auto-fit first, then
 // the legacy one-shot centering reset, then the per-commit pan clamp.
 function applyHexViewPass({
-    loading, svgRef, hexCols, hexRows, zoom, panX, panY,
+    loading, svgRef, hexCols, hexRows, zoom, panX, panY, heldFitVersion, claimMountFitStamp,
     autoFitArmedRef, needsResetViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
 }) {
     if (consumeMountFit({
-        loading, svgRef, hexCols, hexRows, autoFitArmedRef, needsResetViewRef,
-        setZoom, setPanX, setPanY,
+        loading, svgRef, hexCols, hexRows, heldFitVersion, claimMountFitStamp,
+        autoFitArmedRef, needsResetViewRef, setZoom, setPanX, setPanY,
     })) return;
     if (needsResetViewRef.current) {
         needsResetViewRef.current = false;
@@ -248,6 +254,7 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
         zoom, setZoom,
         panX, setPanX,
         panY, setPanY,
+        heldFitVersion, claimMountFitStamp,
         needsResetViewRef,
     } = mapLoader;
 
@@ -520,16 +527,18 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
     }, [campaignName, handleMapDataEvent]);
 
     // ── View reset on grid size change ──
-    // Mount auto-fit (XF backlog 2026-11-16): whole-board fit with edge insets,
-    // ONE time per board-open — see consumeMountFit/applyHexViewPass. Re-armed
-    // only while the loader is loading (map switch), never by pan/zoom
-    // interactions.
+    // Mount auto-fit (XF backlog 2026-11-16 + fitVersion law, YG backlog
+    // 2026-11-16): ONE-time whole-board fit for stamp-less/stale documents
+    // only — a doc stamped at HEX_FIT_VERSION mounts verbatim and never fits.
+    // See consumeMountFit/applyHexViewPass. Re-armed only while the loader is
+    // loading (map switch), never by pan/zoom interactions.
     useLayoutEffect(() => {
         applyHexViewPass({
             loading, svgRef, hexCols, hexRows, zoom, panX, panY,
+            heldFitVersion, claimMountFitStamp,
             autoFitArmedRef, needsResetViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
         });
-    }, [loading, zoom, panX, panY, gridSize, hexCols, hexRows, clampPan, centerView, setZoom, setPanX, setPanY, needsResetViewRef]);
+    }, [loading, zoom, panX, panY, gridSize, hexCols, hexRows, heldFitVersion, claimMountFitStamp, clampPan, centerView, setZoom, setPanX, setPanY, needsResetViewRef]);
 
     const viewPortBounds = useMemo(() => ({
         left: panX, top: panY,

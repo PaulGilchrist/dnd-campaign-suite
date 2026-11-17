@@ -42,7 +42,7 @@ vi.mock('../../../services/campaign/travelService.js', () => ({
 }));
 
 import * as mapsService from '../../../services/maps/mapsService.js';
-import { hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM } from '../../../services/maps/hexViewMath.js';
+import { hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM, HEX_FIT_VERSION } from '../../../services/maps/hexViewMath.js';
 
 const CAMPAIGN = 'test-campaign';
 const MAP = 'test-map';
@@ -66,9 +66,11 @@ const settledPan = (gridSize, zoom, panX, panY) =>
     clampHexPan(hexGridPixelBounds(gridSize * 2, gridSize), gridSize, zoom, panX, panY);
 
 // Factory so each render gets fresh objects (the hook stores these by reference).
-// SETTLED document: every adoption default present, pan already at the view
-// the mount pass would normalize it to, travelState the null the loader adopts
-// for a trip-less file — the exact bytes a settling mount write leaves behind.
+// SETTLED, FITTED document: every adoption default present, pan already at the
+// view the mount pass would normalize it to, travelState the null the loader
+// adopts for a trip-less file — the exact bytes the settling/stamping mount
+// write leaves behind, including the fitVersion stamp that makes every later
+// mount verbatim/zero-PUT (fitVersion law, YG backlog 2026-11-16).
 const PAN_12 = settledPan(12, 3, 40, 60);
 const loadedMap = () => ({
     type: 'outdoor',
@@ -85,10 +87,13 @@ const loadedMap = () => ({
     partyPosition: { q: 7, r: 3 },
     weather: 'fog',
     travelState: null,
+    fitVersion: HEX_FIT_VERSION,
 });
 
 // The exact envelope the save effect writes: every persisted slot of current
-// state, keyed exactly as mapsService.saveMapData receives it.
+// state, keyed exactly as mapsService.saveMapData receives it. The stamped doc
+// re-emits fitVersion verbatim through the CARRIED_DOC_KEYS passthrough
+// (deliberate edits never drop it — criterion of the fitVersion law).
 const savedSnapshot = (overrides = {}) => ({
     type: 'outdoor',
     displayName: 'Frostpeak Wilderness',
@@ -104,6 +109,7 @@ const savedSnapshot = (overrides = {}) => ({
     partyPosition: { q: 7, r: 3 },
     weather: 'fog',
     travelState: null,
+    fitVersion: HEX_FIT_VERSION,
     ...overrides,
 });
 
@@ -283,6 +289,7 @@ describe('useMapLoader - API & persistence', () => {
                 partyPosition: { q: 5, r: 2 },
                 weather: 'clear',
                 travelState: null,
+                fitVersion: HEX_FIT_VERSION,
             };
         };
 
@@ -335,6 +342,7 @@ describe('useMapLoader - API & persistence', () => {
                 partyPosition: { q: 5, r: 2 },
                 weather: 'clear',
                 travelState: null,
+                fitVersion: HEX_FIT_VERSION,
             });
         });
 
@@ -374,7 +382,11 @@ describe('useMapLoader - API & persistence', () => {
     // bytes, the flip-commit envelope the fully-settled ones, and the 1s
     // debounce folds every remaining mount leg into that same flush. The one
     // write carries the adopted defaults AND the view reset together, plus the
-    // generation stamp verbatim.
+    // generation stamp verbatim. FitVersion note (YG backlog 2026-11-16): in a
+    // VISIBLE browser the same single write would also carry the fitted view +
+    // the fresh fitVersion stamp — jsdom harnesses never mount the board's
+    // layout pass (§632), so the claim legs are pinned in
+    // useMapLoader.fit-stamp.test.js and HexMap.mount-fit.test.jsx instead.
     it('zero-edit open of an unsettled doc emits exactly ONE PUT with adopted defaults + view reset + stamp', async () => {
         mapsService.loadMapData.mockResolvedValue({
             type: 'outdoor',

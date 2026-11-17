@@ -26,6 +26,19 @@ export const VIEW_RESET_ZOOM = 2;
 // board.
 export const HEX_FIT_INSET_PX = 40;
 
+// Mount-fit stamp version persisted on the outdoor map document (YG backlog
+// 2026-11-16, owner Option B: the STORED VIEW IS CANONICAL). One canonical
+// shape, one branch: doc.fitVersion === HEX_FIT_VERSION → every mount applies
+// the stored zoom/panX/panY verbatim and never fits; a doc whose stamp is
+// absent or stale (stale-by-shape — no other leniency) gets exactly ONE
+// mount auto-fit whose write persists the fitted view together with this
+// constant, so every subsequent mount is byte-neutral. Deliberate pan/zoom
+// edits are the only other writer of the view and carry the stamp through the
+// hex envelope (useMapLoader.js CARRIED_DOC_KEYS). Bumping this constant
+// re-runs the stamping pass for every doc — migrate repo-owned map fixtures
+// (public/campaigns/**, test fixtures) in the same change.
+export const HEX_FIT_VERSION = 1;
+
 // Pixel bounds of the hexCols×hexRows grid (SVG user units).
 export function hexGridPixelBounds(hexCols, hexRows) {
     const xMin = -HEX_SIZE * Math.sqrt(3) / 2;

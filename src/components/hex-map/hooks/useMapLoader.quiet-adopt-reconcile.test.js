@@ -55,7 +55,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => {
 
 import * as mapsService from '../../../services/maps/mapsService.js';
 import * as runtimeModule from '../../../hooks/runtime/useRuntimeState.js';
-import { hexGridPixelBounds, clampHexPan } from '../../../services/maps/hexViewMath.js';
+import { hexGridPixelBounds, clampHexPan, HEX_FIT_VERSION } from '../../../services/maps/hexViewMath.js';
 
 const campaignStore = runtimeModule.__campaignStore;
 
@@ -69,9 +69,11 @@ const settleAutosave = async () => {
 
 const characters = [{ name: 'Thorin' }];
 
-// Fully-settled document (real-config grid 10): pan stored exactly where the
-// loader's settle-at-mount clamp puts it, so a quiet open compares byte-equal
-// against the dirty baseline and the ONLY writes these lanes observe are the
+// Fully-settled, FITTED document (real-config grid 10): pan stored exactly
+// where the loader's settle-at-mount clamp puts it and the fitVersion stamp
+// present (the settled shape the fitVersion law leaves behind — mounts then
+// apply the view verbatim), so a quiet open compares byte-equal against the
+// dirty baseline and the ONLY writes these lanes observe are the
 // travelState-reconcile ones under test.
 const SETTLED_PAN = clampHexPan(hexGridPixelBounds(20, 10), 10, 3, 40, 60);
 
@@ -90,6 +92,7 @@ const createMapData = (travelState) => ({
     partyPosition: { q: 7, r: 3 },
     weather: null,
     travelState,
+    fitVersion: HEX_FIT_VERSION,
 });
 
 // The STALE trip still on disk (trip A — the plan whose debounced PUT was

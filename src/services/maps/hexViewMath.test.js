@@ -9,7 +9,7 @@ import {
 } from '../../config/outdoorConfig.js';
 import {
     hexGridPixelBounds, clampHexPan, centerHexView, fitHexView,
-    HEX_FIT_INSET_PX, VIEW_RESET_ZOOM,
+    HEX_FIT_INSET_PX, HEX_FIT_VERSION, VIEW_RESET_ZOOM,
 } from './hexViewMath.js';
 
 // Owner fixture shape: poi-showcase (gridSize 8 → 16 cols × 8 rows).
@@ -34,6 +34,18 @@ function toScreenPx(svgX, svgY, { zoom, panX, panY }, elW, elH) {
 describe('HEX_FIT_INSET_PX', () => {
     it('is the deliberate 40 px per-edge inset the mount fit reserves', () => {
         expect(HEX_FIT_INSET_PX).toBe(40);
+    });
+});
+
+describe('HEX_FIT_VERSION', () => {
+    // The stamp is the ONE branch of the mount-fit law (YG backlog 2026-11-16):
+    // doc.fitVersion === HEX_FIT_VERSION → mount verbatim; anything else
+    // (absent reads as stale-by-shape) → one mount fit + restamp. Bumping this
+    // constant re-runs the stamping pass for every doc — the disk fixture
+    // (public/campaigns/test-campaign/maps/poi-showcase.json) and the settled
+    // hook fixtures must migrate in the same change.
+    it('is the version stamped into outdoor map docs by the mount-fit pass', () => {
+        expect(HEX_FIT_VERSION).toBe(1);
     });
 });
 

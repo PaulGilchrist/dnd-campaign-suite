@@ -176,6 +176,25 @@ describe('maps PUT outdoor — editor-scope differential', () => {
             expect(res.status).toBe(200);
         });
 
+        // fitVersion law (YG backlog 2026-11-16): the mount-fit stamp rides the
+        // VIEW lane, not the editor-scope set (outdoorEditorDelta reads only
+        // terrain/rivers/roads/pois/gridSize/draft). A stamped doc's party-travel
+        // PUT must neither 403 for carrying the stamp nor strip it on the
+        // whole-doc replace the route performs.
+        it('passes a view-lane PUT carrying fitVersion (no 403) and preserves the stamp on disk', async () => {
+            mockFsState.exists.add(MAPS_DIR);
+            mockFsState.files.set(HEX_FILE, JSON.stringify({ ...STORED_HEX, fitVersion: 1 }));
+            const res = await request(createTestApp())
+                .put('/api/campaigns/test-campaign/maps/north-reach')
+                .set('Host', FOREIGN_HOST)
+                .send(hexEnvelope({ panX: -40, panY: 12, zoom: 1.5, fitVersion: 1 }));
+
+            expect(res.status).toBe(200);
+            const saved = JSON.parse(mockFsState.files.get(HEX_FILE));
+            expect(saved.fitVersion).toBe(1);
+            expect(saved.panX).toBe(-40);
+        });
+
         it('keeps refusing indoor documents outright (control)', async () => {
             mockFsState.exists.add(MAPS_DIR);
             mockFsState.files.set(`${MAPS_DIR}/test-map.json`, JSON.stringify({ displayName: 'Test Map', type: 'indoor', players: [] }));

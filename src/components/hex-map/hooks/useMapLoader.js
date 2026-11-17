@@ -3,7 +3,7 @@ import { isEqual } from 'lodash';
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { buildMapLoadRejectedNotice } from '../../../services/maps/mapLoadNotice.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
-import { hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM } from '../../../services/maps/hexViewMath.js';
+import { hexGridPixelBounds, clampHexPan, centerHexView, VIEW_RESET_ZOOM, HEX_FIT_VERSION } from '../../../services/maps/hexViewMath.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
@@ -37,7 +37,7 @@ function buildHexEnvelope({ displayName, gridSize, terrain, rivers, roads, pois,
         partyPosition,
         weather,
         travelState,
-        // Generation-stamp passthrough VERBATIM (VG backlog 2026-11-12): `seed` and
+        // Doc-stamp passthrough VERBATIM (see CARRIED_DOC_KEYS): `seed` and
         // `generationOpts` are not board-editable fields — an envelope that dropped
         // them silently killed the Maps-manager Regenerate lane for every generated
         // map the board merely OPENED (mount-flush wiped the stamp, live-proved
@@ -50,10 +50,16 @@ function buildHexEnvelope({ displayName, gridSize, terrain, rivers, roads, pois,
 // The document keys carried through every board save untouched. Undefined values are
 // OMITTED (not stored as undefined) so baseline/save envelopes key-match the create/
 // rejected lanes' stamp-free shapes and lodash dirty-compare stays honest.
-const GENERATION_STAMP_KEYS = ['seed', 'generationOpts'];
-function pickGenerationStamp(existing) {
+//   • seed + generationOpts — generation stamp (VG backlog 2026-11-12).
+//   • fitVersion — the mount-fit stamp (YG backlog 2026-11-16): deliberate pan/zoom
+//     and party-travel writes must survive the whole-doc replace, so this envelope
+//     re-emits it like the generation keys. The load path carries the RAW stored
+//     value; the hex view pass overwrites it with HEX_FIT_VERSION exactly once, via
+//     claimMountFitStamp, when a stamp-less/stale doc's one-shot auto-fit lands.
+const CARRIED_DOC_KEYS = ['seed', 'generationOpts', 'fitVersion'];
+function pickCarriedDocKeys(existing) {
     const carried = {};
-    for (const key of GENERATION_STAMP_KEYS) {
+    for (const key of CARRIED_DOC_KEYS) {
         if (existing && existing[key] !== undefined) carried[key] = existing[key];
     }
     return carried;
@@ -111,7 +117,7 @@ function buildStoredEnvelope(existing) {
         partyPosition: existing.partyPosition,
         weather: existing.weather,
         travelState: existing.travelState,
-    }, pickGenerationStamp(existing));
+    }, pickCarriedDocKeys(existing));
 }
 
 // Weather (improve 2026-10-26-E budget-at-mount): a legacy file travelState
@@ -238,8 +244,13 @@ function applyExistingMap(existing, mapName, characters, ctx) {
 
     if (!existing.type) existing.type = 'outdoor';
     ctx.heldMapTypeRef.current = existing.type;
-    // Capture the doc's generation stamp for every save this session emits.
-    ctx.carriedStampRef.current = pickGenerationStamp(existing);
+    // Capture the doc's carried stamps for every save this session emits, and the
+    // raw fitVersion for the board's mount-fit decision (YG backlog 2026-11-16):
+    // HEX_FIT_VERSION → the view pass applies these bytes VERBATIM (no fit, no
+    // write); absent/stale → the pass fits once and claimMountFitStamp restamps
+    // this carried copy, so view + stamp land in the same single write.
+    ctx.carriedStampRef.current = pickCarriedDocKeys(existing);
+    ctx.setHeldFitVersion(existing.fitVersion ?? null);
 
     ctx.setMapData(existing);
     ctx.setGridSize(loadedGridSize);
@@ -338,8 +349,13 @@ function renderFreshMap(mapName, characters, ctx) {
     ctx.heldMapTypeRef.current = 'outdoor';
     ctx.resumedTripRef.current = false;
     // A fresh/rejected document carries no generation stamp — never resurrect the
-    // previous map's stamp into this session's saves.
+    // previous map's stamp into this session's saves. It is also UNSTAMPED for the
+    // fit law (heldFitVersion null = stale-by-shape): a visible board mount fits it
+    // and the create lane's follow-up write stamps it; the rejected render-only
+    // lane stays zero-write because the fit+stamp lands inside the normalization
+    // drift gate below (YG backlog 2026-11-16).
     ctx.carriedStampRef.current = {};
+    ctx.setHeldFitVersion(null);
     // Claim the held-bytes name before the loading flip so the #800 flush
     // commit passes the persistence name guard (see applyExistingMap). While
     // `loading` is still true the persistence effect skips every commit, so
@@ -410,15 +426,25 @@ function applyRejectedFreshMap(mapName, characters, ctx) {
     ctx.setLoading(false);
 }
 
-// True when `envelope` differs from `baseline` ONLY in the view slots
-// (zoom/panX/panY). Used by the rejected-load fallback gate: the fresh-map
-// needsResetViewRef centering pass rewrites exactly these bytes one commit
-// after the loading flip, and that normalization must not count as a user
-// edit dirtying a render-only document (backlog map-fresh-fallback-silent).
-function isViewOnlyDrift(envelope, baseline) {
+// True when `envelope` differs from `baseline` ONLY in the normalization slots:
+// the view (zoom/panX/panY) and the mount-fit stamp. Used by the rejected-load
+// fallback gate: the fresh document's centering/auto-fit pass rewrites exactly
+// these bytes one commit after the loading flip (and claimMountFitStamp stamps
+// them), and that normalization must not count as a user edit dirtying a
+// render-only document (backlog map-fresh-fallback-silent, fitVersion leg added
+// by YG backlog 2026-11-16). The slots are STRIPPED from both sides rather than
+// copied: lodash reads `{}` ≠ `{fitVersion: undefined}`, so an absent stored
+// stamp must still compare equal to a freshly claimed one here.
+function withoutNormalizationSlots(doc) {
+    const stripped = { ...doc };
+    for (const slot of ['zoom', 'panX', 'panY', 'fitVersion']) delete stripped[slot];
+    return stripped;
+}
+
+function isNormalizationDrift(envelope, baseline) {
     return isEqual(
-        { ...envelope, zoom: baseline.zoom, panX: baseline.panX, panY: baseline.panY },
-        baseline,
+        withoutNormalizationSlots(envelope),
+        withoutNormalizationSlots(baseline),
     );
 }
 
@@ -438,6 +464,17 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
     const [zoom, setZoom] = useState(MIN_ZOOM);
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
+    // Raw fitVersion of the document whose bytes this instance holds (null until a
+    // load claims one). The hex view pass fits ONLY when this differs from
+    // HEX_FIT_VERSION; a stamped board applies the stored view verbatim.
+    const [heldFitVersion, setHeldFitVersion] = useState(null);
+    // Envelope re-run signal for the claimed mount-fit stamp (travelSaveVersion
+    // precedent): a stamp-less doc that is ALREADY view-settled (the same-window
+    // re-open of one whose fitted bytes match) consumes its fit with byte-
+    // identical setters — React bails out without a render, and without this
+    // bump the claimed stamp would sit in the carried ref until some unrelated
+    // dep moved, silently never stamping the document.
+    const [fitSaveVersion, setFitSaveVersion] = useState(0);
 
     const isInitialized = useRef(false);
     const needsResetViewRef = useRef(false);
@@ -498,6 +535,18 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
         setTravelSaveVersion(prev => prev + 1);
     }, []);
 
+    // One-shot mount auto-fit witness (YG backlog 2026-11-16): HexMap's view pass
+    // calls this the instant a stamp-less/stale document's whole-board fit lands.
+    // From this moment every envelope this session writes restamps the carried copy
+    // with HEX_FIT_VERSION; the fit's own zoom/pan setters run in the same commit,
+    // so the debounced flush persists fitted view + stamp together — ONE write —
+    // and every subsequent mount compares byte-equal against the dirty baseline
+    // (zero PUTs). A stamped mount never fits and never calls this.
+    const claimMountFitStamp = useCallback(() => {
+        carriedStampRef.current = { ...carriedStampRef.current, fitVersion: HEX_FIT_VERSION };
+        setFitSaveVersion(prev => prev + 1);
+    }, []);
+
     const clearSaveTimer = () => {
         if (saveTimerRef.current) {
             clearTimeout(saveTimerRef.current);
@@ -537,7 +586,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
             campaignName,
             setMapData, setGridSize, setTerrain, setRivers, setRoads, setPois,
             setZoom, setPanX, setPanY, setWeather, setTravelInit,
-            setMarchingOrder, setPartyPosition, setLoading,
+            setMarchingOrder, setPartyPosition, setLoading, setHeldFitVersion,
             hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
             heldMapTypeRef,
             travelStateRef, lastSavedRef, resumedTripRef,
@@ -635,13 +684,15 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
         }, carriedStampRef.current);
         // Rejected-load fallback gate (backlog map-fresh-fallback-silent):
         // while armed, the fresh document is RENDER-ONLY until real intent.
-        // The needsResetViewRef centering pass (HexMap layout effect) rewrites
-        // zoom/pan one commit after the loading flip — that view-only drift is
-        // normalization, so adopt those bytes into the baseline instead of
-        // dirtying a document that must not exist on disk yet. Any non-view
-        // difference is the first real edit: disarm and persist normally.
+        // The needsResetViewRef centering pass (HexMap view-normalize layout
+        // effect) rewrites zoom/pan one commit after the loading flip — that
+        // view-only drift is normalization, so adopt those bytes into the
+        // baseline instead of dirtying a document that must not exist on disk
+        // yet. The mount-fit's claimed fitVersion rides the same normalization
+        // gate (fitVersion leg, YG backlog 2026-11-16). Any other difference is
+        // the first real edit: disarm and persist normally.
         if (awaitingFirstEditRef.current && lastSavedRef.current && !isEqual(dataToSave, lastSavedRef.current)) {
-            if (isViewOnlyDrift(dataToSave, lastSavedRef.current)) {
+            if (isNormalizationDrift(dataToSave, lastSavedRef.current)) {
                 lastSavedRef.current = dataToSave;
                 awaitingFirstEditRef.current = false;
                 pendingSaveRef.current = null;
@@ -666,7 +717,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
         pendingSaveRef.current = { campaignName, mapName, dataToSave };
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(flushSave, HEX_AUTOSAVE_DEBOUNCE_MS);
-    }, [campaignName, mapName, loading, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion, flushSave]);
+    }, [campaignName, mapName, loading, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion, fitSaveVersion, flushSave]);
 
     // Unmount / dep-change flush: a mutation inside the debounce window (GM
     // advances then immediately leaves the map) still lands — indoor lane's
@@ -691,6 +742,7 @@ function useMapLoader(campaignName, mapName, characters, onLoadRejected, mapDisp
         zoom, setZoom,
         panX, setPanX,
         panY, setPanY,
+        heldFitVersion, claimMountFitStamp,
         needsResetViewRef,
         hexMapNameRef,
         hexMapDisplayNameRef,
