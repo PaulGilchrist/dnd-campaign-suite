@@ -54,7 +54,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **Visitor initiative avatars are pointer-only (ZK 2026-11-17):** the uncontrolled monster/NPC `.npc-avatar` is a plain div with onClick (no role/tabKey/Enter) — the avatar-zoom feature is keyboard-unreachable on that surface and focus has nowhere to return to at close (lands body); GM header avatar proves the good shape (`[role=button]` + restore). Fix: `role="button" tabIndex={0}` + keydown Enter/Space on `CardAvatar`'s visitor branch. `initiative/CreatureCard.jsx`, `common/AvatarImage.jsx`.
 - **Avatar zoom overlay parks behind the sidebar (ZK 2026-11-17, minor, may be by-design):** `.avatar-modal-overlay` spans the content area (starts at x=180 — the sidebar stays fully clickable/live while the zoom is open), unlike the dimmed-viewport modal families; consistent on every consumer surface, so either document it or widen the layer to full viewport for a true "focus on the portrait" feel. `common/AvatarModal.css`.
 
 ## Blocked / Not Verified (fold-gate ledger)
