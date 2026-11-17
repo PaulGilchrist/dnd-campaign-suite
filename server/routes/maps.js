@@ -674,11 +674,25 @@ router.delete('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) 
 
   fs.unlinkSync(filePath);
 
-  // If this was the active map, clear it
+  // If this was the active map, clear it. Reconcile BOTH sources of truth:
+  // the in-memory activeMaps (written by /activate) AND the persisted '__map__'
+  // change-data key, which the GM row-Open force-stamp in MapContextSync writes
+  // WITHOUT ever touching activeMaps — otherwise deleting a merely-Opened map
+  // ghosts '__map__' on disk forever (replayed to every tab on SSE connect).
   const mapKey = fileName.replace(/\.json$/, '');
-  if (activeMaps.get(campaign) === mapKey) {
+  const wasActive = activeMaps.get(campaign) === mapKey;
+  const wasStamped = characterChangeData.get(campaign)?.__map__?.activeMapName === mapKey;
+  if (wasActive) {
     activeMaps.delete(campaign);
+  }
+  if (wasActive || wasStamped) {
     stampActiveMapContext(campaign, null);
+    // map-activate null face (twin of the /deactivate publish): every open tab
+    // disarms its activeMapName over SSE. Without it a GM tab that learned of a
+    // prior activation stays armed on the deleted file and its MapContextSync
+    // force-stamp can resurrect the ghost '__map__' on the next transition
+    // (resurrection vector named in App.jsx handleMapActivateEvent).
+    publish(`map-activate-${campaign}`, { activeMap: null }, campaign);
   }
 
   // Broadcast maps list change
@@ -730,11 +744,16 @@ router.put('/api/campaigns/:campaign/maps/:mapname/rename', asyncHandler((req, r
     fs.unlinkSync(oldFilePath);
   }
 
-  // Update active map in memory if this was the active map
+  // Update active map in memory if this was the active map (same dual-source
+  // reconcile as the DELETE route: the persisted '__map__' key may carry the
+  // old slug from a MapContextSync Open force-stamp even when activeMaps
+  // never learned about it — without this the rename ghosts the old slug).
   const oldKey = oldFileName.replace(/\.json$/, '');
   const newKey = newFileName.replace(/\.json$/, '');
   if (activeMaps.get(campaign) === oldKey) {
     activeMaps.set(campaign, newKey);
+    stampActiveMapContext(campaign, newKey);
+  } else if (characterChangeData.get(campaign)?.__map__?.activeMapName === oldKey) {
     stampActiveMapContext(campaign, newKey);
   }
 
