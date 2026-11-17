@@ -143,6 +143,21 @@ describe('PartyInventory row-scoped accessible names', () => {
     }
   });
 
+  // Backlog 2026-11-17 CE: the four Give chips were the last CurrencyCard buttons still
+  // relying on title alone, so their accessible name was a bare "Give" ×4. They now
+  // mirror their titles like every sibling chip (dc1bf7b29 idiom).
+  it('Give chips mirror their titles as accessible names (no bare "Give" ×4)', async () => {
+    await renderReady();
+    for (const coin of ['Platinum', 'Gold', 'Silver', 'Copper']) {
+      const copy = `Give ${coin} to a player`;
+      const give = screen.getByRole('button', { name: copy, exact: true });
+      expect(give).toHaveAttribute('aria-label', copy);
+      expect(give).toHaveAttribute('title', copy);
+    }
+    // Distinct names per coin: the bare "Give" name no longer resolves anywhere.
+    expect(screen.queryAllByRole('button', { name: 'Give', exact: true })).toHaveLength(0);
+  });
+
   it('the Move-to-Player modal stepper is labelled with its item name too', async () => {
     await renderReady();
     const row = screen.getByText('Goblin Idol').closest('tr');

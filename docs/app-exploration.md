@@ -57,8 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(CE 2026-11-17) Give chips lack the aria-label their sibling chips got:** dc1bf7b29 armed every currency stepper/chip with intent aria (`Add 1 cp`, `Increase quantity of X`) but the four `Give` buttons still rely on `title="Give <Coin> to a player"` only — accessible name is the bare "Give" ×4, the exact ambiguity that commit set out to kill. `PartyInventory.jsx` CurrencyCard: mirror title→aria-label on the Give chip (same idiom).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried; sole surviving original PT, promoted to #1).

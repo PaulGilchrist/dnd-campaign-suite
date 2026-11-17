@@ -219,10 +219,14 @@ function CurrencyCard({ currency, onAdjust, onGiveOpen, disabled, isLocalhost, i
                 </button>
               </span>
             ))}
+            {/* Same title→aria mirror as the amount chips above (backlog 2026-11-17 CE):
+                without it the accessible name is the bare "Give" ×4 — identical across
+                the coin rows, the exact ambiguity dc1bf7b29 set out to kill. */}
             <button
               type="button"
               className="ct-btn pi-give-btn"
               title={`Give ${label} to a player`}
+              aria-label={`Give ${label} to a player`}
               disabled={disabled || currency[key] <= 0}
               onClick={onGiveOpen}
             >
