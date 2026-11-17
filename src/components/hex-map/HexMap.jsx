@@ -8,7 +8,7 @@ import {
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { hexKey, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
-import { VIEW_RESET_ZOOM } from '../../services/maps/hexViewMath.js';
+import { VIEW_RESET_ZOOM, HEX_FIT_INSET_PX, fitHexView } from '../../services/maps/hexViewMath.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
@@ -145,8 +145,62 @@ const AWAITING_DESTINATION_TOAST_MESSAGE = 'Select a destination hex on the map'
 const travelAwaitingDestination = (panelOpen, travelMode, destination) =>
     panelOpen && travelMode === 'planning' && !destination;
 
+// Mount auto-fit branch of the view-normalize layout pass (XF backlog
+// 2026-11-16): while the one-shot fit is armed and the svg has real pixel
+// dimensions, settle zoom/pan to the WHOLE-BOARD fit (hexViewMath.fitHexView,
+// HEX_FIT_INSET_PX free on every edge so no POI hit-rect parks at the
+// toolbar/viewport boundary) and consume both one-shot flags — returning true
+// so the legacy centering/clamp passes skip this commit. Armed once per mount
+// and re-armed only when the loader re-enters loading (map switch), so a fit
+// never follows pan/zoom interactions. Never fits against fake dimensions
+// (hidden mount / jsdom harness). Hoisted out of HexMap's body per the
+// rejectedNoticeName max-statements precedent.
+function consumeMountFit({
+    loading, svgRef, hexCols, hexRows, autoFitArmedRef, needsResetViewRef,
+    setZoom, setPanX, setPanY,
+}) {
+    if (loading) { autoFitArmedRef.current = true; return false; }
+    if (!autoFitArmedRef.current || !svgRef.current) return false;
+    const rect = svgRef.current.getBoundingClientRect();
+    if (rect.width <= 2 * HEX_FIT_INSET_PX || rect.height <= 2 * HEX_FIT_INSET_PX) return false;
+    autoFitArmedRef.current = false;
+    needsResetViewRef.current = false;
+    const fit = fitHexView(hexCols, hexRows, rect.width, rect.height);
+    setZoom(fit.zoom);
+    setPanX(fit.panX);
+    setPanY(fit.panY);
+    return true;
+}
+
+// The one view-normalize layout pass (was inline in HexMap's body; hoisted per
+// the rejectedNoticeName max-statements precedent): mount auto-fit first, then
+// the legacy one-shot centering reset, then the per-commit pan clamp.
+function applyHexViewPass({
+    loading, svgRef, hexCols, hexRows, zoom, panX, panY,
+    autoFitArmedRef, needsResetViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
+}) {
+    if (consumeMountFit({
+        loading, svgRef, hexCols, hexRows, autoFitArmedRef, needsResetViewRef,
+        setZoom, setPanX, setPanY,
+    })) return;
+    if (needsResetViewRef.current) {
+        needsResetViewRef.current = false;
+        const clamped = centerView(VIEW_RESET_ZOOM);
+        setZoom(VIEW_RESET_ZOOM);
+        setPanX(clamped.x);
+        setPanY(clamped.y);
+        return;
+    }
+    const clamped = clampPan(zoom, panX, panY);
+    if (clamped.x !== panX) setPanX(clamped.x);
+    if (clamped.y !== panY) setPanY(clamped.y);
+}
+
 function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered, parentDisplayName, mapDisplayName }) {
-    const svgRef = useRef(null);
+    // svgRef: the viewBox coordinate transforms; autoFitArmedRef: the mount
+    // auto-fit one-shot (consumeMountFit below) — one statement to keep HexMap
+    // inside its max-statements ceiling.
+    const svgRef = useRef(null), autoFitArmedRef = useRef(true);
 
     // ── Display-only map toast (arrival + POI-enter refusal + rejected-load
     // notice share one slot) ──
@@ -466,19 +520,16 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
     }, [campaignName, handleMapDataEvent]);
 
     // ── View reset on grid size change ──
+    // Mount auto-fit (XF backlog 2026-11-16): whole-board fit with edge insets,
+    // ONE time per board-open — see consumeMountFit/applyHexViewPass. Re-armed
+    // only while the loader is loading (map switch), never by pan/zoom
+    // interactions.
     useLayoutEffect(() => {
-        if (needsResetViewRef.current) {
-            needsResetViewRef.current = false;
-            const clamped = centerView(VIEW_RESET_ZOOM);
-            setZoom(VIEW_RESET_ZOOM);
-            setPanX(clamped.x);
-            setPanY(clamped.y);
-            return;
-        }
-        const clamped = clampPan(zoom, panX, panY);
-        if (clamped.x !== panX) setPanX(clamped.x);
-        if (clamped.y !== panY) setPanY(clamped.y);
-    }, [zoom, gridSize, clampPan, centerView, setZoom, setPanX, setPanY, panX, panY, needsResetViewRef]);
+        applyHexViewPass({
+            loading, svgRef, hexCols, hexRows, zoom, panX, panY,
+            autoFitArmedRef, needsResetViewRef, clampPan, centerView, setZoom, setPanX, setPanY,
+        });
+    }, [loading, zoom, panX, panY, gridSize, hexCols, hexRows, clampPan, centerView, setZoom, setPanX, setPanY, needsResetViewRef]);
 
     const viewPortBounds = useMemo(() => ({
         left: panX, top: panY,

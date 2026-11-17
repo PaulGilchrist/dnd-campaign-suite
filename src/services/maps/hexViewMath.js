@@ -10,12 +10,21 @@
 //
 // Arithmetic order mirrors the original component code token-for-token so
 // results stay bit-identical with previously persisted pan values.
-import { HEX_SIZE } from '../../config/outdoorConfig.js';
+import { HEX_SIZE, MIN_ZOOM, MAX_ZOOM } from '../../config/outdoorConfig.js';
 
 // Zoom level every view-reset pass targets (the old literal `centerView(2)` in
 // HexMap's needsResetViewRef layout effect and useZoomPan's resetView). Kept
 // as ONE constant so loader and renderer can never drift apart.
 export const VIEW_RESET_ZOOM = 2;
+
+// Pixel inset the mount auto-fit keeps between the board extent and EVERY
+// viewport edge (XF backlog 2026-11-16: at the old floor the fit could park
+// top-row POI hit-rects at/beyond the toolbar edge — ~36 px slivers Playwright
+// trusted clicks refuse as "element is outside of the viewport"). 40 px clears
+// the full 36 SVG-unit hit-rect plus its label at any realistic fit scale.
+// The inset SHRINKS the usable viewport for the fit math; it never crops the
+// board.
+export const HEX_FIT_INSET_PX = 40;
 
 // Pixel bounds of the hexCols×hexRows grid (SVG user units).
 export function hexGridPixelBounds(hexCols, hexRows) {
@@ -54,9 +63,15 @@ export function clampHexPan(bounds, hexRows, pz, px, py) {
     const minPanY = gridTop;
     const maxPanY = gridBottom - viewH;
 
+    // Inverted bracket (max < min): the whole grid span already fits inside the
+    // viewport (the mount auto-fit's zoom lives here — XF backlog 2026-11-16).
+    // No saturated pan exists, so the old min-of-max used to STICK the view at
+    // the right/bottom edge and park left/top-row POIs off-screen. Center the
+    // board instead, via the exact `centerHexView` expression (centerX − view/2)
+    // so loader-settle and layout-fit bytes stay bit-identical.
     return {
-        x: Math.min(maxPanX, Math.max(minPanX, px)),
-        y: Math.min(maxPanY, Math.max(minPanY, py)),
+        x: maxPanX < minPanX ? bounds.centerX - viewW / 2 : Math.min(maxPanX, Math.max(minPanX, px)),
+        y: maxPanY < minPanY ? bounds.centerY - viewH / 2 : Math.min(maxPanY, Math.max(minPanY, py)),
     };
 }
 
@@ -68,4 +83,28 @@ export function centerHexView(hexCols, hexRows, targetZoom) {
     const cx = bounds.centerX - vw / 2;
     const cy = bounds.centerY - vh / 2;
     return clampHexPan(bounds, hexRows, targetZoom, cx, cy);
+}
+
+// Whole-board auto-fit for a viewport of `viewportWidth × viewportHeight` CSS
+// px (the mounted <svg>'s bounding rect), keeping `insetPx` free on every edge
+// so no POI hit-rect is ever parked at the viewport/toolbar boundary.
+//
+// Geometry: the renderer's viewBox is `bounds/zoom` with the default
+// preserveAspectRatio=meet, so at zoom z the board occupies exactly
+// `z × boardWidthAtZoom1` px on each axis, where boardWidthAtZoom1 is the
+// board extent projected into the viewport at zoom 1 (the constrained axis
+// touches the edge, the other letterboxes). Solving
+// z × widthAtZoom1 ≤ usable on BOTH axes gives the largest fit zoom; the pan
+// then centers the board in the viewport (the inset only shrinks the usable
+// viewport — the board itself is never cropped).
+export function fitHexView(hexCols, hexRows, viewportWidth, viewportHeight, insetPx = HEX_FIT_INSET_PX) {
+    const bounds = hexGridPixelBounds(hexCols, hexRows);
+    const usableW = Math.max(1, viewportWidth - 2 * insetPx);
+    const usableH = Math.max(1, viewportHeight - 2 * insetPx);
+    const boardWidthAtZoom1 = Math.min(viewportWidth, bounds.width * viewportHeight / bounds.height);
+    const boardHeightAtZoom1 = Math.min(viewportHeight, bounds.height * viewportWidth / bounds.width);
+    const fitZoom = Math.min(usableW / boardWidthAtZoom1, usableH / boardHeightAtZoom1);
+    const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fitZoom));
+    const pan = centerHexView(hexCols, hexRows, zoom);
+    return { zoom, panX: pan.x, panY: pan.y };
 }

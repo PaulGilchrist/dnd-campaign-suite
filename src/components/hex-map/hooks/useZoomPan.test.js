@@ -4,6 +4,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useState } from 'react';
 import useZoomPan from './useZoomPan.js';
 import { HEX_SIZE, MIN_ZOOM, MAX_ZOOM } from '../../../config/outdoorConfig.js';
+import { VIEW_RESET_ZOOM } from '../../../services/maps/hexViewMath.js';
 
 // Zoom contract (product constants, pinned here deliberately — they are the
 // behavior under test, not implementation details): toolbar buttons step the
@@ -165,11 +166,14 @@ describe('useZoomPan', () => {
         expect(hostRef.zoom).toBe(MIN_ZOOM);
 
         // resetView returns to the default zoom, grid centered.
-        // Golden: clamped centered pan for a 10x10 grid at the default zoom —
-        // at MIN_ZOOM the horizontal center saturates at the right edge.
+        // Golden: clamped centered pan for a 10x10 grid at VIEW_RESET_ZOOM —
+        // the horizontal bracket is INVERTED there (the whole grid span fits
+        // the view), so the board centers; the old min-of-max saturated at the
+        // right edge, which is what parked top/left POIs off-screen (mount-fit
+        // improve 2026-11-16).
         act(() => { result.current.resetView(); });
-        expect(hostRef.zoom).toBe(MIN_ZOOM);
-        expect(hostRef.panX).toBeCloseTo(116.9134, 3);
+        expect(hostRef.zoom).toBe(VIEW_RESET_ZOOM);
+        expect(hostRef.panX).toBeCloseTo(162.3798, 3);
         expect(hostRef.panY).toBeCloseTo(86.25, 3);
     });
 
@@ -251,8 +255,10 @@ describe('useZoomPan', () => {
             act(() => { result.current.handleWheel(wheelEvent(15)); });
             expect(hostRef.zoom).toBeCloseTo(3 * WHEEL_STEP ** 3 * WHEEL_ZOOM_OUT_STEP, 10);
 
-            // Repeated large out-gestures saturate at MIN_ZOOM (real config value).
-            for (let i = 0; i < 15; i++) {
+            // Repeated large out-gestures saturate at MIN_ZOOM (real config
+            // value — 0.25 since the mount-fit floor drop, so ~59 steps of
+            // ×0.95 from the current zoom are needed to bottom out).
+            for (let i = 0; i < 60; i++) {
                 act(() => { result.current.handleWheel(wheelEvent(500)); });
             }
             expect(hostRef.zoom).toBe(MIN_ZOOM);

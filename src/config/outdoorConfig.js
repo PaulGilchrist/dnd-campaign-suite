@@ -50,6 +50,12 @@ export const TOOL_PAN = 'pan';
 export const TOOL_ROAD = 'road';
 export const TOOL_TRAVEL = 'travel';
 
-// Zoom limits
-export const MIN_ZOOM = 2;
+// Zoom limits. The floor sits BELOW the old 2 because the mount auto-fit
+// (hexViewMath.fitHexView) must be able to show the whole board extent inside
+// the viewport with its edge inset — with the viewBox-as-crop model the board
+// fills the viewport at zoom 1, so any inset needs zoom < 1 (the indoor lane's
+// mapConfig uses the same 0.25 floor). A persisted sub-floor zoom would also
+// bounce off normalizeExistingView's MIN_ZOOM clamp and re-dirty the document
+// on every open.
+export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 8;
