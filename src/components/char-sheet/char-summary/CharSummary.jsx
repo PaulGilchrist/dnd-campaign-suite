@@ -517,6 +517,12 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [displayXp, setDisplayXp] = React.useState(playerStats?.xp ?? 0);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const [showAvatarModal, setShowAvatarModal] = React.useState(false);
+    // Zoom state is per-sheet: a character switch must never carry an armed (or
+    // open) avatar zoom onto the next character's sheet — the component keeps
+    // its local state across sidebar switches.
+    React.useEffect(() => {
+        setShowAvatarModal(false);
+    }, [playerStats.name]);
     const [showAllyModal, setShowAllyModal] = React.useState(false);
     const [allyModalCreatures, setAllyModalCreatures] = React.useState([]);
     const storedAllies = useRuntimeValue(playerStats.name, 'selectedAllies', campaignName);
@@ -676,7 +682,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     return (
         <div>
              <div className='char-header'>
-                 <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} campaignName={campaignName} size={60} onClick={() => setShowAvatarModal(true)} />
+                 <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} campaignName={campaignName} size={60} onClick={playerStats.imagePath ? () => setShowAvatarModal(true) : undefined} />
                 <div className='char-header-text'>
                     <div className='name-row'>
                         <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;

@@ -26,3 +26,47 @@ Cheapest: pass `onClick={playerStats.imagePath ? () => setShowAvatarModal(true) 
 
 ## Severity
 Minor UX issue — no data is touched and the popup is dismissable, but a spontaneous full-viewport modal when switching characters is a genuine UI-state-integrity face and the image-less avatar is a dead button until it fires.
+
+## Resolution (fix run, 2026-11-17)
+
+**Status: FIXED.** The diagnosis in this file was confirmed exactly against the live code.
+
+### What was actually wrong
+As guessed: `CharSummary.jsx` passed `onClick={() => setShowAvatarModal(true)}` to `AvatarImage`
+unconditionally, so image-less avatars advertised `role=button tabIndex=0` (via AvatarImage's own
+tier) yet the modal render is double-guarded `showAvatarModal && playerStats.imagePath` — the press
+armed the flag with zero visible effect, and nothing cleared it on character change (CharSummary
+keeps its local state across sidebar switches), so the next image-bearing sheet self-opened the
+full-viewport zoom.
+
+### Fix (both suggested layers applied — each closes a distinct leak)
+`src/components/char-sheet/char-summary/CharSummary.jsx`:
+1. Gated the button tier: `onClick={playerStats.imagePath ? () => setShowAvatarModal(true) : undefined}`
+   (~line 685) — mirrors the established conditional-tier idiom already used by the sibling consumers
+   `NPCFormModal.jsx:151` and `MonsterCardBody.jsx:205` (`avatarPath ? … : undefined`). An image-less
+   disc now renders no button tier and arms nothing.
+2. Added a `React.useEffect` resetting `showAvatarModal` when `playerStats.name` changes (~line 520) —
+   closes the residual leak the onClick gate alone can't: opening a zoom and switching characters
+   (e.g. via keyboard Tab to the sidebar behind the scrim) used to leave the flag armed on hide.
+
+No server, rules, or dual-ruleset surface touched (shared component; 5e and 2024 sheets ride the same file).
+
+### Verification
+- **Live repro pre-fix (:5173, HEAD unchanged):** AasimarTest avatar `role=button tabindex=0` → Enter →
+  zero overlay (armed) → ElderPaladin switch → `.avatar-modal-overlay` self-opened on
+  `images/ElderPaladin.png` (naturalWidth 494). Exact bug-file face reproduced.
+- **Live re-verify post-fix:** AasimarTest avatar now `role=null tabindex=null focusable=false`; Enter
+  press leaves overlay closed; A→E switch stays closed (zero self-open).
+- **Adjacent sanity:** ElderPaladin avatar keeps `role=button tabindex=0`; Enter opens the zoom
+  (naturalWidth 494); Escape closes with focus restored to `avatar-wrapper`; A→E round trip after
+  dismiss stays closed. Console: 0 errors.
+- **New regression test:** `src/components/char-sheet/char-summary/CharSummary-AvatarZoomArming.test.jsx`
+  (3 tests: no-tier/arms-nothing on image-less, tier+zoom on image-bearing, open zoom never survives a
+  same-instance character switch to the next image-bearing sheet). Red/green proven: against the
+  pre-fix code 2/3 fail (both broken faces), post-fix 3/3 pass.
+- **Folder runs:** `src/components/char-sheet/char-summary/` 55 files / 699 tests pass;
+  `src/components/common/` 68 files / 710 tests pass. `npm run lint` clean (zero warnings).
+- **Exit hygiene (test-campaign):** tab closed, closed-tab two-pass headless admin clears —
+  change-data `{}`, log `[]`; `AasimarTest.json` md5 `3bfe7eca…` and `ElderPaladin.json` md5 `6e4341e4…`
+  byte-exact to the AB baseline pins (opened read-only).
+
