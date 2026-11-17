@@ -1,6 +1,7 @@
 import React from 'react';
 import { loadMonsters } from '../../../services/ui/dataLoader.js';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 import './PolymorphSelectionModal.css';
 
 function parseChallengeRating(crString) {
@@ -113,10 +114,10 @@ function resolveEffectiveMaxCR(playerStats, maxCR) {
     return getClassFeatures(playerStats)?.maxWildShapeChallengeRating || 0;
 }
 
-function LoadingView({ icon, title }) {
+function LoadingView({ icon, title, rootRef }) {
     return (
-        <div className="sp-overlay sp-overlay--evasion">
-            <div className="sp-modal">
+        <div className="sp-overlay sp-overlay--evasion" ref={rootRef}>
+            <div className="sp-modal" role="dialog" aria-modal="true" aria-label={title}>
                 <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                 <div className="sp-body"><p>Loading available creatures...</p></div>
             </div>
@@ -124,10 +125,10 @@ function LoadingView({ icon, title }) {
     );
 }
 
-function ErrorView({ icon, title, error, onCancel }) {
+function ErrorView({ icon, title, error, onCancel, rootRef }) {
     return (
-        <div className="sp-overlay sp-overlay--evasion">
-            <div className="sp-modal">
+        <div className="sp-overlay sp-overlay--evasion" ref={rootRef}>
+            <div className="sp-modal" role="dialog" aria-modal="true" aria-label={title}>
                 <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                 <div className="sp-body"><p className="sp-note">{error}</p></div>
                 <div className="sp-actions">
@@ -138,15 +139,31 @@ function ErrorView({ icon, title, error, onCancel }) {
     );
 }
 
+// Keyboard parity on every row (backlog 2026-11-17 focus entrance): activation
+// semantics are UNCHANGED — Enter/Space route to the exact same onSelect the
+// click fires (arm the row, never confirm), and Space's native scroll is
+// preventDefault'ed like a real button. role=option + aria-selected mirrors
+// the visible .selected arm.
 function BeastRow({ beast, isSelected, wildShapeLimitations, onSelect }) {
     const cr = parseChallengeRating(beast.challenge_rating);
     const beastSpeeds = filterBeastSpeeds(beast.speed, wildShapeLimitations);
     const imageUrl = `https://paulgilchrist.github.io/dnd-tools/images/${beast.index}.jpg`;
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect(beast);
+        }
+    };
+
     return (
         <div
             className={`wild-shape-beast-item ${isSelected ? 'selected' : ''}`}
+            role="option"
+            aria-selected={isSelected}
+            tabIndex={0}
             onClick={() => onSelect(beast)}
+            onKeyDown={handleKeyDown}
         >
             <div className="wild-shape-beast-avatar">
                 <img
@@ -178,6 +195,14 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
     const [searchTerm, setSearchTerm] = React.useState('');
+
+    // Focus entrance/restore tier (backlog 2026-11-17): the overlay ref anchors
+    // useOverlayEntranceFocus (first-focusable pull on open + pre-open
+    // anchor/fallback restore on close, mirroring the Add/Give role=dialog
+    // choosers and the useMenuRoving idiom). Escape stays on the document-level
+    // listener below — it never needed focus inside the panel.
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef, !loading);
 
     const wildShapeLimitations = resolveWildShapeLimitations(playerStats);
     const effectiveMaxCR = resolveEffectiveMaxCR(playerStats, maxCR);
@@ -216,6 +241,20 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
         }
     };
 
+    // Arrow rove across the option rows (useMenuRoving's focusMenuRow tier:
+    // rows re-queried per key so a live search filters the walk, wrap at both
+    // ends, ArrowUp from the top lands on the bottom). Tab already walks the
+    // tabIndex=0 rows natively; Enter/Space activation lives on BeastRow.
+    const handleListKeyDown = (e) => {
+        const delta = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+        if (!delta) return;
+        const rows = Array.from(e.currentTarget.querySelectorAll('.wild-shape-beast-item'));
+        const idx = rows.indexOf(document.activeElement);
+        if (idx === -1) return;
+        e.preventDefault(); // arrows scroll the list natively
+        rows[(idx + delta + rows.length) % rows.length].focus();
+    };
+
     React.useEffect(() => {
         const handleKey = (e) => { if (e.key === 'Escape') onCancel() };
         document.addEventListener('keydown', handleKey);
@@ -223,18 +262,25 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
     }, [onCancel]);
 
     if (loading) {
-        return <LoadingView icon={icon} title={title} />;
+        return <LoadingView icon={icon} title={title} rootRef={overlayRef} />;
     }
 
     if (error) {
-        return <ErrorView icon={icon} title={title} error={error} onCancel={onCancel} />;
+        return <ErrorView icon={icon} title={title} error={error} onCancel={onCancel} rootRef={overlayRef} />;
     }
 
     const { listLabel, searchPlaceholder, noResultsMsg } = computeListCopy({ allowAnyCreature, mode, effectiveMaxCR, wildShapeLimitations });
 
+    // The listbox role pairs with BeastRow's role=option; it is only stamped
+    // while options exist (an aria-required-children clean face — the
+    // no-results <p> renders in a plain list container).
+    const listProps = filteredBeasts.length > 0
+        ? { role: 'listbox', 'aria-label': listLabel, onKeyDown: handleListKeyDown }
+        : {};
+
     return (
-        <div className="sp-overlay sp-overlay--evasion">
-            <div className="sp-modal">
+        <div className="sp-overlay sp-overlay--evasion" ref={overlayRef}>
+            <div className="sp-modal" role="dialog" aria-modal="true" aria-label={title}>
                 <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                 <div className="sp-body">
                     <p>{listLabel}</p>
@@ -256,7 +302,7 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="wild-shape-list">
+                    <div className="wild-shape-list" {...listProps}>
                         {filteredBeasts.length === 0 ? (
                             <p className="sp-note">{noResultsMsg}</p>
                         ) : (

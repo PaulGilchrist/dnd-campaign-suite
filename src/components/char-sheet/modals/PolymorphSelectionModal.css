@@ -19,6 +19,14 @@
     border-color: var(--color-link);
 }
 
+/* Keyboard parity (backlog 2026-11-17 focus entrance): rows are now
+   tabIndex=0 options, so the visible focus ring rides the same hover/selected
+   border language rather than the default UA outline on the dark panel. */
+.wild-shape-beast-item:focus-visible {
+    outline: 2px solid var(--color-link);
+    outline-offset: 1px;
+}
+
 .wild-shape-beast-item.selected {
     background: rgba(255, 255, 255, 0.15);
     border-color: var(--color-link);

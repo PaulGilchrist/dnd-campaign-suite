@@ -1,0 +1,117 @@
+// @maintained-by-ai
+// Unit tier for useOverlayEntranceFocus (backlog 2026-11-17: sp-overlay choosers
+// left document.activeElement on BODY while open). Locks the composed house
+// idioms: DeleteConfirmModal first-focusable entrance pull (disabled skipped,
+// focus already inside never fought), useMenuRoving open-capture/close-restore
+// (usable anchor wins, otherwise the tabindex="-1"-stamped parent fallback),
+// and the deferred restore check so a surface that pulled focus while closing
+// is never fought. Shape mirrors the app lane: a persistent .sheet parent that
+// keeps living while closing UNMOUNTS the chooser child entirely (the state-
+// flip close where CharSheet stops rendering renderPopup's output).
+import React, { useRef } from 'react';
+import { describe, it, expect } from 'vitest';
+import { render, act } from '@testing-library/react';
+import { useOverlayEntranceFocus } from './useOverlayEntranceFocus.js';
+
+function ChooserHost({ ready = true, withFocusables = true }) {
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef, ready);
+    return (
+        <div className="sp-overlay" ref={overlayRef}>
+            {withFocusables ? (
+                <>
+                    <button disabled>Disabled first</button>
+                    <input aria-label="first" />
+                    <input aria-label="second" />
+                </>
+            ) : (
+                <p>Loading available creatures...</p>
+            )}
+        </div>
+    );
+}
+
+function Sheet({ open = true, ...chooserProps }) {
+    return (
+        <div className="sheet">
+            <p>sheet content stays mounted</p>
+            {open ? <ChooserHost {...chooserProps} /> : null}
+        </div>
+    );
+}
+
+// Settle past the microtask restore and React's concurrent close work
+// (benign test-only timer).
+const flush = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+// Every test starts from a known focus state (jsdom can keep a detached
+// element as activeElement across RTL's auto-cleanup).
+const clearFocus = () => document.activeElement?.blur();
+
+describe('useOverlayEntranceFocus', () => {
+    it('pulls the first focusable, non-disabled element on open (BODY entrance closed)', () => {
+        clearFocus();
+        const { getByLabelText } = render(<Sheet />);
+        // The disabled button sorts first in DOM order and must be skipped.
+        expect(document.activeElement).toBe(getByLabelText('first'));
+    });
+
+    it('does not grab while not ready, then grabs when ready flips', async () => {
+        clearFocus();
+        const { getByLabelText, rerender } = render(<Sheet ready={false} />);
+        clearFocus();
+        await flush();
+        expect(document.activeElement).toBe(document.body);
+        rerender(<Sheet ready={true} />);
+        expect(document.activeElement).toBe(getByLabelText('first'));
+    });
+
+    it('never fights focus already inside the overlay', () => {
+        clearFocus();
+        const { getByLabelText, rerender } = render(<Sheet ready={false} />);
+        getByLabelText('second').focus();
+        rerender(<Sheet ready={true} />);
+        // Entrance would have picked 'first'; the already-inside 'second' wins.
+        expect(document.activeElement).toBe(getByLabelText('second'));
+    });
+
+    it('no-ops without focusables (loading face) instead of throwing', async () => {
+        clearFocus();
+        render(<Sheet withFocusables={false} />);
+        await flush();
+        expect(document.activeElement).toBe(document.body);
+    });
+
+    it('restores to the usable pre-open anchor on close', async () => {
+        clearFocus();
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+        const { rerender } = render(<Sheet />);
+        expect(document.activeElement.tagName).toBe('INPUT'); // entrance pulled inside
+        rerender(<Sheet open={false} />);
+        await flush();
+        expect(document.activeElement).toBe(opener);
+    });
+
+    it('falls back to the tabindex-stamped parent sheet when no anchor exists (pointer open)', async () => {
+        clearFocus(); // pointer open: focus lives on BODY
+        const { container, rerender } = render(<Sheet />);
+        const sheet = container.querySelector('.sheet');
+        expect(sheet.getAttribute('tabindex')).toBe('-1');
+        rerender(<Sheet open={false} />);
+        await flush();
+        expect(document.activeElement).toBe(sheet);
+    });
+
+    it('never fights a surface that pulled focus on close', async () => {
+        clearFocus();
+        const { rerender } = render(<Sheet />);
+        const popupBtn = document.createElement('button');
+        document.body.appendChild(popupBtn);
+        popupBtn.focus();
+        rerender(<Sheet open={false} />);
+        await flush();
+        expect(document.activeElement).toBe(popupBtn);
+    });
+});
