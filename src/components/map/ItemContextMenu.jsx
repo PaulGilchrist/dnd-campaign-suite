@@ -25,6 +25,8 @@ function isRotationInvariant(item) {
     return !itemSpriteHref(item.type);
 }
 
+const MENU_WIDTH = 120;
+
 function menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption) {
     let height;
     if (isDoor) height = 116;
@@ -40,34 +42,43 @@ function rotateOffsetFor(showViewStats, showRenameOption, isDoor) {
     return 64;
 }
 
-function buildMenuModel(item, monsterFound, menuY) {
+// Entry flags + panel height are needed BEFORE the origin is placed (the
+// viewport clamp reads the height), while the row offsets need the (clamped)
+// origin — so the model splits into these two pure steps.
+function menuFlagsFor(item, monsterFound) {
     const isNpc = item && item.type === 'npc';
     const isDoor = item && item.type === 'door';
     const showRenameOption = isNpc;
     const showViewStats = isNpc && monsterFound;
     const showRotateOption = !isRotationInvariant(item);
+    return {
+        isDoor,
+        showRenameOption,
+        showViewStats,
+        showRotateOption,
+        height: menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption),
+    };
+}
 
-    const effectiveHeight = menuHeightFor(isNpc, isDoor, showViewStats, showRotateOption);
-    const yRotate = rotateOffsetFor(showViewStats, showRenameOption, isDoor);
-
+function menuEntriesFor(flags, item, menuY) {
+    const yRotate = rotateOffsetFor(flags.showViewStats, flags.showRenameOption, flags.isDoor);
     const entries = [
         { id: 'visibility', y: menuY + 20, label: item?.visible !== false ? 'Hide' : 'Show' },
         { id: 'delete', y: menuY + 42, label: 'Delete' },
     ];
-    if (isDoor) {
+    if (flags.isDoor) {
         entries.push({ id: 'door', y: menuY + 64, label: item?.open ? 'Close Door' : 'Open Door' });
     }
-    if (showRenameOption) {
+    if (flags.showRenameOption) {
         entries.push({ id: 'rename', y: menuY + 64, label: 'Rename' });
     }
-    if (showViewStats) {
+    if (flags.showViewStats) {
         entries.push({ id: 'stats', y: menuY + 86, label: 'View Stats' });
     }
-    if (showRotateOption) {
+    if (flags.showRotateOption) {
         entries.push({ id: 'rotate', y: menuY + yRotate, label: 'Rotate' });
     }
-
-    return { entries, effectiveHeight, yRotate };
+    return entries;
 }
 
 // Roving arrow navigation within the open menu (backlog 2026-11-16 XC) now
@@ -88,10 +99,24 @@ function ItemContextMenu({
     monsterFound,
     onRenameClicked,
     onClose,
+    viewPortBounds,
 }) {
     const menuRef = useRef(null);
-    const menuX = selectedItem ? gridCenterX(selectedItem.gridX) + 10 : 0;
-    const menuY = selectedItem ? gridCenterY(selectedItem.gridY) + 10 : 0;
+    const item = selectedItem ? placedItems.find(i => i.id === selectedItem.id) : undefined;
+    const flags = menuFlagsFor(item, monsterFound);
+    let menuX = selectedItem ? gridCenterX(selectedItem.gridX) + 10 : 0;
+    let menuY = selectedItem ? gridCenterY(selectedItem.gridY) + 10 : 0;
+    // Viewport clamp (backlog 2026-11-17, the SAME law the hex POI menu ships
+    // in POIContextMenu.jsx): a token low on the board anchored the menu so
+    // its tail rows rendered below the visible board — clipped by the svg
+    // viewport and unreachable by mouse (native clicks hit nothing; only the
+    // keyboard/Enter lane could reach them). viewPortBounds is the visible
+    // world rect (the viewBox, which the square .grid-svg maps onto the
+    // screen 1:1) computed by Map.jsx; absent bounds keep the raw anchor.
+    if (viewPortBounds) {
+        menuX = Math.max(viewPortBounds.left + 4, Math.min(menuX, viewPortBounds.right - MENU_WIDTH - 4));
+        menuY = Math.max(viewPortBounds.top + 4, Math.min(menuY, viewPortBounds.bottom - flags.height - 4));
+    }
     // Open-focus (first entry) + Arrow/Home/End rove + close focus-restore all
     // live in the shared hook (the XF-backlog restore tier: after every
     // dismissal the hook re-focuses the element focused before open, or the
@@ -129,8 +154,7 @@ function ItemContextMenu({
 
     if (!selectedItem) return null;
 
-    const item = placedItems.find(i => i.id === selectedItem.id);
-    const { entries, effectiveHeight } = buildMenuModel(item, monsterFound, menuY);
+    const entries = menuEntriesFor(flags, item, menuY);
 
     const handlers = {
         visibility: () => handleToggleItemVisibility(selectedItem.id),
@@ -159,7 +183,7 @@ function ItemContextMenu({
               onClick={(e) => e.stopPropagation()}
               onKeyDown={handleMenuKeyDown}>
               <g>
-                  <rect x={menuX} y={menuY} width="120" height={effectiveHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                  <rect x={menuX} y={menuY} width={MENU_WIDTH} height={flags.height} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
                   {entries.map(entry => (
                       <MenuOption
                           key={entry.id}
@@ -171,7 +195,7 @@ function ItemContextMenu({
                           {entry.label}
                       </MenuOption>
                   ))}
-                  <MenuOption x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onActivate={() => onClose(menuX, menuY)}>✕</MenuOption>
+                  <MenuOption x={menuX + MENU_WIDTH - 12} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onActivate={() => onClose(menuX, menuY)}>✕</MenuOption>
               </g>
           </g>
       );

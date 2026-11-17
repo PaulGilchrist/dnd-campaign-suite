@@ -785,6 +785,21 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     monsterFound={monsterFound}
                     onRenameClicked={handleRenameClicked}
                     onClose={handleCloseMenu}
+                    // Visible world rect = the svg's viewBox; the square
+                    // .grid-svg (aspect-ratio: 1) maps it 1:1 onto the
+                    // on-screen board. The menu clamps its origin into this
+                    // rect so a token low on the board never renders the
+                    // menu's tail rows off-viewport (backlog 2026-11-17
+                    // viewport-clamp improve, same value/law as HexMap's
+                    // viewPortBounds). Inline (no memo): no lane keys on the
+                    // object identity — the clamp reads it during render and
+                    // the effects depend only on the resulting numbers.
+                    viewPortBounds={{
+                        left: panX,
+                        top: panY,
+                        right: panX + SVG_SIZE / zoom,
+                        bottom: panY + SVG_SIZE / zoom,
+                    }}
                 />
 
                 <PlayerContextMenu
