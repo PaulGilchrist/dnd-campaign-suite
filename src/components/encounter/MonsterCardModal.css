@@ -78,6 +78,19 @@
   border-radius: 50%;
 }
 
+/* Title block absorbs the header's leftover width: `.mc-header` distributes
+   with space-between, so with fixed-size avatar/arm/close children the slack
+   used to spread into every adjacent gap (~66 px avatar→name gutter — bug
+   2026-11-16). Growing the info block keeps the avatar+name group left-
+   coherent with its designed 14 px gutter while the arm and close stay
+   right-aligned on both header faces (with and without `.mc-header-arm`).
+   `min-width: 0` (repo header-row idiom) lets long names keep wrapping. */
+.mc-header-info {
+  flex: 1;
+  min-width: 0;
+  margin-right: 14px;
+}
+
 .mc-name {
   font-size: 1.5em;
   font-weight: 700;
