@@ -1,7 +1,8 @@
 // @maintained-by-ai: 2026-10-14
 // NPCs container contracts: list load/empty/loading, search, create/generate/
 // edit/delete flows, saveNPC rename args, and the add-to-initiative seam
-// (args, blocked-stats error, needs-weapon editor). SSE sync, duplicate-name
+// (args, blocked-stats error, needs-weapon Add-anyway confirm). SSE sync,
+// duplicate-name
 // guard, form shell, row rendering, and stat-block forms live in the
 // sibling test files.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -317,11 +318,49 @@ describe('NPCs', () => {
       expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
     });
 
-    it('opens the NPC editor when the GM opts to provide a weapon', async () => {
+    it('arms the in-app Add-anyway confirm when the service refuses an attack-less NPC', async () => {
       mockAddNPCToInitiative.mockResolvedValue('needs-weapon');
       renderNPCs();
       fireEvent.click(screen.getByTestId('init-btn-Goblin'));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
+      const dialog = await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
+      expect(dialog).toHaveTextContent(
+        'Goblin has no weapons or attacks. If you add them to Initiative now, they will fight with an Unarmed Strike.'
+      );
+      // Refusal is zero-write: the service ran once, nothing was re-run.
+      expect(mockAddNPCToInitiative).toHaveBeenCalledTimes(1);
+    });
+
+    it('Add anyway re-runs the join with the host-confirmed addUnarmed flag', async () => {
+      mockAddNPCToInitiative
+        .mockResolvedValueOnce('needs-weapon')
+        .mockResolvedValueOnce('added');
+      renderNPCs();
+      fireEvent.click(screen.getByTestId('init-btn-Goblin'));
+      await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
+      fireEvent.click(screen.getByRole('button', { name: 'Add anyway', exact: true }));
+      await waitFor(() => expect(mockAddNPCToInitiative).toHaveBeenCalledTimes(2));
+      expect(mockAddNPCToInitiative).toHaveBeenLastCalledWith(
+        'test-campaign',
+        defaultNPCs[0],
+        defaultProps.onViewInitiative,
+        { addUnarmed: true }
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'No Weapons or Attacks' })).not.toBeInTheDocument()
+      );
+    });
+
+    it('Cancel adds nothing (no re-run) and guides the GM to the Stats-tab editor', async () => {
+      mockAddNPCToInitiative.mockResolvedValue('needs-weapon');
+      renderNPCs();
+      fireEvent.click(screen.getByTestId('init-btn-Goblin'));
+      await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel', exact: true }));
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'No Weapons or Attacks' })).not.toBeInTheDocument()
+      );
+      expect(mockAddNPCToInitiative).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       expect(screen.getByTestId('modal-editing-npc')).toHaveTextContent('Goblin');
     });
   });

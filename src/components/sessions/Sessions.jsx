@@ -21,6 +21,7 @@ import { npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
 import { addEntry } from '../../services/ui/logService.js';
 import SessionListItem from './SessionListItem.jsx';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
+import NpcUnarmedConfirmModal from '../npcs/NpcUnarmedConfirmModal.jsx';
 import './Sessions.css';
 
 // The six entity lists whose changes must invalidate the picker cache below
@@ -112,6 +113,11 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
   // cached, so the reopen that clears it is also the retry.
   const [pickerLoadFailed, setPickerLoadFailed] = useState(false);
   const [toast, setToast] = useState('');
+  // Attack-less join refusal staged for the in-app NpcUnarmedConfirmModal
+  // (backlog 2026-11-17 EG): the quick-action chip arms the NPC here instead
+  // of the retired inverted native confirm; ephemeral UI pair, never the
+  // runtime store (FriendlyFireConfirmModal idiom).
+  const [pendingUnarmedNpc, setPendingUnarmedNpc] = useState(null);
 
   // Single choke point for the banner: every message carries whether it was a
   // conflict, so the "Reload list" action can never outlive its error copy.
@@ -361,7 +367,8 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
         }
         const status = await addNPCToInitiative(campaignName, npc, onViewInitiative);
         if (status === 'needs-weapon') {
-          showToast(`${value} was not added — give them at least one weapon on the NPCs page`);
+          // Zero-write refusal — arm the honest in-app Add-anyway confirm.
+          setPendingUnarmedNpc(npc);
         } else {
           showToast(`${value} added to initiative`);
         }
@@ -370,6 +377,30 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
       console.error('Failed to run session quick action:', err);
       showError(err.message || 'Quick action failed');
     }
+  };
+
+  // `Add anyway` re-runs the service with the host-confirmed flag — join
+  // bytes and log row exactly the old proceed path's (`added` toast included).
+  const handleUnarmedAddAnyway = async () => {
+    const npc = pendingUnarmedNpc;
+    if (!npc) return;
+    setPendingUnarmedNpc(null);
+    try {
+      await addNPCToInitiative(campaignName, npc, onViewInitiative, { addUnarmed: true });
+      showToast(`${npc.name} added to initiative`);
+    } catch (err) {
+      console.error('Failed to run session quick action:', err);
+      showError(err.message || 'Quick action failed');
+    }
+  };
+
+  // `Cancel` adds nothing — zero writes, board unchanged; the retired
+  // refusal guidance survives as this inert outcome's toast.
+  const handleUnarmedCancel = () => {
+    const npc = pendingUnarmedNpc;
+    if (!npc) return;
+    setPendingUnarmedNpc(null);
+    showToast(`${npc.name} was not added — give them at least one weapon on the NPCs page`);
   };
 
   const findNpc = async (name) => {
@@ -549,6 +580,12 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
           onMarkPlayed={handleMarkPlayed}
         />
       )}
+
+      <NpcUnarmedConfirmModal
+        pending={pendingUnarmedNpc}
+        onCancel={handleUnarmedCancel}
+        onConfirm={handleUnarmedAddAnyway}
+      />
     </div>
   );
 }

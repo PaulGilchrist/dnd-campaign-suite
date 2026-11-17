@@ -1,6 +1,6 @@
 // @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import Sessions from './Sessions.jsx';
 import { emptyLinks } from '../../services/campaign/sessionPlannerUtils.js';
 
@@ -237,6 +237,47 @@ describe('Sessions — linked-resource automations', () => {
     expect(document.querySelector('.sessions-form-error')).toBeNull();
     expect(consoleSpy).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
+  });
+
+  it('arms the in-app Add-anyway confirm for an attack-less NPC and drives both button paths', async () => {
+    // Backlog 2026-11-17 EG: the inverted native join-confirm is gone — the
+    // service's zero-write 'needs-weapon' refusal arms NpcUnarmedConfirmModal.
+    const grixxa = { name: 'Grixxa', armorClass: 15, hitPoints: 22 };
+    loadNPCs.mockResolvedValue({ npcs: [grixxa] });
+    sessionMockStore.items = [makeSession('Session 7', {
+      links: { ...emptyLinks(), npcs: ['Grixxa'] },
+    })];
+    renderSessions();
+    openEditor('Session 7');
+
+    addNPCToInitiative.mockResolvedValueOnce('needs-weapon');
+    fireEvent.click(screen.getByRole('button', { name: /to initiative/i }));
+    const dialog = await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
+    expect(dialog).toHaveTextContent(
+      'Grixxa has no weapons or attacks. If you add them to Initiative now, they will fight with an Unarmed Strike.'
+    );
+    expect(addNPCToInitiative).toHaveBeenCalledTimes(1);
+
+    // Cancel: adds nothing — no service re-run, board untouched — and re-states
+    // the refusal guidance as an inert toast.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel', exact: true }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'No Weapons or Attacks' })).not.toBeInTheDocument()
+    );
+    expect(addNPCToInitiative).toHaveBeenCalledTimes(1);
+    expect(toastText()).toBe('Grixxa was not added — give them at least one weapon on the NPCs page');
+
+    // Re-armed, `Add anyway` re-runs the join with the host-confirmed flag.
+    addNPCToInitiative.mockResolvedValueOnce('needs-weapon').mockResolvedValueOnce('added');
+    fireEvent.click(screen.getByRole('button', { name: /to initiative/i }));
+    const armedAgain = await screen.findByRole('dialog', { name: 'No Weapons or Attacks' });
+    fireEvent.click(within(armedAgain).getByRole('button', { name: 'Add anyway', exact: true }));
+    await waitFor(() => expect(addNPCToInitiative).toHaveBeenCalledTimes(3));
+    expect(addNPCToInitiative).toHaveBeenLastCalledWith(
+      'test-campaign', grixxa, onViewInitiative, { addUnarmed: true }
+    );
+    await waitFor(() => expect(toastText()).toBe('Grixxa added to initiative'));
+    expect(screen.queryByRole('dialog', { name: 'No Weapons or Attacks' })).not.toBeInTheDocument();
   });
 
   it('moves a linked resource to another session, saving both', async () => {

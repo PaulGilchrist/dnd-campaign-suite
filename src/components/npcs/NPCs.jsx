@@ -5,6 +5,7 @@ import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
+import NpcUnarmedConfirmModal from './NpcUnarmedConfirmModal.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import { getDefaultFormData, cleanNPCData } from '../../services/npcs/npcFormUtils.js';
 import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
@@ -29,6 +30,13 @@ function NPCs({ campaignName, onViewInitiative }) {
   const [errorIsConflict, setErrorIsConflict] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState('roleplay');
   const [modalKey, setModalKey] = useState(0);
+  // Attack-less join refusal staged for the in-app NpcUnarmedConfirmModal
+  // (backlog 2026-11-17 EG, replaces the inverted native window.confirm in
+  // the service): { npc, origin: 'row' | 'editor', snapshot? } — 'editor' is
+  // the Save-&-Add lane, where the row is already SAVED and snapshot is the
+  // post-save draft re-baselining the unsaved-edits check on Cancel.
+  // Ephemeral UI pair (FriendlyFireConfirmModal idiom), never the runtime store.
+  const [pendingUnarmed, setPendingUnarmed] = useState(null);
   // Bestiary-name client gate (2026-11-16 QA backlog): the lower-cased
   // monsters.json name-set, fetched ONCE (module memo) and non-blocking.
   // null = still loading or the load failed → gate inert, the server 400
@@ -227,8 +235,8 @@ function NPCs({ campaignName, onViewInitiative }) {
     try {
       const status = await addNPCToInitiative(campaignName, npc, onViewInitiative);
       if (status === 'needs-weapon') {
-        showError(`${npc.name} was not added — give them at least one weapon in the Stats tab.`);
-        handleEditNPC(npc, 'stats');
+        // Zero-write refusal from the service — arm the honest in-app confirm.
+        setPendingUnarmed({ npc, origin: 'row' });
       }
     } catch (err) {
       console.error('Failed to add NPC to initiative:', err);
@@ -259,13 +267,9 @@ function NPCs({ campaignName, onViewInitiative }) {
       missedListBroadcast.current = false;
       const status = await addNPCToInitiative(campaignName, npcForInitiative, onViewInitiative);
       if (status === 'needs-weapon') {
-        showError(`${npcForInitiative.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
-        // Modal stays open — the saved draft is the new baseline for the
-        // unsaved-edits check (see handleReloadList).
-        seedDraft(snapshot);
-        // bump the key so it remounts showing the Stats tab.
-        setModalInitialTab('stats');
-        setModalKey(k => k + 1);
+        // Saved but not joined (zero writes) — the honest Add-anyway question
+        // rides the shared modal on top of the still-open editor.
+        setPendingUnarmed({ npc: npcForInitiative, origin: 'editor', snapshot });
         return;
       }
       handleCloseModal();
@@ -281,6 +285,44 @@ function NPCs({ campaignName, onViewInitiative }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  // `Add anyway` re-runs the service with the host-confirmed flag — the join
+  // bytes, initiative roll, and log row are exactly the old proceed path's.
+  // The 'editor' lane had already saved, so a completed join closes the editor
+  // like a normal Save-&-Add would.
+  const handleUnarmedAddAnyway = async () => {
+    const entry = pendingUnarmed;
+    if (!entry) return;
+    setPendingUnarmed(null);
+    try {
+      await addNPCToInitiative(campaignName, entry.npc, onViewInitiative, { addUnarmed: true });
+      if (entry.origin === 'editor') handleCloseModal();
+    } catch (err) {
+      console.error('Failed to add NPC to initiative:', err);
+      showError(err.message || 'Failed to add NPC to initiative');
+    }
+  };
+
+  // `Cancel` adds nothing — zero writes, board unchanged. The guidance half of
+  // the retired prompt survives as the outcome it always described: send the
+  // GM to the Stats tab to fit a weapon (the row lane's original OK branch).
+  const handleUnarmedCancel = () => {
+    const entry = pendingUnarmed;
+    if (!entry) return;
+    setPendingUnarmed(null);
+    if (entry.origin === 'editor') {
+      showError(`${entry.npc.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
+      // Modal stays open — the saved draft is the new baseline for the
+      // unsaved-edits check (see handleReloadList).
+      seedDraft(entry.snapshot);
+      // bump the key so it remounts showing the Stats tab.
+      setModalInitialTab('stats');
+      setModalKey(k => k + 1);
+      return;
+    }
+    showError(`${entry.npc.name} was not added — give them at least one weapon in the Stats tab.`);
+    handleEditNPC(entry.npc, 'stats');
   };
 
   return (
@@ -383,6 +425,12 @@ function NPCs({ campaignName, onViewInitiative }) {
           onSaveAndAddToInitiative={handleSaveAndAddToInitiative}
         />
       )}
+
+      <NpcUnarmedConfirmModal
+        pending={pendingUnarmed ? pendingUnarmed.npc : null}
+        onCancel={handleUnarmedCancel}
+        onConfirm={handleUnarmedAddAnyway}
+      />
     </div>
   );
 }

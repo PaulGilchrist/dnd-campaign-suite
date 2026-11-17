@@ -1,7 +1,8 @@
 // @maintained-by-ai
 // Lane: npcCombatService.addNPCToInitiative — sole owner of NPC-initiative assembly
-// (source read in full: hard gate → dup check → weapon prompt → roll → push → sort →
-// storage.set → event → log fetch → callback).
+// (source read in full: hard gate → dup check → unarmed refusal (needs-weapon,
+// zero-write — the host arms NpcUnarmedConfirmModal, backlog 2026-11-17 EG) →
+// roll → push → sort → storage.set → event → log fetch → callback).
 //
 // Cited, never re-driven here:
 //   npcStatBlockUtils gates are inputs — predicate internals owned by
@@ -19,7 +20,8 @@
 // service — they cover wiring only, no behavior duplicated there.
 //
 // Old → new map:
-//   hard-gate ×2 → 1 refuse census; "asks" + "adds anyway" → weapon-cancel;
+//   hard-gate ×2 → 1 refuse census; "asks" + "adds anyway" → unarmed refusal
+//     census + addUnarmed join (in-app confirm moved the prompt to the host);
 //   summary-init default → folded into default-bytes; "preserves" + "sorts" → preserve-sort-append;
 //   dup "different names" → removed (baseline covered by every happy path);
 //   initiative pos/neg/invalid loop → it.each table (loop read stale calls[0]);
@@ -77,7 +79,9 @@ describe('npcCombatService - addNPCToInitiative', () => {
     loadCombatSummary.mockResolvedValue(null);
     storage.set.mockImplementation(() => Promise.resolve());
     global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
-    // Default: GM declines the weapon prompt and lets the NPC join anyway.
+    // The service must never open a native dialog (backlog 2026-11-17 EG —
+    // the unarmed prompt is now the host's in-app NpcUnarmedConfirmModal):
+    // the spy stays armed so any window.confirm call trips the censuses.
     vi.spyOn(window, 'confirm').mockReturnValue(false);
   });
 
@@ -99,35 +103,37 @@ describe('npcCombatService - addNPCToInitiative', () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
-  describe('weapon prompt when the NPC has no attacks', () => {
-    it('prompts, then adds (unarmed fallback) and fires onViewInitiative when the GM cancels', async () => {
+  describe('unarmed refusal (host arms the in-app Add-anyway confirm)', () => {
+    it('returns needs-weapon with a zero-write census — no roll, prompt, write, or callback', async () => {
       npcHasAttacks.mockReturnValue(false);
-      const callback = vi.fn();
-
-      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
-
-      expect(window.confirm).toHaveBeenCalledTimes(1);
-      expect(window.confirm.mock.calls[0][0]).toMatch(/no weapons or attacks/i);
-      expect(result).toBe('added');
-      expect(storage.set).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-    });
-
-    it('returns needs-weapon with a zero-write census when the GM opts to provide a weapon', async () => {
-      npcHasAttacks.mockReturnValue(false);
-      window.confirm.mockReturnValue(true);
       const callback = vi.fn();
 
       const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
 
       expect(result).toBe('needs-weapon');
       expect(rollD20).not.toHaveBeenCalled();
+      expect(window.confirm).not.toHaveBeenCalled();
       expect(storage.set).not.toHaveBeenCalled();
       expect(global.fetch).not.toHaveBeenCalled();
       expect(callback).not.toHaveBeenCalled();
     });
 
-    it('does not prompt when the NPC has a usable attack', async () => {
+    it('adds the attack-less NPC when the host confirms with addUnarmed — same join bytes as an armed NPC', async () => {
+      npcHasAttacks.mockReturnValue(false);
+      const callback = vi.fn();
+
+      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback, { addUnarmed: true });
+
+      expect(result).toBe('added');
+      expect(window.confirm).not.toHaveBeenCalled();
+      expect(storage.set).toHaveBeenCalledTimes(1);
+      expect(storage.set.mock.calls[0][1].creatures[0]).toEqual(
+        expect.objectContaining({ name: 'Goblin', type: 'npc', initiative: '15', maxHp: 7, currentHp: 7 })
+      );
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it('joins an attack-capable NPC without needing the flag', async () => {
       const result = await addNPCToInitiative(CAMPAIGN, withAttack(defaultNPC()));
 
       expect(result).toBe('added');

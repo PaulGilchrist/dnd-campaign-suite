@@ -7,7 +7,17 @@ import storage from '../ui/storage.js';
 
 // Returns 'added' | 'already' | 'needs-weapon'. Throws if the NPC lacks the
 // combat stats (AC + HP) the tracker needs to run them.
-export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
+//
+// 'needs-weapon' is a ZERO-WRITE refusal: an attack-less NPC never joins
+// silently and never pays a native window.confirm (backlog 2026-11-17 EG —
+// the old OK/Cancel prompt had INVERTED semantics against the button labels).
+// The refusal routes to the HOST, which arms the in-app
+// NpcUnarmedConfirmModal (shared DeleteConfirmModal tier, honest `Add anyway`
+// / `Cancel` buttons); "Add anyway" re-invokes this function with
+// { addUnarmed: true } and the join proceeds exactly as the old proceed path
+// did (Unarmed Strike fallback — the creature record and log row are
+// unchanged). Cancel closes the modal inert: this service is never re-run.
+export async function addNPCToInitiative(campaignName, npc, onViewInitiative, { addUnarmed = false } = {}) {
   if (!npcHasStatBlock(npc)) {
     throw new Error(`"${npc?.name}" needs AC and HP filled in (Stats tab) before joining initiative.`);
   }
@@ -26,12 +36,8 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
     return 'already';
   }
 
-  if (!npcHasAttacks(npc)) {
-    const provideWeapon = window.confirm(
-      `${npc.name} has no weapons or attacks. Give them at least one weapon before adding them to initiative?\n\n` +
-      'Choose Cancel to add them anyway — they will fight with an Unarmed Strike.'
-    );
-    if (provideWeapon) return 'needs-weapon';
+  if (!npcHasAttacks(npc) && !addUnarmed) {
+    return 'needs-weapon';
   }
 
   const roll = rollD20();
@@ -39,22 +45,7 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
   // Dice-formatted HP ("9 (2d8)") joins at its resolved total, never NaN.
   const maxHp = resolveNPCHitPoints(npc.hitPoints);
 
-  combatSummary.creatures.push({
-    name: npc.name,
-    type: 'npc',
-    monsterType: npc.type,
-    initiative: String(total),
-    targetName: null,
-    ac: npc.armorClass,
-    resistances: npc.damageResistances || [],
-    immunities: npc.damageImmunities || [],
-    concentration: null,
-    imagePath: npc.imagePath || npc.image || '',
-    initiativeBonus: initBonus,
-    maxHp,
-    currentHp: maxHp,
-    saveBonuses: {},
-  });
+  combatSummary.creatures.push(buildNPCCreature(npc, total, maxHp, initBonus));
 
   combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
   storage.set('combatSummary', combatSummary, campaignName);
@@ -72,6 +63,28 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
 
   if (onViewInitiative) onViewInitiative();
   return 'added';
+}
+
+// The canonical initiative creature record (exact-bytes pinned by
+// npcCombatService.test.js) — hoisted so the join lane stays under the
+// complexity cap.
+function buildNPCCreature(npc, total, maxHp, initBonus) {
+  return {
+    name: npc.name,
+    type: 'npc',
+    monsterType: npc.type,
+    initiative: String(total),
+    targetName: null,
+    ac: npc.armorClass,
+    resistances: npc.damageResistances || [],
+    immunities: npc.damageImmunities || [],
+    concentration: null,
+    imagePath: npc.imagePath || npc.image || '',
+    initiativeBonus: initBonus,
+    maxHp,
+    currentHp: maxHp,
+    saveBonuses: {},
+  };
 }
 
 function logInitiativeRoll(campaignName, characterName, roll, initBonus) {
