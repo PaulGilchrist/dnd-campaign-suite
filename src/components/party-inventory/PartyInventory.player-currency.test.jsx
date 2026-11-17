@@ -130,15 +130,17 @@ describe('PartyInventory From Players currency rows (read-back)', () => {
     await screen.findByText('Party Inventory');
     fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: 'Pauper' } });
     expect(within(panel()).getByText('Nothing in Pauper’s backpack.')).toBeTruthy();
-    expect(within(panel()).queryAllByRole('button', { name: /To Party/ })).toHaveLength(0);
+    expect(within(panel()).queryAllByRole('button', { name: /party inventory/ })).toHaveLength(0);
   });
 });
 
 describe('PartyInventory currency `To Party` return lane', () => {
   function copperToParty() {
-    const copperRow = Array.from(panel().querySelectorAll('.pi-player-items li'))
-      .find(li => li.textContent.includes('Copper'));
-    return within(copperRow).getByRole('button', { name: /To Party/ });
+    // The accessible name now names the exact row + destination (improve 2026-11-17 CD),
+    // so the Copper row resolves screen-wide without ancestor-text scoping.
+    return screen.getByRole('button', {
+      name: 'Move 1 cp from War Cleric to party inventory', exact: true,
+    });
   }
 
   it('confirms naming coin, amount, source player and party destination before any write', async () => {

@@ -175,8 +175,11 @@ describe('PartyInventory', () => {
     // Backpack entries without itemMeta still list, defaulting to ×1
     expect(await screen.findByText("Thieves' Tools")).toBeTruthy();
     expect(screen.getByText('×1')).toBeTruthy();
-    const ropeRow = screen.getByText('Rope, Hempen').closest('li');
-    fireEvent.click(within(ropeRow).getByRole('button', { name: /To Party/ }));
+    // Row-scoped accessible name (improve 2026-11-17 CD): the button labels itself with
+    // the exact confirm copy instead of an undifferentiated "To Party".
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Move 3 × Rope, Hempen from War Cleric to party inventory', exact: true,
+    }));
     expect(confirmSpy).toHaveBeenCalledWith('Move 3 × Rope, Hempen from War Cleric to party inventory?');
     await waitFor(() => {
       expect(mockTransferInventory).toHaveBeenCalledWith('test-campaign', {

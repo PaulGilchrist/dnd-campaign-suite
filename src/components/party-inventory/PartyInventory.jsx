@@ -123,13 +123,20 @@ function EquipmentNameInput({ value, onChange, equipmentData, id }) {
   );
 }
 
-function QuantityStepper({ quantity, onStep, onSet }) {
+// Row-scoped step labels (backlog 2026-11-17 CD): the generic "Increase quantity" pair
+// was indistinguishable between rows and shared its class with the currency chips, so
+// an accessible-name locator could not resolve one row's stepper. The label names the
+// item — same title+aria-label idiom as the Edit/Move/Delete action buttons.
+function QuantityStepper({ quantity, itemLabel, onStep, onSet }) {
+  const decreaseLabel = `Decrease quantity of ${itemLabel}`;
+  const increaseLabel = `Increase quantity of ${itemLabel}`;
   return (
     <span className="pi-qty-stepper">
       <button
         type="button"
         className="pi-step-btn"
-        aria-label="Decrease quantity"
+        title={decreaseLabel}
+        aria-label={decreaseLabel}
         onClick={() => onStep(-1)}
         disabled={quantity <= 1}
       >
@@ -146,7 +153,8 @@ function QuantityStepper({ quantity, onStep, onSet }) {
       <button
         type="button"
         className="pi-step-btn"
-        aria-label="Increase quantity"
+        title={increaseLabel}
+        aria-label={increaseLabel}
         onClick={() => onStep(1)}
       >
         <i className="fa-solid fa-plus" />
@@ -177,10 +185,14 @@ function CurrencyCard({ currency, onAdjust, onGiveOpen, disabled, isLocalhost, i
           <span className="pi-currency-chips">
             {AMOUNT_CHIPS.map(amount => (
               <span key={amount} className="pi-chip-pair">
+                {/* aria-label mirrors the title so the chip's accessible name is the
+                    intent ("Add 1 cp"), never the bare "+1" glyph (backlog 2026-11-17 CD:
+                    name queries must not have to guess between chips and steppers). */}
                 <button
                   type="button"
                   className="pi-step-btn ct-btn"
                   title={`Add ${amount} ${key}`}
+                  aria-label={`Add ${amount} ${key}`}
                   disabled={disabled}
                   onClick={() => onAdjust(key, amount)}
                 >
@@ -190,6 +202,7 @@ function CurrencyCard({ currency, onAdjust, onGiveOpen, disabled, isLocalhost, i
                   type="button"
                   className="pi-step-btn ct-btn"
                   title={`Remove ${amount} ${key}`}
+                  aria-label={`Remove ${amount} ${key}`}
                   disabled={disabled || currency[key] < amount}
                   onClick={() => onAdjust(key, -amount)}
                 >
@@ -376,6 +389,7 @@ function MoveToPlayerModal({ item, characters, quantity, onQuantityChange, playe
           </select>
           <label className="ct-label">Quantity (party has {item.quantity})</label>
           <QuantityStepper
+            itemLabel={item.name}
             quantity={quantity}
             onStep={(delta) => onQuantityChange(Math.max(1, Math.min(item.quantity, quantity + delta)))}
             onSet={(v) => onQuantityChange(Math.max(1, Math.min(item.quantity, v)))}
@@ -397,6 +411,19 @@ function MoveToPlayerModal({ item, characters, quantity, onQuantityChange, playe
       </div>
     </div>
   );
+}
+
+// Move-copy builders (backlog 2026-11-17 CD): the From Players `To Party` buttons used
+// to be undifferentiated `.pi-move-btn`s — the row was identifiable only by ancestor
+// text. Each button now carries the exact copy its native confirm computes (minus the
+// "?") as title/aria-label, and the confirm reuses these builders so label and dialog
+// copy can never drift apart.
+function currencyMoveCopy(coin, characterName) {
+  return `Move ${coin.amount} ${coin.key} from ${characterName} to party inventory`;
+}
+
+function playerItemMoveCopy(entry, characterName) {
+  return `Move ${entry.quantity} × ${entry.name} from ${characterName} to party inventory`;
 }
 
 function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
@@ -436,7 +463,7 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
     if (!character) return;
     // Native confirm naming qty + item + source player + party destination, mirroring
     // the currency Give / Delete idioms (backlog 2026-10-24). Refuse = zero writes.
-    if (!window.confirm(`Move ${entry.quantity} × ${entry.name} from ${character.name} to party inventory?`)) return;
+    if (!window.confirm(`${playerItemMoveCopy(entry, character.name)}?`)) return;
     // Drain any debounced currency-chip deltas first (handleConfirmMove idiom) so the
     // pool credits in click order and the transfer lands on top of the pending batch.
     if (beforeTransfer) beforeTransfer();
@@ -468,7 +495,7 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
   const handleCurrencyMove = async (coin) => {
     if (!character) return;
     const stateKey = `currency:${coin.key}`;
-    if (!window.confirm(`Move ${coin.amount} ${coin.key} from ${character.name} to party inventory?`)) return;
+    if (!window.confirm(`${currencyMoveCopy(coin, character.name)}?`)) return;
     if (beforeTransfer) beforeTransfer();
     setMoving(stateKey);
     try {
@@ -509,6 +536,8 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
             <button
               type="button"
               className="ct-btn ct-btn-primary pi-move-btn"
+              title={currencyMoveCopy(coin, character.name)}
+              aria-label={currencyMoveCopy(coin, character.name)}
               disabled={moving !== null}
               onClick={() => handleCurrencyMove(coin)}
             >
@@ -523,6 +552,8 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
             <button
               type="button"
               className="ct-btn ct-btn-primary pi-move-btn"
+              title={playerItemMoveCopy(entry, character.name)}
+              aria-label={playerItemMoveCopy(entry, character.name)}
               disabled={moving !== null}
               onClick={() => handleMove(entry)}
             >
@@ -979,6 +1010,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
                     <td>
                       {isLocalhost ? (
                         <QuantityStepper
+                          itemLabel={item.name}
                           quantity={item.quantity}
                           onStep={(delta) => handleItemStep(item, delta)}
                           onSet={(v) => setItemQuantity(item, Math.max(1, v))}

@@ -129,7 +129,7 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
     // (its echo has not repainted yet — the exact clobber-window state).
     serverItems.push({ id: 'coin1', name: 'QA Concurrent Coin', quantity: 1, description: '' });
 
-    fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity'));
+    fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity of QA Lantern'));
     await waitFor(() => expect(mockApplyItemIntent).toHaveBeenCalledTimes(1));
 
     // The wire carries only the single-row intent — no item list can clobber anything.
@@ -212,7 +212,7 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
     // The other window's delete has landed on the server but the echo is undelivered.
     serverItems = [];
 
-    fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity'));
+    fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity of QA Lantern'));
     await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(
       'Save failed: Party item "QA Lantern" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.'
     ));
@@ -234,7 +234,7 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
     // A step on the still-unacked optimistic row queues behind the add and resolves
     // the SAME locally-minted id (the server keeps client ids — no temp-id drift).
     const censerRow = await screen.findByText('QA Censer');
-    fireEvent.click(within(censerRow.closest('tr')).getByLabelText('Increase quantity'));
+    fireEvent.click(within(censerRow.closest('tr')).getByLabelText('Increase quantity of QA Censer'));
     expect(mockApplyItemIntent).toHaveBeenCalledTimes(1); // serialized: nothing sent yet
     const addIntent = mockApplyItemIntent.mock.calls[0][1];
     const mergedOfAdd = applyIntent(addIntent);

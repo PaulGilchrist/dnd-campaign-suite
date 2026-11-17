@@ -151,7 +151,7 @@ describe('PartyInventory rapid currency clicks', () => {
     // A newer ITEM edit rides its own queue independently — the currency delta lane
     // can never block or clobber it (the old shared full-doc queue made it wait).
     // It posts ONE setQty intent, not an item-list snapshot.
-    fireEvent.click(screen.getByLabelText('Increase quantity'));
+    fireEvent.click(screen.getByLabelText('Increase quantity of Rope, Hempen'));
     await waitFor(() => expect(mockApplyItemIntent).toHaveBeenCalledTimes(1));
     expect(mockApplyItemIntent.mock.calls[0][1]).toEqual({ action: 'setQty', id: 'i1', quantity: 2, name: 'Rope, Hempen' });
 

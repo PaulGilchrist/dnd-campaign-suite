@@ -99,7 +99,7 @@ describe('PartyInventory party→player Move confirm', () => {
     await renderReady();
     const modal = openMoveModal();
     expect(confirmSpy).not.toHaveBeenCalled();
-    fireEvent.click(within(modal).getByLabelText('Increase quantity'));
+    fireEvent.click(within(modal).getByLabelText('Increase quantity of Hempen Rope'));
     fireEvent.change(modalQtyInput(modal), { target: { value: '1' } });
     fireEvent.change(modal.querySelector('select'), { target: { value: 'War Cleric' } });
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -162,10 +162,10 @@ describe('PartyInventory player→party `To Party` confirm', () => {
     await renderReady();
     fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: 'War Cleric' } });
     // The purse lane (currency rows) now also renders a `To Party` button for this
-    // gold-carrying fixture, so scope the item-row locator to the backpack row in the
-    // From Players panel (the party table shows the same item name).
-    const ropeRow = within(document.querySelector('.pi-players-panel')).getByText('Hempen Rope').closest('li');
-    return within(ropeRow).getByRole('button', { name: /To Party/ });
+    // gold-carrying fixture; item rows label themselves with their own confirm copy.
+    return screen.getByRole('button', {
+      name: 'Move 2 × Hempen Rope from War Cleric to party inventory', exact: true,
+    });
   }
 
   it('refusing `To Party` confirms naming qty, item, source player and party destination — zero writes', async () => {

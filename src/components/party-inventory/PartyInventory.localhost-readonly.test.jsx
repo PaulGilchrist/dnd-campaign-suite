@@ -89,8 +89,8 @@ describe('PartyInventory — non-localhost (player) view is read-only for party 
 
     expect(screen.queryByText('Add Item')).toBeNull();
     expect(screen.queryByText('Actions')).toBeNull();
-    expect(screen.queryByLabelText('Increase quantity')).toBeNull();
-    expect(screen.queryByLabelText('Decrease quantity')).toBeNull();
+    expect(screen.queryByLabelText(/Increase quantity of/)).toBeNull();
+    expect(screen.queryByLabelText(/Decrease quantity of/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit item' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Move to player' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete item' })).toBeNull();

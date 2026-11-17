@@ -74,8 +74,8 @@ function clickDelete(name) {
   fireEvent.click(within(row).getByTitle('Delete item'));
 }
 
-function increaseQuantity(label) {
-  fireEvent.click(within(screen.getByText(label).closest('tr')).getByLabelText('Increase quantity'));
+function increaseQuantity(name) {
+  fireEvent.click(within(screen.getByText(name).closest('tr')).getByLabelText(`Increase quantity of ${name}`));
 }
 
 describe('PartyInventory item-delete log ordering (pre-await audit)', () => {

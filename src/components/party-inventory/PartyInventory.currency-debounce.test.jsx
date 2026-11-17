@@ -229,7 +229,7 @@ describe('PartyInventory currency chip burst debounce', () => {
     // The queued currency POST disables the chips (one in-flight per lane) but the
     // ITEM lane posts immediately on its own queue — the old shared full-doc queue
     // used to park it behind the currency write.
-    fireEvent.click(screen.getByLabelText('Increase quantity'));
+    fireEvent.click(screen.getByLabelText('Increase quantity of Rope, Hempen'));
     await pastDebounce(50);
     expect(itemIntents).toHaveLength(1);
     expect(itemIntents[0]).toEqual({ action: 'setQty', id: 'i1', quantity: 2, name: 'Rope, Hempen' });
@@ -250,7 +250,7 @@ describe('PartyInventory currency chip burst debounce', () => {
     await renderReady();
     fireEvent.click(screen.getByTitle('Add 10 gp')); // optimistic gp 60 before any POST
     holdItem = true;
-    fireEvent.click(screen.getByLabelText('Increase quantity')); // item POST parks
+    fireEvent.click(screen.getByLabelText('Increase quantity of Rope, Hempen')); // item POST parks
     await pastDebounce();
     // The parked items response was minted BEFORE the chip flush landed — an old
     // whole-doc answer must never resurrect old coin values over newer truth.
