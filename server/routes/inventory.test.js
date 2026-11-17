@@ -113,53 +113,12 @@ describe('GET inventory', () => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/campaigns/:campaign/inventory
+// POST /api/campaigns/:campaign/inventory — RETIRED. The whole item-list snapshot
+// replace lane clobbered concurrent GM windows (bug-inventory-item-save-concurrent-
+// snapshot-last-writer-wins); item writes are atomic per-row intents on
+// POST /inventory/item, pinned in inventory.item-intent.test.js (incl. the 404 pin
+// that this route stays gone).
 // ---------------------------------------------------------------------------
-
-describe('POST inventory', () => {
-    it('rejects a non-array items payload', async () => {
-        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory`).send({ items: 'nope' });
-        expect(res.status).toBe(400);
-    });
-
-    it('replaces and sorts items while PRESERVING the stored currency (clobber regression)', async () => {
-        writeInventory({
-            currency: { pp: 0, gp: 11, sp: 0, cp: 1 },
-            items: [{ id: 'old', name: 'Old Lantern', quantity: 1, description: '' }],
-        });
-
-        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory`).send({
-            items: [
-                { name: 'Rope, Hempen', quantity: 2, description: '50 ft' },
-                { name: 'Amulet', quantity: 0 },
-                { name: '', quantity: 1 },
-            ],
-        });
-        expect(res.status).toBe(200);
-        const saved = readInventoryFile();
-        // Cross-tab clobber fix: a full items snapshot must never touch the coin
-        // ledger — the other window's debounced presses live only there.
-        expect(saved.currency).toEqual({ pp: 0, gp: 11, sp: 0, cp: 1 });
-        expect(saved.items).toHaveLength(1);
-        expect(saved.items[0].name).toBe('Rope, Hempen');
-        expect(saved.items[0].id).toBeTruthy();
-        expect(publishSpy).toHaveBeenCalledWith(`inventory-${CAMPAIGN}`, saved, CAMPAIGN);
-    });
-
-    it('refuses a snapshot body carrying currency — loud 400, disk untouched', async () => {
-        writeInventory({ currency: { pp: 0, gp: 11, sp: 0, cp: 1 }, items: [] });
-
-        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory`).send({
-            currency: { pp: 0, gp: 25, sp: 0, cp: 0 },
-            items: [],
-        });
-
-        expect(res.status).toBe(400);
-        expect(res.body.error).toMatch(/currency is not written by this lane/);
-        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 11, sp: 0, cp: 1 });
-        expect(publishSpy).not.toHaveBeenCalled();
-    });
-});
 
 // ---------------------------------------------------------------------------
 // POST /api/campaigns/:campaign/inventory/transfer

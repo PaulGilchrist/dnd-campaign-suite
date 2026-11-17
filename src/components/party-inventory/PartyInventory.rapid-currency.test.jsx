@@ -6,21 +6,21 @@
 // trailing debounce and flushes as ONE signed per-coin DELTA on the atomic /adjust lane
 // (bug-inventory-chip-cross-tab-full-doc-clobber: the whole-document snapshot POST is
 // gone — two GM windows pressing in the same window land additively server-side).
-// Also pins the serialized items queue: one in-flight POST per endpoint, stale POST
-// echoes dropped via revision stamp (playbook §39).
+// Also pins the serialized items queue: one in-flight intent POST per endpoint, stale
+// POST echoes dropped via revision stamp (playbook §39).
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
-const mockSavePartyItems = vi.fn();
+const mockApplyItemIntent = vi.fn();
 const mockAdjustCurrency = vi.fn();
 let sseHandler = null;
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  savePartyItems: (...args) => mockSavePartyItems(...args),
+  applyItemIntent: (...args) => mockApplyItemIntent(...args),
   adjustCurrency: (...args) => mockAdjustCurrency(...args),
   transferInventory: vi.fn(),
 }));
@@ -65,9 +65,11 @@ beforeEach(() => {
     currency: { ...serverCurrency },
     items: serverItems,
   }));
-  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => {
-    serverItems = items;
-    return { currency: { ...serverCurrency }, items };
+  mockApplyItemIntent.mockReset().mockImplementation(async (_c, intent) => {
+    if (intent.action === 'setQty') serverItems = serverItems.map(i => i.id === intent.id ? { ...i, quantity: intent.quantity } : i);
+    else if (intent.action === 'delete') serverItems = serverItems.filter(i => i.id !== intent.id);
+    else serverItems = [...serverItems, intent.item];
+    return { currency: { ...serverCurrency }, items: serverItems };
   });
   mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => {
     for (const key of ['pp', 'gp', 'sp', 'cp']) {
@@ -113,8 +115,8 @@ describe('PartyInventory rapid currency clicks', () => {
       expect(mockAdjustCurrency).toHaveBeenCalledTimes(1);
       expect(mockAdjustCurrency.mock.calls[0][1]).toEqual({ pp: 0, gp: 3, sp: 0, cp: 0 });
     });
-    // The chip lane must never touch the full-document items lane.
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    // The chip lane must never touch the item-intent lane.
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
     // And the fake server ledger converges additively: 50 + 3 = 53.
     await waitFor(() => expect(serverCurrency.gp).toBe(53));
   });
@@ -148,9 +150,10 @@ describe('PartyInventory rapid currency clicks', () => {
 
     // A newer ITEM edit rides its own queue independently — the currency delta lane
     // can never block or clobber it (the old shared full-doc queue made it wait).
+    // It posts ONE setQty intent, not an item-list snapshot.
     fireEvent.click(screen.getByLabelText('Increase quantity'));
-    await waitFor(() => expect(mockSavePartyItems).toHaveBeenCalledTimes(1));
-    expect(mockSavePartyItems.mock.calls[0][1][0].quantity).toBe(2);
+    await waitFor(() => expect(mockApplyItemIntent).toHaveBeenCalledTimes(1));
+    expect(mockApplyItemIntent.mock.calls[0][1]).toEqual({ action: 'setQty', id: 'i1', quantity: 2, name: 'Rope, Hempen' });
 
     // The hung adjust lands LAST: the server applied +1 onto ITS ledger and the SSE
     // echo carries the merged truth (gp 51, qty 2) — both lanes converge additively,

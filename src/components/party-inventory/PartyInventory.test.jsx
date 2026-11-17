@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
-const mockSavePartyItems = vi.fn();
+const mockApplyItemIntent = vi.fn();
 const mockAdjustCurrency = vi.fn();
 const mockTransferInventory = vi.fn();
 let sseHandler = null;
@@ -12,7 +12,7 @@ let sseHandler = null;
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  savePartyItems: (...args) => mockSavePartyItems(...args),
+  applyItemIntent: (...args) => mockApplyItemIntent(...args),
   adjustCurrency: (...args) => mockAdjustCurrency(...args),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
@@ -60,9 +60,28 @@ const baseInventory = () => ({
   ],
 });
 
+// Fake per-row ledger mirroring POST /inventory/item: each intent mutates only its
+// target row on the "server" list — no whole-list snapshot ever reaches this lane.
+let serverItems;
+
+function applyIntentToLedger(intent) {
+  if (intent.action === 'add' || intent.action === 'update') {
+    const row = { name: intent.item.name, quantity: intent.item.quantity, description: intent.item.description };
+    const index = serverItems.findIndex(i => i.id === intent.item.id);
+    if (index >= 0) serverItems[index] = { ...serverItems[index], ...row };
+    else serverItems.push({ id: intent.item.id, ...row });
+  } else if (intent.action === 'setQty') {
+    serverItems.find(i => i.id === intent.id).quantity = intent.quantity;
+  } else {
+    serverItems = serverItems.filter(i => i.id !== intent.id);
+  }
+  return { currency: { pp: 1, gp: 50, sp: 20, cp: 0 }, items: serverItems };
+}
+
 beforeEach(() => {
+  serverItems = baseInventory().items;
   mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => ({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items }));
+  mockApplyItemIntent.mockReset().mockImplementation(async (_c, intent) => applyIntentToLedger(intent));
   mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => ({
     currency: { pp: 1, gp: 50 + (amount.gp || 0), sp: 20, cp: amount.cp || 0 },
     items: [],
@@ -97,8 +116,8 @@ describe('PartyInventory', () => {
     await waitFor(() => {
       expect(mockAdjustCurrency).toHaveBeenCalledWith('test-campaign', { pp: 0, gp: 10, sp: 0, cp: 0 });
     });
-    // The chip write must never ride the full-document items lane.
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    // The chip write must never ride the item-intent lane.
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
   });
 
   it('disables the remove chip when it would go below zero', async () => {
@@ -190,9 +209,11 @@ describe('PartyInventory', () => {
     fireEvent.change(nameInput, { target: { value: 'Goblin Idol' } });
     fireEvent.click(screen.getByRole('button', { name: /Save/ }));
     await waitFor(() => {
-      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.arrayContaining([
-        expect.objectContaining({ name: 'Goblin Idol' }),
-      ]));
+      // One atomic ADD intent for just the new row — never a whole-list snapshot.
+      expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        action: 'add',
+        item: expect.objectContaining({ name: 'Goblin Idol' }),
+      }));
     });
   });
 
@@ -202,9 +223,12 @@ describe('PartyInventory', () => {
     const row = screen.getByText('Antitoxin').closest('tr');
     fireEvent.click(within(row).getByTitle('Delete item'));
     await waitFor(() => {
-      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.not.arrayContaining([
-        expect.objectContaining({ id: 'i1' }),
-      ]));
+      // One atomic row-delete intent — siblings stay on the server ledger untouched.
+      expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        action: 'delete',
+        id: 'i1',
+      }));
+      expect(serverItems.map(i => i.id)).toEqual(['i2']);
     });
     window.confirm.mockRestore();
   });

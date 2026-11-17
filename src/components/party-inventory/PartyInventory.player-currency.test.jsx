@@ -13,13 +13,13 @@ import { addEntry } from '../../services/ui/logService.js';
 
 const mockLoadInventory = vi.fn();
 const mockTransferInventory = vi.fn();
-const mockSavePartyItems = vi.fn();
+const mockApplyItemIntent = vi.fn();
 let confirmSpy = null;
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  savePartyItems: (...args) => mockSavePartyItems(...args),
+  applyItemIntent: (...args) => mockApplyItemIntent(...args),
   adjustCurrency: vi.fn(),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
@@ -76,7 +76,7 @@ const poolAfterCopperReturn = () => {
 
 beforeEach(() => {
   mockLoadInventory.mockReset().mockResolvedValue(poolWithoutCopper());
-  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => ({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items }));
+  mockApplyItemIntent.mockReset().mockImplementation(async (_c, intent) => ({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items: intent.item ? [intent.item] : [] }));
   mockTransferInventory.mockReset().mockResolvedValue({
     inventory: poolWithoutCopper(),
     character: { name: 'War Cleric', inventory: {} },
@@ -147,7 +147,7 @@ describe('PartyInventory currency `To Party` return lane', () => {
     fireEvent.click(copperToParty());
     expect(confirmSpy).toHaveBeenCalledWith('Move 1 cp from War Cleric to party inventory?');
     expect(mockTransferInventory).not.toHaveBeenCalled();
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
   });
 
   it('accepting transfers via the atomic player-to-party lane with a cp-only currency payload', async () => {

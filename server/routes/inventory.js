@@ -18,9 +18,11 @@ const router = express.Router();
 // Currency is NEVER written from a client snapshot: every coin movement is an
 // additive delta the server applies to ITS current ledger (/inventory/adjust for
 // chip grants/removals and loot awards, /inventory/transfer for moves in/out of a
-// character purse). POST /inventory owns the item ledger only and refuses bodies
-// carrying currency — the debounced full-document snapshots it used to accept let a
-// second GM window silently clobber concurrent presses (cross-tab full-doc clobber).
+// character purse). Item writes are never full-list snapshots either — POST
+// /inventory/item applies ONE add/update/setQty/delete intent keyed by row id onto
+// the freshly re-read ledger, so a second GM window can neither clobber a concurrent
+// add/edit/step (the residual item face of the cross-tab full-doc clobber) nor
+// silently resurrect a row another window deleted (loud 409 + merged doc).
 // Audited exception: player→party transfers stay open — a player may contribute from
 // their OWN resources; the server debits the character file atomically (409 when short),
 // so that lane can never mint treasury wealth.
@@ -282,25 +284,105 @@ router.get('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
     res.json({ inventory: loadInventory(campaign) });
 }));
 
-// POST /api/campaigns/:campaign/inventory — replaces the party ITEM ledger (GM-only).
-// Body: { items: [...] }. Currency is deliberately NOT writable here: a full-document
-// snapshot from one GM window used to overwrite a concurrent currency press from
-// another (cross-tab full-doc clobber). Coins move only through the atomic delta
-// lanes /inventory/adjust and /inventory/transfer, so a body carrying currency 400s
-// loudly instead of silently clobbering the ledger.
-router.post('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
+// POST /api/campaigns/:campaign/inventory/item — atomic single-item intent on the party
+// ITEM ledger (GM-only). Body (one intent per request):
+//   { action: 'add',    item: { id?, name, quantity, description } } — append a new row;
+//       a client-supplied id is KEPT (the writer's optimistic row keeps the same key and a
+//       retried POST rewrites that row instead of double-adding).
+//   { action: 'update', item: { id, name, quantity, description } } — rewrite one row's fields.
+//   { action: 'setQty', id, quantity, name? } — absolute quantity for one row.
+//   { action: 'delete', id, name? }           — remove one row.
+// The server re-reads ITS ledger and applies only the intent, so concurrent GM windows
+// merge additively — a stale writer can no longer replace the whole item list and silently
+// erase another window's add/edit/step/delete (the residual item face of the cross-tab
+// full-doc clobber class the /adjust lane closed for coins). 'update'/'setQty'/'delete'
+// on a row a concurrent window already removed 409 with the Notes-family conflict copy
+// labelled by display name (the optional `name` rides for exactly that) and the current
+// merged doc, never a silent resurrection. Currency is untouched by every intent.
+// Merges publish `inventory-<campaign>` like /adjust and /transfer.
+const VALID_ITEM_ACTIONS = ['add', 'update', 'setQty', 'delete'];
+
+function sanitizeItemFields(raw) {
+    if (!raw || typeof raw !== 'object') return { error: 'item is required' };
+    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+    if (!name) return { error: 'item.name is required' };
+    const quantity = Number(raw.quantity);
+    if (!Number.isFinite(quantity) || quantity < 1) return { error: 'quantity must be a positive integer' };
+    return {
+        id: typeof raw.id === 'string' && raw.id ? raw.id : null,
+        name,
+        quantity: Math.floor(quantity),
+        description: typeof raw.description === 'string' ? raw.description : '',
+    };
+}
+
+// add/update: rewrite the row keyed by item.id ('add' appends when the id is unknown —
+// a retried POST rewrites instead of double-adding; 'update' 409s on a vanished row
+// instead of resurrecting it). setQty/delete target the top-level id. Mutates the
+// freshly loaded ledger; returns { error } (400), { conflict } (409) or { ok }.
+function applyItemUpsert(inventory, body) {
+    const clean = sanitizeItemFields(body.item);
+    if (clean.error) return clean;
+    if (body.action === 'update' && !clean.id) return { error: 'item.id is required to update an item' };
+    const index = clean.id ? inventory.items.findIndex(i => i.id === clean.id) : -1;
+    if (index >= 0) {
+        Object.assign(inventory.items[index], { name: clean.name, quantity: clean.quantity, description: clean.description });
+    } else if (body.action === 'update') {
+        return { conflict: true, name: clean.name, id: clean.id };
+    } else {
+        inventory.items.push({ id: clean.id || guid.create().value, name: clean.name, quantity: clean.quantity, description: clean.description });
+    }
+    return { ok: true };
+}
+
+function applyItemRowAction(inventory, body) {
+    const id = typeof body.id === 'string' && body.id ? body.id : null;
+    if (!id) return { error: 'id is required' };
+    if (body.action === 'setQty') {
+        const quantity = Number(body.quantity);
+        if (!Number.isFinite(quantity) || quantity < 1) return { error: 'quantity must be a positive integer' };
+        const target = inventory.items.find(i => i.id === id);
+        if (!target) return { conflict: true, name: body.name, id };
+        target.quantity = Math.floor(quantity);
+        return { ok: true };
+    }
+    const index = inventory.items.findIndex(i => i.id === id);
+    if (index === -1) return { conflict: true, name: body.name, id };
+    inventory.items.splice(index, 1);
+    return { ok: true };
+}
+
+function applyItemAction(inventory, body) {
+    if (body.action === 'add' || body.action === 'update') return applyItemUpsert(inventory, body);
+    return applyItemRowAction(inventory, body);
+}
+
+function itemConflict(res, inventory, name, id) {
+    const label = typeof name === 'string' && name.trim() ? name.trim() : id;
+    res.status(409).json({
+        error: `Party item "${label}" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.`,
+        inventory,
+    });
+}
+
+router.post('/api/campaigns/:campaign/inventory/item', asyncHandler((req, res) => {
     if (!refuseUnlessGm(req, res)) return;
     const { campaign } = req.params;
     const body = req.body || {};
-    if (body.currency !== undefined) {
-        return res.status(400).json({ error: 'inventory.currency is not written by this lane — apply per-coin deltas through /inventory/adjust or /inventory/transfer' });
+    if (!VALID_ITEM_ACTIONS.includes(body.action)) {
+        return res.status(400).json({ error: 'action must be "add", "update", "setQty" or "delete"' });
     }
-    const items = sanitizeItems(body.items);
-    if (items === null) {
-        return res.status(400).json({ error: 'inventory.items must be an array' });
-    }
+
     const inventory = loadInventory(campaign);
-    inventory.items = items;
+    const result = applyItemAction(inventory, body);
+    if (result.error) {
+        return res.status(400).json({ error: result.error });
+    }
+    if (result.conflict) {
+        return itemConflict(res, inventory, result.name, result.id);
+    }
+
+    inventory.items = sortItems(inventory.items);
     saveInventory(campaign, inventory);
     publish(`inventory-${campaign}`, inventory, campaign);
     res.json({ success: true, inventory });

@@ -3,7 +3,7 @@ import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import utils from '../../services/ui/utils.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
-import { loadInventory, savePartyItems, adjustCurrency, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
+import { loadInventory, applyItemIntent, adjustCurrency, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
 import Popup from '../common/Popup.jsx';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 import './PartyInventory.css';
@@ -575,16 +575,19 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   // making the open modal obvious instead of silently swallowing clicks.
   const [giveState, setGiveState] = useState(null);
 
-  // Serialize full-store ITEM POSTs (bug-party-inventory-currency-rapid-click-collapse):
-  // one in-flight request per endpoint; writes coalesce into a single follow-up POST
-  // carrying the latest item list. A revision stamp drops stale echoes so out-of-order
-  // responses can never wipe landed edits (playbook §39).
-  // Currency chips no longer ride this snapshot queue at all: they accumulate signed
+  // Serialize the ITEM lane as atomic per-row intents (bug-inventory-item-save-concurrent-
+  // snapshot-last-writer-wins): writes used to POST the tab's whole item list, so a second
+  // GM window's stale snapshot silently erased a concurrent add/edit/step/delete. Each
+  // write now queues ONE add/update/setQty/delete intent keyed by row id (FIFO, one
+  // in-flight POST per endpoint) which the server applies onto ITS freshly re-read ledger
+  // — concurrent windows merge additively. A revision stamp still drops stale acks so
+  // out-of-order responses can never wipe landed edits (playbook §39).
+  // Currency chips no longer ride this queue at all: they accumulate signed
   // per-coin deltas behind the trailing debounce and flush through the atomic
   // server-side /adjust lane (cross-tab full-doc clobber fix — the server clamps and
   // adds onto ITS ledger, so two GM windows both land).
   const inventoryRef = useRef(inventory);
-  const persistQueueRef = useRef({ saving: false, pending: null });
+  const persistQueueRef = useRef({ saving: false, pending: [] });
   const currencyQueueRef = useRef({ saving: false, delta: { pp: 0, gp: 0, sp: 0, cp: 0 } });
   const localRevRef = useRef(0);
   const currencyDebounceRef = useRef(null);
@@ -623,25 +626,51 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     return unsubscribe;
   }, [campaignName, applyInventory]);
 
-  // Items lane: full item-list replacement (currency is server-owned — see
-  // flushCurrencyDelta). Immediate, one in-flight POST, latest-list follow-up.
+  // Items lane: one intent POST in flight at a time, FIFO; each POST carries a single
+  // add/update/setQty/delete the server applies onto ITS re-read ledger (currency is
+  // server-owned — see flushCurrencyDelta). The delete audit row is written ONLY after
+  // the server acked the removal (delete-item-log idiom).
   const flushPersist = useCallback(function flushPersistQueue() {
     const queue = persistQueueRef.current;
-    if (queue.saving || !queue.pending) return;
-    const items = queue.pending;
+    if (queue.saving || queue.pending.length === 0) return;
+    const intent = queue.pending.shift();
     const rev = localRevRef.current;
-    queue.pending = null;
     queue.saving = true;
     setSaving(true);
-    savePartyItems(campaignName, items)
+    applyItemIntent(campaignName, intent)
       .then(saved => {
-        // Stale-response guard: a newer local edit superseded this snapshot.
+        // Post-ack only: the Removed row can never claim a deletion the ledger refused.
+        // It lands even when a newer local edit already owns the display (whose ack the
+        // revision guard below drops) — the server write itself succeeded.
+        if (intent.action === 'delete') {
+          addEntry(campaignName, {
+            type: 'inventory_transfer',
+            message: `Removed "${intent.name}" from party inventory`,
+            timestamp: Date.now(),
+          }).catch(err => console.error('[PartyInventory] log error:', err));
+        }
+        // Stale-response guard: a newer local edit superseded this intent's ack.
         if (localRevRef.current !== rev) return;
         applyInventory(saved, { ack: true });
       })
       .catch(error => {
-        console.error('[PartyInventory] save failed:', error);
-        alert(`Save failed: ${error.message}`);
+        // A 409 conflict carries the server's current merged doc — adopt it: the row
+        // vanished in another window, so neither the write nor its optimistic echo
+        // survives (409s stay loud: this window's view just lost to a concurrent write).
+        if (error.status === 409 && error.inventory) {
+          applyInventory(error.inventory);
+        }
+        if (intent.action === 'delete') {
+          console.error('[PartyInventory] delete failed:', error);
+          alert(`Delete failed: ${error.message}`);
+          // Roll the optimistic delete back so the row re-appears in the open view
+          // (server kept the item). The stale guard mirrors the ack above: a newer
+          // local edit made while this write was in flight owns the display.
+          if (!error.inventory && localRevRef.current === rev) applyInventory(intent.previous);
+        } else {
+          console.error('[PartyInventory] save failed:', error);
+          alert(`Save failed: ${error.message}`);
+        }
       })
       .finally(() => {
         queue.saving = false;
@@ -723,11 +752,10 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     };
   }, [flushCurrencyPersist]);
 
-  const persist = useCallback((next) => {
-    applyInventory(next);
-    persistQueueRef.current.pending = next.items;
+  const queueItemIntent = useCallback((intent) => {
+    persistQueueRef.current.pending.push(intent);
     flushPersist();
-  }, [applyInventory, flushPersist]);
+  }, [flushPersist]);
 
   // Currency chip path: optimistic display is instant, and the click contributes its
   // optimistic difference to the pending signed delta (a press that the zero floor
@@ -778,64 +806,58 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     const name = editForm.name.trim();
     if (!name) return;
     const inv = inventoryRef.current;
-    const existingIndex = editForm.id
-      ? inv.items.findIndex(i => i.id === editForm.id)
-      : inv.items.findIndex(i => i.name.toLowerCase() === name.toLowerCase());
+    // Resolve the target row before sending: an edit carries its id; a new add matching a
+    // stored row's name (case-insensitive) rewrites that row — the historic modal
+    // behaviour. A genuinely new row keeps a locally minted id so later stepper/delete
+    // intents resolve the same key before the ack lands. No id → server-side 'add'
+    // appends onto ITS ledger (never a whole-list replace).
+    const targetId = editForm.id
+      || inv.items.find(i => i.name.toLowerCase() === name.toLowerCase())?.id
+      || null;
+    const row = { name, quantity: Math.max(1, editForm.quantity), description: editForm.description };
     const items = [...inv.items];
+    const existingIndex = targetId ? items.findIndex(i => i.id === targetId) : -1;
+    let id = targetId;
     if (existingIndex === -1) {
-      items.push({ id: utils.safeUuid(), name, quantity: editForm.quantity, description: editForm.description });
+      id = targetId || utils.safeUuid();
+      items.push({ id, ...row });
     } else {
-      items[existingIndex] = { ...items[existingIndex], ...editForm, name, quantity: Math.max(1, editForm.quantity) };
+      items[existingIndex] = { ...items[existingIndex], ...row };
     }
     setEditForm(null);
-    persist({ ...inv, items });
+    applyInventory({ ...inv, items });
+    queueItemIntent(targetId
+      ? { action: 'update', item: { id: targetId, ...row } }
+      : { action: 'add', item: { id, ...row } });
+  };
+
+  // Stepper/qty-set path: ONE server-owned absolute quantity for one row — concurrent
+  // windows stepping other rows merge instead of replacing each other's lists.
+  const setItemQuantity = (item, quantity) => {
+    const inv = inventoryRef.current;
+    const current = inv.items.find(i => i.id === item.id);
+    if (!current || current.quantity === quantity) return;
+    applyInventory({ ...inv, items: inv.items.map(i => i.id === item.id ? { ...i, quantity } : i) });
+    queueItemIntent({ action: 'setQty', id: item.id, quantity, name: current.name });
   };
 
   const handleItemStep = (item, delta) => {
-    const inv = inventoryRef.current;
-    const current = inv.items.find(i => i.id === item.id);
-    if (!current) return;
-    const quantity = Math.max(1, current.quantity + delta);
-    if (quantity === current.quantity) return;
-    persist({ ...inv, items: inv.items.map(i => i.id === item.id ? { ...i, quantity } : i) });
+    const current = inventoryRef.current.items.find(i => i.id === item.id);
+    if (current) setItemQuantity(item, Math.max(1, current.quantity + delta));
   };
 
-  // Pre-await log audit (backlog 2026-10-29-AB): this row used to ride the
-  // fire-and-forget persist queue, so a rejected save left the durable
-  // campaign log claiming a removal the ledger never got — the same log/disk
-  // divergence 4d81b8495 closed for the EB join. Now an atomic destructive
-  // lane (handleConfirmMove idiom): drain the debounced currency snapshot,
-  // POST the deletion, and write the row ONLY after the server acks it.
-  // Rejection = console.error + lane-convention alert + optimistic-delete
-  // rollback (2026-10-29 AC backlog), zero rows.
+  // Delete is an atomic destructive lane on the serialized intent queue (handleConfirmMove
+  // idiom): drain the debounced currency deltas, queue the single-row delete, and write
+  // the `Removed "X" from party inventory` row ONLY after the server acked it (pre-await
+  // audit law, backlog 2026-10-29-AB) — a rejected or conflicted delete writes zero rows.
+  // Rejection = console.error + lane-convention alert + optimistic-delete rollback
+  // (2026-10-29 AC backlog), and a 409 adopts the server's merged truth instead.
   const handleDeleteItem = (item) => {
     if (!window.confirm(`Delete "${item.name}" from party inventory?`)) return;
     flushCurrencyPersist();
     const inv = inventoryRef.current;
-    const items = inv.items.filter(i => i.id !== item.id);
-    applyInventory({ ...inv, items });
-    const rev = localRevRef.current;
-    setSaving(true);
-    savePartyItems(campaignName, items)
-      .then(saved => {
-        // Stale-response guard mirrors flushPersist: a newer local edit
-        // superseded this snapshot's ack.
-        if (localRevRef.current === rev) applyInventory(saved, { ack: true });
-        addEntry(campaignName, {
-          type: 'inventory_transfer',
-          message: `Removed "${item.name}" from party inventory`,
-          timestamp: Date.now(),
-        }).catch(err => console.error('[PartyInventory] log error:', err));
-      })
-      .catch(error => {
-        console.error('[PartyInventory] delete failed:', error);
-        // Roll the optimistic delete back so the row re-appears in the open view
-        // (server kept the item). Stale guard mirrors the ack above: a newer
-        // local edit made while this write was in flight owns the display.
-        if (localRevRef.current === rev) applyInventory(inv);
-        alert(`Delete failed: ${error.message}`);
-      })
-      .finally(() => setSaving(false));
+    applyInventory({ ...inv, items: inv.items.filter(i => i.id !== item.id) });
+    queueItemIntent({ action: 'delete', id: item.id, name: item.name, previous: inv });
   };
 
   const handleConfirmMove = () => {
@@ -988,7 +1010,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
                         <QuantityStepper
                           quantity={item.quantity}
                           onStep={(delta) => handleItemStep(item, delta)}
-                          onSet={(v) => persist({ ...inventoryRef.current, items: inventoryRef.current.items.map(i => i.id === item.id ? { ...i, quantity: Math.max(1, v) } : i) })}
+                          onSet={(v) => setItemQuantity(item, Math.max(1, v))}
                         />
                       ) : (
                         <span>{item.quantity}</span>

@@ -51,23 +51,34 @@ export async function loadInventory(campaignName) {
 }
 
 /**
- * Replace the party ITEM ledger (server re-sorts items). Currency is never written
- * through this lane — the server refuses bodies carrying it; coin movements ride the
- * atomic adjustCurrency / transferInventory delta lanes so a stale full-document
- * snapshot can never clobber a concurrent write from another GM session.
+ * Atomically apply ONE party-item intent (server re-reads its item ledger and writes only
+ * that row — the item mirror of the adjustCurrency coin lane, so concurrent GM windows
+ * merge additively and a stale full-list snapshot can never clobber another window's
+ * add/edit/step/delete). Intents:
+ *   { action: 'add',    item: { id, name, quantity, description } }
+ *   { action: 'update', item: { id, name, quantity, description } }
+ *   { action: 'setQty', id, quantity, name }
+ *   { action: 'delete', id, name }
+ * `name` rides on setQty/delete so a concurrent-deletion 409 can be labelled by display
+ * name rather than raw id.
  * @param {string} campaignName
- * @param {Array} items - the complete replacement item list
- * @returns {Promise<Object>} the updated normalized inventory (currency included)
+ * @param {Object} intent - one item intent, shapes above
+ * @returns {Promise<Object>} the merged normalized inventory (currency included)
+ * @throws {Error} carries `.status` (409 = the target row vanished) and `.inventory`
+ *   (the server's current merged doc attached to a conflict, for the view to adopt)
  */
-export async function savePartyItems(campaignName, items) {
-  const response = await fetch(apiUrl(campaignName), {
+export async function applyItemIntent(campaignName, intent) {
+  const response = await fetch(`${apiUrl(campaignName)}/item`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify(intent),
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to save party inventory');
+    const failure = new Error(error.error || 'Failed to update party inventory');
+    failure.status = response.status;
+    failure.inventory = error.inventory ? normalizeInventory(error.inventory) : undefined;
+    throw failure;
   }
   const data = await response.json();
   return normalizeInventory(data.inventory);

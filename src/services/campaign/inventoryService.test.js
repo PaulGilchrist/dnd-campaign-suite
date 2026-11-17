@@ -8,19 +8,21 @@
  * shapes, server-truth response envelopes, error-body extraction vs the
  * client's own generic fallback strings.
  *
- * THIS file owns `/api/campaigns/:campaign/inventory` (GET bare fetch, POST
- * items-only replace) plus the `/inventory/adjust` and `/inventory/transfer`
- * atomic delta lanes (POST).
+ * THIS file owns `/api/campaigns/:campaign/inventory` (GET bare fetch) plus the
+ * `/inventory/item` atomic per-row intent lane, the `/inventory/adjust` coin lane and
+ * the `/inventory/transfer` move lane (POSTs).
  *
  * Response shapes pinned against server/routes/inventory.js, NOT canned JSON:
  *  - GET  → { inventory: { currency, items } }; the route loadInventory()
  *    initializes a missing file to the empty shape — this endpoint never 404s.
- *  - POST → { success: true, inventory } (sanitized + re-sorted server-side);
- *    the CLIENT drops the success flag and returns normalizeInventory
- *    (data.inventory) only — pinned below.
+ *  - item-intent POST → { success: true, inventory } (the intent merged onto the
+ *    SERVER's re-read ledger, items re-sorted); the CLIENT drops the success flag and
+ *    returns normalizeInventory(data.inventory) only — pinned below.
  *  - transfer POST → { success: true, inventory, character: { name, inventory } };
  *    the client spreads the envelope and re-normalizes only inventory.
- *  - 4xx truths: 400 'inventory.items must be an array' | 'playerName is
+ *  - 4xx truths: item lane 400 'action must be "add", "update", "setQty" or "delete"' |
+ *    'item.name is required' | 'quantity must be a positive integer', 409 concurrent-
+ *    deletion conflict (error + merged inventory); transfer lane 400 'playerName is
  *    required' | 'direction must be "party-to-player" or "player-to-party"' |
  *    'Transfer one item or one currency set per request' | 'quantity must be
  *    a positive integer'; 404 `Character <name> not found`; 409 shortfall
@@ -34,9 +36,9 @@
  *
  * Consumers (liveness verified): src/components/party-inventory/
  * PartyInventory.jsx (App.jsx 'partyInventory' view) — loadInventory on
- * mount, savePartyItems on item edits, adjustCurrency for the +/- chip flush,
- * transferInventory for item/currency moves, normalizeInventory on the raw
- * { currency, items } SSE echo.
+ * mount, applyItemIntent on item add/edit/step/delete, adjustCurrency for the
+ * +/- chip flush, transferInventory for item/currency moves, normalizeInventory
+ * on the raw { currency, items } SSE echo.
  *
  * No timers, no localStorage game state — pure fetch boundary; inventory
  * lives server-side in public/campaigns/:campaign/data/inventory.json.
@@ -44,7 +46,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   loadInventory,
-  savePartyItems,
+  applyItemIntent,
   transferInventory,
   adjustCurrency,
   normalizeInventory,
@@ -196,44 +198,44 @@ describe('inventoryService', () => {
     });
   });
 
-  describe('savePartyItems', () => {
-    it('POSTs the items-only body and returns only the normalized inventory', async () => {
-      const items = [{ id: 'a', name: 'Rope', quantity: 1, description: '50 ft' }];
+  describe('applyItemIntent', () => {
+    it('POSTs the exact single-intent body to /inventory/item and returns only the normalized inventory', async () => {
+      const intent = { action: 'setQty', id: 'a', quantity: 2, name: 'Rope' };
       const inventory = {
         currency: { pp: 0, gp: 15, sp: 0, cp: 0 },
-        items,
+        items: [{ id: 'a', name: 'Rope', quantity: 2, description: '50 ft' }],
       };
-      // server truth: res.json({ success: true, inventory }) — items sanitized +
-      // re-sorted server-side, currency preserved from the ledger (never written here)
+      // server truth: res.json({ success: true, inventory }) — the intent merged onto
+      // the SERVER's re-read ledger (currency preserved, items re-sorted)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
         json: () => Promise.resolve({ success: true, inventory }),
       });
 
-      const result = await savePartyItems('test-campaign', items);
+      const result = await applyItemIntent('test-campaign', intent);
 
       // client DROPS the success flag — returns normalizeInventory(data.inventory)
       expect(result).toEqual(inventory);
       expect(result).not.toHaveProperty('success');
-      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/inventory', {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/inventory/item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify(intent),
       });
     });
 
     it('rethrows the server-truth 400 and its own generic fallback', async () => {
-      // server truth: sanitizeItems(body.items) === null → 400 exact string
+      // server truth: bad action → 400 exact string
       fetchSpy.mockResolvedValueOnce({
         ok: false,
         status: 400,
         statusText: 'Bad Request',
-        json: () => Promise.resolve({ error: 'inventory.items must be an array' }),
+        json: () => Promise.resolve({ error: 'action must be "add", "update", "setQty" or "delete"' }),
       });
       await expect(
-        savePartyItems('test-campaign', 'nope')
-      ).rejects.toThrow('inventory.items must be an array');
+        applyItemIntent('test-campaign', { action: 'polish', id: 'a' })
+      ).rejects.toThrow('action must be "add", "update", "setQty" or "delete"');
 
       // client-only generic when the error body has no error field
       fetchSpy.mockResolvedValueOnce({
@@ -243,15 +245,33 @@ describe('inventoryService', () => {
         json: () => Promise.resolve({}),
       });
       await expect(
-        savePartyItems('test-campaign', [])
-      ).rejects.toThrow('Failed to save party inventory');
+        applyItemIntent('test-campaign', { action: 'delete', id: 'a' })
+      ).rejects.toThrow('Failed to update party inventory');
+    });
+
+    it('carries status + merged inventory on the concurrent-deletion 409 (stale-view adoption)', async () => {
+      // server truth: update/setQty/delete on a row another window already removed
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: () => Promise.resolve({
+          error: 'Party item "Rope" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.',
+          inventory: { currency: { pp: 0, gp: 2, sp: 0, cp: 0 }, items: [] },
+        }),
+      });
+      const failure = await applyItemIntent('test-campaign', { action: 'delete', id: 'a', name: 'Rope' })
+        .then(() => null, error => error);
+      expect(failure.message).toContain('Party item "Rope" was deleted');
+      expect(failure.status).toBe(409);
+      expect(failure.inventory).toEqual({ currency: { pp: 0, gp: 2, sp: 0, cp: 0 }, items: [] });
     });
 
     it('rejects raw network errors without swallowing them', async () => {
       fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(
-        savePartyItems('test-campaign', [])
+        applyItemIntent('test-campaign', { action: 'delete', id: 'a' })
       ).rejects.toThrow('ENOTFOUND');
       // swallow lives in the consumer (PartyInventory.jsx 'save failed:') —
       // the service must rethrow, staying non-silent at this boundary

@@ -81,13 +81,13 @@ beforeEach(() => {
 
 describe('inventory — localhost authority gate (GM-only treasury writes)', () => {
     describe.each(LAN_HOSTS)('from LAN host %s', (host) => {
-        it('POST /inventory (items-ledger save) ⇒ 403, disk untouched, no broadcast', async () => {
+        it('POST /inventory/item (single-row intent) ⇒ 403, disk untouched, no broadcast', async () => {
             setupFs({ [invPath]: baseInventory() });
 
             const res = await request(createTestApp())
-                .post(`/api/campaigns/${CAMPAIGN}/inventory`)
+                .post(`/api/campaigns/${CAMPAIGN}/inventory/item`)
                 .set('Host', host)
-                .send({ items: [{ name: 'Torch', quantity: 1, description: '' }] });
+                .send({ action: 'add', item: { name: 'Torch', quantity: 1, description: '' } });
 
             expect(res.status).toBe(403);
             expect(res.body.error).toMatch(/GM-only/i);
@@ -167,17 +167,17 @@ describe('inventory — localhost authority gate (GM-only treasury writes)', () 
     });
 
     describe('localhost GM lanes unchanged', () => {
-        it('POST /inventory still persists items + broadcasts', async () => {
+        it('POST /inventory/item still appends the row + broadcasts (currency untouched)', async () => {
             setupFs({ [invPath]: { currency: { pp: 0, gp: 7, sp: 0, cp: 0 }, items: [] } });
 
             const res = await request(createTestApp())
-                .post(`/api/campaigns/${CAMPAIGN}/inventory`)
+                .post(`/api/campaigns/${CAMPAIGN}/inventory/item`)
                 .set('Host', 'localhost')
-                .send({ items: [{ id: 't1', name: 'Torch', quantity: 2, description: '' }] });
+                .send({ action: 'add', item: { id: 't1', name: 'Torch', quantity: 2, description: '' } });
 
             expect(res.status).toBe(200);
             const saved = JSON.parse(FILE_SYSTEM.get(invPath));
-            expect(saved.items).toHaveLength(1);
+            expect(saved.items).toEqual([{ id: 't1', name: 'Torch', quantity: 2, description: '' }]);
             expect(saved.currency.gp).toBe(7);
             expect(publishedEvents.find(e => e.key === `inventory-${CAMPAIGN}`)).toBeTruthy();
         });

@@ -11,12 +11,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
-const mockSavePartyItems = vi.fn();
+const mockApplyItemIntent = vi.fn();
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  savePartyItems: (...args) => mockSavePartyItems(...args),
+  applyItemIntent: (...args) => mockApplyItemIntent(...args),
   adjustCurrency: vi.fn(),
   transferInventory: vi.fn(),
 }));
@@ -66,7 +66,7 @@ async function openAddModalAndType(name) {
 beforeEach(() => {
   vi.resetAllMocks();
   dataLoader.loadEquipment.mockResolvedValue(diskEquipment);
-  mockSavePartyItems.mockImplementation(async (_c, items) => ({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items }));
+  mockApplyItemIntent.mockImplementation(async (_c, intent) => ({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items: intent.item ? [intent.item] : [] }));
 });
 
 describe('PartyInventory equipment description autofill', () => {
@@ -91,12 +91,13 @@ describe('PartyInventory equipment description autofill', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Save/ }));
     await waitFor(() => {
-      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.arrayContaining([
-        expect.objectContaining({
+      expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        action: 'add',
+        item: expect.objectContaining({
           name: 'Acid (vial)',
           description: acidRow.description.join('\n\n'),
         }),
-      ]));
+      }));
     });
   });
 
@@ -226,10 +227,11 @@ describe('PartyInventory equipment autofill — inversion & case tolerance', () 
 
     fireEvent.click(screen.getByRole('button', { name: /Save/ }));
     await waitFor(() => {
-      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.arrayContaining([
+      expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        action: 'add',
         // Name is NEVER rewritten to the canonical "Hempen Rope" — only the description autofills.
-        expect.objectContaining({ name: 'Rope, Hempen', description: ropeText }),
-      ]));
+        item: expect.objectContaining({ name: 'Rope, Hempen', description: ropeText }),
+      }));
     });
   });
 
@@ -248,12 +250,13 @@ describe('PartyInventory equipment autofill — inversion & case tolerance', () 
     expect(save.disabled).toBe(false); // miss never blocks the save
     fireEvent.click(save);
     await waitFor(() => {
-      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.arrayContaining([
-        expect.objectContaining({
+      expect(mockApplyItemIntent).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        action: 'add',
+        item: expect.objectContaining({
           name: 'QA Nonsense Widget 9000',
           description: 'nonsense made up whole',
         }),
-      ]));
+      }));
     });
   });
 

@@ -8,13 +8,14 @@
 // ledger), so spaced clicks still flush individually, nothing is dropped, a net-zero
 // burst posts nothing, and an in-flight currency flush can neither block nor clobber an
 // item write (separate queues now). Fake timers; fetch mocked to the real route semantics
-// (GET doc · POST /inventory items-only preserving currency · POST /adjust signed deltas).
+// (GET doc · POST /inventory/item atomic single-row intent · POST /adjust signed deltas).
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const INVENTORY_URL = '/api/campaigns/test-campaign/inventory';
 const ADJUST_URL = `${INVENTORY_URL}/adjust`;
+const ITEM_URL = `${INVENTORY_URL}/item`;
 const DEBOUNCE_MS = 400;
 const COIN_KEYS = ['pp', 'gp', 'sp', 'cp'];
 
@@ -51,7 +52,7 @@ const baseInventory = () => ({
 /** Fake ledger mirroring server/routes/inventory.js lane semantics. */
 let server;
 let adjustments; // currency payloads of every POST to /inventory/adjust
-let itemPosts;   // bodies of every POST to /inventory
+let itemIntents; // bodies of every POST to /inventory/item
 let holdAdjust;  // when true, the next adjust RESPONSE parks (server-side write is
                  // already applied — only network delivery is delayed, the honest
                  // out-of-order-delivery model for a single-threaded sync handler)
@@ -72,9 +73,30 @@ function publishEvent() {
   if (sseHandler) sseHandler({ key: 'inventory-test-campaign', data: clone(server) });
 }
 
+// Apply ONE intent onto the CURRENT fake ledger — rows the intent never mentions
+// survive by construction (the retired snapshot lane replaced the whole list instead).
+function applyIntentToLedger(body) {
+  const items = server.items;
+  if (body.action === 'add' || body.action === 'update') {
+    const index = items.findIndex(i => i.id === body.item.id);
+    const row = { name: body.item.name, quantity: body.item.quantity, description: body.item.description };
+    if (index >= 0) items[index] = { ...items[index], ...row };
+    else items.push({ id: body.item.id, ...row });
+  } else if (body.action === 'setQty') {
+    const target = items.find(i => i.id === body.id);
+    if (!target) return false;
+    target.quantity = body.quantity;
+  } else if (body.action === 'delete') {
+    server = { currency: server.currency, items: items.filter(i => i.id !== body.id) };
+    return true;
+  }
+  server = { currency: server.currency, items };
+  return true;
+}
+
 const fetchMock = vi.fn(async (url, options = {}) => {
   const target = String(url);
-  if (target !== INVENTORY_URL && target !== ADJUST_URL) return response({});
+  if (target !== INVENTORY_URL && target !== ADJUST_URL && target !== ITEM_URL) return response({});
   if (options.method !== 'POST') return response({ inventory: clone(server) });
   const body = JSON.parse(options.body);
   if (target === ADJUST_URL) {
@@ -90,11 +112,14 @@ const fetchMock = vi.fn(async (url, options = {}) => {
     }
     return response({ success: true, inventory: truth });
   }
-  itemPosts.push(body);
-  if (body.currency !== undefined) {
-    return { ok: false, status: 400, json: async () => ({ error: 'inventory.currency is not written by this lane' }) };
+  itemIntents.push(body);
+  if (!applyIntentToLedger(body)) {
+    return {
+      ok: false,
+      status: 409,
+      json: async () => ({ error: `Party item "${body.name}" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.`, inventory: clone(server) }),
+    };
   }
-  server = { currency: server.currency, items: body.items ?? [] };
   const truth = clone(server);
   publishEvent();
   if (holdItem) {
@@ -130,7 +155,7 @@ beforeEach(() => {
   fetchMock.mockClear();
   server = baseInventory();
   adjustments = [];
-  itemPosts = [];
+  itemIntents = [];
   holdAdjust = false;
   holdItem = false;
   releaseAdjust = null;
@@ -163,7 +188,7 @@ describe('PartyInventory currency chip burst debounce', () => {
     expect(adjustments).toHaveLength(1);
     expect(adjustments[0]).toEqual({ pp: 0, gp: 29, sp: 100, cp: 0 });
     // The chips never touch the items lane.
-    expect(itemPosts).toHaveLength(0);
+    expect(itemIntents).toHaveLength(0);
     // The fake ledger converged additively onto 79/120.
     expect(server.currency.gp).toBe(79);
     expect(server.currency.sp).toBe(120);
@@ -206,8 +231,8 @@ describe('PartyInventory currency chip burst debounce', () => {
     // used to park it behind the currency write.
     fireEvent.click(screen.getByLabelText('Increase quantity'));
     await pastDebounce(50);
-    expect(itemPosts).toHaveLength(1);
-    expect(itemPosts[0].items[0].quantity).toBe(2);
+    expect(itemIntents).toHaveLength(1);
+    expect(itemIntents[0]).toEqual({ action: 'setQty', id: 'i1', quantity: 2, name: 'Rope, Hempen' });
     expect(goldAmount()).toBe('60');
 
     const resolve = releaseAdjust;

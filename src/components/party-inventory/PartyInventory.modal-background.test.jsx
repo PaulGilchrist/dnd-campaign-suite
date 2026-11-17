@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
-const mockSavePartyItems = vi.fn();
+const mockApplyItemIntent = vi.fn();
 const mockAdjustCurrency = vi.fn();
 const mockTransferInventory = vi.fn();
 let confirmSpy = null;
@@ -19,7 +19,7 @@ let confirmSpy = null;
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  savePartyItems: (...args) => mockSavePartyItems(...args),
+  applyItemIntent: (...args) => mockApplyItemIntent(...args),
   adjustCurrency: (...args) => mockAdjustCurrency(...args),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
@@ -51,7 +51,7 @@ const baseInventory = () => ({
 
 beforeEach(() => {
   mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => ({ ...baseInventory(), items }));
+  mockApplyItemIntent.mockReset().mockImplementation(async (_c, intent) => ({ ...baseInventory(), items: intent.item ? [intent.item] : baseInventory().items }));
   mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => ({
     currency: { pp: 1, gp: 205, sp: 20, cp: 50 + (amount.cp || 0) },
     items: baseInventory().items,
@@ -113,7 +113,7 @@ describe('PartyInventory modal-open background treatment', () => {
     await renderReady();
     openGiveModal();
     fireEvent.click(screen.getByTitle('Add 1 cp'));
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
     expect(mockAdjustCurrency).not.toHaveBeenCalled();
     expect(mockTransferInventory).not.toHaveBeenCalled();
     // Amount stays at the loaded balance.
@@ -134,7 +134,7 @@ describe('PartyInventory modal-open background treatment', () => {
     const overlay = openGiveModal();
     fireEvent.keyDown(overlay.querySelector('.pi-modal'), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByText('Give Currency to Player')).toBeNull());
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
     expect(mockAdjustCurrency).not.toHaveBeenCalled();
     expect(mockTransferInventory).not.toHaveBeenCalled();
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -160,13 +160,13 @@ describe('PartyInventory modal-open background treatment', () => {
     const overlay = openGiveModal();
     fireEvent.click(withinCancel(overlay));
     await waitFor(() => expect(screen.queryByText('Give Currency to Player')).toBeNull());
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
     expect(currencyCard()).not.toHaveAttribute('inert');
     // Steppers live again: a post-close click schedules the debounced party-pool
     // delta flush (atomic /adjust lane — never a full-document snapshot).
     fireEvent.click(screen.getByTitle('Add 1 cp'));
     await waitFor(() => expect(mockAdjustCurrency).toHaveBeenCalledTimes(1));
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
   });
 });
 

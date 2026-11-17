@@ -13,14 +13,14 @@ import PartyInventory from './PartyInventory.jsx';
 import { addEntry } from '../../services/ui/logService.js';
 
 const mockLoadInventory = vi.fn();
-const mockSavePartyItems = vi.fn();
+const mockApplyItemIntent = vi.fn();
 const mockAdjustCurrency = vi.fn();
 let sseHandler = null;
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  savePartyItems: (...args) => mockSavePartyItems(...args),
+  applyItemIntent: (...args) => mockApplyItemIntent(...args),
   adjustCurrency: (...args) => mockAdjustCurrency(...args),
   transferInventory: vi.fn(),
 }));
@@ -56,7 +56,7 @@ beforeEach(() => {
     currency: { ...serverCurrency },
     items: [],
   }));
-  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => ({ currency: { ...serverCurrency }, items }));
+  mockApplyItemIntent.mockReset().mockImplementation(async (_c, intent) => ({ currency: { ...serverCurrency }, items: intent.item ? [intent.item] : [] }));
   mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => {
     for (const key of ['pp', 'gp', 'sp', 'cp']) {
       serverCurrency[key] = Math.max(0, serverCurrency[key] + (amount[key] || 0));
@@ -107,8 +107,8 @@ describe('PartyInventory chip delta lane (cross-tab clobber regression)', () => 
     expect(mockAdjustCurrency.mock.calls[1][1]).toEqual({ pp: 0, gp: 0, sp: 0, cp: 1 });
     // Both ledger writes landed additively on the fake server: 2×+1 cp → 2.
     expect(serverCurrency.cp).toBe(2);
-    // Chips NEVER touch the full-document items lane.
-    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    // Chips NEVER touch the item-intent lane.
+    expect(mockApplyItemIntent).not.toHaveBeenCalled();
   });
 
   it('merges a mixed-sign burst into ONE net signed delta', async () => {
