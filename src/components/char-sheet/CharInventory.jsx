@@ -4,7 +4,12 @@ import usePopup from '../../hooks/combat/usePopup.js'
 import Popup from '../common/popup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
+import { characterCurrency } from '../../services/campaign/characterCurrency.js';
 import './CharInventory.css'
+
+// Purse coin vocabulary — display order matches the server's CURRENCY_KEYS and the
+// From Players pane's per-non-zero-coin rows (shared characterCurrency rule).
+const PURSE_COINS = ['pp', 'gp', 'sp', 'cp'];
 
 const buildPropertyLines = (item) => {
     const properties = [];
@@ -79,6 +84,16 @@ const findEquipmentItem = (equipmentData, itemName) => {
 function CharInventory({ playerStats }) {
     const { popupHtml, setPopupHtml } = usePopup(() => null);
 
+    // Read-only purse row (backlog 2026-11-17 AB): players viewing their own sheet
+    // see exactly the coin the transfer lanes can move — shared characterCurrency
+    // rule, one entry per non-zero coin. No editing affordance by design (the
+    // From Players pane and the party chips own the write lanes).
+    const currency = characterCurrency(playerStats);
+    const purseText = PURSE_COINS
+        .filter(key => currency[key] > 0)
+        .map(key => `${currency[key]} ${key}`)
+        .join(', ');
+
     const handleItemClick = async (itemName) => {
         // Extract name if item has quantity info in parentheses (e.g., "Arrows (10)" -> "Arrows")
         let lookupName = itemName;
@@ -132,6 +147,7 @@ function CharInventory({ playerStats }) {
         <div className='char-inventory'>
              {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
             <div className='sectionHeader'>Inventory</div>
+            {purseText && <div className='char-inventory-purse'><b>Purse:</b> {purseText}</div>}
             {playerStats.inventory.magicItems && playerStats.inventory.magicItems.length > 0 && <div>
                 <b>Magic Items:</b>
                 {playerStats.inventory.magicItems.map((magicItem, index) => {

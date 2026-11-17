@@ -4,6 +4,7 @@ import utils from '../../services/ui/utils.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 import { loadInventory, applyItemIntent, adjustCurrency, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
+import { characterCurrency } from '../../services/campaign/characterCurrency.js';
 import Popup from '../common/Popup.jsx';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 import './PartyInventory.css';
@@ -73,26 +74,6 @@ function playerItemDescription(character, name) {
   const meta = (character.inventory?.itemMeta || {})[name]
     || Object.entries(character.inventory?.itemMeta || {}).find(([k]) => k.toLowerCase() === name.toLowerCase())?.[1];
   return (meta && meta.description) || '';
-}
-
-// Player purse resolution — mirrors the server's characterCurrency()/transfer debit
-// rule (server/routes/inventory.js) so the pane shows EXACTLY what a `To Party`
-// return can move: the { pp, gp, sp, cp } block when present, else positive gold
-// counted as gp — the same conversion the server applies when debiting characters
-// that carry only inventory.gold.
-function playerCurrency(character) {
-  const currency = { pp: 0, gp: 0, sp: 0, cp: 0 };
-  const raw = character.inventory?.currency;
-  if (raw) {
-    for (const key of Object.keys(currency)) {
-      const value = Number(raw[key]);
-      currency[key] = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-    }
-    return currency;
-  }
-  const gold = Number(character.inventory?.gold);
-  if (Number.isFinite(gold) && gold > 0) currency.gp = Math.floor(gold);
-  return currency;
 }
 
 function EquipmentNameInput({ value, onChange, equipmentData, id }) {
@@ -441,9 +422,11 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
   // writes into the character file, so the same player fetch that lists backpack
   // items must surface the purse with a matching `To Party` return. One row per
   // non-zero coin, CURRENCIES order — mirrors the party CurrencyCard layout.
+  // Purse resolution lives in the shared services/campaign/characterCurrency.js
+  // (single client mirror of the server rule, also used by the sheet's Purse row).
   const purse = useMemo(() => {
     if (!character) return [];
-    const currency = playerCurrency(character);
+    const currency = characterCurrency(character);
     return CURRENCIES
       .map(({ key, label, icon }) => ({ key, label, icon, amount: currency[key] }))
       .filter(row => row.amount > 0);

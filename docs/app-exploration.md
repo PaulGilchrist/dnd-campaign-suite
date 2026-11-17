@@ -52,8 +52,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-17 AB — sheet still shows no purse:** the currency fix chose the From-Players pane only; a player tab (their own sheet) has no currency read face (the bug file's "purse line on the sheet" option was left unimplemented). A read-only `Purse: 10 gp` row in the CharSummary inventory area would close the loop for players viewing their own coin.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried).
