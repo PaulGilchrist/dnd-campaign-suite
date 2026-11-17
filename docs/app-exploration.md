@@ -60,4 +60,3 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 - NPCFormModal avatar zoom live face — no image-bearing campaign NPC exists; gated correctly per source, consumer-agnostic portal law proven on three other surfaces (AB). Cheap via sanctioned disk `imagePath` grant + restore next run.
 - Space-preventDefault scroll face — weakly lived only (initiative board had no scrollable overflow at 1728×~1000; scrollY stayed 0 but the default had nothing to do). Unit-pinned in `NpcAvatar.test.jsx`.
 - ITEM-write cross-tab clobber — code-grounded in the bug file, not reproduced live (modal-Save timing vs the 400 ms window is not deterministic).
-- Playbook size debt: `docs/test-setup-playbook.md` is ~706 lines vs its ~550 charter; needs a dedicated condense/fold-to-archive pass (run AB added only 5 lines; not the right session for bulk surgery).
