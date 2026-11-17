@@ -57,7 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(CE 2026-11-17) 409 conflict alert copy is stale/misleading:** the native alert reads `Save failed: Party item "X" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.` but the client ALREADY adopted the server's merged doc (the row vanishes live, verified) — the "reload the list" instruction is dead advice and the "Save failed:" prefix buries the conflict-specific copy. Suggest a dedicated 409 branch in `PartyInventory.jsx flushPersist` catch (e.g. `Party item "X" was deleted elsewhere — this window now shows the current list; your edit was NOT saved.`), or trim the server sentence in `itemConflict` since the client no longer needs the reload advice.
 - **(CE 2026-11-17) Give chips lack the aria-label their sibling chips got:** dc1bf7b29 armed every currency stepper/chip with intent aria (`Add 1 cp`, `Increase quantity of X`) but the four `Give` buttons still rely on `title="Give <Coin> to a player"` only — accessible name is the bare "Give" ×4, the exact ambiguity that commit set out to kill. `PartyInventory.jsx` CurrencyCard: mirror title→aria-label on the Give chip (same idiom).
 
 ## Blocked / Not Verified (fold-gate ledger)

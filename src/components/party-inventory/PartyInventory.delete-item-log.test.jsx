@@ -181,8 +181,15 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     await renderReady();
     clickDelete('Antitoxin');
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('was deleted in another tab or session'));
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Party item "Antitoxin" was already deleted elsewhere — this window now shows the current list.'
+      );
     });
+    // Trimmed 409 copy: no dead "reload the list" advice, no misleading "Delete failed:"
+    // prefix (the item IS gone — the row was never this window's to delete).
+    const copy = alertSpy.mock.calls[alertSpy.mock.calls.length - 1][0];
+    expect(copy).not.toMatch(/reload the list/i);
+    expect(copy).not.toMatch(/^Delete failed:/);
     // The rollback must NOT resurrect the row the other window deleted.
     expect(screen.queryByText('Antitoxin')).toBeNull();
     expect(screen.getByText('Torch')).toBeTruthy();

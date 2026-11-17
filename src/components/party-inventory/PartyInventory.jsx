@@ -31,6 +31,15 @@ const CURRENCY_PERSIST_DEBOUNCE_MS = 400;
 
 const EMPTY_FORM = { id: '', name: '', quantity: 1, description: '' };
 
+// Row label for the 409 conflict alert — mirrors the server's itemConflict fallback
+// (trimmed name, row id when no name is known). setQty/delete intents carry `name`;
+// modal update intents carry the row under `item`.
+function conflictItemLabel(intent) {
+  const name = intent.name || intent.item?.name;
+  const label = typeof name === 'string' && name.trim() ? name.trim() : (intent.id || intent.item?.id);
+  return `"${label}"`;
+}
+
 const sortByName = (items) => [...items].sort((a, b) => a.name.localeCompare(b.name));
 
 // Equipment-name matching normalization (backlog 2026-10-24): lowercase, trim, collapse
@@ -665,19 +674,27 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
         // A 409 conflict carries the server's current merged doc — adopt it: the row
         // vanished in another window, so neither the write nor its optimistic echo
         // survives (409s stay loud: this window's view just lost to a concurrent write).
-        if (error.status === 409 && error.inventory) {
-          applyInventory(error.inventory);
+        // Adoption makes the server sentence's "reload the list" advice dead here —
+        // this window shows the current list WITHOUT a reload, so the 409 branch
+        // speaks for itself; only non-409 failures quote the server verbatim.
+        const merged = error.status === 409 && error.inventory ? error.inventory : null;
+        if (merged) {
+          applyInventory(merged);
         }
         if (intent.action === 'delete') {
           console.error('[PartyInventory] delete failed:', error);
-          alert(`Delete failed: ${error.message}`);
+          alert(merged
+            ? `Party item ${conflictItemLabel(intent)} was already deleted elsewhere — this window now shows the current list.`
+            : `Delete failed: ${error.message}`);
           // Roll the optimistic delete back so the row re-appears in the open view
           // (server kept the item). The stale guard mirrors the ack above: a newer
           // local edit made while this write was in flight owns the display.
-          if (!error.inventory && localRevRef.current === rev) applyInventory(intent.previous);
+          if (!merged && localRevRef.current === rev) applyInventory(intent.previous);
         } else {
           console.error('[PartyInventory] save failed:', error);
-          alert(`Save failed: ${error.message}`);
+          alert(merged
+            ? `Party item ${conflictItemLabel(intent)} was deleted elsewhere — this window now shows the current list; your edit was NOT saved.`
+            : `Save failed: ${error.message}`);
         }
       })
       .finally(() => {

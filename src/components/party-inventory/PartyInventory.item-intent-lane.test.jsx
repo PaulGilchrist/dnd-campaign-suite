@@ -8,7 +8,8 @@
 // now per-row intents on the atomic /inventory/item lane (the /adjust model): each POST
 // carries ONE add/update/setQty/delete and the server merges it onto ITS ledger, so a
 // stale view can neither erase a concurrent row nor resurrect a deleted one (409 +
-// merged-doc adoption, Notes-family copy). Server-side merge/409 law pinned in
+// merged-doc adoption with dedicated 409 copy — no "reload"/"Save failed:" advice once
+// adoption is live). Server-side merge/409 law pinned in
 // server/routes/inventory.item-intent.test.js; this file locks the CLIENT wire shape.
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -214,8 +215,13 @@ describe('PartyInventory item-intent lane (snapshot-clobber regression)', () => 
 
     fireEvent.click(rowOf('QA Lantern').getByLabelText('Increase quantity of QA Lantern'));
     await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(
-      'Save failed: Party item "QA Lantern" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.'
+      'Party item "QA Lantern" was deleted elsewhere — this window now shows the current list; your edit was NOT saved.'
     ));
+    // 409 copy law: no dead "reload the list" advice (merged-doc adoption is live)
+    // and no generic prefix burying the conflict-specific sentence.
+    const copy = alertSpy.mock.calls[0][0];
+    expect(copy).not.toMatch(/reload the list/i);
+    expect(copy).not.toMatch(/^Save failed:/);
     // Stale view replaced by the merged doc: the ghost row is gone, nothing re-POSTed.
     expect(screen.queryByText('QA Lantern')).toBeNull();
     expect(mockApplyItemIntent).toHaveBeenCalledTimes(1);
