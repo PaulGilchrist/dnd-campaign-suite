@@ -54,7 +54,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-17 CD) Dangling `imagePath` has no fallback face: Marta's npcs.json row points at `images/Marta Copperkettle.png` which does not exist; `resolveAvatarSrc` returns the truthy path, so `AvatarImage` renders a broken `<img>` (never the initials fallback, which only fires on an EMPTY path) and `NPCFormModal` wires the zoom tier onto it. Cheap fix: probe `img.naturalWidth === 0` → render the initials disc (or clear the path on load error), so ghost DB rows degrade honestly. Files: `common/AvatarImage.jsx`, `npcs/NPCFormModal.jsx`.
 - (2026-11-17 CD) The wildcard change-data store accepts ANY key blindly (`keyValidators.js` pass-through by design), which is how the retired-lane shadow lands silently (bug file). Non-blocking idea alongside the fix: surface unknown top-level change-data keys in the Admin panel census so phantoms are visible before the next clear. Files: `campaigns-admin.js`, Admin panel component.
 
 ## Blocked / Not Verified (fold-gate ledger)

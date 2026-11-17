@@ -122,6 +122,47 @@ describe('AvatarModal', () => {
     );
   });
 
+  // Dangling-path degrade (backlog 2026-11-17 CD): a zoom whose image fails to
+  // load converges onto the SAME letter-fallback branch an empty imagePath
+  // already renders — never a persisted broken-image glyph on the full-screen
+  // scrim. Detection mirrors AvatarImage (error event + naturalWidth probe).
+  describe('failed image load (dangling path)', () => {
+    it('shows the letter fallback when the zoomed image fails to load', () => {
+      renderModal({ imagePath: '/images/missing.png' });
+      fireEvent.error(screen.getByRole('img'));
+
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      expect(panelEl().querySelector('.avatar-modal-initial')).toHaveTextContent('G');
+    });
+
+    it('shows the letter fallback when a "successful" load decodes zero pixels', () => {
+      renderModal({ imagePath: '/images/empty.png' });
+      fireEvent.load(screen.getByRole('img'));
+
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      expect(screen.getByText('G')).toBeInTheDocument();
+    });
+
+    it('keeps the painting image on a successful load (no lingering fallback)', () => {
+      renderModal({ imagePath: '/images/gandalf.png' });
+      const img = screen.getByRole('img');
+      Object.defineProperty(img, 'naturalWidth', { value: 494 });
+      fireEvent.load(img);
+
+      expect(screen.getByRole('img')).toHaveClass('avatar-modal-image');
+      expect(panelEl().querySelector('.avatar-modal-initial')).toBeNull();
+    });
+
+    it('the degraded zoom still closes via the × lane', () => {
+      const handleClose = vi.fn();
+      renderModal({ imagePath: '/images/missing.png', onClose: handleClose });
+      fireEvent.error(screen.getByRole('img'));
+
+      fireEvent.click(screen.getByLabelText('Close'));
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('closing', () => {
     it('calls onClose when the close button is clicked', () => {
       const handleClose = vi.fn();

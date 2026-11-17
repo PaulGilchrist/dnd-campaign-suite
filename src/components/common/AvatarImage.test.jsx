@@ -61,6 +61,65 @@ describe('AvatarImage', () => {
     });
   });
 
+  // Dangling imagePath (a DB row whose file is gone): the browser fires error on
+  // the 404, and the naturalWidth probe catches a zero-pixel payload delivered as
+  // a "successful" load. Both must converge onto the initials disc; a genuinely
+  // painting image keeps the existing <img> branch byte-identical.
+  describe('failed image load (dangling path)', () => {
+    it('renders the initials disc instead of a broken image when the load errors', () => {
+      const { wrapper } = renderAvatar({ imagePath: '/missing.png' });
+      fireEvent.error(screen.getByRole('img'));
+
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      expect(wrapper).toHaveClass('avatar-initial');
+      expect(wrapper.querySelector('span')).toHaveTextContent('T');
+    });
+
+    it('renders the initials disc when a "successful" load decodes zero pixels', () => {
+      const { wrapper } = renderAvatar({ imagePath: '/empty.png' });
+      const img = screen.getByRole('img');
+      expect(img.naturalWidth).toBe(0); // jsdom never decodes — the probe's tripwire
+      fireEvent.load(img);
+
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      expect(wrapper).toHaveClass('avatar-initial');
+    });
+
+    it('keeps the painting image on a successful load (no lingering initials)', () => {
+      const { wrapper } = renderAvatar({ imagePath: '/avatar.png' });
+      const img = screen.getByRole('img');
+      Object.defineProperty(img, 'naturalWidth', { value: 240 });
+      fireEvent.load(img);
+
+      expect(screen.getByRole('img')).toHaveAttribute('src', '/avatar.png');
+      expect(wrapper).not.toHaveClass('avatar-initial');
+      expect(screen.queryByText('T')).not.toBeInTheDocument();
+    });
+
+    it('retries the image when a later imagePath resolves to a new src', () => {
+      const { rerender } = render(<AvatarImage name="Test" imagePath="/missing.png" />);
+      fireEvent.error(screen.getByRole('img'));
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+
+      rerender(<AvatarImage name="Test" imagePath="/fixed.png" />);
+      expect(screen.getByRole('img')).toHaveAttribute('src', '/fixed.png');
+    });
+
+    it('keeps the consumer-wired interactive tier on the degraded disc', () => {
+      // Arming stays the consumer's decision (NPCFormModal/CharSummary gate on a
+      // truthy path; CreatureCard's avatar click opens the stat modal, not a
+      // zoom) — the failed face must not silently strip the tier.
+      const onClick = vi.fn();
+      renderAvatar({ imagePath: '/missing.png', onClick });
+      fireEvent.error(screen.getByRole('img'));
+
+      const disc = screen.getByRole('button');
+      expect(disc).toHaveAttribute('tabindex', '0');
+      fireEvent.keyDown(disc, { key: 'Enter' });
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('sizing', () => {
     it.each([
       ['default size', undefined, '60px'],

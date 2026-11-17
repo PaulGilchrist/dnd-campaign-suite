@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { resolveAvatarSrc } from './avatarSrc.js';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 
@@ -87,6 +87,12 @@ function AvatarModal({ name, imagePath, campaignName, onClose }) {
     }, []);
 
     const src = resolveAvatarSrc(imagePath, campaignName);
+    // Dangling-path degrade (backlog 2026-11-17 CD): a zoom whose image 404s must
+    // converge onto the SAME letter-fallback branch an empty src already renders,
+    // never a persisted broken-image glyph on the full-screen scrim. Mirrors
+    // AvatarImage's own onError + naturalWidth probe.
+    const [imageFailed, setImageFailed] = useState(false);
+    useEffect(() => { setImageFailed(false); }, [src]);
 
     return (
         <div
@@ -98,8 +104,10 @@ function AvatarModal({ name, imagePath, campaignName, onClose }) {
         >
             <div className="avatar-modal" ref={panelRef} tabIndex={-1}>
                 <button className="avatar-modal-close" onClick={handleOnClose} aria-label="Close">&times;</button>
-                {src ? (
-                    <img src={src} alt={name} className="avatar-modal-image" />
+                {src && !imageFailed ? (
+                    <img src={src} alt={name} className="avatar-modal-image"
+                        onError={() => setImageFailed(true)}
+                        onLoad={(e) => { if (e.target.naturalWidth === 0) setImageFailed(true); }} />
                 ) : (
                     <div className="avatar-modal-initial">{name ? name.charAt(0).toUpperCase() : '?'}</div>
                 )}
