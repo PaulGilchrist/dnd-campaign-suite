@@ -10,7 +10,10 @@ import { isLairRowClickable, lairRowAffordance } from '../../services/encounters
 import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses, legendarySpellCastMaster } from './MonsterCardHelpers.js';
 import { useSpellNameIndex } from '../../hooks/ui/useSpellNameIndex.js';
 import { useMonsterPendingOa } from './useMonsterPendingOa.js';
+import { useMonsterAvatarZoom } from './useMonsterAvatarZoom.js';
 import TargetSelect from '../initiative/TargetSelect.jsx';
+import AvatarImage from '../common/AvatarImage.jsx';
+import AvatarModal from '../common/AvatarModal.jsx';
 
 // MA-1883: legendary child render-stamp (mirrors the MA-0051 checkBonus
 // stamp at the same seam) — a child delegating to a live Spellcasting master
@@ -37,7 +40,7 @@ function buildTargetArm({ onTargetChange, creatures, creature, isLocalhost, isPl
   return <TargetSelect creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} allCreatures={creatures} overlays={[]} onTargetChange={onTargetChange} />;
 }
 
-export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {}, creatures = null, onTargetChange, isLocalhost, isPlayerSummoned }) {
+export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {}, creatures = null, onTargetChange, isLocalhost, isPlayerSummoned, imageUrl }) {
 
   // MA-1014: spells.json name index for the spell_save_dc-only utility-row
   // chip arm (Ice Devil "Ice Wall") — resolved here so every card gets it
@@ -49,6 +52,9 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
   // stale-eviction/single-press latch) and disappears once consumed or dropped.
   const { pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack } =
     useMonsterPendingOa({ campaignName, monsterName, monster, creatures, handleAttack });
+  // Header avatar lane (improvement 2026-11-16): click-to-zoom like the
+  // character sheet — row/host image resolution + zoom flag live in the hook.
+  const { avatarImageUrl, showZoom, openZoom, closeZoom } = useMonsterAvatarZoom(monsterName, creatures, imageUrl);
   const content = useMemo(() => {
     if (!monster) return null;
 
@@ -103,7 +109,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
 
     return (
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
-        <MonsterCardHeader monster={monster} monsterName={monsterName} onClose={onClose} targetArm={targetArm} />
+        <MonsterCardHeader monster={monster} monsterName={monsterName} campaignName={campaignName} avatarImageUrl={avatarImageUrl} onAvatarClick={openZoom} onClose={onClose} targetArm={targetArm} />
         <div className="mc-body">
           <MonsterCardStats monster={monster} creatureTempHp={creatureTempHp} shieldOfFaithBonus={shieldOfFaithBonus} condEffects={condEffects} handleInitiative={handleInitiative} />
           {monsterConditions.length > 0 && (
@@ -136,9 +142,10 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
             <i className="fa-solid fa-users" aria-hidden="true"></i> Allies ({currentAllies.length})
           </button>
         </div>
+        <MonsterAvatarZoom open={showZoom} name={monsterName} src={avatarImageUrl} campaignName={campaignName} onClose={closeZoom} />
       </div>
     );
-  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack, onTargetChange, creatures, isLocalhost, isPlayerSummoned]);
+  }, [monster, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterName, monsterSpellUses, monsterReactionUses, monsterLegendaryUses, monsterRecharge, spellNameIndex, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, pendingOaMover, pendingOaHasMelee, onResolveOpportunityAttack, onTargetChange, creatures, isLocalhost, isPlayerSummoned, avatarImageUrl, showZoom, openZoom, closeZoom]);
 
   return content;
 }
@@ -173,9 +180,31 @@ function getRegionalEffects(monster) {
   return monster.regional_effects?.effects?.length > 0 ? monster.regional_effects.effects : null;
 }
 
-function MonsterCardHeader({ monster, monsterName, onClose, targetArm = null }) {
+// Full-size avatar zoom for the stat-block modal (improvement 2026-11-16):
+// the shared AvatarModal popup, mounted inside .mc-card. position:fixed
+// escapes the overlay's scroll container; being the card's last subtree it
+// stacks above the stat block. Null-guarded so the open flag alone never
+// mounts an empty overlay (mirrors the char sheet's imagePath gate).
+function MonsterAvatarZoom({ open, name, src, campaignName, onClose }) {
+  if (!open || !src) return null;
+  return <AvatarModal name={name} imagePath={src} campaignName={campaignName} onClose={onClose} />;
+}
+
+function MonsterCardHeader({ monster, monsterName, campaignName, avatarImageUrl = null, onAvatarClick, onClose, targetArm = null }) {
   return (
     <div className="mc-header" onClick={onClose}>
+      {/* Header avatar (improvement 2026-11-16): same click-to-zoom lane as the
+          character-sheet avatar. The header click closes the overlay, so the
+          avatar wrapper stops propagation — zooming never closes the card. */}
+      <div className="mc-header-avatar no-print" onClick={(e) => e.stopPropagation()}>
+        <AvatarImage
+          name={monsterName}
+          imagePath={avatarImageUrl}
+          campaignName={campaignName}
+          size={60}
+          onClick={avatarImageUrl ? onAvatarClick : undefined}
+        />
+      </div>
       <div className="mc-header-info">
         <div className="mc-name">{monsterName}</div>
         <div className="mc-type-line">

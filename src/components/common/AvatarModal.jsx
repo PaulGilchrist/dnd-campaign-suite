@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import { resolveAvatarSrc } from './avatarSrc.js';
 
 function AvatarModal({ name, imagePath, campaignName, onClose }) {
     const handleOnClose = useCallback((event) => {
@@ -16,7 +17,7 @@ function AvatarModal({ name, imagePath, campaignName, onClose }) {
         };
     }, [handleOnClose]);
 
-    const src = imagePath && imagePath.startsWith('http') ? imagePath : (campaignName && imagePath ? `campaigns/${campaignName}/${imagePath}` : imagePath);
+    const src = resolveAvatarSrc(imagePath, campaignName);
 
     return (
         <div className="avatar-modal-overlay" data-testid="avatar-modal-overlay" role="presentation">

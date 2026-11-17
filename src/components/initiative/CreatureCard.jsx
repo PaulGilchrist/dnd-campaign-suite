@@ -1,6 +1,8 @@
 
 
+import { useState } from 'react'
 import AvatarImage from '../common/AvatarImage.jsx'
+import AvatarModal from '../common/AvatarModal.jsx'
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx'
 import NpcAvatar from './NpcAvatar.jsx'
 import CreatureHp from './CreatureHp.jsx'
@@ -102,12 +104,21 @@ function AwayToggle({ creature, isLocalhost, onToggleAway }) {
 }
 
 function CardAvatar({ creature, isLocalhost, isPlayerSummoned, npcImage, campaignName, characters, onViewCharacter, onNpcClick }) {
+    // Visitor (LAN) avatar zoom (improvement 2026-11-16): read-only tabs can't
+    // open the GM-private stat modal, so clicking a monster/NPC avatar opens
+    // the same full-size image popup the character sheet uses. Per-client
+    // ephemeral flag (AGENTS "stays local: showModal").
+    const [showImageModal, setShowImageModal] = useState(false)
+    const formSource = hasFormSource(creature)
+    const avatarName = formSource ? (creature.beastName || creature.formName || creature.name) : creature.name
+    const imageSrc = (formSource ? null : creature.imagePath) || npcImage || null
     const handleAvatarClick = () => {
         if (isLocalhost || isPlayerSummoned) {
             onNpcClick(creature, { allowNonLocalhost: true });
+        } else if (imageSrc) {
+            setShowImageModal(true);
         }
     }
-    const formSource = hasFormSource(creature)
     if (creature.polymorphObject) {
         return (
             <div className='creature-avatar'>
@@ -125,15 +136,25 @@ function CardAvatar({ creature, isLocalhost, isPlayerSummoned, npcImage, campaig
         )
     }
     return (
-        <div className='creature-avatar'>
-            <NpcAvatar
-                name={formSource ? (creature.beastName || creature.formName || creature.name) : creature.name}
-                imageUrl={npcImage}
-                imagePath={formSource ? undefined : creature.imagePath}
-                campaignName={campaignName}
-                onClick={handleAvatarClick}
-            />
-        </div>
+        <>
+            <div className='creature-avatar'>
+                <NpcAvatar
+                    name={avatarName}
+                    imageUrl={npcImage}
+                    imagePath={formSource ? undefined : creature.imagePath}
+                    campaignName={campaignName}
+                    onClick={handleAvatarClick}
+                />
+            </div>
+            {showImageModal && imageSrc && (
+                <AvatarModal
+                    name={avatarName}
+                    imagePath={imageSrc}
+                    campaignName={campaignName}
+                    onClose={() => setShowImageModal(false)}
+                />
+            )}
+        </>
     )
 }
 

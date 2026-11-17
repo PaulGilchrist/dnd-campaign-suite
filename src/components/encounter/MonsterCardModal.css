@@ -45,6 +45,39 @@
   cursor: pointer;
 }
 
+/* Header avatar (improvement 2026-11-16): click-to-zoom lane matching the
+   character sheet. Scoped under .mc-overlay so nothing bleeds into the
+   Initiative card or sheet avatars; circle/cover styling mirrors the
+   `.initiative .avatar-wrapper` face. */
+.mc-overlay .mc-header-avatar {
+  flex-shrink: 0;
+  margin-right: 14px;
+  cursor: default;
+}
+
+.mc-overlay .mc-header-avatar .avatar-wrapper {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background-color: #d1d5db;
+  color: #374151;
+}
+
+.mc-overlay .mc-header-avatar .avatar-initial {
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.mc-overlay .mc-header-avatar .avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .mc-name {
   font-size: 1.5em;
   font-weight: 700;

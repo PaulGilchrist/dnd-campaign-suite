@@ -2408,7 +2408,7 @@ function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml
   );
 }
 
-function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters, onTargetChange, isLocalhost, isPlayerSummoned }) {
+function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters, onTargetChange, isLocalhost, isPlayerSummoned, imageUrl }) {
   const monsterName = creatureName || monster?.name || 'Monster';
   const creatureTempHp = getRuntimeValue(monsterName, 'tempHp', campaignName) || 0;
   const fallbackCsRef = useRef(null);
@@ -3191,6 +3191,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         onTargetChange={onTargetChange}
         isLocalhost={isLocalhost}
         isPlayerSummoned={isPlayerSummoned}
+        imageUrl={imageUrl}
       />
       {popupHtml && (
         <MonsterAttackPopup

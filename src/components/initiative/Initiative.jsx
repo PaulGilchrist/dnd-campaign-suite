@@ -298,7 +298,7 @@ function ConditionSavePopup({ popup, onClose }) {
 // when the controller disappears (released, and no derived lane re-asserts),
 // the overlay unmounts — the same zero-trust face as the inert avatar click
 // after release. Re-assigning control re-mounts the card (open state kept).
-function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignName, creatures, mapName, characters, onClose, onTargetChange }) {
+function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignName, imageUrl, creatures, mapName, characters, onClose, onTargetChange }) {
     // Reactive targetEffects mirror for the summoned lane — read unconditionally
     // (hook order) and only consulted by the LAN gate below.
     const allTargetEffects = useRuntimeValue('campaign', 'targetEffects') ?? []
@@ -320,6 +320,7 @@ function GmStatBlockModal({ tvMode, isLocalhost, monster, monsterName, campaignN
             monster={monster}
             onClose={onClose}
             campaignName={campaignName}
+            imageUrl={imageUrl}
             creatures={creatures}
             creatureName={monsterName}
             mapName={mapName}
@@ -1066,6 +1067,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 monster={viewingMonster}
                 monsterName={viewingMonsterName}
                 campaignName={campaignName}
+                imageUrl={npcImages[viewingMonsterName]}
                 creatures={combatSummary.creatures}
                 mapName={mapName}
                 characters={characters}
