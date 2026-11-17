@@ -94,6 +94,21 @@
     margin: 0 0 6px 0;
 }
 
+/* Census section header: title + its own Refresh control (the census only
+   fetches on mount, so re-surfacing a phantom write needs an affordance).
+   Layout mirrors SessionSection's .session-audit-head. */
+.campaign-admin .admin-census-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.campaign-admin .admin-census-head h3 {
+    margin: 0;
+}
+
 .campaign-admin .admin-snapshots-empty {
     margin: 0;
     color: var(--color-text-secondary);

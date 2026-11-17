@@ -1000,7 +1000,22 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
             </div>
 
             <div className="admin-section">
-                <h3>Change-Data Census</h3>
+                {/* Census is fetched on mount only (no SSE lane) — without this
+                    control a phantom key landing while the view stays mounted
+                    renders a silently stale face (backlog 2026-11-17 EG). The
+                    button mirrors the SessionSection audit-lane Refresh idiom:
+                    wire loadCensus directly, never a busy gate. */}
+                <div className="admin-census-head">
+                    <h3>Change-Data Census</h3>
+                    <button
+                        type="button"
+                        className="ct-btn"
+                        onClick={loadCensus}
+                        title="Re-fetch the change-data census from the server"
+                    >
+                        <i className="fas fa-rotate"></i> Refresh
+                    </button>
+                </div>
                 <CensusBody census={census} censusError={censusError} />
             </div>
 

@@ -5,11 +5,14 @@
  * recognize (phantom buckets from the blindly-accepting wildcard lane).
  * Locks the three rendered faces: honest "none" (empty store and
  * all-known store), the phantom list (key name + type/summary, siblings not
- * listed), the fetch-error face, and the re-census after Clear Change Data.
+ * listed), the fetch-error face, the re-census after Clear Change Data, and
+ * the section's own Refresh control (backlog 2026-11-17 EG: the census only
+ * fetched on mount, so a phantom landing while the view stayed mounted left
+ * the face silently stale).
  * Classification itself is server-side and pinned in
  * server/routes/campaigns-admin-change-data-census.test.js.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
@@ -133,5 +136,59 @@ describe('CampaignAdmin - change-data census', () => {
 
         expect(await screen.findByText('No unknown top-level keys — change data is empty.')).toBeInTheDocument();
         expect(censusCall).toBe(2);
+    });
+
+    // The census section owns its refresh affordance (the Snapshots/Backup
+    // lanes never re-fetched it — mount-only fetch let a phantom key land
+    // while the mounted panel kept claiming "all N recognized", EG law).
+    it('Refresh control re-fetches the census without a view swap: flagged -> clean', async () => {
+        const clean = { totalKeys: 3, unknownKeys: [] };
+        const phantom = {
+            totalKeys: 4,
+            unknownKeys: [{ key: 'eg-census-probe', type: 'object', summary: '1 key: leaked' }],
+        };
+        let censusCall = 0;
+        const fetchMock = vi.fn((url) => {
+            if (url.endsWith('/admin/snapshots')) return Promise.resolve(jsonResponse({ snapshots: [] }));
+            if (url.endsWith('/admin/change-data-census')) {
+                censusCall += 1;
+                return Promise.resolve(jsonResponse(censusCall === 2 ? phantom : clean));
+            }
+            return Promise.resolve(jsonResponse({}));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const { container } = render(<CampaignAdmin {...createDefaultProps()} />);
+
+        const section = screen.getByRole('heading', { level: 3, name: 'Change-Data Census' }).closest('.admin-section');
+        // One Refresh per census face position — this one lives IN the census
+        // section header, not the adjacent audit lane.
+        const refresh = within(section).getByRole('button', { name: 'Refresh' });
+
+        expect(await within(section).findByText('No unknown top-level keys — all 3 keys recognized.')).toBeInTheDocument();
+
+        // Phantom lands server-side -> press Refresh.
+        fireEvent.click(refresh);
+        // Transient loading note while the re-fetch is in flight: plain copy,
+        // never a live region (rendering-idle contract shape).
+        const loading = within(section).getByText('Loading change-data census…');
+        expect(loading).not.toHaveAttribute('role');
+        expect(within(section).queryByRole('status')).toBeNull();
+
+        // Flagged face: N of M copy + .fa-ghost row, and (known live law) the
+        // flagged face carries NO role=status.
+        expect(await within(section).findByText(/1 of 4 top-level keys not recognized/)).toBeInTheDocument();
+        const ghostRow = container.querySelector('.admin-snapshot-row');
+        expect(ghostRow.querySelector('.fa-ghost')).toBeInTheDocument();
+        expect(ghostRow.textContent).toContain('eg-census-probe');
+        expect(ghostRow.textContent).toContain('object · 1 key: leaked');
+        expect(within(section).queryByRole('status')).toBeNull();
+
+        // Probe deleted server-side -> press Refresh again, clean face returns
+        // byte-consistently (and the none face carries role=status again).
+        fireEvent.click(refresh);
+        const none = await within(section).findByText('No unknown top-level keys — all 3 keys recognized.');
+        expect(none).toHaveAttribute('role', 'status');
+        expect(censusCall).toBe(3);
+        expect(container.querySelectorAll('.fa-ghost')).toHaveLength(0);
     });
 });
