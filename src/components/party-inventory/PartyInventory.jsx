@@ -612,6 +612,12 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   const currencyQueueRef = useRef({ saving: false, delta: { pp: 0, gp: 0, sp: 0, cp: 0 } });
   const localRevRef = useRef(0);
   const currencyDebounceRef = useRef(null);
+  // Last doc the SERVER showed us (load, ack, SSE echo, 409 adoption, transfer result —
+  // never an optimistic local edit). A failed non-409 save means the server kept the
+  // previous truth, so the drifted row reconciles back from here instead of waiting for
+  // a reload (backlog FH: a failed stepper press used to leave the row at the optimistic
+  // qty, and the next absolute setQty silently adopted the drift as new truth).
+  const serverSnapshotRef = useRef(null);
 
   const applyInventory = useCallback((next, { ack = false } = {}) => {
     if (!ack) localRevRef.current += 1;
@@ -622,6 +628,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   const refresh = useCallback(async () => {
     try {
       const data = await loadInventory(campaignName);
+      serverSnapshotRef.current = data;
       applyInventory(data);
     } catch (error) {
       console.error('[PartyInventory] load failed:', error);
@@ -641,11 +648,31 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   useEffect(() => {
     const unsubscribe = subscribeToSSE(campaignName, (event) => {
       if (event.key === `inventory-${campaignName}`) {
-        applyInventory(normalizeInventory(event.data));
+        const echoed = normalizeInventory(event.data);
+        serverSnapshotRef.current = echoed;
+        applyInventory(echoed);
       }
     });
     return unsubscribe;
   }, [campaignName, applyInventory]);
+
+  // Reconcile the row one failed non-409 intent was optimistically editing back to the
+  // last known server snapshot (mirrors the delete rollback's intent.previous, but reads
+  // the snapshot ref so no intent carries the whole doc on the wire). A row the snapshot
+  // never learned (a failed add) is a phantom — drop it. Only the affected row moves;
+  // rows other windows or successful intents already converged stay untouched.
+  const reconcileIntentRow = useCallback((intent) => {
+    const snapshot = serverSnapshotRef.current;
+    const id = intent.item?.id || intent.id;
+    if (!snapshot || !id) return;
+    const inv = inventoryRef.current;
+    if (!inv.items.some(i => i.id === id)) return;
+    const serverRow = snapshot.items.find(i => i.id === id);
+    const items = serverRow
+      ? inv.items.map(i => i.id === id ? { ...serverRow } : i)
+      : inv.items.filter(i => i.id !== id);
+    applyInventory({ ...inv, items });
+  }, [applyInventory]);
 
   // Items lane: one intent POST in flight at a time, FIFO; each POST carries a single
   // add/update/setQty/delete the server applies onto ITS re-read ledger (currency is
@@ -671,6 +698,9 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           }).catch(err => console.error('[PartyInventory] log error:', err));
         }
         // Stale-response guard: a newer local edit superseded this intent's ack.
+        // The ack IS the server truth, so the snapshot ref takes it even when the
+        // display is already owned by a newer local edit.
+        serverSnapshotRef.current = saved;
         if (localRevRef.current !== rev) return;
         applyInventory(saved, { ack: true });
       })
@@ -683,6 +713,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
         // speaks for itself; only non-409 failures quote the server verbatim.
         const merged = error.status === 409 && error.inventory ? error.inventory : null;
         if (merged) {
+          serverSnapshotRef.current = merged;
           applyInventory(merged);
         }
         if (intent.action === 'delete') {
@@ -699,6 +730,11 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           alert(merged
             ? `Party item ${conflictItemLabel(intent)} was deleted elsewhere — this window now shows the current list; your edit was NOT saved.`
             : `Save failed: ${error.message}`);
+          // Non-409: the server never absorbed the write, so the optimistic row is
+          // pure drift — converge it back to the snapshot (same stale guard as the
+          // delete rollback). Without this the row shows the uncommitted value until
+          // reload, and the next absolute setQty adopts the drift as new truth.
+          if (!merged && localRevRef.current === rev) reconcileIntentRow(intent);
         }
       })
       .finally(() => {
@@ -706,7 +742,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
         setSaving(false);
         flushPersistQueue();
       });
-  }, [campaignName, applyInventory]);
+  }, [campaignName, applyInventory, reconcileIntentRow]);
 
   // Currency lane: the burst's summed signed per-coin delta goes to the atomic
   // server adjust lane, which clamps-and-adds onto ITS ledger — concurrent presses
@@ -733,7 +769,11 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           message: `Party currency adjusted: ${parts}`,
           timestamp: Date.now(),
         }).catch(err => console.error('[PartyInventory] log error:', err));
-        // Stale-response guard mirrors flushPersist.
+        // Stale-response guard mirrors flushPersist. The ack is server truth, but the
+        // currency lane runs concurrently with the item lane, so only bank it as the
+        // reconcile snapshot while no item intent is mid-flight (its response can be
+        // generated before that write lands and would regress the snapshot).
+        if (!persistQueueRef.current.saving) serverSnapshotRef.current = saved;
         if (localRevRef.current !== rev) return;
         applyInventory(saved, { ack: true });
       })
@@ -808,6 +848,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
         // The server's accepted /transfer POST already appended the
         // `<parts> moved from party inventory to <player>` audit row — no client
         // duplicate (exactly one row per transfer, either lane face).
+        if (!persistQueueRef.current.saving) serverSnapshotRef.current = result.inventory;
         applyInventory(result.inventory);
       })
       .catch(error => {
@@ -903,6 +944,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
       .then(result => {
         // Server-side audit on the accepted /transfer — the row reads
         // `N × <item> moved from party inventory to <player>`; no client duplicate.
+        if (!persistQueueRef.current.saving) serverSnapshotRef.current = result.inventory;
         applyInventory(result.inventory);
       })
       .catch(error => {
