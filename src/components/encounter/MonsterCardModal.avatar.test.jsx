@@ -124,6 +124,25 @@ describe('MonsterCardModal - header avatar', () => {
         expect(onClose).not.toHaveBeenCalled();
     });
 
+    // Keyboard tier (backlog 2026-11-16 YG): the header-zoom face must pull
+    // focus INTO the panel on open and answer Escape there without tabbing —
+    // the stat modal itself never listens for Escape, so it survives.
+    it('header zoom pulls focus into the panel; Escape closes ONLY the zoom', () => {
+        const onClose = vi.fn();
+        const { container } = renderModal({ imageUrl: 'https://cdn.example.com/goblin.jpg', onClose });
+        const avatar = container.querySelector('.mc-header-avatar .avatar-wrapper');
+        avatar.focus();
+        fireEvent.keyDown(avatar, { key: 'Enter' });
+
+        const panel = screen.getByTestId('avatar-modal-overlay').querySelector('.avatar-modal');
+        expect(document.activeElement).toBe(panel);
+
+        fireEvent.keyDown(panel, { key: 'Escape' });
+        expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
+        expect(document.activeElement).toBe(avatar);
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
     it('no image at all → initial avatar; click is inert (no popup, no close)', () => {
         const onClose = vi.fn();
         const { container } = renderModal({ onClose });

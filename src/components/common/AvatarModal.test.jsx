@@ -1,12 +1,49 @@
 // @maintained-by-ai
 // @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import AvatarModal from './AvatarModal.jsx';
 
 /** Render the modal with sensible defaults; pass props to override. */
 const renderModal = (props = {}) =>
   render(<AvatarModal name="Gandalf" onClose={vi.fn()} {...props} />);
+
+const panelEl = () =>
+  screen.getByTestId('avatar-modal-overlay').querySelector('.avatar-modal');
+
+// Consumer-shaped harness: the zoom mounts/unmounts through an open flag
+// exactly like CreatureCard/MonsterCardModal/CharSummary, so close-lane focus
+// restore rides the real unmount path.
+function ZoomHarness() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button data-testid="opener-avatar" onClick={() => setOpen(true)}>
+        Goblin avatar
+      </button>
+      {open && (
+        <AvatarModal
+          name="Goblin"
+          imagePath="/images/goblin.png"
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// Open the zoom the way a keyboard user does: focus the avatar, then activate
+// it while it still holds focus (jsdom clicks never move focus themselves).
+const openFromAvatar = () => {
+  const opener = screen.getByTestId('opener-avatar');
+  opener.focus();
+  fireEvent.click(opener);
+  return opener;
+};
+
+// Flush the unmount's passive cleanup + any deferred restore faces.
+const flush = () => act(async () => {});
 
 describe('AvatarModal', () => {
   describe('image display', () => {
@@ -178,6 +215,107 @@ describe('AvatarModal', () => {
       unmount();
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(handleClose).not.toHaveBeenCalled();
+    });
+  });
+
+  // Keyboard tier (backlog 2026-11-16 YG): the shared Popup's on-open focus
+  // pull + focusin retention, mirrored into the avatar zoom so an Enter-opened
+  // overlay never leaves a keyboard user on the avatar behind it.
+  describe('keyboard focus tier', () => {
+    it('pulls focus into the .avatar-modal panel on open (any open lane)', () => {
+      render(<ZoomHarness />);
+      openFromAvatar();
+
+      expect(document.activeElement).toBe(panelEl());
+    });
+
+    it('marks the panel programmatically focusable (tabIndex -1, no Tab stop)', () => {
+      render(<ZoomHarness />);
+      openFromAvatar();
+
+      expect(panelEl()).toHaveAttribute('tabindex', '-1');
+    });
+
+    it('leaves focus alone once it is inside the zoom layer (× keeps focus)', () => {
+      render(<ZoomHarness />);
+      openFromAvatar();
+
+      const closeButton = screen.getByRole('button', { name: 'Close' });
+      closeButton.focus();
+      expect(document.activeElement).toBe(closeButton);
+    });
+
+    it('re-claims the panel when a host remount steals focus after open', () => {
+      render(<ZoomHarness />);
+      const opener = openFromAvatar();
+
+      // Native focus() so jsdom dispatches focusout/focusin exactly like the
+      // live card re-key remount does (Popup's retention-steal face).
+      opener.focus();
+      expect(document.activeElement).toBe(panelEl());
+    });
+
+    it('Escape from inside the panel closes the zoom without tabbing first', () => {
+      render(<ZoomHarness />);
+      openFromAvatar();
+
+      fireEvent.keyDown(panelEl(), { key: 'Escape' });
+      expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
+    });
+
+    it('Escape from the focused × closes the zoom', () => {
+      render(<ZoomHarness />);
+      openFromAvatar();
+
+      const closeButton = screen.getByRole('button', { name: 'Close' });
+      closeButton.focus();
+      fireEvent.keyDown(closeButton, { key: 'Escape' });
+      expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
+    });
+
+    it('Escape restores focus to the avatar that opened the zoom', async () => {
+      render(<ZoomHarness />);
+      const opener = openFromAvatar();
+
+      fireEvent.keyDown(panelEl(), { key: 'Escape' });
+      await flush();
+      expect(document.activeElement).toBe(opener);
+    });
+
+    it('the × click restores focus to the opening avatar too', async () => {
+      render(<ZoomHarness />);
+      const opener = openFromAvatar();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await flush();
+      expect(document.activeElement).toBe(opener);
+    });
+
+    it('a pure backdrop click closes and restores focus to the opening avatar', async () => {
+      render(<ZoomHarness />);
+      const opener = openFromAvatar();
+
+      const overlay = screen.getByTestId('avatar-modal-overlay');
+      fireEvent.mouseDown(overlay);
+      fireEvent.click(overlay);
+      await flush();
+      expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(opener);
+    });
+
+    it('a vanished opener leaves focus on body (Popup close face) without throwing', () => {
+      // Standalone opener (outside the React tree) so it can honestly detach
+      // while the zoom is open — the card re-key/host-teardown face.
+      const opener = document.createElement('button');
+      document.body.appendChild(opener);
+      opener.focus();
+      const { unmount } = renderModal();
+      expect(document.activeElement).toBe(panelEl());
+
+      opener.remove();
+      expect(() => unmount()).not.toThrow();
+      expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(document.body);
     });
   });
 });
