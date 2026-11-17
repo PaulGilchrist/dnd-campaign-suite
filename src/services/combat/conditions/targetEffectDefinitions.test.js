@@ -125,7 +125,7 @@ const CENSUS = [
   ['incite_rampage', 'Incited Rampage', 'fa-fire', 'effect-buff', 'Spells', ['source']],
   ['redirect_attack', 'Redirected Attack', 'fa-right-left', 'effect-buff', 'Spells', ['source']],
   ['summoned', 'Summoned', 'fa-hand-sparkles', 'effect-summoned', 'Spells', ['source']],
-  ['wild_shape', 'Wild Shape', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName']],
+  ['wild_shape', 'Wild Shape (Beast Form)', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName']],
   ['polymorph', 'Polymorph', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName']],
   ['true_polymorph', 'True Polymorph', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName', 'mode']],
   ['animal_shapes', 'Animal Shapes', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName']],

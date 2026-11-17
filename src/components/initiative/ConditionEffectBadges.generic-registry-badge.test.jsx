@@ -92,6 +92,26 @@ describe('ConditionEffectBadges - registry-fallback generic badges', () => {
         );
     });
 
+    // EG 2026-11-17 improve (dual-badge clarity): while a Wild Shape form is
+    // active the card shows this registry mirror AND the CreatureCard-owned
+    // activeBuffs badge hardcoded as 'Wild Shape'. The mirror must render the
+    // distinct registry label — never the bare 'Wild Shape' duplicate — while
+    // keeping its generic target_effect removal affordance (semantics
+    // unchanged: × evicts only the te row, the buff lane keeps cleanupWildShape).
+    it('renders the wild_shape mirror with a label distinct from the Wild Shape buff badge', () => {
+        renderBadges([{ target: CREATURE, effect: 'wild_shape', source: CREATURE, beastName: 'Wolf' }]);
+        expect(renderedBadgeLabels()).toEqual(['Wild Shape (Beast Form)']);
+        const badge = screen.getByTestId('creature-badge');
+        expect(badge).toHaveClass('creature-badge', 'effect-buff');
+        expect(badge.querySelector('i')).toHaveClass('fa-solid', 'fa-paw');
+        expect(badge).toHaveAttribute(
+            'title',
+            `${getEffectDefinition('wild_shape').description} (from ${CREATURE})`
+        );
+        expect(screen.queryByText('Wild Shape', { selector: '.creature-badge' })).not.toBeInTheDocument();
+        expect(screen.getAllByTitle('Remove effect')).toHaveLength(1);
+    });
+
     it('appends GM notes to the generic tooltip and renders without a source', () => {
         renderBadges([{ target: CREATURE, effect: 'no_healing', notes: 'until spirit turn ends' }]);
         const def = getEffectDefinition('no_healing');

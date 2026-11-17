@@ -1065,8 +1065,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // EG 2026-11-17 improve: while a form is active the card shows TWO paw
+    // badges — this targetEffects mirror and the activeBuffs feature badge
+    // (CreatureCard WildShapeBadge, label 'Wild Shape'). The mirror's label
+    // carries a (Beast Form) qualifier (sibling parenthetical style: 'True
+    // Polymorph (Object)', 'Banished (Demiplane)') so the two lanes read
+    // distinctly; each × stays honest to its own store (mirror × removes
+    // only this te row, buff × runs cleanupWildShape).
     effect: 'wild_shape',
-    label: 'Wild Shape',
+    label: 'Wild Shape (Beast Form)',
     description: 'The Druid has transformed into a beast form. Retains HP, HP Dice, Intelligence/Wisdom/Charisma scores, class features, languages, and feats.',
     icon: 'fa-paw',
     cls: 'effect-buff',
