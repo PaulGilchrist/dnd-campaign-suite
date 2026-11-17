@@ -121,6 +121,78 @@ describe('PartyInventory equipment description autofill', () => {
   });
 });
 
+// Backlog 2026-11-16 YG: a catalog match with NO authored text (Longsword's disk row
+// carries no `description` key at all — 144 such rows) rendered a near-blank
+// "<b>name</b><br/>" panel because the found-branch trusted mere presence of `eq`.
+// The three faces below pin: found-with-text renders verbatim, found-textless and
+// not-found share ONE fallback copy.
+describe('PartyInventory item-details popup — catalog faces', () => {
+  const longswordRow = diskEquipment.find(eq => eq.name === 'Longsword');
+
+  it('disk anchor: the Longsword row exists and carries no description at all', () => {
+    expect(longswordRow).toBeTruthy();
+    expect(longswordRow.description).toBeUndefined();
+  });
+
+  it('found-with-text: bold canonical name + the description rendered verbatim', async () => {
+    await renderReady({
+      ...emptyInventory(),
+      items: [{ id: 'i1', name: 'Acid (vial)', quantity: 1, description: '' }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Acid (vial)' }));
+    const overlay = await screen.findByTestId('popup-overlay');
+    await waitFor(() => expect(overlay.querySelector('b').textContent).toBe('Acid (vial)'));
+    // Array paragraphs join with <br/><br/>; textContent sees them concatenated.
+    expect(overlay.textContent).toContain(acidRow.description.join(''));
+    expect(overlay.textContent).not.toContain('No description recorded.');
+  });
+
+  it('found-textless: a catalog row with no description key takes the fallback face', async () => {
+    await renderReady({
+      ...emptyInventory(),
+      items: [{ id: 'i1', name: 'Longsword', quantity: 1, description: '' }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Longsword' }));
+    const overlay = await screen.findByTestId('popup-overlay');
+    expect(await screen.findByText('No description recorded.')).toBeTruthy();
+    // Bold name row survives; nothing else in the panel.
+    expect(overlay.querySelector('b').textContent).toBe('Longsword');
+  });
+
+  it('found-textless: an empty or whitespace-only description takes the same fallback face', async () => {
+    // Fabricated fixture on purpose: real disk has no empty-string descriptions
+    // (python sweep), so only a synthesis can exercise this arm.
+    dataLoader.loadEquipment.mockResolvedValue([
+      { index: 'empty-blade', name: 'Empty Blade', description: '' },
+      { index: 'blank-blade', name: 'Blank Blade', description: '   \n  ' },
+    ]);
+    await renderReady({
+      ...emptyInventory(),
+      items: [
+        { id: 'i1', name: 'Empty Blade', quantity: 1, description: '' },
+        { id: 'i2', name: 'Blank Blade', quantity: 1, description: '' },
+      ],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Empty Blade' }));
+    expect(await screen.findByText('No description recorded.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Blank Blade' }));
+    expect(await screen.findByText('No description recorded.')).toBeTruthy();
+  });
+
+  it('not-found: an out-of-catalog name keeps the same fallback copy untouched', async () => {
+    await renderReady({
+      ...emptyInventory(),
+      items: [{ id: 'i1', name: 'QATextlessProbe', quantity: 1, description: '' }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'QATextlessProbe' }));
+    const overlay = await screen.findByTestId('popup-overlay');
+    expect(await screen.findByText('No description recorded.')).toBeTruthy();
+    expect(overlay.querySelector('b').textContent).toBe('QATextlessProbe');
+  });
+});
+
 // Backlog 2026-10-24: autofill was exact-name only, so PHB sort-order input
 // ("Rope, Hempen") kept an empty description while disk carries "Hempen Rope".
 // Matching is now case-insensitive + comma-inversion tolerant (single split outside

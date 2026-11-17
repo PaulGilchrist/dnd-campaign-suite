@@ -54,7 +54,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- 2026-11-16 YG: item-details popup shows a nearly-BLANK panel when the name matches an equipment.json row that carries no `description` key (e.g. Longsword) — the out-of-catalog fallback copy "No description recorded." never fires for found-but-textless catalog rows; treat empty `eq.description` as the no-description face.
 - 2026-11-16 YG: first mount of a legacy outdoor map under the `ea2e429d9` auto-fit silently rewrites the stored view (one-shot, viewport-derived) — owner-fixture baselines shift by whoever/whatever window opens them first; consider stamping a `fitVersion` in the doc and pinning the auto-fit output (or skipping the write when nothing else dirtied the doc).
 - 2026-11-16 YG: Party-Inventory mixes two mental models with adjacent controls — currency steppers write the party pool IMMEDIATELY (debounced) while the same-row `Give` opens a transfer modal, and an unnoticed-open modal silently swallows every other click on the view ("Save" click on the Add-Item form during a dwell also closes invisibly); clarify affordances (disabled background, explicit stepper label).
 

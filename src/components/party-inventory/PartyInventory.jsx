@@ -718,8 +718,12 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     // transformed), so only trim/collapse/inversion behavior is added.
     const eq = findEquipmentByName(equipmentData, item.name)
       || (item.name.endsWith('s') ? findEquipmentByName(equipmentData, item.name.slice(0, -1)) : findEquipmentByName(equipmentData, `${item.name}s`));
-    if (eq) {
-      const desc = Array.isArray(eq.description) ? eq.description.join('<br/><br/>') : (eq.description || '');
+    const desc = eq
+      ? (Array.isArray(eq.description) ? eq.description.join('<br/><br/>') : (eq.description || ''))
+      : '';
+    // A found-but-textless catalog row (e.g. Longsword carries no `description` key)
+    // is the same no-description face as an out-of-catalog name — one fallback branch.
+    if (eq && desc.trim()) {
       setPopupHtml(`<b>${eq.name}</b><br/>${desc}`);
     } else {
       setPopupHtml(`<b>${item.name}</b><br/><br/>No description recorded.`);
