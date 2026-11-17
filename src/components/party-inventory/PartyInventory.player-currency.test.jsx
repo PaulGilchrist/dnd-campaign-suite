@@ -162,16 +162,18 @@ describe('PartyInventory currency `To Party` return lane', () => {
     });
   });
 
-  it('audits a directional inventory_transfer row and refreshes the party pool to show the returned coin', async () => {
+  it('writes NO client-side duplicate — the server stamps the single inventory_transfer audit row — and refreshes the party pool', async () => {
     await selectPlayer('War Cleric');
     mockLoadInventory.mockResolvedValueOnce(poolAfterCopperReturn());
     fireEvent.click(copperToParty());
     await waitFor(() => {
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        type: 'inventory_transfer',
-        message: '1 cp moved from War Cleric to party inventory',
-      }));
+      expect(mockTransferInventory).toHaveBeenCalled();
     });
+    // Backlog 2026-11-17 AB: the /transfer route now appends the
+    // `1 cp moved from War Cleric to party inventory` row server-side on every
+    // accepted POST; the client lane must stay silent so a UI transfer lands
+    // exactly one row.
+    expect(addEntry).not.toHaveBeenCalled();
     const card = screen.getByText('Party Currency').closest('.pi-currency-card');
     await waitFor(() => {
       expect(within(card).getByText('1')).toBeTruthy();

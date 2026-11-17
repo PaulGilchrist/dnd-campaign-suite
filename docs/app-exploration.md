@@ -52,7 +52,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-17 AB — player→party transfer has no session↔character binding:** the open-to-all lane (audited exception in `server/routes/inventory.js` header) lets ANY LAN tab debit ANY character's purse/backpack (the route trusts the client-named `playerName`; the app has no auth). Not exploitable against the treasury (can't mint) but "a player may contribute from their OWN resources" is currently enforced only in the UI. If a per-tab character binding ever exists, gate `playerName` against it; meanwhile consider a `contributed_by` audit stamp so drains are attributable in the log. Non-blocking security-hygiene idea.
 - **2026-11-17 AB — sheet still shows no purse:** the currency fix chose the From-Players pane only; a player tab (their own sheet) has no currency read face (the bug file's "purse line on the sheet" option was left unimplemented). A read-only `Purse: 10 gp` row in the CharSummary inventory area would close the loop for players viewing their own coin.
 
 ## Blocked / Not Verified (fold-gate ledger)

@@ -459,17 +459,15 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
     if (beforeTransfer) beforeTransfer();
     setMoving(entry.name);
     try {
+      // The server appends the `N × X moved from <char> to party inventory` audit
+      // row on every accepted /transfer — no client-side addEntry here (dedup: a UI
+      // transfer must land exactly one row, direct-API drains stay traceable too).
       await transferInventory(campaignName, {
         direction: 'player-to-party',
         playerName: character.name,
         itemName: entry.name,
         quantity: entry.quantity,
       });
-      addEntry(campaignName, {
-        type: 'inventory_transfer',
-        message: `${entry.quantity} × ${entry.name} moved from ${character.name} to party inventory`,
-        timestamp: Date.now(),
-      }).catch(err => console.error('[PartyInventory] log error:', err));
       await onMoved();
     } catch (error) {
       console.error('[PartyInventory] player-to-party move failed:', error);
@@ -482,7 +480,8 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
   // Currency return lane — the exact reverse of GiveCurrencyModal's party-to-player
   // transfer: same native-confirm idiom naming coin + source player + party
   // destination, same atomic player-to-party POST (the server debits the character
-  // file and credits the pool, 409 when short), same directional audit row.
+  // file and credits the pool, 409 when short); the server writes the directional
+  // audit row for every accepted transfer.
   const handleCurrencyMove = async (coin) => {
     if (!character) return;
     const stateKey = `currency:${coin.key}`;
@@ -495,11 +494,6 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
         playerName: character.name,
         currency: { [coin.key]: coin.amount },
       });
-      addEntry(campaignName, {
-        type: 'inventory_transfer',
-        message: `${coin.amount} ${coin.key} moved from ${character.name} to party inventory`,
-        timestamp: Date.now(),
-      }).catch(err => console.error('[PartyInventory] log error:', err));
       await onMoved();
     } catch (error) {
       console.error('[PartyInventory] player-to-party currency move failed:', error);
@@ -776,13 +770,10 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     setSaving(true);
     transferInventory(campaignName, { direction: 'party-to-player', playerName, currency: amounts })
       .then(result => {
+        // The server's accepted /transfer POST already appended the
+        // `<parts> moved from party inventory to <player>` audit row — no client
+        // duplicate (exactly one row per transfer, either lane face).
         applyInventory(result.inventory);
-        const parts = Object.entries(amounts).map(([k, v]) => `${v} ${k}`).join(', ');
-        addEntry(campaignName, {
-          type: 'inventory_transfer',
-          message: `${parts} moved from party inventory to ${playerName}`,
-          timestamp: Date.now(),
-        }).catch(err => console.error('[PartyInventory] log error:', err));
       })
       .catch(error => {
         console.error('[PartyInventory] currency transfer failed:', error);
@@ -875,12 +866,9 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
       quantity: moveQuantity,
     })
       .then(result => {
+        // Server-side audit on the accepted /transfer — the row reads
+        // `N × <item> moved from party inventory to <player>`; no client duplicate.
         applyInventory(result.inventory);
-        addEntry(campaignName, {
-          type: 'inventory_transfer',
-          message: `${moveQuantity} × ${moveTarget.name} moved from party inventory to ${movePlayer}`,
-          timestamp: Date.now(),
-        }).catch(err => console.error('[PartyInventory] log error:', err));
       })
       .catch(error => {
         console.error('[PartyInventory] move failed:', error);

@@ -45,6 +45,10 @@ vi.mock('../utils/changeData.js', () => ({
     publish: (...args) => publishSpy(...args),
 }));
 
+// inventory.js shares the server log pipeline (routes/log.js); hermetic noop —
+// /item intents never write a row (transfer audit pinned in transfer-audit tests).
+vi.mock('./log.js', () => ({ addEntry: vi.fn() }));
+
 const CAMPAIGN = 'test-campaign';
 const invPath = `/mock/campaigns/${CAMPAIGN}/data/inventory.json`;
 const itemUrl = `/api/campaigns/${CAMPAIGN}/inventory/item`;

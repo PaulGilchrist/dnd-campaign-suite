@@ -4,6 +4,7 @@ import path from 'path';
 import guid from 'guid';
 import { campaignDataFile, ensureDataDir, campaignDir } from '../utils/campaignPaths.js';
 import { publish } from '../utils/changeData.js';
+import { addEntry as addLogEntry } from './log.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -25,7 +26,11 @@ const router = express.Router();
 // silently resurrect a row another window deleted (loud 409 + merged doc).
 // Audited exception: player→party transfers stay open — a player may contribute from
 // their OWN resources; the server debits the character file atomically (409 when short),
-// so that lane can never mint treasury wealth.
+// so that lane can never mint treasury wealth. Every ACCEPTED transfer (either direction,
+// currency or items) appends exactly ONE campaign-log `inventory_transfer` audit row
+// server-side, so a direct-API drain can never pass untraceable. The optional
+// `contributedBy` body field is a CLIENT ASSERTION, never identity (the app has no auth):
+// it is sanitized + length-capped and recorded alongside a character-name fallback.
 const isLocalhost = (req) => req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 
 function refuseUnlessGm(req, res) {
@@ -401,33 +406,80 @@ function validateTransferTarget(body) {
     return { ok: true };
 }
 
+// Currency half of a transfer payload: an object with at least one positive
+// whole-number coin (sanitizeCurrency truncates + clamps; an all-zero/negative body
+// moves nothing, so it is refused like the /adjust lane's zero-delta 400).
+function resolveTransferCurrency(currency) {
+    if (!currency || typeof currency !== 'object') return null;
+    const amount = sanitizeCurrency(currency);
+    if (!CURRENCY_KEYS.some(key => amount[key] > 0)) {
+        return { error: 'currency must contain a positive whole-number amount' };
+    }
+    return amount;
+}
+
 function validateTransferRequest(body) {
     const itemName = typeof body?.itemName === 'string' ? body.itemName.trim() : '';
-    const currency = body?.currency && typeof body.currency === 'object' ? body.currency : null;
+    const currencyAmount = resolveTransferCurrency(body?.currency);
+    if (currencyAmount?.error) return currencyAmount;
     const quantity = Math.floor(Number(body?.quantity));
 
-    if (!itemName && !currency) {
+    if (!itemName && !currencyAmount) {
         return { error: 'itemName or currency is required' };
     }
-    if (itemName && currency) {
+    if (itemName && currencyAmount) {
         return { error: 'Transfer one item or one currency set per request' };
     }
     if (itemName && (!Number.isFinite(quantity) || quantity < 1)) {
         return { error: 'quantity must be a positive integer' };
     }
 
-    return {
-        ok: true,
-        quantity,
-        cleanName: itemName,
-        currencyAmount: currency ? sanitizeCurrency(currency) : null,
-    };
+    return { ok: true, quantity, cleanName: itemName, currencyAmount };
+}
+
+// Attribution for the transfer audit row. `contributedBy` is a client-supplied actor
+// string (a contribution claim on the open player→party lane) — whitespace-collapsed,
+// length-capped, NEVER trusted as identity; absent/garbage falls back to the character
+// name the server actually debited or credited.
+const MAX_CONTRIBUTOR_LENGTH = 80;
+
+function sanitizeContributor(raw) {
+    if (typeof raw !== 'string') return null;
+    const collapsed = raw.replace(/\s+/g, ' ').trim();
+    return collapsed ? collapsed.slice(0, MAX_CONTRIBUTOR_LENGTH) : null;
+}
+
+function describeTransferMove(currencyAmount, cleanName, quantity) {
+    if (currencyAmount) {
+        return CURRENCY_KEYS
+            .filter(key => currencyAmount[key] > 0)
+            .map(key => `${currencyAmount[key]} ${key}`)
+            .join(', ');
+    }
+    return `${quantity} × ${cleanName}`;
+}
+
+// One audit row per ACCEPTED transfer, mirroring the copy the UI used to write
+// client-side (the /transfer lane's addEntry calls were removed with this server
+// stamp, so a UI transfer and a direct-API drain each land exactly one row).
+function logTransferAudit(campaign, { direction, characterName, currencyAmount, cleanName, quantity, contributedBy }) {
+    const movement = describeTransferMove(currencyAmount, cleanName, quantity);
+    const message = direction === 'party-to-player'
+        ? `${movement} moved from party inventory to ${characterName}`
+        : `${movement} moved from ${characterName} to party inventory`;
+    addLogEntry(campaign, {
+        type: 'inventory_transfer',
+        message,
+        contributedBy: sanitizeContributor(contributedBy) || characterName,
+    });
 }
 
 // POST /api/campaigns/:campaign/inventory/transfer — atomic party<->player move
-// body: { playerName, itemName, quantity } or { playerName, currency: {pp,gp,sp,cp} }
+// body: { playerName, itemName, quantity } or { playerName, currency: {pp,gp,sp,cp} },
+// plus the optional client-asserted `contributedBy` actor string (see header note).
 // GM-only for party→player (disbursement); player→party contributions stay open to
-// every client (server-verified debit — see header audit note).
+// every client (server-verified debit — see header audit note). Every accepted move
+// appends exactly ONE server-side campaign-log audit row after the writes land.
 router.post('/api/campaigns/:campaign/inventory/transfer', asyncHandler((req, res) => {
     const { campaign } = req.params;
     const { playerName, direction } = req.body || {};
@@ -467,6 +519,14 @@ router.post('/api/campaigns/:campaign/inventory/transfer', asyncHandler((req, re
     saveInventory(campaign, inventory);
     publish(`character-${campaign}-${charFileName}`, character, campaign);
     publish(`inventory-${campaign}`, inventory, campaign);
+    logTransferAudit(campaign, {
+        direction,
+        characterName: character.name || playerName,
+        currencyAmount,
+        cleanName,
+        quantity,
+        contributedBy: req.body?.contributedBy,
+    });
 
     res.json({ success: true, inventory, character: { name: character.name, inventory: character.inventory } });
 }));

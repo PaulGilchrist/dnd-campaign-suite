@@ -40,6 +40,10 @@ vi.mock('../utils/changeData.js', () => ({
     publish: (...args) => publishSpy(...args),
 }));
 
+// Transfer audit rows go through the one server log pipeline (routes/log.js);
+// hermetic noop here — the row itself is pinned in inventory.transfer-audit.test.js.
+vi.mock('./log.js', () => ({ addEntry: vi.fn() }));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

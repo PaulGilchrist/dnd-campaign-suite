@@ -54,6 +54,10 @@ vi.mock('../utils/changeData.js', () => ({
     publish: vi.fn((key, data) => { publishedEvents.push({ key, data }); }),
 }));
 
+// Transfer audit rows: hermetic noop (pinned in inventory.transfer-audit.test.js).
+const logEntrySpy = vi.hoisted(() => vi.fn());
+vi.mock('./log.js', () => ({ addEntry: logEntrySpy }));
+
 import inventory from './inventory.js';
 
 const CAMPAIGN = 'test-campaign';
@@ -77,6 +81,7 @@ function createTestApp() {
 beforeEach(() => {
     FILE_SYSTEM.clear();
     publishedEvents = [];
+    logEntrySpy.mockClear();
 });
 
 describe('inventory — localhost authority gate (GM-only treasury writes)', () => {
@@ -131,6 +136,8 @@ describe('inventory — localhost authority gate (GM-only treasury writes)', () 
             expect(JSON.parse(FILE_SYSTEM.get(invPath)).items).toHaveLength(1);
             expect(JSON.parse(FILE_SYSTEM.get(charPath)).inventory.gold).toBe(10);
             expect(publishedEvents).toHaveLength(0);
+            // A refused disbursement writes no audit row either (it never happened).
+            expect(logEntrySpy).not.toHaveBeenCalled();
         });
 
         it('GET /inventory (treasury read lane) stays open', async () => {
@@ -155,6 +162,14 @@ describe('inventory — localhost authority gate (GM-only treasury writes)', () 
             expect(res.status).toBe(200);
             expect(JSON.parse(FILE_SYSTEM.get(invPath)).currency.gp).toBe(4);
             expect(JSON.parse(FILE_SYSTEM.get(charPath)).inventory.gold).toBe(6);
+            // The open drain lane is never silent: the server stamps exactly one
+            // attributed audit row per accepted contribution (backlog AB).
+            expect(logEntrySpy).toHaveBeenCalledTimes(1);
+            expect(logEntrySpy).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+                type: 'inventory_transfer',
+                message: '4 gp moved from AasimarTest to party inventory',
+                contributedBy: 'AasimarTest',
+            }));
 
             // Cannot mint via over-contribution either: debit is server-verified.
             const overdraft = await request(createTestApp())
@@ -163,6 +178,7 @@ describe('inventory — localhost authority gate (GM-only treasury writes)', () 
                 .send({ playerName: 'AasimarTest', direction: 'player-to-party', currency: { gp: 999 } });
             expect(overdraft.status).toBe(409);
             expect(JSON.parse(FILE_SYSTEM.get(invPath)).currency.gp).toBe(4);
+            expect(logEntrySpy).toHaveBeenCalledTimes(1);
         });
     });
 
