@@ -391,7 +391,11 @@ async function handleDashSpeedBonus(action, auto, playerStats, campaignName) {
     };
 }
 
-// Wild Shape ON leg consumes a use, shows the form chooser; OFF leg cleans up (CLA-391).
+// Wild Shape ON leg is zero-write — it only shows the form chooser; the buff, use
+// spend, form and activation log all land on CONFIRM (CharSheet handleWildShapeConfirm
+// → activateWildShape), so dismissing the chooser with Cancel leaves nothing behind
+// (mirrors the monsterShapeShift decline lane and the polymorph confirm lane).
+// OFF leg cleans up (CLA-391: ungated, 0 uses may always end the form).
 // 5e lv20 Archdruid (CLA-013): the refusal gate is skipped (unlimited uses) and the
 // OFF leg logs an explicit free-revert token. 2024 hosts never match the helper.
 async function handleShapeShift(action, auto, playerStats, campaignName, targetName) {
@@ -423,15 +427,9 @@ async function handleShapeShift(action, auto, playerStats, campaignName, targetN
         }
     }
 
-    const { wasActive } = toggleBuff(
-        playerStats.name,
-        action.name,
-        auto,
-        campaignName,
-        targetName
-    );
-
-    if (!wasActive) {
+    if (!formActive) {
+        // ON leg — chooser only: zero store writes, zero log rows. A Cancel
+        // (or a mid-chooser tab close) must leave activeBuffs byte-identical.
         return {
             type: 'popup',
             payload: {
@@ -442,6 +440,16 @@ async function handleShapeShift(action, auto, playerStats, campaignName, targetN
             },
         };
     }
+
+    // OFF leg — the form is active: release it. toggleBuff removes the
+    // shape_shift buff by name; cleanupWildShape strips the form payload.
+    toggleBuff(
+        playerStats.name,
+        action.name,
+        auto,
+        campaignName,
+        targetName
+    );
 
     cleanupWildShape(playerStats.name, campaignName);
 

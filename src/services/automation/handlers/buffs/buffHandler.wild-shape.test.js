@@ -1,8 +1,11 @@
 // @maintained-by-ai
 // Dedicated owner of the Wild Shape (shape_shift) lane in buffHandler.
 // Pins the stable handler contract: CLA-391 uses-gate (ON leg gated, OFF leg
-// always allowed to end the form), the ON-leg wild_shape_select payload echo
-// (chooser modal receives the SAME action/playerStats/campaignName references),
+// always allowed to end the form), the zero-write ON leg — the row click only
+// echoes the wild_shape_select chooser payload (the SAME action/playerStats/
+// campaignName references) and stamps NOTHING; the shape_shift buff is applied
+// by the confirm handler (CharSheet handleWildShapeConfirm), so a chooser
+// Cancel cannot leave a ghost buff —
 // the class-data max fallback when the runtime counter is unset, and the
 // CLA-013 5e lv20 Archdruid unlimited exemption / free-revert log token.
 // hasUnlimitedWildShape input truth is pinned in archdruidWildShapeService.test.js —
@@ -154,15 +157,18 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
     expect(refusal.description).toContain('No Wild Shape uses remaining');
   });
 
-  it('activates with uses available — wild_shape_select chooser echoes action, playerStats and campaignName by reference', async () => {
+  it('activates with uses available — wild_shape_select chooser echoes action, playerStats and campaignName by reference, zero writes, zero logs', async () => {
     mockRuntime({ activeBuffs: [], wildShapeUses: 3 });
-    buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
     const action = makeAction();
     const playerStats = makeDruidStats();
 
     const result = await handle(action, playerStats, campaignName, null);
 
-    expect(buffToggle.toggleBuff).toHaveBeenCalled();
+    // The ON leg must NOT pre-arm the shape_shift buff — a chooser Cancel would
+    // then leave a ghost buff (blocksSpellcasting) with no form, no spend, no log.
+    expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('wild_shape_select');
     expect(result.payload.action).toBe(action);
@@ -172,7 +178,6 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
 
   it('ON leg falls back to class-data wild_shape max when the runtime counter is unset', async () => {
     mockRuntime({ activeBuffs: [] });
-    buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
     const lv7Stats = makeDruidStats({
       level: 7,
       class: { major: { name: 'Druid' }, class_levels: [{ level: 7, wild_shape: 2 }] },
@@ -180,7 +185,7 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
 
     const result = await handle(makeAction(), lv7Stats, campaignName, null);
 
-    expect(buffToggle.toggleBuff).toHaveBeenCalled();
+    expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
     expect(result.payload.type).toBe('wild_shape_select');
     expect(loggedEntries().find(e => e.automationType === 'wild_shape_refused')).toBeUndefined();
   });
@@ -194,13 +199,13 @@ describe('buffHandler Wild Shape uses-gate (CLA-391)', () => {
       },
     });
 
-    it('ON leg is NOT refused at 0 uses or with no counter — shows the form chooser, no refusal log, and never consults the uses counter', async () => {
+    it('ON leg is NOT refused at 0 uses or with no counter — shows the form chooser (still zero-write), no refusal log, and never consults the uses counter', async () => {
       mockRuntime({ activeBuffs: [], wildShapeUses: 0 });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       const result = await handle(makeAction(), makeUnlimitedDruidStats(), campaignName, null);
 
-      expect(buffToggle.toggleBuff).toHaveBeenCalled();
+      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(result.payload.type).toBe('wild_shape_select');
       expect(loggedEntries().find(e => e.automationType === 'wild_shape_refused')).toBeUndefined();
       // Unlimited exemption short-circuits the gate: counter is never read.

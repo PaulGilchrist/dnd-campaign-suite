@@ -2,6 +2,7 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import rulesFactory from '../../services/rules/rulesFactory.js'
+import { computeToggledBuffs } from '../../services/automation/common/buffToggle.js'
 import { applyShieldOfFaith } from '../../services/automation/handlers/shieldOfFaithHandler.js'
 import useSharedPopup from '../../hooks/combat/useSharedPopup.js'
 
@@ -229,7 +230,16 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+    // Confirm is the ONLY writer of the Wild Shape buff (the feature-row click is
+    // zero-write so a chooser Cancel leaves nothing behind). Filter-then-append via
+    // the shared computeToggledBuffs (same byte shape toggleBuff wrote when it
+    // pre-armed) keeps this idempotent against a double-confirm; activateWildShape
+    // then applies the form, spends the use and logs the activation.
     const handleWildShapeConfirm = React.useCallback(async (action, beast, stats, campName) => {
+        const storedBuffs = getRuntimeValue(stats.name, 'activeBuffs', campName);
+        const cleaned = (Array.isArray(storedBuffs) ? storedBuffs : []).filter(b => b.name !== action.name);
+        const { buffs } = computeToggledBuffs(cleaned, action.name, action.automation, stats.name);
+        setRuntimeValue(stats.name, 'activeBuffs', buffs, campName);
         await activateWildShape(stats.name, beast, stats, campName);
     }, []);
 

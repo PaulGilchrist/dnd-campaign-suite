@@ -291,7 +291,19 @@ describe('shape-change popup confirms dispatch to their services', () => {
       label: 'Wild Shape',
       popupHtml: {
         type: 'wild_shape_select',
-        action: { name: 'Wild Shape' },
+        // Production shape: the payload echoes the sheet row, which always carries
+        // its automation (confirm stamps the shape_shift buff from these bytes).
+        action: {
+          name: 'Wild Shape',
+          automation: {
+            type: 'temp_buff',
+            effect: 'shape_shift',
+            action: 'bonus_action',
+            duration: 'half_druid_level_hours',
+            casting_time: '1 bonus action',
+            blocksSpellcasting: true,
+          },
+        },
         playerStats: { name: CHARACTER },
         campaignName: CAMPAIGN,
       },
