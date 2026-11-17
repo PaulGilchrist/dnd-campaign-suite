@@ -182,6 +182,14 @@
   z-index: 100;
 }
 
+/* improve 2026-11-16: visible inertness — while a .pi-modal-overlay is open the
+   background sections carry the `inert` attribute (pointer/focus blocked by the
+   browser AND by the scrim); browsers paint nothing for inert, so this veil makes
+   the parked background READ as disabled instead of silently swallowing clicks. */
+.pi-container [inert] {
+  opacity: 0.4;
+}
+
 .pi-modal {
   width: min(460px, 92vw);
 }

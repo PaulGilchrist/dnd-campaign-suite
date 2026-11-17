@@ -5,6 +5,7 @@ import { addEntry } from '../../services/ui/logService.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 import { loadInventory, saveInventory, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
 import Popup from '../common/Popup.jsx';
+import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 import './PartyInventory.css';
 
 const CURRENCIES = [
@@ -150,29 +151,18 @@ function QuantityStepper({ quantity, onStep, onSet }) {
   );
 }
 
-function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled, isLocalhost }) {
-  const [giveState, setGiveState] = useState(null);
-
-  // Positive whole-number amounts entered in the Give modal, in CURRENCIES order
-  // (all 0 → submit disabled, no accidental transfer on Enter). Confirm names the
-  // player + exact sums before the transfer POST.
-  const giveEntries = giveState
-    ? CURRENCIES
-        .map(({ key }) => [key, Math.floor(Number(giveState.amounts[key]))])
-        .filter(([, n]) => Number.isFinite(n) && n > 0)
-    : [];
-
-  const applyGive = () => {
-    if (!giveState || giveEntries.length === 0) return;
-    const parts = giveEntries.map(([k, v]) => `${v} ${k}`).join(', ');
-    if (!window.confirm(`Give ${parts} to ${giveState.playerName}?`)) return;
-    onTransfer(giveState.playerName, Object.fromEntries(giveEntries));
-    setGiveState(null);
-  };
-
+// The hint line (improve 2026-11-16) states the two mental models explicitly: stepper
+// changes save to the party pool automatically (debounced), while Give opens a transfer
+// modal. Background sections go `inert` (see PartyInventory) while any .pi-modal-overlay
+// is open, so a dwelling user sees the view is parked rather than having clicks eaten.
+function CurrencyCard({ currency, onAdjust, onGiveOpen, disabled, isLocalhost, inert }) {
   return (
-    <div className="pi-currency-card">
+    <div className="pi-currency-card" inert={inert}>
       <h3><i className="fa-solid fa-sack-dollar" /> Party Currency</h3>
+      <p className="pi-move-note">
+        <i className="fa-solid fa-circle-info" /> Amount buttons save to the party pool
+        automatically; Give opens a transfer to a player.
+      </p>
       {CURRENCIES.map(({ key, label, icon }) => (
         <div key={key} className="pi-currency-row">
           <span className="pi-currency-label"><i className={icon} /> {label}</span>
@@ -208,7 +198,7 @@ function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled, is
               className="ct-btn pi-give-btn"
               title={`Give ${label} to a player`}
               disabled={disabled || currency[key] <= 0}
-              onClick={() => setGiveState({ playerName: characters[0]?.name || '', amounts: {} })}
+              onClick={onGiveOpen}
             >
               <i className="fa-solid fa-hand-holding-heart" /> Give
             </button>
@@ -216,65 +206,104 @@ function CurrencyCard({ currency, characters, onAdjust, onTransfer, disabled, is
           )}
         </div>
       ))}
-      {giveState && (
-        <div className="pi-modal-overlay" role="presentation">
-          <div className="ct-modal pi-modal">
-            <div className="ct-modal-header">
-              <h3>Give Currency to Player</h3>
-              <button className="ct-modal-close" onClick={() => setGiveState(null)} aria-label="Close">&times;</button>
+    </div>
+  );
+}
+
+// The Give transfer modal. Positive whole-number amounts entered here, in CURRENCIES
+// order (all 0 → submit disabled, no accidental transfer on Enter); the native confirm
+// names the player + exact sums BEFORE the /inventory/transfer POST. Escape and a pure
+// backdrop click route to the same close lane as Cancel (useModalDismiss family law);
+// the player select autoFocuses so those lanes answer before the first click too.
+function GiveCurrencyModal({ currency, characters, giveState, onChange, onClose, onTransfer }) {
+  const giveEntries = CURRENCIES
+    .map(({ key }) => [key, Math.floor(Number(giveState.amounts[key]))])
+    .filter(([, n]) => Number.isFinite(n) && n > 0);
+
+  const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
+    useModalDismiss(onClose, { panelSelector: '.pi-modal' });
+
+  const applyGive = () => {
+    if (giveEntries.length === 0) return;
+    const parts = giveEntries.map(([k, v]) => `${v} ${k}`).join(', ');
+    if (!window.confirm(`Give ${parts} to ${giveState.playerName}?`)) return;
+    onTransfer(giveState.playerName, Object.fromEntries(giveEntries));
+    onClose();
+  };
+
+  return (
+    <div
+      className="pi-modal-overlay"
+      role="presentation"
+      onMouseDown={handleOverlayMouseDown}
+      onClick={handleOverlayClick}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="ct-modal pi-modal" role="dialog" aria-modal="true" aria-labelledby="pi-give-title">
+        <div className="ct-modal-header">
+          <h3 id="pi-give-title">Give Currency to Player</h3>
+          <button className="ct-modal-close" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="ct-modal-body">
+          <label className="ct-label" htmlFor="pi-give-player">Player</label>
+          <select
+            id="pi-give-player"
+            className="ct-select"
+            value={giveState.playerName}
+            autoFocus
+            onChange={(e) => onChange(prev => ({ ...prev, playerName: e.target.value }))}
+          >
+            {characters.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+          </select>
+          {CURRENCIES.map(({ key, label }) => (
+            <div key={key} className="pi-currency-give-row">
+              <span className="pi-currency-label">{label} (party has {currency[key]})</span>
+              <input
+                type="number"
+                className="ct-input pi-qty-input"
+                min="0"
+                max={currency[key]}
+                value={giveState.amounts[key] ?? 0}
+                onChange={(e) => onChange(prev => ({
+                  ...prev,
+                  amounts: { ...prev.amounts, [key]: Math.max(0, Math.min(currency[key], parseInt(e.target.value, 10) || 0)) },
+                }))}
+              />
             </div>
-            <div className="ct-modal-body">
-              <label className="ct-label">Player</label>
-              <select
-                className="ct-select"
-                value={giveState.playerName}
-                onChange={(e) => setGiveState(prev => ({ ...prev, playerName: e.target.value }))}
-              >
-                {characters.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-              </select>
-              {CURRENCIES.map(({ key, label }) => (
-                <div key={key} className="pi-currency-give-row">
-                  <span className="pi-currency-label">{label} (party has {currency[key]})</span>
-                  <input
-                    type="number"
-                    className="ct-input pi-qty-input"
-                    min="0"
-                    max={currency[key]}
-                    value={giveState.amounts[key] ?? 0}
-                    onChange={(e) => setGiveState(prev => ({
-                      ...prev,
-                      amounts: { ...prev.amounts, [key]: Math.max(0, Math.min(currency[key], parseInt(e.target.value, 10) || 0)) },
-                    }))}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="ct-modal-footer">
-              <div className="ct-modal-buttons">
-                <button className="ct-btn" onClick={() => setGiveState(null)}>Cancel</button>
-                <button
-                  className="ct-btn ct-btn-primary"
-                  onClick={applyGive}
-                  disabled={!giveState.playerName || giveEntries.length === 0}
-                >
-                  <i className="fa-solid fa-hand-holding-heart" /> Give
-                </button>
-              </div>
-            </div>
+          ))}
+        </div>
+        <div className="ct-modal-footer">
+          <div className="ct-modal-buttons">
+            <button className="ct-btn" onClick={onClose}>Cancel</button>
+            <button
+              className="ct-btn ct-btn-primary"
+              onClick={applyGive}
+              disabled={!giveState.playerName || giveEntries.length === 0}
+            >
+              <i className="fa-solid fa-hand-holding-heart" /> Give
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 function ItemEditModal({ form, equipmentData, isNew, saving, onChange, onClose, onSave }) {
+  const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
+    useModalDismiss(onClose, { disabled: saving, panelSelector: '.pi-modal' });
   return (
-    <div className="pi-modal-overlay" role="presentation">
-      <div className="ct-modal pi-modal">
+    <div
+      className="pi-modal-overlay"
+      role="presentation"
+      onMouseDown={handleOverlayMouseDown}
+      onClick={handleOverlayClick}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="ct-modal pi-modal" role="dialog" aria-modal="true" aria-labelledby="pi-item-title">
         <div className="ct-modal-header">
-          <h3>{isNew ? 'Add Item' : `Edit ${form.name}`}</h3>
-          <button className="ct-modal-close" onClick={onClose} aria-label="Close">&times;</button>
+          <h3 id="pi-item-title">{isNew ? 'Add Item' : `Edit ${form.name}`}</h3>
+          <button className="ct-modal-close" onClick={onClose} disabled={saving} aria-label="Close">&times;</button>
         </div>
         <div className="ct-modal-body">
           <label className="ct-label" htmlFor="pi-item-name">Name <span className="ct-required">*</span></label>
@@ -321,16 +350,24 @@ function ItemEditModal({ form, equipmentData, isNew, saving, onChange, onClose, 
 }
 
 function MoveToPlayerModal({ item, characters, quantity, onQuantityChange, player, onPlayerChange, saving, onClose, onConfirm }) {
+  const { handleKeyDown, handleOverlayMouseDown, handleOverlayClick } =
+    useModalDismiss(onClose, { disabled: saving, panelSelector: '.pi-modal' });
   return (
-    <div className="pi-modal-overlay" role="presentation">
-      <div className="ct-modal pi-modal">
+    <div
+      className="pi-modal-overlay"
+      role="presentation"
+      onMouseDown={handleOverlayMouseDown}
+      onClick={handleOverlayClick}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="ct-modal pi-modal" role="dialog" aria-modal="true" aria-labelledby="pi-move-title">
         <div className="ct-modal-header">
-          <h3>Move “{item.name}” to Player</h3>
-          <button className="ct-modal-close" onClick={onClose} aria-label="Close">&times;</button>
+          <h3 id="pi-move-title">Move “{item.name}” to Player</h3>
+          <button className="ct-modal-close" onClick={onClose} disabled={saving} aria-label="Close">&times;</button>
         </div>
         <div className="ct-modal-body">
-          <label className="ct-label">Player</label>
-          <select className="ct-select" value={player} onChange={(e) => onPlayerChange(e.target.value)}>
+          <label className="ct-label" htmlFor="pi-move-player">Player</label>
+          <select id="pi-move-player" className="ct-select" value={player} autoFocus onChange={(e) => onPlayerChange(e.target.value)}>
             {characters.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
           </select>
           <label className="ct-label">Quantity (party has {item.quantity})</label>
@@ -450,6 +487,11 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   const [equipmentData, setEquipmentData] = useState([]);
   const [popupHtml, setPopupHtml] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // Give-transfer modal state, lifted from CurrencyCard (improve 2026-11-16) so ONE
+  // flag owns "a Party-Inventory modal is open" — that flag drives both the real
+  // `disabled` on the currency chips and the `inert` veil on every background section,
+  // making the open modal obvious instead of silently swallowing clicks.
+  const [giveState, setGiveState] = useState(null);
 
   // Serialize full-store POSTs (bug-party-inventory-currency-rapid-click-collapse):
   // one in-flight request per endpoint; a burst of chip clicks coalesces into a single
@@ -739,9 +781,13 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
 
   if (loading) return <div className="ct-container pi-container"><p>Loading party inventory…</p></div>;
 
+  // One flag owns "a Party-Inventory modal is open" (branch-free to stay inside the
+  // complexity cap): drives the `inert` veil on every background section.
+  const modalOpen = [giveState, editForm, moveTarget].some(Boolean);
+
   return (
     <div className="ct-container pi-container">
-      <div className="ct-header">
+      <div className="ct-header" inert={modalOpen}>
         <h2 className="ct-title">
           <i className="fa-solid fa-boxes-stacked" /> Party Inventory
         </h2>
@@ -754,14 +800,14 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
 
       <CurrencyCard
         currency={inventory.currency}
-        characters={characters}
         onAdjust={handleCurrencyAdjust}
-        onTransfer={handleCurrencyTransfer}
-        disabled={saving}
+        onGiveOpen={() => setGiveState({ playerName: characters[0]?.name || '', amounts: {} })}
+        disabled={saving || modalOpen}
         isLocalhost={isLocalhost}
+        inert={modalOpen}
       />
 
-      <div className="pi-main">
+      <div className="pi-main" inert={modalOpen}>
         <div className="pi-items-panel">
           <div className="ct-search-row">
             <i className="fa-solid fa-magnifying-glass ct-search-icon" />
@@ -869,6 +915,17 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
       </div>
 
       {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
+
+      {giveState && (
+        <GiveCurrencyModal
+          currency={inventory.currency}
+          characters={characters}
+          giveState={giveState}
+          onChange={setGiveState}
+          onClose={() => setGiveState(null)}
+          onTransfer={handleCurrencyTransfer}
+        />
+      )}
 
       {editForm && (
         <ItemEditModal
