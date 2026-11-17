@@ -175,8 +175,11 @@ describe('POST inventory/item update', () => {
 
         expect(res.status).toBe(409);
         expect(res.body.error).toBe(
-            'Party item "QA Lantern" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.'
+            'Party item "QA Lantern" was deleted in another tab or session since you loaded it — this response body carries the current merged document — it was NOT saved.'
         );
+        // The client auto-adopts the merged doc (8ce25f1dc), so the copy must NOT
+        // instruct a manual reload — it would be dead advice for an API consumer.
+        expect(res.body.error).not.toContain('reload');
         expect(res.body.error).not.toContain('a1');
         // The 409 carries the server's current merged doc so the stale view can adopt truth.
         expect(res.body.inventory.items).toEqual([]);

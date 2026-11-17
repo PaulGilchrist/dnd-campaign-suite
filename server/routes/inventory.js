@@ -392,7 +392,7 @@ function applyItemAction(inventory, body) {
 function itemConflict(res, inventory, name, id) {
     const label = typeof name === 'string' && name.trim() ? name.trim() : id;
     res.status(409).json({
-        error: `Party item "${label}" was deleted in another tab or session since you loaded it — reload the list and re-apply your edit — it was NOT saved.`,
+        error: `Party item "${label}" was deleted in another tab or session since you loaded it — this response body carries the current merged document — it was NOT saved.`,
         inventory,
     });
 }
