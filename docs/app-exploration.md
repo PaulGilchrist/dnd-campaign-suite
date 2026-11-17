@@ -54,8 +54,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (2026-11-17 CD) The wildcard change-data store accepts ANY key blindly (`keyValidators.js` pass-through by design), which is how the retired-lane shadow lands silently (bug file). Non-blocking idea alongside the fix: surface unknown top-level change-data keys in the Admin panel census so phantoms are visible before the next clear. Files: `campaigns-admin.js`, Admin panel component.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried).

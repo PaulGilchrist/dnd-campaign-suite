@@ -391,6 +391,55 @@ function SnapshotList({ snapshots, onRestore, disabled }) {
     );
 }
 
+// Read-only census of TOP-LEVEL change-data keys the server does not recognize
+// (backlog 2026-11-17 CD): the wildcard lane accepts any key blindly, so a
+// retired route's shadow write lands as a phantom bucket silently. Character
+// roster buckets and known campaign keys are never listed; an honest "none"
+// face renders when there is nothing to flag. Fetch/load state mirrors the
+// snapshots lane exactly (fail-visible note, console.error, never a busy gate).
+function CensusBody({ census, censusError }) {
+    if (censusError) {
+        return (
+            <p className="admin-snapshots-empty" role="status">Could not load the change-data census from the server.</p>
+        );
+    }
+    if (!census) {
+        // Plain (non-live-region) note: the rendering-idle contract pins that
+        // a freshly mounted Admin panel announces nothing yet — only the
+        // settled none/error faces are role=status.
+        return (
+            <p className="admin-snapshots-empty">Loading change-data census…</p>
+        );
+    }
+    if (census.unknownKeys.length === 0) {
+        return (
+            <p className="admin-snapshots-empty" role="status">
+                {census.totalKeys === 0
+                    ? 'No unknown top-level keys — change data is empty.'
+                    : `No unknown top-level keys — all ${census.totalKeys} key${census.totalKeys === 1 ? '' : 's'} recognized.`}
+            </p>
+        );
+    }
+    return (
+        <>
+            <p className="admin-lock-note">
+                {census.unknownKeys.length} of {census.totalKeys} top-level key{census.totalKeys === 1 ? '' : 's'} not
+                recognized by the app — likely a retired write lane or a typo. Sweep via Clear Change Data or the wildcard DELETE.
+            </p>
+            <ul className="admin-snapshots-list">
+                {census.unknownKeys.map((entry) => (
+                    <li key={entry.key} className="admin-snapshot-row">
+                        <span className="admin-snapshot-name">
+                            <i className="fas fa-ghost"></i> {entry.key}
+                        </span>
+                        <span className="admin-snapshot-meta">{entry.type} · {entry.summary}</span>
+                    </li>
+                ))}
+            </ul>
+        </>
+    );
+}
+
 function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [], isLocalhost = false }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
@@ -404,6 +453,10 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
     const [rollbackModal, setRollbackModal] = useState(false);
     const [snapshots, setSnapshots] = useState([]);
     const [snapshotsState, setSnapshotsState] = useState('loading');
+    // Change-data census (unknown top-level keys): null while loading, object
+    // once loaded; censusError mirrors the snapshots 'error' state.
+    const [census, setCensus] = useState(null);
+    const [censusError, setCensusError] = useState(false);
     // Campaign-lock state from GET /api/server-config. Fail-open default:
     // the Rename button stays enabled until the server explicitly reports a
     // lock (mirrors the snapshots pattern — a failed GET never blocks the
@@ -487,6 +540,30 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
         loadSnapshots();
     }, [loadSnapshots]);
 
+    // Census fetch mirrors loadSnapshots: same admin GET idiom, fail-visible
+    // status line, never blocks the rest of the panel.
+    const loadCensus = useCallback(async () => {
+        setCensus(null);
+        setCensusError(false);
+        try {
+            const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/change-data-census`);
+            const data = await res.json();
+            if (!res.ok || !Array.isArray(data.unknownKeys) || typeof data.totalKeys !== 'number') {
+                console.error('Failed to load change-data census:', data.error || res.status);
+                setCensusError(true);
+                return;
+            }
+            setCensus(data);
+        } catch (err) {
+            console.error('Failed to load change-data census:', err.message);
+            setCensusError(true);
+        }
+    }, [campaignName]);
+
+    useEffect(() => {
+        loadCensus();
+    }, [loadCensus]);
+
     // Starter adventure regenerate (arena-starter §3.2): the old native
     // window.confirm gate now opens the shared RegenerateAdventureModal
     // (role=dialog tier, backlog 2026-11-04 CS); the mutation runs
@@ -523,6 +600,9 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                 setStatus({ error: data.error });
             } else {
                 setStatus({ success: data.message });
+                // The clear sweeps every phantom bucket — re-census so the
+                // honest "none" face shows without a page reload.
+                loadCensus();
             }
         } catch (err) {
             setStatus({ error: err.message });
@@ -917,6 +997,11 @@ function CampaignAdmin({ campaignName, theme, toggleTheme, onRenameCampaign, res
                         </button>
                     </div>
                 </div>
+            </div>
+
+            <div className="admin-section">
+                <h3>Change-Data Census</h3>
+                <CensusBody census={census} censusError={censusError} />
             </div>
 
             <div className="admin-section">

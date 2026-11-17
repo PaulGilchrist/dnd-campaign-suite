@@ -10,6 +10,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDir, campaignMapsDir, campaignImagesDir, campaignDataDir, campaignDataFile, campaignSnapshotDir, campaignSnapshotFile } from '../utils/campaignPaths.js';
 import { createSnapshot, listSnapshotFiles } from '../utils/campaignSnapshots.js';
 import { characterChangeData, spellOverlayData, activeMaps, saveFile, markDirty, publish, readFile } from '../utils/changeData.js';
+import { bucketKeySlug, censusChangeDataKeys } from '../utils/changeDataKeys.js';
 import { logCache } from './log.js';
 
 const router = express.Router();
@@ -226,6 +227,55 @@ router.delete('/api/campaigns/:campaign', asyncHandler((req, res) => {
     publish('campaigns-list', { action: 'deleted', campaign }, campaign);
 
     res.json({ message: 'Campaign deleted successfully' });
+}));
+
+// Roster of character-bucket names a top-level change-data key may legally
+// carry: every character JSON file in the campaign folder (same heuristic the
+// rename lane uses) plus every creature name on the live combatSummary board
+// (joined monsters write their own runtime buckets). Slugged bucket-key form
+// (see changeDataKeys.js), so display-name/filename spelling variants agree.
+function knownBucketSlugs(campaign, data) {
+    const characterFileSlugs = new Set();
+    try {
+        for (const file of fs.readdirSync(campaignDir(campaign))) {
+            if (!isCharacterJsonFile(file)) continue;
+            characterFileSlugs.add(bucketKeySlug(file.slice(0, -'.json'.length)));
+        }
+    } catch (err) {
+        console.error(`Failed to list character files for census (${campaign}):`, err.message);
+    }
+    const creatureSlugs = new Set();
+    const creatures = data?.combatSummary?.creatures;
+    if (Array.isArray(creatures)) {
+        for (const creature of creatures) {
+            if (creature && typeof creature.name === 'string') {
+                creatureSlugs.add(bucketKeySlug(creature.name));
+            }
+        }
+    }
+    return { characterFileSlugs, creatureSlugs };
+}
+
+// GET /api/campaigns/:campaign/admin/change-data-census
+// Read-only census (backlog 2026-11-17 CD): the wildcard change-data lane
+// accepts ANY top-level key blindly (keyValidators.js pass-through), so
+// retired-lane shadow writes can land as phantom buckets silently. This lane
+// reports the top-level keys the app does NOT recognize (see
+// utils/changeDataKeys.js for the canonical recognized set) so the Admin
+// panel surfaces phantoms before the next clear. Writes nothing; the
+// in-memory store is the same source the change-data GET serves.
+router.get('/api/campaigns/:campaign/admin/change-data-census', asyncHandler((req, res) => {
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'Only available on localhost' });
+    }
+
+    const { campaign } = req.params;
+    if (!fs.existsSync(campaignDir(campaign))) {
+        return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    const data = characterChangeData.get(campaign) || {};
+    res.json(censusChangeDataKeys(data, knownBucketSlugs(campaign, data)));
 }));
 
 // POST /api/campaigns/:campaign/admin/clear-change-data

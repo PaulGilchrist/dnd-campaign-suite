@@ -71,6 +71,10 @@ function stubFetch(adminHandler = jsonResponse({ message: 'Done' })) {
         let result;
         if (url.endsWith('/admin/snapshots')) {
             result = jsonResponse({ snapshots: [] });
+        } else if (url.endsWith('/admin/change-data-census')) {
+            // Census lane has its own test file; these flows just need the
+            // honest empty store so the mount fetch never lands on the error face.
+            result = jsonResponse({ totalKeys: 0, unknownKeys: [] });
         } else if (/\/admin\/(clear-change-data|clear-log|full-reset)$/.test(url)) {
             result = adminHandler;
         } else {

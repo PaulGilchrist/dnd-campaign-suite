@@ -117,7 +117,7 @@ describe('CampaignAdmin - Rendering', () => {
         // The child consoles have their own test files for behavior;
         // here we only verify the admin view wires them in.
         renderAdmin();
-        ['Appearance', 'Campaign Management', 'Data Management', 'Backup & Restore'].forEach((heading) => {
+        ['Appearance', 'Campaign Management', 'Data Management', 'Change-Data Census', 'Backup & Restore'].forEach((heading) => {
             expect(screen.getByRole('heading', { level: 3, name: heading })).toBeInTheDocument();
         });
         [/Enforcement/, /Session/, /AI Referee/].forEach((heading) => {
