@@ -3,7 +3,7 @@ import { subscribeToSSE } from '../../services/ui/sseClient.js';
 import utils from '../../services/ui/utils.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
-import { loadInventory, saveInventory, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
+import { loadInventory, savePartyItems, adjustCurrency, transferInventory, normalizeInventory } from '../../services/campaign/inventoryService.js';
 import Popup from '../common/Popup.jsx';
 import { useModalDismiss } from '../../hooks/ui/useModalDismiss.js';
 import './PartyInventory.css';
@@ -17,12 +17,15 @@ const CURRENCIES = [
 
 const AMOUNT_CHIPS = [1, 10, 100];
 
-// Trailing debounce for currency chip writes (backlog 2026-10-24): ~30 whole-store
-// POSTs per session collapsed to ONE per click-burst. Each click still updates the
-// optimistic local balance instantly; the network flush waits for a short quiet
-// window, so a burst POSTs the summed final snapshot (and SSE publishes once).
-// A lone click lands within ~debounce + flush time — writes are deferred, never
-// dropped or rate-limited. Benign network/save debounce (no-timers guard).
+const CURRENCY_KEYS = CURRENCIES.map(({ key }) => key);
+
+// Trailing debounce for currency chip writes (backlog 2026-10-24): a click-burst
+// collapses to ONE flush ~400 ms after the last click. Each click still updates the
+// optimistic local balance instantly; the burst flushes as the summed signed per-coin
+// DELTA posted to the atomic server adjust lane — never a document snapshot, so a
+// second GM window pressing within the same window lands additively instead of being
+// clobbered (cross-tab full-doc clobber fix). Benign network/save debounce
+// (no-timers guard).
 const CURRENCY_PERSIST_DEBOUNCE_MS = 400;
 
 const EMPTY_FORM = { id: '', name: '', quantity: 1, description: '' };
@@ -451,8 +454,8 @@ function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
     // Native confirm naming qty + item + source player + party destination, mirroring
     // the currency Give / Delete idioms (backlog 2026-10-24). Refuse = zero writes.
     if (!window.confirm(`Move ${entry.quantity} × ${entry.name} from ${character.name} to party inventory?`)) return;
-    // Drain any debounced currency-chip snapshot first (handleConfirmMove idiom) so a
-    // stale full-store POST can never clobber the credit this transfer lands on the pool.
+    // Drain any debounced currency-chip deltas first (handleConfirmMove idiom) so the
+    // pool credits in click order and the transfer lands on top of the pending batch.
     if (beforeTransfer) beforeTransfer();
     setMoving(entry.name);
     try {
@@ -572,15 +575,17 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   // making the open modal obvious instead of silently swallowing clicks.
   const [giveState, setGiveState] = useState(null);
 
-  // Serialize full-store POSTs (bug-party-inventory-currency-rapid-click-collapse):
-  // one in-flight request per endpoint; a burst of chip clicks coalesces into a single
-  // follow-up POST carrying the latest snapshot. A revision stamp drops stale echoes so
-  // out-of-order responses can never wipe landed edits (playbook §39).
-  // Currency chip clicks additionally sit behind a trailing debounce (CURRENCY_PERSIST_
-  // DEBOUNCE_MS): rapid clicks merge into ONE flush per burst with latest-snapshot
-  // semantics; items/save/delete stay immediate.
+  // Serialize full-store ITEM POSTs (bug-party-inventory-currency-rapid-click-collapse):
+  // one in-flight request per endpoint; writes coalesce into a single follow-up POST
+  // carrying the latest item list. A revision stamp drops stale echoes so out-of-order
+  // responses can never wipe landed edits (playbook §39).
+  // Currency chips no longer ride this snapshot queue at all: they accumulate signed
+  // per-coin deltas behind the trailing debounce and flush through the atomic
+  // server-side /adjust lane (cross-tab full-doc clobber fix — the server clamps and
+  // adds onto ITS ledger, so two GM windows both land).
   const inventoryRef = useRef(inventory);
   const persistQueueRef = useRef({ saving: false, pending: null });
+  const currencyQueueRef = useRef({ saving: false, delta: { pp: 0, gp: 0, sp: 0, cp: 0 } });
   const localRevRef = useRef(0);
   const currencyDebounceRef = useRef(null);
 
@@ -618,15 +623,17 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     return unsubscribe;
   }, [campaignName, applyInventory]);
 
+  // Items lane: full item-list replacement (currency is server-owned — see
+  // flushCurrencyDelta). Immediate, one in-flight POST, latest-list follow-up.
   const flushPersist = useCallback(function flushPersistQueue() {
     const queue = persistQueueRef.current;
     if (queue.saving || !queue.pending) return;
-    const snapshot = queue.pending;
+    const items = queue.pending;
     const rev = localRevRef.current;
     queue.pending = null;
     queue.saving = true;
     setSaving(true);
-    saveInventory(campaignName, snapshot)
+    savePartyItems(campaignName, items)
       .then(saved => {
         // Stale-response guard: a newer local edit superseded this snapshot.
         if (localRevRef.current !== rev) return;
@@ -643,27 +650,68 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
       });
   }, [campaignName, applyInventory]);
 
+  // Currency lane: the burst's summed signed per-coin delta goes to the atomic
+  // server adjust lane, which clamps-and-adds onto ITS ledger — concurrent presses
+  // from other GM sessions merge additively, a snapshot can never clobber one
+  // (cross-tab full-doc clobber fix). Every accepted batch writes an audit row:
+  // a treasury mint is never silent.
+  const flushCurrencyDelta = useCallback(function flushCurrencyQueue() {
+    const queue = currencyQueueRef.current;
+    if (queue.saving) return;
+    const amount = { ...queue.delta };
+    if (!CURRENCY_KEYS.some(key => amount[key] !== 0)) return;
+    for (const key of CURRENCY_KEYS) queue.delta[key] = 0;
+    const rev = localRevRef.current;
+    queue.saving = true;
+    setSaving(true);
+    adjustCurrency(campaignName, amount)
+      .then(saved => {
+        const parts = CURRENCY_KEYS
+          .filter(key => amount[key] !== 0)
+          .map(key => `${amount[key] > 0 ? `+${amount[key]}` : amount[key]} ${key}`)
+          .join(', ');
+        addEntry(campaignName, {
+          type: 'inventory_transfer',
+          message: `Party currency adjusted: ${parts}`,
+          timestamp: Date.now(),
+        }).catch(err => console.error('[PartyInventory] log error:', err));
+        // Stale-response guard mirrors flushPersist.
+        if (localRevRef.current !== rev) return;
+        applyInventory(saved, { ack: true });
+      })
+      .catch(error => {
+        console.error('[PartyInventory] currency adjustment failed:', error);
+        alert(`Currency save failed: ${error.message}`);
+      })
+      .finally(() => {
+        queue.saving = false;
+        setSaving(false);
+        flushCurrencyQueue();
+      });
+  }, [campaignName, applyInventory]);
+
   // Trailing debounce (network/save debounce — permitted by no-timers guard): each chip
   // click resets the timer, so a burst flushes once, ~CURRENCY_PERSIST_DEBOUNCE_MS after
-  // the last click. If a flush is already in flight the pending snapshot rides the
+  // the last click. If a flush is already in flight the pending deltas ride the
   // existing finally-refill; the expired timer then harmlessly no-ops.
   const scheduleCurrencyFlush = useCallback(() => {
     if (currencyDebounceRef.current) clearTimeout(currencyDebounceRef.current);
     currencyDebounceRef.current = setTimeout(() => {
       currencyDebounceRef.current = null;
-      flushPersist();
+      flushCurrencyDelta();
     }, CURRENCY_PERSIST_DEBOUNCE_MS);
-  }, [flushPersist]);
+  }, [flushCurrencyDelta]);
 
-  // Cancel any scheduled burst flush and POST now — used by atomic transfer/move so a
-  // debounced chip snapshot can never race the server-side /transfer ledger edit.
+  // Cancel any scheduled burst flush and POST the pending deltas now — used by atomic
+  // transfer/move/delete so the chip batch lands on the server ledger in click order
+  // ahead of the transfer's own delta.
   const flushCurrencyPersist = useCallback(() => {
     if (currencyDebounceRef.current) {
       clearTimeout(currencyDebounceRef.current);
       currencyDebounceRef.current = null;
     }
-    flushPersist();
-  }, [flushPersist]);
+    flushCurrencyDelta();
+  }, [flushCurrencyDelta]);
 
   // Never leave a debounced burst stranded by navigation away from the page.
   useEffect(() => {
@@ -677,23 +725,22 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
 
   const persist = useCallback((next) => {
     applyInventory(next);
-    persistQueueRef.current.pending = next;
+    persistQueueRef.current.pending = next.items;
     flushPersist();
   }, [applyInventory, flushPersist]);
 
-  // Currency chip path: optimistic display is instant, the POST waits out the burst.
-  const persistCurrency = useCallback((next) => {
-    applyInventory(next);
-    persistQueueRef.current.pending = next;
-    scheduleCurrencyFlush();
-  }, [applyInventory, scheduleCurrencyFlush]);
-
+  // Currency chip path: optimistic display is instant, and the click contributes its
+  // optimistic difference to the pending signed delta (a press that the zero floor
+  // swallows contributes nothing — no phantom POST). The burst flushes as ONE /adjust
+  // delta POST after the quiet window.
   const handleCurrencyAdjust = (key, delta) => {
     const prev = inventoryRef.current;
-    persistCurrency({
-      ...prev,
-      currency: { ...prev.currency, [key]: Math.max(0, (prev.currency[key] || 0) + delta) },
-    });
+    const current = prev.currency[key] || 0;
+    const nextAmount = Math.max(0, current + delta);
+    if (nextAmount === current) return;
+    applyInventory({ ...prev, currency: { ...prev.currency, [key]: nextAmount } });
+    currencyQueueRef.current.delta[key] += nextAmount - current;
+    scheduleCurrencyFlush();
   };
 
   const handleCurrencyTransfer = (playerName, amounts) => {
@@ -754,7 +801,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
   };
 
   // Pre-await log audit (backlog 2026-10-29-AB): this row used to ride the
-  // fire-and-forget persist queue, so a rejected saveInventory left the durable
+  // fire-and-forget persist queue, so a rejected save left the durable
   // campaign log claiming a removal the ledger never got — the same log/disk
   // divergence 4d81b8495 closed for the EB join. Now an atomic destructive
   // lane (handleConfirmMove idiom): drain the debounced currency snapshot,
@@ -765,11 +812,11 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
     if (!window.confirm(`Delete "${item.name}" from party inventory?`)) return;
     flushCurrencyPersist();
     const inv = inventoryRef.current;
-    const next = { ...inv, items: inv.items.filter(i => i.id !== item.id) };
-    applyInventory(next);
+    const items = inv.items.filter(i => i.id !== item.id);
+    applyInventory({ ...inv, items });
     const rev = localRevRef.current;
     setSaving(true);
-    saveInventory(campaignName, next)
+    savePartyItems(campaignName, items)
       .then(saved => {
         // Stale-response guard mirrors flushPersist: a newer local edit
         // superseded this snapshot's ack.

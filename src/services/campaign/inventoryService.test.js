@@ -9,7 +9,8 @@
  * client's own generic fallback strings.
  *
  * THIS file owns `/api/campaigns/:campaign/inventory` (GET bare fetch, POST
- * full overwrite) and `/api/campaigns/:campaign/inventory/transfer` (POST).
+ * items-only replace) plus the `/inventory/adjust` and `/inventory/transfer`
+ * atomic delta lanes (POST).
  *
  * Response shapes pinned against server/routes/inventory.js, NOT canned JSON:
  *  - GET  → { inventory: { currency, items } }; the route loadInventory()
@@ -33,8 +34,9 @@
  *
  * Consumers (liveness verified): src/components/party-inventory/
  * PartyInventory.jsx (App.jsx 'partyInventory' view) — loadInventory on
- * mount, saveInventory on edits, transferInventory for item/currency moves,
- * normalizeInventory on the raw { currency, items } SSE echo.
+ * mount, savePartyItems on item edits, adjustCurrency for the +/- chip flush,
+ * transferInventory for item/currency moves, normalizeInventory on the raw
+ * { currency, items } SSE echo.
  *
  * No timers, no localStorage game state — pure fetch boundary; inventory
  * lives server-side in public/campaigns/:campaign/data/inventory.json.
@@ -42,9 +44,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   loadInventory,
-  saveInventory,
+  savePartyItems,
   transferInventory,
-  depositCurrency,
+  adjustCurrency,
   normalizeInventory,
 } from './inventoryService.js';
 
@@ -194,21 +196,22 @@ describe('inventoryService', () => {
     });
   });
 
-  describe('saveInventory', () => {
-    it('POSTs the exact overwrite body and returns only the normalized inventory', async () => {
+  describe('savePartyItems', () => {
+    it('POSTs the items-only body and returns only the normalized inventory', async () => {
+      const items = [{ id: 'a', name: 'Rope', quantity: 1, description: '50 ft' }];
       const inventory = {
         currency: { pp: 0, gp: 15, sp: 0, cp: 0 },
-        items: [{ id: 'a', name: 'Rope', quantity: 1, description: '50 ft' }],
+        items,
       };
-      // server truth: res.json({ success: true, inventory }) — sanitized +
-      // re-sorted server-side
+      // server truth: res.json({ success: true, inventory }) — items sanitized +
+      // re-sorted server-side, currency preserved from the ledger (never written here)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
         json: () => Promise.resolve({ success: true, inventory }),
       });
 
-      const result = await saveInventory('test-campaign', inventory);
+      const result = await savePartyItems('test-campaign', items);
 
       // client DROPS the success flag — returns normalizeInventory(data.inventory)
       expect(result).toEqual(inventory);
@@ -216,7 +219,7 @@ describe('inventoryService', () => {
       expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inventory),
+        body: JSON.stringify({ items }),
       });
     });
 
@@ -229,7 +232,7 @@ describe('inventoryService', () => {
         json: () => Promise.resolve({ error: 'inventory.items must be an array' }),
       });
       await expect(
-        saveInventory('test-campaign', { currency: {}, items: 'nope' })
+        savePartyItems('test-campaign', 'nope')
       ).rejects.toThrow('inventory.items must be an array');
 
       // client-only generic when the error body has no error field
@@ -240,7 +243,7 @@ describe('inventoryService', () => {
         json: () => Promise.resolve({}),
       });
       await expect(
-        saveInventory('test-campaign', { currency: EMPTY_CURRENCY, items: [] })
+        savePartyItems('test-campaign', [])
       ).rejects.toThrow('Failed to save party inventory');
     });
 
@@ -248,7 +251,7 @@ describe('inventoryService', () => {
       fetchSpy.mockRejectedValue(new Error('ENOTFOUND'));
 
       await expect(
-        saveInventory('test-campaign', { currency: EMPTY_CURRENCY, items: [] })
+        savePartyItems('test-campaign', [])
       ).rejects.toThrow('ENOTFOUND');
       // swallow lives in the consumer (PartyInventory.jsx 'save failed:') —
       // the service must rethrow, staying non-silent at this boundary
@@ -375,24 +378,25 @@ describe('inventoryService', () => {
     });
   });
 
-  describe('depositCurrency', () => {
-    it('POSTs the exact deposit body to /inventory/deposit and returns the normalized inventory', async () => {
-      const currency = { pp: 70, gp: 3, sp: 0, cp: 0 };
-      // server truth: res.json({ success: true, inventory }) — credited server-side
+  describe('adjustCurrency', () => {
+    it('POSTs the exact signed delta body to /inventory/adjust and returns the normalized inventory', async () => {
+      const currency = { pp: 0, gp: -10, sp: 0, cp: 3 };
+      // server truth: res.json({ success: true, inventory }) — clamped-and-added
+      // onto the SERVER's ledger
       fetchSpy.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: () => Promise.resolve({
           success: true,
-          inventory: { currency: { pp: 72, gp: 8, sp: 0, cp: 7 }, items: [] },
+          inventory: { currency: { pp: 0, gp: 0, sp: 0, cp: 10 }, items: [] },
         }),
       });
 
-      const result = await depositCurrency('test-campaign', currency);
+      const result = await adjustCurrency('test-campaign', currency);
 
-      expect(result).toEqual({ currency: { pp: 72, gp: 8, sp: 0, cp: 7 }, items: [] });
+      expect(result).toEqual({ currency: { pp: 0, gp: 0, sp: 0, cp: 10 }, items: [] });
       expect(result).not.toHaveProperty('success');
-      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/inventory/deposit', {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test-campaign/inventory/adjust', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currency }),
@@ -404,10 +408,10 @@ describe('inventoryService', () => {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
-        json: () => Promise.resolve({ error: 'currency with a positive amount is required' }),
+        json: () => Promise.resolve({ error: 'currency with a non-zero whole-number amount is required' }),
       });
-      await expect(depositCurrency('test-campaign', { pp: 0, gp: 0, sp: 0, cp: 0 }))
-        .rejects.toThrow('currency with a positive amount is required');
+      await expect(adjustCurrency('test-campaign', { pp: 0, gp: 0, sp: 0, cp: 0 }))
+        .rejects.toThrow('currency with a non-zero whole-number amount is required');
 
       fetchSpy.mockResolvedValueOnce({
         ok: false,
@@ -415,11 +419,11 @@ describe('inventoryService', () => {
         statusText: 'Internal Server Error',
         json: () => Promise.resolve({}),
       });
-      await expect(depositCurrency('test-campaign', { gp: 1 }))
-        .rejects.toThrow('Failed to deposit party currency');
+      await expect(adjustCurrency('test-campaign', { gp: 1 }))
+        .rejects.toThrow('Failed to adjust party currency');
 
       fetchSpy.mockRejectedValueOnce(new Error('ENOTFOUND'));
-      await expect(depositCurrency('test-campaign', { gp: 1 })).rejects.toThrow('ENOTFOUND');
+      await expect(adjustCurrency('test-campaign', { gp: 1 })).rejects.toThrow('ENOTFOUND');
     });
   });
 });

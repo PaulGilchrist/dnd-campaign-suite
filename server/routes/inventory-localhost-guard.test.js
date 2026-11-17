@@ -4,8 +4,8 @@
 // campaigns-character.js refuseUnlessGm / maps.js / quests.js / campaigns-admin.js
 // pattern and the client-side PartyInventory.jsx isLocalhost gate): a non-localhost
 // (network) client must get 403 with NO inventory file written and NO SSE broadcast
-// on every minting/disbursing lane — full-store POST (+/− chip flushes, item add/
-// edit/delete), loot deposit, and party→player transfers.
+// on every minting/disbursing lane — the items-ledger POST, currency adjust (chip
+// flush / loot award), and party→player transfers.
 //
 // Audited exception: player→party transfers stay OPEN to every client — a player may
 // contribute from their OWN resources; the server debits the character file atomically
@@ -81,13 +81,13 @@ beforeEach(() => {
 
 describe('inventory — localhost authority gate (GM-only treasury writes)', () => {
     describe.each(LAN_HOSTS)('from LAN host %s', (host) => {
-        it('POST /inventory (chip-grant full overwrite) ⇒ 403, disk untouched, no broadcast', async () => {
+        it('POST /inventory (items-ledger save) ⇒ 403, disk untouched, no broadcast', async () => {
             setupFs({ [invPath]: baseInventory() });
 
             const res = await request(createTestApp())
                 .post(`/api/campaigns/${CAMPAIGN}/inventory`)
                 .set('Host', host)
-                .send({ currency: { pp: 0, gp: 100, sp: 0, cp: 0 }, items: [] });
+                .send({ items: [{ name: 'Torch', quantity: 1, description: '' }] });
 
             expect(res.status).toBe(403);
             expect(res.body.error).toMatch(/GM-only/i);
@@ -95,11 +95,11 @@ describe('inventory — localhost authority gate (GM-only treasury writes)', () 
             expect(publishedEvents).toHaveLength(0);
         });
 
-        it('POST /inventory/deposit (currency mint) ⇒ 403, disk untouched, no broadcast', async () => {
+        it('POST /inventory/adjust (currency delta mint/removal) ⇒ 403, disk untouched, no broadcast', async () => {
             setupFs({ [invPath]: baseInventory() });
 
             const res = await request(createTestApp())
-                .post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+                .post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
                 .set('Host', host)
                 .send({ currency: { gp: 100 } });
 
@@ -167,24 +167,26 @@ describe('inventory — localhost authority gate (GM-only treasury writes)', () 
     });
 
     describe('localhost GM lanes unchanged', () => {
-        it('POST /inventory still persists + broadcasts', async () => {
-            setupFs({ [invPath]: baseInventory() });
+        it('POST /inventory still persists items + broadcasts', async () => {
+            setupFs({ [invPath]: { currency: { pp: 0, gp: 7, sp: 0, cp: 0 }, items: [] } });
 
             const res = await request(createTestApp())
                 .post(`/api/campaigns/${CAMPAIGN}/inventory`)
                 .set('Host', 'localhost')
-                .send({ currency: { pp: 0, gp: 100, sp: 0, cp: 0 }, items: [] });
+                .send({ items: [{ id: 't1', name: 'Torch', quantity: 2, description: '' }] });
 
             expect(res.status).toBe(200);
-            expect(JSON.parse(FILE_SYSTEM.get(invPath)).currency.gp).toBe(100);
+            const saved = JSON.parse(FILE_SYSTEM.get(invPath));
+            expect(saved.items).toHaveLength(1);
+            expect(saved.currency.gp).toBe(7);
             expect(publishedEvents.find(e => e.key === `inventory-${CAMPAIGN}`)).toBeTruthy();
         });
 
-        it('POST /inventory/deposit still credits the ledger', async () => {
+        it('POST /inventory/adjust still credits the ledger', async () => {
             setupFs({ [invPath]: baseInventory() });
 
             const res = await request(createTestApp())
-                .post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+                .post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
                 .set('Host', 'localhost')
                 .send({ currency: { gp: 25 } });
 

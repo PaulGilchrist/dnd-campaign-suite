@@ -15,7 +15,11 @@ let confirmSpy = null;
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  saveInventory: vi.fn().mockImplementation(async (_c, inv) => inv),
+  savePartyItems: vi.fn().mockImplementation(async (_c, items) => ({ currency: { pp: 1, gp: 205, sp: 20, cp: 50 }, items })),
+  adjustCurrency: vi.fn().mockImplementation(async (_c, amount) => ({
+    currency: { pp: 1, gp: 205 + (amount.gp || 0), sp: 20, cp: 50 + (amount.cp || 0) },
+    items: [],
+  })),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
 

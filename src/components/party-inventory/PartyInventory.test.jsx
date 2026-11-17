@@ -4,14 +4,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
-const mockSaveInventory = vi.fn();
+const mockSavePartyItems = vi.fn();
+const mockAdjustCurrency = vi.fn();
 const mockTransferInventory = vi.fn();
 let sseHandler = null;
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  saveInventory: (...args) => mockSaveInventory(...args),
+  savePartyItems: (...args) => mockSavePartyItems(...args),
+  adjustCurrency: (...args) => mockAdjustCurrency(...args),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
 
@@ -60,7 +62,11 @@ const baseInventory = () => ({
 
 beforeEach(() => {
   mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-  mockSaveInventory.mockReset().mockImplementation(async (_c, inv) => inv);
+  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => ({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items }));
+  mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => ({
+    currency: { pp: 1, gp: 50 + (amount.gp || 0), sp: 20, cp: amount.cp || 0 },
+    items: [],
+  }));
   mockTransferInventory.mockReset().mockResolvedValue({ inventory: baseInventory(), character: { name: 'War Cleric', inventory: {} } });
   sseHandler = null;
 });
@@ -85,14 +91,14 @@ describe('PartyInventory', () => {
     expect(itemNames).toEqual(['Antitoxin', 'Torch']);
   });
 
-  it('adds currency via stepper chips without the user computing the total', async () => {
+  it('adds currency via stepper chips through the atomic delta lane, never a snapshot', async () => {
     await renderReady();
     fireEvent.click(screen.getByTitle('Add 10 gp'));
     await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        currency: expect.objectContaining({ gp: 60 }),
-      }));
+      expect(mockAdjustCurrency).toHaveBeenCalledWith('test-campaign', { pp: 0, gp: 10, sp: 0, cp: 0 });
     });
+    // The chip write must never ride the full-document items lane.
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
   });
 
   it('disables the remove chip when it would go below zero', async () => {
@@ -184,11 +190,9 @@ describe('PartyInventory', () => {
     fireEvent.change(nameInput, { target: { value: 'Goblin Idol' } });
     fireEvent.click(screen.getByRole('button', { name: /Save/ }));
     await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        items: expect.arrayContaining([
-          expect.objectContaining({ name: 'Goblin Idol' }),
-        ]),
-      }));
+      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.arrayContaining([
+        expect.objectContaining({ name: 'Goblin Idol' }),
+      ]));
     });
   });
 
@@ -198,9 +202,9 @@ describe('PartyInventory', () => {
     const row = screen.getByText('Antitoxin').closest('tr');
     fireEvent.click(within(row).getByTitle('Delete item'));
     await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        items: expect.not.arrayContaining([expect.objectContaining({ id: 'i1' })]),
-      }));
+      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.not.arrayContaining([
+        expect.objectContaining({ id: 'i1' }),
+      ]));
     });
     window.confirm.mockRestore();
   });

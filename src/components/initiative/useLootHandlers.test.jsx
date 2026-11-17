@@ -28,7 +28,7 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useLootHandlers } from './useLootHandlers.js';
 import { generateLootFromCombatSummary } from '../../services/items/lootGenerator.js';
-import { depositCurrency } from '../../services/campaign/inventoryService.js';
+import { adjustCurrency } from '../../services/campaign/inventoryService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue, notify } from '../../hooks/runtime/useRuntimeState.js';
 
@@ -42,12 +42,12 @@ vi.mock('../../services/items/lootGenerator.js', async (importOriginal) => ({
     generateLootFromCombatSummary: vi.fn(async () => ({ lootEntries: [], totalEncounterXp: 0 })),
 }));
 
-// Deposit boundary: the award seam POSTs parsed currency to /inventory/deposit
+// Deposit boundary: the award seam POSTs parsed currency to /inventory/adjust
 // and logs the credit. Never live (campaign lockdown), calls recorded verbatim.
 const { depositCalls } = vi.hoisted(() => ({ depositCalls: [] }));
 
 vi.mock('../../services/campaign/inventoryService.js', () => ({
-    depositCurrency: vi.fn(async (campaignName, currency) => {
+    adjustCurrency: vi.fn(async (campaignName, currency) => {
         depositCalls.push({ campaignName, currency });
         return { currency, items: [] };
     }),
@@ -367,7 +367,7 @@ describe('useLootHandlers', () => {
             });
 
             // Currency credited once, exact amounts, through the server deposit route
-            expect(depositCurrency).toHaveBeenCalledTimes(1);
+            expect(adjustCurrency).toHaveBeenCalledTimes(1);
             expect(depositCalls).toEqual([{
                 campaignName,
                 currency: { pp: 70, gp: 3, sp: 2, cp: 0 },
@@ -410,14 +410,14 @@ describe('useLootHandlers', () => {
                 await result.current.handleAwardLoot();
             });
 
-            expect(depositCurrency).not.toHaveBeenCalled();
+            expect(adjustCurrency).not.toHaveBeenCalled();
             expect(addEntry).toHaveBeenCalledTimes(2);
             expect(setRuntimeValue).toHaveBeenCalledTimes(2);
             expect(result.current.lootTextValue).toBe('');
         });
 
         it('completes the award and clears the panel when the deposit route fails', async () => {
-            depositCurrency.mockRejectedValueOnce(new Error('deposit down'));
+            adjustCurrency.mockRejectedValueOnce(new Error('deposit down'));
             const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
 
             const { result } = renderHook(() =>
@@ -463,7 +463,7 @@ describe('useLootHandlers', () => {
                 await result.current.handleAwardLoot();
             });
 
-            expect(depositCurrency).toHaveBeenCalledTimes(1);
+            expect(adjustCurrency).toHaveBeenCalledTimes(1);
             expect(addEntry).toHaveBeenCalledTimes(2);
             expect(addEntry).toHaveBeenNthCalledWith(1, campaignName, {
                 type: 'encounter',

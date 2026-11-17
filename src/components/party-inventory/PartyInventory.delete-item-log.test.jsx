@@ -1,7 +1,7 @@
 // @maintained-by-ai: 2026-10-29
 // Improve (2026-10-29-AB pre-await log-row audit): the item-delete lane wrote its
 // `Removed "X" from party inventory` row alongside the fire-and-forget persist
-// queue, so a rejected saveInventory left the durable campaign log claiming a
+// queue, so a rejected save left the durable campaign log claiming a
 // removal the ledger never got (the EB-join divergence class, bug-eb-join-*
 // fixed by 4d81b8495). The row now lands ONLY after the server acks the new
 // ledger; a rejected save shows the lane's alert feedback and writes ZERO rows.
@@ -14,13 +14,14 @@ import PartyInventory from './PartyInventory.jsx';
 import { addEntry } from '../../services/ui/logService.js';
 
 const mockLoadInventory = vi.fn();
-const mockSaveInventory = vi.fn();
+const mockSavePartyItems = vi.fn();
 const mockTransferInventory = vi.fn();
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  saveInventory: (...args) => mockSaveInventory(...args),
+  savePartyItems: (...args) => mockSavePartyItems(...args),
+  adjustCurrency: vi.fn(),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
 
@@ -66,7 +67,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
 
   beforeEach(() => {
     mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-    mockSaveInventory.mockReset().mockImplementation(async (_c, inv) => inv);
+    mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => ({ currency: baseInventory().currency, items }));
     mockTransferInventory.mockReset().mockResolvedValue({});
     addEntry.mockClear();
     confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -83,9 +84,9 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     clickDelete('Antitoxin');
     expect(confirmSpy).toHaveBeenCalledWith('Delete "Antitoxin" from party inventory?');
     await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        items: expect.not.arrayContaining([expect.objectContaining({ id: 'i1' })]),
-      }));
+      expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.not.arrayContaining([
+        expect.objectContaining({ id: 'i1' }),
+      ]));
     });
     await waitFor(() => {
       expect(addEntry).toHaveBeenCalledTimes(1);
@@ -102,11 +103,11 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
 
   it('reject leg: no success row, honest alert + console.error feedback', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockSaveInventory.mockRejectedValue(new Error('disk on fire'));
+    mockSavePartyItems.mockRejectedValue(new Error('disk on fire'));
     await renderReady();
     clickDelete('Antitoxin');
     await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalled();
+      expect(mockSavePartyItems).toHaveBeenCalled();
     });
     // Let the rejection chain settle.
     await waitFor(() => {
@@ -126,7 +127,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
 
   it('reject leg: optimistic delete rolls back — row re-appears without remount', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockSaveInventory.mockRejectedValue(new Error('disk on fire'));
+    mockSavePartyItems.mockRejectedValue(new Error('disk on fire'));
     await renderReady();
     clickDelete('Antitoxin');
     // Optimistic: the row vanishes immediately…
@@ -140,9 +141,9 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     expect(screen.getByText('Antitoxin')).toBeTruthy();
     expect(screen.getByText('Torch')).toBeTruthy();
     // Pre-delete snapshot restored verbatim (same items, same order).
-    expect(mockSaveInventory).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      items: expect.not.arrayContaining([expect.objectContaining({ id: 'i1' })]),
-    }));
+    expect(mockSavePartyItems).toHaveBeenCalledWith('test-campaign', expect.not.arrayContaining([
+      expect.objectContaining({ id: 'i1' }),
+    ]));
     expect(addEntry).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
@@ -150,7 +151,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
   it('reject leg with newer local edit in flight: rollback skipped (stale guard)', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     let rejectDelete;
-    mockSaveInventory.mockImplementation(
+    mockSavePartyItems.mockImplementation(
       () => new Promise((_resolve, reject) => { rejectDelete = reject; })
     );
     await renderReady();
@@ -158,7 +159,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     await waitFor(() => expect(screen.queryByText('Antitoxin')).toBeNull());
     // Newer local edit while the delete write is in flight: +1 Torch qty
     // (persist bumps localRevRef and POSTs the delete-less snapshot).
-    mockSaveInventory.mockImplementation(async (_c, inv) => inv);
+    mockSavePartyItems.mockImplementation(async (_c, items) => ({ currency: baseInventory().currency, items }));
     const torchRow = screen.getByText('Torch').closest('tr');
     fireEvent.click(within(torchRow).getByLabelText('Increase quantity'));
     await waitFor(() => {
@@ -181,7 +182,7 @@ describe('PartyInventory item-delete log ordering (pre-await audit)', () => {
     await renderReady();
     clickDelete('Antitoxin');
     await waitFor(() => expect(screen.getByText('Antitoxin')).toBeTruthy());
-    expect(mockSaveInventory).not.toHaveBeenCalled();
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
   });
 });

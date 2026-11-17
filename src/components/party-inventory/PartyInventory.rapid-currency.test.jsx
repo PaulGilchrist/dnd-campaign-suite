@@ -1,22 +1,27 @@
-// @maintained-by-ai: 2026-10-24
+// @maintained-by-ai: 2026-11-17
 // Regression (bug-party-inventory-currency-rapid-click-collapse): rapid chip clicks in a
 // single synchronous task each read the SAME stale closure snapshot of `inventory`, so
 // +1×3 collapsed to +1 and +100×2 collapsed to +100 — every click POSTed the same
-// collapsed full-store snapshot, silently dropping GM intent. Also pins the serialized
-// persist queue: one in-flight POST per endpoint, burst coalesced into a trailing POST
-// with the latest snapshot, and stale POST echoes dropped via revision stamp (playbook §39).
+// collapsed snapshot, silently dropping GM intent. The burst now sits behind the 400ms
+// trailing debounce and flushes as ONE signed per-coin DELTA on the atomic /adjust lane
+// (bug-inventory-chip-cross-tab-full-doc-clobber: the whole-document snapshot POST is
+// gone — two GM windows pressing in the same window land additively server-side).
+// Also pins the serialized items queue: one in-flight POST per endpoint, stale POST
+// echoes dropped via revision stamp (playbook §39).
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
-const mockSaveInventory = vi.fn();
+const mockSavePartyItems = vi.fn();
+const mockAdjustCurrency = vi.fn();
 let sseHandler = null;
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  saveInventory: (...args) => mockSaveInventory(...args),
+  savePartyItems: (...args) => mockSavePartyItems(...args),
+  adjustCurrency: (...args) => mockAdjustCurrency(...args),
   transferInventory: vi.fn(),
 }));
 
@@ -48,15 +53,34 @@ const baseInventory = () => ({
   items: [],
 });
 
+// Fake server ledger: adjust behaves like the real route — clamped-and-added onto
+// the CURRENT server currency, the same merged document then SSE-echoes back.
+let serverCurrency;
+let serverItems;
+
 beforeEach(() => {
-  mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-  mockSaveInventory.mockReset().mockImplementation(async (_c, inv) => inv);
+  serverCurrency = { ...baseInventory().currency };
+  serverItems = [];
+  mockLoadInventory.mockReset().mockImplementation(async () => ({
+    currency: { ...serverCurrency },
+    items: serverItems,
+  }));
+  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => {
+    serverItems = items;
+    return { currency: { ...serverCurrency }, items };
+  });
+  mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => {
+    for (const key of ['pp', 'gp', 'sp', 'cp']) {
+      serverCurrency[key] = Math.max(0, serverCurrency[key] + (amount[key] || 0));
+    }
+    return { currency: { ...serverCurrency }, items: serverItems };
+  });
   sseHandler = null;
 });
 
 async function renderReady() {
   render(<PartyInventory {...defaultProps} />);
-  await screen.findByText('Party Inventory');
+  await screen.findByText('Party Currency');
 }
 
 function goldAmount() {
@@ -76,22 +100,23 @@ function tripleClick(title) {
 }
 
 describe('PartyInventory rapid currency clicks', () => {
-  it('accumulates three same-frame +1 clicks to +3 in the UI and persists +3', async () => {
+  it('accumulates three same-frame +1 clicks to +3 in the UI and persists +3 as a delta', async () => {
     await renderReady();
     tripleClick('Add 1 gp');
 
     // Every click lands immediately in the displayed balance: 50 + 3 = 53.
     expect(goldAmount()).toBe('53');
 
-    // The burst sits behind the 400ms trailing debounce, then flushes as ONE POST of the
-    // latest snapshot — never three identical collapsed POSTs.
+    // The burst sits behind the 400ms trailing debounce, then flushes as ONE signed
+    // delta POST — never a document snapshot, never three collapsed POSTs.
     await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalledTimes(1);
-      expect(mockSaveInventory.mock.calls[0][1].currency.gp).toBe(53);
+      expect(mockAdjustCurrency).toHaveBeenCalledTimes(1);
+      expect(mockAdjustCurrency.mock.calls[0][1]).toEqual({ pp: 0, gp: 3, sp: 0, cp: 0 });
     });
-    // Responses settling must not revert the display (stale echoes dropped).
-    await waitFor(() => expect(goldAmount()).toBe('53'));
-    mockSaveInventory.mock.calls.forEach(([, inv]) => expect(inv.currency.gp).toBeGreaterThanOrEqual(51));
+    // The chip lane must never touch the full-document items lane.
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    // And the fake server ledger converges additively: 50 + 3 = 53.
+    await waitFor(() => expect(serverCurrency.gp).toBe(53));
   });
 
   it('accumulates two same-frame +100 clicks to +200', async () => {
@@ -103,66 +128,77 @@ describe('PartyInventory rapid currency clicks', () => {
     });
     expect(goldAmount()).toBe('250');
     await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalledTimes(1);
-      expect(mockSaveInventory.mock.calls[0][1].currency.gp).toBe(250);
+      expect(mockAdjustCurrency).toHaveBeenCalledTimes(1);
+      expect(mockAdjustCurrency.mock.calls[0][1].gp).toBe(200);
     });
   });
 
-  it('drops a stale POST echo when a newer local edit queues mid-flight', async () => {
+  it('merges a hanging currency flush with a concurrent item edit — both lanes land', async () => {
     mockLoadInventory.mockResolvedValueOnce({
       currency: { pp: 0, gp: 50, sp: 0, cp: 0 },
       items: [{ id: 'i1', name: 'Rope, Hempen', quantity: 1, description: '' }],
     });
+    serverItems = [{ id: 'i1', name: 'Rope, Hempen', quantity: 1, description: '' }];
     await renderReady();
-    // The debounced +1-burst flush hangs in flight carrying gp 51.
-    let resolveFirst;
-    mockSaveInventory.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; }));
+    // The debounced +1-burst flush hangs in flight carrying delta gp 1.
+    let resolveAdjust;
+    mockAdjustCurrency.mockImplementationOnce(() => new Promise(resolve => { resolveAdjust = resolve; }));
     fireEvent.click(screen.getByTitle('Add 1 gp'));
-    await waitFor(() => expect(mockSaveInventory).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockAdjustCurrency).toHaveBeenCalledTimes(1));
 
-    // A newer edit queues behind the hang (currency chips are disabled mid-flight,
-    // so the item stepper drives the queue).
+    // A newer ITEM edit rides its own queue independently — the currency delta lane
+    // can never block or clobber it (the old shared full-doc queue made it wait).
     fireEvent.click(screen.getByLabelText('Increase quantity'));
-    expect(goldAmount()).toBe('51');
-    expect(mockSaveInventory).toHaveBeenCalledTimes(1); // never posts early
+    await waitFor(() => expect(mockSavePartyItems).toHaveBeenCalledTimes(1));
+    expect(mockSavePartyItems.mock.calls[0][1][0].quantity).toBe(2);
 
-    // The hung POST lands LAST with its OLD full-store snapshot (gp 50 / qty 1) — a
-    // classic replace-route reorder. It must be ignored, never resurrected over 51/2.
+    // The hung adjust lands LAST: the server applied +1 onto ITS ledger and the SSE
+    // echo carries the merged truth (gp 51, qty 2) — both lanes converge additively,
+    // and the adjust's now-stale ack (revision moved) is dropped, never resurrecting
+    // the pre-edit view (playbook §39 guard).
     await act(async () => {
-      resolveFirst({ currency: { pp: 0, gp: 50, sp: 0, cp: 0 }, items: [{ id: 'i1', name: 'Rope, Hempen', quantity: 1, description: '' }] });
-    });
-    await waitFor(() => {
-      expect(mockSaveInventory).toHaveBeenCalledTimes(2);
-      expect(mockSaveInventory.mock.calls[1][1].currency.gp).toBe(51);
-      expect(mockSaveInventory.mock.calls[1][1].items[0].quantity).toBe(2);
+      serverCurrency.gp = 51;
+      const merged = { currency: { ...serverCurrency }, items: serverItems };
+      resolveAdjust(merged);
+      sseHandler({ key: 'inventory-test-campaign', data: merged });
     });
     expect(goldAmount()).toBe('51');
+    expect(screen.getByLabelText('Quantity').value).toBe('2');
   });
 
-  it('clamps subtract clicks at zero', async () => {
+  it('clamps subtract clicks at zero and flushes one negative delta', async () => {
     await renderReady();
-    // Chips are disabled while a POST is in flight — wait for re-enable between clicks.
-    for (let i = 0; i < 5; i++) {
-      await waitFor(() => expect(screen.getByTitle('Remove 10 gp').disabled).toBe(false));
-      fireEvent.click(screen.getByTitle('Remove 10 gp'));
-    }
-    await waitFor(() => expect(goldAmount()).toBe('0'));
-    expect(screen.getByTitle('Remove 10 gp').disabled).toBe(true);
-    await waitFor(() => {
-      mockSaveInventory.mock.calls.forEach(([, inv]) => expect(inv.currency.gp).toBeGreaterThanOrEqual(0));
+    // Five same-frame-rate −10 presses from 50 merge into ONE burst flush of −50.
+    const button = screen.getByTitle('Remove 10 gp');
+    act(() => {
+      for (let i = 0; i < 5; i++) button.click();
     });
+    await waitFor(() => expect(goldAmount()).toBe('0'));
+    await waitFor(() => {
+      expect(mockAdjustCurrency).toHaveBeenCalledTimes(1);
+      expect(mockAdjustCurrency.mock.calls[0][1]).toEqual({ pp: 0, gp: -50, sp: 0, cp: 0 });
+    });
+    // The floor chip stays honestly disabled at zero, and the ledger never went below.
+    expect(screen.getByTitle('Remove 10 gp').disabled).toBe(true);
+    expect(serverCurrency.gp).toBe(0);
   });
 
   it('live-updates from SSE without clobbering the amount chip semantics', async () => {
     await renderReady();
     const next = baseInventory();
     next.currency.gp = 400;
+    serverCurrency.gp = 400; // the echo came FROM the server ledger
     await act(async () => {
       sseHandler({ key: 'inventory-test-campaign', data: next });
     });
     expect(await within(screen.getByText('Gold').closest('.pi-currency-row')).findByText('400')).toBeTruthy();
-    // Adjustments after an SSE adoption build on the adopted value.
+    // Adjustments after an SSE adoption build on the adopted value — and the flush
+    // posts the +1 DELTA, never the 401 snapshot.
     fireEvent.click(screen.getByTitle('Add 1 gp'));
     await waitFor(() => expect(goldAmount()).toBe('401'));
+    await waitFor(() => {
+      expect(mockAdjustCurrency).toHaveBeenCalledTimes(1);
+      expect(mockAdjustCurrency.mock.calls[0][1]).toEqual({ pp: 0, gp: 1, sp: 0, cp: 0 });
+    });
   });
 });

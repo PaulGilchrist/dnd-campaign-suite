@@ -122,9 +122,13 @@ describe('POST inventory', () => {
         expect(res.status).toBe(400);
     });
 
-    it('persists, sorts items, sanitizes currency, and broadcasts via SSE', async () => {
+    it('replaces and sorts items while PRESERVING the stored currency (clobber regression)', async () => {
+        writeInventory({
+            currency: { pp: 0, gp: 11, sp: 0, cp: 1 },
+            items: [{ id: 'old', name: 'Old Lantern', quantity: 1, description: '' }],
+        });
+
         const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory`).send({
-            currency: { gp: 25, sp: -5, cp: 7.9, electrum: 3 },
             items: [
                 { name: 'Rope, Hempen', quantity: 2, description: '50 ft' },
                 { name: 'Amulet', quantity: 0 },
@@ -133,11 +137,27 @@ describe('POST inventory', () => {
         });
         expect(res.status).toBe(200);
         const saved = readInventoryFile();
-        expect(saved.currency).toEqual({ pp: 0, gp: 25, sp: 0, cp: 7 });
+        // Cross-tab clobber fix: a full items snapshot must never touch the coin
+        // ledger — the other window's debounced presses live only there.
+        expect(saved.currency).toEqual({ pp: 0, gp: 11, sp: 0, cp: 1 });
         expect(saved.items).toHaveLength(1);
         expect(saved.items[0].name).toBe('Rope, Hempen');
         expect(saved.items[0].id).toBeTruthy();
-        expect(publishSpy).toHaveBeenCalledWith(`inventory-${CAMPAIGN}`, expect.objectContaining({ currency: saved.currency }), CAMPAIGN);
+        expect(publishSpy).toHaveBeenCalledWith(`inventory-${CAMPAIGN}`, saved, CAMPAIGN);
+    });
+
+    it('refuses a snapshot body carrying currency — loud 400, disk untouched', async () => {
+        writeInventory({ currency: { pp: 0, gp: 11, sp: 0, cp: 1 }, items: [] });
+
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory`).send({
+            currency: { pp: 0, gp: 25, sp: 0, cp: 0 },
+            items: [],
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/currency is not written by this lane/);
+        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 11, sp: 0, cp: 1 });
+        expect(publishSpy).not.toHaveBeenCalled();
     });
 });
 
@@ -313,29 +333,35 @@ describe('POST inventory transfer', () => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/campaigns/:campaign/inventory/deposit — atomic party credit
+// POST /api/campaigns/:campaign/inventory/adjust — atomic signed per-coin delta
+// (the +/- chip flush and the loot Award panel; replaced /deposit)
 // ---------------------------------------------------------------------------
 
-describe('POST inventory deposit', () => {
-    it('rejects an empty or non-positive currency body', async () => {
+describe('POST inventory adjust', () => {
+    it('rejects an empty or all-zero currency body', async () => {
         writeInventory({ currency: { pp: 0, gp: 5, sp: 0, cp: 0 }, items: [] });
 
-        const empty = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`).send({});
+        const empty = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`).send({});
         expect(empty.status).toBe(400);
 
-        const zero = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
-            .send({ currency: { pp: 0, gp: 0, sp: -3, electrum: 9 } });
+        const zero = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
+            .send({ currency: { pp: 0, gp: 0, sp: 0, cp: 0, electrum: 9 } });
         expect(zero.status).toBe(400);
+        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 5, sp: 0, cp: 0 });
+
+        const nonNumeric = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
+            .send({ currency: { gp: 'abc' } });
+        expect(nonNumeric.status).toBe(400);
         expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 5, sp: 0, cp: 0 });
     });
 
-    it('credits currency onto the stored ledger, leaves items untouched, and broadcasts', async () => {
+    it('credits positive deltas onto the stored ledger, leaves items untouched, and broadcasts', async () => {
         writeInventory({
             currency: { pp: 2, gp: 5, sp: 0, cp: 7 },
             items: [{ id: 'x', name: 'Torch', quantity: 3, description: '' }],
         });
 
-        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
             .send({ currency: { pp: 70, gp: 3, sp: 0, cp: 0 } });
 
         expect(res.status).toBe(200);
@@ -348,21 +374,61 @@ describe('POST inventory deposit', () => {
         expect(publishSpy).toHaveBeenCalledWith(`inventory-${CAMPAIGN}`, saved, CAMPAIGN);
     });
 
-    it('initializes a missing inventory file and deposits onto the empty ledger', async () => {
-        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+    it('applies negative deltas clamped at zero per coin', async () => {
+        writeInventory({ currency: { pp: 0, gp: 5, sp: 2, cp: 0 }, items: [] });
+
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
+            .send({ currency: { gp: -10, sp: -2 } });
+
+        expect(res.status).toBe(200);
+        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 0, sp: 0, cp: 0 });
+    });
+
+    it('initializes a missing inventory file and adjusts onto the empty ledger', async () => {
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
             .send({ currency: { gp: 25 } });
 
         expect(res.status).toBe(200);
         expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 25, sp: 0, cp: 0 });
     });
 
-    it('floors and drops non-numeric currency amounts', async () => {
+    it('truncates non-whole and stringified amounts', async () => {
         writeInventory({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items: [] });
 
-        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/deposit`)
+        const res = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
             .send({ currency: { gp: '10.9', sp: 'abc', cp: 4.5 } });
 
         expect(res.status).toBe(200);
         expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 10, sp: 0, cp: 4 });
+    });
+
+    // Cross-tab full-doc clobber regression (bug-inventory-chip-cross-tab-full-doc-clobber):
+    // two GM windows pressing within the same debounce window used to each POST their
+    // own whole-document snapshot and the later POST silently erased the earlier press.
+    // Every flush is now a server-side delta onto the CURRENT ledger, so both land.
+    it('lands concurrent same-coin presses from two sessions additively (2×+1 cp → 2)', async () => {
+        writeInventory({ currency: { pp: 0, gp: 0, sp: 0, cp: 0 }, items: [] });
+
+        const first = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
+            .send({ currency: { cp: 1 } });
+        const second = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
+            .send({ currency: { cp: 1 } });
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(readInventoryFile().currency.cp).toBe(2);
+    });
+
+    it('lands concurrent cross-coin presses additively (+100 gp ∥ +10 cp → both)', async () => {
+        writeInventory({ currency: { pp: 0, gp: 11, sp: 0, cp: 1 }, items: [] });
+
+        const gold = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
+            .send({ currency: { gp: 100 } });
+        const copper = await request(app).post(`/api/campaigns/${CAMPAIGN}/inventory/adjust`)
+            .send({ currency: { cp: 10 } });
+
+        expect(gold.status).toBe(200);
+        expect(copper.status).toBe(200);
+        expect(readInventoryFile().currency).toEqual({ pp: 0, gp: 111, sp: 0, cp: 11 });
     });
 });

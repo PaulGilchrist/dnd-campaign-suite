@@ -11,14 +11,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
-const mockSaveInventory = vi.fn();
+const mockSavePartyItems = vi.fn();
+const mockAdjustCurrency = vi.fn();
 const mockTransferInventory = vi.fn();
 let confirmSpy = null;
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  saveInventory: (...args) => mockSaveInventory(...args),
+  savePartyItems: (...args) => mockSavePartyItems(...args),
+  adjustCurrency: (...args) => mockAdjustCurrency(...args),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
 
@@ -49,7 +51,11 @@ const baseInventory = () => ({
 
 beforeEach(() => {
   mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-  mockSaveInventory.mockReset().mockImplementation(async (_c, inv) => inv);
+  mockSavePartyItems.mockReset().mockImplementation(async (_c, items) => ({ ...baseInventory(), items }));
+  mockAdjustCurrency.mockReset().mockImplementation(async (_c, amount) => ({
+    currency: { pp: 1, gp: 205, sp: 20, cp: 50 + (amount.cp || 0) },
+    items: baseInventory().items,
+  }));
   mockTransferInventory.mockReset().mockResolvedValue({
     inventory: baseInventory(),
     character: { name: 'War Cleric', inventory: {} },
@@ -107,7 +113,8 @@ describe('PartyInventory modal-open background treatment', () => {
     await renderReady();
     openGiveModal();
     fireEvent.click(screen.getByTitle('Add 1 cp'));
-    expect(mockSaveInventory).not.toHaveBeenCalled();
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    expect(mockAdjustCurrency).not.toHaveBeenCalled();
     expect(mockTransferInventory).not.toHaveBeenCalled();
     // Amount stays at the loaded balance.
     expect(screen.getByText('Party Currency').closest('.pi-currency-card')
@@ -127,7 +134,8 @@ describe('PartyInventory modal-open background treatment', () => {
     const overlay = openGiveModal();
     fireEvent.keyDown(overlay.querySelector('.pi-modal'), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByText('Give Currency to Player')).toBeNull());
-    expect(mockSaveInventory).not.toHaveBeenCalled();
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
+    expect(mockAdjustCurrency).not.toHaveBeenCalled();
     expect(mockTransferInventory).not.toHaveBeenCalled();
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(currencyCard()).not.toHaveAttribute('inert');
@@ -152,11 +160,13 @@ describe('PartyInventory modal-open background treatment', () => {
     const overlay = openGiveModal();
     fireEvent.click(withinCancel(overlay));
     await waitFor(() => expect(screen.queryByText('Give Currency to Player')).toBeNull());
-    expect(mockSaveInventory).not.toHaveBeenCalled();
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
     expect(currencyCard()).not.toHaveAttribute('inert');
-    // Steppers live again: a post-close click schedules the debounced party-pool save.
+    // Steppers live again: a post-close click schedules the debounced party-pool
+    // delta flush (atomic /adjust lane — never a full-document snapshot).
     fireEvent.click(screen.getByTitle('Add 1 cp'));
-    await waitFor(() => expect(mockSaveInventory).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockAdjustCurrency).toHaveBeenCalledTimes(1));
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
   });
 });
 

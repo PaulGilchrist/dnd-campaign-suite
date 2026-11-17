@@ -51,15 +51,19 @@ export async function loadInventory(campaignName) {
 }
 
 /**
- * Save the entire party inventory (full overwrite; server re-sorts items).
+ * Replace the party ITEM ledger (server re-sorts items). Currency is never written
+ * through this lane — the server refuses bodies carrying it; coin movements ride the
+ * atomic adjustCurrency / transferInventory delta lanes so a stale full-document
+ * snapshot can never clobber a concurrent write from another GM session.
  * @param {string} campaignName
- * @param {Object} inventory
+ * @param {Array} items - the complete replacement item list
+ * @returns {Promise<Object>} the updated normalized inventory (currency included)
  */
-export async function saveInventory(campaignName, inventory) {
+export async function savePartyItems(campaignName, items) {
   const response = await fetch(apiUrl(campaignName), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(inventory),
+    body: JSON.stringify({ items }),
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -95,22 +99,24 @@ export async function transferInventory(campaignName, transfer) {
 }
 
 /**
- * Atomically credit currency to the party ledger (server-side increment —
- * items and existing balances are merged on the server, never from a
- * client snapshot). Used by the loot Award flow.
+ * Atomically apply a signed per-coin delta to the party currency ledger
+ * (server-side increment/decrement, each coin clamped at zero — items and
+ * existing balances are merged on the server, never from a client snapshot, so
+ * two sessions pressing within the same window both land additively). Used by
+ * the burst-merged +/- currency chips and the loot Award flow.
  * @param {string} campaignName
- * @param {Object} currency - { pp, gp, sp, cp } amounts to deposit
+ * @param {Object} currency - { pp, gp, sp, cp } signed whole-number deltas
  * @returns {Promise<Object>} the updated normalized inventory
  */
-export async function depositCurrency(campaignName, currency) {
-  const response = await fetch(`${apiUrl(campaignName)}/deposit`, {
+export async function adjustCurrency(campaignName, currency) {
+  const response = await fetch(`${apiUrl(campaignName)}/adjust`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ currency }),
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to deposit party currency');
+    throw new Error(error.error || 'Failed to adjust party currency');
   }
   const data = await response.json();
   return normalizeInventory(data.inventory);

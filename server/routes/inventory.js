@@ -10,10 +10,17 @@ const router = express.Router();
 
 // Authority (mirrors campaigns-character.js refuseUnlessGm / maps.js / quests.js /
 // campaigns-admin.js): party inventory is the durable campaign treasury — minting
-// currency (+/- chip grants, full-store overwrite, loot deposits) and disbursing it
-// (party→player transfers, item add/edit/delete) are GM-only writes; network clients
-// get a read-only view (AGENTS.md). The client hides the chip/button affordances on
-// PartyInventory; this route guard is the server seam (bug-player-clients-can-write-party-inventory).
+// currency (+/− chip adjusts, loot awards) and disbursing it (party→player transfers,
+// item add/edit/delete) are GM-only writes; network clients get a read-only view
+// (AGENTS.md). The client hides the chip/button affordances on PartyInventory; this
+// route guard is the server seam (bug-player-clients-can-write-party-inventory).
+//
+// Currency is NEVER written from a client snapshot: every coin movement is an
+// additive delta the server applies to ITS current ledger (/inventory/adjust for
+// chip grants/removals and loot awards, /inventory/transfer for moves in/out of a
+// character purse). POST /inventory owns the item ledger only and refuses bodies
+// carrying currency — the debounced full-document snapshots it used to accept let a
+// second GM window silently clobber concurrent presses (cross-tab full-doc clobber).
 // Audited exception: player→party transfers stay open — a player may contribute from
 // their OWN resources; the server debits the character file atomically (409 when short),
 // so that lane can never mint treasury wealth.
@@ -41,6 +48,19 @@ function sanitizeCurrency(input) {
         currency[key] = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
     }
     return currency;
+}
+
+// Signed counterpart of sanitizeCurrency for the /adjust delta lane: each coin is a
+// whole-number increment/decrement (negative allowed); the ledger clamps at zero when
+// the delta is applied, mirroring the client chip's Math.max(0, …) floor.
+function sanitizeCurrencyDelta(input) {
+    const delta = { pp: 0, gp: 0, sp: 0, cp: 0 };
+    if (!input || typeof input !== 'object') return delta;
+    for (const key of CURRENCY_KEYS) {
+        const raw = Number(input[key]);
+        delta[key] = Number.isFinite(raw) ? Math.trunc(raw) : 0;
+    }
+    return delta;
 }
 
 function sortItems(items) {
@@ -262,16 +282,25 @@ router.get('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
     res.json({ inventory: loadInventory(campaign) });
 }));
 
-// POST /api/campaigns/:campaign/inventory — full overwrite (GM-only)
+// POST /api/campaigns/:campaign/inventory — replaces the party ITEM ledger (GM-only).
+// Body: { items: [...] }. Currency is deliberately NOT writable here: a full-document
+// snapshot from one GM window used to overwrite a concurrent currency press from
+// another (cross-tab full-doc clobber). Coins move only through the atomic delta
+// lanes /inventory/adjust and /inventory/transfer, so a body carrying currency 400s
+// loudly instead of silently clobbering the ledger.
 router.post('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
     if (!refuseUnlessGm(req, res)) return;
     const { campaign } = req.params;
     const body = req.body || {};
+    if (body.currency !== undefined) {
+        return res.status(400).json({ error: 'inventory.currency is not written by this lane — apply per-coin deltas through /inventory/adjust or /inventory/transfer' });
+    }
     const items = sanitizeItems(body.items);
     if (items === null) {
         return res.status(400).json({ error: 'inventory.items must be an array' });
     }
-    const inventory = { currency: sanitizeCurrency(body.currency), items };
+    const inventory = loadInventory(campaign);
+    inventory.items = items;
     saveInventory(campaign, inventory);
     publish(`inventory-${campaign}`, inventory, campaign);
     res.json({ success: true, inventory });
@@ -360,22 +389,25 @@ router.post('/api/campaigns/:campaign/inventory/transfer', asyncHandler((req, re
     res.json({ success: true, inventory, character: { name: character.name, inventory: character.inventory } });
 }));
 
-// POST /api/campaigns/:campaign/inventory/deposit — atomic credit to the
-// party currency ledger. body: { currency: {pp,gp,sp,cp} }. The ledger is
-// re-read server-side before the add, so a stale client snapshot can never
-// overwrite items or existing balances (transfer-route pattern, no player leg).
-// GM-only: the loot Award panel that calls it is already localhost-gated.
-router.post('/api/campaigns/:campaign/inventory/deposit', asyncHandler((req, res) => {
+// POST /api/campaigns/:campaign/inventory/adjust — atomic per-coin delta on the party
+// currency ledger (the +/− chip flush and the loot Award panel). Body:
+// { currency: {pp,gp,sp,cp} } with SIGNED whole-number amounts; each coin is added to
+// the SERVER's current ledger and clamped at zero. The ledger is re-read server-side,
+// so concurrent writers merge additively — a stale client snapshot can neither clobber
+// items nor another session's presses (this lane replaced the /deposit credit-only
+// route and the chip's full-document snapshot POST after the cross-tab clobber bug).
+// GM-only: chips and the loot Award panel are already localhost-gated in the client.
+router.post('/api/campaigns/:campaign/inventory/adjust', asyncHandler((req, res) => {
     if (!refuseUnlessGm(req, res)) return;
     const { campaign } = req.params;
-    const amount = sanitizeCurrency(req.body?.currency);
-    if (!CURRENCY_KEYS.some(key => amount[key] > 0)) {
-        return res.status(400).json({ error: 'currency with a positive amount is required' });
+    const amount = sanitizeCurrencyDelta(req.body?.currency);
+    if (!CURRENCY_KEYS.some(key => amount[key] !== 0)) {
+        return res.status(400).json({ error: 'currency with a non-zero whole-number amount is required' });
     }
 
     const inventory = loadInventory(campaign);
     for (const key of CURRENCY_KEYS) {
-        inventory.currency[key] += amount[key];
+        inventory.currency[key] = Math.max(0, inventory.currency[key] + amount[key]);
     }
     saveInventory(campaign, inventory);
     publish(`inventory-${campaign}`, inventory, campaign);

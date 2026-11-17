@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { getRuntimeValue, setRuntimeValue, getStore, notify, addStorageChangeListener } from '../../hooks/runtime/useRuntimeState.js'
 import { generateLootFromCombatSummary, parseCurrencyFromLootText, parsePureCurrencyLine, filterNoLootSentinel } from '../../services/items/lootGenerator.js'
-import { depositCurrency } from '../../services/campaign/inventoryService.js'
+import { adjustCurrency } from '../../services/campaign/inventoryService.js'
 import * as logService from '../../services/ui/logService.js'
 
 // Improve 2026-10-29: the loot panel is GM scratch state — hand-typed drafts
@@ -210,7 +210,7 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
             }
 
             // Credit pure-currency loot lines (e.g. "70 platinum pieces") to the
-            // party ledger via the atomic server deposit route — server re-reads
+            // party ledger via the atomic server adjust route — server re-reads
             // the ledger so a stale client snapshot can never wipe items/balances.
             // Kept out of the award's main try/catch: a failed deposit must not
             // block XP/log completion, but is logged loudly for the GM to retry.
@@ -218,7 +218,7 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
             const depositParts = Object.entries(deposit).filter(([, amount]) => amount > 0)
             if (depositParts.length > 0) {
                 try {
-                    await depositCurrency(campaignName, deposit)
+                    await adjustCurrency(campaignName, deposit)
                     await logEntry({
                         type: 'inventory_transfer',
                         message: `Loot currency deposited to party inventory: ${depositParts.map(([key, amount]) => `${amount} ${key}`).join(', ')}`,

@@ -13,13 +13,14 @@ import PartyInventory from './PartyInventory.jsx';
 
 const mockLoadInventory = vi.fn();
 const mockTransferInventory = vi.fn();
-const mockSaveInventory = vi.fn();
+const mockSavePartyItems = vi.fn();
 let confirmSpy = null;
 
 vi.mock('../../services/campaign/inventoryService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   loadInventory: (...args) => mockLoadInventory(...args),
-  saveInventory: (...args) => mockSaveInventory(...args),
+  savePartyItems: (...args) => mockSavePartyItems(...args),
+  adjustCurrency: vi.fn(),
   transferInventory: (...args) => mockTransferInventory(...args),
 }));
 
@@ -63,7 +64,7 @@ const afterPartyToPlayer = () => ({
 
 beforeEach(() => {
   mockLoadInventory.mockReset().mockResolvedValue(baseInventory());
-  mockSaveInventory.mockReset().mockResolvedValue(afterPartyToPlayer());
+  mockSavePartyItems.mockReset().mockResolvedValue(afterPartyToPlayer());
   mockTransferInventory.mockReset().mockResolvedValue({
     inventory: afterPartyToPlayer(),
     character: { name: 'War Cleric', inventory: {} },
@@ -136,7 +137,7 @@ describe('PartyInventory party→player Move confirm', () => {
     fireEvent.click(modalSubmit(modal));
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(mockTransferInventory).not.toHaveBeenCalled();
-    expect(mockSaveInventory).not.toHaveBeenCalled();
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
     expect(screen.getByText('Move “Hempen Rope” to Player')).toBeTruthy();
   });
 
@@ -174,7 +175,7 @@ describe('PartyInventory player→party `To Party` confirm', () => {
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(confirmSpy).toHaveBeenCalledWith('Move 2 × Hempen Rope from War Cleric to party inventory?');
     expect(mockTransferInventory).not.toHaveBeenCalled();
-    expect(mockSaveInventory).not.toHaveBeenCalled();
+    expect(mockSavePartyItems).not.toHaveBeenCalled();
   });
 
   it('accepting `To Party` executes the player-to-party transfer exactly as before', async () => {
