@@ -311,15 +311,24 @@ describe('POST inventory/item concurrent-window merge (cross-tab clobber regress
 
 // No-backward-compatibility law: the whole-list snapshot lane is GONE — nothing in the
 // app may re-introduce a full-item-list replace (it is what let stale windows clobber).
+// And the retired path must never alias into another store: with the router in
+// isolation it used to 404 (which the composed server then silently re-routed into the
+// change-data wildcard — bug-retired-inventory-post-shadowed-by-change-data-wildcard);
+// it now answers the loud 400 itself. The composition-level pin lives beside it in
+// inventory.retired-snapshot-wildcard-shadow.test.js.
 describe('retired POST /inventory snapshot lane', () => {
-    it('POST /api/campaigns/:campaign/inventory 404s — the full item-list replace lane no longer exists', async () => {
+    it('POST /api/campaigns/:campaign/inventory 400s with the replacement-lane copy — the full item-list replace lane no longer exists', async () => {
         writeInventory({ currency: { pp: 0, gp: 11, sp: 0, cp: 1 }, items: [lantern] });
 
         const res = await request(app)
             .post(`/api/campaigns/${CAMPAIGN}/inventory`)
             .send({ items: [{ name: 'Torch', quantity: 1 }] });
 
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/snapshot save lane is retired/i);
+        expect(res.body.error).toMatch(/\/inventory\/adjust/);
+        expect(res.body.error).toMatch(/\/inventory\/item/);
+        expect(res.body.error).toMatch(/nothing was saved/i);
         expect(readInventoryFile().items).toEqual([lantern]);
         expect(publishSpy).not.toHaveBeenCalled();
     });

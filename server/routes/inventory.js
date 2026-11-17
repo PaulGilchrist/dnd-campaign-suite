@@ -289,6 +289,33 @@ router.get('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
     res.json({ inventory: loadInventory(campaign) });
 }));
 
+// POST /api/campaigns/:campaign/inventory — RETIRED snapshot lane, loud guard.
+// The full-document replace was removed after the cross-tab clobber class, but with
+// no route here the request fell through to the generic change-data wildcard
+// (campaigns-changedata.js POST /:campaign/:key, L5 rule: no validator registered ⇒
+// the write passes through), which answered 200 and stored the raw snapshot verbatim
+// as a phantom top-level `inventory` key — a false success for a treasury write that
+// never touched the ledger (bug-retired-inventory-post-shadowed-by-change-data-wildcard).
+// Fail loud beside the wildcard's deprecated "campaign"-key and .json-key guards:
+// plain-English 400 naming the replacement lanes, write NOTHING, publish NOTHING.
+// DELETE on this path stays wildcard-owned on purpose — it is the eviction lane for
+// stores poisoned before this guard existed.
+router.post('/api/campaigns/:campaign/inventory', asyncHandler((req, res) => {
+    const { campaign } = req.params;
+    console.error(
+        '[inventory] Rejected POST to the retired party-inventory snapshot lane. ' +
+        `Campaign: "${campaign}". Coin deltas must POST /api/campaigns/${campaign}/inventory/adjust; ` +
+        `item edits must POST /api/campaigns/${campaign}/inventory/item as single intents. ` +
+        'A stale client bundle is writing the pre-intent full-document snapshot.',
+        { campaign, stack: new Error().stack }
+    );
+    res.status(400).json({
+        error: 'The party-inventory snapshot save lane is retired — full-document writes silently ' +
+            `clobbered concurrent GM windows. Apply coin deltas via /api/campaigns/${campaign}/inventory/adjust ` +
+            `and item edits via /api/campaigns/${campaign}/inventory/item — nothing was saved.`,
+    });
+}));
+
 // POST /api/campaigns/:campaign/inventory/item — atomic single-item intent on the party
 // ITEM ledger (GM-only). Body (one intent per request):
 //   { action: 'add',    item: { id?, name, quantity, description } } — append a new row;
