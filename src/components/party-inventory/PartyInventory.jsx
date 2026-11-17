@@ -72,6 +72,26 @@ function playerItemDescription(character, name) {
   return (meta && meta.description) || '';
 }
 
+// Player purse resolution — mirrors the server's characterCurrency()/transfer debit
+// rule (server/routes/inventory.js) so the pane shows EXACTLY what a `To Party`
+// return can move: the { pp, gp, sp, cp } block when present, else positive gold
+// counted as gp — the same conversion the server applies when debiting characters
+// that carry only inventory.gold.
+function playerCurrency(character) {
+  const currency = { pp: 0, gp: 0, sp: 0, cp: 0 };
+  const raw = character.inventory?.currency;
+  if (raw) {
+    for (const key of Object.keys(currency)) {
+      const value = Number(raw[key]);
+      currency[key] = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    }
+    return currency;
+  }
+  const gold = Number(character.inventory?.gold);
+  if (Number.isFinite(gold) && gold > 0) currency.gp = Math.floor(gold);
+  return currency;
+}
+
 function EquipmentNameInput({ value, onChange, equipmentData, id }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -395,7 +415,7 @@ function MoveToPlayerModal({ item, characters, quantity, onQuantityChange, playe
   );
 }
 
-function PlayersPanel({ characters, campaignName, onMoved }) {
+function PlayersPanel({ characters, campaignName, onMoved, beforeTransfer }) {
   const [selected, setSelected] = useState(null);
   const [moving, setMoving] = useState(null);
 
@@ -414,11 +434,26 @@ function PlayersPanel({ characters, campaignName, onMoved }) {
     })));
   }, [character]);
 
+  // Currency rows (bug-player-currency-give-is-one-way-invisible): the Give lane
+  // writes into the character file, so the same player fetch that lists backpack
+  // items must surface the purse with a matching `To Party` return. One row per
+  // non-zero coin, CURRENCIES order — mirrors the party CurrencyCard layout.
+  const purse = useMemo(() => {
+    if (!character) return [];
+    const currency = playerCurrency(character);
+    return CURRENCIES
+      .map(({ key, label, icon }) => ({ key, label, icon, amount: currency[key] }))
+      .filter(row => row.amount > 0);
+  }, [character]);
+
   const handleMove = async (entry) => {
     if (!character) return;
     // Native confirm naming qty + item + source player + party destination, mirroring
     // the currency Give / Delete idioms (backlog 2026-10-24). Refuse = zero writes.
     if (!window.confirm(`Move ${entry.quantity} × ${entry.name} from ${character.name} to party inventory?`)) return;
+    // Drain any debounced currency-chip snapshot first (handleConfirmMove idiom) so a
+    // stale full-store POST can never clobber the credit this transfer lands on the pool.
+    if (beforeTransfer) beforeTransfer();
     setMoving(entry.name);
     try {
       await transferInventory(campaignName, {
@@ -441,6 +476,36 @@ function PlayersPanel({ characters, campaignName, onMoved }) {
     }
   };
 
+  // Currency return lane — the exact reverse of GiveCurrencyModal's party-to-player
+  // transfer: same native-confirm idiom naming coin + source player + party
+  // destination, same atomic player-to-party POST (the server debits the character
+  // file and credits the pool, 409 when short), same directional audit row.
+  const handleCurrencyMove = async (coin) => {
+    if (!character) return;
+    const stateKey = `currency:${coin.key}`;
+    if (!window.confirm(`Move ${coin.amount} ${coin.key} from ${character.name} to party inventory?`)) return;
+    if (beforeTransfer) beforeTransfer();
+    setMoving(stateKey);
+    try {
+      await transferInventory(campaignName, {
+        direction: 'player-to-party',
+        playerName: character.name,
+        currency: { [coin.key]: coin.amount },
+      });
+      addEntry(campaignName, {
+        type: 'inventory_transfer',
+        message: `${coin.amount} ${coin.key} moved from ${character.name} to party inventory`,
+        timestamp: Date.now(),
+      }).catch(err => console.error('[PartyInventory] log error:', err));
+      await onMoved();
+    } catch (error) {
+      console.error('[PartyInventory] player-to-party currency move failed:', error);
+      alert(`Move failed: ${error.message}`);
+    } finally {
+      setMoving(null);
+    }
+  };
+
   return (
     <div className="pi-players-panel">
       <h3><i className="fa-solid fa-user-injured" /> From Players</h3>
@@ -453,10 +518,24 @@ function PlayersPanel({ characters, campaignName, onMoved }) {
         <option value="">Choose a player…</option>
         {characters.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
       </select>
-      {character && backpack.length === 0 && (
+      {character && backpack.length === 0 && purse.length === 0 && (
         <p className="pi-empty">Nothing in {character.name}&rsquo;s backpack.</p>
       )}
       <ul className="pi-player-items">
+        {purse.map(coin => (
+          <li key={`currency-${coin.key}`}>
+            <span className="pi-player-item-name"><i className={coin.icon} /> {coin.label}</span>
+            <span className="pi-player-item-qty">{coin.amount} {coin.key}</span>
+            <button
+              type="button"
+              className="ct-btn ct-btn-primary pi-move-btn"
+              disabled={moving !== null}
+              onClick={() => handleCurrencyMove(coin)}
+            >
+              <i className="fa-solid fa-box-open" /> {moving === `currency:${coin.key}` ? 'Moving…' : 'To Party'}
+            </button>
+          </li>
+        ))}
         {backpack.map(entry => (
           <li key={entry.name}>
             <span className="pi-player-item-name">{entry.name}</span>
@@ -911,6 +990,7 @@ function PartyInventory({ campaignName, characters = [], isLocalhost }) {
           characters={characters}
           campaignName={campaignName}
           onMoved={refresh}
+          beforeTransfer={flushCurrencyPersist}
         />
       </div>
 

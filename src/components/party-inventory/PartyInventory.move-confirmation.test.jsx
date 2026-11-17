@@ -160,7 +160,11 @@ describe('PartyInventory player→party `To Party` confirm', () => {
   async function openPlayerBackpack() {
     await renderReady();
     fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: 'War Cleric' } });
-    return screen.getByRole('button', { name: /To Party/ });
+    // The purse lane (currency rows) now also renders a `To Party` button for this
+    // gold-carrying fixture, so scope the item-row locator to the backpack row in the
+    // From Players panel (the party table shows the same item name).
+    const ropeRow = within(document.querySelector('.pi-players-panel')).getByText('Hempen Rope').closest('li');
+    return within(ropeRow).getByRole('button', { name: /To Party/ });
   }
 
   it('refusing `To Party` confirms naming qty, item, source player and party destination — zero writes', async () => {
