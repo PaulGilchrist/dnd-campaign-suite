@@ -8,6 +8,9 @@
 //   visitor click with only the resolved remote npcImage → popup shows it verbatim
 //   visitor click with no image at all → no-op (no popup, no dispatch)
 //   popup Close button dismisses (mount-local state, no writes)
+//   popup portals to document.body — never mounted inside the .creature-card
+//     subtree (the card's transform/opacity make it a fixed-position
+//     containing block + stacking context; bug 2026-11-16)
 //   localhost click still routes onNpcClick({allowNonLocalhost:true}) and never
 //     mounts the popup (existing GM lane byte-unchanged)
 // NOT owned here (do not duplicate):
@@ -155,6 +158,30 @@ describe('CreatureCard - visitor monster-avatar image popup', () => {
         fireEvent.click(screen.getByTestId('npc-avatar-Goblin'));
         expect(screen.getByTestId('avatar-modal-overlay')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
+    });
+
+    // Regression pin (bug 2026-11-16): .initiative .creature-card carries
+    // transform: scale(1.0) + opacity 0.9, which makes the card a containing
+    // block AND stacking context for position:fixed descendants — an
+    // in-subtree overlay anchored to the CARD box, painted its × under
+    // neighbouring cards, and a mouse-only visitor could not close the zoom.
+    // The popup must portal onto document.body instead.
+    it('visitor popup portals onto document.body — outside the .creature-card subtree', () => {
+        const { container } = render(<CreatureCard {...props} />);
+        fireEvent.click(screen.getByTestId('npc-avatar-Goblin'));
+        const overlay = screen.getByTestId('avatar-modal-overlay');
+        expect(overlay.parentElement).toBe(document.body);
+        expect(container.querySelector('[data-testid="avatar-modal-overlay"]')).toBeNull();
+        expect(overlay.closest('.creature-card')).toBeNull();
+    });
+
+    it('backdrop click on the portalled popup closes it (no trapped zoom)', () => {
+        render(<CreatureCard {...props} />);
+        fireEvent.click(screen.getByTestId('npc-avatar-Goblin'));
+        const overlay = screen.getByTestId('avatar-modal-overlay');
+        fireEvent.mouseDown(overlay);
+        fireEvent.click(overlay);
         expect(screen.queryByTestId('avatar-modal-overlay')).not.toBeInTheDocument();
     });
 

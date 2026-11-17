@@ -94,11 +94,36 @@ describe('AvatarModal', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    it('does not close when the overlay background is clicked', () => {
+    // Backdrop dismiss lane (backlog 2026-11-16, modal-family law shared with
+    // DeleteConfirmModal/quick-create): a PURE backdrop click — mousedown AND
+    // click both on the overlay — routes to onClose. A drag that started inside
+    // .avatar-modal (text selection released over the backdrop) never dismisses.
+    it('calls onClose exactly once on a pure backdrop click (mousedown and click both on the overlay)', () => {
       const handleClose = vi.fn();
       renderModal({ onClose: handleClose });
 
-      fireEvent.click(screen.getByTestId('avatar-modal-overlay'));
+      const overlay = screen.getByTestId('avatar-modal-overlay');
+      fireEvent.mouseDown(overlay);
+      fireEvent.click(overlay);
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not close when a drag started inside the modal body and released over the backdrop', () => {
+      const handleClose = vi.fn();
+      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
+
+      const overlay = screen.getByTestId('avatar-modal-overlay');
+      fireEvent.mouseDown(screen.getByRole('img'));
+      fireEvent.click(overlay);
+      expect(handleClose).not.toHaveBeenCalled();
+    });
+
+    it('does not close when a backdrop press releases inside the modal body', () => {
+      const handleClose = vi.fn();
+      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
+
+      fireEvent.mouseDown(screen.getByTestId('avatar-modal-overlay'));
+      fireEvent.click(screen.getByRole('img'));
       expect(handleClose).not.toHaveBeenCalled();
     });
 

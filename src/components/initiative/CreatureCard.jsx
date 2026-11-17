@@ -1,6 +1,7 @@
 
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import AvatarImage from '../common/AvatarImage.jsx'
 import AvatarModal from '../common/AvatarModal.jsx'
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx'
@@ -146,13 +147,19 @@ function CardAvatar({ creature, isLocalhost, isPlayerSummoned, npcImage, campaig
                     onClick={handleAvatarClick}
                 />
             </div>
-            {showImageModal && imageSrc && (
+            {showImageModal && imageSrc && createPortal(
                 <AvatarModal
                     name={avatarName}
                     imagePath={imageSrc}
                     campaignName={campaignName}
                     onClose={() => setShowImageModal(false)}
-                />
+                />,
+                // The card's base CSS (transform: scale(1.0) + opacity, Initiative.css)
+                // makes .creature-card a containing block AND stacking context for
+                // position:fixed descendants, so an in-subtree overlay anchors to the
+                // card and paints under neighbouring cards (unreachable ×). Mount the
+                // zoom on document.body so it is viewport-level like every other modal.
+                document.body,
             )}
         </>
     )

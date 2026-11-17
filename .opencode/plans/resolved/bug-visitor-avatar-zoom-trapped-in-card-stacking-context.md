@@ -35,3 +35,26 @@ Regression pin: LAN-context tab, click monster avatar → assert overlay rect ==
 
 ## Severity
 Broken feature — the headline purpose of `8ebbffb8f` (read-only tabs get a viewable full-size avatar) renders mangled on exactly the tabs it was built for, with no clickable dismissal.
+
+## Resolution
+FIXED 2026-11-16 (fix run). The "Likely location" diagnosis stood exactly as written — reproduced live first on HEAD-with-working-tree, then fixed.
+
+**What was wrong (confirmed):** `CardAvatar` (initiative) rendered the visitor-branch `<AvatarModal>` as a sibling INSIDE `.creature-card`; the base `.initiative .creature-card { transform: scale(1.0); opacity: 0.9 }` (Initiative.css:101-102) makes the card a `position: fixed` containing block AND stacking context, so the "full-screen" overlay anchored to the card box and painted under later-sibling cards. Live repro (isolated-context LAN tab, 1440×900 viewport): overlay parent `DIV.creature-card npc`, rect **[378, 305, 1260, 900]** (card-anchored), image off-centre at [648, 395], `elementFromPoint(× centre)` → `DIV.creature-card player`, trusted × click NO-OP (stayed open), trusted backdrop click NO-OP (no lane existed), Escape closed — mouse-only visitor trapped.
+
+**Changes:**
+- `src/components/initiative/CreatureCard.jsx` — the visitor-branch `AvatarModal` now mounts via `createPortal(…, document.body)`, escaping the card's containing block/stacking context. Mount-site-only portal: the other `AvatarModal` consumers (`.mc-card` header zoom, NPCFormModal, char-sheet) are untouched at their mounts (no transform ancestors there — verified live).
+- `src/components/common/AvatarModal.jsx` — bonus hardening (backlog 2026-11-16 YG bullet): backdrop-click dismiss lane reusing the shared `useModalDismiss` hook (mousedown+click both fully on `.avatar-modal-overlay` closes; a drag started inside `.avatar-modal` never dismisses; modal-body clicks inert). Escape keeps its document-level listener (focus stays on the opening avatar — no focus trap — so a panel keydown would miss it).
+- `src/components/common/AvatarModal.test.jsx` — the old "does not close when the overlay background is clicked" pin is replaced by the new family law: pure backdrop (mousedown+click) closes exactly once; panel→backdrop drag does NOT close; backdrop-press-released-in-panel does NOT close; bubbled body click still inert.
+- `src/components/initiative/CreatureCard.avatarImagePopup.test.jsx` — new regression pins: the visitor popup portals onto `document.body` (`parentElement === document.body`, `closest('.creature-card') === null`, absent from the render container); backdrop click on the portalled popup closes it.
+
+**Live re-verification (Playwright, :5173 dev pair, test-campaign):**
+- **Visitor repro re-run:** Goblin card avatar trusted click → overlay parent **BODY**, rect **[180, 0, 1260, 900]** on 1440×900 (viewport-minus-sidebar, matching the healthy control lane), image centred at (810, 450), `elementFromPoint(× centre)` → `BUTTON.avatar-modal-close`, trusted × click closes, trusted backdrop click closes, Escape closes.
+- **(a) GM leg:** card avatar → stat modal → header-avatar zoom still viewport-anchored [180, 0, 1548, 941], × closes (stat modal survives), Escape closes zoom ONLY, new backdrop lane closes zoom with the stat modal intact.
+- **(b) delegated leg:** GM `select[aria-label="Assign who controls Goblin"]` → AasimarTest; visitor avatar click opens the delegated stat modal; its header zoom rect [180, 0, 1260, 900], × hittable, closes; clean teardown. (Pitfall: the first click no-oped because the initiative `.carousel-container` scroll animation had not settled under the trusted mouse click — scroll first, then click the settled rect.)
+- **(c) uncontrolled-monster-WITHOUT-image leg:** statless `NPC 1` card (initial avatar, no img) — trusted visitor avatar click stays a silent no-op (no AvatarModal, no stat modal).
+- **(d) char-sheet consumer:** ElderPaladin sheet 60px avatar click → zoom opens (unportal'd mount inside `.no-print`), rect [180, 0, 1548, 941], image centred (954, 471), ×/backdrop/Escape all close, modal-body click inert.
+
+**Tests/lint:** new+updated files pass (30/30); touched-folder run `vitest run src/components/common src/components/initiative + MonsterCardModal.avatar + NPCFormModal` = **183 files / 1571 tests passed**; `npm run lint` clean (zero warnings).
+
+**Exit hygiene:** all tabs closed; two-pass headless admin clears GET-verified cd `{}` + log `[]` + overlays `[]`, disk cd/log files absent; npcs.json md5 `db6666c1` byte-exact (statless NPC spawn writes only change-data — swept by the clear).
+
