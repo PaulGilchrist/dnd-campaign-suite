@@ -51,13 +51,22 @@
     padding: 4px 10px;
 }
 
+/* Full-viewport scrim (backlog ZK 2026-11-17, Paul's decision): the old
+   content-area box (left: 180px carve-out copied from .popup-overlay above)
+   kept the sidebar fully live while zooming a portrait. Widened to the
+   .modal-shell-overlay/.loading-overlay family convention — fixed, all four
+   insets 0, theme-token backdrop — so the zoom dims the whole viewport for a
+   true "focus on the portrait" feel. z-index 1000 is the same modal tier and
+   outranks the 100 sidebar; the visitor-card consumer portals to body and the
+   .mc-card/char-sheet hosts are transform-free, so nothing traps the layer.
+   A click over the sidebar region is now just another backdrop spot. */
 .avatar-modal-overlay {
     position: fixed;
     top: 0;
-    left: 180px;
-    width: calc(100vw - 180px);
-    height: 100vh;
-    background-color: rgba(0, 0, 0, 0.9);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--background-color-overlay);
     z-index: 1000;
 }
 

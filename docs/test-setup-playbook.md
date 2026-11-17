@@ -482,6 +482,8 @@ sections below and the raw log frozen into `docs/test-setup-playbook-archive-202
 
 - **`keyboard.press` on a stray focus switches views (same run):** while a sidebar link holds focus, a press sequence silently navigates the app mid-probe (the card you meant to drive is gone on the next read) — re-probe `document.activeElement` immediately before every `keyboard.press` batch.
 
+- **Portaled-to-body yet offset (live 2026-11-17 improve avatar-zoom-overlay-fullscreen):** an `x=180` measurement on a body-portaled `position:fixed` overlay is the rule's OWN authored inset, never a positioning-host failure — ~14 content-area modal families hardcode `left:180px` (`.popup-overlay`, `.sp-overlay`, `.avatar-modal-overlay` pre-fix), so audit the rule's own fixed insets before blaming ancestors. Reference family for a true full-viewport scrim is `.modal-shell-overlay`/`.loading-overlay` (inset-0 + `var(--background-color-overlay)`); `.sp-overlay` is content-area, NOT a full-viewport reference.
+
 - **Sheet two-stage popup drift (live 2026-11-16 attack-popup fix run):** the damage stage dismisses on click, so a Done-click that fires BEFORE the to-hit verdict mounts consumes a *stale* Done and desyncs every later probe by one stage. Recipe: assert `.popup-overlay` text contains HIT/MISS before clicking Done, then read `.dice-roll-damage-applied` before any further click. Lethal-blow rigs need OVERKILL damage to exercise the clamp path — if a roll lands exactly at remaining HP, re-attack; revive via the HP badge (Meta+A fill) between kills.
 
 ## 13. Rules-engine mechanics facts
