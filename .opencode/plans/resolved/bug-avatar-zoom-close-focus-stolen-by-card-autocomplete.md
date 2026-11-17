@@ -69,3 +69,61 @@ ghost-list and rename-lane tests that motivated `initialFocus`.
 Minor UX issue (a11y focus contract) — no data risk; mouse users unaffected. But it is a
 deterministic, reproduced break of an owner-witnessed focus-restore law on the GM's
 primary combat surface, so it should not be parked.
+
+## Resolution
+FIXED (run AV 2026-11-17).
+
+### What was actually wrong (refines the "Likely location")
+The symptom reproduced exactly via the steps above (3/3 Escape + × + backdrop →
+`input.monster-autocomplete-input[aria-label="Goblin name"]`), but instrumentation
+(`HTMLElement.prototype.focus` stack capture + node-identity probe) showed the
+close-time mechanism is NOT a fresh-instance mount steal racing the unmount: the
+autocomplete node is the SAME node at close (no remount rode the close commit), and the
+only `focus()` call during the whole close is **AvatarModal's own unmount-cleanup
+`opener.focus()`**. The mount-time auto-focus fires at a different seam: the passive
+card mount (EB Join auto-navigate / any tick re-key) drops the caret into the rename
+field via the `initialFocus = true` DEFAULT, and a zoom opened while that caret is parked
+there captures the rename field as its focus-restore "opener" — the close then faithfully
+"restores" into the card field. Lived both ways: real-mouse lanes with the caret elsewhere
+restored correctly; any lane opening the zoom with the caret in the rename field (passive
+steal OR a GM mid-rename) deterministically lands on the field on all three close lanes.
+So the root defect is exactly the filed law — a passive mount owning the caret (the same
+remount-refocus-steal family Popup's focus-retention law already traps against) —
+while `contested` was honestly never engaged on this lane.
+
+### Fix (mirrors the ghost-list intent gate in the same file)
+- `src/components/common/MonsterNameAutocomplete.jsx` — `initialFocus` default flipped
+  `true → false`; the mount focus effect now fires only on user intent:
+  `initialFocus || isTypingIntent(value || '')`. A mid-rename echo remount (the +NPC
+  rename lane) still carries the caret because the typed text survives across remounts —
+  the SAME `isTypingIntent()` machinery that gates the dropdown. Header comment records
+  the caret law.
+- `src/components/map/Map.jsx` — the token rename popover is the one mount opened by an
+  explicit user gesture (context-menu Rename), so it now passes `initialFocus`
+  explicitly; its keyboard rename tier is unchanged.
+- `src/components/initiative/CreatureCard.jsx` — unchanged: the card lane opts into the
+  intent gate via the new default.
+- `AvatarModal.jsx` — unchanged (its opener-capture + stand-down law is honest).
+- Intentional behavior change: after a suggestion-pick/Enter commit + echo remount the
+  caret stands down to body instead of being re-grabbed — keeping it would reopen the
+  same steal window for any remount riding the next 2 s.
+
+### Verification
+- Live (`test-campaign`, :5173, dev pair): pre-fix repro re-run 3/3 Escape + × +
+  backdrop landed on the input (bug confirmed). Post-fix: the literal evaluate-click
+  lane no longer lands on the input (focus stays body, 2/2 repeat); the real-mouse user
+  lane restores `document.activeElement === .mc-header-avatar .avatar-wrapper` on
+  **Escape ×2, ×, and backdrop** (4/4, `restoredToOpener: true`, open-focus
+  `.avatar-modal` PASS). Rename lane re-ran live: click-into-field focuses, mid-word
+  echo remount carries the caret (typed `X` into "Goblin" survived the re-key with
+  updated aria-label "GoXblin name", then restored to "Goblin"), Enter commit stands
+  down. Ghost-list lanes unit-locked. Cleanup: Admin Clear Change Data + Clear Campaign
+  Log — GET-verified change-data `{}` / log `[]`; campaigns/ untouched.
+- Tests: NEW `MonsterNameAutocomplete.focus-intent.test.jsx` (5 tests: passive mount
+  keeps the opener's focus, tick re-key remount without intent never re-grabs,
+  mid-rename echo remount DOES carry, blur clears intent, explicit `initialFocus`
+  arms); `MonsterNameAutocomplete.test.jsx` focus laws inverted (`typeQuery` now
+  clicks-to-focus first — a passive mount never owns the caret); ghost-list file
+  updated the same way + asserts the echo-remount caret carry.
+  `npx vitest run src/components/common src/components/map` → 167 files / 1756 tests
+  passed. `npm run lint` → zero warnings. `node .opencode/plans/no-timers-guard.mjs` → OK.

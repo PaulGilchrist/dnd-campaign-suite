@@ -12,6 +12,16 @@ import './MonsterNameAutocomplete.css';
 // Join auto-navigating to Initiative with pre-filled card names, turn re-keys —
 // never match, so no ghost dropdown can drape over card inputs and swallow
 // clicks. Benign UI intent only: no game state, cleared on blur/outside/pick.
+//
+// The SAME intent gate now also rules the mount-time caret
+// (bug-avatar-zoom-close-focus-stolen-by-card-autocomplete): the initialFocus
+// DEFAULT used to make every passive card mount grab the caret, so an avatar
+// zoom opened over the board captured that auto-focused rename field as its
+// focus-restore "opener" and every close lane faithfully walked focus out of
+// the modal into the card input. A mount owns the caret ONLY when it
+// continues user intent — a fresh in-flight rename (isTypingIntent, the +NPC
+// echo-remount lane) or an explicitly armed surface (initialFocus, e.g. the
+// map token rename popover opened by a Rename gesture).
 let lastTypedQuery = null;
 let lastTypedAt = 0;
 const TYPING_INTENT_MS = 2000;
@@ -30,7 +40,7 @@ function isTypingIntent(text) {
     return !!text && lastTypedQuery === text && Date.now() - lastTypedAt < TYPING_INTENT_MS;
 }
 
-function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs, ariaLabel }) {
+function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = false, npcs, ariaLabel }) {
     const [monsters, setMonsters] = useState([]);
     const [query, setQuery] = useState(value || '');
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -60,9 +70,17 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
           }, [value]);
 
     useEffect(() => {
+        // Caret law: a mount may only own the caret when it continues user
+        // intent — an explicitly armed open (initialFocus: the map token rename
+        // popover mounts on a Rename gesture) or a mid-rename echo remount
+        // (isTypingIntent, the same gate as the ghost list above). Passive
+        // mounts — tick re-key, SSE echo, Join auto-navigate, an overlay
+        // opening over the board — must never grab focus.
         // preventScroll: refocusing on remount (cards re-key on runtimeStateTick each
         // turn) must not natively scroll the initiative carousel back to this card.
-        if (initialFocus && inputRef.current) inputRef.current.focus({ preventScroll: true });
+        if (inputRef.current && (initialFocus || isTypingIntent(value || ''))) {
+            inputRef.current.focus({ preventScroll: true });
+        }
          // eslint-disable-next-line react-hooks/exhaustive-deps
          }, []);
 

@@ -865,6 +865,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     key={renamePopover.name}
                     value={renamePopover.name}
                     position={renamePopover.position}
+                    // Explicit caret arm: this popover mounts on a user Rename
+                    // gesture (context-menu row / ✎), the one lane where a fresh
+                    // mount legitimately owns the caret (board-card mounts are
+                    // intent-gated — see the focus law in MonsterNameAutocomplete).
+                    initialFocus
                     onCommit={(newName) => handleRenameItem(renamePopover.id, newName)}
                 />
             )}

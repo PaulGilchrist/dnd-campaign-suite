@@ -38,9 +38,13 @@ function getInput() {
     return screen.getByRole('textbox');
 }
 
-/** Types into the input and deterministically flushes the suggestion debounce. */
+/** Types into the input and deterministically flushes the suggestion debounce.
+ *  Focuses first the way a real click-then-type does — mount no longer arms the
+ *  caret (bug-avatar-zoom-close-focus-stolen-by-card-autocomplete). */
 function typeQuery(value) {
-    fireEvent.change(getInput(), { target: { value } });
+    const input = getInput();
+    input.focus();
+    fireEvent.change(input, { target: { value } });
     act(() => {
         vi.advanceTimersByTime(DEBOUNCE_MS);
     });
@@ -89,8 +93,20 @@ describe('MonsterNameAutocomplete', () => {
         expect(getInput()).toHaveValue('Gobl');
     });
 
-    it('focuses the input by default', async () => {
-        await renderAutocomplete();
+    it('does not focus the input on a passive mount (caret follows intent, not mounts)', async () => {
+        // Initiative cards re-key on every runtimeStateTick; an auto-focused
+        // rename field captured itself as an AvatarModal's focus-restore
+        // "opener" and every zoom close lane then stole focus out of the modal.
+        const anchor = document.createElement('button');
+        document.body.appendChild(anchor);
+        anchor.focus();
+        await renderAutocomplete({ value: 'Goblin' });
+        expect(document.activeElement).toBe(anchor);
+        anchor.remove();
+    });
+
+    it('focuses the input when the mount is explicitly armed (initialFocus)', async () => {
+        await renderAutocomplete({ initialFocus: true });
         expect(document.activeElement).toBe(getInput());
     });
 

@@ -65,10 +65,10 @@ describe('MonsterNameAutocomplete ghost-list regression', () => {
     });
 
     it('does not open the list when mounted pre-filled (initiative join-card lane)', async () => {
-        // Repro: EB Join auto-navigates to Initiative; the new Bandit card
-        // autofocuses its rename input pre-filled with "Bandit" (initialFocus
-        // default). Previously the debounce auto-opened a 4-item ghost list
-        // over the HP inputs.
+        // Repro: EB Join auto-navigates to Initiative with the new Bandit card
+        // pre-filled with "Bandit". Previously the debounce auto-opened a
+        // 4-item ghost list over the HP inputs even while the field held the
+        // caret (the old initialFocus default auto-focused it).
         await renderAutocomplete({ value: 'Bandit' });
         expect(getInput()).toHaveValue('Bandit');
         expect(suggestionNames()).toBeNull();
@@ -96,6 +96,7 @@ describe('MonsterNameAutocomplete ghost-list regression', () => {
         // survive that remount so the +NPC flow ("rename it to a monster
         // name…") keeps its suggestions until dismissed (§312 lane).
         const utils = await renderAutocomplete({ value: '' });
+        getInput().focus(); // a real rename starts with a click into the field
         fireEvent.change(getInput(), { target: { value: 'Band' } });
         flushDebounce();
         expect(suggestionNames()).not.toBeNull();
@@ -103,6 +104,9 @@ describe('MonsterNameAutocomplete ghost-list regression', () => {
             utils.unmount();
             render(<MonsterNameAutocomplete value="Band" />);
         });
+        // The rename-echo remount carries the caret (intent gate), which is
+        // what lets the list re-open over the fresh instance.
+        expect(getInput()).toHaveFocus();
         flushDebounce();
         expect(suggestionNames()).toEqual([
             'Bandit', 'Bandit Captain', 'Bandit Crime Lord', 'Bandit Deceiver',
@@ -115,6 +119,7 @@ describe('MonsterNameAutocomplete ghost-list regression', () => {
 
     it('opens on user typing and closes on blur without selection', async () => {
         await renderAutocomplete();
+        getInput().focus();
         fireEvent.change(getInput(), { target: { value: 'Band' } });
         flushDebounce();
         expect(suggestionNames()).toEqual([
@@ -130,6 +135,7 @@ describe('MonsterNameAutocomplete ghost-list regression', () => {
 
     it('closes on mouse-down outside the component and does not re-open', async () => {
         await renderAutocomplete();
+        getInput().focus();
         fireEvent.change(getInput(), { target: { value: 'bandit' } });
         flushDebounce();
         expect(suggestionNames()).not.toBeNull();
@@ -142,6 +148,7 @@ describe('MonsterNameAutocomplete ghost-list regression', () => {
     it('closes for good when a suggestion is picked (no post-select echo re-open)', async () => {
         const onChange = vi.fn();
         const { rerender } = await renderAutocomplete({ onChange });
+        getInput().focus();
         fireEvent.change(getInput(), { target: { value: 'band' } });
         flushDebounce();
         expect(suggestionNames()).not.toBeNull();
