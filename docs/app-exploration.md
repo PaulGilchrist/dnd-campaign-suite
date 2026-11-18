@@ -57,8 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab headless clears, single-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (HL 2026-11-17) A GM monster attack commit stamps `pendingCombatSuperiorityPrompt` into the MONSTER's change-data bucket (observed in the `Goblin` bucket after a staged-HIT Done commit) though Combat Superiority is a fighter class feature — a class-gate gap in the post-processing heuristic (no user-visible harm found; buckets get swept). Consider gating the write on the attacker being a player-class holder. Files: `src/hooks/combat/attackPostProcessing.js:204`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried; sole surviving original PT).

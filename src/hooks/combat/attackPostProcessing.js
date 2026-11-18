@@ -6,6 +6,7 @@ import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import { hasPotentCantrip, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { getKnownManeuvers } from './battleMaster.js';
 
 export async function processAttackAfterResult({ hit, isAutoMiss: _isAutoMiss, targetName, characterName, campaignName, context, combatSummary, characters, logEntry, setPopupHtml, state }) {
     if (context?.rollType !== 'attack') return;
@@ -200,6 +201,21 @@ function storeRollContextAndSuperiorityPrompt({ characterName, campaignName, con
         oldHit: hit,
         timestamp: Date.now(),
     }, campaignName);
+
+    // HL 2026-11-17: Combat Superiority is a fighter class feature, so the
+    // prompt stamps only its HOLDERS. The gate REUSES the established holder
+    // check — getKnownManeuvers (battleMaster.js) reads the
+    // BattleMasterManeuvers_selection runtime key, the same predicate
+    // targetResolution.js consults at this roll seam, and the one the pending-
+    // prompt CONSUMERS (combatSuperiorityQueries.js handleAttackRiderPrompt/
+    // handleSkillCheckPrompt) enforce before adjudicating: with zero known
+    // maneuvers they null the stamp, so the once-unconditional write was dead
+    // residue in every non-holder bucket (observed live in the GM's `Goblin`
+    // bucket after a staged-HIT Done commit). Both rulesets share this one
+    // write site (sole caller processAttackAfterResult), so this is the ONE
+    // canonical gate. _lastRollContext above stays ungated by design — it is
+    // the generic roll record every attacker lane writes.
+    if (getKnownManeuvers(characterName, campaignName).length === 0) return;
 
     setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
         rollType: 'attack',
