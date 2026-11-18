@@ -14,6 +14,10 @@
 // (another creature's prompt survives), revival on a fresh value echo, and
 // that an evicted active slot lets the next prompt surface.
 //
+// All pins ride the OFFENSE shape post bug-bi-defense-prompt-producer-orphaned
+// (owner decision 2026-11-17): the defense branch of this lane was deleted, so
+// offense prompts (keyed on the attacking creature) are the only mountable payload.
+//
 // Presentation/roll/skip mechanics live in BardicInspirationReactionModal.test.jsx
 // — not repeated here.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -50,18 +54,6 @@ vi.mock('./Subscriber.jsx', () => ({
 
 const CAMPAIGN = 'test-campaign';
 
-const defensePrompt = (overrides = {}) => ({
-  promptId: 'bi-cross-defense-1',
-  mode: 'defense',
-  targetName: 'HeroesFeastBard',
-  attackerName: 'Goblin',
-  attackRoll: 12,
-  bonus: 4,
-  effectiveAc: 18,
-  dieSize: 8,
-  ...overrides,
-});
-
 const offensePrompt = (overrides = {}) => ({
   promptId: 'bi-cross-offense-1',
   mode: 'offense',
@@ -72,15 +64,15 @@ const offensePrompt = (overrides = {}) => ({
 });
 
 // Prompts arrive on the lane's canonical wildcard-key echo: `<name>-biPrompt`
-// (`<name>` = reacting creature — defense → target, offense → attacker).
+// (`<name>` = the attacking creature — offense-only since the defense
+// producer/branch deletion, bug-bi-defense-prompt-producer-orphaned).
 function emit(coinKey, data) {
   act(() => {
     mockSubscriber.handleEvent({ key: `change-${CAMPAIGN}-${coinKey}`, data });
   });
 }
 
-const emitPrompt = (prompt) =>
-  emit(`${prompt.mode === 'offense' ? prompt.attackerName : prompt.targetName}-biPrompt`, prompt);
+const emitPrompt = (prompt) => emit(`${prompt.attackerName}-biPrompt`, prompt);
 
 // Remote tab's clearBardicInspirationPrompt DELETE — the server broadcasts a
 // null echo for the cleared key (the drain-to-evict broadcast).
@@ -98,21 +90,7 @@ describe('BardicInspirationReactionModal cross-tab eviction', () => {
     vi.restoreAllMocks();
   });
 
-  it('a null cleared-key echo dequeues the mounted defense prompt (the stranded twin self-evicts)', async () => {
-    render(<BardicInspirationReactionModal campaignName={CAMPAIGN} />);
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
-
-    emitCleared('HeroesFeastBard');
-
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
-    // Passive dequeue: the twin never DELETEs again and never consumes.
-    expect(clearBardicInspirationPrompt).not.toHaveBeenCalled();
-    expect(clearBardicInspiration).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-  });
-
-  it('a null cleared-key echo dequeues an offense prompt keyed on the attacker', async () => {
+  it('a null cleared-key echo dequeues the mounted offense prompt (the stranded twin self-evicts)', async () => {
     render(<BardicInspirationReactionModal campaignName={CAMPAIGN} />);
     emitPrompt(offensePrompt());
     await screen.findByText(/Combat Inspiration - Offense/);
@@ -120,21 +98,47 @@ describe('BardicInspirationReactionModal cross-tab eviction', () => {
     emitCleared('HeroesFeastBard');
 
     expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
+    // Passive dequeue: the twin never DELETEs again and never consumes.
+    expect(clearBardicInspirationPrompt).not.toHaveBeenCalled();
+    expect(clearBardicInspiration).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
+  });
+
+  it('a defense-mode payload never mounts, so a later cleared echo stays inert (dead lane)', () => {
+    const { container } = render(<BardicInspirationReactionModal campaignName={CAMPAIGN} />);
+
+    // The orphaned defense shape (only reachable via manual seed after
+    // bug-bi-defense-prompt-producer-orphaned) must not mount...
+    emit('Goblin-biPrompt', {
+      promptId: 'bi-cross-dead-1',
+      mode: 'defense',
+      targetName: 'Goblin',
+      attackerName: 'Orc',
+      attackRoll: 12,
+      bonus: 4,
+      effectiveAc: 18,
+      dieSize: 8,
+    });
+    expect(container.querySelector('.sp-overlay')).not.toBeInTheDocument();
+
+    // ...and its eviction echo dequeues nothing it never mounted.
+    emitCleared('Goblin');
+    expect(container.querySelector('.sp-overlay')).not.toBeInTheDocument();
   });
 
   it('the cleared echo dequeues only the creature whose key was cleared', async () => {
     render(<BardicInspirationReactionModal campaignName={CAMPAIGN} />);
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     // Another creature's prompt resolved remotely — this one survives.
     emitCleared('SomeOtherBard');
-    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+    expect(screen.getByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
     expect(screen.getByText('HeroesFeastBard')).toBeInTheDocument();
 
     // The clear for THIS prompt's key finally lands — the twin evicts.
     emitCleared('HeroesFeastBard');
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
   });
 
   it('never re-enqueues on null (no-re-enqueue law) and lets a fresh prompt mount afterwards', async () => {
@@ -147,51 +151,51 @@ describe('BardicInspirationReactionModal cross-tab eviction', () => {
     expect(container.querySelector('.sp-overlay')).not.toBeInTheDocument();
 
     // The lane stays healthy for the next adjudication.
-    emitPrompt(defensePrompt({ promptId: 'bi-cross-defense-2' }));
-    expect(await screen.findByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+    emitPrompt(offensePrompt({ promptId: 'bi-cross-offense-2' }));
+    expect(await screen.findByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
   });
 
   it('a fresh value echo after a cleared echo revives the same promptId (key revived server-side)', async () => {
     render(<BardicInspirationReactionModal campaignName={CAMPAIGN} />);
-    const prompt = defensePrompt();
+    const prompt = offensePrompt();
     emitPrompt(prompt);
-    await screen.findByText(/Combat Inspiration - Defense/);
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     emitCleared('HeroesFeastBard');
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
 
     // A legitimate re-POST recreates the server key — the modal re-mounts.
     emitPrompt(prompt);
-    expect(await screen.findByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+    expect(await screen.findByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
     expect(screen.getByText('HeroesFeastBard')).toBeInTheDocument();
   });
 
   it('a cross-tab eviction frees the active slot so the next prompt surfaces without a reconnect', async () => {
     render(<BardicInspirationReactionModal campaignName={CAMPAIGN} />);
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     emitCleared('HeroesFeastBard');
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
 
     // A different creature's prompt arrives while nothing is mounted.
-    emitPrompt(defensePrompt({ promptId: 'bi-cross-defense-3', targetName: 'TargetThree', attackerName: 'Orc', dieSize: 6 }));
-    expect(await screen.findByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    expect(screen.getByText('TargetThree')).toBeInTheDocument();
+    emitPrompt(offensePrompt({ promptId: 'bi-cross-offense-3', attackerName: 'AttackerThree', targetName: 'Orc', dieSize: 6 }));
+    expect(await screen.findByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
+    expect(screen.getByText('AttackerThree')).toBeInTheDocument();
   });
 
   it('a local Skip still evicts and the resolving tab ignores its own echoed null', async () => {
-    const result = listenFor('bardic-inspiration-defense-result');
+    const result = listenFor('bardic-inspiration-offense-result');
     render(<BardicInspirationReactionModal campaignName={CAMPAIGN} />);
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     expect(result).toHaveBeenCalledTimes(1);
 
     // The answering tab's own DELETE echo arrives — queue already empty, inert.
     emitCleared('HeroesFeastBard');
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
     expect(result).toHaveBeenCalledTimes(1);
     expect(rollExpression).not.toHaveBeenCalled();
   });

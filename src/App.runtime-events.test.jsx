@@ -743,11 +743,11 @@ describe('App - Runtime Events & State Management', () => {
 
       await dispatch({
         key: 'change-test-campaign-Aragorn-biPrompt',
-        data: { promptId: 'bi-1', mode: 'defense', targetName: 'Aragorn' },
+        data: { promptId: 'bi-1', mode: 'offense', attackerName: 'Aragorn', targetName: 'Goblin' },
       });
       // Registered dynamic campaign key (campaignKeys.js): the echo mirrors into
       // the campaign store on every mounted tab — never a ghost character bucket.
-      expect(campaignStore.get('Aragorn-biPrompt')).toEqual({ promptId: 'bi-1', mode: 'defense', targetName: 'Aragorn' });
+      expect(campaignStore.get('Aragorn-biPrompt')).toEqual({ promptId: 'bi-1', mode: 'offense', attackerName: 'Aragorn', targetName: 'Goblin' });
       expect(replaceRuntimeObject).not.toHaveBeenCalled();
 
       // The resolved prompt's wildcard DELETE null echo is a REMOVE — an answered

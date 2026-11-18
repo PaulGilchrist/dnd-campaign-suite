@@ -24,9 +24,16 @@ function BardicInspirationReactionModal({ campaignName }) {
         });
     }, []);
 
-    const enqueuePrompt = useCallback((targetName, keySuffix, promptData) => {
+    const enqueuePrompt = useCallback((keySuffix, promptData) => {
         const promptId = promptData?.promptId;
         if (!promptId) return;
+        // Single-shape law (bug-bi-defense-prompt-producer-orphaned, owner
+        // decision 2026-11-17): the ONLY payload this lane mounts is an OFFENSE
+        // prompt keyed on the attacking creature. A `mode: 'defense'` payload is
+        // a dead shape — defense adjudication lives exclusively on the popup-
+        // inline `Bardic Inspiration - Defense (dN)` button (hitResolution.js
+        // applyBardicInspirationDefense) — so it never mounts here.
+        if (promptData.mode !== 'offense') return;
         if (processedPromptIdsRef.current.has(promptId)) return;
         if (activePromptIdRef.current !== null) return;
         if (promptsRef.current.some(p => p.promptId === promptId)) return;
@@ -34,9 +41,9 @@ function BardicInspirationReactionModal({ campaignName }) {
         activePromptIdRef.current = promptId;
         setPrompts(prev => {
             // The arrival key identifies the exact server key this prompt lives
-            // on ('<name>-biPrompt'), so a cleared echo can dequeue precisely it
-            // (SavePromptModal's promptKeySuffix doctrine).
-            const next = [...prev, { targetName, promptKeySuffix: keySuffix, ...promptData }];
+            // on ('<attackerName>-biPrompt'), so a cleared echo can dequeue
+            // precisely it (SavePromptModal's promptKeySuffix doctrine).
+            const next = [...prev, { promptKeySuffix: keySuffix, ...promptData }];
             promptsRef.current = next;
             return next;
         });
@@ -65,10 +72,11 @@ function BardicInspirationReactionModal({ campaignName }) {
         const prefix = `change-${campaignName}-`;
         if (!event.key.startsWith(prefix)) return;
         // Sole prompt shape: the `<name>-biPrompt` wildcard-key echo carrying the
-        // raw prompt payload (bardicInspirationPromptUtils). A null payload is
-        // the drain-to-evict DELETE echo: it DE-queues (handleEvent's cleared
-        // branch) but never mounts — the no-re-enqueue law that keeps an evicted
-        // prompt from resurrecting on a fresh connect.
+        // raw OFFENSE prompt payload (`name` = the attacking creature;
+        // bardicInspirationPromptUtils). A null payload is the drain-to-evict
+        // DELETE echo: it DE-queues (handleEvent's cleared branch) but never
+        // mounts — the no-re-enqueue law that keeps an evicted prompt from
+        // resurrecting on a fresh connect.
         const match = event.key.slice(prefix.length).match(/^(.+)-biPrompt$/);
         if (!match) return;
         const keySuffix = `${match[1]}-biPrompt`;
@@ -76,7 +84,7 @@ function BardicInspirationReactionModal({ campaignName }) {
             dequeuePrompt(keySuffix);
             return;
         }
-        enqueuePrompt(match[1], keySuffix, event.data);
+        enqueuePrompt(keySuffix, event.data);
     }, [campaignName, enqueuePrompt, dequeuePrompt]);
 
     const handleUseReaction = useCallback(async () => {
@@ -85,15 +93,11 @@ function BardicInspirationReactionModal({ campaignName }) {
         const dieRoll = rollExpression(`1d${current.dieSize}`);
         const biRoll = dieRoll?.total || 0;
 
-        if (current.mode === 'defense') {
-            clearBardicInspirationPrompt(campaignName, current.targetName);
-            clearBardicInspiration(current.targetName, campaignName);
-        } else {
-            clearBardicInspirationPrompt(campaignName, current.attackerName);
-            clearBardicInspiration(current.attackerName, campaignName);
-        }
+        // The attacker spends their own inspiration and answers on their own key.
+        clearBardicInspirationPrompt(campaignName, current.attackerName);
+        clearBardicInspiration(current.attackerName, campaignName);
 
-        window.dispatchEvent(new CustomEvent(`bardic-inspiration-${current.mode}-result`, {
+        window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', {
             detail: { promptId, used: true, biRoll },
         }));
 
@@ -103,10 +107,10 @@ function BardicInspirationReactionModal({ campaignName }) {
     const handleSkip = useCallback(() => {
         if (!current) return;
         const promptId = current.promptId;
-        window.dispatchEvent(new CustomEvent(`bardic-inspiration-${current.mode}-result`, {
+        window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', {
             detail: { promptId, used: false },
         }));
-        clearBardicInspirationPrompt(campaignName, current.mode === 'offense' ? current.attackerName : current.targetName);
+        clearBardicInspirationPrompt(campaignName, current.attackerName);
         advance();
     }, [campaignName, current, advance]);
     // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
@@ -125,21 +129,11 @@ function BardicInspirationReactionModal({ campaignName }) {
                 <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal">
                         <div className="sp-header">
-                            <i className="fa-solid fa-bard"></i> {current.mode === 'defense' ? 'Combat Inspiration - Defense' : 'Combat Inspiration - Offense'}
+                            <i className="fa-solid fa-bard"></i> Combat Inspiration - Offense
                         </div>
                         <div className="sp-body">
-                            {current.mode === 'defense' ? (
-                                <>
-                                    <p><strong>{current.targetName}</strong> is hit by <strong>{current.attackerName}</strong>'s attack!</p>
-                                    <p className="sp-dc">Attack: d20({current.attackRoll}) + {current.bonus} = {current.attackRoll + current.bonus} vs AC {current.effectiveAc}</p>
-                                    <p className="sp-note">Use your Reaction to roll your Bardic Inspiration die (d{current.dieSize}) and add to your AC?</p>
-                                </>
-                            ) : (
-                                <>
-                                    <p><strong>{current.attackerName}</strong> hit <strong>{current.targetName}</strong>!</p>
-                                    <p className="sp-note">Use your Reaction to roll your Bardic Inspiration die (d{current.dieSize}) and add to the damage?</p>
-                                </>
-                            )}
+                            <p><strong>{current.attackerName}</strong> hit <strong>{current.targetName}</strong>!</p>
+                            <p className="sp-note">Use your Reaction to roll your Bardic Inspiration die (d{current.dieSize}) and add to the damage?</p>
                         </div>
                         <div className="sp-actions">
                             <button className="sp-roll-btn" onClick={handleUseReaction} type="button">

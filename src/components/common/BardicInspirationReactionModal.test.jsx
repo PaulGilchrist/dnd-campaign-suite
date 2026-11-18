@@ -37,7 +37,13 @@ vi.mock('./Subscriber.jsx', () => ({
 
 const CAMPAIGN = 'test-campaign';
 
-const defensePrompt = (overrides = {}) => ({
+// Dead shape (bug-bi-defense-prompt-producer-orphaned, owner decision
+// 2026-11-17): the producer was deleted and the modal refuses to mount any
+// non-offense payload — the defense adjudication's single source of truth is
+// the popup-inline `Bardic Inspiration - Defense (dN)` button (AttackResultPopup,
+// fed by hitResolution.js applyBardicInspirationDefense). This fixture exists
+// ONLY to pin that refusal.
+const deadDefensePrompt = (overrides = {}) => ({
   promptId: 'bi-prompt-defense-1',
   mode: 'defense',
   targetName: 'TargetOne',
@@ -59,16 +65,14 @@ const offensePrompt = (overrides = {}) => ({
   ...overrides,
 });
 
-// Prompts arrive on the lane's canonical wildcard-key echo: `<name>-biPrompt`
-// carrying the RAW prompt payload (bardicInspirationPromptUtils routes every
-// prompt through the campaign store under that key; the modal is the sole
-// consumer). `<name>` is the reacting creature — defense → target, offense →
-// attacker.
+// Prompts arrive on the lane's canonical wildcard-key echo: `<attackerName>-biPrompt`
+// carrying the RAW offense prompt payload (bardicInspirationPromptUtils routes every
+// prompt through the campaign store, keyed on the ATTACKING creature; the modal is
+// the sole consumer and mounts offense payloads only).
 function emitPrompt(prompt, campaignName = CAMPAIGN) {
-  const owner = prompt.mode === 'offense' ? prompt.attackerName : prompt.targetName;
   act(() => {
     mockSubscriber.handleEvent({
-      key: `change-${campaignName}-${owner}-biPrompt`,
+      key: `change-${campaignName}-${prompt.attackerName}-biPrompt`,
       data: prompt,
     });
   });
@@ -108,19 +112,23 @@ describe('BardicInspirationReactionModal', () => {
     expect(document.querySelector('.sp-overlay')).not.toBeInTheDocument();
   });
 
-  it('presents a defense prompt with the attack math and both choices', async () => {
-    renderModal();
+  it('never mounts a defense-mode payload — the dead shared lane stays inert (single-shape lock)', async () => {
+    const { container } = renderModal();
 
-    emitPrompt(defensePrompt());
+    emitPrompt(deadDefensePrompt());
+    // A synthetic/API-seeded defense payload (the only way this shape ever
+    // reached the key lane) must mount NOTHING: no overlay, no clear traffic.
+    expect(container.querySelector('.sp-overlay')).not.toBeInTheDocument();
+    expect(clearBardicInspirationPrompt).not.toHaveBeenCalled();
+    expect(clearBardicInspiration).not.toHaveBeenCalled();
 
-    expect(await screen.findByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    expect(screen.getByText('TargetOne')).toBeInTheDocument();
-    expect(screen.getByText('Goblin')).toBeInTheDocument();
-    expect(screen.getByText(/Attack: d20\(14\) \+ 3 = 17 vs AC 16/)).toBeInTheDocument();
-    expect(screen.getByText(/roll your Bardic Inspiration die \(d6\) and add to your AC/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Use Reaction & Roll/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
+    // A malformed mode value is refused the same way.
+    emitPrompt(offensePrompt({ promptId: 'bi-bogus-mode', mode: 'whatever' }));
+    expect(container.querySelector('.sp-overlay')).not.toBeInTheDocument();
+
+    // The lane stays healthy for the real offense shape afterwards.
+    emitPrompt(offensePrompt());
+    expect(await screen.findByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
   });
 
   it('presents an offense prompt naming the attacker who hit, offering the damage die', async () => {
@@ -139,29 +147,7 @@ describe('BardicInspirationReactionModal', () => {
 
   // ── Use reaction ──
 
-  it('uses reaction on defense: rolls 1d6, reports success, clears defender prompt and consumption, closes modal', async () => {
-    rollExpression.mockReturnValue({ total: 4 });
-    const result = listenFor('bardic-inspiration-defense-result');
-    renderModal();
-
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
-
-    fireEvent.click(screen.getByRole('button', { name: /Use Reaction & Roll/ }));
-
-    expect(result).toHaveBeenCalledTimes(1);
-    expect(result.mock.calls[0][0].detail).toEqual({
-      promptId: 'bi-prompt-defense-1',
-      used: true,
-      biRoll: 4,
-    });
-    expect(rollExpression).toHaveBeenCalledWith('1d6');
-    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith(CAMPAIGN, 'TargetOne');
-    expect(clearBardicInspiration).toHaveBeenCalledWith('TargetOne', CAMPAIGN);
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
-  });
-
-  it('uses reaction on offense: rolls the die and clears the attacker (not the target)', async () => {
+  it('uses reaction on offense: rolls the die, reports success, clears the attacker (not the target) prompt and consumption, closes modal', async () => {
     rollExpression.mockReturnValue({ total: 3 });
     const result = listenFor('bardic-inspiration-offense-result');
     renderModal();
@@ -191,17 +177,17 @@ describe('BardicInspirationReactionModal', () => {
     ['an object without a total', {}],
   ])('treats a failed roll (%s) as biRoll 0 but still reports the reaction as used', async (_label, rollResult) => {
     rollExpression.mockReturnValue(rollResult);
-    const result = listenFor('bardic-inspiration-defense-result');
+    const result = listenFor('bardic-inspiration-offense-result');
     renderModal();
 
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     fireEvent.click(screen.getByRole('button', { name: /Use Reaction & Roll/ }));
 
     expect(result).toHaveBeenCalledTimes(1);
     expect(result.mock.calls[0][0].detail).toEqual({
-      promptId: 'bi-prompt-defense-1',
+      promptId: 'bi-prompt-offense-1',
       used: true,
       biRoll: 0,
     });
@@ -209,27 +195,7 @@ describe('BardicInspirationReactionModal', () => {
 
   // ── Skip ──
 
-  it('skipping defense declines without rolling or consuming inspiration', async () => {
-    const result = listenFor('bardic-inspiration-defense-result');
-    renderModal();
-
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-
-    expect(result).toHaveBeenCalledTimes(1);
-    expect(result.mock.calls[0][0].detail).toEqual({
-      promptId: 'bi-prompt-defense-1',
-      used: false,
-    });
-    expect(rollExpression).not.toHaveBeenCalled();
-    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith(CAMPAIGN, 'TargetOne');
-    expect(clearBardicInspiration).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
-  });
-
-  it('skipping offense declines on the attacker and clears the attacker prompt', async () => {
+  it('skipping offense declines without rolling, evicts the attacker prompt and consumes nothing', async () => {
     const result = listenFor('bardic-inspiration-offense-result');
     renderModal();
 
@@ -253,18 +219,18 @@ describe('BardicInspirationReactionModal', () => {
   // ── Overlay is inert (adjudication prompts wait indefinitely) ──
 
   it('does nothing when the overlay backdrop is clicked', async () => {
-    const defenseResult = listenFor('bardic-inspiration-defense-result');
+    const offenseResult = listenFor('bardic-inspiration-offense-result');
     renderModal();
 
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     fireEvent.click(document.querySelector('.sp-overlay'));
 
-    expect(defenseResult).not.toHaveBeenCalled();
+    expect(offenseResult).not.toHaveBeenCalled();
     expect(clearBardicInspirationPrompt).not.toHaveBeenCalled();
     expect(clearBardicInspiration).not.toHaveBeenCalled();
-    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+    expect(screen.getByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
   });
 
   // ── Prompt lifecycle ──
@@ -272,31 +238,31 @@ describe('BardicInspirationReactionModal', () => {
   it('shows one prompt at a time, ignoring later prompts until the active one is dismissed', async () => {
     renderModal();
 
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     // A second prompt while one is active must not replace the visible one.
-    emitPrompt(defensePrompt({ promptId: 'bi-prompt-defense-2', targetName: 'TargetThree', attackerName: 'Orc', dieSize: 8 }));
+    emitPrompt(offensePrompt({ promptId: 'bi-prompt-offense-2', attackerName: 'AttackerThree', targetName: 'Orc', dieSize: 10 }));
     expect(screen.getByText('TargetOne')).toBeInTheDocument();
-    expect(screen.queryByText('TargetThree')).not.toBeInTheDocument();
+    expect(screen.queryByText('AttackerThree')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
 
     // After dismissal, new prompts are accepted again with fresh content.
-    emitPrompt(defensePrompt({ promptId: 'bi-prompt-defense-2', targetName: 'TargetThree', attackerName: 'Orc', dieSize: 8 }));
-    expect(await screen.findByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    expect(screen.getByText('TargetThree')).toBeInTheDocument();
-    expect(screen.getByText(/roll your Bardic Inspiration die \(d8\) and add to your AC/)).toBeInTheDocument();
+    emitPrompt(offensePrompt({ promptId: 'bi-prompt-offense-2', attackerName: 'AttackerThree', targetName: 'Orc', dieSize: 10 }));
+    expect(await screen.findByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
+    expect(screen.getByText('AttackerThree')).toBeInTheDocument();
+    expect(screen.getByText(/roll your Bardic Inspiration die \(d10\) and add to the damage/)).toBeInTheDocument();
   });
 
   it('does not queue the same promptId twice — one Skip permanently dismisses it', async () => {
-    const result = listenFor('bardic-inspiration-defense-result');
+    const result = listenFor('bardic-inspiration-offense-result');
     renderModal();
-    const prompt = defensePrompt();
+    const prompt = offensePrompt();
 
     emitPrompt(prompt);
-    await screen.findByText(/Combat Inspiration - Defense/);
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     emitPrompt(prompt); // duplicate delivery — must be ignored
 
@@ -304,7 +270,7 @@ describe('BardicInspirationReactionModal', () => {
 
     expect(result).toHaveBeenCalledTimes(1);
     // If the duplicate had been queued, a second modal would reappear here.
-    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
   });
 
   // ── Eviction is the clear lane's job (see bardicInspirationPromptUtils.test.js):
@@ -313,12 +279,12 @@ describe('BardicInspirationReactionModal', () => {
   // never a re-enqueue (the resurrection face of bug-bi-prompt-skip-never-evicts-server-key).
 
   it.each([
-    ['no key', { data: defensePrompt() }],
+    ['no key', { data: offensePrompt() }],
     ['no data', { key: 'change-test-campaign-TargetOne-biPrompt' }],
     ['a null payload (the DELETE eviction echo)', { key: 'change-test-campaign-TargetOne-biPrompt', data: null }],
-    ['a prompt payload without a promptId', { key: 'change-test-campaign-TargetOne-biPrompt', data: { mode: 'defense' } }],
+    ['a prompt payload without a promptId', { key: 'change-test-campaign-TargetOne-biPrompt', data: { mode: 'offense' } }],
     ['an unrelated key', { key: 'change-test-campaign-TargetOne-somethingElse', data: { foo: 1 } }],
-    ['the retired biPromptCleared handshake shape', { key: 'change-test-campaign-TargetOne-biPromptCleared', data: { promptId: 'bi-prompt-defense-1' } }],
+    ['the retired biPromptCleared handshake shape', { key: 'change-test-campaign-TargetOne-biPromptCleared', data: { promptId: 'bi-prompt-offense-1' } }],
   ])('ignores malformed SSE events (%s) without rendering or throwing', async (_label, event) => {
     const { container } = renderModal();
 
