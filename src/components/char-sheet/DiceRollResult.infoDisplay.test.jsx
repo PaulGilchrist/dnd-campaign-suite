@@ -28,13 +28,13 @@ describe('breakdown line', () => {
             props: { name: 'Fireball', type: 'damage', rolls: [6, 5, 4], formula: '8d6', total: 15 },
             breakdown: '8d6: 6, 5, 4', total: '15',
         },
-        { label: 'positive bonus', props: { bonus: 3 }, breakdown: 'd20 10 +3', total: '13' },
-        { label: 'negative bonus', props: { bonus: -2 }, breakdown: 'd20 10 -2', total: '8' },
-        { label: 'bonus with detail', props: { bonus: 3, bonusDetail: 'proficient' }, breakdown: 'd20 10 +3 proficient', total: '13' },
-        { label: 'zero bonus and modifier shows no modifier', props: {}, breakdown: 'd20 10', total: '10' },
-        { label: 'bonus plus modifier with detail', props: { bonus: 2, modifier: 1, bonusDetail: 'proficient' }, breakdown: 'd20 10 +3 proficient', total: '13' },
-        { label: 'negative bonus plus modifier', props: { bonus: -1, modifier: -2 }, breakdown: 'd20 10 -3', total: '7' },
-        { label: 'bonus cancels modifier', props: { bonus: 5, modifier: -5 }, breakdown: 'd20 10', total: '10' },
+        { label: 'positive bonus', props: { bonus: 3 }, breakdown: 'd20 10 +3 → 13', total: '13' },
+        { label: 'negative bonus', props: { bonus: -2 }, breakdown: 'd20 10 -2 → 8', total: '8' },
+        { label: 'bonus with detail', props: { bonus: 3, bonusDetail: 'proficient' }, breakdown: 'd20 10 +3 proficient → 13', total: '13' },
+        { label: 'zero bonus and modifier shows no modifier', props: {}, breakdown: 'd20 10 → 10', total: '10' },
+        { label: 'bonus plus modifier with detail', props: { bonus: 2, modifier: 1, bonusDetail: 'proficient' }, breakdown: 'd20 10 +3 proficient → 13', total: '13' },
+        { label: 'negative bonus plus modifier', props: { bonus: -1, modifier: -2 }, breakdown: 'd20 10 -3 → 7', total: '7' },
+        { label: 'bonus cancels modifier', props: { bonus: 5, modifier: -5 }, breakdown: 'd20 10 → 10', total: '10' },
     ])('$label — breakdown "$breakdown", total $total', ({ props, breakdown, total }) => {
         const { container } = renderResult(props);
         expect(queryBreakdown(container)?.textContent).toBe(breakdown);
@@ -130,27 +130,27 @@ describe('str check/save replace (Indomitable Might)', () => {
         {
             label: 'save keeps display total when strScore is lower',
             props: { rolls: [18], bonus: 3, rollType: 'save', strSaveReplace: true, strScore: 12 },
-            total: '21', breakdown: 'd20 18 +3',
+            total: '21', breakdown: 'd20 18 +3 → 21',
         },
         {
             label: 'check keeps display total when strScore is lower',
             props: { rolls: [8], bonus: 4, rollType: 'check', strCheckReplace: true, strScore: 10 },
-            total: '12', breakdown: 'd20 8 +4',
+            total: '12', breakdown: 'd20 8 +4 → 12',
         },
         {
             label: 'boundary display total equal to strScore is not replaced',
             props: { rolls: [12], bonus: 3, rollType: 'save', strSaveReplace: true, strScore: 15 },
-            total: '15', breakdown: 'd20 12 +3',
+            total: '15', breakdown: 'd20 12 +3 → 15',
         },
         {
             label: 'strSaveReplace ignored on a check',
             props: { rolls: [3], bonus: 1, rollType: 'check', strSaveReplace: true, strCheckReplace: false, strScore: 15 },
-            total: '4', breakdown: 'd20 3 +1',
+            total: '4', breakdown: 'd20 3 +1 → 4',
         },
         {
             label: 'strCheckReplace ignored on a save',
             props: { rolls: [3], bonus: 1, rollType: 'save', strSaveReplace: false, strCheckReplace: true, strScore: 15 },
-            total: '4', breakdown: 'd20 3 +1',
+            total: '4', breakdown: 'd20 3 +1 → 4',
         },
     ])('$label', ({ props, total, breakdown }) => {
         const { container } = renderResult({ name: 'Athletics', bonus: 0, ...props });

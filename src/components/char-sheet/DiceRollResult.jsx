@@ -157,6 +157,36 @@ function rollModifierText(props, state) {
     return '';
 }
 
+// 2026-11-18 QA readability law (roll-face fused token): when the popup's text
+// is read as one string (textContent of .popup-modal / .dice-roll-result), the
+// raw .dice-roll-total digit abutted the breakdown's `d20 …` and read as a
+// dice-notation token — `Glaive 17` + `d20 8 +9` → `Glaive17d20 8 +9`. Two
+// fixes at this single owner: (1) literal space text nodes bracketing the
+// breakdown div — the only separators that survive block-adjacent textContent
+// (they collapse to nothing visually), so neither the total digit nor the
+// modifier tail ever abuts a neighbouring block's digits (`+315 damage`);
+// (2) d20-test lines close with the full equation `… → total` so die and
+// total read as one parseable sentence
+// (`d20 8 +9 → 17`), consistent on every face that uses this builder (sheet
+// CharActions lane, AttackResultPopup host, monster-chip MonsterCardModal).
+// The equation tail prints ONLY when the shown die + shown modifier actually
+// sum to the shown total — d20 floors, Homing Strikes, WIS replacement and
+// the Indomitable Might replace already print their own resolution line (and
+// the replace line already ends in the total), so an appended equation there
+// would be arithmetically false.
+function displayedModifierValue(props, state) {
+    const { bonus = 0, modifier = 0 } = props;
+    if (state.rerollResult !== null) return state.rerollResult.total - state.rerollResult.roll;
+    if (state.bardicInspirationResult !== null) return state.bardicInspirationResult.total - state.bardicInspirationResult.d20Roll;
+    return bonus + modifier;
+}
+
+function rollTotalEquation(props, state) {
+    if (!state.isD20 || state.strReplaceApplied) return '';
+    const shown = state.displayRoll + displayedModifierValue(props, state);
+    return shown === state.finalTotal ? ` → ${state.finalTotal}` : '';
+}
+
 function RollSummary({ props, state }) {
     const { type, rollType, formula = '', finalDamage } = props;
     if (type === 'damage_type_choice') return null;
@@ -164,11 +194,14 @@ function RollSummary({ props, state }) {
     return (
         <>
             <div className="dice-roll-total">{state.finalTotal}</div>
+            {' '}
             <div className="dice-roll-breakdown">
                 {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
                 {rollDiceSpan(props, state)}
                 {rollModifierText(props, state)}
+                {rollTotalEquation(props, state)}
             </div>
+            {' '}
         </>
     );
 }
