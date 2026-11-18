@@ -288,9 +288,36 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
     // activation cells for exactly that window so the press reads as blocked.
     // Purely per-client: derived from the sheet-local popup/modal state only
     // (never the runtime store, never a timer).
-    const attackChainDwelling = popupHtml != null || Object.values(mergedModalState).some(v => v != null);
+    const sheetModalMounted = Object.values(mergedModalState).some(v => v != null);
+    const attackChainDwelling = popupHtml != null || sheetModalMounted;
     const dwellCls = attackChainDwelling ? ' attack-dwell-disabled' : '';
     const dwellAria = attackChainDwelling ? 'true' : undefined;
+
+    // MA 2026-11-18 backlog, owner decision (auto-retire at chain mount): the
+    // committed-damage result popup (popupHtml.damageApplied — the hp_change row
+    // has ALREADY landed; the face is purely cosmetic) must never dwell as a
+    // "click to dismiss" `.popup-modal` under a top-most rider-chain overlay:
+    // every chain `.sp-overlay` (this sheet's chooser modals via mergedModalState
+    // — charger/push-prone — or a campaign save prompt armed via the
+    // pendingSavePrompts bucket — Shield Bash STR, poison, topple) intercepts
+    // pointer events, so the popup's Done becomes unclickable under it and the
+    // hint is a lie the user has to drain manually after the chain resolves
+    // (playbook §2 OVERLAY DWELL DRAIN ORDER). Retire the popup at chain mount —
+    // exactly the popup's own Done close (setPopupHtml(null): zero state, zero
+    // log, damage truth already committed). Reactive in BOTH mount orders: the
+    // effect re-runs when the popup arrives under an already-mounted chain and
+    // when the chain arms over an already-mounted popup. A riderless commit
+    // (no chooser, no save prompt) keeps the popup and its normal Done/click
+    // dismissal untouched. Never gated on the staged Done-pending face (it has
+    // autoDamage but no damageApplied) — staged damage still only commits or
+    // honestly cancels. Purely per-client UI state; no timers.
+    const pendingSavePrompts = useRuntimeValue('campaign', 'pendingSavePrompts', campaignName);
+    useEffect(() => {
+        if (popupHtml?.damageApplied !== true) return;
+        const chainPromptArmed = Object.values(pendingSavePrompts || {}).some(p =>
+            p?.attackerName === playerStats.name || (!!popupHtml.targetName && p?.targetName === popupHtml.targetName));
+        if (sheetModalMounted || chainPromptArmed) setPopupHtml(null);
+    }, [popupHtml, sheetModalMounted, pendingSavePrompts, playerStats.name, setPopupHtml]);
 
     const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState('campaign', 'cleavePending', false, campaignName);
     const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState('campaign', 'cleaveSecondTargets', [], campaignName);
