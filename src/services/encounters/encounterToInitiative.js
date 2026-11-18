@@ -49,12 +49,25 @@ function rollNpcInitiative(monster) {
     return { roll: r1, total, rolls: [r1], bonus };
 }
 
+// Initiative rows carry sign-formatted bonus text (no "7 + -1" readings).
+function formatInitiativeBonus(bonus) {
+    return bonus >= 0 ? `+ ${bonus}` : `- ${-bonus}`;
+}
+
+// EB-join honest-row law (improve 2026-11-18): every join-lane roll row ships
+// a self-describing `description` (same convention as the player-lane
+// Lucky/Indomitable roll rows, the server-dice rows, and the
+// initiative_while_away disclosure) — initiative rolls have no target, so the
+// row must name itself instead of dangling as a bare `roll | <Monster>` entry
+// in the log API with no description/message/targetName at all.
 function logRoll(campaignName, name, rollResult) {
     addEntry(campaignName, {
         type: 'roll',
         characterName: name,
         rollType: 'initiative',
         name: 'Initiative',
+        description: `${name} rolled initiative: d20 ${rollResult.roll} `
+            + `${formatInitiativeBonus(rollResult.bonus)} = ${rollResult.total}`,
         rolls: rollResult.rolls,
         total: rollResult.roll,
         bonus: rollResult.bonus,

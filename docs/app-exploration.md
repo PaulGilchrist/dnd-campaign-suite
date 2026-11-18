@@ -63,7 +63,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab headless clears, single-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (IJ 2026-11-18) EB join emits a bare `roll` log row (`characterName:"<Monster>"`, no targetName/description — witnessed `roll | Goblin 2 -> None` timestamped at join) — re-observation of the TA-era "dangling roll row" face; the join path should log honestly (initiative row) or not at all.
 - (IJ 2026-11-18) Devious Strikes chooser Cancel does NOT latch `_cunningStrikeSkippedRound` (charger decline does) — same-round repeat hits may re-offer the chooser indefinitely; confirm behavior + align the decline-latch across rider branches (`CharActionModals.jsx handleAttackRiderClose`).
 - (IJ 2026-11-18) Sheet-lane weapon press has no in-flight guard: rapid re-clicks while a rider modal/popup dwells silently do nothing (force-clicks land on the overlay; 4 presses produced zero rolls and zero feedback) — a disabled/dimmed row state while the attack chain dwells would remove the "did my click register?" ambiguity.
 

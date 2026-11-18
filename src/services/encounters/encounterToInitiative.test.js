@@ -279,10 +279,12 @@ describe('loadEncounterToInitiative', () => {
 
   // Entry byte: total is the raw die and bonus is logged separately (the UI adds
   // them) — asserted as-is; a normal-mode row carries exactly one die (§82 law).
+  // The row is also self-describing (join honest-row law): description names
+  // the monster, the die, the sign-formatted bonus, and the initiative total.
   it.each([
-    ['normal roll with bonus', '+5', 14, { total: 14, bonus: 5, isNatural20: false, isNatural1: false }],
-    ['natural 20', undefined, 20, { total: 20, bonus: 0, isNatural20: true, isNatural1: false }],
-    ['natural 1', undefined, 1, { total: 1, bonus: 0, isNatural20: false, isNatural1: true }],
+    ['normal roll with bonus', '+5', 14, { total: 14, bonus: 5, isNatural20: false, isNatural1: false, description: 'Goblin rolled initiative: d20 14 + 5 = 19' }],
+    ['natural 20', undefined, 20, { total: 20, bonus: 0, isNatural20: true, isNatural1: false, description: 'Goblin rolled initiative: d20 20 + 0 = 20' }],
+    ['natural 1', undefined, 1, { total: 1, bonus: 0, isNatural20: false, isNatural1: true, description: 'Goblin rolled initiative: d20 1 + 0 = 1' }],
   ])('logs one initiative roll entry per npc — %s', async (_label, details, die, expectedTail) => {
     rollD20.mockReturnValueOnce(die);
     const monster = createInitMonster('Goblin', details);
