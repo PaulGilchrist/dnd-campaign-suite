@@ -84,6 +84,7 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
                                     <input
                                         type="radio"
                                         name="shieldBashOption"
+                                        aria-label={`${opt.name} ${targetName}`}
                                         checked={isSelected}
                                         onChange={() => setSelected(opt.name)}
                                         className="shield-bash-option-input"

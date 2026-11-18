@@ -48,8 +48,8 @@ describe('ShieldBashChoiceModal', () => {
     expect(screen.getByText('Orc')).toBeInTheDocument();
     expect(screen.getByText(/DC 13/)).toBeInTheDocument();
     expect(screen.getAllByRole('radio')).toHaveLength(2);
-    expect(screen.getByRole('radio', { name: /Push/ })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: /Prone/ })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Push Orc' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Prone Orc' })).not.toBeChecked();
     expect(screen.getByText(/Push target 5 feet away from you/)).toBeInTheDocument();
     expect(screen.getByText(/Target gains Prone condition/)).toBeInTheDocument();
 
@@ -60,16 +60,32 @@ describe('ShieldBashChoiceModal', () => {
     expect(baseProps.onClose).not.toHaveBeenCalled();
   });
 
+  it('gives every radio an explicit "<Option> <target>" accessible name (a11y parity with the DS/heal choosers)', () => {
+    // Backlog KA 2026-11-18: the rows used to be label-wrapped UNLABELLED
+    // radios — role-keyed automation could not reach them. The aria-label now
+    // mirrors the SecondaryTargetModal `Select <Name>` idiom: option + target.
+    render(<ShieldBashChoiceModal {...makeProps({ targetName: 'Goblin 2' })} />);
+
+    expect(screen.getByRole('radio', { name: 'Push Goblin 2' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Prone Goblin 2' })).toBeInTheDocument();
+    // Same names resolvable via raw attribute selectors (automation parity).
+    expect(document.querySelector('input[aria-label="Push Goblin 2"]')).toBeTruthy();
+    expect(document.querySelector('input[aria-label="Prone Goblin 2"]')).toBeTruthy();
+    // The aria-label overrides the mashed label text: no effect copy bleed.
+    expect(screen.getByRole('radio', { name: 'Push Goblin 2' }).getAttribute('aria-label'))
+      .toBe('Push Goblin 2');
+  });
+
   it('selects an option on click and enforces single-choice until Apply', () => {
     render(<ShieldBashChoiceModal {...makeProps()} />);
 
-    fireEvent.click(screen.getByRole('radio', { name: /Push/ }));
-    expect(screen.getByRole('radio', { name: /Push/ })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Push Orc' }));
+    expect(screen.getByRole('radio', { name: 'Push Orc' })).toBeChecked();
     expect(screen.getByRole('button', { name: /Apply Effect/ })).not.toBeDisabled();
 
-    fireEvent.click(screen.getByRole('radio', { name: /Prone/ }));
-    expect(screen.getByRole('radio', { name: /Prone/ })).toBeChecked();
-    expect(screen.getByRole('radio', { name: /Push/ })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Prone Orc' }));
+    expect(screen.getByRole('radio', { name: 'Prone Orc' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Push Orc' })).not.toBeChecked();
     expect(shieldBash.applyShieldBashEffect).not.toHaveBeenCalled();
   });
 
@@ -81,7 +97,7 @@ describe('ShieldBashChoiceModal', () => {
       const onClose = vi.fn();
       render(<ShieldBashChoiceModal {...makeProps({ onClose })} />);
 
-      fireEvent.click(screen.getByRole('radio', { name: new RegExp(option) }));
+      fireEvent.click(screen.getByRole('radio', { name: `${option} Orc` }));
       fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
 
       expect(shieldBash.applyShieldBashEffect).toHaveBeenCalledWith(expectedPayload(option));
@@ -111,7 +127,7 @@ describe('ShieldBashChoiceModal', () => {
     shieldBash.applyShieldBashEffect.mockResolvedValue(null);
     render(<ShieldBashChoiceModal {...makeProps()} />);
 
-    fireEvent.click(screen.getByRole('radio', { name: /Push/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Push Orc' }));
     fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
     await waitFor(() => {
       expect(shieldBash.applyShieldBashEffect).toHaveBeenCalled();
@@ -121,7 +137,7 @@ describe('ShieldBashChoiceModal', () => {
     expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Failed to apply/)).not.toBeInTheDocument();
     // selection retained, so the player can retry
-    expect(screen.getByRole('radio', { name: /Push/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Push Orc' })).toBeChecked();
     expect(screen.getByRole('button', { name: /Apply Effect/ })).not.toBeDisabled();
   });
 
@@ -130,14 +146,14 @@ describe('ShieldBashChoiceModal', () => {
     shieldBash.applyShieldBashEffect.mockRejectedValue(new Error('Network error'));
     render(<ShieldBashChoiceModal {...makeProps()} />);
 
-    fireEvent.click(screen.getByRole('radio', { name: /Push/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Push Orc' }));
     fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
 
     await waitFor(() => {
       expect(screen.getByText('Failed to apply Shield Bash: Network error')).toBeInTheDocument();
     });
     expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Push/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Push Orc' })).toBeChecked();
     expect(screen.getByRole('button', { name: /Apply Effect/ })).not.toBeDisabled();
     consoleError.mockRestore();
   });
@@ -172,7 +188,7 @@ describe('ShieldBashChoiceModal', () => {
 
     // Choice view at rest AND after selecting Push: zero inline style attrs in the body.
     expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('radio', { name: /Push/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Push Orc' }));
     expect(rows[0].className).toContain('selected');
     expect(rows[1].className).not.toContain('selected');
     expect(document.querySelectorAll('.sp-body [style]')).toHaveLength(0);
