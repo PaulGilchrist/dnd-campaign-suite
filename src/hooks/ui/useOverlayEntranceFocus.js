@@ -25,7 +25,7 @@
 // on BOTH owner unmount (the state-flip close every parent-mounted chooser
 // uses) AND a ready true→false transition. The second lane covers the
 // toggle-shaped consumers — the always-mounted SSE listeners
-// (BardicInspirationReactionModal, InlineChoiceModals) that mount/unmount the
+// (InlineChoiceModals) that mount/unmount the
 // overlay INSIDE their own render, where an unmount-only restore would strand
 // focus on BODY at every prompt dismissal. `ready` gates the whole tier until
 // the interactive face is mounted — the chooser family renders a LoadingView

@@ -13,7 +13,7 @@
 //   #1024 lunarForm           — round-re-arm falsifier (the ONLY family lane with
 //                                storedRound !== round); its distinct face PRESERVED — this
 //                                file never pins round bytes, only spell/weapon routing
-//   #936  automationBonuses/natural20 fold — CANON for this same step (steps[12],
+//   #936  automationBonuses/natural20 fold — CANON for this same step (steps[11],
 //         attackRollDamageSteps.js:21): oncePerTurn same-round skip, uses-depleted,
 //         option-skip, upgraded-suppress, ' or ' modal-on-weapon fire, usedRound stamp
 //         call, both-trigger acceptance, condition — never re-driven here.

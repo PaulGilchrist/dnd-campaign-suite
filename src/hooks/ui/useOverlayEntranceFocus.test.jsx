@@ -122,8 +122,8 @@ describe('useOverlayEntranceFocus', () => {
     });
 
     it('toggle-shaped listener: pull on ready-flip, restore on ready-fall WITHOUT owner unmount', async () => {
-        // The always-mounted SSE listener lane (BardicInspirationReactionModal,
-        // InlineChoiceModals): the overlay renders INSIDE a permanently mounted
+        // The toggle-shaped always-mounted SSE listener lane (InlineChoiceModals):
+        // the overlay renders INSIDE a permanently mounted
         // owner only while its prompt flag is set, so the tier must key its
         // lifecycle to `ready` — never BODY at arrival, never BODY at dismissal.
         clearFocus();

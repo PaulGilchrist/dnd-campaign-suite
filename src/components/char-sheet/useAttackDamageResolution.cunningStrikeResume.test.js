@@ -74,10 +74,6 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
   applyManeuveringAllyGrant: vi.fn(),
 }));
 
-vi.mock('../../services/combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
-}));
-
 vi.mock('../../services/combat/auras/bardicInspirationState.js', () => ({
   hasBardicInspirationOffense: vi.fn(() => false),
   getBardicInspirationDieSize: vi.fn(() => null),

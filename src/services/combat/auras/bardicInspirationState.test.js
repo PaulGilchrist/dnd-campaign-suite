@@ -1,12 +1,18 @@
 // @maintained-by-ai
 // bardicInspirationState lane — unit home for the granted-inspiration runtime
-// readers (consumers: BardicInspirationReactionModal, useLoggedDiceRollAttack/
-// Damage hooks, which mock this module in their own lanes).
+// readers (consumers: the popup-inline BI offer/commit lanes — handlePlainDamage.js
+// and useLoggedDiceRollAttack.js gate the offense button through
+// hasBardicInspirationOffense; CharSheet/DiceRoll hooks, which mock this module
+// in their own lanes). The <name>-biPrompt modal/key lane was DELETED
+// 2026-11-18 (bug-bi-offense-modal-rider-gate-arg-shape, owner decision: the
+// popup-inline button is the single offense lane, mirroring the 1a308c928
+// defense adjudication) — no rider/prompt producer may be reintroduced.
 // Constitution pins:
 // - No wall-clock anywhere in this module (grep-verified: no Date.now /
 //   setTimeout / setInterval). Inspiration offers wait indefinitely; state only
-//   moves at explicit seams (grant → runtime keys, consume → clearBardicInspiration
-//   from the reaction modal). Purity test below proves readers never mutate state.
+//   moves at explicit seams (grant → runtime keys, consume → the popup commit
+//   handler nulls the die/options/grantedBy trio). Purity test below proves
+//   readers never mutate state.
 // - Runtime keys are the envelope: bardicInspirationDie / GrantedBy /
 //   CombatOptions / Uses. Per-key mockImplementation pins them by name, so
 //   tests survive call-order refactors that positional Once-chains would not.
@@ -29,7 +35,6 @@ import {
   getBardicInspirationDieSize,
   getBardicInspirationDieSizeFromClass,
   getBardicInspirationGrantedBy,
-  clearBardicInspiration,
 } from './bardicInspirationState.js';
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -159,6 +164,28 @@ describe('hasBardicInspirationOffense', () => {
     expect(hasBardicInspirationOffense(bard(), 'Campaign')).toBe(false);
     expect(warnSpy).toHaveBeenCalled();
   });
+
+  it('ARG-SHAPE falsifier: a bare NAME STRING never arms — only the full playerStats object does', () => {
+    // The deleted modal rider called this gate as
+    // hasBardicInspirationOffense(ctx.playerStats.name, campaignName) — a
+    // string whose .name is undefined — so every runtime lookup missed and the
+    // offer died silently in every real lane while mocked-gate tests stayed
+    // green. The gate signature is (playerStats, campaignName); callers on the
+    // surviving popup-inline lane MUST pass the object. A future caller that
+    // regresses to the string shape gets this exact false, never a true.
+    // Name-scoped store: keys resolve ONLY under the holder's real name (the
+    // production store is name-keyed; the shared mock's name-blind map would
+    // mask the miss).
+    Object.assign(runtime, {
+      bardicInspirationDie: 8,
+      bardicInspirationCombatOptions: JSON.stringify(['offense_add_to_damage']),
+      bardicInspirationUses: { current: 1, max: 1 },
+    });
+    getRuntimeValue.mockImplementation((name, key) => (name === 'BardPlayer' ? runtime[key] : undefined));
+    const stats = bard();
+    expect(hasBardicInspirationOffense(stats, 'Campaign')).toBe(true);
+    expect(hasBardicInspirationOffense(stats.name, 'Campaign')).toBe(false);
+  });
 });
 
 describe('getBardicInspirationDieSize', () => {
@@ -223,17 +250,6 @@ describe('getBardicInspirationGrantedBy', () => {
       expect(getBardicInspirationGrantedBy('BardPlayer', 'Campaign')).toBe(expected);
     }
     expect(getRuntimeValue).toHaveBeenCalledWith('BardPlayer', 'bardicInspirationGrantedBy', 'Campaign');
-  });
-});
-
-describe('clearBardicInspiration', () => {
-  it('nulls the full granted-inspiration envelope — exactly three writes, no more', () => {
-    clearBardicInspiration('BardPlayer', 'Campaign');
-    expect(setRuntimeValue.mock.calls).toEqual([
-      ['BardPlayer', 'bardicInspirationDie', null, 'Campaign'],
-      ['BardPlayer', 'bardicInspirationGrantedBy', null, 'Campaign'],
-      ['BardPlayer', 'bardicInspirationCombatOptions', null, 'Campaign'],
-    ]);
   });
 });
 

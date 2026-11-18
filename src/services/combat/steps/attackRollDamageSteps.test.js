@@ -14,14 +14,14 @@
 //   automation/weapon-hit bonuses .. attackRollDamageSteps-automationBonuses/-weaponHitBonuses.test.js
 //   n20-celestial conditions ....... #1035 (attackRollDamageSteps-natural20-celestial.test.js)
 //   dmg_type:modified→damage:ready→damage:applied + poison CANON .. #1033
-//                                    (attackRollDamageSteps-endgame.test.js owns idx 17/18 bodies;
-//                                    the wiring bytes for idx 16-18 are pinned here)
+//                                    (attackRollDamageSteps-endgame.test.js owns idx 16/17 bodies;
+//                                    the wiring bytes for idx 15-17 are pinned here)
 //   mastery steps .................. #1031/#1036/#1037 (-cleaveMastery/-tacticalMaster/-toppleMastery.test.js)
 //   option-positives ............... #1038
 //
 // old→new map: 'returns an array'/'has 24 steps'/'names in order' (PRESERVED :170-196 → now :34-61)
 //   + 'subscribe/emit chain' + 'masteryDone cleave:check chain' (PRESERVED :228-247 → now :34-61, tail :55-60)
-//   → single golden wiring table below (now also covering idx 19 stalkersFlurryPostDamage,
+//   → single golden wiring table below (now also covering idx 18 stalkersFlurryPostDamage,
 //   which the old chain test never asserted). Housekeeping/rider/cunningStrike body
 //   describe blocks → removed, owned by the behavior lanes above (see #1029 fold).
 // The factory takes zero arguments — there is no degenerate-input surface to probe.
@@ -36,8 +36,7 @@ const GOLDEN_STEPS = [
   ['attackRiderManeuvers', 'maneuvers:check', 'maneuvers:handled'],
   ['cunningStrike', 'maneuvers:handled', 'cunning:checked'],
   ['charger', 'cunning:checked', 'charger:checked'],
-  ['bardicInspirationOffense', 'charger:checked', 'bi:checked'],
-  ['rollBaseDamage', 'bi:checked', 'damage:rolled'],
+  ['rollBaseDamage', 'charger:checked', 'damage:rolled'],
   ['buildContext', 'damage:rolled', 'context:built'],
   ['sneakAttack', 'context:built', 'sneak:applied'],
   ['twoWeaponFighting', 'sneak:applied', 'twf:applied'],
@@ -53,7 +52,7 @@ const GOLDEN_STEPS = [
   ['proceedToDamage', 'damage:ready', 'damage:applied'],
   ['stalkersFlurryPostDamage', 'damage:applied', 'cleave:check'],
   // Mastery tail: 'cleave:check' has ONE live subscriber in the single-path runner
-  // (idx 20 chooser — idx 23 previously rode 'cleave:check' too but was unreachable:
+  // (idx 19 chooser — idx 22 previously rode 'cleave:check' too but was unreachable:
   // steps.find never returns it after the chooser consumes the event). masteryDone now
   // rides topple's 'mastery:done' so pipeline:complete fires strictly after mastery.
   ['cleaveMastery', 'cleave:check', 'cleave:done'],
@@ -65,7 +64,7 @@ const GOLDEN_STEPS = [
 describe('buildAttackRollDamageSteps — composition contract', () => {
   const steps = buildAttackRollDamageSteps();
 
-  it('composes exactly 24 steps with exact names, subscribe/emit bytes, in order (golden census)', () => {
+  it('composes exactly 23 steps with exact names, subscribe/emit bytes, in order (golden census)', () => {
     expect(steps.map(({ name, subscribe, emit }) => [name, subscribe, emit])).toEqual(GOLDEN_STEPS);
   });
 

@@ -1,13 +1,8 @@
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
-import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getAttackRiderOptions, getAttackRiderOptionsByContext } from '../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
-import { sendBardicInspirationOffensePrompt } from '../../combat/prompts/bardicInspirationPromptUtils.js';
-import { hasBardicInspirationOffense, getBardicInspirationDieSize } from '../../combat/auras/bardicInspirationState.js';
-import { spendResource } from '../../automation/common/resourceCheck.js';
 import { checkOncePerTurnWithSkip } from '../../automation/common/oncePerTurn.js';
-import { addEntry } from '../../ui/logService.js';
-import utils from '../../ui/utils.js';
 
 export function buildAttackRiderManeuversStep() {
   return {
@@ -157,51 +152,14 @@ export function buildChargerStep() {
   };
 }
 
-export function buildBardicInspirationOffenseStep() {
-  return {
-    name: 'bardicInspirationOffense',
-    subscribe: 'charger:checked',
-    emit: 'bi:checked',
-    condition: (ctx) => ctx.hit,
-    handler: async (ctx) => {
-      const hasOffense = hasBardicInspirationOffense(ctx.playerStats.name, ctx.campaignName);
-      if (!hasOffense) return { data: {} };
-
-      const dieSize = getBardicInspirationDieSize(ctx.playerStats.name, ctx.campaignName);
-      const raw = getRuntimeValue(ctx.playerStats.name, 'bardicInspirationUses', ctx.campaignName);
-      const uses = (typeof raw === 'object' && raw !== null) ? raw.current
-        : (raw != null ? Number(raw) : (ctx.playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
-      if (!dieSize || uses <= 0) return { data: {} };
-
-      const targetName = ctx.targetName || 'unknown target';
-      const promptId = `bi-offense-${utils.guid()}`;
-      sendBardicInspirationOffensePrompt(ctx.campaignName, ctx.playerStats.name, targetName, dieSize, promptId);
-
-      await new Promise(resolve => {
-        const handler = event => {
-          if (event.detail.promptId !== promptId) return;
-          window.removeEventListener('bardic-inspiration-offense-result', handler);
-          if (event.detail.used) {
-            const biRoll = event.detail.biRoll;
-            spendResource(ctx.playerStats.name, 'bardicInspirationUses', 1, ctx.campaignName);
-            setRuntimeObject(ctx.playerStats.name, { bardicInspirationOffenseValue: String(biRoll) }, ctx.campaignName, true);
-            addEntry(ctx.campaignName, {
-              type: 'ability_use',
-              characterName: ctx.playerStats.name,
-              abilityName: 'Combat Inspiration - Offense',
-              description: `${ctx.playerStats.name} used Combat Inspiration - Offense, rolling ${biRoll} (d${dieSize}) bonus damage against ${targetName}.`,
-              biDieRoll: biRoll,
-              timestamp: Date.now(),
-            }).catch((e) => { console.error("[attackRollRiders:log-error]", e); });
-          }
-          resolve();
-        };
-        window.addEventListener('bardic-inspiration-offense-result', handler);
-        // no-timers plan T2 (was 30s silent auto-decline): the offer waits
-        // INDEFINITELY for the player — accept AND decline are both real
-        // choices carried by the event; neither is ever made by a clock.
-      });
-      return { data: {} };
-    },
-  };
-}
+// BI OFFENSE adjudication is NOT a pipeline rider (owner decision 2026-11-18,
+// bug-bi-offense-modal-rider-gate-arg-shape): the popup-inline `Bardic
+// Inspiration - Offense (dN)` button on the damage face (handlePlainDamage.js /
+// useLoggedDiceRollAttack.js feed it, CharSheet.handlers.js
+// handleBardicInspirationOffense commits it) is the SINGLE offense lane,
+// mirroring the 1a308c928 defense adjudication. The deleted rider step produced
+// the `<attacker>-biPrompt` modal/key lane — it called
+// hasBardicInspirationOffense with a NAME STRING while the gate reads
+// `playerStats.name`, so it silently early-returned on every real hit and no
+// production path could reach the modal. Never reintroduce a prompt key or a
+// chain-blocking offer face here; the popup already offers on the same hit.

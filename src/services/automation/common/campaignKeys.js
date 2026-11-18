@@ -109,16 +109,5 @@ export function isCampaignKey(key) {
     if (key.startsWith('_activeInvisibility_')) return true;
     if (key.startsWith('_activeFriends_')) return true;
     if (/^_.*_appliedTarget$/.test(key)) return true;
-    // OFFENSE Combat Inspiration adjudication prompts ride the dynamic
-    // `<attacker>-biPrompt` wildcard key (bardicInspirationPromptUtils routes the
-    // prompt to the attacking creature; campaign-store routed). The key lane has
-    // no defense face — defense adjudication is the popup-inline BI button
-    // (bug-bi-defense-prompt-producer-orphaned). Unregistered,
-    // its value echo would misroute to a ghost CHARACTER store no consumer reads and
-    // its DELETE null echo would drop (pendingOAs/lastCombatResult misroute family) —
-    // registered so every mounted tab mirrors the prompt AND its drain-to-evict
-    // REMOVE, and a resolved prompt never replays on a fresh SSE connect
-    // (bug-bi-prompt-skip-never-evicts-server-key).
-    if (key.endsWith('-biPrompt')) return true;
     return false;
 }

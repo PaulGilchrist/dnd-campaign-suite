@@ -16,7 +16,7 @@
 //   attackRollDamageSteps.test.js              composite structure — order, names, event chain
 //   attackRollDamageCalc-cla120-*.test.js     EE fold-exactly-once / never re-append gate
 //   attackRollDamageCalc-radiantSoul.test.js  Radiant Soul append + execution-owned dedupe
-//   attackRollDamageSteps-endgame.test.js     overchannel step (idx 17) post-damage rolls
+//   attackRollDamageSteps-endgame.test.js     overchannel step (idx 16) post-damage rolls
 //   attackRollRiders.test.js                  cunningStrike rider modal (not the cost fold here)
 //
 // Determinism (#1026/#1027): ROLL_TABLE hand-derived ONCE (1d6→4, 1d8→5 stub

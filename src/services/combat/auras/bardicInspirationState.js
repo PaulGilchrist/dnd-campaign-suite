@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export function hasBardicInspiration(name, campaignName) {
     const die = getRuntimeValue(name, 'bardicInspirationDie', campaignName);
@@ -53,10 +53,4 @@ export function getBardicInspirationDieSizeFromClass(playerStats) {
 
 export function getBardicInspirationGrantedBy(name, campaignName) {
     return getRuntimeValue(name, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
-}
-
-export function clearBardicInspiration(name, campaignName) {
-    setRuntimeValue(name, 'bardicInspirationDie', null, campaignName);
-    setRuntimeValue(name, 'bardicInspirationGrantedBy', null, campaignName);
-    setRuntimeValue(name, 'bardicInspirationCombatOptions', null, campaignName);
 }

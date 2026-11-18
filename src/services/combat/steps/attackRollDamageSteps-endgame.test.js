@@ -1,10 +1,10 @@
 // @maintained-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// ── Lane: buildAttackRollDamageSteps() idx 17 + 18 ─────────────────────────
+// ── Lane: buildAttackRollDamageSteps() idx 16 + 17 ─────────────────────────
 // attackRollDamageSteps.js:25-26 composes:
-//   idx 17 buildOverchannelStep()     (attackRollPostDamage.js:157-175)
-//   idx 18 buildProceedToDamageStep() (attackRollPostDamage.js:329-347)
+//   idx 16 buildOverchannelStep()     (attackRollPostDamage.js:157-175)
+//   idx 17 buildProceedToDamageStep() (attackRollPostDamage.js:329-347)
 // Behavioral coverage only; names/subscribe/emit composition is cited to
 // attackRollDamageSteps.test.js (structural lane, :189-190).
 // The poisoned-weapons save flow (attackRollPostDamage.js:183-327) has NO
@@ -79,10 +79,6 @@ vi.mock('../../ui/logService.js', () => ({
 vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
   getAttackRiderOptions: vi.fn(() => Promise.resolve([])),
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
-}));
-
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
 }));
 
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
@@ -185,7 +181,7 @@ const poisonStats = {
 
 // ── Tests ────────────────────────────────────────────────────────
 
-describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 proceedToDamage)', () => {
+describe('buildAttackRollDamageSteps — endgame (idx 16 overchannel, idx 17 proceedToDamage)', () => {
   let steps;
 
   beforeEach(() => {
@@ -197,7 +193,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
     vi.restoreAllMocks();
   });
 
-  describe('overchannel step (idx 17)', () => {
+  describe('overchannel step (idx 16)', () => {
     it('condition truth table: fires only when active AND useCount > 1', () => {
       const rows = [
         [{ overchannelActive: true, overchannelUseCount: 2 }, true],
@@ -208,7 +204,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         [{ overchannelActive: true, overchannelUseCount: undefined }, false],
       ];
       for (const [ctxOverrides, expected] of rows) {
-        expect(steps[17].condition(makeCtx(ctxOverrides))).toBe(expected);
+        expect(steps[16].condition(makeCtx(ctxOverrides))).toBe(expected);
       }
     });
 
@@ -224,7 +220,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         const roll = ROLL_TABLE[formula]; // byte→total lookup, never re-parse (#1032)
         const ctx = makeCtx({ overchannelActive: true, ...ctxOverrides });
 
-        const result = await steps[17].handler(ctx);
+        const result = await steps[16].handler(ctx);
 
         expect(rollExpression).toHaveBeenCalledTimes(1);
         expect(rollExpression).toHaveBeenCalledWith(formula);
@@ -278,7 +274,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         modifier: 0,
       });
 
-      const result = await steps[17].handler(ctx);
+      const result = await steps[16].handler(ctx);
 
       expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Overchannel cost roll failed (2d12)'));
       expect(rollExpression).toHaveBeenCalledTimes(2); // cost, then plain base — never doubled (not a crit)
@@ -324,7 +320,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         modifier: 0,
       });
 
-      const result = await steps[17].handler(ctx);
+      const result = await steps[16].handler(ctx);
 
       expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Overchannel cost roll failed (4d12)'));
       expect(rollExpressionDoubled).toHaveBeenCalledWith('4d6');
@@ -342,7 +338,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
 
     it('#1044-attack-twin double-failure resolves null — fix#69 abort token, never {data:{}}; refusal logged with abort wording', async () => {
       // Cost '2d12' AND base 'gibberish' both fail. Nothing honest exists to hand
-      // steps[18] proceedToDamage — the old {data:{}} would have fired 'damage:ready'
+      // steps[17] proceedToDamage — the old {data:{}} would have fired 'damage:ready'
       // with the maximized total. null breaks the chain (actionPipeline.js:36).
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       rollExpression
@@ -358,7 +354,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         modifier: 0,
       });
 
-      await expect(steps[17].handler(ctx)).resolves.toBeNull();
+      await expect(steps[16].handler(ctx)).resolves.toBeNull();
 
       expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Overchannel cost roll failed (2d12)'));
       expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -371,7 +367,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
     });
   });
 
-  describe('proceedToDamage step (idx 18)', () => {
+  describe('proceedToDamage step (idx 17)', () => {
     it('condition truth table: gates on formula != null (0 proceeds; null/undefined withheld)', () => {
       const rows = [
         [{ formula: '1d6' }, true],
@@ -381,7 +377,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         [{ formula: null }, false],
       ];
       for (const [ctxOverrides, expected] of rows) {
-        expect(steps[18].condition(makeCtx(ctxOverrides))).toBe(expected);
+        expect(steps[17].condition(makeCtx(ctxOverrides))).toBe(expected);
       }
     });
 
@@ -395,7 +391,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         critLabels: 'Natural 20',
       });
 
-      const result = await steps[18].handler(ctx);
+      const result = await steps[17].handler(ctx);
 
       expect(ctx.proceedWithDamage).toHaveBeenCalledWith({
         attack: { name: 'Greataxe', damage: '1d12' },
@@ -422,7 +418,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
         playerStats: poisonStats,
       });
 
-      const result = await steps[18].handler(ctx);
+      const result = await steps[17].handler(ctx);
 
       expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
         targetName: 'Goblin',
@@ -478,7 +474,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
       const goblin = armPoison({ saveSucceeds: true });
       const ctx = makeCtx({ formula: '1d8+2', total: 11, rolls: [5, 6], modifier: 2, playerStats: poisonStats });
 
-      const result = await steps[18].handler(ctx);
+      const result = await steps[17].handler(ctx);
 
       expect(createSaveListener).toHaveBeenCalledTimes(1);
       expect(setRuntimeValue).toHaveBeenCalledTimes(1);
@@ -494,7 +490,7 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
       armPoison({ hit: false });
       const ctx = makeCtx({ formula: '1d8+2', total: 11, rolls: [5, 6], modifier: 2, playerStats: poisonStats });
 
-      const result = await steps[18].handler(ctx);
+      const result = await steps[17].handler(ctx);
 
       expect(createSaveListener).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();

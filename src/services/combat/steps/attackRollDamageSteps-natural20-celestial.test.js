@@ -1,5 +1,5 @@
 // @maintained-by-ai
-// natural20 + celestial lane: owns attackRollDamageSteps.js steps[13]/[14] (buildNatural20-
+// natural20 + celestial lane: owns attackRollDamageSteps.js steps[12]/[14] (buildNatural20-
 // BonusesStep / buildCelestialRevelationStep, attackRollBonuses.js:387/:426).
 //
 // PRESERVED cites (#1029: automationBonuses cut its n20 condition block because THIS file is
@@ -21,7 +21,7 @@
 //     full-acc pins + exact stamp bytes (#973/#829); oncePerTurn latch-inert kept as the
 //     ONLY falsifier of the stamp-guard (:449).
 //   #1032 class dead-mock purge: rollExpressionDoubled/Maximized, attack-rider option,
-//     bardic-prompt, resourceCheck, rangeValidation, savePrompt, mastery, automationService,
+//     bardic-state, resourceCheck, rangeValidation, savePrompt, mastery, automationService,
 //     applyDamage mocks deleted — this lane provably never reaches them (cla048 runs the
 //     real graph with a subset and passes; bare ctx needs no hit/distance/rider flags).
 //   #1007 afterEach(vi.restoreAllMocks) added; #1026 stub made faithful (constants are
@@ -150,7 +150,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
 
   describe('natural20Bonuses step', () => {
     describe('condition', () => {
-      const cond = (o) => steps[13].condition(makeCtx(o));
+      const cond = (o) => steps[12].condition(makeCtx(o));
 
       it('true when ctx.isNatural20', () => expect(cond({
         isNatural20: true,
@@ -188,7 +188,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
 
     describe('handler', () => {
       it('returns ctx data unchanged when no natural_20_attack_roll actions (exact bytes)', async () => {
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           playerStats: { automation: { actions: [] } },
           formula: '1d8+3',
@@ -204,7 +204,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
       // is VOID post-fix: same_as_attack / explicit / missing now diverge (pinned
       // below, mutually distinguishable #1348).
       it('dice bonus with extraDamageType=force rolls and appends + 1d6 [force] (exact acc)', async () => {
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           playerStats: {
             automation: {
@@ -229,7 +229,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
       });
 
       it('increased_ability_score flat + 5 appends authored type [thunder] (#1035: type consumed; flat branch :424-429)', async () => {
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           attack: { damageType: 'Slashing' },
           playerStats: {
@@ -257,7 +257,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
       });
 
       it('increased_ability_score with unknown ability appends + 0 [cold] and total unchanged', async () => {
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           playerStats: {
             abilities: [{ name: 'Dexterity', bonus: 5 }],
@@ -286,7 +286,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
       // (byte-style mirrors frenzyDamageLabel :71-74 — attack-less ctx falls
       // back to 'Slashing', the same default the frenzy rider uses).
       it('extraDamageType=same_as_attack appends the attack type: + 2d8 [piercing] (exact acc)', async () => {
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           attack: { damageType: 'Piercing' },
           playerStats: {
@@ -315,7 +315,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
       // ' + 5 [Overwhelming Strike]' on metadata whose type was discarded.
       it('missing extraDamageType appends ZERO extra and logs console.error (ctx byte-intact)', async () => {
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           playerStats: {
             abilities: [{ name: 'Strength', bonus: 5 }],
@@ -350,7 +350,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           name, type: 'damage_bonus', trigger: 'natural_20_attack_roll',
           extraDamageExpression: '1d4', extraDamageType,
         });
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           attack: { damageType: 'Piercing' },
           playerStats: {
@@ -373,7 +373,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
         expect(diskN20Automation.trigger).toBe('natural_20_attack_roll');
         expect(diskN20Automation.extraDamageType).toBe('same_as_attack');
         expect(diskN20Automation.extraDamageExpression).toBe('increased_ability_score');
-        const r = await steps[13].handler(makeCtx({
+        const r = await steps[12].handler(makeCtx({
           isNatural20: true,
           attack: { damageType: 'Slashing' },
           playerStats: {
@@ -403,12 +403,12 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
       it('fix#350(a): natural20 handler fires EXACTLY once per attack pipeline, even through an upstream modal pause/resume (same-attack double-stack structurally impossible)', async () => {
         getCurrentCombatRound.mockReturnValue(1);
         getRuntimeValue.mockReturnValue(null);
-        const n20 = steps[13];
+        const n20 = steps[12];
         const spy = vi.fn((ctx) => n20.handler(ctx));
 
         const pipeline = createPipeline();
         pipeline
-          .step(steps[12]) // real weaponHitBonuses — 'fire or cold' row forces the modal pause
+          .step(steps[11]) // real weaponHitBonuses — 'fire or cold' row forces the modal pause
           .step({ ...n20, handler: spy })
           .step({ name: 'terminal', subscribe: 'n20:applied', emit: 'terminal:done', handler: async () => ({ data: { terminalReached: true } }) });
 
@@ -466,8 +466,8 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         });
-        const attack1 = await steps[13].handler(mk());
-        const attack2 = await steps[13].handler(mk()); // separate attack roll, same round (round stays 1)
+        const attack1 = await steps[12].handler(mk());
+        const attack2 = await steps[12].handler(mk()); // separate attack roll, same round (round stays 1)
         expect(attack1.data.formula).toBe('1d8+3 + 4 [slashing]');
         expect(attack2.data.formula).toBe('1d8+3 + 4 [slashing]'); // both attacks ride — RAW
         expect(setRuntimeValue).not.toHaveBeenCalled(); // no consumption stamp exists or is owed
@@ -497,7 +497,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
 
     it('returns empty data when no targetName is set (no roll, no stamp)', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
-      const r = await steps[14].handler(celCtx([rider()], { formula: '1d8+3', total: 11, rolls: [8, 3] }));
+      const r = await steps[13].handler(celCtx([rider()], { formula: '1d8+3', total: 11, rolls: [8, 3] }));
       expect(r.data).toEqual({});
       expect(rollExpression).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -507,7 +507,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
     // automationBonuses' sibling guard legs omit targetName and all short-circuit here.
     it('returns empty data when passives carry no hit-triggered attack_rider with an expression', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
-      const r = await steps[14].handler(celCtx([
+      const r = await steps[13].handler(celCtx([
         { type: 'passive_rule', effect: 'some-effect' },
         { type: 'attack_rider', name: 'Heavenly Wings', damageType: 'radiant' },
       ], { targetName: 'Goblin' }));
@@ -517,14 +517,14 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
 
     it('returns empty data when no active buff matches the celestial registry', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Bless' }]);
-      const r = await steps[14].handler(celCtx([rider()], { targetName: 'Goblin' }));
+      const r = await steps[13].handler(celCtx([rider()], { targetName: 'Goblin' }));
       expect(r.data).toEqual({});
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('rider-mismatch: wings buff active but passives carry only Necrotic Shroud → empty data', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
-      const r = await steps[14].handler(celCtx(
+      const r = await steps[13].handler(celCtx(
         [rider({ name: 'Necrotic Shroud', damageType: 'necrotic' })],
         { targetName: 'Goblin' },
       ));
@@ -536,7 +536,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
       getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
       getCurrentCombatRound.mockReturnValue(2);
       getRuntimeValue.mockImplementation((_key, prop) => (prop === '_Heavenly_Wings_usedRound' ? 2 : null));
-      const r = await steps[14].handler(celCtx([rider()], { targetName: 'Goblin' }));
+      const r = await steps[13].handler(celCtx([rider()], { targetName: 'Goblin' }));
       expect(r.data).toEqual({});
       expect(rollExpression).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -545,7 +545,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
     // Covers BOTH discard branches of :458-462: roller null + unparseable token.
     it('unresolvable expression (roller null, parseConstant null) → empty data, no fabricated bonus', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
-      const r = await steps[14].handler(celCtx(
+      const r = await steps[13].handler(celCtx(
         [rider({ damageExpression: 'not_a_dice' })],
         { targetName: 'Goblin' },
       ));
@@ -556,7 +556,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
     it('Heavenly Wings rolls 1d8 and stamps at round 3; second rider skipped when buff inactive (exact acc)', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Heavenly Wings' }]);
       getCurrentCombatRound.mockReturnValue(3);
-      const r = await steps[14].handler(celCtx([
+      const r = await steps[13].handler(celCtx([
         rider(),
         rider({ name: 'Inner Radiance', damageExpression: '1d6' }),
       ], { targetName: 'Goblin', formula: '1d8+3', total: 11, rolls: [8, 3] }));
@@ -569,7 +569,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
 
     it('Inner Radiance rolls 1d6 [radiant] (exact acc, CANON shared with automationBonuses)', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Inner Radiance' }]);
-      const r = await steps[14].handler(celCtx(
+      const r = await steps[13].handler(celCtx(
         [rider({ name: 'Inner Radiance', damageExpression: '1d6' })],
         { targetName: 'Goblin', formula: '1d8', total: 5, rolls: [5] },
       ));
@@ -578,7 +578,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
 
     it('Necrotic Shroud rolls 1d4 [necrotic] (exact acc)', async () => {
       getActiveBuffs.mockReturnValue([{ name: 'Necrotic Shroud' }]);
-      const r = await steps[14].handler(celCtx(
+      const r = await steps[13].handler(celCtx(
         [rider({ name: 'Necrotic Shroud', damageExpression: '1d4', damageType: 'necrotic' })],
         { targetName: 'Orc', formula: '1d6+2', total: 8, rolls: [6, 2] },
       ));

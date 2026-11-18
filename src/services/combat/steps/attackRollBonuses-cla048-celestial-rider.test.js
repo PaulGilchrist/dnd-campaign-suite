@@ -10,7 +10,7 @@
 // consumption, targetless/riderless/buffless guards, and the bonusValue<=0 zero-guard are
 // CANON in sibling attackRollDamageSteps-automationBonuses.test.js and
 // attackRollDamageSteps-natural20-celestial.test.js — both run THIS SAME step as
-// steps[14] via buildAttackRollDamageSteps (attackRollDamageSteps.js:23 imports the builder).
+// steps[13] via buildAttackRollDamageSteps (attackRollDamageSteps.js:23 imports the builder).
 // The step never logs (celestialRevelationHandler owns the single ability_use entry —
 // negative-pinned in t1) and never touches targetEffects/addExpiration: speed_reduction te
 // + addExpiration clock is the CLA-044 twin / brutalStrike branch (applyBrutalStrikeTarget-

@@ -22,11 +22,7 @@
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
  *       the campaign store; character-scoped keys adopt via
  *       replaceRuntimeObject (full-bucket REPLACE — ghost keys absent from the
- *       payload are evicted; memory-only, never re-POSTed); the dynamic
- *       `<name>-biPrompt` prompt key is a registered campaign key — its value
- *       echo mirrors into the campaign store and its DELETE null echo REMOVES
- *       it (a resolved prompt never replays — bug-bi-prompt-skip-never-evicts-
- *       server-key). Null (cleared-key) echoes
+ *       payload are evicted; memory-only, never re-POSTed). Null (cleared-key) echoes
  *       REMOVE the key from the campaign store (declared defaults win — never
  *       a raw null in the mirror); scalar echoes mirror into the campaign
  *       store; for character keys both stay dropped (snapshot lane).
@@ -735,27 +731,6 @@ describe('App - Runtime Events & State Management', () => {
       expect(writesFor('Aragorn')).toHaveLength(0);
       expect(campaignStore.size).toBe(0);
       expect(notify).not.toHaveBeenCalledWith('campaign');
-    });
-
-    it('mirrors a <name>-biPrompt prompt echo into the campaign store and evicts it on the DELETE null echo', async () => {
-      const campaignStore = new Map();
-      getStore.mockImplementation(() => campaignStore);
-
-      await dispatch({
-        key: 'change-test-campaign-Aragorn-biPrompt',
-        data: { promptId: 'bi-1', mode: 'offense', attackerName: 'Aragorn', targetName: 'Goblin' },
-      });
-      // Registered dynamic campaign key (campaignKeys.js): the echo mirrors into
-      // the campaign store on every mounted tab — never a ghost character bucket.
-      expect(campaignStore.get('Aragorn-biPrompt')).toEqual({ promptId: 'bi-1', mode: 'offense', attackerName: 'Aragorn', targetName: 'Goblin' });
-      expect(replaceRuntimeObject).not.toHaveBeenCalled();
-
-      // The resolved prompt's wildcard DELETE null echo is a REMOVE — an answered
-      // prompt must not survive in any mirror for a fresh SSE connect to replay
-      // (bug-bi-prompt-skip-never-evicts-server-key resurrection lock).
-      await dispatch({ key: 'change-test-campaign-Aragorn-biPrompt', data: null });
-      expect(campaignStore.has('Aragorn-biPrompt')).toBe(false);
-      expect(notify).toHaveBeenCalledWith('campaign');
     });
 
     it.each([

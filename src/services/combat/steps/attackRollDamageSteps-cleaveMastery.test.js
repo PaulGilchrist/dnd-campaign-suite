@@ -93,10 +93,6 @@ vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
 }));
 
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
-}));
-
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
   hasBardicInspirationOffense: vi.fn(() => false),
   getBardicInspirationDieSize: vi.fn(() => null),

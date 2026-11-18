@@ -1,6 +1,6 @@
 // @maintained-by-ai
 // Lane: toppleMastery + masteryDone steps ASSEMBLED via buildAttackRollDamageSteps()
-// (attackRollDamageSteps.js:31-32; steps[22] / steps[23]).
+// (attackRollDamageSteps.js:31-32; steps[21] / steps[22]).
 // Mechanics named from source (buildToppleMasteryStep attackRollPostDamage.js:663-719): post-hit
 // mastery resolution — on lastAttack.hit with Topple anywhere in the base/extra/choice union
 // (:675-677), prompts the last
@@ -85,10 +85,6 @@ vi.mock('../../ui/logService.js', () => ({
 vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
   getAttackRiderOptions: vi.fn(() => Promise.resolve([])),
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
-}));
-
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
 }));
 
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({

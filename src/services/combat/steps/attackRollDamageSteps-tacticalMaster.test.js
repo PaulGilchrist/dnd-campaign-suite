@@ -1,5 +1,5 @@
 // @maintained-by-ai
-// Lane: tacticalMaster step ASSEMBLED via buildAttackRollDamageSteps() (attackRollDamageSteps.js:30, steps[21];
+// Lane: tacticalMaster step ASSEMBLED via buildAttackRollDamageSteps() (attackRollDamageSteps.js:30, steps[20];
 // source buildTacticalMasterStep attackRollPostDamage.js:590).
 // Mechanics named from source (:570-627): post-hit mastery resolution — reads campaign lastAttack,
 // auto-applies non-modal masteries to the last target (skipping Graze/Topple/Nick, choice/replace
@@ -66,10 +66,6 @@ vi.mock('../../ui/logService.js', () => ({
 vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
   getAttackRiderOptions: vi.fn(() => Promise.resolve([])),
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
-}));
-
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
 }));
 
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({

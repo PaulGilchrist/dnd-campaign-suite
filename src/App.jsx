@@ -47,7 +47,6 @@ import SavePromptModal from './components/common/SavePromptModal.jsx';
 import DeathSavePromptModal from './components/common/DeathSavePromptModal.jsx';
 import ConcentrationPromptModal from './components/common/ConcentrationPromptModal.jsx';
 import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
-import BardicInspirationReactionModal from './components/common/BardicInspirationReactionModal.jsx';
 import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
 import TvExitButton from './components/common/TvExitButton/TvExitButton.jsx';
@@ -965,7 +964,6 @@ function App() {
         <SavePromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
         <DeathSavePromptModal campaignName={campaignName} characters={computedCharacters} />
         <ConcentrationPromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
-        <BardicInspirationReactionModal campaignName={campaignName} characters={computedCharacters} />
         <ConditionChoiceModal />
         <Subscriber campaignName={campaignName} handleEvent={handleRuntimeEvent} />
         <CampaignReloadNotice campaignName={campaignName} />

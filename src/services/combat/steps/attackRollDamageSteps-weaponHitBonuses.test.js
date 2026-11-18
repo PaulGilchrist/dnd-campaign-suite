@@ -2,7 +2,7 @@
 // attackRollDamageSteps-weaponHitBonuses lane: the TWO positive-option legs of
 // buildWeaponHitBonusesStep's guard weaponHitChoiceSkips (attackRollBonuses.js:273-278) —
 // the repo's only falsifiers of "chosen option contains 'strike' → bonus applies".
-// Fold (attackRollDamageSteps-automationBonuses.test.js, CANON #1029; its steps[12]
+// Fold (attackRollDamageSteps-automationBonuses.test.js, CANON #1029; its steps[11]
 // block :468-540, ranges refreshed fix#363) owns every other face of this step:
 // condition arms :473-474, no-match unchanged :479, weapon_attack_hit app :484,
 // weapon_or_beast_form_attack_hit app :488, option-SKIP (negative only,
@@ -23,7 +23,7 @@
 //
 // old->new map: condition×2, no-match, weapon_attack_hit, beast_form, upgraded,
 // oncePerTurn-skip, oncePerTurn-stamp, uses<=0-skip, uses-2→1, ' or ' modal,
-// option-skip('') → fold attackRollDamageSteps-automationBonuses.test.js steps[12];
+// option-skip('') → fold attackRollDamageSteps-automationBonuses.test.js steps[11];
 // option-apply('strike') → t1 (upgrades-key) + t2 (name-key).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -68,7 +68,6 @@ vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.
   getAttackRiderOptions: vi.fn(() => Promise.resolve([])),
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({ sendBardicInspirationOffensePrompt: vi.fn() }));
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
   hasBardicInspirationOffense: vi.fn(() => false),
   getBardicInspirationDieSize: vi.fn(() => null),
@@ -114,7 +113,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses positive option legs', (
   // runtime writes pinned negative.
   it('upgraded rider with chosen "Divine Strike" option applies +1d8 [radiant] (exact acc, zero writes)', async () => {
     gvImpl((_, p) => p === '_Blessed_Strikes_option' ? 'Divine Strike' : null);
-    const r = await steps[12].handler(makeCtx({
+    const r = await steps[11].handler(makeCtx({
       playerStats: { name: 'TestChar', automation: { actions: [
         { name: 'Improved Blessed Strikes', upgrades: 'Blessed Strikes', type: 'damage_bonus', trigger: 'weapon_attack_hit', damageExpression: '1d8', damageType: 'radiant', options: ['Divine Strike', 'Potent Spellcasting'] },
       ], passives: [] } },
@@ -129,7 +128,7 @@ describe('buildAttackRollDamageSteps - weaponHitBonuses positive option legs', (
   // by die+type from t1 (#1022). Fold's 'poison' arm (:378-382) stays the negative here.
   it('base rider with chosen "Divine Strike" option applies +1d6 [necrotic] (exact acc, zero writes)', async () => {
     gvImpl((_, p) => p === '_Divine_Strike_option' ? 'Divine Strike' : null);
-    const r = await steps[12].handler(makeCtx({
+    const r = await steps[11].handler(makeCtx({
       playerStats: { name: 'TestChar', automation: { actions: [
         { name: 'Divine Strike', type: 'damage_bonus', trigger: 'weapon_attack_hit', damageExpression: '1d6', damageType: 'necrotic', options: ['Divine Strike', 'Potent Spellcasting'] },
       ], passives: [] } },

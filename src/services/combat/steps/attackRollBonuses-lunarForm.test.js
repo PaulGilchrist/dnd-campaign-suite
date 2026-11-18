@@ -16,7 +16,7 @@
 // steps/ rider-family split (#1022/#1023 cites): weaponHitBonuses generic guards
 // (oncePerTurn same-round skip, uses-depleted, option-skip, upgraded-suppress, ' or ' modal,
 // usedRound stamp, both-trigger acceptance, condition) are CANON in
-// attackRollDamageSteps-automationBonuses.test.js on steps[12] (attackRollDamageSteps.js:21)
+// attackRollDamageSteps-automationBonuses.test.js on steps[11] (attackRollDamageSteps.js:21)
 // — never re-driven here (#936). Spell-attack discriminator is CANON in
 // attackRollBonuses-spellDiscriminator.test.js. brutalStrike application #1022;
 // celestial resolve-first #1023. This file's unique lane = the round-re-arm falsifier (the

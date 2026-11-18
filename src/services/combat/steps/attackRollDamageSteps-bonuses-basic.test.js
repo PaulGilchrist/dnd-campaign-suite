@@ -83,10 +83,6 @@ vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
 }));
 
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
-}));
-
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
   hasBardicInspirationOffense: vi.fn(() => false),
   getBardicInspirationDieSize: vi.fn(() => null),
@@ -147,7 +143,7 @@ function makeCtx(overrides = {}) {
 
 // ── Tests ────────────────────────────────────────────────────────
 
-describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting, steps[9] targetEffects, steps[10] superiorityDieBonuses', () => {
+describe('attackRollDamageSteps basic-bonus lane — steps[7] twoWeaponFighting, steps[8] targetEffects, steps[9] superiorityDieBonuses', () => {
   let steps;
 
   beforeEach(() => {
@@ -160,10 +156,10 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
   });
 
   it('t1: twoWeaponFighting condition — true only for bonus-action attacks with playerStats', () => {
-    expect(steps[8].condition(makeCtx({ isBonusActionAttack: true }))).toBe(true);
-    expect(steps[8].condition(makeCtx({ isBonusActionAttack: false }))).toBe(false);
-    expect(steps[8].condition(makeCtx())).toBeFalsy();
-    expect(steps[8].condition(makeCtx({ isBonusActionAttack: true, playerStats: null }))).toBe(false);
+    expect(steps[7].condition(makeCtx({ isBonusActionAttack: true }))).toBe(true);
+    expect(steps[7].condition(makeCtx({ isBonusActionAttack: false }))).toBe(false);
+    expect(steps[7].condition(makeCtx())).toBeFalsy();
+    expect(steps[7].condition(makeCtx({ isBonusActionAttack: true, playerStats: null }))).toBe(false);
   });
 
   // t2: every early-return arm in one falsifiable table; the step authors NO runtime
@@ -182,7 +178,7 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
 
     for (const [label, hasFeature, overrides] of cases) {
       hasTwoWeaponFighting.mockReturnValue(hasFeature);
-      const result = await steps[8].handler(makeCtx({ isBonusActionAttack: true, ...overrides }));
+      const result = await steps[7].handler(makeCtx({ isBonusActionAttack: true, ...overrides }));
       expect(result.data, label).toEqual({});
     }
     expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -198,16 +194,16 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
       total: 4,
       rolls: [1],
     });
-    const result = await steps[8].handler(ctx);
+    const result = await steps[7].handler(ctx);
 
     expect(result.data).toEqual({ formula: '1d6 + 3 [Dexterity]', total: 7, rolls: [1, 3] });
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
   it('t4: targetEffects and superiorityDieBonuses conditions always run', () => {
+    expect(steps[8].condition({})).toBe(true);
+    expect(steps[8].condition({ attack: null })).toBe(true);
     expect(steps[9].condition({})).toBe(true);
-    expect(steps[9].condition({ attack: null })).toBe(true);
-    expect(steps[10].condition({})).toBe(true);
   });
 
   // t5: guards return exact {} and short-circuit BEFORE the cleanup write —
@@ -222,7 +218,7 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
     for (const [label, raw] of cases) {
       getRuntimeValue.mockReturnValue(raw);
       const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-      const result = await steps[9].handler(ctx);
+      const result = await steps[8].handler(ctx);
       expect(result.data, label).toEqual({});
     }
     expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -238,7 +234,7 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
     ]);
 
     const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3], attack: { damageType: 'Slashing' } });
-    const result = await steps[9].handler(ctx);
+    const result = await steps[8].handler(ctx);
 
     // Label ladder: te.label verbatim > te.damageType lowered > attack damageType lowered.
     // Each 1d4 stubs to 3 (#1026): total 11+3+3+3 = 20.
@@ -254,7 +250,7 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
     getRuntimeValue.mockReturnValue([{ effect: 'damage_bonus', damageExpression: '1d6' }]);
 
     const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-    const result = await steps[9].handler(ctx);
+    const result = await steps[8].handler(ctx);
 
     // 1d6 stubs to 4 (#1026): total 11+4 = 15.
     expect(result.data).toEqual({ formula: '1d8+3 + 1d6 [same_as_weapon]', total: 15, rolls: [8, 3, 4] });
@@ -269,7 +265,7 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
     rollExpression.mockReturnValue(null);
 
     const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-    const result = await steps[9].handler(ctx);
+    const result = await steps[8].handler(ctx);
 
     expect(result.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
     expect(setRuntimeValue.mock.calls).toEqual([[
@@ -277,13 +273,14 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
     ]]);
   });
 
-  // t9: one call consumes ALL six pending die stores in pipeline order with
-  // distinguishable bytes (2,3,4,5,6,7) — labels lowered except 'Bardic Inspiration'
-  // and the verbatim Commander's Strike source stamp (#1022/#786 collaborators-once).
-  it('t9: superiorityDieBonuses consumes every pending die in order, exact damage acc, then clears all eight store keys', async () => {
+  // t9: one call consumes ALL pending die stores in pipeline order with
+  // distinguishable bytes (2,4,5,6,7) — labels lowered, plus the verbatim
+  // Commander's Strike source stamp (#1022/#786 collaborators-once).
+  // (The 'Bardic Inspiration' fold rode the deleted modal-rider's
+  // bardicInspirationOffenseValue stash — offense now folds on the popup face.)
+  it('t9: superiorityDieBonuses consumes every pending die in order, exact damage acc, then clears all seven store keys', async () => {
     getRuntimeValue.mockImplementation((_key, prop) => ({
       feintingAttackDieValue: 2,
-      bardicInspirationOffenseValue: 3,
       pendingRiposteDieValue: 4,
       attackRiderDieValue: 5,
       lungingAttackDieValue: 6,
@@ -297,17 +294,16 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
       rolls: [8, 3],
       attack: { weaponType: 'melee', damageType: 'Slashing' },
     });
-    const result = await steps[10].handler(ctx);
+    const result = await steps[9].handler(ctx);
 
     expect(result.data).toEqual({
-      formula: "1d8+3 + 2 [slashing] + 3 [Bardic Inspiration] + 4 [slashing] + 5 [slashing] + 6 [slashing] + 7 [Commander's Fury]",
-      total: 38,
-      rolls: [8, 3, 2, 3, 4, 5, 6, 7],
+      formula: "1d8+3 + 2 [slashing] + 4 [slashing] + 5 [slashing] + 6 [slashing] + 7 [Commander's Fury]",
+      total: 35,
+      rolls: [8, 3, 2, 4, 5, 6, 7],
       isMeleeOrUnarmed: true,
     });
     expect(setRuntimeValue.mock.calls).toEqual([
       ['TestChar', 'feintingAttackDieValue', null, 'test-campaign'],
-      ['TestChar', 'bardicInspirationOffenseValue', null, 'test-campaign'],
       ['TestChar', 'pendingRiposteDieValue', null, 'test-campaign'],
       ['TestChar', 'attackRiderDieValue', null, 'test-campaign'],
       ['TestChar', 'lungingAttackDieValue', null, 'test-campaign'],
@@ -322,14 +318,14 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
   it('t10: lungingAttackDieValue is consumed only for melee/unarmed, never ranged', async () => {
     getRuntimeValue.mockImplementation((_key, prop) => (prop === 'lungingAttackDieValue' ? 6 : null));
 
-    const ranged = await steps[10].handler(makeCtx({
+    const ranged = await steps[9].handler(makeCtx({
       formula: '1d8+3', total: 11, rolls: [8, 3], attack: { weaponType: 'ranged' },
     }));
     expect(ranged.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3], isMeleeOrUnarmed: false });
     expect(setRuntimeValue).not.toHaveBeenCalled();
 
     setRuntimeValue.mockClear();
-    const unarmed = await steps[10].handler(makeCtx({
+    const unarmed = await steps[9].handler(makeCtx({
       formula: '1d8+3', total: 11, rolls: [8, 3], attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
     }));
     expect(unarmed.data).toEqual({ formula: '1d8+3 + 6 [bludgeoning]', total: 17, rolls: [8, 3, 6], isMeleeOrUnarmed: true });
@@ -340,7 +336,7 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
     getRuntimeValue.mockReturnValue(0);
 
     const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3], attack: { weaponType: 'melee' } });
-    const result = await steps[10].handler(ctx);
+    const result = await steps[9].handler(ctx);
 
     expect(result.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3], isMeleeOrUnarmed: true });
     expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -352,7 +348,7 @@ describe('attackRollDamageSteps basic-bonus lane — steps[8] twoWeaponFighting,
     getRuntimeValue.mockImplementation((_key, prop) => (prop === 'commanderStrikeBonus' ? 7 : null));
 
     const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-    const result = await steps[10].handler(ctx);
+    const result = await steps[9].handler(ctx);
 
     expect(result.data).toEqual({
       formula: "1d8+3 + 7 [Commander's Strike]",

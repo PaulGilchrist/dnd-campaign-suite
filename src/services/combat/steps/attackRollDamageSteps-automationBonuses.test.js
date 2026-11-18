@@ -96,7 +96,6 @@ vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.
   getAttackRiderOptions: vi.fn(() => Promise.resolve([])),
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({ sendBardicInspirationOffensePrompt: vi.fn() }));
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
   hasBardicInspirationOffense: vi.fn(() => false),
   getBardicInspirationDieSize: vi.fn(() => null),
@@ -154,23 +153,23 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  // ── automationBonuses (steps[11]) ──
+  // ── automationBonuses (steps[10]) ──
   describe('automationBonuses step', () => {
     describe('condition', () => {
-      const cond = (o) => steps[11].condition(makeCtx(o));
+      const cond = (o) => steps[10].condition(makeCtx(o));
       it('true when automation exists', () => expect(cond({ playerStats: { automation: { actions: [] } } })).toBe(true));
       it('false when automation missing', () => expect(cond({ playerStats: { automation: {} } })).toBe(false));
     });
     describe('handler', () => {
       it('returns data unchanged when no matching actions', async () => {
-        const r = await steps[11].handler(makeCtx({ isMeleeOrUnarmed: true, formula: '1d8+3', total: 11, rolls: [8, 3] }));
+        const r = await steps[10].handler(makeCtx({ isMeleeOrUnarmed: true, formula: '1d8+3', total: 11, rolls: [8, 3] }));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
       });
 
       // CLA-280 melee/unarmed gate (:13): one true-flag gain, one false-flag skip —
       // distinguishable rider bytes; unarmed shares the same isMeleeOrUnarmed flag.
       it('CLA-280: melee hit gains +1d8 [radiant] (exact acc)', async () => {
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           attack: { weaponType: 'melee', properties: ['Versatile'] },
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_weapon_hit', damageExpression: '1d8', damageType: 'Radiant' }] } },
@@ -179,7 +178,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         expect(r.data).toEqual({ formula: '1d8+5 + 1d8 [radiant]', total: 15, rolls: [5, 5, 5] });
       });
       it('CLA-280: ranged attack gains NO melee_weapon_hit bonus (exact bytes)', async () => {
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: false,
           attack: { weaponType: 'ranged', properties: ['Ammunition', 'Heavy', 'Range'] },
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_weapon_hit', damageExpression: '1d8', damageType: 'Radiant' }] } },
@@ -192,7 +191,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       // Elemental attunement (:26): option normalizes lowercase; missing option falls back to fire.
       it('monk hit attunes to "Lightning" option → +1d6 [lightning]', async () => {
         gvImpl((_, p) => p === '_Elemental_Attunement_option' ? 'Lightning' : null);
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'monk_weapon_or_unarmed_hit', damageExpression: '1d6', damageType: '' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -200,7 +199,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         expect(r.data).toEqual({ formula: '1d8+3 + 1d6 [lightning]', total: 15, rolls: [8, 3, 4] });
       });
       it('monk hit with no attunement stored defaults to [fire]', async () => {
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'monk_weapon_or_unarmed_hit', damageExpression: '1d6', damageType: '' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -211,7 +210,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       // Heavy weapon (:37 fallback chain): explicit type + no-type fallback in one
       // call, distinguishable by dice (1d6 vs 1d8).
       it('heavy hit appends explicit [slashing] and falls back to [slashing] when type missing', async () => {
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           attack: { properties: ['Heavy'] },
           playerStats: { name: 'TestChar', automation: { actions: [
@@ -230,7 +229,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       // feats.json): the eval→number leg pinned as numeric-string-safe.
       it('heavy disk token proficiency_bonus → + 3 [Heavy Weapon Mastery] flat, total stays NUMBER', async () => {
         rollExpression.mockReturnValueOnce(null); // defeat host lenient fallback mock :63 fabricating a roll for the token
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           attack: { properties: ['Heavy'] },
           playerStats: { name: 'TestChar', proficiency: 3, automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', name: 'Heavy Weapon Mastery', damageExpression: 'proficiency_bonus', damageType: 'same_as_weapon' }] } },
@@ -247,7 +246,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         rollExpression.mockReturnValue(null); // raw + eval-string legs BOTH null (lenient fallback mock :63 would fabricate)
         vi.mocked(evaluateAutoExpression).mockReturnValueOnce('frost_bite');
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           attack: { properties: ['Heavy'] },
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', name: 'Frost Bite', damageExpression: 'frost_bite' }] } },
@@ -262,7 +261,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       // inert QUIET; a blanket loud would scream every paladin melee hit.
       it('melee Divine Smite spell_slot_level row → inert QUIET: no roll, no bytes, no console.error', async () => {
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           attack: { weaponType: 'melee', properties: ['Versatile'] },
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_weapon_hit', name: 'Divine Smite', damageExpression: '2d8 + (spell_slot_level - 1)d8', damageType: 'Radiant' }] } },
@@ -273,7 +272,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('skips melee_heavy when weapon is not Heavy (exact bytes)', async () => {
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           attack: { properties: ['Finesse'] },
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d6', damageType: 'slashing' }] } },
@@ -293,7 +292,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       it('frenzy: flat non-dice expression declines LOUD — formula intact, no roll, no stamp', async () => {
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         gvImpl((_, p) => p === 'activeBuffs' ? FRENZY_BUFFS : null);
-        const r = await steps[11].handler(frenzyCtx());
+        const r = await steps[10].handler(frenzyCtx());
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(rollExpression).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -302,31 +301,31 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       });
       it('frenzy: miss gains no bonus and never stamps the latch', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? FRENZY_BUFFS : null);
-        const r = await steps[11].handler(frenzyCtx({ hit: false }));
+        const r = await steps[10].handler(frenzyCtx({ hit: false }));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('frenzy: no reckless advantage buff → no bonus, no stamp', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
-        const r = await steps[11].handler(frenzyCtx());
+        const r = await steps[10].handler(frenzyCtx());
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('frenzy: no rage damage buff → no bonus, no stamp', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? [{ effect: 'advantage_attacks_advantage_against' }] : null);
-        const r = await steps[11].handler(frenzyCtx());
+        const r = await steps[10].handler(frenzyCtx());
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('frenzy: Dexterity attack → no bonus, no stamp', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? FRENZY_BUFFS : null);
-        const r = await steps[11].handler(frenzyCtx({ attack: { abilityName: 'Dexterity' } }));
+        const r = await steps[10].handler(frenzyCtx({ attack: { abilityName: 'Dexterity' } }));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('frenzy: latch already used this round → no bonus', async () => {
         gvImpl((_, p) => p === '_frenzyUsedRound' ? 1 : p === 'activeBuffs' ? FRENZY_BUFFS : null);
-        const r = await steps[11].handler(frenzyCtx());
+        const r = await steps[10].handler(frenzyCtx());
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
@@ -340,7 +339,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       // canonical shape is pinned here, strict-grammar loud arms live in the census lane.
       it('divine fury while raging: disk-canonical 1d6 + barbarian_level / 2 → dice+flat [radiant], stamps once', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', name: 'Divine Fury', damageExpression: '1d6 + barbarian_level / 2', damageType: 'radiant' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -357,7 +356,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       it('divine fury missing level → console.error pre-roll, zero bytes, latch untouched', async () => {
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', name: 'Divine Fury', damageExpression: '1d6 + barbarian_level / 2', damageType: 'radiant' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -370,7 +369,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       });
       it('divine fury: latch already used this round → no bonus, no stamp', async () => {
         gvImpl((_, p) => p === '_divineFuryUsedRound' ? 1 : p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: '2', damageType: 'radiant' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -379,7 +378,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('divine fury: not raging → no bonus, no stamp', async () => {
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: '2', damageType: 'radiant' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -394,7 +393,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
         vi.mocked(rollExpression).mockReturnValueOnce(null);
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: '0', damageType: 'radiant' }] } },
           formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -409,7 +408,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       it('divine fury: "radiant or necrotic" opens divineFury modal, pending data, zero writes', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
         const setDF = vi.fn();
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           setDivineFuryChoice: setDF,
           playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: '2', damageType: 'radiant or necrotic' }] } },
@@ -424,7 +423,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       // Brutal strike fold (#1022): inactive guard here (cited by bs lane :18); dice/
       // selection/te application CANON is the bs lane's exact-byte t1/t2 (#986 order).
       it('brutalStrike inactive: sticky null → formula byte-identical, zero te writes', async () => {
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           targetName: 'Orc',
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '1d6', damageType: 'slashing' }] } },
@@ -438,7 +437,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       // app-wide — Hamstring Blow te full-object + addExpiration exact payload + grant log.
       it('Hamstring Blow: speed_reduction te granted, addExpiration clock armed, grant logged', async () => {
         gvImpl((_, p) => p === '_brutalStrikeActive' ? true : p === '_brutalStrikeEffects' ? ['Hamstring Blow'] : p === 'targetEffects' ? [] : null);
-        const r = await steps[11].handler(makeCtx({
+        const r = await steps[10].handler(makeCtx({
           isMeleeOrUnarmed: true,
           targetName: 'Goblin',
           playerStats: { name: 'TestChar', automation: { actions: [{ type: 'attack_rider', name: 'Brutal Strike', featureLevel: 9, trigger: 'strength_attack_hit_after_reckless', damageExpression: '1d6', damageType: 'slashing', options: [{ name: 'Hamstring Blow', effect: 'speed_reduction' }] }] } },
@@ -465,11 +464,11 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
     });
   });
 
-  // ── weaponHitBonuses (steps[12]) — CANON for generic guards, cited by lunarForm
+  // ── weaponHitBonuses (steps[11]) — CANON for generic guards, cited by lunarForm
   //    (#1024/#1028: never re-driven there) and spellDiscriminator (#1025, ' or ' modal) ──
   describe('weaponHitBonuses step', () => {
     describe('condition', () => {
-      const cond = (o) => steps[12].condition(makeCtx(o));
+      const cond = (o) => steps[11].condition(makeCtx(o));
       it('true when automation.actions exists', () => expect(cond({ playerStats: { automation: { actions: [] } } })).toBe(true));
       it('false when automation missing', () => expect(cond({ playerStats: { automation: {} } })).toBe(false));
     });
@@ -477,55 +476,55 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
       const rider = (extra = {}) => ({ type: 'damage_bonus', trigger: 'weapon_attack_hit', damageExpression: '1d4', damageType: 'cold', name: 'TB', ...extra });
       const ctxWith = (actions, o = {}) => makeCtx({ playerStats: { name: 'TestChar', automation: { actions, passives: [] } }, formula: '1d8+3', total: 11, rolls: [8, 3], ...o });
       it('returns data unchanged when no matching actions', async () => {
-        const r = await steps[12].handler(ctxWith([]));
+        const r = await steps[11].handler(ctxWith([]));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
       });
       // both-triggers acceptance arms (cited): 'weapon_attack_hit' then beast_form.
       it('weapon_attack_hit rider appends +1d4 [cold] (exact acc)', async () => {
-        const r = await steps[12].handler(ctxWith([rider()]));
+        const r = await steps[11].handler(ctxWith([rider()]));
         expect(r.data).toEqual({ formula: '1d8+3 + 1d4 [cold]', total: 14, rolls: [8, 3, 3] });
       });
       it('weapon_or_beast_form_attack_hit rider appends +1d4 [piercing] (exact acc)', async () => {
-        const r = await steps[12].handler(ctxWith([rider({ trigger: 'weapon_or_beast_form_attack_hit', damageType: 'piercing' })]));
+        const r = await steps[11].handler(ctxWith([rider({ trigger: 'weapon_or_beast_form_attack_hit', damageType: 'piercing' })]));
         expect(r.data).toEqual({ formula: '1d8+3 + 1d4 [piercing]', total: 14, rolls: [8, 3, 3] });
       });
       it('upgraded-suppress: superseded rider skipped (exact bytes)', async () => {
-        const r = await steps[12].handler(ctxWith([rider()], { playerStats: { name: 'TestChar', automation: { actions: [rider()], passives: [{ name: 'TB', upgrades: 'TB' }] } } }));
+        const r = await steps[11].handler(ctxWith([rider()], { playerStats: { name: 'TestChar', automation: { actions: [rider()], passives: [{ name: 'TB', upgrades: 'TB' }] } } }));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
       });
       it('option-skip: chosen "poison" (no "strike") skips the rider (exact bytes)', async () => {
         gvImpl((_, p) => p === '_TB_option' ? 'poison' : null);
-        const r = await steps[12].handler(ctxWith([rider({ options: ['poison', 'cold strike'] })]));
+        const r = await steps[11].handler(ctxWith([rider({ options: ['poison', 'cold strike'] })]));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
       });
       it('oncePerTurn skip: usedRound === round skips and re-stamps nothing (exact bytes)', async () => {
         gvImpl((_, p) => p === '_TB_usedRound' ? 1 : null);
-        const r = await steps[12].handler(ctxWith([rider({ oncePerTurn: true })]));
+        const r = await steps[11].handler(ctxWith([rider({ oncePerTurn: true })]));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('uses-depleted skip: stored uses "0" skips the rider (exact bytes)', async () => {
         gvImpl((_, p) => p === '_TB_uses' ? '0' : null);
-        const r = await steps[12].handler(ctxWith([rider({ uses_expression: '1d4', recharge: true, usesMax: 3 })]));
+        const r = await steps[11].handler(ctxWith([rider({ uses_expression: '1d4', recharge: true, usesMax: 3 })]));
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       // :278 modal-fire CANON cited by spellDiscriminator #1025 — strengthened to full data.
       it('"radiant or necrotic" opens damageTypeChoice modal with pending data, zero writes', async () => {
-        const r = await steps[12].handler(ctxWith([rider({ damageType: 'radiant or necrotic' })]));
+        const r = await steps[11].handler(ctxWith([rider({ damageType: 'radiant or necrotic' })]));
         expect(r.modal).toEqual({ type: 'damageTypeChoice', props: { title: 'TB — Damage Type', types: ['radiant', 'necrotic'] } });
         expect(r.data).toEqual({ _weaponHitPending: true, bonusExpr: '1d4', bonusTotal: 3, bonusRolls: [3], _weaponHitOnceKey: '_TB_usedRound' });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
       it('recharge consumes uses 2→1 with the bonus applied', async () => {
         gvImpl((_, p) => p === '_TB_uses' ? '2' : null);
-        const r = await steps[12].handler(ctxWith([rider({ uses_expression: '1d4', recharge: true, usesMax: 3 })]));
+        const r = await steps[11].handler(ctxWith([rider({ uses_expression: '1d4', recharge: true, usesMax: 3 })]));
         expect(r.data).toEqual({ formula: '1d8+3 + 1d4 [cold]', total: 14, rolls: [8, 3, 3] });
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_TB_uses', 1, 'test-campaign');
       });
       it('oncePerTurn stamps _OB_usedRound at the seam with the bonus applied', async () => {
-        const r = await steps[12].handler(ctxWith([rider({ name: 'OB', oncePerTurn: true })]));
+        const r = await steps[11].handler(ctxWith([rider({ name: 'OB', oncePerTurn: true })]));
         expect(r.data).toEqual({ formula: '1d8+3 + 1d4 [cold]', total: 14, rolls: [8, 3, 3] });
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_OB_usedRound', 1, 'test-campaign');
@@ -533,7 +532,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
     });
   });
 
-  // ── natural20Bonuses (steps[13]) — condition arms + dice/flat/zero handler arms are
+  // ── natural20Bonuses (steps[12]) — condition arms + dice/flat/zero handler arms are
   //    CANON in attackRollDamageSteps-natural20-celestial.test.js (drives this same step,
   //    superset of the old six here) — only the Math.max(STR,DEX) default branch is unique.
   //    #1035 fix: extraDamageType is the append gate; the fixture carries an authored type
@@ -541,7 +540,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
   //    dead name-label byte ' + 5 [AB]' (extraDamageType discarded). ──
   describe('natural20Bonuses step', () => {
     it('increased_ability_score with no abilityIncreased appends max(STR,DEX) = +5 [fire]', async () => {
-      const r = await steps[13].handler(makeCtx({
+      const r = await steps[12].handler(makeCtx({
         isNatural20: true,
         playerStats: { name: 'TestChar', abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Dexterity', bonus: 5 }], automation: { actions: [{ type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: 'increased_ability_score', extraDamageType: 'fire', name: 'AB' }] } },
         formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -553,7 +552,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
     // unauthored row → ZERO extra, ctx bytes byte-intact, console.error once.
     it('missing extraDamageType → zero extra (ctx bytes intact, console.error)', async () => {
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const r = await steps[13].handler(makeCtx({
+      const r = await steps[12].handler(makeCtx({
         isNatural20: true,
         playerStats: { name: 'TestChar', abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Dexterity', bonus: 5 }], automation: { actions: [{ type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: 'increased_ability_score', name: 'AB' }] } },
         formula: '1d8+3', total: 11, rolls: [8, 3],
@@ -563,7 +562,7 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
     });
   });
 
-  // ── celestialRevelation (steps[14]) — guards CANON per cla048 lane cite; one exact
+  // ── celestialRevelation (steps[13]) — guards CANON per cla048 lane cite; one exact
   //    dice-app + latch-stamp leg; proficiency-token resolution CANON in cla048 ──
   // #1035 test-integrity fix (ledger:436-457, fix#154 vacuity family): the handler's
   // FIRST arm is `if (!ctx.targetName) return { data: {} }` (attackRollBonuses.js:461).
@@ -584,12 +583,12 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
     });
     it('riderless: no attack_rider passives → empty data (guards before buff read)', async () => {
       buffsMock([]);
-      expect((await steps[14].handler(riderless([]))).data).toEqual({});
+      expect((await steps[13].handler(riderless([]))).data).toEqual({});
       expect(getActiveBuffs).not.toHaveBeenCalled();
     });
     it('buffless: active buff not in celestial registry → empty data (reached the registry guard)', async () => {
       buffsMock([{ name: 'Other Buff' }]);
-      const r = await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '1d6', trigger: 'hit' }]));
+      const r = await steps[13].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '1d6', trigger: 'hit' }]));
       expect(r.data).toEqual({});
       expect(getActiveBuffs).toHaveBeenCalledTimes(1);
       expect(rollExpression).not.toHaveBeenCalled();
@@ -597,28 +596,28 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
     });
     it('rider-mismatch: buff active but matching rider absent → empty data, no roll', async () => {
       buffsMock([{ name: 'Heavenly Wings' }]);
-      expect((await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Other', damageExpression: '1d6', trigger: 'hit' }]))).data).toEqual({});
+      expect((await steps[13].handler(riderless([{ type: 'attack_rider', name: 'Other', damageExpression: '1d6', trigger: 'hit' }]))).data).toEqual({});
       expect(rollExpression).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
     it('latch-inert: oncePerTurn rider already used this round → empty data, no roll, no stamp', async () => {
       buffsMock([{ name: 'Heavenly Wings' }]);
       gvImpl((_, p) => p === '_Heavenly_Wings_usedRound' ? 1 : null);
-      expect((await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '1d6', trigger: 'hit', oncePerTurn: true }]))).data).toEqual({});
+      expect((await steps[13].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '1d6', trigger: 'hit', oncePerTurn: true }]))).data).toEqual({});
       expect(rollExpression).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
     it('zero-guard: unrollable "0" expression → empty data (no fabricated bonus, console loud)', async () => {
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       buffsMock([{ name: 'Heavenly Wings' }]);
-      expect((await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '0', trigger: 'hit' }]))).data).toEqual({});
+      expect((await steps[13].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '0', trigger: 'hit' }]))).data).toEqual({});
       expect(rollExpression).toHaveBeenCalledWith('0');
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(errSpy).toHaveBeenCalledTimes(1);
     });
     it('Inner Radiance hit: +1d6 [radiant] exact acc, latch stamped once', async () => {
       buffsMock([{ name: 'Inner Radiance' }]);
-      const r = await steps[14].handler(makeCtx({
+      const r = await steps[13].handler(makeCtx({
         targetName: 'Goblin',
         playerStats: { name: 'TestChar', abilities: [{ name: 'Strength', bonus: 3 }], automation: { passives: [{ type: 'attack_rider', name: 'Inner Radiance', damageExpression: '1d6', damageType: 'radiant', trigger: 'hit', oncePerTurn: true }] } },
         formula: '1d8+3', total: 11, rolls: [8, 3],

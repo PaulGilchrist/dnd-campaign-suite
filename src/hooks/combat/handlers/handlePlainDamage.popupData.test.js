@@ -107,7 +107,9 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     clearReTriggeredSequence: vi.fn(),
 }));
 
-vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
+// Path corrected (the old '../../combat/auras/…' shape resolved nowhere, so the
+// mock was DORMANT and the lane ran the real gate over the mocked store).
+vi.mock('../../../services/combat/auras/bardicInspirationState.js', () => ({
     hasBardicInspirationOffense: vi.fn(() => false),
     getBardicInspirationDieSize: vi.fn(() => 0),
     getBardicInspirationDieSizeFromClass: vi.fn(() => 0),
@@ -124,6 +126,7 @@ vi.mock('../../rules/spells/metamagicRules.js', () => ({
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
+import { hasBardicInspirationOffense } from '../../../services/combat/auras/bardicInspirationState.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 
 describe('handlePlainDamage — popup payload bytes', () => {
@@ -253,6 +256,19 @@ describe('handlePlainDamage — popup payload bytes', () => {
 
     it.each(passthroughBytes)('surfaces context passthrough bytes verbatim — $label', async ({ context, bytes }) => {
         expect(await run(longsword(context))).toMatchObject(bytes);
+    });
+
+    // ARG-SHAPE caller pin (bug-bi-offense-modal-rider-gate-arg-shape): with no
+    // pre-baked offense byte, resolveBardicInspirationFlags must consult the
+    // offense gate with the FULL playerStats object. The deleted modal rider
+    // passed the name STRING instead — the gate read .name off it, every runtime
+    // lookup missed, and the whole offer lane died silently while its own
+    // mocked-gate tests stayed green. Any caller regression to the string shape
+    // fails this pin.
+    it('consults the BI offense gate with the full playerStats object, never the name string', async () => {
+        const playerStats = { name: 'TestFighter', class: { name: 'Fighter' } };
+        await run(longsword({ playerStats }));
+        expect(hasBardicInspirationOffense).toHaveBeenCalledWith(playerStats, 'test-campaign');
     });
 
     const featGateBytes = [

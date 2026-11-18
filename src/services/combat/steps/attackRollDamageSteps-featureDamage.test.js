@@ -2,11 +2,11 @@
 // Lane: feature-driven damage in the attack pipeline — the two post-damage-calc steps owned by
 // attackRollPostDamage.js. Services (features/*.js, automation handlers) own grant/consume store
 // and per-spell internals (#945-#951); THIS lane pins only the pipeline-step bytes of the
-// generic featureRiders dispatcher (idx 15) and the unarmed damageTypeModifiers step (idx 16).
+// generic featureRiders dispatcher (idx 14) and the unarmed damageTypeModifiers step (idx 15).
 //
 // Composition map (verified against attackRollDamageSteps.js buildAttackRollDamageSteps()):
-//   steps[15] = buildFeatureRidersStep()   name 'featureRiders'      subscribe 'celestial:applied' emit 'riders:applied'
-//   steps[16] = buildDamageTypeModifiersStep() name 'damageTypeModifiers' subscribe 'riders:applied' emit 'dmg_type:modified'
+//   steps[14] = buildFeatureRidersStep()   name 'featureRiders'      subscribe 'celestial:applied' emit 'riders:applied'
+//   steps[15] = buildDamageTypeModifiersStep() name 'damageTypeModifiers' subscribe 'riders:applied' emit 'dmg_type:modified'
 // Structure (names/order/subscribe-emit chain) is owned by attackRollDamageSteps.test.js exact
 // ordered-names toEqual — cited here, not re-pinned. This file covers handler behavior only.
 //
@@ -94,10 +94,6 @@ vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.
   getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
 }));
 
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
-}));
-
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
   hasBardicInspirationOffense: vi.fn(() => false),
   getBardicInspirationDieSize: vi.fn(() => null),
@@ -180,13 +176,13 @@ const EMPOWERED_STRIKES = {
 
 // ── Tests ────────────────────────────────────────────────────────
 
-describe('featureRiders step (steps[15]) — dispatcher bytes', () => {
+describe('featureRiders step (steps[14]) — dispatcher bytes', () => {
   let step;
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
-    step = buildAttackRollDamageSteps()[15];
+    step = buildAttackRollDamageSteps()[14];
     featureModules.length = 0;
   });
 
@@ -284,13 +280,13 @@ describe('featureRiders step (steps[15]) — dispatcher bytes', () => {
   });
 });
 
-describe('damageTypeModifiers step (steps[16]) — unarmed damage-type bytes', () => {
+describe('damageTypeModifiers step (steps[15]) — unarmed damage-type bytes', () => {
   let step;
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
-    step = buildAttackRollDamageSteps()[16];
+    step = buildAttackRollDamageSteps()[15];
     featureModules.length = 0;
   });
 

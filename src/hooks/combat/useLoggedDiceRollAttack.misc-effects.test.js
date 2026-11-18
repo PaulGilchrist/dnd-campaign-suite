@@ -171,6 +171,7 @@ import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 import { getManeuversForRules } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import {
     hasBardicInspirationDefense,
+    hasBardicInspirationOffense,
     getBardicInspirationDieSize,
 } from '../../services/combat/auras/bardicInspirationState.js';
 
@@ -486,9 +487,15 @@ describe('createLogAndShow - Bardic Inspiration Defense context', () => {
         expect(context.bardicInspirationDefense).toBe(true);
         expect(context.bardicInspirationDefenseDieSize).toBe('d6');
         expect(context.bardicInspirationDefenseTargetName).toBe('Bard');
+        // ARG-SHAPE caller pin (bug-bi-offense-modal-rider-gate-arg-shape): the
+        // offense gate must be consulted with the FULL playerStats object, never
+        // the name string — the deleted modal rider's string arg read .name off a
+        // string, missed every runtime lookup, and silenced the whole offer lane.
+        expect(hasBardicInspirationOffense).toHaveBeenCalledWith(context.playerStats, 'test-campaign');
         // Defense is actively selected by the player from their character
-        // sheet — the seam must never auto-prompt (a prompt writes the
-        // '<name>-biPrompt' campaign-store key per bardicInspirationPromptUtils).
+        // sheet — the seam must never auto-prompt (the '<name>-biPrompt'
+        // campaign-store key lane was deleted 2026-11-18 with the dead
+        // modal rider — popup-inline is the single BI adjudication lane).
         expect(setRuntimeValue.mock.calls.filter((call) => typeof call[1] === 'string' && (call[1] === 'biPrompt' || call[1].endsWith('-biPrompt')))).toHaveLength(0);
     });
 

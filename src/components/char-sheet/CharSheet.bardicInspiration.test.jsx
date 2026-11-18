@@ -3,7 +3,9 @@
 // features into the playerStats handed to CharSpecialActions / CharReactions.
 // Grant/eligibility state machine: services/combat/auras/bardicInspirationState.test.js
 // Spend handlers + log shapes: CharSheet.featureRiders.test.jsx
-// Offer modals/popups: BardicInspirationReactionModal + AttackResultPopup tests.
+// Offer popups: AttackResultPopup + DiceRollResult tests — the popup-inline
+// `Bardic Inspiration - Offense/Defense (dN)` buttons are the single
+// adjudication lanes (the <name>-biPrompt modal/key lane was deleted 2026-11-18).
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

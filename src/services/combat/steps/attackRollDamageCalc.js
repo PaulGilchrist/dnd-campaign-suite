@@ -69,7 +69,7 @@ function markRadiantSoulUsed(ctx, ps, formula) {
 export function buildRollBaseDamageStep() {
   return {
     name: 'rollBaseDamage',
-    subscribe: 'bi:checked',
+    subscribe: 'charger:checked',
     emit: 'damage:rolled',
     condition: (ctx) => !!ctx.attack?.damage || !!ctx.autoFormulaOverride,
     handler: async (ctx) => {
@@ -250,7 +250,7 @@ export function buildSuperiorityDieBonusesStep() {
         const raw = getRuntimeValue(ctx.playerStats.name, key, ctx.campaignName);
         if (raw && Number(raw) > 0) {
           const val = Number(raw);
-          const labelLower = typeof label === 'string' && !['Bardic Inspiration'].includes(label) ? label.toLowerCase() : label;
+          const labelLower = typeof label === 'string' ? label.toLowerCase() : label;
           formula += ` + ${val} [${labelLower}]`;
           total += val;
           rolls = [...rolls, val];
@@ -261,7 +261,8 @@ export function buildSuperiorityDieBonusesStep() {
       };
 
       consume('feintingAttackDieValue', defaultDmg);
-      consume('bardicInspirationOffenseValue', 'Bardic Inspiration');
+      // bardicInspirationOffenseValue (the dead modal-rider's stash) is retired —
+      // BI offense folds on the popup face, never through this step.
       consume('pendingRiposteDieValue', defaultDmg);
       consume('attackRiderDieValue', defaultDmg);
 

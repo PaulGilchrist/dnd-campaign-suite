@@ -1,8 +1,14 @@
 // @maintained-by-ai
-// Lane: step-BODY behavior of all four attack-roll chooser riders in attackRollRiders.js —
-// CLA-188 Cunning Strike chooser, FT-022/023 Charger chooser, Superiority maneuver
-// hit/miss chooser, and Bardic Inspiration offense chooser. Gates, suppression, prompt
+// Lane: step-BODY behavior of all three attack-roll chooser riders in attackRollRiders.js —
+// CLA-188 Cunning Strike chooser, FT-022/023 Charger chooser, and the Superiority
+// maneuver hit/miss chooser. Gates, suppression, prompt
 // issuance, and passthrough bytes only — nothing else.
+//
+// Bardic Inspiration offense is NOT a rider here: the popup-inline `Bardic
+// Inspiration - Offense (dN)` button is the single offense adjudication lane
+// (owner decision 2026-11-18, bug-bi-offense-modal-rider-gate-arg-shape) —
+// its bytes are owned by handlePlainDamage.popupData /
+// useLoggedDiceRollDamage.popup-data / DiceRollResult lanes.
 //
 // Ownership split (cited, never re-pinned here — see each file's lane header):
 //   names/subscribe/emit/order/step-keys golden census .. attackRollDamageSteps.test.js (#1039)
@@ -13,15 +19,10 @@
 //                                    combatSuperiorityHandlerQuery.test.js
 //   hook-side dispatch/resume/ledger/pause-strand ........ useAttackDamageResolution.maneuvers/
 //                                    .skipManeuver/.cunningStrikeResume/.mn014/.mn015/.maneuveringAlly.test.js
-//   BI prompt util itself .................................. combat/prompts/bardicInspirationPromptUtils.test.js
-//   BI popup passthrough + bonus folding ................. useLoggedDiceRollDamage.popup-data,
-//                                    handlePlainDamage.popupData, attackRollDamageSteps-bonuses-basic (#1030)
 //   Charger consumer reaction gate ....................... useAttackDamageResolution.opportunity-transport.test.js
 //
 // These steps roll no dice — they only offer choices and pass bytes through, so no dice
-// stub exists here (inert-or-faithful, #1026). Zero wall-clock waits: the BI chooser is
-// settled ONLY by dispatched player events; accept AND decline are both real choices
-// (T2 no-timers plan) and the never-answered case is pinned as a genuine pending race.
+// stub exists here (inert-or-faithful, #1026). Zero wall-clock waits.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -37,7 +38,6 @@ vi.mock('../../../encounters/combatData.js', () => ({
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
-  setRuntimeObject: vi.fn(),
 }));
 
 // executeAttackRiderManeuver purged — attackRollRiders.js only imports the two getters.
@@ -46,50 +46,22 @@ vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.
   getAttackRiderOptionsByContext: vi.fn(),
 }));
 
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
-}));
-
-vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
-  hasBardicInspirationOffense: vi.fn(),
-  getBardicInspirationDieSize: vi.fn(),
-}));
-
-vi.mock('../../automation/common/resourceCheck.js', () => ({
-  spendResource: vi.fn(),
-}));
-
-vi.mock('../../ui/logService.js', () => ({
-  addEntry: vi.fn(),
-}));
-
-vi.mock('../../ui/utils.js', () => ({
-  default: { guid: () => 'test-guid-123' },
-}));
-
 import {
   buildAttackRiderManeuversStep,
   buildCunningStrikeStep,
   buildChargerStep,
-  buildBardicInspirationOffenseStep,
 } from './attackRollRiders.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
-import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import {
   getAttackRiderOptions,
   getAttackRiderOptionsByContext,
 } from '../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
-import { sendBardicInspirationOffensePrompt } from '../../combat/prompts/bardicInspirationPromptUtils.js';
-import { hasBardicInspirationOffense, getBardicInspirationDieSize } from '../../combat/auras/bardicInspirationState.js';
-import { spendResource } from '../../automation/common/resourceCheck.js';
-import { addEntry } from '../../ui/logService.js';
-import { createPipeline } from '../actionPipeline.js';
 
 const CAMPAIGN = 'test-campaign';
 const HOLDER = 'AasimarTest';
 const TARGET = 'Animated Rug of Smothering 1';
-const BI_PID = 'bi-offense-test-guid-123';
 
 // Byte-distinct fixtures (#1022): hit-channel, miss-channel, and wrong-channel
 // canary options are all distinguishable, so any channel cross-wiring fails loudly.
@@ -114,7 +86,6 @@ const chargerPassive = {
 const csStep = buildCunningStrikeStep();
 const chargerStep = buildChargerStep();
 const maneuversStep = buildAttackRiderManeuversStep();
-const biStep = buildBardicInspirationOffenseStep();
 
 function makeCtx(overrides = {}) {
   return {
@@ -144,7 +115,6 @@ beforeEach(() => {
   getCurrentCombatRound.mockReturnValue(1);
   getAttackRiderOptions.mockResolvedValue([]);
   getAttackRiderOptionsByContext.mockResolvedValue([]);
-  addEntry.mockResolvedValue({});
   runtimeValues({ lastAttack: { hit: true, attackerName: HOLDER } });
 });
 
@@ -152,7 +122,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('condition gates — all four riders', () => {
+describe('condition gates — all three riders', () => {
   const chargerStats = { name: HOLDER, automation: { passives: [chargerPassive] } };
 
   it.each([
@@ -166,8 +136,6 @@ describe('condition gates — all four riders', () => {
     ['charger: melee hit', chargerStep, { hit: true, attack: { weaponType: 'melee' }, playerStats: chargerStats }, true],
     ['attackRiderManeuvers: no prompt sink', maneuversStep, { popupHtml: { hit: true } }, false],
     ['attackRiderManeuvers: prompt sink present', maneuversStep, { popupHtml: { hit: true }, setAttackRiderManeuverPrompt: () => {} }, true],
-    ['bardicInspirationOffense: hit', biStep, { hit: true }, true],
-    ['bardicInspirationOffense: miss', biStep, { hit: false }, false],
   ])('%s → %s', (_label, step, ctx, expected) => {
     expect(step.condition(ctx)).toBe(expected);
   });
@@ -381,134 +349,8 @@ describe('buildChargerStep (FT-022/023)', () => {
   });
 });
 
-describe('buildBardicInspirationOffenseStep — offense chooser', () => {
-  // Gate + ledger byte-path census. Prompt-firing rows are settled by an explicit
-  // DECLINE event (still a real player choice) so nothing is left dangling.
-  it.each([
-    { label: 'offense unavailable → {data:{}}', offense: false, dieSize: 8, raw: { current: 2 }, tracked: null, prompt: false },
-    { label: 'die size missing → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: null, raw: { current: 2 }, tracked: null, prompt: false },
-    { label: 'uses 0, object ledger → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: 8, raw: { current: 0 }, tracked: null, prompt: false },
-    { label: 'uses 0, legacy number ledger → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: 8, raw: 0, tracked: null, prompt: false },
-    { label: 'no ledger anywhere → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: 8, raw: null, tracked: null, prompt: false },
-    { label: 'object ledger current:2 → prompt fires', offense: true, dieSize: 8, raw: { current: 2 }, tracked: null, prompt: true },
-    { label: 'legacy number ledger 3 → prompt fires', offense: true, dieSize: 8, raw: 3, tracked: null, prompt: true },
-    { label: 'trackedResources fallback when raw null → prompt fires', offense: true, dieSize: 8, raw: null, tracked: 1, prompt: true },
-  ])('$label', async ({ offense, dieSize, raw, tracked, prompt }) => {
-    hasBardicInspirationOffense.mockReturnValue(offense);
-    getBardicInspirationDieSize.mockReturnValue(dieSize);
-    runtimeValues({ bardicInspirationUses: raw });
-    const ctx = makeCtx({
-      playerStats: {
-        name: HOLDER,
-        level: 14,
-        automation: { actions: [], passives: [] },
-        ...(tracked !== null ? { _trackedResources: { bardicInspirationUses: { current: tracked } } } : {}),
-      },
-      targetName: 'Goblin',
-    });
-    const pending = biStep.handler(ctx);
-    if (prompt) {
-      window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', { detail: { promptId: BI_PID, used: false } }));
-    }
-    // Shape pin (#1041): EVERY no-prompt arm must be the exact {data:{}}
-    // continue-token — bare null is the pipeline ABORT token (actionPipeline.js:36
-    // `if (result === null) break;`) and would strand rollBaseDamage (subscribes
-    // 'bi:checked') so a hit with exhausted BI rolled no base damage.
-    const result = await pending;
-    expect(result).toEqual({ data: {} });
-    expect(hasBardicInspirationOffense).toHaveBeenCalledWith(HOLDER, CAMPAIGN);
-    if (prompt) {
-      expect(sendBardicInspirationOffensePrompt).toHaveBeenCalledWith(CAMPAIGN, HOLDER, 'Goblin', dieSize, BI_PID);
-    } else {
-      expect(sendBardicInspirationOffensePrompt).not.toHaveBeenCalled();
-    }
-    expect(spendResource).not.toHaveBeenCalled();
-  });
 
-  // The chooser waits indefinitely; only the player's event settles it.
-  it.each([
-    ['ACCEPT spends one use, stashes the die roll, and logs it', true, 5],
-    ['DECLINE spends nothing and logs nothing', false, undefined],
-  ])('%s', async (_label, used, biRoll) => {
-    hasBardicInspirationOffense.mockReturnValue(true);
-    getBardicInspirationDieSize.mockReturnValue(8);
-    runtimeValues({ bardicInspirationUses: { current: 2 } });
-    const ctx = makeCtx({ targetName: 'Goblin' });
-    const pending = biStep.handler(ctx);
-
-    // A foreign promptId must neither settle nor consume the chooser.
-    window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', { detail: { promptId: 'bi-offense-not-mine', used: true, biRoll: 99 } }));
-    window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', { detail: { promptId: BI_PID, used, biRoll } }));
-    expect(await pending).toEqual({ data: {} });
-
-    if (used) {
-      expect(spendResource).toHaveBeenCalledWith(HOLDER, 'bardicInspirationUses', 1, CAMPAIGN);
-      expect(setRuntimeObject).toHaveBeenCalledWith(HOLDER, { bardicInspirationOffenseValue: '5' }, CAMPAIGN, true);
-      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
-        type: 'ability_use',
-        characterName: HOLDER,
-        abilityName: 'Combat Inspiration - Offense',
-        description: `${HOLDER} used Combat Inspiration - Offense, rolling 5 (d8) bonus damage against Goblin.`,
-        biDieRoll: 5,
-        timestamp: expect.any(Number),
-      });
-    } else {
-      expect(spendResource).not.toHaveBeenCalled();
-      expect(setRuntimeObject).not.toHaveBeenCalled();
-      expect(addEntry).not.toHaveBeenCalled();
-    }
-  });
-
-  it('unanswered chooser stays pending forever — no clock ever settles it (T2 no-timers)', async () => {
-    hasBardicInspirationOffense.mockReturnValue(true);
-    getBardicInspirationDieSize.mockReturnValue(8);
-    runtimeValues({ bardicInspirationUses: { current: 2 } });
-    const ctx = makeCtx({ targetName: 'Goblin' });
-    const pending = biStep.handler(ctx);
-    // Race against an already-resolved sentinel: any auto-resolve timer added in
-    // future would flip this to 'settled' and fail this falsifiable check.
-    const raced = await Promise.race([pending.then(() => 'settled'), Promise.resolve('pending')]);
-    expect(raced).toBe('pending');
-    expect(spendResource).not.toHaveBeenCalled();
-    window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', { detail: { promptId: BI_PID, used: false } }));
-    await pending;
-  });
-
-  // #1041 consumer-relay pin: the no-die/no-uses arms must RELAY the chain on to
-  // 'bi:checked' (real createPipeline, real biStep, stand-in for rollBaseDamage —
-  // its own lane owns its body, this only pins the seam). Documented outcome shift:
-  // PRE-fix these arms returned bare null, which actionPipeline.js:36
-  // (`if (result === null) break;`) treats as chain ABORT — a BI-exhausted bard's
-  // hit never reached rollBaseDamage. The {data:{}} shape restores the INTENDED
-  // silent-skip parity with the :168 no-offense arm; prompt/accept/decline rows
-  // above are byte-identical pre/post.
-  it.each([
-    ['die size missing', { dieSize: null, raw: { current: 2 } }],
-    ['uses 0', { dieSize: 8, raw: { current: 0 } }],
-  ])('#1041 relay — %s: chain continues past bi:checked to the damage step', async (_label, { dieSize, raw }) => {
-    hasBardicInspirationOffense.mockReturnValue(true);
-    getBardicInspirationDieSize.mockReturnValue(dieSize);
-    runtimeValues({ bardicInspirationUses: raw });
-    const reached = [];
-    const pipeline = createPipeline();
-    pipeline.step(biStep);
-    pipeline.step({
-      name: 'rollBaseDamageStandIn',
-      subscribe: 'bi:checked',
-      emit: 'damage:rolled',
-      handler: () => { reached.push('bi:checked'); return { data: {} }; },
-    });
-    const resumeRef = { current: { existingProp: 'keep' } };
-    await pipeline.run('charger:checked', makeCtx({ targetName: 'Goblin' }), resumeRef);
-    expect(reached).toEqual(['bi:checked']);
-    expect(sendBardicInspirationOffensePrompt).not.toHaveBeenCalled();
-    expect(spendResource).not.toHaveBeenCalled();
-    // Clean terminal exit: no pause envelope left behind, pre-existing state intact.
-    expect(resumeRef.current).toBeNull();
-  });
-});
-
-describe('#1348 return-shape census — every skip/continue arm of all four riders', () => {
+describe('#1348 return-shape census — every skip/continue arm of all three riders', () => {
   // Contract (actionPipeline.js:10): handler result is { data?, modal?, popup?, nextEvent? } | null,
   // and null ABORTS the chain (:36, pinned by actionPipeline.test.js "aborts the chain").
   // Rider steps must never emit bare null on inert paths — exact-bytes pins below.
@@ -545,34 +387,6 @@ describe('#1348 return-shape census — every skip/continue arm of all four ride
     {
       label: 'charger: no charge passive → :131',
       run: async () => chargerStep.handler(makeCtx({ attack: { weaponType: 'melee' }, playerStats: { name: HOLDER, automation: { passives: [] } } })),
-      expected: { data: {} },
-    },
-    {
-      label: 'bardicInspirationOffense: no offense feature → :168',
-      run: async () => {
-        hasBardicInspirationOffense.mockReturnValue(false);
-        return biStep.handler(makeCtx());
-      },
-      expected: { data: {} },
-    },
-    {
-      label: 'bardicInspirationOffense: die missing → :174 (#1041 was bare null)',
-      run: async () => {
-        hasBardicInspirationOffense.mockReturnValue(true);
-        getBardicInspirationDieSize.mockReturnValue(null);
-        runtimeValues({ bardicInspirationUses: { current: 2 } });
-        return biStep.handler(makeCtx());
-      },
-      expected: { data: {} },
-    },
-    {
-      label: 'bardicInspirationOffense: uses 0 → :174 (#1041 was bare null)',
-      run: async () => {
-        hasBardicInspirationOffense.mockReturnValue(true);
-        getBardicInspirationDieSize.mockReturnValue(8);
-        runtimeValues({ bardicInspirationUses: { current: 0 } });
-        return biStep.handler(makeCtx());
-      },
       expected: { data: {} },
     },
   ])('$label', async ({ run, expected }) => {

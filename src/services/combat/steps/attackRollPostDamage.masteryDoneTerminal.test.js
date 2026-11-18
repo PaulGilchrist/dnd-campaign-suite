@@ -9,7 +9,7 @@
 //   the marker rides 'mastery:done' — emitted by toppleMastery (attackRollPostDamage.js:667),
 //   the chain's last mastery handler — so 'pipeline:complete' / ctx._pipelineComplete is
 //   guaranteed strictly AFTER mastery resolution. Pre-fix bytes ('cleave:check') never fired
-//   the marker at all: cleaveMastery (:520, idx 20) consumes 'cleave:check' and the chain
+//   the marker at all: cleaveMastery (:520, idx 19) consumes 'cleave:check' and the chain
 //   never returns to it; run() then breaks at 'mastery:done' (no subscriber).
 //
 // Kill proofs (NEVER delete/weaken):
@@ -62,7 +62,7 @@ describe('masteryDone terminal marker — subscribes mastery:done, fires once, s
     const step = buildAttackRollDamageSteps().find((s) => s.name === 'masteryDone');
     expect([step.subscribe, step.emit]).toEqual(['mastery:done', 'pipeline:complete']);
     // Emitter guarantee: toppleMastery is the sole mastery:done emitter in this chain and
-    // sits immediately before the marker (idx 22 -> idx 23).
+    // sits immediately before the marker (idx 21 -> idx 22).
     const topple = buildAttackRollDamageSteps().find((s) => s.name === 'toppleMastery');
     expect(topple.emit).toBe('mastery:done');
   });
