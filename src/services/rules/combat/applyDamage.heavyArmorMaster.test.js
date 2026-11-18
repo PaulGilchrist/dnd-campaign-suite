@@ -207,23 +207,31 @@ describe('FT-045 Heavy Armor Master damage reduction (applyDamage consumer seam)
     expect(applied[0][1].description).toContain('6 reduced to 1');
   });
 
-  it('floors the reduction at 0 — 3 Slashing → 0 never negative, full 5 still reported, honest appliedDamage 0 log', async () => {
+  // Clamp pin (HL 2026-11-17 backlog): HAM capacity (5) exceeds the incoming
+  // 3 — metadata reports the APPLIED delta (3), never the capacity, so no
+  // breakdown entry or automation row can read reducedBy > reducedFrom.
+  it('floors the reduction at 0 — 3 Slashing → 0 never negative, applied delta 3 reported (not capacity 5), honest appliedDamage 0 log', async () => {
     const result = await hit([createHolder()], 3, ['Slashing']);
 
     expect(result.finalDamage).toBe(0);
-    expect(result.damageReducedByFeature).toBe(5);
+    expect(result.damageReducedByFeature).toBe(3);
     expect(result.featureReduction).toEqual({
       damageType: 'Slashing',
       source: 'Heavy Armor Master',
-      reducedBy: 5,
+      reducedBy: 3,
       reducedFrom: 3,
       amount: 0,
     });
+    // Invariant: reducedBy is exactly the applied delta.
+    expect(result.featureReduction.reducedBy).toBe(
+      result.featureReduction.reducedFrom - result.featureReduction.amount
+    );
 
     const applied = hamLogCalls().filter(c => c[1].automationType === 'heavy_armor_master_applied');
     expect(applied).toHaveLength(1);
+    expect(applied[0][1].reducedBy).toBe(3);
     expect(applied[0][1].appliedDamage).toBe(0);
-    expect(applied[0][1].description).toContain('3 reduced to 0');
+    expect(applied[0][1].description).toContain('reduces this Slashing damage by 3: 3 reduced to 0');
   });
 
   it.each([

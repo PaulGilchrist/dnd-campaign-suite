@@ -19,6 +19,8 @@ vi.mock('../../../services/combat/automation/automationService.js', () => ({
 
 import { buildDamageBreakdownEntry, buildDamageBreakdownEntries } from './damageHandlerUtils.js';
 
+// Canonical applied-delta shape (applyDamage.js stamps reducedBy = reducedFrom - amount):
+// reducedBy NEVER exceeds reducedFrom.
 const HAM_REDUCTION = {
     damageType: 'Bludgeoning',
     source: 'Heavy Armor Master',

@@ -402,9 +402,15 @@ function applyFeatureDamageReduction({ creature, playerComputed, playerStats, da
   if (reduction > 0) {
     const rawBeforeReduction = finalDamage;
     finalDamage = Math.max(0, finalDamage - reduction);
+    // HONEST APPLIED DELTA: the feat's raw capacity can exceed the incoming
+    // damage (e.g. HAM capacity 5 clamping a 3 to 0). Every metadata surface
+    // below reports the reduction ACTUALLY applied (reducedFrom - amount),
+    // never the theoretical capacity — a breakdown entry with reducedBy >
+    // reducedFrom invites "where did the negative damage come from?" reads.
+    const appliedReduction = rawBeforeReduction - finalDamage;
     markChosenResistanceUsed(playerComputed, creature.name, campaignName);
     if (ham) {
-      logHeavyArmorMaster({ creature, rawDamage: rawBeforeReduction, finalDamage, reduction, damageType: damageTypes[0], campaignName });
+      logHeavyArmorMaster({ creature, rawDamage: rawBeforeReduction, finalDamage, reduction: appliedReduction, damageType: damageTypes[0], campaignName });
     }
     // Reduction breakdown record consumed by the hp_change damageBreakdown
     // (buildDamageBreakdownEntries) — amount is the POST-reduction value, same
@@ -413,11 +419,11 @@ function applyFeatureDamageReduction({ creature, playerComputed, playerStats, da
     const featureReduction = {
       damageType: damageTypes[0],
       source: [...new Set(sources)].join(' + '),
-      reducedBy: reduction,
+      reducedBy: appliedReduction,
       reducedFrom: rawBeforeReduction,
       amount: finalDamage,
     };
-    return { finalDamage, damageReducedByFeature: reduction, featureReduction };
+    return { finalDamage, damageReducedByFeature: appliedReduction, featureReduction };
   }
   if (ham && finalDamage > 0) {
     const reason = isWearingHeavyArmor ? 'non_bp_s_damage' : 'not_wearing_heavy_armor';

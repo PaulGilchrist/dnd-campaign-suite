@@ -57,7 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab headless clears, single-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (HL 2026-11-17) `hp_change` damageBreakdown can read absurdly when an absorption feat clamps to zero: EvasiveFighter's Heavy Armor Master logged `{amount:0, status:'reduced', source:'Heavy Armor Master', reducedFrom:3, reducedBy:6}` — `reducedBy` exceeding `reducedFrom` invites "where did -3 come from?" reads (the applied math is honest; the metadata wording is the wart). Suggest clamping the stamped `reducedBy` to `reducedFrom` or wording it as the feat's flat+halving capacity. Files: the HAM rider in `src/services/automation/` (grep `reducedBy`).
 - (HL 2026-11-17) A GM monster attack commit stamps `pendingCombatSuperiorityPrompt` into the MONSTER's change-data bucket (observed in the `Goblin` bucket after a staged-HIT Done commit) though Combat Superiority is a fighter class feature — a class-gate gap in the post-processing heuristic (no user-visible harm found; buckets get swept). Consider gating the write on the attacker being a player-class holder. Files: `src/hooks/combat/attackPostProcessing.js:204`.
 
 ## Blocked / Not Verified (fold-gate ledger)
