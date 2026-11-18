@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createCreatureHandlers } from './createCreatureHandlers.js';
 import { clearCombat } from '../../services/encounters/initiativeService.js';
 import { clearCombatLatches } from '../../services/automation/common/oncePerTurn.js';
+import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
@@ -84,6 +85,17 @@ describe('confirmClear — new-combat latch eviction seam', () => {
         expect(clearCombatLatches).toHaveBeenCalledTimes(1);
         expect(clearCombatLatches).toHaveBeenCalledWith(campaignName, ['Alice', 'Bob', 'Goblin']);
         expect(clearCombat).toHaveBeenCalledTimes(1);
+
+        // ORDERING LAW (bug-clear-latch-eviction-resurrects-stamps): the latch
+        // eviction is dispatched BEFORE the Dread Ambush nulls. Both lanes POST
+        // whole-bucket snapshots; nulling latches first guarantees every later
+        // body already carries the nulls, so no same-bucket arrival order can
+        // resurrect a stamp.
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Alice', 'dreadAmbushSpeedActive', null, campaignName);
+        const latchCallOrder = clearCombatLatches.mock.invocationCallOrder[0];
+        const dreadCallOrder = Math.min(...runtimeState.setRuntimeValue.mock.calls
+            .map((call, i) => call[1] === 'dreadAmbushSpeedActive' ? runtimeState.setRuntimeValue.mock.invocationCallOrder[i] : Infinity));
+        expect(latchCallOrder).toBeLessThan(dreadCallOrder);
     });
 
     it('handleClear alone (prompt merely armed, never confirmed) evicts nothing', () => {

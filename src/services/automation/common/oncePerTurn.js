@@ -1,5 +1,5 @@
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { getRuntimeValue, setRuntimeValue, getRuntimeKeysByPrefix } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch, getRuntimeKeysByPrefix } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 
 /**
@@ -214,17 +214,33 @@ export async function clearSkipFlag(skipKey, playerStats, campaignName) {
  * (never a round number) cannot alias via round reuse and are left alone.
  *
  * Returns the number of latch keys evicted (0 ⇒ zero writes, byte-identical).
+ *
+ * bug-clear-latch-eviction-resurrects-stamps: the eviction ships as ONE
+ * merged write per creature (setRuntimeBatch = a single whole-bucket POST
+ * whose body already nulls EVERY matched key). The old per-key
+ * setRuntimeValue loop dispatched one whole-bucket snapshot POST per key in
+ * rapid succession; HTTP/1.1 socket fan-out carries no ordering guarantee
+ * between them, so a body still carrying the freshest stamp could land LAST
+ * and RESURRECT it while the audit row below counted intent — the new
+ * combat's round-1 rider then silently dropped again. One body ⇒ no
+ * self-interleave.
  */
 export function clearCombatLatches(campaignName, creatureNames) {
     if (!campaignName || !Array.isArray(creatureNames)) return 0;
     let cleared = 0;
     for (const creatureName of creatureNames) {
         if (!creatureName) continue;
+        const evictions = {};
+        let hasEvictions = false;
         for (const key of getRuntimeKeysByPrefix(creatureName, '')) {
             if (/round$/i.test(key)) {
-                setRuntimeValue(creatureName, key, null, campaignName);
+                evictions[key] = null;
+                hasEvictions = true;
                 cleared += 1;
             }
+        }
+        if (hasEvictions) {
+            setRuntimeBatch(creatureName, evictions, campaignName);
         }
     }
     // Fail-loud audit trail (mirrors the zone sweep's board-clear row): the GM

@@ -24,6 +24,11 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
         return value === undefined ? null : value;
     }),
     setRuntimeValue: vi.fn((name, key, value) => { storeOf(name).set(key, value); }),
+    // Real-behavior fake of the merged-write lane clearCombatLatches uses:
+    // one call mirrors ALL properties of one creature in a single write.
+    setRuntimeBatch: vi.fn((name, properties) => {
+        for (const [key, value] of Object.entries(properties)) storeOf(name).set(key, value);
+    }),
     getRuntimeKeysByPrefix: vi.fn((name, prefix) =>
         Array.from(storeOf(name).keys()).filter((key) => key.startsWith(prefix))),
 }));
@@ -110,7 +115,19 @@ describe('clearCombatLatches — round-reuse-after-Clear regression', () => {
             expect(storeOf('EvasiveFighter').get(key)).toBeNull();
         }
         expect(storeOf('Goblin').get('_Shield_Bash_usedRound')).toBeNull();
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Goblin', '_Shield_Bash_usedRound', null, CAMPAIGN);
+        // One merged write per creature — Goblin's single latch travels in ONE
+        // batch body (never a per-key POST lane that could self-interleave).
+        expect(runtimeState.setRuntimeBatch).toHaveBeenCalledTimes(2);
+        expect(runtimeState.setRuntimeBatch).toHaveBeenCalledWith('Goblin', { _Shield_Bash_usedRound: null }, CAMPAIGN);
+        expect(runtimeState.setRuntimeBatch).toHaveBeenCalledWith('EvasiveFighter', {
+            _Shield_Bash_usedRound: null,
+            _Charge_Attack_skippedRound: null,
+            _Cleave_UsedRound: null,
+            _cunningStrikeSkippedRound: null,
+            actionSurgeUsedThisRound: null,
+            _PsychicBlade_attack_round: null,
+        }, CAMPAIGN);
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('leaves non-round-stamp keys byte-untouched (booleans and markers re-arm on their own seams)', () => {
@@ -135,7 +152,7 @@ describe('clearCombatLatches — round-reuse-after-Clear regression', () => {
     it('logs one audit row only when latches were actually evicted', async () => {
         // Nothing stamped ⇒ zero writes, zero rows (byte-identical Clear).
         expect(clearCombatLatches(CAMPAIGN, ['EvasiveFighter', 'Goblin'])).toBe(0);
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(runtimeState.setRuntimeBatch).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
 
         storeOf('EvasiveFighter').set('_Shield_Bash_usedRound', { round: 1, activeCreature: 'EvasiveFighter' });
@@ -155,6 +172,6 @@ describe('clearCombatLatches — round-reuse-after-Clear regression', () => {
         expect(clearCombatLatches(CAMPAIGN, undefined)).toBe(0);
         expect(clearCombatLatches(CAMPAIGN, [null, ''])).toBe(0);
         expect(clearCombatLatches(null, ['EvasiveFighter'])).toBe(0);
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(runtimeState.setRuntimeBatch).not.toHaveBeenCalled();
     });
 });

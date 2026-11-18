@@ -296,6 +296,24 @@ export function createCreatureHandlers({
             storage.set('activeCreatureName', firstCreatureName, campaignName)
             setActiveCreatureName(firstCreatureName)
         }
+        // Once-per-turn rider latches stamp the bare combatSummary.round number,
+        // and the round-wrap re-arm only ever expires a stamp via `round > stamp`
+        // comparison — the stamp itself survives. Clear RESETS the round to 1, so a
+        // leftover `{round:1}` stamp aliases the new combat's first round and
+        // checkOncePerTurnWithSkip silently drops the rider (Shield Bash prompt /
+        // Charge chooser never arm — the round-reuse-after-Clear bug). Evict the
+        // stamps for EVERY closing-board creature — players AND joined monsters
+        // (a re-joined same-named monster re-collides on its stale `_<Feat>_usedRound`)
+        // — the same CLA-100 rationale as the Dread Ambush reset below.
+        // ORDERING LAW (bug-clear-latch-eviction-resurrects-stamps): this eviction
+        // must run BEFORE the Dread Ambush nulls below. Both lanes POST whole
+        // bucket snapshots and setRuntimeBatch mutates the mirror synchronously,
+        // so running the latch eviction first guarantees EVERY body this seam
+        // dispatches for a creature bucket already carries the latch nulls —
+        // whatever order the same-bucket POSTs arrive in, no stale stamp can
+        // resurrect. The reverse order let the Dread Ambush snapshot (still
+        // stamped) land last and revive the freshest latch.
+        clearCombatLatches(campaignName, closingSummary.creatures.map(c => c.name))
         // CLA-100: Clear restarts combat (round back to 1) but preserves per-creature
         // runtime stores and dispatches no initiative-rolled event — reset the Dread
         // Ambush Ambusher's Leap once-per-combat latch so round-1 of the new
@@ -305,16 +323,6 @@ export function createCreatureHandlers({
                 setRuntimeValue(creature.name, 'dreadAmbushSpeedActive', null, campaignName)
             }
         }
-        // Once-per-turn rider latches stamp the bare combatSummary.round number,
-        // and the round-wrap re-arm only ever expires a stamp via `round > stamp`
-        // comparison — the stamp itself survives. Clear RESETS the round to 1, so a
-        // leftover `{round:1}` stamp aliases the new combat's first round and
-        // checkOncePerTurnWithSkip silently drops the rider (Shield Bash prompt /
-        // Charge chooser never arm — the round-reuse-after-Clear bug). Evict the
-        // stamps for EVERY closing-board creature — players AND joined monsters
-        // (a re-joined same-named monster re-collides on its stale `_<Feat>_usedRound`)
-        // — the same CLA-100 rationale as the Dread Ambush reset above.
-        clearCombatLatches(campaignName, closingSummary.creatures.map(c => c.name))
         // no-timers T4: Clear restarts combat — combat-scoped effects of
         // the old combat end here too (enforcement off ⇒ zero writes).
         sweepNewCombatClocks(campaignName)
