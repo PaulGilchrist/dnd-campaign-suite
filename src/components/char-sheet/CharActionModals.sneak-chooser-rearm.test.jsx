@@ -16,7 +16,7 @@
 // - Cycle-1 → cycle-2 chooser re-offer + sneak latch honesty at the pipeline seam →
 //   useAttackDamageResolution.sneak-cycle-rearm.test.js
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
 import { createBaseProps } from './CharActionModals.test-utils.jsx';
 
@@ -68,7 +68,7 @@ describe('CharActionModals — cycle-2 Devious Strikes chooser re-arms past a le
     expect(screen.getByTestId('attack-rider-modal')).toBeInTheDocument();
   });
 
-  it('closing that re-armed chooser resumes the pipeline exactly once so the queued damage stage dispatches', () => {
+  it('closing that re-armed chooser resumes the pipeline exactly once so the queued damage stage dispatches', async () => {
     const props = createBaseProps({ resumeAttackPipeline: vi.fn(), rollDamage: vi.fn() });
     render(<CharActionModals
       {...props}
@@ -77,8 +77,9 @@ describe('CharActionModals — cycle-2 Devious Strikes chooser re-arms past a le
     />);
 
     fireEvent.click(screen.getByTestId('attack-rider-close'));
-    // Resume is fire-and-forget — synchronous assertions are deterministic.
-    expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1);
+    // Close declines (nothing applied): the round-skip latch write is awaited
+    // BEFORE resume (charger-branch order), so await the resume via waitFor.
+    await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
     expect(props.setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
     // The close must not roll damage itself; proceedToDamage lands via resume.
     expect(props.rollDamage).not.toHaveBeenCalled();

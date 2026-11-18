@@ -15,6 +15,17 @@ export function isCunningStrikeFeatureName(name) {
     return CUNNING_STRIKE_FEATURE_NAMES.includes(name);
 }
 
+/**
+ * Read the round out of a Cunning Strike skip/used stamp written by
+ * setSkipFlag / markOncePerTurn ({ round, activeCreature }). Shared by the
+ * rider-step offer gate (attackRollRiders.js) and the chooser-host close
+ * latch (CharActionModals.jsx handleAttackRiderClose) so both read the same
+ * round-stamp shape.
+ */
+export function resolveRoundStamp(raw) {
+    return raw && typeof raw === 'object' ? raw.round : raw;
+}
+
 function hasRequiredToolOrItem(option, playerStats) {
     const toolProficiencies = playerStats?.toolProficiencies || [];
     const hasProficiency = toolProficiencies.some(p =>

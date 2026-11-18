@@ -3,6 +3,7 @@ import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getAttackRiderOptions, getAttackRiderOptionsByContext } from '../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { checkOncePerTurnWithSkip } from '../../automation/common/oncePerTurn.js';
+import { resolveRoundStamp } from '../../automation/handlers/combat/cunningStrikeUtils.js';
 
 export function buildAttackRiderManeuversStep() {
   return {
@@ -48,10 +49,6 @@ export function buildAttackRiderManeuversStep() {
   };
 }
 
-function resolveRoundStamp(raw) {
-  return raw && typeof raw === 'object' ? raw.round : raw;
-}
-
 function findCunningStrikePassive(passives) {
   return passives.find(p => p.name === 'Devious Strikes' && p.type === 'attack_rider') ||
     passives.find(p => p.name === 'Improved Cunning Strike' && p.type === 'attack_rider') ||
@@ -61,7 +58,13 @@ function findCunningStrikePassive(passives) {
 async function offerCunningStrikeModal(ctx, csPassive, sneakDice) {
   const round = getCurrentCombatRound(ctx.campaignName);
   const usedRound = resolveRoundStamp(getRuntimeValue(ctx.playerStats.name, '_CunningStrike_usedRound', ctx.campaignName));
-  const skippedRound = resolveRoundStamp(getRuntimeValue(ctx.playerStats.name, '_cunningStrikeSkippedRound', ctx.campaignName));
+  const skipped = getRuntimeValue(ctx.playerStats.name, '_cunningStrikeSkippedRound', ctx.campaignName);
+  const skippedRound = resolveRoundStamp(skipped);
+  // Round-wrap hygiene: a decline stamp from an earlier round no longer means
+  // anything once the round has advanced — evict it and let the chooser re-arm.
+  if (skipped != null && skippedRound !== round) {
+    setRuntimeValue(ctx.playerStats.name, '_cunningStrikeSkippedRound', null, ctx.campaignName);
+  }
   if (usedRound !== round && skippedRound !== round) {
     const cs = await getCombatContext(ctx.campaignName);
     const target = cs ? getTargetFromAttacker(cs, ctx.playerStats.name) : null;
@@ -76,9 +79,6 @@ async function offerCunningStrikeModal(ctx, csPassive, sneakDice) {
       data: { _cunningStrike: true, sneakDice },
       modal: { type: 'cunningStrike', props: modalProps },
     };
-  }
-  if (skippedRound === round) {
-    setRuntimeValue(ctx.playerStats.name, '_cunningStrikeSkippedRound', null, ctx.campaignName);
   }
   return null;
 }

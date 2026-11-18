@@ -32,7 +32,8 @@ import { logHealingToSSE } from '../../services/automation/common/healingRoll.js
 import { addEntry } from '../../services/ui/logService.js'
 import SecondaryModals from './CharActionModals.SecondaryModals.jsx';
 import { mergeModalStates } from './modalStateMerge.js';
-import { isCunningStrikeFeatureName } from '../../services/automation/handlers/combat/cunningStrikeUtils.js';
+import { isCunningStrikeFeatureName, resolveRoundStamp } from '../../services/automation/handlers/combat/cunningStrikeUtils.js';
+import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
 
 const CLOCKWORK_CHOICE_MODAL_KEYS = {
     heal: 'clockworkCavalcadeHealModal',
@@ -414,6 +415,23 @@ function CharActionModals({
         onClose();
     };
 
+    // IJ 2026-11-18: CS-family chooser close — a Cancel (no option applied)
+    // latches the per-round decline exactly like the Charger/Stalker's Flurry
+    // branches: the rider step (offerCunningStrikeModal) reads
+    // `_cunningStrikeSkippedRound` and suppresses offers for the holder's rest
+    // of the round. A successful Apply already stamped `_CunningStrike_usedRound`
+    // for this round via markOncePerTurn (oncePerTurn is authored on every CS
+    // variant), so the used-latch owns that lane — never stack a skip. Either
+    // way resume the paused damage stage exactly once.
+    const closeCunningStrikeRider = async (modalAction, modalPlayerStats, modalCampaignName) => {
+        if (!isCunningStrikeFeatureName(modalAction?.name)) return;
+        const usedRound = resolveRoundStamp(getRuntimeValue(modalPlayerStats.name, '_CunningStrike_usedRound', modalCampaignName));
+        if (usedRound !== getCurrentCombatRound(modalCampaignName)) {
+            await setSkipFlag('_cunningStrikeSkippedRound', modalPlayerStats, modalCampaignName);
+        }
+        await resumeAttackPipeline?.();
+    };
+
     const handleAttackRiderClose = async () => {
         const modalAction = mergedModalState.attackRiderModal?.action;
         const modalPlayerStats = mergedModalState.attackRiderModal?.playerStats;
@@ -434,10 +452,9 @@ function CharActionModals({
             // (Apply path) or gated by the skip flag (Cancel path).
             await resumeAttackPipeline?.();
         }
-        const isCunningStrikeVariant = isCunningStrikeFeatureName(modalAction?.name);
-        if (isCunningStrikeVariant) {
-            resumeAttackPipeline?.();
-        }
+        // Cunning Strike family close (no-op for other riders; the helper
+        // guards on the CS-family name) — decline latch + resume, once.
+        await closeCunningStrikeRider(modalAction, modalPlayerStats, modalCampaignName);
         // Charger: pause happens before damage lands. Latch the skip flag when
         // the player declines so later melee hits this round don't re-prompt,
         // then resume so the triggering hit's weapon damage applies.

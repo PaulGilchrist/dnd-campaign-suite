@@ -241,13 +241,22 @@ describe('buildCunningStrikeStep (CLA-188)', () => {
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('skipped stamp in current round → suppressed AND one-shot skip cleared', async () => {
+  it('skipped stamp in current round → suppressed and stamp KEPT for the whole round (charger-aligned latch)', async () => {
     runtimeValues({ lastAttack: { hit: true }, _cunningStrikeSkippedRound: { round: 1, activeCreature: HOLDER } });
     const ctx = makeCtx();
     const result = await csStep.handler(ctx);
     expect(result).toEqual({ data: { sneakDice: 7 } });
     expect(ctx.setAttackRiderModal).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('skipped stamp from an earlier round → one-shot clear AND the chooser re-arms', async () => {
+    runtimeValues({ lastAttack: { hit: true }, _cunningStrikeSkippedRound: { round: 1, activeCreature: HOLDER } });
+    getCurrentCombatRound.mockReturnValue(2);
+    const ctx = makeCtx();
+    const result = await csStep.handler(ctx);
     expect(setRuntimeValue).toHaveBeenCalledWith(HOLDER, '_cunningStrikeSkippedRound', null, CAMPAIGN);
+    expect(result.modal?.type).toBe('cunningStrike');
   });
 
   it('used in an earlier round → re-armed (round 2 vs stamp round 1)', async () => {
