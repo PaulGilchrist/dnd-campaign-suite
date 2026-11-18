@@ -56,7 +56,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab single-pass
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (KA 2026-11-18) `FriendlyFireConfirmModal.jsx` header comment still claims "backdrop clicks and Escape do NOT dismiss" but the shared `DeleteConfirmModal` chrome answers Escape via the inert Cancel lane since the 11-13 AD WAI-ARIA improve (re-lived live: Escape = revert-select zero-write). Stale comment mis-leads the next probe author — update it in place.
 - (KA 2026-11-18) The push/prone chooser rows are `<label>`-wrapped UNLABELLED radios (no `aria-label`, mirrors the DS-chooser pattern the playbook already flags) — role-keyed automation can't reach them; give each radio an accessible name (`Push Goblin 2` / `Prone Goblin 2` style).
 
 ## Blocked / Not Verified (fold-gate ledger)
