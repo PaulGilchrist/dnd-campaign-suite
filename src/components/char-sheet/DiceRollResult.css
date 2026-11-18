@@ -207,6 +207,13 @@
     opacity: 0.9;
 }
 
+/* RZ 2026-11-18: the staged-Done label is one expression child (no JSX
+   leading-space text node after the icon), so the icon gap is CSS-owned here
+   — same 6px rhythm as .dice-roll-reroll-result i. */
+.dice-roll-done-btn i {
+    margin-right: 6px;
+}
+
 .lunar-radiance-choice {
     display: flex;
     flex-direction: column;

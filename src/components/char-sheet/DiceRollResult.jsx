@@ -22,8 +22,15 @@ function AutoDamageActionButton({ autoDamage, computedHit, onDone }) {
         );
     }
     return (
-        <button className="dice-roll-reroll-btn" onClick={() => onDone?.(computedHit)} type="button">
-            <i className="fa-solid fa-check"></i> Done
+        <button className="dice-roll-reroll-btn dice-roll-done-btn" onClick={() => onDone?.(computedHit)} type="button">
+            {/* RZ 2026-11-18 (OA-chip byte-exact precedent, MonsterCardBody
+                PendingOpportunityAttackRow): the label is ONE expression child —
+                a JSX text node after the icon carried a leading space into
+                textContent (" Done"), tripping strict-text harnesses (§53
+                leading-space family, generalised away for the popup-footer
+                family). Icon gap stays CSS-owned (.dice-roll-done-btn i
+                margin-right), so the raw text is byte-exact 'Done'. */}
+            <i className="fa-solid fa-check"></i>{'Done'}
         </button>
     );
 }
