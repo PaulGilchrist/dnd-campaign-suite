@@ -57,7 +57,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
 - **(GK 2026-11-17)** Guarded HIT-staged popup close (`Cancel attack`/`Done`) lands focus on BODY — the no-anchor design is deliberate for the OPEN side (never steal from the chip) but the CLOSE side could stamp the same `tabindex="-1"` fallback host the dismissable tier uses without moving any focus while open; keyboard users currently restart at document root after every cancelled attack (`src/components/common/popup.jsx` guarded branch).
-- **(GK 2026-11-17)** The synthetic-BI resurrection modal PULLS ENTRANCE FOCUS on campaign load — once the eviction bug is fixed this becomes moot, but a replayed-prompt guard (ignore `<Char>-biPrompt` payloads whose `promptId` predates the current combat round/board) would make the lane resilient against future producer leaks.
 - **(GK 2026-11-17)** Maps-manager row inline-rename commits on Enter but the input carries its text via the `value` PROPERTY only — automation `input[value="<name>"]` attribute selectors resolve for clicks yet `.press()` can race/timeout; mirroring the row's own `aria-label` onto the rename input (or setting the attribute) would make the lane symmetric with every other row control.
 
 ## Blocked / Not Verified (fold-gate ledger)
