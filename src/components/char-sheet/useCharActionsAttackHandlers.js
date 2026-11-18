@@ -1,5 +1,6 @@
 import { getActiveCreatureName, getCurrentCombatRound, getCombatSummary } from '../../services/encounters/combatData.js'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
+import { refuseUnarmedAttackPress } from '../../services/combat/noTargetRefusal.js'
 import { isLineOfSightEnforced, checkLineOfSight } from '../../services/combat/lineOfSightGate.js'
 import { isCoverEnforced } from '../../services/combat/coverService.js'
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
@@ -50,6 +51,15 @@ export default function useCharActionsAttackHandlers({
             refuseCannotActAttack(attack);
             return;
         }
+        // 2026-11-18 sheet-attack no-target refusal (monster-chip TA-1116
+        // parity): the sheet has no target picker — the armed target lives on
+        // the initiative card. A weapon row pressed while the character's
+        // combatSummary row carries NO targetName refuses LOUD, BEFORE the
+        // action-slot charge, the _attackActionTakenRound/_bonusAction stamps,
+        // the Reckless chooser and the invisibility/Friends hostile-action
+        // ends (createLogAndShow keeps the deep backstop gate for the lanes
+        // that press through this seam).
+        if (refuseUnarmedAttack(attack)) return;
         // L5-003 §8.2: line-of-sight pre-check for enforced RANGED rows.
         // Runs BEFORE assertCanAct so a blocked shot never charges its slot
         // (denied refusals must not consume economy — plan §7.2 semantics).
@@ -119,6 +129,18 @@ export default function useCharActionsAttackHandlers({
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
         }).catch((e) => { console.error("[CharActions] Error:", e); });
+    }
+
+    // Returns true when the press was refused (loud `.mc-no-target-refusal`
+    // popup + `<weapon>_refused` zero-spend log row, nothing rolled/stamped).
+    function refuseUnarmedAttack(attack) {
+        return refuseUnarmedAttackPress({
+            combatSummary: getCombatSummary(campaignName),
+            attackerName: playerName,
+            actionName: attack?.name || 'Attack',
+            setPopupHtml,
+            log: (entry) => addEntry(campaignName, entry).catch((e) => { console.error("[useCharActionsAttackHandlers:no-target-refusal-log-error]", e); }),
+        });
     }
 
     // RB-1115: the cannotAct press is loud in BOTH faces — the Stinking Cloud

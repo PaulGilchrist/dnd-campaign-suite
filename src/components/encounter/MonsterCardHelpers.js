@@ -3075,23 +3075,10 @@ export function formatActionUsage(usage) {
 // TA-1116: the same loud lane now also fronts the ATTACK-chip press (rollNoun
 // 'attack'); the save copy stays byte-identical (default), the AoE parenthetical
 // is save-lane-only because attack chips never own an area picker.
-export function buildNoTargetRefusalPopup({ monsterName, actionName, rollNoun = 'save' }) {
-  const isSave = rollNoun !== 'attack';
-  const aoeNote = isSave ? ' (AoE rows pick their own area targets)' : '';
-  return `<div class="mc-no-target-refusal"><h3>No Target</h3><p>${monsterName} cannot use ${actionName} — no target is armed on ${monsterName}'s initiative card. Arm a target with the Target select at the top of this card (or on the initiative card)${aoeNote}. No ${isSave ? 'save' : 'attack'} rolled, nothing spent.</p></div>`;
-}
-
-export function buildNoTargetRefusalLog({ monsterName, actionName }) {
-  const slug = String(actionName || 'action').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  return {
-    type: 'automation',
-    automationType: `${slug}_refused`,
-    characterName: monsterName,
-    abilityName: actionName,
-    description: `${monsterName} ${actionName} refused (no target) — no armed target on the initiative card, no self-resolve. Zero spend, no save prompt.`,
-    timestamp: Date.now(),
-  };
-}
+// 2026-11-18 sheet-attack improve: the builders moved to their single owner
+// (services/combat/noTargetRefusal.js, where the PC sheet lane's predicate
+// lives too) — re-exported here so the chip consumers ride the same lane.
+export { buildNoTargetRefusalPopup, buildNoTargetRefusalLog } from '../../services/combat/noTargetRefusal.js';
 
 // MA-0322: flat integer hit damage ("Hit: 1 Slashing damage.") authored as
 // prose with NO dice (no damage_dice_primary, no parenthesized formula) —

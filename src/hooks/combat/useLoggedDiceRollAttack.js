@@ -33,6 +33,7 @@ import { processAttackAfterResult, processPotentCantrip } from './attackPostProc
 import { processSaveRoll } from './saveProcessing.js';
 import { processInitiativeRoll } from './initiativeProcessing.js';
 import { consumeArmedRestoreBalance } from '../../services/combat/restoreBalanceState.js';
+import { refuseUnarmedAttackPress } from '../../services/combat/noTargetRefusal.js';
 
 // MN-002: Bait and Switch AC fold for ANY attacker — max with the attacker-side
 // context value; both read the same defender keys, so no double-count.
@@ -42,8 +43,18 @@ function foldBaitAndSwitchAc(ctx, defenderName, campaignName) {
 }
 
 // Sanctuary / blocker pre-phase for attack rolls. Returns true when the roll
-// must be aborted (blocked attacker or unresolved sanctuary save).
-async function runAttackPrePhase({ attackerName, targetName, campaignName, setPopupHtml, logEntry }) {
+// must be aborted (unarmed-press refusal, blocked attacker or unresolved
+// sanctuary save).
+async function runAttackPrePhase({ attackerName, name, targetName, combatSummary, campaignName, setPopupHtml, logEntry }) {
+    // 2026-11-18 sheet-attack no-target refusal (monster-chip TA-1116 parity):
+    // an in-combat attack press with NO armed target on the attacker's
+    // initiative row refuses LOUD through the shared `.mc-no-target-refusal`
+    // lane — zero roll, zero dice popup, and nothing spent (this runs before
+    // the Sanctuary/hostile-action ends and every roll-time consume). Presses
+    // carrying an explicit targetName (chips, OA marked-movers, automation)
+    // and rolls with no board are byte-unchanged.
+    if (refuseUnarmedAttackPress({ combatSummary, attackerName, explicitTargetName: targetName, actionName: name, setPopupHtml, log: logEntry })) return true;
+
     // Sanctuary: ends when the warded creature makes an attack
     const attackerSanctuary = (getRuntimeValue('campaign', 'targetEffects') || []).find(
         te => te.effect === 'sanctuary' && te.target === attackerName
@@ -494,14 +505,15 @@ export function createLogAndShow(deps) {
         context = context || {};
         const ctx = { ...context, name, rollType };
 
+        // Load combat summary early (needed for the no-target attack refusal
+        // gate, maneuver loading, target resolution)
+        const combatSummary = await loadCombatSummary(campaignName);
+
         if (rollType === 'attack') {
             const attackerName = ctx.attackerName || characterName;
-            const blocked = await runAttackPrePhase({ attackerName, targetName: ctx.targetName, campaignName, setPopupHtml, logEntry });
+            const blocked = await runAttackPrePhase({ attackerName, name, targetName: ctx.targetName, combatSummary, campaignName, setPopupHtml, logEntry });
             if (blocked) return;
         }
-
-        // Load combat summary early (needed for maneuver loading, target resolution)
-        const combatSummary = await loadCombatSummary(campaignName);
 
         // Resolve target (needed for compelled duel forcedMode before d20 resolution)
         const { target, availableSuperiorityManeuvers } = await resolveTarget({ characterName, campaignName, context: ctx, combatSummary, getKnownManeuvers });
