@@ -1,53 +1,37 @@
 // @maintained-by-ai
 // Lane: bardicInspirationPromptUtils — sole owner of the 'biPrompt' payload shape and
-// store routing (defense prompt → target's store, offense prompt → attacker's store).
-// Prompts family: this is the only test in src/services/combat/prompts/ (no
-// restoreBalanceState sibling lives here). Consumer lanes covered elsewhere, NOT duplicated:
+// store routing (prompts ride the `<name>-biPrompt` wildcard key through the CAMPAIGN
+// store: defense → target's key, offense → attacker's key, mirroring the sibling
+// save/concentration/death-save prompt lanes in savePromptService.js).
+// REGRESSION LOCK (bug-bi-prompt-skip-never-evicts-server-key): the old clear lane was a
+// local-only Map.delete with ZERO fetches — the persisted key replayed on every SSE
+// connect and resurrected the already-answered modal until an Admin change-data clear.
+// The real useRuntimeState module runs here with fetch stubbed at the network boundary,
+// so the exact wire requests (per-prompt-key POST write + wildcard DELETE evict) are
+// pinned — a local-only clear fails these tests.
+// Consumer lanes covered elsewhere, NOT duplicated:
 // offense issuance (attackRollRiders + attackRollDamageSteps-* mock sendBardicInspirationOffensePrompt),
 // modal clear invocation (BardicInspirationReactionModal.test.jsx mocks clearBardicInspirationPrompt),
-// SSE prompt events (App.runtime-events.test.jsx).
+// SSE echo mirroring (App.runtime-events.test.jsx), deleteRuntimeKey wire contract
+// (useRuntimeState.core.test.js).
 // Prompts NEVER time out (#app MANDATORY): verified — the source contains no setTimeout/auto-resolve;
 // offers wait indefinitely for the player.
-// Store boundary mocked faithfully (useRuntimeState.js:21-76): getStore auto-creates per characterKey,
-// getRuntimeValue is a keyed read returning null when absent — no scan-all-stores hack, so a
-// misrouted prompt fails here instead of being silently found.
-// Old->new map: 16 tests folded to 4 — defense/offense exact-payload+routing legs absorb the
-// objectContaining/numeric-fields/expected-keys/fullDescription duplicates; fire-and-forget and
-// void-return trivia deleted (#923); store-scan get tests replaced by faithful round-trip legs;
-// 'ignores campaignName' strengthened into a falsifier (clear works under a different campaign).
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// --- store-boundary mock (faithful: per-character keyed stores, null when absent) ---
-
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => {
-  const stores = new Map();
-  const getStore = (characterKey) => {
-    if (!stores.has(characterKey)) stores.set(characterKey, new Map());
-    return stores.get(characterKey);
-  };
-  return {
-    getStore: vi.fn(getStore),
-    getRuntimeValue: vi.fn((characterKey, propertyName) => {
-      const store = stores.get(characterKey);
-      return store && store.has(propertyName) ? store.get(propertyName) : null;
-    }),
-    setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
-      getStore(characterKey).set(propertyName, value);
-    }),
-    __resetStores: () => stores.clear(),
-  };
-});
-
-import { __resetStores, getStore, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import {
   sendBardicInspirationDefensePrompt,
   sendBardicInspirationOffensePrompt,
   clearBardicInspirationPrompt,
   getBardicInspirationPrompt,
-  clearBardicInspirationPromptState,
 } from './bardicInspirationPromptUtils.js';
+
+import {
+  clearRuntimeState,
+  getAllStoreKeys,
+  getStore,
+  listeners,
+} from '../../../hooks/runtime/useRuntimeState.js';
 
 // --- hand-derived exact payloads (#815) ---
 
@@ -72,6 +56,13 @@ const OFFENSE_PAYLOAD = {
   fullDescription: "Immediately after you hit a target with an attack roll, you can roll the Bardic Inspiration die and add the number rolled to the attack's damage against the target.",
 };
 
+function clearAllStores() {
+  for (const key of getAllStoreKeys()) {
+    clearRuntimeState(key);
+  }
+  listeners.clear();
+}
+
 function sendDefense() {
   sendBardicInspirationDefensePrompt({
     campaignName: 'test-campaign',
@@ -89,61 +80,112 @@ function sendOffense() {
   sendBardicInspirationOffensePrompt('test-campaign', 'Bard', 'Goblin', 8, 202);
 }
 
+function fetchCalls() {
+  return global.fetch.mock.calls.map(([url, init]) => ({ url, method: init?.method }));
+}
+
 // --- tests ---
 
 describe('bardicInspirationPromptUtils', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    __resetStores();
+    clearAllStores();
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true, status: 200 });
+    global.fetch.mockClear();
   });
 
-  it('defense prompt writes the exact payload to the target\'s biPrompt key, campaign pinned', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('defense prompt POSTs the exact payload to the target\'s <target>-biPrompt key, campaign pinned', () => {
     sendDefense();
 
-    // routed to the target (the one who reacts), campaign forwarded
-    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-    expect(setRuntimeValue).toHaveBeenCalledWith('Ally', 'biPrompt', DEFENSE_PAYLOAD, 'test-campaign');
+    // routed to the target (the one who reacts), on the dedicated prompt key —
+    // NOT a character-bucket POST (the bucket lane is what made the key
+    // undeletable by the wildcard DELETE eviction lane)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = global.fetch.mock.calls[0];
+    expect(url).toBe('/api/campaigns/test-campaign/Ally-biPrompt');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ value: DEFENSE_PAYLOAD });
 
-    // round-trip: the target reads back exactly what was written; nobody else sees it
+    // round-trip: the prompt reads back exactly what was written; nobody else sees it
     expect(getBardicInspirationPrompt('test-campaign', 'Ally')).toEqual(DEFENSE_PAYLOAD);
     expect(getBardicInspirationPrompt('test-campaign', 'Goblin')).toBeNull();
     expect(getBardicInspirationPrompt('test-campaign', 'Nobody')).toBeNull();
+    expect(getStore('Ally').has('biPrompt')).toBe(false);
   });
 
-  it('offense prompt writes the exact payload to the attacker\'s biPrompt key, campaign pinned', () => {
+  it('offense prompt POSTs the exact payload to the attacker\'s <attacker>-biPrompt key, campaign pinned', () => {
     sendOffense();
 
     // routed to the attacker (the one who hit), not the target
-    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-    expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'biPrompt', OFFENSE_PAYLOAD, 'test-campaign');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = global.fetch.mock.calls[0];
+    expect(url).toBe('/api/campaigns/test-campaign/Bard-biPrompt');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ value: OFFENSE_PAYLOAD });
 
     // round-trip: attacker-only visibility; offense carries no attackRoll/bonus/effectiveAc
     expect(getBardicInspirationPrompt('test-campaign', 'Bard')).toEqual(OFFENSE_PAYLOAD);
     expect(getBardicInspirationPrompt('test-campaign', 'Goblin')).toBeNull();
   });
 
-  it('clearBardicInspirationPrompt removes both biPrompt keys and preserves unrelated store data', () => {
+  it('clearing a defense prompt EVICTS the server key with a wildcard DELETE (resurrection regression)', () => {
     sendDefense();
-    const allyStore = getStore('Ally');
-    allyStore.set('biPromptCleared', true);
-    allyStore.set('unrelatedKey', 'keep');
-
     clearBardicInspirationPrompt('test-campaign', 'Ally');
 
-    expect(allyStore.has('biPrompt')).toBe(false);
-    expect(allyStore.has('biPromptCleared')).toBe(false);
-    expect(allyStore.get('unrelatedKey')).toBe('keep');
+    // exactly the write POST + the evict DELETE — a local-only clear (the filed
+    // bug: zero server writes on Skip) leaves no DELETE and fails here.
+    expect(fetchCalls()).toEqual([
+      { url: '/api/campaigns/test-campaign/Ally-biPrompt', method: 'POST' },
+      { url: '/api/campaigns/test-campaign/Ally-biPrompt', method: 'DELETE' },
+    ]);
+    // DELETE carries no body — it is the campaigns-changedata.js wildcard
+    // eviction lane (200 + null echo), not a write-empty.
+    expect(global.fetch.mock.calls[1][1]?.body).toBeUndefined();
+
+    // local mirror evicted in the same breath (drain-to-evict notify), so an
+    // immediate re-clear cannot re-POST/DELETE anything
     expect(getBardicInspirationPrompt('test-campaign', 'Ally')).toBeNull();
   });
 
-  it('clearBardicInspirationPromptState clears the prompt regardless of campaignName', () => {
+  it('clearing a prompt never touches biPromptCleared or the character bucket', () => {
     sendDefense();
-    expect(getBardicInspirationPrompt('test-campaign', 'Ally')).not.toBeNull();
+    getStore('Ally').set('hitPoints', 30);
+    clearBardicInspirationPrompt('test-campaign', 'Ally');
 
-    // different campaignName must still clear — the store is character-keyed (#app delegation contract)
-    clearBardicInspirationPromptState('OtherCampaign', 'Ally');
+    for (const [url] of global.fetch.mock.calls) {
+      expect(url).not.toContain('biPromptCleared');
+      expect(url).not.toBe('/api/campaigns/test-campaign/Ally');
+    }
+    // unrelated character state survives the eviction untouched
+    expect(getStore('Ally').get('hitPoints')).toBe(30);
+  });
 
+  it('clearing offense-evicts the attacker key only and is idempotent', () => {
+    sendDefense();
+    sendOffense();
+    global.fetch.mockClear();
+
+    clearBardicInspirationPrompt('test-campaign', 'Bard');
+
+    expect(fetchCalls()).toEqual([
+      { url: '/api/campaigns/test-campaign/Bard-biPrompt', method: 'DELETE' },
+    ]);
+    expect(getBardicInspirationPrompt('test-campaign', 'Bard')).toBeNull();
+    // the defender's pending prompt is a separate key and survives
+    expect(getBardicInspirationPrompt('test-campaign', 'Ally')).toEqual(DEFENSE_PAYLOAD);
+
+    // second clear of the same prompt writes nothing (deleteRuntimeKey has()
+    // guard — no honest-404 churn)
+    clearBardicInspirationPrompt('test-campaign', 'Bard');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('clearing a prompt that was never issued sends zero requests', () => {
+    clearBardicInspirationPrompt('test-campaign', 'Ally');
+    expect(global.fetch).not.toHaveBeenCalled();
     expect(getBardicInspirationPrompt('test-campaign', 'Ally')).toBeNull();
-    expect(getStore('Ally').has('biPromptCleared')).toBe(false);
   });
 });

@@ -487,8 +487,9 @@ describe('createLogAndShow - Bardic Inspiration Defense context', () => {
         expect(context.bardicInspirationDefenseDieSize).toBe('d6');
         expect(context.bardicInspirationDefenseTargetName).toBe('Bard');
         // Defense is actively selected by the player from their character
-        // sheet — the seam must never auto-prompt (a prompt writes 'biPrompt').
-        expect(setRuntimeValue.mock.calls.filter((call) => call[1] === 'biPrompt')).toHaveLength(0);
+        // sheet — the seam must never auto-prompt (a prompt writes the
+        // '<name>-biPrompt' campaign-store key per bardicInspirationPromptUtils).
+        expect(setRuntimeValue.mock.calls.filter((call) => typeof call[1] === 'string' && (call[1] === 'biPrompt' || call[1].endsWith('-biPrompt')))).toHaveLength(0);
     });
 
     it('does not set bardicInspirationDefense when attack misses', async () => {

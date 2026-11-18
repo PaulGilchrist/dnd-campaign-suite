@@ -41,32 +41,16 @@ function BardicInspirationReactionModal({ campaignName }) {
 
     const handleEvent = useCallback((event) => {
         if (!event.key || event.data == null) return;
-        const charMatch = event.key.match(/^change-([^]+)-(.+)$/);
-        if (charMatch && typeof event.data === 'object' && event.data.biPrompt?.promptId) {
-            enqueuePrompt(charMatch[2], event.data.biPrompt);
-            return;
-        }
         const prefix = `change-${campaignName}-`;
         if (!event.key.startsWith(prefix)) return;
+        // Sole prompt shape: the `<name>-biPrompt` wildcard-key echo carrying the
+        // raw prompt payload (bardicInspirationPromptUtils). A null payload (the
+        // drain-to-evict DELETE echo) exits above — dismissal is the local Skip/
+        // Resolve path; nothing re-enqueues an evicted prompt on a fresh connect.
         const match = event.key.slice(prefix.length).match(/^(.+)-biPrompt$/);
         if (!match) return;
         enqueuePrompt(match[1], event.data);
     }, [campaignName, enqueuePrompt]);
-
-    const handleClearedEvent = useCallback((event) => {
-        if (!event.key || event.data == null) return;
-        const prefix = `change-${campaignName}-`;
-        if (!event.key.startsWith(prefix)) return;
-        const keySuffix = event.key.slice(prefix.length);
-        const match = keySuffix.match(/^(.+)-biPromptCleared$/);
-        if (!match) return;
-        if (!event.data?.promptId) return;
-        setPrompts(prev => {
-            const next = prev.filter(p => p.promptId !== event.data.promptId);
-            promptsRef.current = next;
-            return next;
-        });
-    }, [campaignName]);
 
     const handleUseReaction = useCallback(async () => {
         if (!current) return;
@@ -107,10 +91,7 @@ function BardicInspirationReactionModal({ campaignName }) {
             {typeof EventSource !== 'undefined' && (
                 <Subscriber
                     campaignName={campaignName}
-                    handleEvent={(event) => {
-                        handleEvent(event);
-                        handleClearedEvent(event);
-                    }}
+                    handleEvent={handleEvent}
                 />
             )}
             {current && (

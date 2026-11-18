@@ -1,7 +1,7 @@
 // @maintained-by-ai
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import BardicInspirationReactionModal from './BardicInspirationReactionModal.jsx';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { clearBardicInspiration } from '../../services/combat/auras/bardicInspirationState.js';
@@ -59,20 +59,17 @@ const offensePrompt = (overrides = {}) => ({
   ...overrides,
 });
 
+// Prompts arrive on the lane's canonical wildcard-key echo: `<name>-biPrompt`
+// carrying the RAW prompt payload (bardicInspirationPromptUtils routes every
+// prompt through the campaign store under that key; the modal is the sole
+// consumer). `<name>` is the reacting creature — defense → target, offense →
+// attacker.
 function emitPrompt(prompt, campaignName = CAMPAIGN) {
+  const owner = prompt.mode === 'offense' ? prompt.attackerName : prompt.targetName;
   act(() => {
     mockSubscriber.handleEvent({
-      key: `change-${campaignName}-${prompt.targetName}-biPrompt`,
-      data: { biPrompt: prompt },
-    });
-  });
-}
-
-function emitCleared(targetName, promptId, campaignName = CAMPAIGN) {
-  act(() => {
-    mockSubscriber.handleEvent({
-      key: `change-${campaignName}-${targetName}-biPromptCleared`,
-      data: { promptId },
+      key: `change-${campaignName}-${owner}-biPrompt`,
+      data: prompt,
     });
   });
 }
@@ -310,48 +307,18 @@ describe('BardicInspirationReactionModal', () => {
     expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
   });
 
-  it('removes the prompt when a matching biPromptCleared event arrives', async () => {
-    renderModal();
-
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
-
-    emitCleared('TargetOne', 'bi-prompt-defense-1');
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('leaves the prompt visible when biPromptCleared names a different promptId', async () => {
-    renderModal();
-
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
-
-    // Only promptId decides removal — a stale/other promptId must not dismiss it.
-    emitCleared('TargetOne', 'some-other-prompt');
-
-    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-  });
-
-  it('ignores a biPromptCleared event from another campaign', async () => {
-    renderModal();
-
-    emitPrompt(defensePrompt());
-    await screen.findByText(/Combat Inspiration - Defense/);
-
-    emitCleared('TargetOne', 'bi-prompt-defense-1', 'other-campaign');
-
-    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-  });
+  // ── Eviction is the clear lane's job (see bardicInspirationPromptUtils.test.js):
+  // Skip/Resolve route through clearBardicInspirationPrompt (asserted above); its
+  // wildcard DELETE answers with a null echo the listener must treat as inert —
+  // never a re-enqueue (the resurrection face of bug-bi-prompt-skip-never-evicts-server-key).
 
   it.each([
-    ['no key', { data: { biPrompt: defensePrompt() } }],
+    ['no key', { data: defensePrompt() }],
     ['no data', { key: 'change-test-campaign-TargetOne-biPrompt' }],
-    ['biPrompt without a promptId', { key: 'change-test-campaign-TargetOne-biPrompt', data: { biPrompt: { mode: 'defense' } } }],
+    ['a null payload (the DELETE eviction echo)', { key: 'change-test-campaign-TargetOne-biPrompt', data: null }],
+    ['a prompt payload without a promptId', { key: 'change-test-campaign-TargetOne-biPrompt', data: { mode: 'defense' } }],
     ['an unrelated key', { key: 'change-test-campaign-TargetOne-somethingElse', data: { foo: 1 } }],
-    ['a biPromptCleared without promptId', { key: 'change-test-campaign-TargetOne-biPromptCleared', data: {} }],
+    ['the retired biPromptCleared handshake shape', { key: 'change-test-campaign-TargetOne-biPromptCleared', data: { promptId: 'bi-prompt-defense-1' } }],
   ])('ignores malformed SSE events (%s) without rendering or throwing', async (_label, event) => {
     const { container } = renderModal();
 

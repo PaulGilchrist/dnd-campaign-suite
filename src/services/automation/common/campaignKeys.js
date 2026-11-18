@@ -109,5 +109,13 @@ export function isCampaignKey(key) {
     if (key.startsWith('_activeInvisibility_')) return true;
     if (key.startsWith('_activeFriends_')) return true;
     if (/^_.*_appliedTarget$/.test(key)) return true;
+    // Combat Inspiration adjudication prompts ride the dynamic `<name>-biPrompt`
+    // wildcard key (bardicInspirationPromptUtils, campaign-store routed). Unregistered,
+    // its value echo would misroute to a ghost CHARACTER store no consumer reads and
+    // its DELETE null echo would drop (pendingOAs/lastCombatResult misroute family) —
+    // registered so every mounted tab mirrors the prompt AND its drain-to-evict
+    // REMOVE, and a resolved prompt never replays on a fresh SSE connect
+    // (bug-bi-prompt-skip-never-evicts-server-key).
+    if (key.endsWith('-biPrompt')) return true;
     return false;
 }

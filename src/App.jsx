@@ -157,7 +157,7 @@ function syncCombatSummaryCache(storeKey, data, campaignName) {
   }
 }
 
-function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
+function handleChangeKeyEvent(event, campaignName) {
   const prefix = `change-${campaignName}-`;
   if (!event.key.startsWith(prefix)) return;
   const storeKey = event.key.slice(prefix.length);
@@ -179,14 +179,6 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
   if (storeKey.startsWith('saveResult-') && event.data.promptId) {
     redispatchSaveResult(event.data.promptId, event.data, campaignName);
   }
-  if ('biPrompt' in event.data) {
-    pendingPromptIdRef.current = event.data.biPrompt?.promptId || null;
-    return;
-  }
-  if (pendingPromptIdRef.current && 'biPromptCleared' in event.data) {
-    return;
-  }
-  pendingPromptIdRef.current = null;
   applyStoreUpdate(storeKey, event.data);
 }
 
@@ -266,7 +258,7 @@ function seedCharServerKeys(storeName, charServerData) {
   const store = getStore(storeName);
   let seededAny = false;
   for (const [key, value] of Object.entries(charServerData)) {
-    if (!store.has(key) && value != null && key !== 'biPrompt') {
+    if (!store.has(key) && value != null) {
       store.set(key, value);
       seededAny = true;
     }
@@ -810,8 +802,6 @@ function App() {
    * setRuntimeObject is called with skipSync=true to prevent re-POSTing the full
    * store back to the server on SSE echoes (the server already has this data).
    */
-  // eslint-disable-next-line server-first/no-local-game-state
-  const pendingPromptIdRef = useRef(null);
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null) return;
     // Null data on a change-<campaign>-<key> echo is a cleared-key broadcast —
@@ -830,7 +820,7 @@ function App() {
       handleMapActivateEvent(event, { isLocalhost, activeView, mapsView, setMapsView, setActiveMapName });
       return;
     }
-    handleChangeKeyEvent(event, campaignName, pendingPromptIdRef);
+    handleChangeKeyEvent(event, campaignName);
   }, [campaignName, isLocalhost, activeView, mapsView, setCharacters, activeCharacter, setActiveCharacter]);
 
   const handleDeleteCharacter = async (characterName) => {
