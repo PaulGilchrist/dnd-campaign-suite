@@ -38,6 +38,7 @@ vi.mock('../../../ui/logService.js', () => ({
 vi.mock('../../../automation/common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
   createSaveListener: vi.fn(),
+  logSaveDismissed: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../automation/common/oncePerTurn.js', () => ({
@@ -60,7 +61,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { parseMagicItemName } from '../../../rules/core/attackCalc.js';
 import { addEntry } from '../../../ui/logService.js';
-import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
+import { buildSaveDc, createSaveListener, logSaveDismissed } from '../../../automation/common/savePrompt.js';
 import { checkOncePerTurnWithSkip } from '../../../automation/common/oncePerTurn.js';
 import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
@@ -338,6 +339,70 @@ describe('shieldBash', () => {
         total: saveResult.total, rolls: [saveResult.roll], bonus: saveResult.saveBonus, formula,
         description: `Goblin1 ${word} the STR save (DC 15).${saveResult.success ? '' : ' Choose an effect.'}`,
       });
+    });
+  });
+
+  // bug-sheet-attack-shield-bash-rider-drops-weapon-damage (abandon leg): a
+  // Dismiss on the un-rolled prompt NEVER resolves the listener promise
+  // (savePrompt dismiss doctrine). Bare-awaited, it used to park the rider
+  // chain forever — now the handler races `save-dismissed` and closes
+  // honestly: skip the push/prone rider, restore the FT-082 stash, log the
+  // refusal through the shared seam, continue the pipeline.
+  describe('save dismissed (abandon leg)', () => {
+    async function runDismissedLeg() {
+      const lastAttack = { ...LAST_ATTACK };
+      stubStore({ 'campaign.lastAttack': lastAttack, 'Fighter1._shieldBashBaseAttack': lastAttack });
+      buildSaveDc.mockReturnValue(17);
+      createSaveListener.mockReturnValue({ promptId: 'prompt-1', promise: new Promise(() => {}) });
+      const ctx = makeCtx();
+
+      const pending = shieldBash.handler(ctx, PREV_DATA);
+      // Flush the handler's pre-await store reads (microtasks only — no
+      // timers) so the save-dismissed listener is attached before the sweep.
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      window.dispatchEvent(new CustomEvent('save-dismissed', { detail: { promptId: 'prompt-1' } }));
+      return { result: await pending, ctx };
+    }
+
+    it('dismissed prompt → { data: prevData }, FT-082 restore sequence, save_dismissed refusal, no chooser modal', async () => {
+      const { result } = await runDismissedLeg();
+
+      expect(result).toEqual({ data: PREV_DATA });
+      // Same 3-write restore sequence as the save-SUCCESS lane.
+      expect(setRuntimeValue.mock.calls).toEqual([
+        ['Fighter1', '_shieldBashBaseAttack', LAST_ATTACK, CAMPAIGN],
+        ['campaign', 'lastAttack', LAST_ATTACK, CAMPAIGN],
+        ['Fighter1', '_shieldBashBaseAttack', null, CAMPAIGN],
+      ]);
+      expect(logSaveDismissed).toHaveBeenCalledWith(CAMPAIGN, {
+        casterName: 'Fighter1', abilityName: 'Shield Bash', targetName: 'Goblin1',
+        saveDc: 17, saveType: 'STR', logPrefix: '[shieldBash]',
+      });
+      // Only the arm row logs — an un-rolled save must never stamp a
+      // save-outcome row or open the Push/Prone chooser.
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(withoutTimestamp(addEntry.mock.calls[0][1]).description)
+        .toBe('Shield Bash: Goblin1 must make a STR saving throw (DC 17).');
+    });
+
+    it('a dismissal for a DIFFERENT promptId leaves the bash prompt armed (no false resolve)', async () => {
+      const lastAttack = { ...LAST_ATTACK };
+      stubStore({ 'campaign.lastAttack': lastAttack, 'Fighter1._shieldBashBaseAttack': lastAttack });
+      buildSaveDc.mockReturnValue(17);
+      createSaveListener.mockReturnValue({ promptId: 'prompt-1', promise: new Promise(() => {}) });
+
+      const pending = shieldBash.handler(makeCtx(), PREV_DATA);
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      window.dispatchEvent(new CustomEvent('save-dismissed', { detail: { promptId: 'other-prompt' } }));
+
+      let settled = false;
+      pending.then(() => { settled = true; });
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      expect(settled).toBe(false);
+
+      // The real dismissal still closes it.
+      window.dispatchEvent(new CustomEvent('save-dismissed', { detail: { promptId: 'prompt-1' } }));
+      expect(await pending).toEqual({ data: PREV_DATA });
     });
   });
 });

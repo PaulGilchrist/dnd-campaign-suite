@@ -2,7 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { parseMagicItemName } from '../../../rules/core/attackCalc.js';
 import { addEntry } from '../../../ui/logService.js';
-import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
+import { buildSaveDc, createSaveListener, logSaveDismissed } from '../../../automation/common/savePrompt.js';
 import { checkOncePerTurnWithSkip } from '../../../automation/common/oncePerTurn.js';
 import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
@@ -119,7 +119,7 @@ export const shieldBash = {
     await setRuntimeValue(ctx.playerStats.name, '_shieldBashBaseAttack', lastAttack, ctx.campaignName);
 
     // Create STR save prompt
-    const { promise } = createSaveListener(ctx.campaignName, {
+    const { promptId, promise } = createSaveListener(ctx.campaignName, {
       targetName,
       attackerName: ctx.playerStats.name,
       saveType: 'STR',
@@ -140,7 +140,41 @@ export const shieldBash = {
       timestamp: Date.now(),
     }).catch((e) => { console.error("[shieldBash:log-error]", e); });
 
-    const saveResult = await promise;
+    // Dismiss hygiene (save-dismissed family, 2026-11-05; rider-park fix,
+    // bug-sheet-attack-shield-bash-rider-drops-weapon-damage): a GM Dismiss on
+    // the un-rolled prompt NEVER resolves `.promise` (dismiss doctrine — a
+    // falsy-success resolution would read as "save failed → apply effect" to
+    // fire-and-forget consumers). Awaited bare, it parked this chain forever.
+    // Mirror relentlessRageService's opt-in: race the prompt against a
+    // `save-dismissed` match, and on dismissal restore the FT-082 base-attack
+    // stash, log the refusal through the shared logSaveDismissed seam
+    // (save_dismissed row), and skip only the push/prone rider.
+    let onBashDismissed;
+    const dismissedPromise = new Promise((resolve) => {
+      onBashDismissed = (event) => {
+        if (event.detail.promptId !== promptId) return;
+        window.removeEventListener('save-dismissed', onBashDismissed);
+        resolve({ dismissed: true });
+      };
+      window.addEventListener('save-dismissed', onBashDismissed);
+    });
+
+    const saveResult = await Promise.race([promise, dismissedPromise]);
+    window.removeEventListener('save-dismissed', onBashDismissed);
+
+    if (saveResult.dismissed) {
+      await restoreBaseAttackAfterBash(ctx.playerStats, ctx.campaignName);
+      logSaveDismissed(ctx.campaignName, {
+        casterName: ctx.playerStats.name,
+        abilityName: 'Shield Bash',
+        targetName,
+        saveDc,
+        saveType: 'STR',
+        logPrefix: '[shieldBash]',
+      });
+      return { data: prevData };
+    }
+
     const success = saveResult.success;
 
     logShieldBashSaveResult(ctx, saveResult, targetName, saveDc, success);

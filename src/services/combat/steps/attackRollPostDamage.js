@@ -6,6 +6,7 @@ import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { addEntry } from '../../ui/logService.js';
 import { collectWeaponMastery } from '../../combat/automation/automationService.js';
 import { featureModules } from './features/index.js';
+import { shieldBash } from './features/shieldBash.js';
 import { applyMasteryEffect } from '../../automation/handlers/combat/weaponMasteryHandler.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
@@ -388,10 +389,37 @@ export function buildProceedToDamageStep() {
   };
 }
 
+// bug-sheet-attack-shield-bash-rider-drops-weapon-damage: the Shield Bash
+// rider used to arm its STR save prompt inside the PRE-damage featureRiders
+// loop and await it there, so a staged-HIT `Done` committed zero weapon
+// damage — the hp_change only landed after the whole save→chooser chain, and
+// a prompt Dismiss (never resolved per the savePrompt dismiss doctrine)
+// stranded the committed hit forever. The rider now adjudicates HERE, on the
+// dedicated post-damage seam: proceedToDamage has already landed the hit's
+// own synchronous hp_change row; this step only mounts the push/prone save
+// chain and skips cleanly (dismissed prompt, or chooser Skip/Apply → resume)
+// without ever holding base damage hostage. A null module result (no
+// shield-bash passive) must NOT abort the chain (actionPipeline runner
+// breaks on null) — it degrades to { data: {} } like the cleave/tactical
+// siblings.
+export function buildShieldBashRiderStep() {
+  return {
+    name: 'shieldBashRider',
+    subscribe: 'damage:applied',
+    emit: 'bash:resolved',
+    condition: shieldBash.condition,
+    handler: async (ctx) => {
+      const data = { formula: ctx.formula, total: ctx.total, rolls: [...(ctx.rolls || [])] };
+      const result = await shieldBash.handler(ctx, data);
+      return result || { data: {} };
+    },
+  };
+}
+
 export function buildStalkersFlurryPostDamageStep() {
   return {
     name: 'stalkersFlurryPostDamage',
-    subscribe: 'damage:applied',
+    subscribe: 'bash:resolved',
     emit: 'cleave:check',
     condition: (ctx) => !!ctx.playerStats.automation?.passives,
     handler: async (ctx) => {

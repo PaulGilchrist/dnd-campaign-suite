@@ -1,7 +1,6 @@
 import { assassinate } from './assassinate.js';
 import { stealthAttackCost } from './stealthAttackCost.js';
 import { rendMind } from './rendMind.js';
-import { shieldBash } from './shieldBash.js';
 import { colossusSlayer } from './colossusSlayer.js';
 import { superiorHuntersPrey } from './superiorHuntersPrey.js';
 import { eldritchStrikes } from './eldritchStrikes.js';
@@ -23,13 +22,18 @@ export const featureModules = [
   assassinate,
   stealthAttackCost,
   rendMind,
-  // FT-090: tavern riders mount BEFORE shieldBash — shieldBash offers a
-  // chooser modal that PAUSES featureRiders (FT-074) and resumes from its
-  // emit, so every module ordered after it is skipped for that attack.
-  // Unarmed hits on shield-holders stranded tavern push/reroll forever.
+  // FT-090: tavern riders mount first — every module here runs pre-damage
+  // inside the featureRiders loop and a modal return PAUSES that loop
+  // (FT-074), so ordering still matters for pause-sensitive riders.
   tavernBrawler,
   tavernBrawlerPush,
-  shieldBash,
+  // bug-sheet-attack-shield-bash-rider-drops-weapon-damage: shieldBash is
+  // GONE from this pre-damage loop. Its save prompt used to park the
+  // triggering hit's weapon damage behind the save chain (and a Dismiss —
+  // never resolved per the dismiss doctrine — stranded the committed damage
+  // forever). It now adjudicates AFTER damage via buildShieldBashRiderStep
+  // (attackRollPostDamage.js), mounted only on the attack-roll lane — the
+  // spell lane never re-prompts a stale melee lastAttack either.
   colossusSlayer,
   superiorHuntersPrey,
   eldritchStrikes,

@@ -511,14 +511,17 @@ export default function useAttackDamageResolution({
     const resumeAttackPipeline = async () => {
         const pausedStep = resumeRef.current?._pausedStep;
         const pausedModalType = resumeRef.current?._modalType;
-        // FT-074/CLA-326: featureRiders-step modals pause BEFORE proceedToDamage,
-        // so every such modal must carry its _modalType through this allow-list or
-        // the triggering hit's weapon damage strands at the pause. Approved:
-        // shieldBash (FT-074), stalkersFlurry (CLA-326). cantripBonuses keeps
-        // its own flow.
-        const approvedFeatureRidersPause = pausedStep === 'featureRiders'
-            && (pausedModalType === 'shieldBash' || pausedModalType === 'stalkersFlurry');
-        if (pausedStep !== 'cunningStrike' && pausedStep !== 'charger' && pausedStep !== 'attackRiderManeuvers' && pausedStep !== 'tacticalMaster' && !approvedFeatureRidersPause) return;
+        // FT-074/CLA-326: rider-modal pauses must carry their _modalType
+        // through this allow-list or the chain downstream of the pause strands.
+        // Approved: stalkersFlurry chooser (CLA-326, featureRiders pause) and
+        // the shieldBash chooser — which since bug-sheet-attack-shield-bash-
+        // rider-drops-weapon-damage pauses on its own post-damage seam
+        // 'shieldBashRider' (the triggering hit's weapon damage has already
+        // landed at that point; resuming only completes rider bookkeeping).
+        // cantripBonuses keeps its own flow.
+        const approvedFeatureRidersPause = pausedStep === 'featureRiders' && pausedModalType === 'stalkersFlurry';
+        const approvedShieldBashPause = pausedStep === 'shieldBashRider' && pausedModalType === 'shieldBash';
+        if (pausedStep !== 'cunningStrike' && pausedStep !== 'charger' && pausedStep !== 'attackRiderManeuvers' && pausedStep !== 'tacticalMaster' && !approvedFeatureRidersPause && !approvedShieldBashPause) return;
         const stash = resumeRef.current?.pipelineStash;
         if (!stash) return;
         await stash.pipeline.resume(stash.ctx, resumeRef);

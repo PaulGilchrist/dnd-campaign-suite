@@ -7,8 +7,9 @@
  * tavernBrawlerPush.test.js the latch internals; GWM/Frenzy/monk exact formulas
  * live in the automationDamage lane (#299). Here, one seam test per feat family:
  * exact targetEffects payloads, latch round-trips, save-prompt consumer args
- * (DC branch: automation buildSaveDc vs STR+PB fallback), and pause-without-
- * stranding at the shield-bash / charger choice modals (FT-074).
+ * (DC branch: automation buildSaveDc vs STR+PB fallback), and damage committing
+ * at Done while the shield-bash / charger choice modals hold only the rider
+ * (FT-074 lane, post bug-sheet-attack-shield-bash-rider-drops-weapon-damage).
  * Every absence assertion is positive-leg-gated (damage still rolls / prompt fires).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -290,8 +291,11 @@ describe('useAttackDamageResolution - feats', () => {
             expect(modalState.shieldBashModal).toEqual(
                 expect.objectContaining({ targetName: 'Goblin', saveDc: expectedSaveDc })
             );
-            // FT-074: the triggering hit's weapon damage strands at the pause.
-            expect(mockRollDamage).not.toHaveBeenCalled();
+            // bug-sheet-attack-shield-bash-rider-drops-weapon-damage: the
+            // triggering hit's weapon damage commits synchronously at Done —
+            // the open chooser may only hold the push/prone rider, never the
+            // base damage (exactly one rollDamage, no parked backlog).
+            expect(mockRollDamage).toHaveBeenCalledTimes(1);
         });
 
         it('refuses the bash when the last hit was not the player\'s own — no save, no latch, damage flows', async () => {

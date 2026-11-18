@@ -82,3 +82,80 @@ path applies weapon damage once, never a merged multi-hit delta.
 Broken feature / data-integrity risk — a committed attack can silently vanish (never applied,
 never logged), and when it does apply it can merge multiple attacks into one wrong-shaped row
 and land long after the player moved on.
+
+## Resolution
+FIXED 2026-11-19.
+
+### What was actually wrong
+The bug file's guess was right in shape but the stall was worse than "the sheet commit pipeline
+treats that as a pause": the `shieldBash` feature module ran INSIDE the pre-damage
+`featureRiders` step and `await`ed the STR save-prompt promise there. The pipeline runner
+chains steps strictly, so `proceedToDamage` (the step that pushes the weapon damage) could not
+run until the save resolved. And `createSaveListener`'s dismiss doctrine (savePrompt.js,
+2026-11-05) is that **a Dismiss never resolves the promise** — so a Dismiss didn't just skip
+the rider, it parked the whole damage chain forever with no error. The late `-19` row was two
+separately-parked chains each finally pushing its own deferred weapon damage in the same
+window once a later queued prompt resolution let its `featureRiders` await settle — either
+way, the parked-backlog shape itself is what this fix kills. The chooser's Apply/Skip resume
+(`resumeAttackPipeline`) was the "complete leg" that eventually pushed the parked damage.
+
+### Fix (damage-first seam + honest dismissal)
+- `src/services/combat/steps/attackRollPostDamage.js` — new `buildShieldBashRiderStep()`:
+  subscribes `damage:applied`, emits `bash:resolved`, i.e. it runs AFTER `proceedToDamage` has
+  already committed the hit's damage synchronously. `stalkersFlurryPostDamage` re-pointed from
+  `damage:applied` to `bash:resolved`. A null module result degrades to `{data:{}}` so the
+  tail never aborts.
+- `src/services/combat/steps/features/index.js` — `shieldBash` removed from the pre-damage
+  `featureModules` loop (tombstone comment). Side benefit: the spell lane (which also runs
+  `featureModules`) can no longer re-prompt Shield Bash off a stale melee `lastAttack`.
+- `src/services/combat/steps/features/shieldBash.js` — abandon leg: the handler now races the
+  prompt promise against a `save-dismissed` event match for its own `promptId`
+  (relentlessRageService's opt-in pattern); on dismissal it restores the FT-082 base-attack
+  stash, logs the refusal through the shared `logSaveDismissed` seam (dedicated
+  `save_dismissed` audit row naming Shield Bash, DC and target) and returns
+  `{data: prevData}`. A different promptId's dismissal is inert. The module serves
+  BOTH rulesets (5e trigger + 2024 `push_or_prone` shapes), so one fix covers both.
+- `src/services/combat/steps/attackRollDamageSteps.js` — rider step inserted after
+  `buildProceedToDamageStep()`.
+- `src/components/char-sheet/useAttackDamageResolution.js` — resume allow-list: the
+  `shieldBash` chooser now pauses at `_pausedStep:'shieldBashRider'` (post-damage); approved
+  there, and the dead pre-fix `featureRiders`+`shieldBash` shape denies.
+
+### Tests (migrated + new pins)
+- NEW `src/services/combat/steps/attackRollPostDamage.shieldBashRider.test.js` — order pin
+  (exactly ONE damage commit BEFORE the rider is consulted), abandon pin (a never-resolving
+  rider can no longer strand the committed damage), chooser pause/resume shape, null-result
+  pass-through, FT-103 OA gate.
+- `shieldBash.test.js` — new 'save dismissed (abandon leg)' describe: `{data}` + FT-082
+  restore + `logSaveDismissed` args + zero outcome rows; foreign-promptId dismissal inert.
+- `attackRollDamageSteps.test.js` — golden wiring table → 24 steps,
+  `damage:applied→shieldBashRider→bash:resolved→stalkersFlurryPostDamage`.
+- `useAttackDamageResolution.shieldBashResume.test.js` — rebuilt on the post-damage seam:
+  damage byte-exact BEFORE pause clears, resume never re-pushes (merged-flush shape dead);
+  new deny leg for the dead `featureRiders`+`shieldBash` shape.
+- `useAttackDamageResolution.feats.test.js` — the FT-074 strand pin
+  (`rollDamage NOT called` at the open chooser) flipped to the fixed contract: exactly one
+  synchronous `rollDamage` per shape (5e + 2024).
+
+### Verification
+- `npx vitest run` on steps/, char-sheet/, common/, services/combat/, hooks/: green; full
+  `npm run test:run` 3371 files / 36039 tests passed; `npm run lint` clean;
+  `no-timers-guard` OK (46 sites, unchanged).
+- LIVE (test-campaign, EvasiveFighter Glaive vs EB-joined Goblin, localhost:5173):
+  - Repro pre-fix (same build path as the file): Done → no damage face, zero `hp_change`,
+    Goblin 7/7; charge-chooser Cancel → Shield Bash prompt; Dismiss → everything closed with
+    the committed damage permanently lost and no console error (matches the filed face).
+  - Post-fix complete leg: HIT → Done → damage face mounts IMMEDIATELY with
+    `hp_change delta:-18` (cs 7→0), save prompt arms behind it; Roll Save → fail → chooser →
+    Push → Apply → Done → tail rows honest (`save_result`, `failed the STR save … Choose an
+    effect.`, `pushed 5 ft`), `targetEffects` push te = 1, and the hp_change count stays at
+    ONE per attack — no merged/late flush ever.
+  - Post-fix abandon leg (fresh round re-armed): Done → damage row
+    `delta:-10` lands with just the chooser pending; charge Cancel → damage commits → prompt
+    arms → **Dismiss** → damage stays applied, `save_dismissed` row
+    "Goblin's STR save (DC 17) against Shield Bash was dismissed before rolling — no effect."
+    logs, prompt buckets drain to absent.
+  - Control: ElderPaladin Longsword HIT → Done → `delta:-18` synchronous; board ends with
+    three honest one-row-per-attack `hp_change` rows (-18/-10/-18), zero console errors.
+- Cleanup: closed tab + two-pass headless Admin clears → `change-data {}`, `log []`
+  GET-verified; dev pair killed, ports 80/5173 dark.

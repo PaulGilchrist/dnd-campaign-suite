@@ -50,7 +50,12 @@ const GOLDEN_STEPS = [
   ['damageTypeModifiers', 'riders:applied', 'dmg_type:modified'],
   ['overchannel', 'dmg_type:modified', 'damage:ready'],
   ['proceedToDamage', 'damage:ready', 'damage:applied'],
-  ['stalkersFlurryPostDamage', 'damage:applied', 'cleave:check'],
+  // bug-sheet-attack-shield-bash-rider-drops-weapon-damage: the Shield Bash
+  // rider moved OFF the pre-damage featureRiders loop onto this post-damage
+  // seam — the hit's weapon damage commits at proceedToDamage, then the
+  // push/prone save chain adjudicates (a Dismiss can only skip the rider).
+  ['shieldBashRider', 'damage:applied', 'bash:resolved'],
+  ['stalkersFlurryPostDamage', 'bash:resolved', 'cleave:check'],
   // Mastery tail: 'cleave:check' has ONE live subscriber in the single-path runner
   // (idx 19 chooser — idx 22 previously rode 'cleave:check' too but was unreachable:
   // steps.find never returns it after the chooser consumes the event). masteryDone now
@@ -64,7 +69,7 @@ const GOLDEN_STEPS = [
 describe('buildAttackRollDamageSteps — composition contract', () => {
   const steps = buildAttackRollDamageSteps();
 
-  it('composes exactly 23 steps with exact names, subscribe/emit bytes, in order (golden census)', () => {
+  it('composes exactly 24 steps with exact names, subscribe/emit bytes, in order (golden census)', () => {
     expect(steps.map(({ name, subscribe, emit }) => [name, subscribe, emit])).toEqual(GOLDEN_STEPS);
   });
 
