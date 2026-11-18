@@ -63,8 +63,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab headless clears, single-
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- (IJ 2026-11-18) Sheet-lane weapon press has no in-flight guard: rapid re-clicks while a rider modal/popup dwells silently do nothing (force-clicks land on the overlay; 4 presses produced zero rolls and zero feedback) — a disabled/dimmed row state while the attack chain dwells would remove the "did my click register?" ambiguity.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried; sole surviving original PT).

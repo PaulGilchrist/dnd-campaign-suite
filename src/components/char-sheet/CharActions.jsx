@@ -280,6 +280,18 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
 
     const mergedModalState = React.useMemo(() => mergeModalStates(modalState, spellModalState), [modalState, spellModalState]);
 
+    // IJ 2026-11-18: attack-chain dwell — while this sheet's popup host is staged
+    // (popupHtml → `.popup-overlay > .popup-modal`, e.g. an attack result awaiting
+    // Done/Cancel) or any of this sheet's modals is open (mergedModalState → e.g.
+    // the `.sp-overlay` rider chooser), the overlay intercepts every pointer event
+    // and a weapon press silently does nothing. Dim + aria-disable the weapon
+    // activation cells for exactly that window so the press reads as blocked.
+    // Purely per-client: derived from the sheet-local popup/modal state only
+    // (never the runtime store, never a timer).
+    const attackChainDwelling = popupHtml != null || Object.values(mergedModalState).some(v => v != null);
+    const dwellCls = attackChainDwelling ? ' attack-dwell-disabled' : '';
+    const dwellAria = attackChainDwelling ? 'true' : undefined;
+
     const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useSyncedState('campaign', 'cleavePending', false, campaignName);
     const [cleaveSecondTargets, setCleaveSecondTargets] = useSyncedState('campaign', 'cleaveSecondTargets', [], campaignName);
 
@@ -548,13 +560,13 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                             ? `Base: +${attack.hitBonus}, Sacred Weapon: +${sacredWeaponBonus}`
                             : undefined;
                         return <React.Fragment key={attack.name}>
-                            <div className='left clickable' onClick={() => handleAttackClick(attackItem)}>{attack.name}</div>
+                            <div className={'left clickable' + dwellCls} aria-disabled={dwellAria} onClick={() => handleAttackClick(attackItem)}>{attack.name}</div>
                             <div>{attackLevel != null ? (attackLevel === 0 ? 'Cantrip' : attackLevel) : ''}</div>
                             <div>{formatWeaponRange(attack)}</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
-                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={hitTitle} onClick={() => handleAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}
-                            <div className={attack.damage ? "clickable" : ""} onClick={() => {
+                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "") + dwellCls} aria-disabled={dwellAria} title={hitTitle} onClick={() => handleAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}
+                            <div className={(attack.damage ? "clickable" : "") + (attack.damage ? dwellCls : "")} aria-disabled={attack.damage ? dwellAria : undefined} onClick={() => {
                                 // L5-001/RB-1115: cannotAct fed into the gate —
                                 // blocked press pops the shared reason (UI-only).
                                 if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', cannotAct, cannotActReason, setPopupHtml, source: 'char-actions-attack-damage' }).allowed) return;

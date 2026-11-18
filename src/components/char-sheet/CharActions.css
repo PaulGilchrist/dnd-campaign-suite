@@ -25,6 +25,16 @@
     pointer-events: none;
 }
 
+/* IJ 2026-11-18: weapon-row activation cells dim while the attack chain dwells
+   on a modal face (staged attack-result popup or rider chooser). The overlay
+   already swallows the presses — this makes that visible. CharActions.jsx
+   derives the state from sheet-local popup/modal state (aria-disabled rides
+   alongside). */
+.char-actions .attacks .attack-dwell-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .char-actions .disabled-attack-label {
     display: inline;
     font-size: 0.75rem;
