@@ -26,12 +26,15 @@ function getModalFocusable(modalEl) {
 }
 
 // Optional typed-name extension (backlog 2026-11-04 CO, campaign-delete lane):
-// pass `typedConfirm={{ label, value, onChange }}` to arm an exact-name input
-// ABOVE the action row (the shared modal's initial focus lands on it, being
-// the first focusable element), and `error` to surface inline copy (role="alert")
-// WITHOUT closing the dialog — the destructive lanes that used to ride a raw
-// window.prompt for the typed gate. Consumers that omit both props render
-// byte-identical to the original tier (pinned by DeleteConfirmModal.test.jsx).
+// pass `typedConfirm={{ label, value, onChange, placeholder }}` to arm an
+// exact-name input ABOVE the action row (the shared modal's initial focus lands
+// on it, being the first focusable element), and `error` to surface inline copy
+// (role="alert") WITHOUT closing the dialog — the destructive lanes that used to
+// ride a raw window.prompt for the typed gate. `placeholder` is optional
+// (backlog 2026-11-18 LA): only the campaign-delete host supplies it (the exact
+// name, mirroring the rename modal's `placeholder={campaignName}` idiom);
+// consumers that omit it — or both props — render byte-identical to the
+// original tier (pinned by DeleteConfirmModal.test.jsx).
 // Optional `confirmDisabled` (owner decision 2026-11-11): hosts whose typed-name
 // gate must live IN the button pass it true until the input matches — mirroring
 // the app's gated-button pattern (e.g. the rename modal's disabled Confirm).
@@ -129,6 +132,7 @@ function DeleteConfirmModal({ titleId, title, confirmLabel, onCancel, onConfirm,
                             type="text"
                             value={typedConfirm.value}
                             onChange={(e) => typedConfirm.onChange(e.target.value)}
+                            placeholder={typedConfirm.placeholder}
                             autoComplete="off"
                         />
                     </div>

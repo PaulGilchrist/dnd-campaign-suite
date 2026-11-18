@@ -56,8 +56,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass he
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-18 LA — campaign-name inputs are unlabelled:** the Admin → Delete Campaign typed-name `<input>` carries no placeholder and no aria-label (probe found `ph:"" aria:null` — the gate itself works); the quick-create modal input is the same tier. The app otherwise names every control — add `aria-label="Type the exact campaign name"` style labels to the Delete/typed-confirm inputs (and a placeholder) — `campaign-admin` panel + `SeededCampaignModal`.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried).

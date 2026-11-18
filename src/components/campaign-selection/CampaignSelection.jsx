@@ -411,6 +411,7 @@ function CampaignSelection({ onCampaignSelect, autoSelectCampaign, isLocalhost =
                type="text"
                value={newCampaignName}
                onChange={(e) => setNewCampaignName(e.target.value)}
+               aria-label="New campaign name"
                placeholder="Enter campaign name"
                className="modal-input"
                autoFocus

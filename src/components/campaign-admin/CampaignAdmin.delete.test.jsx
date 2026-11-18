@@ -149,6 +149,10 @@ describe('CampaignAdmin - Delete Campaign', () => {
                 `This will permanently delete the entire campaign '${CAMPAIGN}'`
             );
             expect(typedInput()).toBeInTheDocument();
+            // Backlog 2026-11-18 LA: the raw probe read ph:"" here — the
+            // campaign-delete host now echoes the exact token into the
+            // placeholder (gate + label-derived accessible name unchanged).
+            expect(typedInput()).toHaveAttribute('placeholder', CAMPAIGN);
             expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
             // ONE destructive confirm inside the dialog (the trigger button
             // behind the backdrop is not part of the dialog).

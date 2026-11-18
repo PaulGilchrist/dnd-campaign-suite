@@ -299,6 +299,10 @@ function DeleteCampaignModal({ campaignName, typedName, onTypedNameChange, error
                 label: `Type the exact campaign name to confirm deletion of "${campaignName}":`,
                 value: typedName,
                 onChange: onTypedNameChange,
+                // The label already names the gate; the placeholder echoes the
+                // exact token to type (backlog 2026-11-18 LA — the raw probe
+                // read ph:"" here). Mirrors RenameModal's placeholder={campaignName}.
+                placeholder: campaignName,
             }}
             error={error}
         >

@@ -123,8 +123,24 @@ describe('DeleteConfirmModal', () => {
         const input = screen.getByLabelText('Type the exact name:');
         expect(input).toHaveValue('draft');
         expect(input).toHaveFocus(); // first focusable element in the dialog
+        // No placeholder supplied → the attribute stays absent, so every
+        // consumer that omits it renders byte-identical to the original tier.
+        expect(input).not.toHaveAttribute('placeholder');
         fireEvent.change(input, { target: { value: 'typed' } });
         expect(onChange).toHaveBeenCalledWith('typed');
+    });
+
+    // Backlog 2026-11-18 LA: a host may supply typedConfirm.placeholder (only
+    // the campaign-delete lane does, echoing the exact name to type).
+    it('renders typedConfirm.placeholder on the typed-name input when supplied', () => {
+        renderModal({
+            typedConfirm: {
+                label: 'Type the exact name:', value: '', onChange: vi.fn(),
+                placeholder: 'Widget',
+            }
+        });
+        expect(screen.getByLabelText('Type the exact name:'))
+            .toHaveAttribute('placeholder', 'Widget');
     });
 
     it('shows inline error copy without touching the action row or firing dialogs', () => {

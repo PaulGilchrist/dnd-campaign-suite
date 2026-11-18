@@ -50,6 +50,7 @@ function SeededCampaignModal({ preset, name, onNameChange, seeding, onCreate, on
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
+          aria-label="New campaign name"
           placeholder="Enter campaign name"
           className="modal-input"
           autoFocus

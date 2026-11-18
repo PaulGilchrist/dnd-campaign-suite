@@ -184,6 +184,10 @@ describe('CampaignSelection', () => {
       expect(screen.getByRole('heading', { level: 2, name: 'New Campaign' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+      // Backlog 2026-11-18 LA: explicit accessible name (an aria-label, not
+      // the placeholder fallback) on the inline campaign-name input.
+      expect(screen.getByRole('textbox', { name: 'New campaign name', exact: true }))
+        .toBeInTheDocument();
 
       fireEvent.change(nameInput(), { target: { value: 'My Campaign' } });
       expect(nameInput()).toHaveValue('My Campaign');

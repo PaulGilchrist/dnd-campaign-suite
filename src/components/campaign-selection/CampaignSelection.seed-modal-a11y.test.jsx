@@ -58,6 +58,9 @@ function expectLabelledSeedDialog(headingText, defaultNamePrefix) {
 
   const input = dialog.querySelector('input');
   expect(input).not.toBeNull();
+  // Backlog 2026-11-18 LA: the placeholder alone was only a fallback name —
+  // both seed inputs now carry an explicit accessible name.
+  expect(input).toHaveAttribute('aria-label', 'New campaign name');
   expect(input.value.startsWith(defaultNamePrefix)).toBe(true);
   fireEvent.change(input, { target: { value: 'typed-name' } });
   expect(input).toHaveValue('typed-name');
