@@ -3,6 +3,7 @@ import utils from '../../ui/utils.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
+import { restoreBaseAttackAfterBash } from '../../combat/steps/features/shieldBashBaseAttack.js';
 
 // Bucket write with drain-to-evict (backlog 2026-11-03 CJ: after a full sweep
 // the two aggregate save-prompt keys persisted in change-data as
@@ -78,6 +79,10 @@ function buildPromptPayload(config) {
         secondaryDamageType: config.secondaryDamageType || null,
         secondaryRawDamage: config.secondaryRawDamage || 0,
         isSpellDamage: config.isSpellDamage === true,
+        // Turn-END repeat-save lanes stamp their OWN attributed save_result
+        // row; ride the flag into the stored prompt so the consumerless
+        // resolution seam (post-reload, chain dead) can honor the opt-out too.
+        suppressOutcomeLog: config.suppressOutcomeLog === true,
     };
 }
 
@@ -141,8 +146,20 @@ function logSaveOutcome(campaignName, config, detail) {
     return addEntry(campaignName, entry).catch((e) => { console.error('[savePrompt] Error logging save result:', e); });
 }
 
+// Page-local registry of promptIds whose createSaveListener consumer (the
+// parked `.promise` continuation — the Shield Bash rider step, the
+// attackRiderHandler feature-row save, poison/secondary-save pipeline
+// steps, etc.) is ALIVE on this page. The continuation is a tab-local async
+// frame: it cannot survive navigation, so a prompt replayed from the store
+// after a reload has NO live consumer anywhere. The save-prompt modal's
+// resolution seam consults this registry (resolveConsumerlessSavePrompt) to
+// tell "a local chain will write the outcome rows" from "the chain died with
+// the previous page — write honest rows here".
+const liveSaveListenerIds = new Set();
+
 export function createSaveListener(campaignName, config) {
     const promptId = utils.guid();
+    liveSaveListenerIds.add(promptId);
 
     const payload = buildPromptPayload(config);
 
@@ -159,6 +176,7 @@ export function createSaveListener(campaignName, config) {
     const promise = new Promise((resolve) => {
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
+            liveSaveListenerIds.delete(promptId);
             window.removeEventListener('save-result', handler);
             window.removeEventListener('save-dismissed', onDismissed);
             // Spread before deleting (playbook §41): in-place mutation of the
@@ -178,6 +196,7 @@ export function createSaveListener(campaignName, config) {
         // never-resolves doctrine untouched.
         const onDismissed = (event) => {
             if (event.detail.promptId !== promptId) return;
+            liveSaveListenerIds.delete(promptId);
             window.removeEventListener('save-dismissed', onDismissed);
             window.removeEventListener('save-result', handler);
         };
@@ -232,6 +251,75 @@ export function dropPendingSavePrompt(campaignName, promptId) {
     if (Array.isArray(listenerIds) && listenerIds.includes(promptId)) {
         setSavePromptBucket(campaignName, 'pendingSaveListenerPrompts', listenerIds.filter(id => id !== promptId));
     }
+}
+
+// Consumerless resolution (bug-shieldbash-save-resolved-after-reload-is-a-dead-end):
+// a save prompt REPLAYS after a tab reload (SSE snapshot law — savePrompt-*
+// keys remount as overlays by design) and the modal answers it honestly, but
+// the createSaveListener continuation that normally consumes the local
+// `save-result` dispatch — the Shield Bash rider chain, the attackRiderHandler
+// feature-row save, the poison/secondary post-damage steps, the turn-END
+// repeat-save roller — is a page-local async frame that died with the previous
+// page. Without this lane the resolution was a silent dead end: no
+// `save_result` row, no outcome row (the "must make a STR saving throw" row
+// dangled as the last trace), no chooser could ever mount, and the FT-082
+// `_shieldBashBaseAttack` stash + campaign `lastAttack` clobber stayed
+// unrestored. When the resolved prompt is still a listener-family row (in
+// pendingSaveListenerPrompts — the createSaveListener marker; modal-family
+// prompts are absent there and stay untouched) AND no live consumer exists on
+// this page, write the honest pair — the generic `save_result` row (unless the
+// lane opted out via suppressOutcomeLog) plus a `save_lapsed` audit row naming
+// the lapsed effect — and run the FT-082 stash restore store-side (self-
+// guarded: byte-inert no-op unless the attacker's Shield Bash stash dangles).
+// The rules outcome genuinely cannot be applied (no chain to mount the
+// chooser) so the copy says LAPSED, never "applied". Called by the modal
+// BEFORE its `save-result`/`save-dismissed` dispatch so the live-consumer read
+// races nothing; on a same-page live chain the registry check no-ops it,
+// keeping every live lane byte-unchanged.
+export function resolveConsumerlessSavePrompt(campaignName, prompt, detail) {
+    const promptId = prompt?.promptId;
+    if (!promptId) return;
+    if (liveSaveListenerIds.has(promptId)) return;
+    const listenerIds = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || [];
+    if (!Array.isArray(listenerIds) || !listenerIds.includes(promptId)) return;
+    if (detail && prompt.suppressOutcomeLog !== true) {
+        logSaveOutcome(campaignName, prompt, detail);
+    }
+    logSaveLapsed(campaignName, prompt, detail != null);
+    if (prompt.attackerName) {
+        restoreBaseAttackAfterBash({ name: prompt.attackerName }, campaignName)
+            .catch((e) => { console.error('[savePrompt] Error restoring lapsed-rider base attack:', e); });
+    }
+}
+
+// Lapsed-resolution audit row (save_dismissed idiom, b0f315161 family): the
+// un-rolled branch mirrors the dismissal refusal copy; the rolled branch says
+// the roll was recorded (its `save_result` row rides above) but the waiting
+// effect lapsed with the lost page — never a silent void.
+function logSaveLapsed(campaignName, prompt, rolled) {
+    const targetName = prompt.targetName || 'Unknown';
+    const saveType = prompt.saveType || 'CON';
+    const saveDc = prompt.saveDc ?? 0;
+    const against = prompt.sourceName ? ` against ${prompt.sourceName}` : '';
+    const awaiting = prompt.sourceName || 'pending effect';
+    const description = rolled
+        ? `${targetName}'s ${saveType} save (DC ${saveDc})${against} was resolved after a page reload — the ${awaiting} awaiting it lapsed with the lost page (effect not applied, no chooser available).`
+        : `${targetName}'s ${saveType} save (DC ${saveDc})${against} was dismissed after a page reload before rolling — the ${awaiting} lapsed with the lost page (no effect).`;
+    return addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'save_lapsed',
+        automationDetail: 'save_lapsed',
+        characterName: prompt.attackerName || targetName,
+        abilityName: prompt.sourceName || 'Saving throw',
+        targetName,
+        saveDc,
+        saveType,
+        reason: rolled
+            ? 'save resolved after page reload — awaiting effect chain lost'
+            : 'save dismissed after page reload before rolling — awaiting effect chain lost',
+        description,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[savePrompt] Error logging lapsed save:', e); });
 }
 
 // Dismiss-hygiene log row (save-dismissed sweep family, 2026-11-05): every

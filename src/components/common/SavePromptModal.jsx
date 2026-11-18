@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import utils from '../../services/ui/utils.js';
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
-import { dropPendingSavePrompt } from '../../services/automation/common/savePrompt.js';
+import { dropPendingSavePrompt, resolveConsumerlessSavePrompt } from '../../services/automation/common/savePrompt.js';
 import Subscriber from './Subscriber.jsx';
 import CreatureBadge from './CreatureBadge.jsx';
 import { getSaveDisadvantage, getHolyAuraSaveAdvantage, getHolyNimbusSaveAdvantage } from './savePromptUtils.js';
@@ -544,6 +544,20 @@ function submitResultAndClear(campaignName, current, result, { includeBaneRoll, 
     ...sendExtra,
   });
 
+  // Consumerless-replay rescue (must run BEFORE the dispatch below and before
+  // dropPendingSavePrompt): when this page holds no live createSaveListener
+  // chain for this prompt (the producer died in a reload), this writes the
+  // honest save_result + save_lapsed rows and restores the FT-082 base-attack
+  // stash store-side. A live same-page chain makes it a no-op (savePrompt.js).
+  resolveConsumerlessSavePrompt(campaignName, current, {
+    promptId: current.promptId,
+    targetName: current.targetName,
+    success: result.success,
+    roll: result.roll,
+    total: result.total,
+    saveBonus,
+  });
+
   window.dispatchEvent(new CustomEvent('save-result', {
     detail: {
       ...buildResultDispatchDetail({ current, result, saveBonus, rawRolls, rollMode, evasionActive }),
@@ -1035,6 +1049,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     // save never resolves", savePrompt.js) stays intact, because the ~40
     // `.promise` consumers all treat a falsy `success` as "save failed →
     // apply damage" and must never see an un-rolled save as an outcome.
+    // Consumerless-replay rescue BEFORE the dispatch: an un-rolled Dismiss of
+    // a replayed prompt whose chain died leaves no refusal row and no FT-082
+    // restore otherwise (savePrompt.js writes the honest lapse copy, no-ops
+    // when a same-page chain is listening).
+    resolveConsumerlessSavePrompt(campaignName, current, null);
     window.dispatchEvent(new CustomEvent('save-dismissed', {
       detail: { promptId: current.promptId, targetName: current.targetName },
     }));

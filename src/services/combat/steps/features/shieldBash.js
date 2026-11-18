@@ -7,20 +7,11 @@ import { checkOncePerTurnWithSkip } from '../../../automation/common/oncePerTurn
 import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
-// FT-082 collateral: restore the stashed base weapon attack as campaign
-// lastAttack after the Shield Bash save resolution clobbered it with a
-// save record ({attackName:'Shield Bash', damageType:null}). Without this,
-// Slasher Hamstring (slashing_damage_hit) falsely refuses on shield holders
-// within the same turn. Clears the stash afterwards.
-export async function restoreBaseAttackAfterBash(playerStats, campaignName) {
-  const stash = getRuntimeValue(playerStats.name, '_shieldBashBaseAttack', campaignName);
-  // A valid stash is the base attack object; ignore null/arrays/empty.
-  if (!stash || typeof stash !== 'object' || Array.isArray(stash) || !stash.attackName) return;
-  if (stash.attackName !== 'Shield Bash') {
-    await setRuntimeValue('campaign', 'lastAttack', stash, campaignName);
-  }
-  await setRuntimeValue(playerStats.name, '_shieldBashBaseAttack', null, campaignName);
-}
+// FT-082 collateral restore — implementation lives in the useRuntimeState-only
+// leaf (shared with the consumerless-save resolution seam); re-exported here
+// for the rider-step/feature-row lanes that already import it from this module.
+import { restoreBaseAttackAfterBash } from './shieldBashBaseAttack.js';
+export { restoreBaseAttackAfterBash };
 
 function hasShieldEquipped(playerStats) {
   return playerStats.inventory?.equipped?.some(itemName => {

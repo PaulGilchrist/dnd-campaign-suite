@@ -48,6 +48,7 @@ vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
 
 vi.mock('../../services/automation/common/savePrompt.js', () => ({
   dropPendingSavePrompt: vi.fn(),
+  resolveConsumerlessSavePrompt: vi.fn(),
 }));
 
 vi.mock('../../services/combat/auras/auraOfProtection.js', () => ({

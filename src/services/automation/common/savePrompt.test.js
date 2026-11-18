@@ -190,6 +190,7 @@ describe('createSaveListener', () => {
             secondaryRawDamage: 0,
             isSpellDamage: false,
             saveConditions: null,
+            suppressOutcomeLog: false,
         });
     });
 
@@ -228,6 +229,7 @@ describe('createSaveListener', () => {
             secondaryRawDamage: 0,
             isSpellDamage: false,
             saveConditions: ['frightened'],
+            suppressOutcomeLog: false,
         });
     });
 
