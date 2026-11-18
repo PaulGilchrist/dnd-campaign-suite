@@ -51,6 +51,8 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     }),
     setRuntimeValue: vi.fn((_key, _prop, _value, _campaign) => {}),
     setRuntimeObject: vi.fn(),
+    // CLA-100 clear seam: oncePerTurn.clearCombatLatches censuses each store's keys.
+    getRuntimeKeysByPrefix: vi.fn(() => []),
 }));
 vi.mock('../../services/ui/storage.js', () => ({
     default: { get: vi.fn(), set: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },

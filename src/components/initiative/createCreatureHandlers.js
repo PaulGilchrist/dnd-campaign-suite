@@ -15,6 +15,7 @@ import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCrea
 import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js'
 import { getCreatureController } from '../../services/encounters/creatureControl.js'
 import { sweepNewCombatClocks } from '../../services/rules/effects/zoneDurationClock.js'
+import { clearCombatLatches } from '../../services/automation/common/oncePerTurn.js'
 import { clearAllPendingOas, prunePendingOas } from '../../services/combat/pendingOpportunityAttacks.js'
 
 /**
@@ -301,6 +302,16 @@ export function createCreatureHandlers({
                 setRuntimeValue(creature.name, 'dreadAmbushSpeedActive', null, campaignName)
             }
         }
+        // Once-per-turn rider latches stamp the bare combatSummary.round number,
+        // and the round-wrap re-arm only ever expires a stamp via `round > stamp`
+        // comparison — the stamp itself survives. Clear RESETS the round to 1, so a
+        // leftover `{round:1}` stamp aliases the new combat's first round and
+        // checkOncePerTurnWithSkip silently drops the rider (Shield Bash prompt /
+        // Charge chooser never arm — the round-reuse-after-Clear bug). Evict the
+        // stamps for EVERY closing-board creature — players AND joined monsters
+        // (a re-joined same-named monster re-collides on its stale `_<Feat>_usedRound`)
+        // — the same CLA-100 rationale as the Dread Ambush reset above.
+        clearCombatLatches(campaignName, closingSummary.creatures.map(c => c.name))
         // no-timers T4: Clear restarts combat — combat-scoped effects of
         // the old combat end here too (enforcement off ⇒ zero writes).
         sweepNewCombatClocks(campaignName)

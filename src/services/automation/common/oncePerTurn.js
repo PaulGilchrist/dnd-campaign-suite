@@ -1,5 +1,6 @@
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, getRuntimeKeysByPrefix } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../ui/logService.js';
 
 /**
  * Centralized once-per-turn check for combat features.
@@ -184,4 +185,58 @@ export async function setSkipFlag(skipKey, playerStats, campaignName) {
  */
 export async function clearSkipFlag(skipKey, playerStats, campaignName) {
     await setRuntimeValue(playerStats.name, skipKey, null, campaignName);
+}
+
+/**
+ * New-combat seam eviction (CLA-100: Initiative "Clear" restarts combat — the
+ * board-wide clear, NOT a per-creature initiative roll; owner ruling 2026-11-10).
+ *
+ * Every latch in this family stamps the BARE combatSummary.round number
+ * (`_<Feat>_usedRound` / `_<Feat>_skippedRound`, both holder-side and
+ * monster-side), and the round-wrap re-arm only ever expires a stamp via the
+ * `currentRound > stamp.round` comparison — the stamp itself survives the wrap.
+ * A board Clear RESETS the round to 1, so a surviving `{round:1}` stamp ALIASES
+ * the new combat's first round and checkOncePerTurn / checkOncePerTurnWithSkip
+ * silently drop the rider (no prompt, no chooser, no log row — the round-reuse
+ * after Clear bug). The comparison lanes cannot distinguish "this round" from
+ * "a reused round number", so the eviction must happen at the seam itself —
+ * exactly why handleClear resets the Dread Ambush once-per-combat latch.
+ *
+ * Eviction is pattern-based over each creature's own runtime store: any key
+ * ending in "round" (case-insensitive) holds a round stamp — the static family
+ * (`_Shield_Bash_usedRound`, `_Cleave_UsedRound`, `_cunningStrikeSkippedRound`),
+ * the dynamically named rider keys (`_<Action>_usedRound` / `_<Action>_skippedRound`
+ * built from feature names, players AND monsters alike), and the named round
+ * counters (`actionSurgeUsedThisRound`, `relentlessUsedRound`,
+ * `_PsychicBlade_attack_round`, …). A missed key would silently rules-skip like
+ * the bug itself, so the store's own key census is authoritative over any
+ * hand-maintained list. Keys that hold booleans or attack-instance markers
+ * (never a round number) cannot alias via round reuse and are left alone.
+ *
+ * Returns the number of latch keys evicted (0 ⇒ zero writes, byte-identical).
+ */
+export function clearCombatLatches(campaignName, creatureNames) {
+    if (!campaignName || !Array.isArray(creatureNames)) return 0;
+    let cleared = 0;
+    for (const creatureName of creatureNames) {
+        if (!creatureName) continue;
+        for (const key of getRuntimeKeysByPrefix(creatureName, '')) {
+            if (/round$/i.test(key)) {
+                setRuntimeValue(creatureName, key, null, campaignName);
+                cleared += 1;
+            }
+        }
+    }
+    // Fail-loud audit trail (mirrors the zone sweep's board-clear row): the GM
+    // sees which stale latches were evicted so a re-armed rider is explainable.
+    if (cleared > 0) {
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'new_combat_latch_reset',
+            characterName: 'Campaign',
+            description: `Combat board cleared: ${cleared} once-per-turn latch${cleared === 1 ? '' : 'es'} from the previous combat evicted.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[oncePerTurn:new-combat-latch-log]', e); });
+    }
+    return cleared;
 }

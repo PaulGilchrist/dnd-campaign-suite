@@ -48,6 +48,8 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
         listeners: new Map(),
         getRuntimeValue: vi.fn((_key, _prop, _campaign) => null),
         setRuntimeValue: vi.fn((_key, _prop, _value, _campaign) => {}),
+        // CLA-100 clear seam: oncePerTurn.clearCombatLatches censuses each store's keys.
+        getRuntimeKeysByPrefix: vi.fn(() => []),
         setRuntimeObject: vi.fn(),
     };
 });

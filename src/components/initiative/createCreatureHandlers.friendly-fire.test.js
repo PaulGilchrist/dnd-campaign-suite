@@ -18,6 +18,8 @@ import { setTarget } from '../../services/encounters/initiativeService.js';
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
+    // CLA-100 clear seam: oncePerTurn.clearCombatLatches censuses each store's keys.
+    getRuntimeKeysByPrefix: vi.fn(() => []),
 }));
 vi.mock('../../services/ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn(), patch: vi.fn() } }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(async () => ({})) }));
