@@ -15,6 +15,7 @@ import MapsManager from './components/maps-manager/MapsManager.jsx';
 import { loadCombatSummary, setCombatSummaryCache } from './services/encounters/combatData.js';
 import storage from './services/ui/storage.js';
 import { requestEncounterLoad } from './services/ui/encounterLoadSignal.js';
+import { isWizardOffered, markWizardOffered } from './services/ui/wizardOfferedStore.js';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/maps/mapsService.js';
 import { characterFileName } from './services/campaign/characterFileName.js';
@@ -460,7 +461,13 @@ function App() {
       if (loaded.length > 0) {
         charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
         setActiveView('charSheet');
-      } else {
+      } else if (!isWizardOffered(name)) {
+        // Offer the creation wizard ONCE per campaign per client (localStorage
+        // display pref, backlog KA 2026-11-18): re-selecting a zero-character
+        // campaign after cancelling must not re-arm the modal that swallows
+        // every next click. The shell stays navigable — the sidebar "Add
+        // Character" button and starter checklist still open the wizard.
+        markWizardOffered(name);
         wizardRef.current.handleAddCharacter();
       }
       // Post-rollback auto-selection: land the GM back on the Admin view

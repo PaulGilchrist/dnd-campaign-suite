@@ -348,10 +348,14 @@ describe('App - Runtime Events & State Management', () => {
     });
 
     it('auto-opens the creation wizard when the selected campaign has no characters', async () => {
+      localStorage.removeItem('character-wizard-offered:test-campaign');
       await renderInCampaign([]);
 
       expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
       expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+      // The offer stamps the per-campaign display pref (backlog KA 2026-11-18)
+      // so a re-select after Cancel lands on the navigable shell instead.
+      expect(localStorage.getItem('character-wizard-offered:test-campaign')).toBe('1');
     });
   });
 
