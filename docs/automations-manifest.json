@@ -1318,13 +1318,12 @@
       "verified": "verified",
       "class": "Bard",
       "triggerConditions": "Passive: Always active",
-      "expectedBehavior": "A creature that has a Bardic Inspiration die from you can use it for two effects:\n\nDefense (reaction, when hit by an attack): hitResolution.js:88 sets context.bardicInspirationDefense and related flags (bardicInspirationDefenseDieSize, bardicInspirationDefenseEffectiveAc, etc.) when an attack hits and the target has defense enabled. The UI reads these flags and presents the Bardic Inspiration reaction as an option for the player to actively select. No auto-prompt is sent \u2014 sendBardicInspirationDefensePrompt exists in bardicInspirationPromptUtils.js but is intentionally never called from production code.\n\nOffense (bonus action, after hitting): Triggers via buildBardicInspirationOffenseStep in the attackRollRiders module. Sends sendBardicInspirationOffensePrompt which the UI handles.",
+      "expectedBehavior": "A creature that has a Bardic Inspiration die from you can use it for two effects:\n\nDefense (reaction, when hit by an attack): hitResolution.js:88 sets context.bardicInspirationDefense and related flags (bardicInspirationDefenseDieSize, bardicInspirationDefenseEffectiveAc, etc.) when an attack hits and the target has defense enabled. The UI reads these flags and presents the Bardic Inspiration reaction as an option for the player to actively select. No auto-prompt is sent — the old shared-key defense lane (sendBardicInspirationDefensePrompt + the modal's defense face) was deleted 2026-11-17 (fix bi-defense-prompt-producer-orphaned): the popup-inline button is the single defense lane and the <name>-biPrompt key lane is offense-only.\n\nOffense (bonus action, after hitting): Triggers via buildBardicInspirationOffenseStep in the attackRollRiders module. Sends sendBardicInspirationOffensePrompt which the UI handles.",
       "implementation": {
         "defenseCheck": "src/hooks/combat/hitResolution.js:88",
         "defenseContextPropagation": "src/hooks/combat/useLoggedDiceRollAttack.js:121-126,267-269",
         "offenseStep": "src/services/combat/automation/steps/attackRollRiders.js:109",
-        "offensePrompt": "src/services/combat/prompts/bardicInspirationPromptUtils.js:21",
-        "defensePromptExists": "src/services/combat/prompts/bardicInspirationPromptUtils.js:6 (intentionally never called \u2014 player actively selects reaction)"
+        "offensePrompt": "src/services/combat/prompts/bardicInspirationPromptUtils.js:21"
       }
     },
     {
