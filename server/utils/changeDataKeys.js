@@ -78,7 +78,7 @@ export const SPECIAL_TOP_LEVEL_KEYS = new Set([
 // Dynamic campaign-scope families that carry a per-instance suffix.
 export const TOP_LEVEL_KEY_PREFIXES = [
     'travel-',            // useTravelManagement.js / travelSession.js (travel-mode, …)
-    'pipeline-',          // pipeline-events.js (pipeline-<campaign>-<key>) + client 'pipeline-pause'
+    'pipeline-',          // useCharActionModals.js client key 'pipeline-pause'
     'savePrompt-',        // savePromptService.js (savePrompt-<Target>[-<id>])
     'deathSavePrompt-',   // savePromptService.js
     'concentrationPrompt-', // concentrationService.js

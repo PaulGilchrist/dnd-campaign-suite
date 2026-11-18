@@ -1,10 +1,9 @@
 // @maintained-by-ai
 // Lane: INTERNALS of observers.js (log observers) ONLY — registration census + per-handler
-// payload bytes against the logger boundary. SSE broadcast internals live in
-// sseObservers.test.js; pipeline assembly and the campaignName registration gate
-// (createObservers zero-args, handler-fires-with-ctx-identity, no-campaign → SSE factory
-// never invoked while log observers are still registered) are pinned by index.test.js
-// (#1064) — cited, never re-pinned here.
+// payload bytes against the logger boundary. Pipeline assembly and the log-observer
+// registration (createObservers zero-args, handler-fires-with-ctx-identity) are pinned
+// by index.test.js (#1064) — cited, never re-pinned here. (The former SSE broadcast
+// lane, sseObservers.js, was removed 2026-11-18 as a readerless ghost-key writer.)
 //
 // Discipline: golden registration census (#985); happy paths pin FULL addEntry bytes
 // (#829/#1007); inert/degenerate payloads co-located per observer (#945/#948);

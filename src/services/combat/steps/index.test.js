@@ -1,17 +1,25 @@
 // @maintained-by-ai
 // Lane: ROUTING DECISIONS of buildPipelineForAction (index.js) ONLY — which builder is
-// assembled for which action shape, and the campaignName gate on SSE observer registration.
+// assembled for which action shape, and the no-write pin for the removed SSE
+// milestone lane.
 // Step internals are CITED, never re-pinned here: attack census lives in
 // attackRollDamageSteps.test.js (#1039 template), spell census in
 // directSpellDamageSteps-structure.test.js (#1039/#1048 golden), observer bodies in
-// observers.test.js / sseObservers.test.js.
+// observers.test.js.
 //
-// Mock discipline (#744/#786): the two step-builders and both observer factories are
+// Mock discipline (#744/#786): the two step-builders and the log-observer factory are
 // inert spies returning distinguishable sentinel lanes (two chained steps each, unique
 // recorder names). No real step body ever executes here; routing is falsifiable because
 // the RIGHT spy must be called once (zero args — builders take none, exact-bytes #993),
 // the WRONG spies never, and the executed recorder must byte-equal the lane's sentinel
 // sequence (pins which pipeline was assembled #1022 + step registration count/order).
+//
+// SSE milestone observers (sseObservers.js + POST /pipeline-event) were REMOVED
+// 2026-11-18: the wildcard change-data POST route (mounted before the dedicated
+// pipeline-events router) swallowed every milestone POST and persisted a readerless
+// `pipeline-event` ghost bucket that re-hydrated on every connect; the intended
+// pipeline-<campaign>-<key> SSE lane never fired and nothing read it. The pin below
+// keeps the write lane dead: a full chain run must issue ZERO fetches.
 //
 // Routing table census (every reachable branch of selectStepBuilders):
 //   attack : type==='weapon_attack' | weaponType | (damage|damageExpression|hasDamage
@@ -38,7 +46,7 @@
 //   :5-11 toHaveProperty smoke + :13-16/:18-21/:23-26/:75-81 expect(run).toBeDefined()
 //   (assert nothing about registration #1048) + :28-31/:83-90/:92-98 (toBeDefined proves
 //   nothing) → routing table test below (each old weapon-shape fixture is a distinct
-//   falsifiable row) + campaignName gate tests below.
+//   falsifiable row) + the zero-fetch pin for the removed SSE lane below.
 //   :33-36 spell fixture → spell row of the routing table.
 //   :38-47 'spell pipeline includes featureRiders step' weak toContain + one lessThan →
 //   REMOVED per applied rec #1048: strictly subsumed by the golden census in
@@ -66,15 +74,12 @@ const S = vi.hoisted(() => {
     },
   ];
   const logObserverHandler = vi.fn();
-  const sseObserverHandler = vi.fn();
   return {
     executed,
     attackBuilder: vi.fn(() => lane('attack')),
     spellBuilder: vi.fn(() => lane('spell')),
     logObserverHandler,
-    sseObserverHandler,
     createObservers: vi.fn(() => [{ event: '*', handler: logObserverHandler }]),
-    createSseObservers: vi.fn(() => [{ event: '*', handler: sseObserverHandler }]),
   };
 });
 
@@ -83,7 +88,6 @@ import { buildPipelineForAction } from './index.js';
 vi.mock('./attackRollDamageSteps.js', () => ({ buildAttackRollDamageSteps: S.attackBuilder }));
 vi.mock('./directSpellDamageSteps.js', () => ({ buildDirectSpellDamageSteps: S.spellBuilder }));
 vi.mock('./observers.js', () => ({ createObservers: S.createObservers }));
-vi.mock('./sseObservers.js', () => ({ createSseObservers: S.createSseObservers }));
 
 const BUILDERS = {
   attack: S.attackBuilder,
@@ -111,8 +115,8 @@ function reArm() {
   // sentinel implementations (clearAllMocks would destroy the builder factories).
   [
     S.attackBuilder, S.spellBuilder,
-    S.createObservers, S.createSseObservers,
-    S.logObserverHandler, S.sseObserverHandler,
+    S.createObservers,
+    S.logObserverHandler,
   ].forEach((spy) => spy.mockClear());
   S.executed.length = 0;
 }
@@ -141,30 +145,28 @@ describe('buildPipelineForAction — router: which pipeline is assembled', () =>
   });
 });
 
-describe('buildPipelineForAction — observer registration gate', () => {
+describe('buildPipelineForAction — removed SSE milestone write lane stays dead', () => {
   const ATTACK = { name: 'Greataxe', damage: '1d12' };
 
-  it('registers log AND SSE observers when campaignName present — exact campaignName bytes and ctx identity passthrough', async () => {
-    const ctx = { attack: ATTACK, setPopupHtml: vi.fn() };
-    const pipeline = buildPipelineForAction(ATTACK, { name: 'Gimli', campaignName: 'test-campaign' });
-    await pipeline.run('chain:start', ctx, { current: null });
+  it('a full chain run issues ZERO fetches even with campaignName present, and log observers still register', async () => {
+    // 2026-11-18 ghost-key eviction (pipeline-event backlog): the SSE observers used
+    // to POST every pipeline event to /api/campaigns/<c>/pipeline-event — swallowed
+    // by the change-data wildcard into a readerless `pipeline-event` bucket that
+    // lingered across resolved chains and re-hydrated on every connect. Nothing may
+    // write that lane again; log rows still ride observers.js (registration pinned).
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      const ctx = { attack: ATTACK, setPopupHtml: vi.fn() };
+      const pipeline = buildPipelineForAction(ATTACK, { name: 'Gimli', campaignName: 'test-campaign' });
+      await pipeline.run('chain:start', ctx, { current: null });
 
-    expect(S.createObservers).toHaveBeenCalledTimes(1);
-    expect(S.createObservers.mock.calls[0]).toEqual([]);
-    expect(S.createSseObservers).toHaveBeenCalledTimes(1);
-    expect(S.createSseObservers).toHaveBeenCalledWith('test-campaign'); // exact bytes #993
-    expect(S.logObserverHandler).toHaveBeenCalledWith(ctx, expect.anything(), 'chain:start');
-    expect(S.sseObserverHandler).toHaveBeenCalledWith(ctx, expect.anything(), 'chain:start');
-  });
-
-  it('without campaignName registers log observers only — createSseObservers never invoked', async () => {
-    const ctx = { attack: ATTACK };
-    const pipeline = buildPipelineForAction(ATTACK, { name: 'Gimli' });
-    await pipeline.run('chain:start', ctx, { current: null });
-
-    expect(S.createObservers).toHaveBeenCalledTimes(1);
-    expect(S.createSseObservers).not.toHaveBeenCalled();
-    expect(S.logObserverHandler).toHaveBeenCalled();
-    expect(S.sseObserverHandler).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(S.createObservers).toHaveBeenCalledTimes(1);
+      expect(S.createObservers.mock.calls[0]).toEqual([]);
+      expect(S.logObserverHandler).toHaveBeenCalledWith(ctx, expect.anything(), 'chain:start');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

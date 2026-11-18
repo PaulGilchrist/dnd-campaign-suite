@@ -29,7 +29,7 @@ import rulesFactory from './services/rules/rulesFactory.js';
 import Subscriber from './components/common/Subscriber.jsx';
 import CampaignReloadNotice from './components/common/CampaignReloadNotice/CampaignReloadNotice.jsx';
 import MapContextSync from './components/common/MapContextSync.jsx';
-import { setRuntimeObject, replaceRuntimeObject, seedTrackedResources, getStore, notify } from './hooks/runtime/useRuntimeState.js';
+import { replaceRuntimeObject, seedTrackedResources, getStore, notify } from './hooks/runtime/useRuntimeState.js';
 import { applyServerOverride, trackedResourcesToStoreEntries } from './services/rules/trackedResources.js';
 import { usePostRestoreNotice } from './hooks/ui/usePostRestoreNotice.js';
 import { useBattleMasterSelectionVersion, battleMasterSelectionSerial } from './hooks/combat/battleMaster.js';
@@ -88,13 +88,6 @@ function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setAct
       setActiveCharacter(updated);
     }
   }
-}
-
-function handlePipelineKeyEvent(event, campaignName) {
-  const prefix = `pipeline-${campaignName}-`;
-  if (!event.key.startsWith(prefix)) return;
-  const actualKey = event.key.slice(prefix.length);
-  setRuntimeObject(actualKey, event.data, campaignName, true);
 }
 
 function redispatchSaveResult(promptId, data, campaignName) {
@@ -805,8 +798,9 @@ function App() {
 
   /**
    * WARNING: SSE re-render loop risk
-   * setRuntimeObject is called with skipSync=true to prevent re-POSTing the full
-   * store back to the server on SSE echoes (the server already has this data).
+   * Echo mirroring (applyStoreUpdate / replaceRuntimeObject) is memory-only —
+   * SSE echoes must never re-POST to the server (the server already has this
+   * data; re-POSTing causes a broadcast loop).
    */
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null) return;
@@ -816,10 +810,6 @@ function App() {
     if (event.data == null && !event.key.startsWith(`change-${campaignName}-`)) return;
     if (event.key.startsWith('character-')) {
       handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter });
-      return;
-    }
-    if (event.key.startsWith('pipeline-')) {
-      handlePipelineKeyEvent(event, campaignName);
       return;
     }
     if (event.key === `map-activate-${campaignName}`) {

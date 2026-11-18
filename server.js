@@ -27,7 +27,6 @@ import campaignsMeta from './server/routes/campaigns-meta.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
 import spellOverlayRoutes from './server/routes/spell-overlay.js';
-import pipelineEventsRoutes from './server/routes/pipeline-events.js';
 import createServerConfigRouter from './server/routes/server-config.js';
 import { createCampaignLockMiddleware, createCampaignCreateGuard, createCampaignRenameGuard, setCampaignLock } from './server/utils/campaignLock.js';
 import { noStoreCampaignGets } from './server/utils/noStoreApi.js';
@@ -235,6 +234,3 @@ app.use(logRoutes);
 
 // Spell overlay routes (transient, broadcast only)
 app.use(spellOverlayRoutes);
-
-// Pipeline event routes (milestone broadcasting)
-app.use(pipelineEventsRoutes);

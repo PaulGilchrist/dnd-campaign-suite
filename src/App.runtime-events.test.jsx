@@ -17,8 +17,8 @@
  *       the active character to the next remaining one (or null when the
  *       roster empties) — mirroring the local-delete lane's fallback —
  *       while the API is never re-called.
- *     - `pipeline-<campaign>-<key>` mirrors into the runtime store with
- *       skipSync=true (the SSE echo must never re-POST to the server).
+ *     - `pipeline-<campaign>-<key>` (removed milestone lane 2026-11-18) is ignored:
+ *       nothing mirrors into the runtime store and nothing re-POSTs.
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
  *       the campaign store; character-scoped keys adopt via
  *       replaceRuntimeObject (full-bucket REPLACE — ghost keys absent from the
@@ -549,12 +549,17 @@ describe('App - Runtime Events & State Management', () => {
       expect(screen.getAllByTestId('char-btn-Stranger')).toHaveLength(1);
     });
 
-    it('mirrors pipeline events into the runtime store with skipSync (never re-posting the SSE echo)', async () => {
+    it('pipeline-* SSE echoes (removed milestone lane) mirror nothing into the runtime store', async () => {
+      // 2026-11-18 dead-lane removal: the server never publishes pipeline-<campaign>-<key>
+      // events again (the POST lane they came from only ever produced a readerless
+      // `pipeline-event` ghost bucket). Should a stray echo ever arrive, it must be
+      // dropped — not mirrored as a runtime key.
       const data = { total: 14, critical: false };
 
       await dispatch({ key: 'pipeline-test-campaign-damage:rolled', data });
 
-      expect(setRuntimeObject).toHaveBeenCalledWith('damage:rolled', data, 'test-campaign', true);
+      expect(writesFor('damage:rolled')).toHaveLength(0);
+      expect(replaceRuntimeObject).not.toHaveBeenCalled();
     });
 
     // bug-changedata-key-removal-stale-on-mounted-tab: the server wildcard POST

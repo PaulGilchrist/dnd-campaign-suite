@@ -57,7 +57,6 @@ There is **no routing library** — `src/App.jsx` switches views manually via an
 | `encounters.js` | Saved encounters | `data/encounters.json`; CRUD + rename |
 | `log.js` | Campaign log | `data/campaign-log.json`; own 1s debounce, 500-entry cap; publishes `log-<c>` per entry |
 | `spell-overlay.js` | Spell AoE overlays | **Memory-only**; non-`/api` path `/spell-overlay?campaign=`; publishes `spell-overlay-<c>` |
-| `pipeline-events.js` | Combat pipeline milestones | Stored inside `characterChangeData` under `pipeline-<c>-<key>`; re-published over SSE |
 | `npcs.js`, `settlements.js` | NPCs / settlements | Factory CRUD + hand-rolled PUT upsert (near-copies of each other) |
 | `notes.js`, `quests.js` | Notes / quests | Factory + localhost/privacy filtering |
 | `factions.js` | Factions | Factory only — **no localhost gate** despite being a GM feature |
@@ -147,11 +146,11 @@ local re-render  ◄──  other clients: Subscriber.handleRuntimeEvent
 ```
 
 ### 3.3 Combat attack (representative flow)
-1. UI click → `hooks/combat/useCharActionModals` → `useAttackDamageResolution.resolveAttackDamage` builds a pipeline context and `buildPipelineForAction` (steps + log/SSE observers).
+1. UI click → `hooks/combat/useCharActionModals` → `useAttackDamageResolution.resolveAttackDamage` builds a pipeline context and `buildPipelineForAction` (steps + log observers).
 2. `pipeline.run('housekeeping:do', ctx, resumeRef)` walks the event chain (`housekeeping:do → maneuvers:check → … → damage:rolled → sneak/twf/riders applied → damage:ready → damage:applied → … → pipeline:complete`); steps may return `{modal}` to **pause** the pipeline (`_pausedStep` stashed in `resumeRef`) until the user confirms, then `resume()` re-enters.
 3. Rolls come from `dice/diceRoller.js`; feature riders add damage dice; automation passives route through `combat/automation/automationService` (`automationCollector → automationRouter.routeAutomation`).
 4. Damage applies in `rules/combat/applyDamage.js`: resistance/temp-HP/ward, concentration and death-save prompts, `setRuntimeValue(creature,'currentHitPoints',…)`, `campaign.lastAttack` stamp.
-5. Persistence/sync per §3.2; every pipeline event also POSTs to `/api/campaigns/:c/pipeline-event` (`steps/sseObservers.js`) so all clients render live combat milestones.
+5. Persistence/sync per §3.2. (A former "POST every pipeline event to `/pipeline-event`" SSE-milestone lane lived here; its writes were swallowed by the change-data wildcard as a readerless `pipeline-event` ghost bucket, so the whole lane was removed 2026-11-18.)
 
 ### 3.4 Spell casting
 `rules/spells/spellCastService/execution/` splits save / no-save / modal / trigger paths; trigger spells dispatch to per-spell services in `rules/features/` (e.g. `blessService.applyBlessEffect` writes `{target, effect, source, duration}` rows into `campaign.targetEffects`); AoE casts publish overlays to the memory-only `/spell-overlay` endpoint, rendered on every client's map.

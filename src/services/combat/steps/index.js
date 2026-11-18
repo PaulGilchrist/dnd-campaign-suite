@@ -2,24 +2,22 @@ import { createPipeline } from '../actionPipeline.js';
 import { buildAttackRollDamageSteps } from './attackRollDamageSteps.js';
 import { buildDirectSpellDamageSteps } from './directSpellDamageSteps.js';
 import { createObservers } from './observers.js';
-import { createSseObservers } from './sseObservers.js';
 
 /**
  * Build an action pipeline for the given action type.
  *
  * @param {object} action - The action being executed (attack, spell, etc.)
- * @param {object} playerStats - The acting character's computed stats
  * @returns {object} pipeline - A configured pipeline (call pipeline.run() to execute)
+ *   (callers still pass playerStats as a second arg — it is no longer read here
+ *   since the SSE milestone observer lane was removed, see registerObservers)
  */
-function registerObservers(pipeline, campaignName) {
-  // Register log observers
+// SSE milestone observers (sseObservers.js) removed 2026-11-18: their POST to
+// /pipeline-event was captured by the change-data wildcard (mounted before the
+// dedicated pipeline-events router), persisting a ghost `pipeline-event` bucket
+// no client ever read — and the intended pipeline-<campaign>-<key> lane never
+// fired. Dead lane removal per no-legacy policy; log rows still ride observers.js.
+function registerObservers(pipeline) {
   for (const obs of createObservers()) {
-    pipeline.observe(obs.event, obs.handler);
-  }
-
-  // Register SSE observers
-  if (!campaignName) return;
-  for (const obs of createSseObservers(campaignName)) {
     pipeline.observe(obs.event, obs.handler);
   }
 }
@@ -55,10 +53,10 @@ function selectStepBuilders(action) {
   return null;
 }
 
-export function buildPipelineForAction(action, playerStats) {
+export function buildPipelineForAction(action) {
   const pipeline = createPipeline();
 
-  registerObservers(pipeline, playerStats?.campaignName || '');
+  registerObservers(pipeline);
 
   // Register steps based on action type
   const buildSteps = selectStepBuilders(action);
