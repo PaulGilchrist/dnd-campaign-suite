@@ -70,7 +70,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 vi.mock('../../services/encounters/initiativeService.js', () => ({
     setupCreatures: vi.fn((characters) => characters.map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null }))),
-    isBareNpcPlaceholder: (c) => c.type === 'npc' && !c.monsterIndex && /^NPC \d+$/.test(c.name || ''),
     addNpc: vi.fn(), removeNpc: vi.fn(),
     getNextCreatureName: vi.fn(), getPreviousCreatureName: vi.fn(),
     isPreviousDisabled: vi.fn(() => false),

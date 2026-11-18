@@ -57,7 +57,7 @@ function wire({ isLocalhost = true, combatSummary = board() } = {}) {
     const handlers = createCreatureHandlers({
         combatSummary, campaignName: 'test-campaign', campaignNpcs: [],
         setNpcImages: vi.fn(), overlays: [], setCombatSummary,
-        setActiveCreatureName: vi.fn(), characters: [], numOfNpc: 0, isLocalhost,
+        setActiveCreatureName: vi.fn(), characters: [], isLocalhost,
     });
     return { handlers, combatSummary, setCombatSummary };
 }

@@ -82,7 +82,6 @@ function makeTab(staleMirror) {
         setCombatSummary,
         setActiveCreatureName: vi.fn(),
         characters: [{ name: 'Alice' }],
-        numOfNpc: 0,
         isLocalhost: true,
         showToast,
     });

@@ -13,7 +13,11 @@ function parseInitBonus(monster) {
     return match ? parseInt(match[1], 10) : 0
 }
 
-function setupCreatures(characters, npcCount, getName) {
+// Players only: a fresh board never carries NPC rows. Bare "+NPC" placeholders
+// are combat-time spawns (addNpc) — no Clear rebuild re-bakes them
+// (backlog 2026-11-18: the closing-board placeholder count used to be re-seeded
+// here, so a bookkeeping slot survived Clear and poisoned the victory bank).
+function setupCreatures(characters, getName) {
     const creatureList = characters.map((character) => {
         return {
             name: getName(character.name),
@@ -24,32 +28,7 @@ function setupCreatures(characters, npcCount, getName) {
         }
     })
     creatureList.sort((a, b) => a.name.localeCompare(b.name))
-    for (let i = 0; i < npcCount; i++) {
-        creatureList.push({
-            name: `NPC ${i + 1}`,
-            type: 'npc',
-            initiative: '',
-            targetName: null,
-            ac: 10,
-            resistances: [],
-            immunities: [],
-            concentration: null,
-            maxHp: 10,
-            currentHp: 10,
-            saveBonuses: {},
-        })
-    }
     return creatureList
-}
-
-// bug-initiative-clear-monsters-become-npc-stubs: Clear must remove every
-// JOINED monster from the board (the confirm copy says so). Only untouched
-// "+ NPC" placeholders — auto-named "NPC N" with no bestiary binding — may
-// survive the reset (and ARE re-seeded by clearCombat). EB-joined monsters and
-// summons carry monsterIndex (and/or a species name), so they never match here
-// and can no longer resurrect as anonymous NPC stubs.
-function isBareNpcPlaceholder(creature) {
-    return creature.type === 'npc' && !creature.monsterIndex && /^NPC \d+$/.test(creature.name || '')
 }
 
 function addNpc(combatSummary) {
@@ -223,14 +202,14 @@ function setTarget(combatSummary, creatureName, targetName) {
     combatSummary.creatures[idx].targetName = targetName || null
 }
 
-function clearCombat(characters, npcCount, getName) {
-    const creatures = setupCreatures(characters, npcCount, getName)
+function clearCombat(characters, getName) {
+    const creatures = setupCreatures(characters, getName)
     return { round: 1, creatures }
 }
 
 function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
     if (!initialSummary?.creatures) {
-        const creatures = setupCreatures(characters, 0, getName)
+        const creatures = setupCreatures(characters, getName)
         return { round: 1, creatures }
     }
     const creatureNameSet = new Set(initialSummary.creatures.map(c => c.name))
@@ -283,7 +262,6 @@ function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
 export {
     parseInitBonus,
     setupCreatures,
-    isBareNpcPlaceholder,
     addNpc,
     removeNpc,
     getNextCreatureName,

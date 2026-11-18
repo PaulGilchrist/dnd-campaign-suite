@@ -92,7 +92,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({ clearPerRoundMajestyTrackers: vi.fn() }));
 vi.mock('../../services/encounters/initiativeService.js', () => ({
     setupCreatures: vi.fn((characters) => characters.map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null }))),
-    isBareNpcPlaceholder: (c) => c.type === 'npc' && !c.monsterIndex && /^NPC \d+$/.test(c.name || ''),
     addNpc: vi.fn((cs) => { cs.creatures.push({ name: 'NPC 1', type: 'npc', initiative: '', targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} }); return 1; }),
     removeNpc: vi.fn(),
     getNextCreatureName: vi.fn((cs, active) => { const idx = cs.creatures.findIndex((c) => c.name === active); if (idx < cs.creatures.length - 1) return { newActiveName: cs.creatures[idx + 1].name, roundIncrement: false }; return { newActiveName: cs.creatures[0].name, roundIncrement: true }; }),
@@ -102,10 +101,11 @@ vi.mock('../../services/encounters/initiativeService.js', () => ({
     rollNpcInitiative: vi.fn(() => ({ roll: 15, bonus: 2, total: 17 })),
     renameNpc: vi.fn(() => Promise.resolve()),
     setTarget: vi.fn(),
-    clearCombat: vi.fn((characters, npcCount = 0) => ({ round: 1, creatures: [
-        ...characters.map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null })),
-        ...Array.from({ length: npcCount }, (_, i) => ({ name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetName: null, concentration: null })),
-    ] })),
+    // Players-only rebuild: Clear re-bakes NOTHING (no placeholder count lane,
+    // backlog 2026-11-18).
+    clearCombat: vi.fn((characters) => ({ round: 1, creatures:
+        characters.map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null })),
+    })),
     mergeCombatSummaryWithCharacters: vi.fn((initialSummary, characters) => {
         const names = new Set((initialSummary?.creatures ?? []).map(c => c.name));
         const newCreatures = characters.filter(ch => !names.has(ch.name)).map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null }));
@@ -215,7 +215,7 @@ describe('Initiative', () => {
         // — confirmClear internals cited in createCreatureHandlers.test.jsx).
         fireEvent.click(screen.getByText('Clear'));
         const dialog = screen.getByRole('dialog', { name: 'Clear Initiative Board' });
-        expect(within(dialog).getByText('Clear combat status for all creatures? This resets initiative and removes monsters from the board — bare +NPC placeholder slots are kept and re-seeded. This action is irreversible.')).toBeInTheDocument();
+        expect(within(dialog).getByText('Clear combat status for all creatures? This resets initiative and removes every monster from the board, bare +NPC placeholder slots included. This action is irreversible.')).toBeInTheDocument();
         expect(window.confirm).not.toHaveBeenCalled();
         expect(clearCombat).not.toHaveBeenCalled();
         expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument();
@@ -228,18 +228,17 @@ describe('Initiative', () => {
 
         // Confirmed face: DOM click → modal → factory confirmClear, and the UI
         // round-trips to round 1.
-        // The fixture's 'Goblin' has no monsterIndex but is not a bare "NPC N" placeholder either —
-        // it is monster-shaped, so Clear counts zero carry-overs (bug-initiative-clear-monsters-become-npc-stubs).
         await act(async () => { fireEvent.click(screen.getByText('Clear')); });
         await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Yes, Clear Board' })); });
-        expect(clearCombat).toHaveBeenCalledWith(props.characters, 0, expect.any(Function));
+        expect(clearCombat).toHaveBeenCalledWith(props.characters, expect.any(Function));
         await waitFor(() => { expect(screen.getByText('Initiative (round 1)')).toBeInTheDocument(); });
         const cardNames = screen.getAllByTestId(/^creature-card-/).map((el) => el.getAttribute('data-testid').replace('creature-card-', ''));
         expect([...cardNames].sort()).toEqual(['Alice', 'Bob']);
     });
 
-    it('Clear re-seeds players + only bare "NPC N" placeholders — EB-joined monsters never resurrect as stubs', async () => {
-        // Live board shape after EB Join + "+ NPC": the monster carries monsterIndex.
+    it('Clear re-seeds players ONLY — bare placeholders are evicted, EB-joined monsters never resurrect as stubs', async () => {
+        // Live board shape after EB Join + "+ NPC": the monster carries monsterIndex,
+        // the placeholder matches the bare "NPC N" auto-name shape.
         vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 2, creatures: [
             { name: 'Alice', type: 'player', initiative: '18', targetName: null, concentration: null },
             { name: 'Bob', type: 'player', initiative: '12', targetName: null, concentration: null },
@@ -252,10 +251,11 @@ describe('Initiative', () => {
         await act(async () => { fireEvent.click(screen.getByText('Clear')); });
         await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Yes, Clear Board' })); });
 
-        // Only the bare placeholder is counted — the Goblin is gone for good.
-        expect(clearCombat).toHaveBeenCalledWith(props.characters, 1, expect.any(Function));
+        // No carry-over count is passed at all (backlog 2026-11-18): a bookkeeping
+        // placeholder must not survive the reset as a fresh 10/10 foe.
+        expect(clearCombat).toHaveBeenCalledWith(props.characters, expect.any(Function));
         await waitFor(() => { expect(screen.getByText('Initiative (round 1)')).toBeInTheDocument(); });
         const cardNames = screen.getAllByTestId(/^creature-card-/).map((el) => el.getAttribute('data-testid').replace('creature-card-', ''));
-        expect([...cardNames].sort()).toEqual(['Alice', 'Bob', 'NPC 1']);
+        expect([...cardNames].sort()).toEqual(['Alice', 'Bob']);
     });
 });

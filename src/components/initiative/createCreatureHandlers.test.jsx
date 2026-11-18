@@ -85,7 +85,6 @@ vi.mock('../../services/encounters/combatData.js', () => {
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({ clearPerRoundMajestyTrackers: vi.fn() }));
 vi.mock('../../services/encounters/initiativeService.js', () => ({
     setupCreatures: vi.fn((characters) => characters.map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null }))),
-    isBareNpcPlaceholder: (c) => c.type === 'npc' && !c.monsterIndex && /^NPC \d+$/.test(c.name || ''),
     addNpc: vi.fn((cs) => { cs.creatures.push({ name: 'NPC 1', type: 'npc', initiative: '', targetName: null, ac: 10, maxHp: 10, currentHp: 10 }); return 1; }),
     removeNpc: vi.fn(),
     getNextCreatureName: vi.fn((cs, active) => { const idx = cs.creatures.findIndex((c) => c.name === active); if (idx < cs.creatures.length - 1) return { newActiveName: cs.creatures[idx + 1].name, roundIncrement: false }; return { newActiveName: cs.creatures[0].name, roundIncrement: true }; }),
@@ -173,7 +172,6 @@ function makeHandlers(creatures, overrides = {}) {
         setCombatSummary,
         setActiveCreatureName,
         characters,
-        numOfNpc: creatures.filter((c) => c.type === 'npc').length,
         isLocalhost: true,
         ...overrides,
     });
@@ -538,19 +536,20 @@ describe('handleClear / confirmClear', () => {
             creatures: [
                 { name: 'Alice', type: 'player' },
                 { name: 'Bob', type: 'player' },
-                { name: 'NPC 1', type: 'npc' },
             ],
         };
         clearCombat.mockReturnValue(cleared);
         const { handlers, setCombatSummary, setActiveCreatureName, characters } = makeHandlers([
             { name: 'Alice', type: 'player', currentHp: 20 },
             { name: 'Goblin', type: 'npc', currentHp: 5 },
-        ], { numOfNpc: 1 });
+        ]);
 
         handlers.confirmClear();
 
         expect(window.confirm).not.toHaveBeenCalled();
-        expect(clearCombat).toHaveBeenCalledWith(characters, 1, expect.any(Function));
+        // No placeholder carry-over count (backlog 2026-11-18): the rebuild is
+        // characters-only — a bare +NPC slot is never re-baked.
+        expect(clearCombat).toHaveBeenCalledWith(characters, expect.any(Function));
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cleared, campaignName);
         expect(setCombatSummary).toHaveBeenCalledWith(cleared);
         expect(storage.set).toHaveBeenCalledWith('activeCreatureName', 'Alice', campaignName);
@@ -616,7 +615,7 @@ describe('handleClear / confirmClear', () => {
         const { handlers } = makeHandlers([
             { name: 'Alice', type: 'player', currentHp: 20 },
             { name: 'Goblin', type: 'npc', currentHp: 0 },
-        ], { numOfNpc: 1 });
+        ]);
 
         handlers.confirmClear();
 
@@ -667,7 +666,6 @@ describe('no-combat guards', () => {
             setCombatSummary,
             setActiveCreatureName: vi.fn(),
             characters: [],
-            numOfNpc: 0,
             isLocalhost: true,
         });
 

@@ -56,7 +56,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass he
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-18 LA — bare `+NPC` placeholders are counted as combat foes by the victory bank and re-baked by Clear:** a placeholder added for bookkeeping survives Clear (numOfNpc = closing placeholder count), silently KILLS the victory celebration (trackerHasFoes outranks `celebrated:true` — a real 6-kill win went banner-less) and later pops a stale banner claiming `"6 foes defeated · 1 drove off"` where the "1" is the never-attacked placeholder. Suggest: exclude bare placeholders (AC10/HP10, no attacks) from `foes`/fled math and either not re-bake them on Clear or not gate the banner on them — `createCreatureHandlers.js` handleClear, `useTvPresentation.js` trackerHasFoes, `victoryLines.js`.
 - **2026-11-18 LA — campaign-name inputs are unlabelled:** the Admin → Delete Campaign typed-name `<input>` carries no placeholder and no aria-label (probe found `ph:"" aria:null` — the gate itself works); the quick-create modal input is the same tier. The app otherwise names every control — add `aria-label="Type the exact campaign name"` style labels to the Delete/typed-confirm inputs (and a placeholder) — `campaign-admin` panel + `SeededCampaignModal`.
 
 ## Blocked / Not Verified (fold-gate ledger)

@@ -8,10 +8,11 @@
 // convention that backdrop clicks and Escape do NOT dismiss — the user must
 // choose an explicit button.
 // Copy honesty fix (backlog 2026-11-08 EP): the retired native string promised
-// it "removes all monsters from the board", but clearCombat re-seeds every
-// bare "+NPC" placeholder (isBareNpcPlaceholder carry-over, test-pinned by
-// design, playbook §9) — so the body now says the placeholders are kept.
-// Button labels and dialog contract are unchanged.
+// it "removes all monsters from the board" while clearCombat re-seeded every
+// bare "+NPC" placeholder. Re-baking is RETIRED (backlog 2026-11-18 — surviving
+// placeholders polluted the victory bank) so the body now honestly says the
+// whole board, placeholder slots included, is removed. Button labels and dialog
+// contract are unchanged.
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
 
 function ClearCombatConfirmModal({ pending, onCancel, onConfirm }) {
@@ -24,7 +25,7 @@ function ClearCombatConfirmModal({ pending, onCancel, onConfirm }) {
             onCancel={onCancel}
             onConfirm={onConfirm}
         >
-            {'Clear combat status for all creatures? This resets initiative and removes monsters from the board — bare +NPC placeholder slots are kept and re-seeded. This action is irreversible.'}
+            {'Clear combat status for all creatures? This resets initiative and removes every monster from the board, bare +NPC placeholder slots included. This action is irreversible.'}
         </DeleteConfirmModal>
     );
 }

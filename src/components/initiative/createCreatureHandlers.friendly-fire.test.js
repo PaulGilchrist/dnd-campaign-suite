@@ -63,7 +63,6 @@ function makeHandlers(overrides = {}) {
         setCombatSummary,
         setActiveCreatureName: vi.fn(),
         characters: [{ name: 'Alice' }, { name: 'Bob' }],
-        numOfNpc: 1,
         isLocalhost: true,
         showToast: vi.fn(),
         requestFriendlyFireConfirm,

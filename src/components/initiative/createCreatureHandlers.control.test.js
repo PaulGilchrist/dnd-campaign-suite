@@ -55,7 +55,6 @@ function makeHandlers(overrides = {}) {
         setCombatSummary,
         setActiveCreatureName: vi.fn(),
         characters: [{ name: 'Alice' }, { name: 'Bob' }],
-        numOfNpc: 2,
         isLocalhost: true,
         showToast: vi.fn(),
         ...overrides,
@@ -233,7 +232,7 @@ describe('handleControllerChange', () => {
         const handlers = createCreatureHandlers({
             combatSummary: null, campaignName, campaignNpcs: [], setNpcImages: vi.fn(),
             overlays: [], setCombatSummary: vi.fn(), setActiveCreatureName: vi.fn(),
-            characters: [], numOfNpc: 0, isLocalhost: true, showToast: vi.fn(),
+            characters: [], isLocalhost: true, showToast: vi.fn(),
         });
         expect(() => handlers.handleControllerChange('Zombie', 'Alice')).not.toThrow();
         expect(addEntry).not.toHaveBeenCalled();

@@ -2,14 +2,14 @@
 // Lane: ClearCombatConfirmModal — the copy/chrome layer for the Initiative
 // "Clear" overlay (backlog 2026-11-08 EK, replaces the retired native
 // window.confirm in createCreatureHandlers.handleClear). OWNED here: the
-// honest question copy (backlog 2026-11-08 EP: it admits bare "+NPC"
-// placeholder slots survive the reset — clearCombat re-seeds them, playbook
-// §9 — instead of promising the whole board empties; scope + irreversibility
-// per the house NAMED canon), the heading/confirm-label derivation, the
-// null-when-idle mount contract, the callback pass-through, and the modal
-// family's dismissal convention PINNED (backlog 2026-11-13 AD: backdrop click
-// and Escape route to the inert onCancel — an explicit confirm still owns the
-// destructive leg).
+// honest question copy (backlog 2026-11-08 EP → re-honestened by backlog
+// 2026-11-18: re-baking bare "+NPC" placeholders on Clear is RETIRED, so the
+// body now promises the whole board empties — placeholder slots included;
+// scope + irreversibility per the house NAMED canon), the heading/confirm-label
+// derivation, the null-when-idle mount contract, the callback pass-through, and
+// the modal family's dismissal convention PINNED (backlog 2026-11-13 AD:
+// backdrop click and Escape route to the inert onCancel — an explicit confirm
+// still owns the destructive leg).
 // Factory bridge + confirmed body → createCreatureHandlers.test.jsx;
 // container wiring + both DOM faces → initiative.test.jsx;
 // underlying a11y tier internals → common/DeleteConfirmModal.test.jsx.
@@ -41,11 +41,11 @@ describe('ClearCombatConfirmModal', () => {
         expect(heading.id).toBe('clear-combat-confirm-title');
     });
 
-    it('renders honest copy: initiative reset + monsters removed, bare +NPC placeholders kept and re-seeded, plus explicit buttons', () => {
+    it('renders honest copy: initiative reset + every monster and bare +NPC placeholder removed, plus explicit buttons', () => {
         renderModal(true);
         const paragraph = document.querySelector('.modal-shell p');
         expect(paragraph.textContent).toBe(
-            'Clear combat status for all creatures? This resets initiative and removes monsters from the board — bare +NPC placeholder slots are kept and re-seeded. This action is irreversible.'
+            'Clear combat status for all creatures? This resets initiative and removes every monster from the board, bare +NPC placeholder slots included. This action is irreversible.'
         );
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         // Confirm label differs from the "Clear" trigger button so role queries stay unique.

@@ -6,6 +6,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { clearDeathSavePrompt, sendDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import utils from '../../services/ui/utils.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc, mergeCombatSummaryWithCharacters } from '../../services/encounters/initiativeService.js'
+import { isBareNpcPlaceholder } from '../../services/combat/npcPlaceholder.js'
 import { applyPresenceChanges, isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { loadCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js'
 import { setSessionPhase } from '../../services/combat/sessionService.js'
@@ -156,7 +157,6 @@ export function createCreatureHandlers({
     setCombatSummary,
     setActiveCreatureName,
     characters,
-    numOfNpc,
     isLocalhost,
     showToast = () => {},
     // Friendly-fire overlay bridge (backlog 2026-11-04 CQ): the host component
@@ -247,8 +247,11 @@ export function createCreatureHandlers({
         // BEFORE the roster is wiped (combat UI state, AGENTS server-first
         // allowlist). Every client — including the TV tab — celebrates the
         // seam until dismissed; "defeated" is kills only (hp ≤ 0), anything
-        // else fled and pays nothing. UI presentation only — no game rule
-        // reads this key.
+        // else fled and pays nothing. Bare "+NPC" placeholders are bookkeeping
+        // slots, not combatants (npcPlaceholder.js) — they NEVER contribute to
+        // the foes/defeated/fled bank, so an untouched placeholder can neither
+        // inflate "N drove off" nor gate the banner. UI presentation only — no
+        // game rule reads this key.
         // Victory law (IMP-1, backlog 2026-11-13): a Clear only celebrates when
         // the closing board generation actually saw an attack — a pure prep-time
         // tidy stays silent. Evidence: the campaign `lastAttack` key (written by
@@ -257,7 +260,7 @@ export function createCreatureHandlers({
         // so the fingerprint always advances — stale attacks from an already-
         // cleared board can never re-celebrate. celebrated:false stamps are
         // written (not skipped) so an undismissed stale banner is outranked too.
-        const foeRows = closingSummary.creatures.filter(c => c.type === 'npc')
+        const foeRows = closingSummary.creatures.filter(c => c.type === 'npc' && !isBareNpcPlaceholder(c))
         const defeatedFoes = foeRows.filter(c => (c.currentHp ?? 0) <= 0).length
         const playerRows = closingSummary.creatures.filter(c => c.type === 'player')
         const survivors = playerRows.filter(c =>
@@ -279,7 +282,7 @@ export function createCreatureHandlers({
             celebrated,
             attackEvidence,
         }, campaignName)
-        const newSummary = clearCombat(characters, numOfNpc, (name) => name)
+        const newSummary = clearCombat(characters, (name) => name)
         storage.set('combatSummary', newSummary, campaignName)
         setCombatSummary(newSummary)
         // L5 §10.1: clearing combat returns the table to exploration.

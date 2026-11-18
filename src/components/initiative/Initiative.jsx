@@ -15,7 +15,6 @@ import {
     setupCreatures,
     mergeCombatSummaryWithCharacters,
     isPreviousDisabled,
-    isBareNpcPlaceholder,
 } from '../../services/encounters/initiativeService.js'
 import { isCreaturePresent } from '../../services/combat/creaturePresence.js'
 import { getCreatureController } from '../../services/encounters/creatureControl.js'
@@ -558,9 +557,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setCombatSummary,
         setActiveCreatureName,
         characters,
-        // Only bare "+ NPC" placeholders carry over a Clear — EB-joined monsters
-        // and summons must never re-materialise as NPC stubs (bug-initiative-clear-monsters-become-npc-stubs).
-        numOfNpc: creaturesOrEmpty(combatSummary).filter(isBareNpcPlaceholder).length,
         isLocalhost,
         showToast,
         requestFriendlyFireConfirm: setPendingFriendlyFire,
@@ -872,7 +868,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 }
             } else {
                 if (cancelled) return
-                const creatures = setupCreatures(characters, 0, utils.getName)
+                const creatures = setupCreatures(characters, utils.getName)
                 const newSummary = { round: 1, creatures }
                 // Zero-character campaigns (Arena/Starter quick-create — first board
                 // mount before any hero joined) leave an empty roster: store the null
