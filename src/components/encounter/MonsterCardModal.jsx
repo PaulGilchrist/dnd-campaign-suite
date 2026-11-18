@@ -2389,21 +2389,29 @@ function logUnpickedVariantDefaults({ campaignName, monsterName, autoDamage }) {
 }
 
 function MonsterAttackPopup({ popupHtml, campaignName, monsterName, setPopupHtml, onQuickRoll, onChargeBonus, onChargeBonusDecline, onTwoHandedVariant, onRangedVariant, onHitChoice }) {
+  // The wrapper stays mounted while the stat modal is open and ONLY the
+  // popup unmounts on close (GK 2026-11-17 guarded close-focus): Popup's
+  // close-restore tier uses this wrapper as its stamped tabindex="-1"
+  // fallback host (overlay.parentElement) — if the gate lived here, the
+  // host would detach in the same commit as the guarded face and the
+  // stranded-only restore would stand down, stranding focus on BODY.
   return (
     <div onClick={(e) => e.stopPropagation()}>
-      <AttackResultPopup
-        popupHtml={popupHtml}
-        onClose={() => setPopupHtml(null)}
-        campaignName={campaignName}
-        attackerName={monsterName}
-        setPopupHtml={setPopupHtml}
-        onQuickRoll={popupHtml.waitingForPlayerSave ? () => onQuickRoll(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined}
-        onChargeBonus={onChargeBonus}
-        onChargeBonusDecline={onChargeBonusDecline}
-        onTwoHandedVariant={onTwoHandedVariant}
-        onRangedVariant={onRangedVariant}
-        onHitChoice={onHitChoice}
-      />
+      {popupHtml && (
+        <AttackResultPopup
+          popupHtml={popupHtml}
+          onClose={() => setPopupHtml(null)}
+          campaignName={campaignName}
+          attackerName={monsterName}
+          setPopupHtml={setPopupHtml}
+          onQuickRoll={popupHtml.waitingForPlayerSave ? () => onQuickRoll(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined}
+          onChargeBonus={onChargeBonus}
+          onChargeBonusDecline={onChargeBonusDecline}
+          onTwoHandedVariant={onTwoHandedVariant}
+          onRangedVariant={onRangedVariant}
+          onHitChoice={onHitChoice}
+        />
+      )}
     </div>
   );
 }
@@ -3193,20 +3201,21 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         isPlayerSummoned={isPlayerSummoned}
         imageUrl={imageUrl}
       />
-      {popupHtml && (
-        <MonsterAttackPopup
-          popupHtml={popupHtml}
-          campaignName={campaignName}
-          monsterName={monsterName}
-          setPopupHtml={setPopupHtml}
-          onQuickRoll={handleQuickRollWithEvasion}
-          onChargeBonus={() => resolveChargeBonus('granted')}
-          onChargeBonusDecline={() => resolveChargeBonus('declined')}
-          onTwoHandedVariant={(decision) => resolveTwoHandedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml })}
-          onRangedVariant={(decision) => resolveRangedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml, mapData, getTarget })}
-          onHitChoice={(decision) => resolveHitChoiceSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml, getTarget })}
-        />
-      )}
+      {/* Host stays mounted while the modal is open (GK 2026-11-17 guarded
+          close-focus): its stamped tabindex="-1" wrapper is the Popup tier's
+          no-anchor fallback host, which must survive the popup's unmount. */}
+      <MonsterAttackPopup
+        popupHtml={popupHtml}
+        campaignName={campaignName}
+        monsterName={monsterName}
+        setPopupHtml={setPopupHtml}
+        onQuickRoll={handleQuickRollWithEvasion}
+        onChargeBonus={() => resolveChargeBonus('granted')}
+        onChargeBonusDecline={() => resolveChargeBonus('declined')}
+        onTwoHandedVariant={(decision) => resolveTwoHandedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml })}
+        onRangedVariant={(decision) => resolveRangedVariantSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml, mapData, getTarget })}
+        onHitChoice={(decision) => resolveHitChoiceSelection({ popupHtml, decision, monsterName, campaignName, setPopupHtml, getTarget })}
+      />
     </div>
     {evasionSelection !== null && pendingSaveRef.current && (
       <MonsterEvasionModal

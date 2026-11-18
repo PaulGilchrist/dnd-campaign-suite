@@ -37,13 +37,24 @@ function Popup({ html, children, onClickOrKeyDown, showCloseButton = true, dismi
     // the popup opened (a chooser restore, a stacked popup, a dialog) wins
     // untouched. No usable anchor stamps tabindex="-1" on the overlay's parent
     // (the useMenuRoving no-anchor fallback host). Guarded faces (staged
-    // damage) never move focus at all — their chrome stays as the void guard
-    // shipped it, so no anchor is captured and no restore runs.
+    // damage) capture NO anchor and still never pull or trap while open
+    // (GK 2026-11-17: zero-pull-on-open law kept) — but they DO participate in
+    // the close side: they always fall back to the stamped host, so a keyboard
+    // user whose Cancel attack/Done button unmounts under focus lands on that
+    // tabindex="-1" host instead of restarting at document root (BODY). The
+    // stranded-only check means nothing moves if focus is still healthily
+    // parked elsewhere (e.g. the opening chip) when the guarded face closes.
+    // Host LIFETIME law: consumers must keep overlay.parentElement mounted
+    // beyond the popup's own unmount (MonsterCardModal's MonsterAttackPopup
+    // wrapper gates AttackResultPopup INSIDE itself) — a host that detaches
+    // with the popup fails the isConnected guard and the close strands BODY.
+    // (Live-proved 2026-11-17: the old outer {popupHtml && …} gate made the
+    // staged face's host vanish in the same commit as the popup.)
     useEffect(() => {
-        if (guarded) return undefined;
         const overlay = modalRef.current ? modalRef.current.parentElement : null;
         const active = document.activeElement;
-        const usable = active
+        const usable = !guarded
+            && active
             && active !== document.body
             && active !== document.documentElement
             && active.isConnected
