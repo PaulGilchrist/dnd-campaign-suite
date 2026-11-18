@@ -39,6 +39,9 @@ vi.mock('../../services/combat/auras/bardicInspirationState.js', () => ({
 
 vi.mock('../../services/combat/prompts/bardicInspirationPromptUtils.js', () => ({
   clearBardicInspirationPrompt: vi.fn(),
+  // Drain-on-close re-read seam: cross-tab pins here drive the echo lane only
+  // (the store-driven drain is pinned in .queue-drain.test.jsx).
+  getPendingBardicInspirationPrompts: vi.fn(() => []),
 }));
 
 const mockSubscriber = vi.hoisted(() => ({ handleEvent: null }));

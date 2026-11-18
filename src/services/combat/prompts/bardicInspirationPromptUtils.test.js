@@ -31,6 +31,7 @@ import {
   sendBardicInspirationOffensePrompt,
   clearBardicInspirationPrompt,
   getBardicInspirationPrompt,
+  getPendingBardicInspirationPrompts,
 } from './bardicInspirationPromptUtils.js';
 
 import {
@@ -88,6 +89,7 @@ describe('bardicInspirationPromptUtils', () => {
     expect(Object.keys(promptUtils).sort()).toEqual([
       'clearBardicInspirationPrompt',
       'getBardicInspirationPrompt',
+      'getPendingBardicInspirationPrompts',
       'sendBardicInspirationOffensePrompt',
     ]);
   });
@@ -171,5 +173,40 @@ describe('bardicInspirationPromptUtils', () => {
     clearBardicInspirationPrompt('test-campaign', 'Ally');
     expect(global.fetch).not.toHaveBeenCalled();
     expect(getBardicInspirationPrompt('test-campaign', 'Ally')).toBeNull();
+  });
+
+  // Drain re-read lane (backlog HL 2026-11-17): the modal's drain-on-close
+  // effect re-reads deferred / missed-echo prompts from the campaign store when
+  // the active prompt closes. Enumeration covers ONLY biPrompt-lane keys with
+  // non-null payloads — unrelated campaign-store keys, null residues, and
+  // already-DELETEd (evicted) entries never list. Shape/mode filtering stays
+  // consumer-side (the modal refuses a defense payload listed here).
+  it('drain re-read lists pending biPrompt keys and excludes evicted/null/unrelated entries', () => {
+    sendOffense('Bard', 'Goblin', 8, 202);
+    sendOffense('SisterBard', 'Orc', 10, 303);
+    getStore('campaign').set('combatSummary', { creatures: [] });
+    getStore('campaign').set('Ghost-biPrompt', null);
+
+    expect(getPendingBardicInspirationPrompts()).toEqual([
+      { keySuffix: 'Bard-biPrompt', prompt: OFFENSE_PAYLOAD },
+      {
+        keySuffix: 'SisterBard-biPrompt',
+        prompt: {
+          mode: 'offense',
+          promptId: 303,
+          targetName: 'Orc',
+          attackerName: 'SisterBard',
+          dieSize: 10,
+          fullDescription: OFFENSE_PAYLOAD.fullDescription,
+        },
+      },
+    ]);
+
+    // A wildcard-DELETE eviction immediately drops the key from the drain list
+    // (Skip clears its own key BEFORE advance() runs, so the drain never sees it).
+    clearBardicInspirationPrompt('test-campaign', 'Bard');
+    expect(getPendingBardicInspirationPrompts().map((p) => p.keySuffix)).toEqual([
+      'SisterBard-biPrompt',
+    ]);
   });
 });

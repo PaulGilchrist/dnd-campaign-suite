@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import Subscriber from './Subscriber.jsx';
 import { clearBardicInspiration } from '../../services/combat/auras/bardicInspirationState.js';
-import { clearBardicInspirationPrompt } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
+import { clearBardicInspirationPrompt, getPendingBardicInspirationPrompts } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
 import './SavePromptModal.css';
 import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
 
@@ -35,6 +35,8 @@ function BardicInspirationReactionModal({ campaignName }) {
         // applyBardicInspirationDefense) — so it never mounts here.
         if (promptData.mode !== 'offense') return;
         if (processedPromptIdsRef.current.has(promptId)) return;
+        // Deferred while one is mounted — never silently lost: the drained
+        // server key surfaces from the drain-on-close effect below.
         if (activePromptIdRef.current !== null) return;
         if (promptsRef.current.some(p => p.promptId === promptId)) return;
         processedPromptIdsRef.current.add(promptId);
@@ -86,6 +88,25 @@ function BardicInspirationReactionModal({ campaignName }) {
         }
         enqueuePrompt(keySuffix, event.data);
     }, [campaignName, enqueuePrompt, dequeuePrompt]);
+
+    // Drain-on-close (backlog HL 2026-11-17): a second prompt that arrives while
+    // one is mounted is DEFERRED by enqueuePrompt's active-guard (and a prompt
+    // whose arrival echo was missed entirely waits too) — either way it still
+    // lives on its `<attacker>-biPrompt` key in the campaign-store mirror App.jsx
+    // maintains. When the active prompt closes by ANY path (Skip / Use-Reaction
+    // via advance, or a cross-tab cleared echo via dequeuePrompt) and the queue
+    // is empty, re-read the remaining `*-biPrompt` keys so a deferred prompt
+    // mounts in-session — no reload, no SSE reconnect. The active-guard keeps
+    // the mount single, so the drain chains: every close re-drains until the
+    // store holds no pending prompts. Dedupe laws hold — a drained mount
+    // swallows its own later replay echoes (processedPromptIds), and a drained
+    // defense-shape payload is refused exactly like an arrived one.
+    useEffect(() => {
+        if (current) return;
+        getPendingBardicInspirationPrompts().forEach(({ keySuffix, prompt }) => {
+            enqueuePrompt(keySuffix, prompt);
+        });
+    }, [current, enqueuePrompt]);
 
     const handleUseReaction = useCallback(async () => {
         if (!current) return;

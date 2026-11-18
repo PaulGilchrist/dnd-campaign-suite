@@ -22,6 +22,10 @@ vi.mock('../../services/combat/auras/bardicInspirationState.js', () => ({
 
 vi.mock('../../services/combat/prompts/bardicInspirationPromptUtils.js', () => ({
   clearBardicInspirationPrompt: vi.fn(),
+  // Drain-on-close re-read seam: these lifecycle tests drive prompts through
+  // the SSE echo lane only — an empty drain keeps the store invisible here
+  // (the real store-driven drain is pinned in .queue-drain.test.jsx).
+  getPendingBardicInspirationPrompts: vi.fn(() => []),
 }));
 
 const mockSubscriber = vi.hoisted(() => ({ handleEvent: null }));

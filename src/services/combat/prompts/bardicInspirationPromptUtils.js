@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, deleteRuntimeKey, getStore } from '../../../hooks/runtime/useRuntimeState.js';
 
 // OFFENSE Combat Inspiration adjudication prompts ride the `<name>-biPrompt`
 // top-level change-data key through the campaign store (`name` is the ATTACKING
@@ -40,4 +40,23 @@ export function clearBardicInspirationPrompt(campaignName, name) {
 
 export function getBardicInspirationPrompt(campaignName, name) {
     return getRuntimeValue('campaign', biPromptKey(name));
+}
+
+// Drain re-read (backlog HL 2026-11-17): a prompt that arrives while the modal
+// already shows one is DEFERRED — it still lives on its `<attacker>-biPrompt`
+// campaign-store key (App.jsx mirrors every registered biPrompt echo), so when
+// the active prompt closes the consumer re-reads the store instead of waiting
+// for the next SSE connect. Enumerates the non-null biPrompt entries as
+// `{ keySuffix, prompt }` pairs (keySuffix = the exact server key, so the
+// modal can dequeue it precisely on its cleared echo); shape/mode filtering
+// stays in the modal's enqueuePrompt guard — a dead defense payload listed here
+// still refuses to mount.
+export function getPendingBardicInspirationPrompts() {
+    const pending = [];
+    for (const [key, value] of getStore('campaign')) {
+        if (key.endsWith('-biPrompt') && value != null) {
+            pending.push({ keySuffix: key, prompt: value });
+        }
+    }
+    return pending;
 }
