@@ -26,3 +26,21 @@ In `handleEvent`, on `event.data == null` with a key matching `/^(.+)-biPrompt$/
 
 ## Severity
 Data integrity risk — the adjudication is shared-table state; a resolved prompt staying actionable on every other tab allows double-consumption of a Bardic Inspiration die / reaction (and a defense-use dispatched on a twin could apply bonus math to the wrong pending attack where a live rider waits). Not silent DATA corruption server-side (eviction itself is honest), but the client queue lies to the player.
+
+## Resolution
+FIXED 2026-11-17 (fix run, dev pair :5173 live source, CAMPAIGN_LOCK=test-campaign).
+
+**Root cause — as diagnosed in the bug file:** `BardicInspirationReactionModal.handleEvent` opened with `if (!event.key || event.data == null) return`, so the drain-to-evict null DELETE echo never reached the queue: the store mirror evicted on every tab, but an already-mounted modal on a non-answering tab kept the resolved prompt actionable indefinitely.
+
+**Fix (files changed):**
+- `src/components/common/BardicInspirationReactionModal.jsx` — mirrored the `SavePromptModal.jsx` cleared-branch doctrine (no new architecture):
+  - `enqueuePrompt` now captures the arrival key as `promptKeySuffix` (`'<name>-biPrompt'`), exactly like `appendSavePrompt` stamps `promptKeySuffix`.
+  - `handleEvent` moved the `data == null` check BELOW the `-biPrompt` key match; a null echo on a matching key routes to a new `dequeuePrompt(keySuffix)` that filters the queue by `promptKeySuffix`, resets `activePromptIdRef` when the removed prompt was the active one, and drops the promptId from `processedPromptIdsRef` so a fresh value echo on the revived key can legitimately re-mount (the save lane's clear/revive doctrine). Null never MOUNTS — the no-re-enqueue law from `5bf8c89a3` is untouched (malformed-events pins still pass unchanged).
+  - Dual-ruleset: single shared modal for 5e + 2024 (one producer lane via `bardicInspirationPromptUtils`/`attackRollRiders`) — no sibling module needed the fix.
+- `src/components/common/BardicInspirationReactionModal.cross-tab.test.jsx` (NEW) — 7 regression pins: defense + offense null echo dequeues the mounted twin; key-exact matching (another creature's clear is inert); no-re-enqueue law (null/undefined never mounts); same-promptId revival on a fresh value echo; evicted active slot lets the next prompt surface without a reconnect; local Skip + own echoed null stays inert (no second consume/DELETE).
+
+**Verification:**
+- Live repro CONFIRMED pre-fix (two GM tabs on :5173 in test-campaign): seeded `HeroesFeastBard-biPrompt` (`hl-bi-x1` shape) → both tabs mounted "Combat Inspiration - Defense" → tab 0 Skip fired the wildcard DELETE, tab 0 unmounted, server key absent — tab 1 stayed mounted with the stale "d20(12) + 4 = 16 vs AC 18" payload.
+- Live re-verify post-fix (fresh reload both tabs, fresh prompt `hl-bi-verify-1`): both tabs mounted → tab 0 Skip → DELETE fired → **tab 1's overlay self-evicted within the wait window** (`twinEvicted: true`, both tabs `mounted: false`). Sanity legs: fresh prompt still mounts on both tabs; the no-re-enqueue law held over the live lane (seed `hl-bi-verify-2` then external `DELETE` via curl → both tabs evicted and stayed evicted across a dwell, zero re-mounts).
+- Tests: new cross-tab file 7/7; BI-lane touched set (modal/cross-tab/prompt-utils/App.runtime-events/AttackResultPopup.bi-defense/useLoggedDiceRollAttack.misc-effects) 99/99; full `src/components/common` folder 73 files / 742 tests green. `npm run lint` clean (zero warnings).
+- Cleanup: all seeded `HeroesFeastBard-biPrompt` keys evicted; change-data cache + campaign log cleared via the admin lanes with all tabs closed — GET-verified `{}` / `[]`.

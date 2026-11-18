@@ -24,7 +24,7 @@ function BardicInspirationReactionModal({ campaignName }) {
         });
     }, []);
 
-    const enqueuePrompt = useCallback((targetName, promptData) => {
+    const enqueuePrompt = useCallback((targetName, keySuffix, promptData) => {
         const promptId = promptData?.promptId;
         if (!promptId) return;
         if (processedPromptIdsRef.current.has(promptId)) return;
@@ -33,24 +33,51 @@ function BardicInspirationReactionModal({ campaignName }) {
         processedPromptIdsRef.current.add(promptId);
         activePromptIdRef.current = promptId;
         setPrompts(prev => {
-            const next = [...prev, { targetName, ...promptData }];
+            // The arrival key identifies the exact server key this prompt lives
+            // on ('<name>-biPrompt'), so a cleared echo can dequeue precisely it
+            // (SavePromptModal's promptKeySuffix doctrine).
+            const next = [...prev, { targetName, promptKeySuffix: keySuffix, ...promptData }];
+            promptsRef.current = next;
+            return next;
+        });
+    }, []);
+
+    // Cleared-key echo (the drain-to-evict DELETE broadcast): the prompt was
+    // resolved or skipped on another tab — dequeue the un-adjudicated prompt
+    // sitting on that exact server key so a twin tab's mounted modal self-evicts
+    // instead of staying actionable on a resolved adjudication. Drops the
+    // promptId dedupe entry (a fresh value echo on the key legitimately revives
+    // the prompt — clearPromptKeys/revive doctrine, SavePromptModal).
+    const dequeuePrompt = useCallback((keySuffix) => {
+        setPrompts(prev => {
+            const next = prev.filter(p => p.promptKeySuffix !== keySuffix);
+            if (next.length === prev.length) return prev;
+            const removed = prev.find(p => p.promptKeySuffix === keySuffix);
+            if (removed.promptId === activePromptIdRef.current) activePromptIdRef.current = null;
+            processedPromptIdsRef.current.delete(removed.promptId);
             promptsRef.current = next;
             return next;
         });
     }, []);
 
     const handleEvent = useCallback((event) => {
-        if (!event.key || event.data == null) return;
+        if (!event.key) return;
         const prefix = `change-${campaignName}-`;
         if (!event.key.startsWith(prefix)) return;
         // Sole prompt shape: the `<name>-biPrompt` wildcard-key echo carrying the
-        // raw prompt payload (bardicInspirationPromptUtils). A null payload (the
-        // drain-to-evict DELETE echo) exits above — dismissal is the local Skip/
-        // Resolve path; nothing re-enqueues an evicted prompt on a fresh connect.
+        // raw prompt payload (bardicInspirationPromptUtils). A null payload is
+        // the drain-to-evict DELETE echo: it DE-queues (handleEvent's cleared
+        // branch) but never mounts — the no-re-enqueue law that keeps an evicted
+        // prompt from resurrecting on a fresh connect.
         const match = event.key.slice(prefix.length).match(/^(.+)-biPrompt$/);
         if (!match) return;
-        enqueuePrompt(match[1], event.data);
-    }, [campaignName, enqueuePrompt]);
+        const keySuffix = `${match[1]}-biPrompt`;
+        if (event.data == null) {
+            dequeuePrompt(keySuffix);
+            return;
+        }
+        enqueuePrompt(match[1], keySuffix, event.data);
+    }, [campaignName, enqueuePrompt, dequeuePrompt]);
 
     const handleUseReaction = useCallback(async () => {
         if (!current) return;
