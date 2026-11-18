@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyOpenHandTechnique } from '../../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
 import ChooserModalFooter from './shared/ChooserModalFooter.jsx';
 import { CHOOSER_FOOTER_LABELS } from './shared/chooserFooterLabels.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName, saveDc, onClose, onConfirm }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const options = action.automation?.options || action.options || [];
 
@@ -32,7 +36,7 @@ function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName,
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand-rock"></i> {action.name}
@@ -52,7 +56,7 @@ function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName,
         : 'Choose an effect.';
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand-rock"></i> {action.name}

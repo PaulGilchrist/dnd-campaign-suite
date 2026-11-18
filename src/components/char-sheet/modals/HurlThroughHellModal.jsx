@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createSaveListener, logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -6,10 +6,14 @@ import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.
 import { getCombatSummary, getCurrentCombatRound } from '../../../services/encounters/combatData.js';
 import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function HurlThroughHellModal({ action, playerStats, campaignName, targetName, saveType, saveDc, damageType, damageExpression, damageTotal, _dieRoll, currentUses, maxUses, pactSlotLevel, pactSlotsAvailable, pactMagicRecharge, onClose }) {
     const [step, setStep] = useState('info'); // 'info' | 'result'
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const playerName = playerStats.name;
     const featureName = action.name || 'Hurl Through Hell';
@@ -233,7 +237,7 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
     // Info screen — shows error message when can't use
     if (step === 'info') {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-dragon"></i> {featureName}
@@ -296,7 +300,7 @@ function HurlThroughHellModal({ action, playerStats, campaignName, targetName, s
         }
 
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-dragon"></i> {featureName}

@@ -29,6 +29,7 @@ import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.
 import { handleOverchannelSelfDamage } from '../../../../hooks/combat/handlers/handleOverchannelSelfDamage.js';
 import { hasSoulstitchProtection, clearSoulstitchStamp } from '../../../../hooks/combat/loggedDiceRollUtils.js';
 import { setTempHp } from '../../../../services/automation/handlers/buffs/tempHpService.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 // CLA-037: spell-origin school stamp for the Bewitching Magic manual gate.
 function resolveActionSpellSchool(action) {
@@ -2047,6 +2048,9 @@ function SaveAttackAoeModal({
     const handleCreatureSelectionSkip = useCallback(() => {
         onClose();
     }, [onClose]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const renderBody = (ctx) => {
         if (!ctx.processing && !ctx.allResolved && !summary) {
@@ -2109,7 +2113,7 @@ function SaveAttackAoeModal({
 
     if (summary) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-bomb"></i> {action.name} — Results

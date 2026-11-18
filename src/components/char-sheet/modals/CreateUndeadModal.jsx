@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function CreateUndeadModal({ maxTargets, onConfirm, onClose }) {
     const [ghoulCount, setGhoulCount] = useState(1);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const adjustGhoul = (delta) => {
         setGhoulCount(prev => Math.max(1, Math.min(maxTargets, prev + delta)));
@@ -12,7 +16,7 @@ export default function CreateUndeadModal({ maxTargets, onConfirm, onClose }) {
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-skull"></i> Create Undead

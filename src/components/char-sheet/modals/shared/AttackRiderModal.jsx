@@ -7,6 +7,7 @@ import SecondaryTargetModal from './SecondaryTargetModal.jsx';
 import ChooserModalFooter from './ChooserModalFooter.jsx';
 import { CHOOSER_FOOTER_LABELS } from './chooserFooterLabels.js';
 import '../../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const RIDER_EFFECT_LABELS = [
     [opt => opt.effect === 'disadvantage_on_next_save', () => 'Disadvantage on next save'],
@@ -55,8 +56,11 @@ function riderCanApply(multiSelect, selectedMulti, selected) {
 }
 
 function RiderResultOverlay({ title, description, onClose }) {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {title}
@@ -194,6 +198,9 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     // Pre-apply Cancel remains a free "roll with no effect" exit.
     const [dispatched, setDispatched] = useState(false);
     const dispatchedRef = useRef(false);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => {
         if (applied && !result && !versatileTricksterTargets && !stalkersFlurryTargets) {
@@ -272,7 +279,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const canApply = riderCanApply(multiSelect, selectedMulti, selected);
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {action.name}

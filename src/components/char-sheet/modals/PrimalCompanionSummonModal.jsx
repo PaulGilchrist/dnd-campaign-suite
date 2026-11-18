@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { confirmPrimalCompanionSummon } from '../../../services/automation/handlers/class-ranger/primalCompanionHandler.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function PrimalCompanionSummonModal({ action, playerStats, campaignName, onClose }) {
     const [selectedType, setSelectedType] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const companionTypes = action?.automation?.companionTypes || [];
 
@@ -16,7 +20,7 @@ export default function PrimalCompanionSummonModal({ action, playerStats, campai
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-paw"></i> {action.name}
@@ -33,7 +37,7 @@ export default function PrimalCompanionSummonModal({ action, playerStats, campai
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-paw"></i> Primal Companion

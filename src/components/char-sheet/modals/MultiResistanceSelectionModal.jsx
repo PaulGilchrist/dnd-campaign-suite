@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import '../CharSheet.css';
 import './MultiResistanceSelectionModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function AppliedResultModal({ title, icon, result, onClose }) {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon || 'fa-shield-halved'}`}></i> {title || 'Resistance Selection'}
@@ -23,6 +27,9 @@ function MultiResistanceSelectionModal({ title, icon, action: _action, playerSta
     const [selected, setSelected] = useState(existingTypes ? [...existingTypes] : []);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleToggle = (type) => {
         if (selected.includes(type)) {
@@ -44,7 +51,7 @@ function MultiResistanceSelectionModal({ title, icon, action: _action, playerSta
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon || 'fa-shield-halved'}`}></i> {title || 'Resistance Selection'}

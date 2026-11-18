@@ -4,6 +4,7 @@ import Subscriber from './Subscriber.jsx';
 import { clearBardicInspiration } from '../../services/combat/auras/bardicInspirationState.js';
 import { clearBardicInspirationPrompt } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
 import './SavePromptModal.css';
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
 
 function BardicInspirationReactionModal({ campaignName }) {
     const [prompts, setPrompts] = useState([]);
@@ -97,6 +98,9 @@ function BardicInspirationReactionModal({ campaignName }) {
         clearBardicInspirationPrompt(campaignName, current.mode === 'offense' ? current.attackerName : current.targetName);
         advance();
     }, [campaignName, current, advance]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef, !!current);
 
     return (
         <>
@@ -110,7 +114,7 @@ function BardicInspirationReactionModal({ campaignName }) {
                 />
             )}
             {current && (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bard"></i> {current.mode === 'defense' ? 'Combat Inspiration - Defense' : 'Combat Inspiration - Offense'}

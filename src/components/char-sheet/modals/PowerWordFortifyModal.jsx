@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import './PowerWordFortifyModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function PowerWordFortifyModal({
     creatureTargets,
@@ -66,9 +67,12 @@ export default function PowerWordFortifyModal({
         if (sum > totalTempHp) return;
         onConfirm(distribution);
     }, [selected, allocations, totalTempHp, onConfirm]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield"></i> Power Word Fortify

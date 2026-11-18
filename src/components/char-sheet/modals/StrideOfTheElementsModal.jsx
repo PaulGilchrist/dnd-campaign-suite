@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { STRIDE_OPTIONS } from '../../../services/automation/handlers/combat/strideOfTheElementsHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function StrideOfTheElementsModal({ action, _playerStats, _campaignName, onConfirm, onClose }) {
     const [selected, setSelected] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = () => {
         if (!selected) return;
@@ -19,7 +23,7 @@ function StrideOfTheElementsModal({ action, _playerStats, _campaignName, onConfi
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-person-walking"></i> {action?.name || 'Stride of the Elements'}

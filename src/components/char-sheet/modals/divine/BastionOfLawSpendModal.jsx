@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import './BastionOfLawSpendModal.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function BastionOfLawSpendModal({ featureName, playerName, campaignName, onClose, onConfirm }) {
     const [rollResult, setRollResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const wardDice = useRuntimeValue(playerName, 'bastionOfLawWardDice', campaignName) || [];
     const lastAttackDamage = useRuntimeValue(playerName, 'bastionOfLawLastAttackDamage', campaignName) || 0;
@@ -32,7 +36,7 @@ function BastionOfLawSpendModal({ featureName, playerName, campaignName, onClose
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> {featureName}

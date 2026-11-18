@@ -5,6 +5,7 @@ import { isApplyBusy, setApplyBusy } from './areaEffectModalInstances.js';
 import { createOverlay, hitTestOverlay } from '../../../../models/SpellOverlay.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { isCreaturePresent } from '../../../../services/combat/creaturePresence.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 // CLA-303: Turn Undead target validity — dead creatures are invalid; trust the
 // monsterType joined onto combatSummary first, then fall back to a suffix-strip
@@ -171,6 +172,9 @@ function AreaEffectTargetModalBase({
   const handleSaveDismissed = useCallback((event) => {
     handleSaveDismissedOverrideRef.current(event, ctxRef.current);
   }, []);
+  // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+  const overlayRef = useRef(null);
+  useOverlayEntranceFocus(overlayRef);
 
   ctxRef.current = {
     processing, allResolved, selected, eligibleTargets,
@@ -202,7 +206,7 @@ function AreaEffectTargetModalBase({
   const ctx = ctxRef.current;
 
   return (
-    <div className="sp-overlay">
+    <div className="sp-overlay" ref={overlayRef}>
       <div className="sp-modal">
         <div className="sp-header">
           <i className={icon}></i> {featureName}

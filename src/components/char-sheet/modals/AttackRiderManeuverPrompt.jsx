@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip, isMiss }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const selectedManeuver = maneuvers.find(m => m.name === selected);
 
@@ -20,7 +24,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
     if (applied && result) {
         if (result.isMissResult) {
             return (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> Precision Attack
@@ -36,7 +40,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
         }
         if (result.payload) {
             return (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> {result.payload.name || 'Maneuver'}
@@ -51,7 +55,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
             );
         }
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-bolt"></i> Maneuver Applied
@@ -76,7 +80,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
         : 'Choose an attack rider maneuver to use on this hit:';
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {headerText}

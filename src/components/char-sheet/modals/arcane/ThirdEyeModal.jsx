@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyThirdEye } from '../../../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import '../../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const THIRD_EYE_OPTIONS = [
     { name: 'Darkvision (120 feet)', description: 'You gain Darkvision out to a range of 120 feet.' },
@@ -13,6 +14,9 @@ function ThirdEyeModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(THIRD_EYE_OPTIONS[0]?.name || null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = async () => {
         if (!selected) return;
@@ -28,7 +32,7 @@ function ThirdEyeModal({ action, playerStats, campaignName, onClose }) {
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-eye"></i> {action.name}
@@ -45,7 +49,7 @@ function ThirdEyeModal({ action, playerStats, campaignName, onClose }) {
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-eye"></i> {action.name}

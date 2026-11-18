@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function AnimateDeadModal({ maxTargets, onConfirm, onClose }) {
     const [zombieCount, setZombieCount] = useState(0);
     const [skeletonCount, setSkeletonCount] = useState(maxTargets);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const total = zombieCount + skeletonCount;
 
@@ -29,7 +33,7 @@ export default function AnimateDeadModal({ maxTargets, onConfirm, onClose }) {
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bone"></i> Animate Dead

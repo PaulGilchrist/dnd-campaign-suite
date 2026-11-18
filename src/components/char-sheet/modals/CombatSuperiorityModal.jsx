@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const ACTION_TYPE_LABELS = {
     attack_rider: 'Attack Riders (on hit)',
@@ -114,8 +115,11 @@ function groupManeuversByType(maneuverList) {
 }
 
 function SpOverlay({ wide, children }) {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className={wide ? 'sp-modal sp-modal--wide' : 'sp-modal'}>
                 {children}
             </div>

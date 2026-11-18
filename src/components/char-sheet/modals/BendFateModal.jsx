@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyBendFateChoice } from '../../../services/automation/handlers/reactions/reactionBonusHandler.js';
 import '../../common/SavePromptModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function resolveBendFateBonus(lastAttack) {
     if (typeof lastAttack.bonus === 'object') {
@@ -12,6 +13,9 @@ function resolveBendFateBonus(lastAttack) {
 function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, attackerName: _attackerName, eventLabel, hitStatus, saveStatus, isAttack, isSave, isCheck: _isCheck, onClose }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const bonusValue = resolveBendFateBonus(lastAttack);
     const originalTotal = (lastAttack.d20 || 0) + bonusValue;
@@ -28,7 +32,7 @@ function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, 
 
     if (result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand"></i> {action.name || 'Bend Luck'}
@@ -44,7 +48,7 @@ function BendFateModal({ action, playerStats, campaignName, d4Roll, lastAttack, 
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand"></i> {action.name || 'Bend Luck'}

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { MASTERY_EFFECTS, applyMasteryEffect } from '../../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { loadWeaponMasteries } from '../../../hooks/combat/useActionPopup.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerStats, campaignName, targetName: targetNameProp, damageTotal, onClose }) {
     const [selected, setSelected] = useState(null);
@@ -10,6 +11,9 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
     const [result, setResult] = useState(null);
     const [masteryDescriptions, setMasteryDescriptions] = useState(null);
     const [targetName, setTargetName] = useState(targetNameProp || null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => {
         if (!targetName) {
@@ -53,7 +57,7 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-crosshairs"></i> Weapon Mastery
@@ -69,7 +73,7 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-crosshairs"></i> Weapon Mastery — {attackName}

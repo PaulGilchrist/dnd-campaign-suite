@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import './SecondaryTargetModal.css';
 import { getTargetMapStatuses, distanceBadgeText } from '../../../../services/maps/spellOverlayService.js';
 import { useRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { resolveLiveTargetHp } from '../../../../services/automation/handlers/healing/liveTargetHp.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function isOptionTarget(target) {
     return 'value' in target;
@@ -142,6 +143,9 @@ function SelectTargetHint({ text, selected, targetCount }) {
 function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSkip, featureDescription, description, confirmLabel, confirmIcon, showHp, showSize, hideConfirm, variantLabel, variantChecked, onVariantChange, variantDisabled, campaignName, attackerName, rangeFt, liveHp, skipLabel, onDismiss, dismissLabel, selectHint }) {
     const [selected, setSelected] = useState(null);
     const [mapStatuses, setMapStatuses] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => {
         if (!campaignName || !attackerName || targets.length === 0) return undefined;
@@ -167,7 +171,7 @@ function SecondaryTargetModal({ title, titleId, targets, onTargetSelected, onSki
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 {/* titleId: optional anchor for a wrapping shell's aria-labelledby
                     (backlog 2026-11-10 HD dialog tier). Undefined = no attribute,

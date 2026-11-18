@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { confirmWarMagicCantrip } from '../../../services/automation/handlers/class-fighter-rogue/warMagicCantripHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function WarMagicCantripModal({ action, playerStats, campaignName, options, optionDetails, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleConfirm = async () => {
         const res = await confirmWarMagicCantrip(action, playerStats, campaignName, selected);
@@ -15,7 +19,7 @@ function WarMagicCantripModal({ action, playerStats, campaignName, options, opti
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hat-wizard"></i> {action.name}
@@ -31,7 +35,7 @@ function WarMagicCantripModal({ action, playerStats, campaignName, options, opti
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hat-wizard"></i> {action.name}

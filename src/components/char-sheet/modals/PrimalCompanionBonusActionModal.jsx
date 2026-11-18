@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyBonusActionCommand } from '../../../services/automation/handlers/class-ranger/primalCompanionHandler.js';
 import '../CharSheet.css';
 import './PrimalCompanionBonusActionModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const BONUS_ACTION_COMMANDS = [
     { name: 'Dash', description: 'Double movement speed this turn' },
@@ -15,6 +16,9 @@ function PrimalCompanionBonusActionModal({ action, playerStats, campaignName, co
     const [useForceDamage, setUseForceDamage] = useState(false);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const canUseForceDamage = action.automation?.forceDamageOption;
 
@@ -27,7 +31,7 @@ function PrimalCompanionBonusActionModal({ action, playerStats, campaignName, co
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hands"></i> {action.name}
@@ -43,7 +47,7 @@ function PrimalCompanionBonusActionModal({ action, playerStats, campaignName, co
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hands"></i> {action.name}

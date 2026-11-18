@@ -1,4 +1,6 @@
 
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
+import { useRef } from 'react';
 const aspectOptions = [
     { name: 'Owl', description: 'You have Darkvision with a range of 60 feet. If you already have Darkvision, its range increases by 60 feet.', icon: 'eye' },
     { name: 'Panther', description: 'You have a Climb Speed equal to your Speed.', icon: 'paw' },
@@ -6,9 +8,12 @@ const aspectOptions = [
 ];
 
 function AspectOfTheWildsModal({ aspectOfTheWildsModal, handleAspectOfTheWildsConfirm, handleAspectOfTheWildsSkip }) {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     if (!aspectOfTheWildsModal) return null;
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-paw"></i> Aspect of the Wilds

@@ -1,5 +1,7 @@
 import '../shared/SecondaryTargetModal.css';
 import './ClockworkCavalcadeModal.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
+import { useRef } from 'react';
 
 const OPTIONS = [
     {
@@ -27,8 +29,11 @@ export default function ClockworkCavalcadeModal({
     onChoose,
     onClose,
 }) {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-gears"></i> {featureName}

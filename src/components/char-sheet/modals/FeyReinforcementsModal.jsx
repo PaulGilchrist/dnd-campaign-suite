@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { confirmFeyReinforcement } from '../../../services/automation/handlers/class-warlock/feyReinforcementsHandler.js';
 import '../CharSheet.css';
 import './FeyReinforcementsModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function FeyReinforcementsModal({ action, playerStats, campaignName, onClose }) {
     const [noConcentration, setNoConcentration] = useState(false);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleConfirm = async () => {
         const res = await confirmFeyReinforcement(action, playerStats, campaignName, noConcentration);
@@ -16,7 +20,7 @@ function FeyReinforcementsModal({ action, playerStats, campaignName, onClose }) 
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-leaf"></i> {action.name}
@@ -32,7 +36,7 @@ function FeyReinforcementsModal({ action, playerStats, campaignName, onClose }) 
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-leaf"></i> {action.name}

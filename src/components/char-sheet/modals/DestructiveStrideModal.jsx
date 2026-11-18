@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyDamageTypeChoice, skipTargetChoice } from '../../../services/automation/handlers/combat/destructiveStrideHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const DAMAGE_TYPES = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
 
@@ -14,6 +15,9 @@ const DAMAGE_DATA = {
 
 function DestructiveStrideModal({ action, playerStats, campaignName, onConfirm, onClose }) {
     const [selected, setSelected] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = async () => {
         if (!selected) return;
@@ -34,7 +38,7 @@ function DestructiveStrideModal({ action, playerStats, campaignName, onConfirm, 
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-person-running"></i> {action?.name || 'Destructive Stride'}

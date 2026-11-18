@@ -31,6 +31,23 @@ function ChooserHost({ ready = true, withFocusables = true }) {
     );
 }
 
+// Toggle-shaped owner: permanently mounted, overlay div mounts/unmounts
+// INSIDE its render with the flag — exactly the SSE listener shape.
+function ListenerHost({ open }) {
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef, open);
+    return (
+        <div className="sheet">
+            <p>listener never unmounts</p>
+            {open ? (
+                <div className="sp-overlay" ref={overlayRef}>
+                    <input aria-label="first" />
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 function Sheet({ open = true, ...chooserProps }) {
     return (
         <div className="sheet">
@@ -102,6 +119,34 @@ describe('useOverlayEntranceFocus', () => {
         rerender(<Sheet open={false} />);
         await flush();
         expect(document.activeElement).toBe(sheet);
+    });
+
+    it('toggle-shaped listener: pull on ready-flip, restore on ready-fall WITHOUT owner unmount', async () => {
+        // The always-mounted SSE listener lane (BardicInspirationReactionModal,
+        // InlineChoiceModals): the overlay renders INSIDE a permanently mounted
+        // owner only while its prompt flag is set, so the tier must key its
+        // lifecycle to `ready` — never BODY at arrival, never BODY at dismissal.
+        clearFocus();
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+        const { rerender } = render(<ListenerHost open={false} />);
+        rerender(<ListenerHost open={true} />);
+        expect(document.activeElement).toBe(document.querySelector('[aria-label="first"]'));
+        rerender(<ListenerHost open={false} />); // dismissal inside the STILL-mounted owner
+        await flush();
+        expect(document.activeElement).toBe(opener);
+    });
+
+    it('a ready-fall close is still never fought by a surface that claimed focus', async () => {
+        clearFocus();
+        const { rerender } = render(<ListenerHost open={true} />);
+        rerender(<ListenerHost open={false} />);
+        const popupBtn = document.createElement('button');
+        document.body.appendChild(popupBtn);
+        popupBtn.focus(); // wins before the restore microtask
+        await flush();
+        expect(document.activeElement).toBe(popupBtn);
     });
 
     it('never fights a surface that pulled focus on close', async () => {

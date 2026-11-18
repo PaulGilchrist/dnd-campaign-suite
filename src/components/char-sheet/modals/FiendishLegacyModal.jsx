@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { confirmFiendishLegacy } from '../../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const FIENDISH_LEGACIES = [
     { name: 'Abyssal', description: 'Resistance to Poison damage + Poison Spray cantrip. Level 3: Ray of Sickness. Level 5: Hold Person.', spellcastingAbility: 'Charisma', icon: 'fa-dragon' },
@@ -13,6 +14,9 @@ function FiendishLegacyModal({ action: _action, playerStats, campaignName, onClo
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = async () => {
         if (!selected) return;
@@ -28,7 +32,7 @@ function FiendishLegacyModal({ action: _action, playerStats, campaignName, onClo
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-dragon"></i> Fiendish Legacy
@@ -44,7 +48,7 @@ function FiendishLegacyModal({ action: _action, playerStats, campaignName, onClo
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-dragon"></i> Fiendish Legacy

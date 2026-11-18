@@ -1,5 +1,6 @@
 import React from 'react'
 import './PartyPresenceModal.css'
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
 
 /**
  * Split-party tracker UI (plan initiative-split-party). A ticked box means the
@@ -15,6 +16,9 @@ export default function PartyPresenceModal({ players, onConfirm, onCancel }) {
     const [present, setPresent] = React.useState(() =>
         new Set(players.filter(p => p.away !== true).map(p => p.name))
     )
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const togglePlayer = (name) => {
         setPresent(prev => {
@@ -34,7 +38,7 @@ export default function PartyPresenceModal({ players, onConfirm, onCancel }) {
     const awayCount = players.length - present.size
 
     return (
-        <div className="sp-overlay" role="dialog" aria-label="Split party">
+        <div className="sp-overlay" ref={overlayRef} role="dialog" aria-label="Split party">
             <div className="sp-modal party-presence-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-people-arrows"></i> Split Party

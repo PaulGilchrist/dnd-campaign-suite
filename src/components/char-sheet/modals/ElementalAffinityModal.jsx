@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyTypeChoice } from '../../../services/automation/handlers/class-sorcerer/elementalAffinityHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function affinityIntroText(action, existingType) {
     if (existingType) return 'Change damage type (currently ' + existingType + '):';
@@ -12,6 +13,9 @@ function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) 
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const damageTypes = action?.automation?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
     const existingType = action?.existingType;
@@ -26,7 +30,7 @@ function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) 
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-bolt"></i> {title}
@@ -42,7 +46,7 @@ function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) 
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {title}

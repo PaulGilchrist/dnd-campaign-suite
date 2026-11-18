@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyRevelationOptions } from '../../../services/automation/handlers/class-warlock/revelationInFleshHandler.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function RevelationInFleshModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState([]);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const options = action.automation?.options || [];
 
@@ -32,7 +36,7 @@ function RevelationInFleshModal({ action, playerStats, campaignName, onClose }) 
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-dna"></i> {action.name}
@@ -48,7 +52,7 @@ function RevelationInFleshModal({ action, playerStats, campaignName, onClose }) 
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-dna"></i> {action.name}

@@ -1,15 +1,19 @@
 import React, { useCallback, memo } from 'react';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export function ResultsSummaryModal({ results, conditionLabel, onClose }) {
     const handleClose = useCallback(() => {
         onClose();
     }, [onClose]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     const dismissedCount = results.filter(r => r.dismissed).length;
     const successCount = results.filter(r => r.success && !r.dismissed).length;
     const failCount = results.filter(r => !r.success).length;
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-dice-d20"></i> Save Results

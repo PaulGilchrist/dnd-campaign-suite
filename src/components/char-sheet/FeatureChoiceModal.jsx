@@ -1,9 +1,14 @@
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
+import { useRef } from 'react';
 
 function FeatureChoiceModal({ featureChoiceModal, handleFeatureChoiceConfirm, handleFeatureChoiceSkip }) {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     if (!featureChoiceModal) return null;
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-bolt"></i> {featureChoiceModal.action.name}

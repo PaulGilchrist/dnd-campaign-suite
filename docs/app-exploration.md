@@ -58,8 +58,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **sp-overlay family entrance-focus adoption (improve chooser-focus-grab audit 2026-11-17):** the Wild-Shape chooser now pulls entrance focus via the new `src/hooks/ui/useOverlayEntranceFocus.js` tier (FI re-lived green), but the census found ~85 component files still render `.sp-overlay` roots with ZERO focus mechanism — notably MassHealModal, PrayerOfHealingModal→shared/CreatureSelectionModal, AnimalShapes/Ally/Mount/ObjectTransform/PartyPresence selection modals, SavePromptModal (both faces), BardicInspirationReactionModal, InlineChoiceModals, WeaponKindMasteryModal, StepsOfTheFeyTauntModal, and the ~45 arcane/divine/lineage choice modals. Adoption is a drop-in `useOverlayEntranceFocus(overlayRef, ready)` per file, but each needs a per-file dismissal-race review (SavePrompt pending-save gates, AttackResultPopup staged damage). SECOND HALF: the shared Popup close path can orphan focus on BODY (re-witnessed FI after a MISS-popup Escape over the stat modal — open-pull works, close-restore missing). Minor a11y, non-blocking.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried; sole surviving original PT).

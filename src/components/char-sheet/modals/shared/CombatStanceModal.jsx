@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyStanceOption } from '../../../../services/automation/handlers/combat/combatStanceHandler.js';
 import '../../CharSheet.css';
 import './CombatStanceModal.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const STANCE_EFFECTS = {
     Bear: 'Resistance to all damage except Force, Necrotic, Psychic, Radiant',
@@ -27,6 +28,9 @@ function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const options = action.automation?.options || [];
 
@@ -44,7 +48,7 @@ function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
 
     if (applied && result?.payload?.description) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-paw"></i> {action.name}
@@ -60,7 +64,7 @@ function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-paw"></i> {action.name}

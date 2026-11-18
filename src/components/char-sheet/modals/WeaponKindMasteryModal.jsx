@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { applyWeaponKindMastery } from '../../../services/automation/index.js';
 import '../CharSheet.css';
 import { loadWeapons } from './weapon-kind-mastery-cache.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, onClose, existing }) {
     const [selected, setSelected] = useState(existing || []);
     const [result, setResult] = useState(null);
     const [weapons, setWeapons] = useState([]);
     const [maxKinds, setMaxKinds] = useState(2);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => {
         const auto = action?.automation || {};
@@ -53,7 +57,7 @@ function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, 
 
     if (result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-crosshairs"></i> Weapon Mastery
@@ -69,7 +73,7 @@ function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, 
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-crosshairs"></i> Weapon Mastery — Choose Weapon Kinds

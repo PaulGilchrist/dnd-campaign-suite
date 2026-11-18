@@ -1,6 +1,7 @@
 import React from 'react';
 import { isInteractive } from '../../../services/ui/modalDismissUtils.js';
 import { confirmTeleport } from '../../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function InlineChoiceModals({
     mergedModalState,
@@ -35,6 +36,11 @@ export default function InlineChoiceModals({
         featureChoice,
         clockworkCavalcadeRepairModal,
     } = mergedModalState;
+    const anyInlineModalOpen = [moonlightStepFallbackModal, attackRiderOptionsModal, divineFuryChoice, damageTypeChoice, featureChoice, clockworkCavalcadeRepairModal].some(Boolean);
+
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef, anyInlineModalOpen);
 
     if (!moonlightStepFallbackModal && !attackRiderOptionsModal && !divineFuryChoice && !damageTypeChoice && !featureChoice && !clockworkCavalcadeRepairModal) {
         return null;
@@ -43,7 +49,7 @@ export default function InlineChoiceModals({
     return (
         <>
             {moonlightStepFallbackModal && (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal" onClick={(e) => {
                         if (isInteractive(e.target)) return;
                         setModalState({ moonlightStepFallbackModal: null });
@@ -75,7 +81,7 @@ export default function InlineChoiceModals({
                 </div>
             )}
             {attackRiderOptionsModal && (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal" onClick={(e) => {
                         if (isInteractive(e.target)) return;
                         setModalState({ attackRiderOptionsModal: null });
@@ -113,7 +119,7 @@ export default function InlineChoiceModals({
                 </div>
             )}
             {divineFuryChoice && (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> Divine Fury — Damage Type
@@ -136,7 +142,7 @@ export default function InlineChoiceModals({
                 </div>
             )}
             {damageTypeChoice && (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> {damageTypeChoice.title}
@@ -171,7 +177,7 @@ export default function InlineChoiceModals({
                 </div>
             )}
             {featureChoice && (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal">
                         <div className="sp-header">
                             <i className="fa-solid fa-bolt"></i> {featureChoice.action.name}
@@ -202,7 +208,7 @@ export default function InlineChoiceModals({
                 </div>
             )}
             {clockworkCavalcadeRepairModal && (
-                <div className="sp-overlay">
+                <div className="sp-overlay" ref={overlayRef}>
                     <div className="sp-modal" onClick={(e) => {
                         if (isInteractive(e.target)) return;
                         setModalState({ clockworkCavalcadeRepairModal: null });

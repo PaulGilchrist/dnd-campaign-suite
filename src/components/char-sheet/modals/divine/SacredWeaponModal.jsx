@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyDamageTypeChoice } from '../../../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js';
 import '../../CharSheet.css';
 import './SacredWeaponModal.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function SacredWeaponModal({ action, playerStats, campaignName, onClose, onCancel }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const options = action.automation?.options || [];
 
@@ -27,7 +31,7 @@ function SacredWeaponModal({ action, playerStats, campaignName, onClose, onCance
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-sun"></i> {action.name}
@@ -43,7 +47,7 @@ function SacredWeaponModal({ action, playerStats, campaignName, onClose, onCance
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-sun"></i> {action.name}

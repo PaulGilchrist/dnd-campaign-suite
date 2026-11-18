@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import './DivineInterventionModal.css';
 import { sanitizeHtml } from '../../../../services/ui/sanitize.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function SpellLevelFilters({ levels, filterLevel, onSelectLevel }) {
     return (
@@ -80,6 +81,9 @@ function SelectedSpellDetails({ spell }) {
 function DivineInterventionModal({ eligibleSpells, isGreater, featureName, onSelect, onClose }) {
     const [selectedSpell, setSelectedSpell] = useState(null);
     const [filterLevel, setFilterLevel] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const levelGroups = {};
     eligibleSpells.forEach(spell => {
@@ -104,7 +108,7 @@ function DivineInterventionModal({ eligibleSpells, isGreater, featureName, onSel
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-star-of-life"></i> {featureName}

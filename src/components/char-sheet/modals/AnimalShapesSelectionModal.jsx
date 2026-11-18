@@ -1,6 +1,7 @@
 import React from 'react';
 import { loadMonsters } from '../../../services/ui/dataLoader.js';
 import './AnimalShapesSelectionModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function parseChallengeRating(crString) {
     if (!crString) return 0;
@@ -35,6 +36,9 @@ function AnimalShapesSelectionModal({ targets, maxCR, campaignName, title = 'Ani
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
     const [searchTerms, setSearchTerms] = React.useState({});
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef, !loading);
 
     React.useEffect(() => {
         async function loadBeasts() {
@@ -112,7 +116,7 @@ function AnimalShapesSelectionModal({ targets, maxCR, campaignName, title = 'Ani
 
     if (loading) {
         return (
-            <div className="sp-overlay sp-overlay--evasion">
+            <div className="sp-overlay sp-overlay--evasion" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                     <div className="sp-body"><p>Loading available creatures...</p></div>
@@ -123,7 +127,7 @@ function AnimalShapesSelectionModal({ targets, maxCR, campaignName, title = 'Ani
 
     if (error) {
         return (
-            <div className="sp-overlay sp-overlay--evasion">
+            <div className="sp-overlay sp-overlay--evasion" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                     <div className="sp-body"><p className="sp-note">{error}</p></div>
@@ -139,7 +143,7 @@ function AnimalShapesSelectionModal({ targets, maxCR, campaignName, title = 'Ani
     const selectedCount = Object.keys(selectedBeasts).length;
 
     return (
-        <div className="sp-overlay sp-overlay--evasion">
+        <div className="sp-overlay sp-overlay--evasion" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header"><i className={`fa-solid ${icon}`}></i> {title}</div>
                 <div className="sp-body">

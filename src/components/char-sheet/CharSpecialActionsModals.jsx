@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useRef } from 'react';
 import { applyTypeChoice as applyBoonOfEnergyResistance } from '../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
 import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
@@ -32,6 +32,7 @@ import MistyWandererModal from './modals/MistyWandererModal.jsx';
 import FiendishLegacyModal from './modals/FiendishLegacyModal.jsx';
 import ConstellationSelectionModal from './modals/ConstellationSelectionModal.jsx';
 import { applyConstellationOption as applyTwinklingConstellation } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
 
 function getEventDisplayLabel(eventType, eventData) {
     if (eventType === 'attack') {
@@ -53,26 +54,34 @@ const TeleportBlock = ({ modal, onClose }) => (
     />
 );
 
-const MoonlightStepFallbackBlock = ({ fallback, onConfirm, onDismiss }) => (
-    <div className="sp-overlay">
-        <div className="sp-modal">
-            <div className="sp-header">
-                <i className="fa-solid fa-moon"></i> {fallback.action.name}
-            </div>
-            <div className="sp-body">
-                <p>No Moonlight Step uses remaining. Consume a level {fallback.slotLevel} spell slot to use Moonlight Step?</p>
-            </div>
-            <div className="sp-actions">
-                <button className="sp-roll-btn" onClick={onConfirm}>
-                    <i className="fa-solid fa-check"></i> Yes, Consume Slot
-                </button>
-                <button className="sp-dismiss-btn" onClick={onDismiss}>
-                    <i className="fa-solid fa-times"></i> No
-                </button>
+const MoonlightStepFallbackBlock = ({ fallback, onConfirm, onDismiss }) => {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay
+    // adoption). Dispatcher mount law: the block MOUNTS/UNMOUNTS with the
+    // pending fallback flag (CharSpecialActionsModals renders it only while
+    // set), so the hook lifecycle is exactly open→close — no toggle-shape.
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
+    return (
+        <div className="sp-overlay" ref={overlayRef}>
+            <div className="sp-modal">
+                <div className="sp-header">
+                    <i className="fa-solid fa-moon"></i> {fallback.action.name}
+                </div>
+                <div className="sp-body">
+                    <p>No Moonlight Step uses remaining. Consume a level {fallback.slotLevel} spell slot to use Moonlight Step?</p>
+                </div>
+                <div className="sp-actions">
+                    <button className="sp-roll-btn" onClick={onConfirm}>
+                        <i className="fa-solid fa-check"></i> Yes, Consume Slot
+                    </button>
+                    <button className="sp-dismiss-btn" onClick={onDismiss}>
+                        <i className="fa-solid fa-times"></i> No
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 const PortentBlock = ({ portentModal, handlePortentModalClose, handlePortentDieChoice }) => (
     <div className="portent-modal-overlay">

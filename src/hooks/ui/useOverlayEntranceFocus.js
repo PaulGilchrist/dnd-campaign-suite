@@ -12,15 +12,24 @@
 //     the overlay, so a child that owns focus itself (an autoFocus editor) is
 //     never fought;
 //  3. ui/useMenuRoving.js open-capture/close-restore — the pre-open anchor is
-//     captured once on mount (with the body-root fallback: no usable anchor
-//     stamps `tabindex="-1"` on the overlay's parent so the restore lands on a
-//     programmatic focus target without joining the Tab sequence), and the
-//     restore runs one microtask after the overlay unmounts, acting ONLY when
-//     focus actually fell out (body/html or a detached node). A surface that
-//     mounted above the closing chooser and pulled focus itself (a roll-result
-//     Popup) wins the race untouched.
-// `ready` gates the entrance grab until the interactive face is mounted — the
-// chooser family renders a LoadingView with nothing focusable first.
+//     captured as the overlay opens (with the body-root fallback: no usable
+//     anchor stamps `tabindex="-1"` on the overlay's parent so the restore
+//     lands on a programmatic focus target without joining the Tab sequence),
+//     and the restore runs one microtask after the overlay closes, acting ONLY
+//     when focus actually fell out (body/html or a detached node). A surface
+//     that mounted above the closing chooser and pulled focus itself (a
+//     roll-result Popup) wins the race untouched.
+// Lifecycle: capture→pull run together whenever `ready` flips true (or on mount
+// when it starts true — capture executes BEFORE the pull inside the same effect,
+// so the anchor never reads the pull's own grab), and the restore cleanup fires
+// on BOTH owner unmount (the state-flip close every parent-mounted chooser
+// uses) AND a ready true→false transition. The second lane covers the
+// toggle-shaped consumers — the always-mounted SSE listeners
+// (BardicInspirationReactionModal, InlineChoiceModals) that mount/unmount the
+// overlay INSIDE their own render, where an unmount-only restore would strand
+// focus on BODY at every prompt dismissal. `ready` gates the whole tier until
+// the interactive face is mounted — the chooser family renders a LoadingView
+// with nothing focusable first.
 import { useEffect } from 'react';
 
 const OVERLAY_FOCUSABLE_SELECTOR =
@@ -32,15 +41,14 @@ function firstFocusableIn(overlay) {
 }
 
 // overlayRef points at the overlay ROOT element (the .sp-overlay div); the
-// effect wiring lives entirely on the consumer's mounted lifetime — when the
-// chooser unmounts (any dismissal path funnels through the host's state flip),
-// the restore fires. Returns nothing.
+// effect wiring lives on the consumer's open lifetime — when the chooser
+// closes (any dismissal path funnels through the host's state flip), the
+// restore fires. Returns nothing.
 export function useOverlayEntranceFocus(overlayRef, ready = true) {
-    // DECLARED FIRST on purpose: effects run in declaration order, so the
-    // pre-open anchor is captured BEFORE the entrance pull moves focus —
-    // otherwise the capture would read its own grab as the "pre-open" state.
     useEffect(() => {
+        if (!ready) return undefined;
         const overlay = overlayRef.current;
+        // ── capture (useMenuRoving open-capture law) ──
         const active = document.activeElement;
         const usable = active
             && active !== document.body
@@ -53,6 +61,13 @@ export function useOverlayEntranceFocus(overlayRef, ready = true) {
             if (!host.hasAttribute('tabindex')) host.setAttribute('tabindex', '-1');
             anchor = host;
         }
+        // ── entrance pull (DeleteConfirmModal first-focusable law; the
+        // popup.jsx never-fighting check keeps autoFocus children winning) ──
+        if (overlay && !overlay.contains(document.activeElement)) {
+            const entrance = firstFocusableIn(overlay);
+            if (entrance) entrance.focus();
+        }
+        // ── close restore (stranded-only, never-fighting) ──
         return () => {
             let restored = false;
             // Promise.resolve().then is the microtask queue (same deferral as
@@ -78,15 +93,6 @@ export function useOverlayEntranceFocus(overlayRef, ready = true) {
             // extra tick re-runs the same idempotent, never-fighting check.
             setTimeout(restoreFocusIfStranded, 0);
         };
-    }, [overlayRef]);
-
-    useEffect(() => {
-        if (!ready) return undefined;
-        const overlay = overlayRef.current;
-        if (!overlay || overlay.contains(document.activeElement)) return undefined;
-        const entrance = firstFocusableIn(overlay);
-        if (entrance) entrance.focus();
-        return undefined;
     }, [overlayRef, ready]);
 }
 

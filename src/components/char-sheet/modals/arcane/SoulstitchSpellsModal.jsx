@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applySoulstitchSelection } from '../../../../services/automation/handlers/class-wizard/soulstitchSpellsHandler.js';
 import { confirmSoulstitchSelection } from '../../../../services/rules/spells/postCastRiderService.js';
 import '../../CharSheet.css';
 import './SoulstitchSpellsModal.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function SoulstitchSpellsModal({ action, playerStats, campaignName, maxSelections = 1, eligibleTargets = [], spellName = 'Unknown', featureName = 'Soulstitch Spells', onClose }) {
     const [selected, setSelected] = useState([]);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleToggle = (name) => {
         if (selected.includes(name)) {
@@ -35,7 +39,7 @@ function SoulstitchSpellsModal({ action, playerStats, campaignName, maxSelection
 
     if (applied && result) {
         return (
-            <div className="sp-overlay soulstitch-result-overlay">
+            <div className="sp-overlay soulstitch-result-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-shield-halved"></i> {featureName}
@@ -51,7 +55,7 @@ function SoulstitchSpellsModal({ action, playerStats, campaignName, maxSelection
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> {featureName}

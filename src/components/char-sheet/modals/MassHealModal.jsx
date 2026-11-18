@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function MassHealModal({
     creatureTargets,
@@ -77,11 +78,14 @@ export default function MassHealModal({
         if (!hasAllocation) return;
         onConfirm(distribution);
     }, [selected, allocations, onConfirm]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const selectedTargets = creatureTargets.slice(0, maxTargets);
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon}`}></i> {title}

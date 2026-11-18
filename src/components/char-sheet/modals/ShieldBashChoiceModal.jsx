@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyShieldBashEffect } from '../../../services/combat/steps/features/shieldBash.js';
 import ChooserModalFooter from './shared/ChooserModalFooter.jsx';
 import { CHOOSER_FOOTER_LABELS } from './shared/chooserFooterLabels.js';
 import '../CharSheet.css';
 import './ShieldBashChoiceModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, saveDc, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     // RAW default distance is 5 feet (public/data/2024/feats.json:2633/:2646,
     // Shield Bash: "push the target 5 feet from you or cause it to have the
@@ -48,7 +52,7 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-shield-halved"></i> Shield Bash
@@ -64,7 +68,7 @@ function ShieldBashChoiceModal({ action, playerStats, campaignName, targetName, 
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> Shield Bash

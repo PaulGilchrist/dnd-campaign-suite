@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import './WarBondChooserModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function WarBondChooserModal({ title, icon, options, maxChoices, existing, confirmLabel, onConfirm, onClose }) {
     const [selected, setSelected] = useState(maxChoices > 1 && Array.isArray(existing) ? [...existing] : []);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const toggle = (name) => {
         setSelected(prev => {
@@ -22,7 +26,7 @@ function WarBondChooserModal({ title, icon, options, maxChoices, existing, confi
 
     if (result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className={`fa-solid ${icon || 'fa-link'}`}></i> {title}
@@ -39,7 +43,7 @@ function WarBondChooserModal({ title, icon, options, maxChoices, existing, confi
     const capReached = selected.length >= maxChoices;
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon || 'fa-link'}`}></i> {title}

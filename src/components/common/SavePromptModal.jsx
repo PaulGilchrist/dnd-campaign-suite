@@ -23,6 +23,7 @@ import { useSaveRerollHandlers } from './useSaveRerollHandlers.js';
 import { cancelInfernalWoundAfterSaveSuccess } from '../../services/rules/features/infernalWoundService.js';
 import { consumeBurstOfIngenuityBuff } from '../../services/encounters/monsterBurstOfIngenuity.js';
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
 
 const GUARDED_MIND_SAVE_TYPES = ['Intelligence', 'Wisdom', 'Charisma', 'INT', 'WIS', 'CHA'];
 
@@ -768,9 +769,12 @@ function withToggledAlly(selection, targetName) {
 }
 
 function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange, onConfirm, onSkip }) {
+  // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+  const overlayRef = useRef(null);
+  useOverlayEntranceFocus(overlayRef);
   const selected = evasionSelection?.selectedAllies || [];
   return (
-    <div className="sp-overlay sp-overlay--evasion">
+    <div className="sp-overlay sp-overlay--evasion" ref={overlayRef}>
       <div className="sp-modal">
         <div className="sp-header">
           <i className="fa-solid fa-shield-halved"></i> Leading Evasion — Choose Allies
@@ -859,10 +863,13 @@ function SavePromptDialog({
   current, prompts, dimmed, characters, campaignName, display, hasResult, preRoll,
   rerollUsedForSave, rerollAvailability, handlers,
 }) {
+  // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+  const overlayRef = useRef(null);
+  useOverlayEntranceFocus(overlayRef);
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = display;
   const queueCount = prompts.length;
   return (
-    <div className={`sp-overlay${dimmed ? ' sp-overlay--dimmed' : ''}`}>
+    <div className={`sp-overlay${dimmed ? ' sp-overlay--dimmed' : ''}`} ref={overlayRef}>
       {/* Stable probe anchor (backlog 2026-11-11 IE): after an AoE picker confirm the
           dispatched picker keeps its own `.sp-modal` mounted DISABLED ahead of this
           prompt in DOM order, so a first-match `.sp-modal` probe reads dead buttons.

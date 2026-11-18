@@ -11,6 +11,7 @@ import { addEntry } from '../../../services/ui/logService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../services/automation/common/damageRollback.js';
 import utils from '../../../services/ui/utils.js';
 import './EyebiteEffectModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const EFFECT_OPTIONS = [
     { key: 'asleep', label: 'Asleep', condition: 'unconscious', description: 'The target has the Unconscious condition. It wakes up if it takes any damage or if another creature takes an action to shake it awake.' },
@@ -416,6 +417,9 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
 
         setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
     }, [pendingPrompts, attackerName, campaignName, saveDc, featureName]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -435,7 +439,7 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
 
     if (popup) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-eye"></i> {featureName}
@@ -455,7 +459,7 @@ function EyebiteEffectModal({ combatSummary, attackerName, saveDc, campaignName,
 
     if (!selectedEffect) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-eye"></i> {featureName}

@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import './BastionOfLawModal.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function BastionOfLawModal({ featureName, creatureTargets, playerName, campaignName, auto, onClose, onConfirm }) {
     const [selectedTarget, setSelectedTarget] = useState(null);
     const [spAmount, setSpAmount] = useState(1);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const maxSP = auto?.maxSP || 5;
     const minSP = auto?.minSP || 1;
@@ -33,7 +37,7 @@ function BastionOfLawModal({ featureName, creatureTargets, playerName, campaignN
     const rangeDisplay = auto?.range ? auto.range.replace(/_/g, ' ') : '30 ft';
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> {featureName}

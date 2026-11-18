@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { confirmMistyWanderer } from '../../../services/automation/handlers/class-warlock/mistyWandererHandler.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import '../CharSheet.css';
 import './MistyWandererModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 // CLA-229: populate the companion select from the live combatSummary — every
 // combatant except the caster is a candidate willing creature (gridless
@@ -19,6 +20,9 @@ function MistyWandererModal({ action, playerStats, campaignName, usesMax, onClos
     const [selectedAlly, setSelectedAlly] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const companions = getCompanionOptions(playerStats, campaignName);
     const featureName = action?.name || 'Misty Wanderer';
@@ -34,7 +38,7 @@ function MistyWandererModal({ action, playerStats, campaignName, usesMax, onClos
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-cloud"></i> {action.name}
@@ -50,7 +54,7 @@ function MistyWandererModal({ action, playerStats, campaignName, usesMax, onClos
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-cloud"></i> {action.name}

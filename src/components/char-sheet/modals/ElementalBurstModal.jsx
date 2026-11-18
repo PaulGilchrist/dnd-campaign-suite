@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { addEntry } from '../../../services/ui/logService.js';
 import SaveAttackAoeModal from './shared/SaveAttackAoeModal.jsx';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const DAMAGE_TYPES = [
     { name: 'Acid', icon: 'fa-leaf' },
@@ -55,10 +56,13 @@ function ElementalBurstModal({ action, playerStats, campaignName, characters = n
     const handleAoeClose = useCallback(() => {
         onClose();
     }, [onClose]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     if (phase === 'element') {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Burst

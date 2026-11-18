@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyStealthAttack } from '../../../../services/automation/handlers/class-fighter-rogue/stealthAttackHandler.js';
 import '../../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function StealthAttackModal({ action, playerStats, campaignName, costD6, availableDice, onClose }) {
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = async () => {
         const res = await applyStealthAttack(action, playerStats, campaignName, costD6);
@@ -14,7 +18,7 @@ function StealthAttackModal({ action, playerStats, campaignName, costD6, availab
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-eye-slash"></i> {action.name}
@@ -45,7 +49,7 @@ function StealthAttackModal({ action, playerStats, campaignName, costD6, availab
     // so there is nothing to derive (same shape as fix#328's push-5 keep-with-cite).
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-eye-slash"></i> {action.name}

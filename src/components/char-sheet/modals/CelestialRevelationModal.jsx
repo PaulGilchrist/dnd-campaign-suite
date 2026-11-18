@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { confirmCelestialRevelation } from '../../../services/automation/handlers/class-sorcerer/celestialRevelationHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const TRANSFORMATION_OPTIONS = [
     { name: 'Heavenly Wings', description: 'Two spectral wings sprout from your back. You gain a Fly Speed equal to your Speed.', icon: 'fa-feather-pointed', damageType: 'Radiant' },
@@ -12,6 +13,9 @@ function CelestialRevelationModal({ action: _action, playerStats, campaignName, 
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = async () => {
         if (!selected) return;
@@ -27,7 +31,7 @@ function CelestialRevelationModal({ action: _action, playerStats, campaignName, 
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-star"></i> Celestial Revelation
@@ -43,7 +47,7 @@ function CelestialRevelationModal({ action: _action, playerStats, campaignName, 
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-star"></i> Celestial Revelation

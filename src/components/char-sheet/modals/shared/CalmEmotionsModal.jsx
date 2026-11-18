@@ -22,6 +22,7 @@ import {
     dropPendingPrompt,
 } from './AreaEffectSaveFlow.utils.js';
 import { logSaveDismissed } from '../../../../services/automation/common/savePrompt.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 async function resolveCalmNpcSave(ctx, targetName, target) {
     const { campaignName, casterName, saveType, saveDc, isCarefulSpell, isCarefulAlly, choice } = ctx;
@@ -269,6 +270,9 @@ function CalmEmotionsModal({
             [targetName]: choice,
         }));
     }, []);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     if (isOverlayTargeted && activeOverlay) {
         return (
@@ -284,7 +288,7 @@ function CalmEmotionsModal({
     const includedTargets = displayedTargets.filter(c => !excludedTargets[c.name]);
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand-holding-heart"></i> Calm Emotions

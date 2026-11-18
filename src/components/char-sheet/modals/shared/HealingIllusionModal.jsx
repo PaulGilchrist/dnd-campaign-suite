@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
 import '../../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 // Runtime store returns null for unset keys (useRuntimeState.js). Unresolved HP
 // means the target state is unknown — parse to null and refuse, never fabricate 0
@@ -17,6 +18,9 @@ function HealingIllusionModal({ action, playerStats, campaignName, onClose }) {
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [customName, setCustomName] = useState('');
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const healAmount = playerStats.level || 1;
 
@@ -53,7 +57,7 @@ function HealingIllusionModal({ action, playerStats, campaignName, onClose }) {
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-heart"></i> Healing Illusion
@@ -70,7 +74,7 @@ function HealingIllusionModal({ action, playerStats, campaignName, onClose }) {
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-heart"></i> Healing Illusion

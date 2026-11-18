@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import './AllySelectionModal.css';
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function AllySelectionModal({
     title,
@@ -15,6 +16,9 @@ export default function AllySelectionModal({
     const [selected, setSelected] = useState(() =>
         (currentAllies || []).filter(name => creatures.some(c => c.name === name))
     );
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const toggleCreature = (name) => {
         setSelected(prev =>
@@ -49,7 +53,7 @@ export default function AllySelectionModal({
     const label = title || 'Select Allies';
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${iconClass}`}></i> {label}

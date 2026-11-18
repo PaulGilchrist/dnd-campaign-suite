@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyTypeChoice } from '../../../services/automation/handlers/class-warlock/fiendishResilienceHandler.js';
 import '../CharSheet.css';
 import './SingleResistanceSelectionModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function ResistanceHeader({ title, icon, action }) {
     return (
@@ -12,8 +13,11 @@ function ResistanceHeader({ title, icon, action }) {
 }
 
 function ResistanceAppliedView({ title, icon, action, result, onClose }) {
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <ResistanceHeader title={title} icon={icon} action={action} />
                 <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
@@ -52,6 +56,9 @@ function SingleResistanceSelectionModal({ title, icon, action, playerStats, camp
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const damageTypes = action?.automation?.damageTypes || [
         'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning',
@@ -76,7 +83,7 @@ function SingleResistanceSelectionModal({ title, icon, action, playerStats, camp
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <ResistanceHeader title={title} icon={icon} action={action} />
                 <div className="sp-body">

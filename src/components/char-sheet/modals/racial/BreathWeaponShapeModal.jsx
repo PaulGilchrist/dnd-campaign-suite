@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../../../services/automation/index.js';
 import '../../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function BreathWeaponShapeModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleChoose = async () => {
         if (!selected) return;
@@ -18,7 +22,7 @@ function BreathWeaponShapeModal({ action, playerStats, campaignName, onClose }) 
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-dragon"></i> {action?.name || 'Breath Weapon'}

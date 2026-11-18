@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createSaveListener, logSaveDismissed } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { KEY as EXPIRATION_KEY } from '../../../services/rules/effects/expirations.js';
 import { getCurrentCombatRound } from '../../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetName, saveType, saveDc, currentUses, maxUses, pactSlotLevel, pactSlotsAvailable, pactMagicRecharge, onClose }) {
     const [step, setStep] = useState('info'); // 'info' | 'result'
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const playerName = playerStats.name;
     const featureName = action.name || 'Clairvoyant Combatant';
@@ -202,7 +206,7 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
     // Info screen — shows error message when can't use
     if (step === 'info') {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-eye"></i> {featureName}
@@ -258,7 +262,7 @@ function ClairvoyantCombatantModal({ action, playerStats, campaignName, targetNa
         }
 
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-eye"></i> {featureName}

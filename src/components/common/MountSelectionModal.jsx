@@ -1,7 +1,8 @@
 // FT-107: single-select mount chooser cloned from the verified
 // AllySelectionModal seam (same .sp-overlay/.sp-modal chrome, no new CSS).
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import './AllySelectionModal.css';
+import { useOverlayEntranceFocus } from '../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function MountSelectionModal({
     creatures,
@@ -10,6 +11,9 @@ export default function MountSelectionModal({
     onCancel,
 }) {
     const [selected, setSelected] = useState('');
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const selectCreature = (name) => {
         setSelected(prev => (prev === name ? '' : name));
@@ -21,7 +25,7 @@ export default function MountSelectionModal({
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-horse"></i> Select a Mount for {riderName}

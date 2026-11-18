@@ -12,6 +12,7 @@ import { addExpiration } from '../../../services/rules/effects/expirations.js';
 import { persistAndNotify } from './shared/AreaEffectTargetModalBase.utils.jsx';
 import { loadMapData } from '../../../services/maps/mapsService.js';
 import CreatureSelectionModal from './shared/CreatureSelectionModal.jsx';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const ELEMENT_DATA = {
     Cold: {
@@ -580,10 +581,13 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
         setPhase('done');
         onClose();
     }, [playerStats.name, campaignName, chosenElement, action.name, onClose]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     if (phase === 'element') {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement
@@ -640,7 +644,7 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
 
     if (phase === 'processing') {
         return (
-            <div className="sp-overlay" onClick={() => {}}>
+            <div className="sp-overlay" ref={overlayRef} onClick={() => {}}>
                 <div className="sp-modal" onClick={e => e.stopPropagation()}>
                     <div className="sp-header">
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement ({chosenElement})
@@ -676,7 +680,7 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
 
     if (phase === 'summary' && results.length > 0) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Elemental Attunement ({chosenElement}) — Results

@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { applyConstellationOption } from '../../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function ConstellationSelectionModal({ action, playerStats, campaignName, isTwinkled, onConfirm, onClose, applyOption = applyConstellationOption, autoApply = true }) {
     const [selected, setSelected] = useState(null);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const options = ['Archer', 'Chalice', 'Dragon'];
 
@@ -33,7 +37,7 @@ function ConstellationSelectionModal({ action, playerStats, campaignName, isTwin
 
     if (result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-star"></i> {action.name}
@@ -49,7 +53,7 @@ function ConstellationSelectionModal({ action, playerStats, campaignName, isTwin
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-star"></i> {action.name}

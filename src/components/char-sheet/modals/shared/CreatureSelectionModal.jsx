@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './SecondaryTargetModal.css';
 import { getCurrentOverlayTarget, getCreaturesInsideOverlay, getTargetMapStatuses, distanceBadgeText } from '../../../../services/maps/spellOverlayService.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 export default function CreatureSelectionModal({
     title,
@@ -34,6 +35,9 @@ export default function CreatureSelectionModal({
     // re-click deselect is gated on this snapshot (and stays inert when the same click
     // newly selected the radio, since browsers dispatch change before click).
     const heightenWasCheckedRef = useRef(false);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => {
         if (!campaignName || !attackerName || targets.length === 0) return undefined;
@@ -78,7 +82,7 @@ export default function CreatureSelectionModal({
     const label = confirmLabel || 'Confirm';
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid ${icon}`}></i> {title}

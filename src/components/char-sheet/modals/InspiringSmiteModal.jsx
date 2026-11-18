@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import './InspiringSmiteModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 // Sum of every target's allocation except the named one's share.
 function othersAllocated(allocations, name) {
@@ -85,9 +86,12 @@ export default function InspiringSmiteModal({
         }
         onConfirm(distribution);
     }, [selected, allocations, tempHp, onConfirm]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand-holding-heart"></i> Inspiring Smite

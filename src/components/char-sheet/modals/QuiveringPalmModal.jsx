@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyShockwave, applyRelease } from '../../../services/automation/handlers/class-monk/quiveringPalmHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isRelease, onClose }) {
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleShockwave = async () => {
         setLoading(true);
@@ -22,7 +26,7 @@ function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isR
 
     if (result?.payload?.isRelease) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand-fist"></i> {action.name}
@@ -42,7 +46,7 @@ function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isR
         const p = result.payload;
         const saveText = p.success ? 'Success' : 'Failure';
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand-fist"></i> {action.name}
@@ -62,7 +66,7 @@ function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isR
 
     if (isRelease) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand-fist"></i> {action.name}
@@ -83,7 +87,7 @@ function QuiveringPalmModal({ action, playerStats, campaignName, targetName, isR
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand-fist"></i> {action.name}

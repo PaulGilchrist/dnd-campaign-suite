@@ -10,6 +10,7 @@ import { getCombatContext, getTargetFromAttacker } from '../../../services/rules
 import { applyTeleportTokenMove } from '../../../services/combat/teleportService.js';
 import '../CharSheet.css';
 import './StepsOfTheFeyTauntModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, campaignName, saveDc, featureName, newCount, freeCastCountKey, unlimited, onClose }) {
     const [applied, setApplied] = useState(false);
@@ -25,6 +26,9 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     // late save-result resolved the dead promise and ran setResult/setApplied and
     // side effects against unmounted state.
     const listenerLedgerRef = useRef([]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => () => {
         // Entries are {type, handler} pairs (save-dismissed sweep family,
@@ -467,7 +471,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     };
 
     const renderBewitchingChoice = () => (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-wand-sparkles"></i> {title || featureName}
@@ -487,7 +491,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     );
 
     const renderChoiceStep = () => (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className={`fa-solid fa-wand-sparkles`}></i> {title || featureName}
@@ -524,7 +528,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     );
 
     const renderDisappearingConfirm = () => (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-eye-slash"></i> {title || featureName}
@@ -544,7 +548,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     );
 
     const renderRefreshingConfirm = () => (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-heart-pulse"></i> {title || featureName}
@@ -593,7 +597,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-wand-sparkles"></i> {title || featureName}

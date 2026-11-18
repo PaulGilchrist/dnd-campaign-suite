@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function toggleSelectionKey(prev, key, maxSelections) {
   if (prev.includes(key)) return prev.filter(k => k !== key);
@@ -19,8 +20,11 @@ function choiceApplyBlocked(multiSelect, selected) {
 }
 
 function ChoiceResultView({ icon, title, result, onClose }) {
+  // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+  const overlayRef = useRef(null);
+  useOverlayEntranceFocus(overlayRef);
   return (
-    <div className="sp-overlay">
+    <div className="sp-overlay" ref={overlayRef}>
       <div className="sp-modal">
         <div className="sp-header">
           <i className={`fa-solid ${icon}`}></i> {title}
@@ -87,8 +91,11 @@ function ChoiceListContent({
   getOptionDescription,
   onClose,
 }) {
+  // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+  const overlayRef = useRef(null);
+  useOverlayEntranceFocus(overlayRef);
   return (
-    <div className="sp-overlay">
+    <div className="sp-overlay" ref={overlayRef}>
       <div className="sp-modal">
         <div className="sp-header">
           <i className={`fa-solid ${icon}`}></i> {title}

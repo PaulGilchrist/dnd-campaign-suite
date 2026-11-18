@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { executeHandler } from '../../../../services/automation/index.js';
 import { addEntry } from '../../../../services/ui/logService.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function HypnoticPatternShakeModal({ attackerName, campaignName, targets, rangeFeet, featureName, onClose }) {
     const [selected, setSelected] = useState(null);
@@ -37,9 +38,12 @@ function HypnoticPatternShakeModal({ attackerName, campaignName, targets, rangeF
         setProcessing(false);
         onClose();
     }, [selected, attackerName, campaignName, rangeFeet, featureName, onClose]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-brain"></i> {featureName || 'Shake Out Stupor'}

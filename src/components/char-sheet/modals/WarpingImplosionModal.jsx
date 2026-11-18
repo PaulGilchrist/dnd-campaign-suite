@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { applyWarpingImplosion } from '../../../services/automation/handlers/class-sorcerer/warpingImplosionHandler.js';
 import SaveAttackAoeModal from './shared/SaveAttackAoeModal.jsx';
 import './WarpingImplosionModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function WarpingImplosionModal({
     action,
@@ -36,6 +37,9 @@ function WarpingImplosionModal({
     const handleMessageClose = useCallback(() => {
         onClose?.();
     }, [onClose]);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     if (phase === 'aoe') {
         return (
@@ -60,7 +64,7 @@ function WarpingImplosionModal({
 
     if (phase === 'message') {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-arrow-right-arrow-left"></i> Warping Implosion
@@ -77,7 +81,7 @@ function WarpingImplosionModal({
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-arrow-right-arrow-left"></i> Warping Implosion

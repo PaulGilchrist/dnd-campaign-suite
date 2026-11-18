@@ -10,6 +10,7 @@ import { applyHealingToTarget } from '../../../../services/rules/combat/applyHea
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js';
 import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 function resolveSparkSaveDc(playerStats, wisModifier) {
     // CLA-092: caster's real spell save DC — never a hardcoded +2 proficiency.
@@ -75,6 +76,9 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
     // count. The parallel state flag re-renders it immediately to match the
     // spend row's "N remaining" tail through the Rolling/result/dismissed views.
     const [chargeSpent, setChargeSpent] = useState(false);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const spendCharge = (description) => {
         if (chargeSpentRef.current) return;
@@ -301,7 +305,7 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         : null;
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-star-of-life"></i> {featureName}

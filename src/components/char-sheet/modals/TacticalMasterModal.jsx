@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { MASTERY_EFFECTS } from '../../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { loadWeaponMasteries } from '../../../hooks/combat/useActionPopup.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 // WM-003 F3: a once-per-turn refusal comes back as a popup without the
 // mastery_rider automation (or an explicit refused flag) — surface its
@@ -20,6 +21,9 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
     const [applied, setApplied] = useState(false);
     const [refusalText, setRefusalText] = useState(null);
     const [masteryDescriptions, setMasteryDescriptions] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     useEffect(() => {
         loadWeaponMasteries().then(masteries => {
@@ -50,7 +54,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
 
     if (applied) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-crosshairs"></i> {featureTitle}
@@ -67,7 +71,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
     }
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-crosshairs"></i> {featureTitle} — {attackName}

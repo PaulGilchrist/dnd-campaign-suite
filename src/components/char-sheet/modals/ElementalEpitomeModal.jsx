@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyResistanceChoice } from '../../../services/automation/handlers/combat/elementalEpitomeHandler.js';
 import '../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const RESISTANCE_TYPES = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
 
@@ -14,6 +15,9 @@ const RESISTANCE_DATA = {
 
 function ElementalEpitomeModal({ action, playerStats, campaignName, currentResistance, onConfirm, onClose }) {
     const [selected, setSelected] = useState(currentResistance || null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = async () => {
         if (!selected) return;
@@ -25,7 +29,7 @@ function ElementalEpitomeModal({ action, playerStats, campaignName, currentResis
     };
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-shield-halved"></i> {action?.name || 'Elemental Epitome'}

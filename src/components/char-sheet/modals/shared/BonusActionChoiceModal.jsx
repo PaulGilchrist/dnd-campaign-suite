@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { applyBonusActionChoice } from '../../../../services/automation/handlers/combat/bonusActionChoiceHandler.js';
 import { chargeSlot } from '../../../../services/combat/chargeEconomy.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import '../../CharSheet.css';
+import { useOverlayEntranceFocus } from '../../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const INTERNAL_SKILL_CHECK_EVENT = 'internal-skill-check';
 
@@ -21,6 +22,9 @@ function BonusActionChoiceModal({ action, options: optionsProp, playerStats, cam
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     const handleApply = async () => {
         if (!selected) return;
@@ -63,7 +67,7 @@ function BonusActionChoiceModal({ action, options: optionsProp, playerStats, cam
 
     if (applied && result) {
         return (
-            <div className="sp-overlay">
+            <div className="sp-overlay" ref={overlayRef}>
                 <div className="sp-modal">
                     <div className="sp-header">
                         <i className="fa-solid fa-hand"></i> {action.name}
@@ -81,7 +85,7 @@ function BonusActionChoiceModal({ action, options: optionsProp, playerStats, cam
     const options = optionsProp || action.automation?.options || [];
 
     return (
-        <div className="sp-overlay">
+        <div className="sp-overlay" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header">
                     <i className="fa-solid fa-hand"></i> {action.name}

@@ -1,5 +1,6 @@
 import React from 'react';
 import './ObjectTransformModal.css';
+import { useOverlayEntranceFocus } from '../../../hooks/ui/useOverlayEntranceFocus.js';
 
 const OBJECT_TYPES = [
     { value: 'stone_block', label: 'Stone Block', icon: 'fa-cube' },
@@ -15,6 +16,9 @@ const OBJECT_TYPES = [
 function ObjectTransformModal({ onConfirm, onCancel }) {
     const [selectedType, setSelectedType] = React.useState('stone_block');
     const [customType, setCustomType] = React.useState('');
+    // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
+    const overlayRef = React.useRef(null);
+    useOverlayEntranceFocus(overlayRef);
 
     React.useEffect(() => {
         const handleKey = (e) => { if (e.key === 'Escape') onCancel() };
@@ -28,7 +32,7 @@ function ObjectTransformModal({ onConfirm, onCancel }) {
     };
 
     return (
-        <div className="sp-overlay sp-overlay--evasion">
+        <div className="sp-overlay sp-overlay--evasion" ref={overlayRef}>
             <div className="sp-modal">
                 <div className="sp-header"><i className="fa-solid fa-paw"></i> Creature into Object</div>
                 <div className="sp-body">
