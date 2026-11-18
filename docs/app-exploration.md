@@ -56,8 +56,6 @@ change-data `{}` + log `[]` + overlays `[]` (closed-tab two-pass headless clears
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(GK 2026-11-17)** Maps-manager row inline-rename commits on Enter but the input carries its text via the `value` PROPERTY only — automation `input[value="<name>"]` attribute selectors resolve for clicks yet `.press()` can race/timeout; mirroring the row's own `aria-label` onto the rename input (or setting the attribute) would make the lane symmetric with every other row control.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - DeathSavePromptModal resolved-id-guard RACE face — deterministic rig unknown; unit-pinned (carried; sole surviving original PT).

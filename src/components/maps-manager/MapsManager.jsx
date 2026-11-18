@@ -509,6 +509,13 @@ function MapsManager({ campaignName, onOpenMap, onMapDeleted }) {
                                 <input
                                     type="text"
                                     value={renameValue}
+                                        /* Accessible name mirrors the row-control idiom
+                                           (`Rename "<map>"`, `Open "<map>"`) so automation
+                                           can key the live input by name the same way it
+                                           keys every sibling button (backlog GK 2026-11-17:
+                                           `input[value=…]` attribute locators raced the
+                                           controlled property on `.press()`). */
+                                        aria-label={`New name for "${map.name}"`}
                                         autoFocus
                                         onChange={(e) => setRenameValue(e.target.value)}
                                         onBlur={() => handleRenameSave(map.fileName)}
