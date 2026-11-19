@@ -3,7 +3,7 @@ name: readme
 description: Update README.md to ensure all currently implemented features are covered.
 ---
 
-Do a really good review of this application starting  with the following:
+Do a really good review of this application starting with the following:
 
 - README.md
 - AGENTS.md
