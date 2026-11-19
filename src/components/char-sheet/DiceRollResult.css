@@ -214,6 +214,13 @@
     margin-right: 6px;
 }
 
+/* NB 2026-11-18: the Savage Attacker chip label is one expression child (no
+   JSX leading-space text node after the icon), so the icon gap is CSS-owned
+   here — same 6px rhythm as .dice-roll-done-btn i / .dice-roll-reroll-result i. */
+.dice-roll-savage-btn i {
+    margin-right: 6px;
+}
+
 .lunar-radiance-choice {
     display: flex;
     flex-direction: column;

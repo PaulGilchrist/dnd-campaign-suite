@@ -682,8 +682,17 @@ function DamageFeatureTriggers({ props, state, handlers }) {
             when: () => savageAttacker && !state.savageAttackerUsed && state.isDamageType,
             render: () => (
               <div className="dice-roll-reroll">
-                <button className="dice-roll-reroll-btn" onClick={handlers.handleSavageAttacker} type="button">
-                  <i className="fa-solid fa-arrows-spin"></i> Savage Attacker
+                <button className="dice-roll-reroll-btn dice-roll-savage-btn" onClick={handlers.handleSavageAttacker} type="button">
+                  {/* NB 2026-11-18 (popup-footer leading-space family, 2da7466dd
+                      idiom): the damage-result-popup Savage Attacker chip rides
+                      the dwell face as a bare label — a JSX text node after the
+                      icon carried a leading space into textContent
+                      (" Savage Attacker"), tripping raw-text locators. The
+                      label is ONE expression child; the icon gap stays
+                      CSS-owned (.dice-roll-savage-btn i margin-right), so the
+                      raw text is byte-exact 'Savage Attacker' and the visible
+                      copy/behavior are unchanged. */}
+                  <i className="fa-solid fa-arrows-spin"></i>{'Savage Attacker'}
                 </button>
               </div>
             ),
