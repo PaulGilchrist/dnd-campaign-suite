@@ -6,8 +6,10 @@
 // adder from that row must REMAP the target to the holder (CLA-360 law — the same
 // holderName resolution buildDisplayCreature uses), so conditions/targetEffects/
 // concentration writes AND the audit rows land on the holder's real, visible,
-// removable state instead of orphaning under the doomed key.
-// Boundary mocks mirror Initiative.effectAdder-evict.test.jsx.
+// removable state instead of orphaning under the doomed key. Since the 2026-11-19
+// demotion the open target is per-client local state, so the remap is pinned via
+// the modal's props — and NO effectAdder-shaped key may touch the store at all.
+// Boundary mocks mirror Initiative.effectAdder-local.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
@@ -16,10 +18,14 @@ import * as combatData from '../../services/encounters/combatData.js';
 import * as runtime from '../../hooks/runtime/useRuntimeState.js';
 
 const syncStateStore = new Map();
-const KEY = 'combat-ui-effectAdderTarget';
 const CAMPAIGN = 'test-campaign';
 const HOLDER = 'Alice';
 const ST_ROW = 'Alice (Second Turn)';
+
+// Oracle: any runtime-store call aiming an effectAdder-shaped key (the retired
+// open-flag lane). Any hit re-lives the orphan bug.
+const isAdderKey = (key) => typeof key === 'string' && key.toLowerCase().includes('effectadder');
+const adderEvicts = () => vi.mocked(runtime.deleteRuntimeKey).mock.calls.filter(([, key]) => isAdderKey(key));
 
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
@@ -140,7 +146,7 @@ const ROSTER = { round: 1, creatures: [
     { name: ST_ROW, type: 'player', initiative: '10', targetName: null, concentration: null, secondTurn: true, holderName: HOLDER },
 ] };
 
-const keyWrites = () => vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => key === KEY);
+const keyWrites = () => vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => isAdderKey(key));
 
 describe('Initiative effectAdder target remap for (Second Turn) rows (phantom-bucket fix)', () => {
     let props;
@@ -167,13 +173,15 @@ describe('Initiative effectAdder target remap for (Second Turn) rows (phantom-bu
         return view;
     };
 
-    it('opening from the (Second Turn) card routes the target to the HOLDER — the synced flag and the modal never carry the synthetic name', async () => {
+    it('opening from the (Second Turn) card routes the target to the HOLDER — the modal never carries the synthetic name and the store is untouched', async () => {
         await mount();
         await act(async () => { fireEvent.click(screen.getByTestId(`open-adder-${ST_ROW}`)); });
-        // The write seam EffectAdder/addCondition/audit rows all key off this name:
-        // it must be the holder, never the doomed suffixed row.
-        expect(keyWrites()).toHaveLength(1);
-        expect(keyWrites()[0]).toEqual(['campaign', KEY, expect.objectContaining({ name: HOLDER, openedFromSecondTurn: true }), CAMPAIGN]);
+        // The write seam EffectAdder/addCondition/audit rows all key off the
+        // targetName the modal was handed: it must be the holder, never the
+        // doomed suffixed row. The open flag itself is local state — zero
+        // effectAdder-key store traffic on the open leg (2026-11-19 demotion).
+        expect(keyWrites()).toHaveLength(0);
+        expect(adderEvicts()).toHaveLength(0);
         expect(screen.getByTestId('ea-target-name')).toHaveTextContent(HOLDER);
         expect(screen.getByTestId('ea-target-name')).not.toHaveTextContent(ST_ROW);
         // Header provenance (FV 2026-11-09 backlog): names the HOLDER but visibly
@@ -193,18 +201,15 @@ describe('Initiative effectAdder target remap for (Second Turn) rows (phantom-bu
         expect(teWrites[0][2]).toEqual([{ target: HOLDER, effect: 'marked' }]);
         // Audit truth: the applied row names the real creature, not the phantom key.
         expect(vi.mocked(runtime.setRuntimeValue).mock.calls.some(([, key]) => key === ST_ROW)).toBe(false);
-        // Close leg still EVICTS the open flag (deleteRuntimeKey — the mocked
-        // primitive cannot echo null back into the fake sync store, so the
-        // eviction call, like the sibling evict test, is the unmount witness).
-        expect(runtime.deleteRuntimeKey).toHaveBeenCalledWith('campaign', KEY, CAMPAIGN);
+        // Close leg is a pure local-flag clear: no effectAdder-key write, no evict.
+        expect(keyWrites()).toHaveLength(0);
+        expect(adderEvicts()).toHaveLength(0);
     });
 
     it('control: opening from the holder card keeps its own name (no remap for real creatures)', async () => {
         await mount();
         await act(async () => { fireEvent.click(screen.getByTestId(`open-adder-${HOLDER}`)); });
-        expect(keyWrites()).toHaveLength(1);
-        expect(keyWrites()[0]).toEqual(['campaign', KEY, expect.objectContaining({ name: HOLDER }), CAMPAIGN]);
-        expect(keyWrites()[0][2].openedFromSecondTurn).toBeUndefined();
+        expect(keyWrites()).toHaveLength(0);
         expect(screen.getByTestId('ea-target-name')).toHaveTextContent(HOLDER);
         // AC: holder-opened header stays byte-identical to the pre-hint modal.
         expect(screen.getByTestId('ea-header').textContent).toBe(HOLDER);

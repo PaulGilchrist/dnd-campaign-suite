@@ -70,7 +70,6 @@ export const SPECIAL_TOP_LEVEL_KEYS = new Set([
     'cleaveSecondTargets',       // CharActions.jsx
     'tacticalMasterPending',     // CharActions.jsx
     'pendingStarryChaliceHeal',  // postCastHealService.js
-    'combat-ui-effectAdderTarget', // useEffectAdderTarget.js EFFECT_ADDER_TARGET_KEY
     'loot-draft',                // useLootHandlers.js LOOT_DRAFT_KEY
     'leadingEvasionSelections',  // evasionUtils.js LEADING_EVASION_KEY
 ]);

@@ -3,7 +3,6 @@ import { cloneDeep } from 'lodash'
 import useSSEEqualityGuard from '../../hooks/runtime/useSSEEqualityGuard.js'
 import utils from '../../services/ui/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
-import { useEffectAdderTarget } from './useEffectAdderTarget.js'
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
 import { getMonsterImageUrl } from '../../services/npcs/monsterUtils.js'
@@ -382,9 +381,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const [conditionPopup, setConditionPopup] = React.useState(null)
 
-    // Close = EVICT, never POST null (backlog EP 2026-11-08 orphan fix) — the
-    // delete-on-close + detach-evict doctrine lives in useEffectAdderTarget.js.
-    const [effectAdderTarget, setEffectAdderTarget, closeEffectAdderTarget] = useEffectAdderTarget(campaignName)
+    // Owner decision 2026-11-19: the open-modal target is a per-GM ephemeral
+    // UI flag (local-vs-synced law, showModal category) — plain useState, zero
+    // network on every open/close leg. It intentionally does NOT restore after
+    // a remount (view-switch / campaign re-select unmount Initiative — the
+    // flag resets with it) and is never shared cross-tab.
+    const [effectAdderTarget, setEffectAdderTarget] = React.useState(null)
     // L5-001: End Turn renders only while enforcement is on (off ⇒ today's view, byte-identical)
     const enforcement = useRuntimeValue('campaign', 'enforcement')
     const enforcementOn = !!enforcement && enforcement.mode === 'on'
@@ -588,8 +590,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const openEffectAdder = React.useCallback((creature, tab) => {
         // Owner ruling 2026-11-10 (improve gate-away-condition-add): the manual
-        // door never opens for an AWAY row — backstop for stale/shared synced
-        // target flags (the real card hides the Add affordance outright).
+        // door never opens for an AWAY row — backstop for stale local target
+        // state (the real card hides the Add affordance outright).
         if (!isLocalhost || !isCreaturePresent(creature)) return
         // CLA-360 law (displayCreatureUtils.js:49, Initiative.jsx holderName lane):
         // structural (Second Turn) rows are synthetic transport — state keyed by the
@@ -610,11 +612,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             campaignName,
             characters,
             combatSummary,
-            setEffectAdderTarget: closeEffectAdderTarget,
+            setEffectAdderTarget,
             setCombatSummary,
         })
         return handler
-    }, [campaignName, characters, combatSummary, closeEffectAdderTarget])
+    }, [campaignName, characters, combatSummary])
 
     const { handleRollConditionSave } = React.useMemo(() => ({
         handleRollConditionSave: createRollConditionSaveHandler({
@@ -1075,7 +1077,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     targetName={effectAdderTarget.name}
                     titleSuffix={effectAdderTitleSuffix(effectAdderTarget)}
                     initialTab={effectAdderTab}
-                    onCancel={() => closeEffectAdderTarget(null)}
+                    onCancel={() => setEffectAdderTarget(null)}
                     onApply={handleApplyEffect}
                     creatures={creaturesOrEmpty(combatSummary)}
                 />

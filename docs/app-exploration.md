@@ -51,7 +51,6 @@ change-data `{}` + log `[]` + overlays GET `{"value":null}` (CLOSED-TAB two-pass
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(explore 2026-11-19 PD) `combat-ui-effectAdderTarget` persists as campaign change-data:** every EffectAdder open POSTs a top-level `combat-ui-effectAdderTarget` key (server log showed fresh `new top-level key` per open) — a per-GM ephemeral UI selection living in the shared server-first store per the local-vs-synced law; if the sharing is intentional, it should hydrate quietly (key reuse), else keep it local `useState`.
 
 ## Blocked / Not Verified (fold-gate ledger)
 

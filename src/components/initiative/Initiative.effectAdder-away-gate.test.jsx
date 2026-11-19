@@ -3,25 +3,32 @@
 // (improve gate-away-condition-add): the GM manual door never opens for an
 // AWAY row. The card itself hides the Add affordance (pinned by
 // CreatureCard.away.test.jsx); this file pins the container backstops —
-// openEffectAdder refuses away creatures (no synced flag, no modal), and a
-// stale rehydrated flag aimed at an away row (modal opened while present,
-// then Split Party parked the creature away) writes NOTHING on Apply and
-// evicts the flag. Present-card control keeps its byte-exact open/apply
-// semantics (automated lanes untouched). Boundary mocks mirror
-// Initiative.effectAdder-second-turn.test.jsx.
+// openEffectAdder refuses away creatures (no open-flag state, no modal) and a
+// PRESENT card opens exactly once with zero store traffic (the open flag is
+// per-client local state since the 2026-11-19 demotion). The Apply-time away
+// refusal for the stale-modal race (opened present, then Split Party parked
+// the creature away) is exercised directly on the handler by
+// createEffectAdderHandlers.test.jsx 'away target refusal'. Boundary mocks
+// mirror Initiative.effectAdder-second-turn.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import Initiative from './Initiative.jsx';
 import * as combatData from '../../services/encounters/combatData.js';
-import * as combatLoggingService from '../../services/encounters/combatLoggingService.js';
 import * as runtime from '../../hooks/runtime/useRuntimeState.js';
 
 const syncStateStore = new Map();
-const KEY = 'combat-ui-effectAdderTarget';
 const CAMPAIGN = 'test-campaign';
 const PRESENT = 'Alice';
 const AWAY = 'Bo';
+
+// Oracle: any runtime-store call aiming an effectAdder-shaped key (the retired
+// synced open-flag lane). Any hit re-lives the orphan bug.
+const isAdderKey = (key) => typeof key === 'string' && key.toLowerCase().includes('effectadder');
+const adderStoreWrites = () => [
+    ...vi.mocked(runtime.setRuntimeValue).mock.calls,
+    ...vi.mocked(runtime.setRuntimeObject).mock.calls,
+].filter(([, key]) => isAdderKey(key));
 
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
@@ -139,7 +146,7 @@ const ROSTER = { round: 1, creatures: [
     { name: AWAY, type: 'player', initiative: '', away: true, targetName: null, concentration: null },
 ] };
 
-const keyWrites = () => vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => key === KEY);
+const keyWrites = () => adderStoreWrites();
 
 describe('Initiative effectAdder away gate (owner ruling 2026-11-10)', () => {
     let props;
@@ -164,40 +171,27 @@ describe('Initiative effectAdder away gate (owner ruling 2026-11-10)', () => {
         await waitFor(() => { expect(screen.getByText('Initiative (round 1)')).toBeInTheDocument(); });
     };
 
-    it('opening from an AWAY card is refused: no synced flag write, no modal', async () => {
+    it('opening from an AWAY card is refused: no open-flag state, no modal, zero store traffic', async () => {
         await mount();
         await act(async () => { fireEvent.click(screen.getByTestId(`open-adder-${AWAY}`)); });
         expect(keyWrites()).toHaveLength(0);
-        expect(vi.mocked(runtime.setRuntimeObject).mock.calls.filter(([, key]) => key === KEY)).toHaveLength(0);
         expect(screen.queryByTestId('effect-adder')).toBeNull();
     });
 
-    it('control: a PRESENT card still opens the modal exactly once', async () => {
+    it('control: a PRESENT card still opens the modal exactly once, with zero store traffic', async () => {
         await mount();
         await act(async () => { fireEvent.click(screen.getByTestId(`open-adder-${PRESENT}`)); });
-        expect(keyWrites()).toHaveLength(1);
-        expect(keyWrites()[0]).toEqual([
-            'campaign', KEY, expect.objectContaining({ name: PRESENT }), CAMPAIGN,
-        ]);
+        // 2026-11-19 demotion: the open flag is per-client local state — the
+        // modal renders from React state alone, never a synced key write.
+        expect(keyWrites()).toHaveLength(0);
         expect(screen.getByTestId('ea-target-name')).toHaveTextContent(PRESENT);
     });
 
-    it('stale rehydrated flag aimed at an away row: Apply writes nothing and evicts', async () => {
-        // The modal was opened while Bo was present; a Split Party parked Bo
-        // away before Apply. The synced flag rehydrated the open modal against
-        // the now-away row — the handler guard must refuse every write lane.
-        syncStateStore.set(KEY, { name: AWAY, type: 'player', initiative: '', away: true });
-        await mount();
-        expect(screen.getByTestId('ea-target-name')).toHaveTextContent(AWAY);
-
-        await act(async () => { fireEvent.click(screen.getByTestId('ea-apply')); });
-        // Zero effect writes, zero audit rows… (mount legitimately reads
-        // many runtime values, so reads are not the oracle here).
-        expect(vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => key === 'targetEffects')).toHaveLength(0);
-        expect(combatLoggingService.logConditionEvent).not.toHaveBeenCalled();
-        // …and the open flag EVICTS (deleteRuntimeKey — the mocked primitive
-        // cannot echo null back into the fake sync store, same witness as the
-        // sibling evict test).
-        expect(runtime.deleteRuntimeKey).toHaveBeenCalledWith('campaign', KEY, CAMPAIGN);
-    });
+    // The third leg of the original gate — the stale-modal Apply race (opened
+    // present, Split Party parks the creature away before Apply, handler
+    // refuses every write lane and closes) — no longer has a rehydrated synced
+    // flag to ride: the flag is local, so the race can only come from THIS
+    // client's own open modal. The handler-side presence guard is exercised
+    // directly, for all three tabs, by createEffectAdderHandlers.test.jsx
+    // ('away target refusal (presence gate)').
 });

@@ -150,7 +150,6 @@ describe('campaignsAdmin - GET /api/campaigns/:campaign/admin/change-data-census
             cleaveSecondTargets: [],
             tacticalMasterPending: null,
             pendingStarryChaliceHeal: null,
-            'combat-ui-effectAdderTarget': null,
             'loot-draft': {},
             leadingEvasionSelections: {},
             'spell-overlay': [],
@@ -184,16 +183,20 @@ describe('campaignsAdmin - GET /api/campaigns/:campaign/admin/change-data-census
     it('a phantom top-level key is listed exactly, siblings stay unflagged', async () => {
         ensureCampaign('test-campaign');
         // The retired-lane shadow shape from the fixed bug: a whole snapshot
-        // stored verbatim as a top-level `inventory` bucket.
+        // stored verbatim as a top-level `inventory` bucket. Plus the EffectAdder
+        // open flag, RETIRED from the store 2026-11-19 (demoted to per-client
+        // useState) — a surviving write is now a phantom, not a special key.
         characterChangeData.set('test-campaign', {
             AasimarTest: { currentHitPoints: 143 },
             combatSummary: { round: 1, creatures: [] },
             inventory: { campaign: 'test-campaign', items: [{ id: 1, qty: 4 }] },
+            'combat-ui-effectAdderTarget': null,
         });
         const res = await request(createTestApp()).get(CENSUS_URL).set('Host', 'localhost');
         expect(res.status).toBe(200);
-        expect(res.body.totalKeys).toBe(3);
+        expect(res.body.totalKeys).toBe(4);
         expect(res.body.unknownKeys).toEqual([
+            { key: 'combat-ui-effectAdderTarget', type: 'null', summary: 'null' },
             { key: 'inventory', type: 'object', summary: '2 keys: campaign, items' },
         ]);
     });
