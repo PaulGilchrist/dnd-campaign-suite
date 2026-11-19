@@ -15,6 +15,21 @@ const ABILITY_OPTIONS = [
   { value: 'cha', label: 'Charisma' },
 ]
 
+// Zone-effect honesty hint (QA 2026-11-19): manual adds of cast-armed zones are inert
+// markers — the recurring turn-start saves arm only from the cast lane, which seeds the
+// caster `_<prefix>_<source>` tracking key processZoneTurnStartSaves reads. Rendered from
+// the registry flag (castArmedSaves), never inferred from the dc field. Owner decision:
+// informational only — no caster key is seeded here. Module-level so the modal's branch
+// count (and lint complexity ceiling) stays untouched.
+function CastArmedSavesHint({ def }) {
+  if (!def.castArmedSaves) return null
+  return (
+    <div className='ea-dc-hint'>
+      Recurring saves only when cast — GM manual add marks the zone.
+    </div>
+  )
+}
+
 function EffectAdder({ targetName, titleSuffix, initialTab, onCancel, onApply, creatures }) {
   const [activeTab, setActiveTab] = React.useState(initialTab || 'conditions')
 
@@ -278,6 +293,8 @@ function EffectAdder({ targetName, titleSuffix, initialTab, onCancel, onApply, c
                   <strong>{selectedEffectDef.label}</strong>
                 </div>
                 <p className='ea-config-desc'>{selectedEffectDef.description}</p>
+
+                <CastArmedSavesHint def={selectedEffectDef} />
 
                 {hasField('source') && (
                   <label className='ea-config-field'>

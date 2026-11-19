@@ -11,6 +11,10 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
  * @property {string[]} [fields] - Extra config fields shown when selected: 'value', 'ability', 'source', 'dc'
  * @property {Object} [defaults] - Default values for config fields
  * @property {string} [sourceLabel] - Override label for the source field
+ * @property {boolean} [castArmedSaves] - Recurring turn-start saves are armed only by the
+ *   cast lane (which seeds the caster `_<prefix>_<source>` tracking key the turn-start
+ *   consumer reads). A GM manual add only MARKS the zone (badge) — EffectAdder renders a
+ *   hint from this flag so the inert-marker case is never silent.
  */
 
 /** @type {TargetEffectDef[]} */
@@ -1179,6 +1183,7 @@ const TARGET_EFFECT_DEFINITIONS = [
     cls: 'effect-debuff',
     group: 'Spells',
     fields: ['source', 'dc'],
+    castArmedSaves: true,
   },
   {
     effect: 'sleet_storm',
@@ -1188,6 +1193,7 @@ const TARGET_EFFECT_DEFINITIONS = [
     cls: 'effect-debuff',
     group: 'Spells',
     fields: ['source', 'dc'],
+    castArmedSaves: true,
   },
 
   {
@@ -1198,6 +1204,7 @@ const TARGET_EFFECT_DEFINITIONS = [
     cls: 'effect-debuff',
     group: 'Spells',
     fields: ['source', 'dc'],
+    castArmedSaves: true,
   },
 
   // ── Spells (continued) ─────────────────────────────────
@@ -1218,6 +1225,7 @@ const TARGET_EFFECT_DEFINITIONS = [
     cls: 'effect-debuff',
     group: 'Spells',
     fields: ['source', 'dc'],
+    castArmedSaves: true,
   },
   {
     // MA-0610: Djinni Create Whirlwind zone te (armed by the MA-0042/MA-0043

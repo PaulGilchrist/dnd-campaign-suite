@@ -171,11 +171,21 @@ describe('TARGET_EFFECT_DEFINITIONS golden census (#820)', () => {
   it.each(CENSUS)('te "%s" is golden', (effect, label, icon, cls, group, fields, defaults) => {
     const def = getEffectDefinition(effect);
     expect(def).toBeDefined();
-    const { description, ...shape } = def;
+    const { description, castArmedSaves, ...shape } = def;
     expect(typeof description).toBe('string');
     expect(description.length).toBeGreaterThan(0);
-    // Exact shape: no missing, extra, or drifted property beyond description (#app mandate).
+    // Exact shape: no missing, extra, or drifted property beyond description
+    // and the castArmedSaves zone hint flag (whose member census is pinned below).
     expect(shape).toEqual({ effect, label, icon, cls, group, fields, defaults });
+    expect(castArmedSaves === true || castArmedSaves === undefined).toBe(true);
+  });
+
+  it('castArmedSaves is stamped on exactly the four cast-armed zone defs', () => {
+    // EffectAdder renders its "manual add marks the zone" hint from this flag;
+    // grease/sleet_storm/stinking_cloud/web are the recurring-turn-start-save
+    // zones whose saves are armed only by the cast lane (tracker seed).
+    expect(TARGET_EFFECT_DEFINITIONS.filter(d => d.castArmedSaves).map(d => d.effect).sort())
+      .toEqual(['grease', 'sleet_storm', 'stinking_cloud', 'web']);
   });
 
   it('roster is exactly the golden census — no additions, removals, or duplicates', () => {

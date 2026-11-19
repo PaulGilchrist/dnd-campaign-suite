@@ -51,7 +51,6 @@ change-data `{}` + log `[]` + overlays GET `{"value":null}` (CLOSED-TAB two-pass
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(explore 2026-11-19 PD) zone-effect manual adds are silently inert markers:** adding `Grease (Zone)`/`Sleet Storm`/`Web`/`Stinking Cloud` by hand gives a badge but NEVER arms the recurring turn-start save (no caster `_<prefix>_<source>` tracking seed, `processZoneTurnStartSaves` silent-continues) with zero feedback that the cast lane owns the saves. Non-blocking: consider an inline hint on zone-effect rows in the adder ("recurring saves only when cast — GM manual add marks the zone") or seed a manual caster key from the te's dc.
 - **(explore 2026-11-19 PD) `combat-ui-effectAdderTarget` persists as campaign change-data:** every EffectAdder open POSTs a top-level `combat-ui-effectAdderTarget` key (server log showed fresh `new top-level key` per open) — a per-GM ephemeral UI selection living in the shared server-first store per the local-vs-synced law; if the sharing is intentional, it should hydrate quietly (key reuse), else keep it local `useState`.
 
 ## Blocked / Not Verified (fold-gate ledger)
