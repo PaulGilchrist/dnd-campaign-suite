@@ -1,0 +1,72 @@
+/* Token status chips (roadmap Item 6) — corner indicators on indoor map
+   tokens. The tone classes are the SAME semantic badge classes CreatureBadge
+   uses (effect-buff/effect-debuff/effect-neutral/effect-condition + the
+   registry aliases that survive resolveEffectTone); the colors below mirror
+   CreatureBadge.css values one-for-one so map and tracker read identically
+   (SVG needs fill/stroke rather than background/border — the color pairing
+   is the only parallelism, the class language is shared). Scoped to the
+   map surface to keep the global CSS clean. */
+
+.map .token-status-bg {
+    stroke-width: 1.5;
+    /* Unlisted/unknown tone fallback stays visible (honest chip). */
+    fill: #64748b;
+    stroke: #334155;
+}
+
+.map .token-status-glyph {
+    fill: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Buff blue (CreatureBadge .effect-buff / .effect-target-disadv) */
+.map .token-status-chip.effect-buff .token-status-bg {
+    fill: #3b82f6;
+    stroke: #1e40af;
+}
+
+/* Debuff red (CreatureBadge .effect-debuff and its alias family:
+   effect-disadvantage / effect-target-adv / effect-auto-crit) */
+.map .token-status-chip.effect-debuff .token-status-bg,
+.map .token-status-chip.effect-disadvantage .token-status-bg,
+.map .token-status-chip.effect-target-adv .token-status-bg,
+.map .token-status-chip.effect-auto-crit .token-status-bg {
+    fill: #ef4444;
+    stroke: #991b1b;
+}
+
+/* Condition red (CreatureBadge .effect-condition, #dc2626 family) */
+.map .token-status-chip.effect-condition .token-status-bg {
+    fill: #dc2626;
+    stroke: #7f1d1d;
+}
+
+/* Neutral purple (CreatureBadge .effect-neutral; effect-charm has no badge
+   color law either, so it shares the neutral family here) */
+.map .token-status-chip.effect-neutral .token-status-bg,
+.map .token-status-chip.effect-charm .token-status-bg {
+    fill: #8b5cf6;
+    stroke: #5b21b6;
+}
+
+/* Bless/resist green (CreatureBadge .effect-bless / .effect-resist) */
+.map .token-status-chip.effect-bless .token-status-bg,
+.map .token-status-chip.effect-resist .token-status-bg {
+    fill: #22c55e;
+    stroke: #166534;
+}
+
+/* Summoned amber (CreatureBadge .effect-summoned) */
+.map .token-status-chip.effect-summoned .token-status-bg {
+    fill: #fbbf24;
+    stroke: #92400e;
+}
+
+/* "+N" overflow chip — presentation, not a status tone */
+.map .token-status-chip.token-status-overflow .token-status-bg {
+    fill: #1f2937;
+    stroke: #6b7280;
+}

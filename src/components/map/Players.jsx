@@ -1,9 +1,55 @@
 
 import { tokenStackTransform } from '../../services/maps/tokenStackOffsets.js';
+import TokenStatusIndicators from './TokenStatusIndicators.jsx';
 
 const RADIUS = 20;
 
-const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer, campaignName, tokenOffsets }) => {
+// Ownership tint predicate (roadmap Item 6) — hoisted to keep the token
+// renderer under the complexity ratchet. Minimal honest model: characters
+// are shared campaign data, so the only "mine" signal a device genuinely
+// has is its OWN sidebar selection (App-level activeCharacter, threaded as
+// localCharacterName — pure per-client local state, zero server writes).
+// A visitor client tints the locally-selected character's token; the GM
+// (localhost) sees every token neutral — the gold selection highlight stays
+// the only selection language there.
+function isTokenOwnedHere({ isLocalhost, localCharacterName, playerName }) {
+    return !isLocalhost && !!localCharacterName && playerName === localCharacterName;
+}
+
+// Player-token chrome (context-menu selection rect + visitor ownership ring)
+// — hoisted out of the token renderer to keep it under the complexity
+// ratchet; both are inert overlays (pointer-events: none).
+function PlayerTokenOverlays({ cx, cy, isSelected, isOwnedHere }) {
+    return (
+        <>
+            {isSelected && (
+                <rect
+                    x={cx - RADIUS - 3}
+                    y={cy - RADIUS - 3}
+                    width={(RADIUS + 3) * 2}
+                    height={(RADIUS + 3) * 2}
+                    fill="none"
+                    stroke="#FFD700"
+                    strokeWidth={2}
+                    rx={4}
+                    strokeDasharray="4 2"
+                    pointerEvents="none"
+                />
+            )}
+            {isOwnedHere && (
+                <circle
+                    cx={cx}
+                    cy={cy}
+                    r={RADIUS + 3}
+                    className="owned-token-ring"
+                    pointerEvents="none"
+                />
+            )}
+        </>
+    );
+}
+
+const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer, campaignName, tokenOffsets, localCharacterName }) => {
     const getPlayerImage = (player, characters) => {
         if (!characters || !player) return null;
         const character = characters.find((c) => c.name === player.name);
@@ -29,6 +75,7 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                 // single tokens keep no transform attribute and the plain
                 // class (byte-unchanged). Map.css owns the fade value.
                 const stack = tokenStackTransform(tokenOffsets, player.id);
+                const isOwnedHere = isTokenOwnedHere({ isLocalhost, localCharacterName, playerName: player.name });
                 // Hide creature from players if cell is fogged
                 if (!isLocalhost && fog?.has(`${player.gridX},${player.gridY}`)) return null;
 
@@ -56,20 +103,12 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                                 setSelectedPlayer(player);
                             }}
                         />
-                        {isSelected && (
-                            <rect
-                                x={cx - RADIUS - 3}
-                                y={cy - RADIUS - 3}
-                                width={(RADIUS + 3) * 2}
-                                height={(RADIUS + 3) * 2}
-                                fill="none"
-                                stroke="#FFD700"
-                                strokeWidth={2}
-                                rx={4}
-                                strokeDasharray="4 2"
-                                pointerEvents="none"
-                            />
-                        )}
+                        <PlayerTokenOverlays
+                            cx={cx}
+                            cy={cy}
+                            isSelected={isSelected}
+                            isOwnedHere={isOwnedHere}
+                        />
                         {img ? (
                             <image
                                 xlinkHref={img}
@@ -106,6 +145,12 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                         >
                             {player.name}
                         </text>
+                        <TokenStatusIndicators
+                            campaignName={campaignName}
+                            creatureName={player.name}
+                            cx={cx}
+                            cy={cy}
+                        />
                     </g>
                 );
             })}

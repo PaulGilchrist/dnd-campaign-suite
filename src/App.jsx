@@ -295,7 +295,7 @@ function seedCampaignRuntimeData(serverData) {
   }
 }
 
-function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, activeMapName, onBackFromMap, backMapTarget, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
+function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, activeMapName, activeCharacter, onBackFromMap, backMapTarget, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
   if (mapsView.type === 'manager') {
     return (
       <MapsManager
@@ -332,6 +332,11 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, a
           isLocalhost={isLocalhost}
           mapName={mapsView.mapName}
           mapDisplayName={mapsView.mapDisplayName}
+          // Ownership tint (roadmap Item 6): the name this device currently
+          // has open in the sidebar/sheet (per-client local state, never
+          // synced). Visitors get a green ring on their selected
+          // character's token; the GM lane renders every token neutral.
+          localCharacterName={activeCharacter?.name}
           // Deactivated-map advisory (backlog 2026-11-05 CW): false once the
           // campaign's active map ('__map__' SSE seam) no longer matches the
           // mounted board — the GM deactivated or switched while this view was
@@ -927,6 +932,7 @@ function App() {
             isLocalhost={isLocalhost}
             mapsView={mapsView}
             activeMapName={activeMapName}
+            activeCharacter={activeCharacter}
             onBackFromMap={handleBackFromMap}
             backMapTarget={mapHistory.top}
             onEncounterCreated={handleEnterMap}

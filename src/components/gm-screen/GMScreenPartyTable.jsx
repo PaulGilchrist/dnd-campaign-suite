@@ -5,14 +5,14 @@
 // condition keys (hooks must live per-row, so each row is its own component).
 import { useMemo } from 'react';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { normalizeConditionKeys } from '../../services/combat/conditions/conditionDisplay.js';
 import StatusBadges from './StatusBadges.jsx';
+import { getBaseSpeed } from '../char-sheet/char-summary/charSummaryCalc.js';
 import {
     deriveSaves,
     deriveProficientSkills,
-    derivePassives,
     deriveClassLabel,
     formatBonus,
-    normalizeConditionKeys,
 } from './partyRowData.js';
 
 function SkillsCell({ skills }) {
@@ -67,9 +67,13 @@ function PartyRow({ character, campaignName, campaignEffects }) {
     const derived = useMemo(() => ({
         saves: deriveSaves(stats),
         skills: deriveProficientSkills(stats),
-        passives: derivePassives(stats),
         classLabel: deriveClassLabel(stats),
-    }), [stats]);
+        // CLA-201 speed resolution law: the rules-layer folded
+        // playerStats.speed first, else the race-JSON base the sheet's
+        // getBaseSpeed lane uses. (Reading stats.speed alone showed "—"
+        // for every character with no speed passive.)
+        speed: stats.speed ?? getBaseSpeed(stats, campaignName),
+    }), [stats, campaignName]);
 
     // Same lane the sheet's CharHitPoints uses: stored current HP (defaulting
     // to the effective max), max folded with Aid / Hero's Feast increases.
@@ -107,15 +111,6 @@ function PartyRow({ character, campaignName, campaignEffects }) {
                 ))}
             </td>
             <SkillsCell skills={derived.skills} />
-            <td className="gm-cell-passives">
-                {derived.passives.length === 0 ? (
-                    <span className="text-muted">—</span>
-                ) : derived.passives.map(passive => (
-                    <span key={passive.label} className="gm-passive">
-                        {passive.label} {passive.value}
-                    </span>
-                ))}
-            </td>
             <HpCell
                 maxHp={stats.hitPoints || 0}
                 storedHp={storedHp}
@@ -123,7 +118,7 @@ function PartyRow({ character, campaignName, campaignEffects }) {
                 heroesFeastIncrease={heroesFeastIncrease}
                 tempHp={tempHp}
             />
-            <td>{stats.speed != null ? `${stats.speed} ft.` : '—'}</td>
+            <td className="gm-cell-speed">{derived.speed} ft.</td>
             <DefenseCell stats={stats} />
             <td className="gm-cell-status">
                 <StatusBadges conditionKeys={conditionKeys} targetEffects={myEffects} />
@@ -150,7 +145,6 @@ export default function GMScreenPartyTable({ party, campaignName, campaignEffect
                                 <th scope="col">AC</th>
                                 <th scope="col">Saves</th>
                                 <th scope="col">Skills</th>
-                                <th scope="col">Passives</th>
                                 <th scope="col">HP</th>
                                 <th scope="col">Speed</th>
                                 <th scope="col">Res/Imm</th>

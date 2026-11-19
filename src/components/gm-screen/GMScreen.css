@@ -56,11 +56,18 @@
     font-size: 1rem;
 }
 
+/* The app's standard table-header pairing (same vars the global thead rule
+   uses) — stays light-on-dark in BOTH themes. */
+.gm-party-table thead {
+    background-color: var(--background-color-header);
+    color: var(--color-header);
+}
+
 .gm-party-table th {
     position: sticky;
     top: 0;
-    background: var(--background-color-table-header);
-    color: var(--color-header-inner);
+    background: inherit;
+    color: inherit;
     text-align: left;
     padding: 8px 10px;
     white-space: nowrap;
@@ -84,16 +91,16 @@
 
 /* Saving throws: proficient ones carry the primary-green status color so the
    eye catches them across the table. */
+/* NOTE: never set `display` on these tds — table-cell layout must survive;
+   chips wrap naturally as inline-blocks inside the cell. */
 .gm-cell-saves {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    white-space: nowrap;
+    white-space: normal;
 }
 
 .gm-save {
     display: inline-block;
     min-width: 52px;
+    margin: 0 8px 2px 0;
 }
 
 .gm-save-proficient {
@@ -101,26 +108,15 @@
     color: var(--color-primary);
 }
 
-.gm-cell-skills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-}
-
 .gm-skill {
     white-space: nowrap;
+    display: inline-block;
+    margin: 0 8px 2px 0;
 }
 
 .gm-skill-expert {
     font-weight: 700;
     color: var(--color-info-hover);
-}
-
-.gm-cell-passives {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    white-space: nowrap;
 }
 
 .gm-cell-hp {

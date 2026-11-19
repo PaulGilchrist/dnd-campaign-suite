@@ -62,42 +62,13 @@ export function deriveProficientSkills(stats) {
     return skills.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Passive scores as computed into PlayerStats.senses by computePassiveSkills
- * ("Passive Perception" / "Passive Investigation" / "Passive Insight").
- */
-export function derivePassives(stats) {
-    const senses = Array.isArray(stats.senses) ? stats.senses : [];
-    return senses
-        .filter(sense => typeof sense.name === 'string' && sense.name.startsWith('Passive '))
-        .map(sense => ({
-            label: sense.name.replace('Passive ', ''),
-            value: sense.value,
-        }));
-}
-
 /** Compact "Fighter 3" label from the computed class object + level. */
 export function deriveClassLabel(stats) {
     const className = stats.class?.name || '';
     return [className, stats.level].filter(v => v !== '' && v != null).join(' ');
 }
 
-/**
- * Normalize a runtime activeConditions entry (string key, or an object
- * carrying a key) to its display label — same capitalization contract as
- * the sheet's CharConditions badges.
- */
-export function conditionLabel(key) {
-    if (key === 'speed_zero') return 'Speed 0';
-    return String(key).charAt(0).toUpperCase() + String(key).slice(1);
-}
-
-/** Unique condition keys from a runtime activeConditions array. */
-export function normalizeConditionKeys(raw) {
-    if (!Array.isArray(raw)) return [];
-    return [...new Set(
-        raw
-            .map(entry => (typeof entry === 'string' ? entry : entry?.key))
-            .filter(Boolean)
-    )];
-}
+// conditionLabel / normalizeConditionKeys MOVED to
+// services/combat/conditions/conditionDisplay.js (roadmap Item 6) — the map
+// token indicators consume the same label contract, so it lives with the
+// shared condition-display family, not in this GM-Screen-only module.

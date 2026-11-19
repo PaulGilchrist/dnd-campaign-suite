@@ -4,9 +4,9 @@
 // derives from shared-store subscriptions — no local state, no writes.
 import { useMemo } from 'react';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { normalizeConditionKeys } from '../../services/combat/conditions/conditionDisplay.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import StatusBadges from './StatusBadges.jsx';
-import { normalizeConditionKeys } from './partyRowData.js';
 
 // One party member's live line; renders nothing while the character carries
 // no conditions and no effects (per-row hook = per-row component).
@@ -30,7 +30,53 @@ function CharacterActivity({ character, campaignName, campaignEffects }) {
 // Initiative-board rows are heterogeneous: player rows mirror the sheet,
 // monster rows carry the join-stamped board fields. Conditions arrive as
 // {key,label} objects (CreatureCard contract).
-function CombatActivity({ campaignName, campaignEffects }) {
+//
+// HP law (mirrors CreatureCard/CreatureHp): the board's currentHp/maxHp are
+// authoritative ONLY for monster/NPC rows — a player row's board HP is the
+// join-time placeholder (e.g. 1/1), so player rows resolve the same runtime
+// keys the sheet writes, exactly like the party table's HpCell.
+function CombatRow({ creature, partyStats, campaignName, campaignEffects }) {
+    const isPlayer = creature.type === 'player' && partyStats;
+    const storedHp = useRuntimeValue(creature.name, 'currentHitPoints', campaignName);
+    const aidIncrease = useRuntimeValue(creature.name, 'aidHpMaxIncrease', campaignName);
+    const heroesFeastIncrease = useRuntimeValue(creature.name, 'heroesFeastHpMaxIncrease', campaignName);
+    const tempHp = useRuntimeValue(creature.name, 'tempHp', campaignName);
+
+    const conditionKeys = Array.isArray(creature.conditions)
+        ? [...new Set(creature.conditions.map(cond => (
+            cond && typeof cond === 'object' ? (cond.label || cond.key) : cond
+        )).filter(Boolean))]
+        : [];
+
+    let current;
+    let max;
+    if (isPlayer) {
+        const effectiveMax = (partyStats.hitPoints || 0)
+            + (Number(aidIncrease) || 0) + (Number(heroesFeastIncrease) || 0);
+        max = effectiveMax;
+        current = storedHp != null ? storedHp : effectiveMax;
+    } else {
+        current = creature.currentHp;
+        max = creature.maxHp;
+    }
+    return (
+        <div className="gm-inplay-line">
+            <span className="gm-inplay-name">{creature.name}</span>
+            <span className={`gm-combat-hp${current <= 0 ? ' gm-hp-down' : ''}`}>
+                {current} / {max}
+                {Number(tempHp) > 0 && (
+                    <span className="gm-temp-hp" title="Temporary hit points">{` +${Number(tempHp)}`}</span>
+                )}
+            </span>
+            <StatusBadges
+                conditionKeys={conditionKeys}
+                targetEffects={(campaignEffects || []).filter(te => te.target === creature.name)}
+            />
+        </div>
+    );
+}
+
+function CombatActivity({ party, campaignName, campaignEffects }) {
     // Live lane: the App echo adopts every combatSummary bucket into the
     // 'combatSummary' store (App.applyStoreUpdate), so these subscriptions
     // re-render the strip whenever the board changes. The combatData module
@@ -42,6 +88,10 @@ function CombatActivity({ campaignName, campaignEffects }) {
     const cached = getCombatSummary(campaignName);
     const creatures = storedCreatures ?? cached?.creatures ?? null;
     const round = storedRound ?? cached?.round ?? null;
+    const partyStatsByName = useMemo(
+        () => new Map((party || []).map(character => [character.computedStats.name, character.computedStats])),
+        [party],
+    );
     if (!Array.isArray(creatures) || creatures.length === 0) return null;
     return (
         <div className="gm-combat">
@@ -51,25 +101,15 @@ function CombatActivity({ campaignName, campaignEffects }) {
                 {activeCreatureName && <span className="gm-combat-active">active: {activeCreatureName}</span>}
             </div>
             <div className="gm-combat-rows">
-                {creatures.map((creature, index) => {
-                    const conditionKeys = Array.isArray(creature.conditions)
-                        ? [...new Set(creature.conditions.map(cond => (
-                            cond && typeof cond === 'object' ? (cond.label || cond.key) : cond
-                        )).filter(Boolean))]
-                        : [];
-                    return (
-                        <div key={`${creature.name}-${index}`} className="gm-inplay-line">
-                            <span className="gm-inplay-name">{creature.name}</span>
-                            <span className={`gm-combat-hp${creature.currentHp <= 0 ? ' gm-hp-down' : ''}`}>
-                                {creature.currentHp} / {creature.maxHp}
-                            </span>
-                            <StatusBadges
-                                conditionKeys={conditionKeys}
-                                targetEffects={(campaignEffects || []).filter(te => te.target === creature.name)}
-                            />
-                        </div>
-                    );
-                })}
+                {creatures.map((creature, index) => (
+                    <CombatRow
+                        key={`${creature.name}-${index}`}
+                        creature={creature}
+                        partyStats={partyStatsByName.get(creature.name)}
+                        campaignName={campaignName}
+                        campaignEffects={campaignEffects}
+                    />
+                ))}
             </div>
         </div>
     );
@@ -88,7 +128,7 @@ export default function GMScreenInPlay({ party, campaignName, campaignEffects })
             <h3 className="gm-section-title">
                 <i className="fa-solid fa-bolt" aria-hidden="true"></i> In Play
             </h3>
-            <CombatActivity campaignName={campaignName} campaignEffects={zones} />
+            <CombatActivity party={party} campaignName={campaignName} campaignEffects={zones} />
             {party.map(character => (
                 <CharacterActivity
                     key={character.computedStats.name || character.name}

@@ -5,13 +5,11 @@
 import CreatureBadge from '../common/CreatureBadge.jsx';
 import { CONDITION_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js';
 import { getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js';
-import { conditionLabel } from './partyRowData.js';
+import { conditionLabel, conditionTone } from '../../services/combat/conditions/conditionDisplay.js';
 
-// Mirrors the sheet's CharConditions tone law: Invisible reads as a buff,
-// every other condition uses the condition (red-save) tone.
-function conditionTone(key) {
-    return key === 'invisible' ? 'effect-buff' : 'effect-condition';
-}
+// conditionLabel / conditionTone come from conditionDisplay.js — the shared
+// label/tone law (sheet CharConditions / map token indicators) so every
+// surface reads identically.
 
 function StatusBadges({ conditionKeys = [], targetEffects = [] }) {
     const hasContent = conditionKeys.length > 0 || targetEffects.length > 0;

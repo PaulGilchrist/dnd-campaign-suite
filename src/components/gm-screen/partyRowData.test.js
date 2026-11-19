@@ -1,16 +1,13 @@
 // @maintained-by-ai
 // Pure-derivation contract for the GM Screen party rows: every formatter
 // reads exactly the PlayerStats fields the rules engine computes (abilities
-// with save/skills, skillProficiencies/expertise, Passive-* senses).
+// with save/skills, skillProficiencies/expertise, race speed).
 import { describe, it, expect } from 'vitest';
 import {
     formatBonus,
     deriveSaves,
     deriveProficientSkills,
-    derivePassives,
     deriveClassLabel,
-    conditionLabel,
-    normalizeConditionKeys,
 } from './partyRowData.js';
 import { makeStats } from './gm-test-utils.jsx';
 
@@ -46,30 +43,13 @@ describe('partyRowData', () => {
         expect(skills[1]).toMatchObject({ bonus: 4, expert: false });
     });
 
-    it('derivePassives emits only the Passive-* senses with short labels', () => {
-        expect(derivePassives(makeStats())).toEqual([
-            { label: 'Perception', value: '14' },
-            { label: 'Investigation', value: '10' },
-            { label: 'Insight', value: '11' },
-        ]);
-        expect(derivePassives({})).toEqual([]);
-    });
-
     it('deriveClassLabel joins class name and level', () => {
         expect(deriveClassLabel(makeStats())).toBe('Fighter 3');
         expect(deriveClassLabel({ level: 1 })).toBe('1');
         expect(deriveClassLabel({ class: { name: 'Rogue' } })).toBe('Rogue');
     });
-
-    it('conditionLabel capitalizes and translates the speed_zero special case', () => {
-        expect(conditionLabel('poisoned')).toBe('Poisoned');
-        expect(conditionLabel('speed_zero')).toBe('Speed 0');
-    });
-
-    it('normalizeConditionKeys dedupes strings and object keys alike', () => {
-        expect(normalizeConditionKeys(['poisoned', 'poisoned', { key: 'prone' }, null]))
-            .toEqual(['poisoned', 'prone']);
-        expect(normalizeConditionKeys(undefined)).toEqual([]);
-        expect(normalizeConditionKeys('not-an-array')).toEqual([]);
-    });
 });
+
+// conditionLabel / normalizeConditionKeys moved with roadmap Item 6 to
+// services/combat/conditions/conditionDisplay.js — their tests ride the
+// canon in conditionDisplay.test.js now.

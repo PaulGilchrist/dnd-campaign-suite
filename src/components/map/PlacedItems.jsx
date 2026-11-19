@@ -9,6 +9,7 @@ import { itemSpriteHref } from '../../services/maps/itemSprites';
 // had the same gap, so the title rides every marker in both lanes.
 import { placedItemLabel } from './hooks/usePlacedItems.js';
 import { tokenStackTransform, isStackedToken } from '../../services/maps/tokenStackOffsets.js';
+import TokenStatusIndicators from './TokenStatusIndicators.jsx';
 const RADIUS = 20;
 const SPRITE = 36;      // single-cell sprite edge (SVG units)
 const WIDE_SPRITE = 72; // two-cell sprite long edge at rotation 0
@@ -42,6 +43,7 @@ function PlacedItems({
     itemDragging,
     handleItemPointerDown,
     tokenOffsets,
+    campaignName,
 }) {
     const isVisible = (item) => {
         // A secret door is never shown as an icon to players: hidden it is a
@@ -285,6 +287,12 @@ function PlacedItems({
                 >
                     {item.name}
                 </text>
+                <TokenStatusIndicators
+                    campaignName={campaignName}
+                    creatureName={item.name}
+                    cx={cx}
+                    cy={cy}
+                />
                 {isHidden(item) && hiddenRing(cx, cy, 48, 48, true)}
                 {isLocalhost && (
                     <>

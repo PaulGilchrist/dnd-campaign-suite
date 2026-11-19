@@ -55,15 +55,6 @@ describe('GMScreenPartyTable', () => {
         expect(skills.querySelector('.gm-skill-expert')).toHaveTextContent('Stealth +1');
     });
 
-    it('shows passive Perception/Investigation/Insight and not the other senses', () => {
-        renderTable([makePartyMember()]);
-        const passives = document.querySelector('.gm-cell-passives');
-        expect(passives.textContent).toContain('Perception 14');
-        expect(passives.textContent).toContain('Investigation 10');
-        expect(passives.textContent).toContain('Insight 11');
-        expect(passives.textContent).not.toContain('Darkvision');
-    });
-
     it('HP defaults to the effective max and folds Aid/Feast increases live', () => {
         seedCharStore('Aragorn', { aidHpMaxIncrease: 5 });
         renderTable([makePartyMember()]);
@@ -110,12 +101,12 @@ describe('GMScreenPartyTable', () => {
     it('speed and resistances/immunities render compactly, with an em-dash when empty', () => {
         renderTable([makePartyMember({ resistances: ['Poison'], immunities: ['Necrotic'] })]);
         const row = screen.getByRole('row', { name: /Aragorn/ });
-        expect(row.cells[7]).toHaveTextContent('30 ft.');
-        expect(row.cells[8]).toHaveTextContent('Res Poison');
-        expect(row.cells[8]).toHaveTextContent('Imm Necrotic');
+        expect(row.cells[6]).toHaveTextContent('30 ft.');
+        expect(row.cells[7]).toHaveTextContent('Res Poison');
+        expect(row.cells[7]).toHaveTextContent('Imm Necrotic');
         renderTable([makePartyMember({ name: 'Shadow' })]);
         const shadowRow = screen.getByRole('row', { name: /Shadow/ });
-        expect(shadowRow.cells[8]).toHaveTextContent('—');
+        expect(shadowRow.cells[7]).toHaveTextContent('—');
     });
 
     it('empty party renders the honest placeholder', () => {

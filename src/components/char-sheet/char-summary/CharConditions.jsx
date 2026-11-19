@@ -2,6 +2,7 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../../../hooks/runtime/useRuntimeState.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import { getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
+import { conditionLabel, conditionTone } from '../../../services/combat/conditions/conditionDisplay.js'
 import { CONDITION_DESCRIPTIONS } from '../../../services/combat/conditions/effectDescriptions.js'
 import { addEntry } from '../../../services/ui/logService.js'
 import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/combat/conditions/exhaustionRules.js'
@@ -131,7 +132,9 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
 
     const saveAbility = meta.ability || 'con'
     const saveLabel = getAbilityLabel(saveAbility)
-    const conditionLabel = conditionKey === 'speed_zero' ? 'Speed 0' : conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1)
+    // Shared label law (conditionDisplay) — badge text, log rows and the
+    // popup all name the condition exactly as the badge does.
+    const conditionLabelText = conditionLabel(conditionKey)
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
     const hasAdvantage = computeConditionSaveAdvantage(playerStats, campaignName, conditionEffects, conditionKey)
 
@@ -149,7 +152,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       type: 'roll',
       characterName: playerStats.name,
       rollType: 'save',
-      name: `${saveLabel} (${conditionLabel})`,
+      name: `${saveLabel} (${conditionLabelText})`,
       rolls,
       mode,
       total,
@@ -157,10 +160,10 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       bonusDetail,
       dc: meta.dc,
       success,
-      condition: conditionLabel,
+      condition: conditionLabelText,
     })
 
-    logConditionSave({ campaignName, creatureName: playerStats.name, roll: hasAdvantage ? [roll1, roll2] : finalRoll, bonus: saveBonus + auraBonus, bonusDetail, conditionLabel, abilityLabel: saveLabel, dc: meta.dc, success })
+    logConditionSave({ campaignName, creatureName: playerStats.name, roll: hasAdvantage ? [roll1, roll2] : finalRoll, bonus: saveBonus + auraBonus, bonusDetail, conditionLabel: conditionLabelText, abilityLabel: saveLabel, dc: meta.dc, success })
 
     setPopupHtml({
       type: 'd20',
@@ -264,13 +267,13 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       <div className="char-conditions-grid">
         {hasConditions && [...new Set(activeConditions)].map(key => {
           const meta = conditionMeta[key] || {}
-          const label = key.charAt(0).toUpperCase() + key.slice(1)
+          const label = conditionLabel(key)
           const hasSave = !!(meta.dc && meta.ability)
           const displayText = meta.dc ? `${label} DC ${meta.dc}` : label
           const title = meta.dc ? CONDITION_DESCRIPTIONS[label] || label : (CONDITION_DESCRIPTIONS[label] || label)
           const onClick = hasSave ? () => handleConditionSave(key) : null
 
-          const condCls = key === 'invisible' ? 'effect-buff' : 'effect-condition'
+          const condCls = conditionTone(key)
           return (
             <CreatureBadge
               key={key}

@@ -46,7 +46,7 @@ function computeCircleFormsACOverride(playerStats, activeBuffs) {
 // CLA-118: race JSON alone misses the 2024 Elfish Lineage ladder grant (the
 // Wood Elf option carries speedBonus 5, not an absolute subrace speed), so
 // the sheet lane adds the same grant rules.js applies to playerStats.speed.
-function getBaseSpeed(playerStats, campaignName) {
+export function getBaseSpeed(playerStats, campaignName) {
     const raceSpeed = playerStats.race?.subrace?.speed ?? playerStats.race?.speed
     if (raceSpeed == null) {
         console.error('[charSummaryCalc] no race speed on playerStats.race for', playerStats.name)

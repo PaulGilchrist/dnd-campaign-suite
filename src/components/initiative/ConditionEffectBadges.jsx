@@ -2,6 +2,7 @@ import { computeConditionEffects } from '../../services/combat/conditions/condit
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDescriptions.js'
 import { getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js'
+import { resolveEffectTone } from '../../services/combat/conditions/conditionDisplay.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
 import CreatureBadge from '../common/CreatureBadge.jsx'
 
@@ -42,16 +43,8 @@ function removeBuffsByTypes(creatureName, buffEffects, campaignName) {
     setRuntimeValue(creatureName, 'activeBuffs', filtered, campaignName)
 }
 
-const EFFECT_TO_SEMANTIC = {
-    'effect-stealth-attack': 'effect-neutral',
-    'effect-speed-zero': 'effect-debuff',
-    'effect-target-disadv': 'effect-buff',
-    'effect-cannot-act': 'effect-debuff',
-}
-
-function resolveCls(cls) {
-    return EFFECT_TO_SEMANTIC[cls] || cls
-}
+// Semantic-tone fold lives in conditionDisplay.js (shared with the map
+// token indicators) — moved out verbatim so tracker and map agree.
 
 const findDirect = (ctx, effect) => (ctx.targetEffects || []).find(te => te.effect === effect && te.target === ctx.creatureName)
 
@@ -708,7 +701,7 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
                     key={`${b.label}-${i}`}
                     icon={b.icon}
                     label={b.label}
-                    cls={resolveCls(b.cls)}
+                    cls={resolveEffectTone(b.cls)}
                     tooltip={b.tooltip || getEffectDescription(b.label)}
                     removable={isLocalhost && b.removable}
                     onRemove={() => removeBadgeEffect(b, ctx)}

@@ -10,7 +10,7 @@ export const CAMPAIGN = 'test-campaign';
  * A minimal-but-realistic PlayerStats shape (exactly what
  * rulesFactory.getPlayerStats produces for the fields the GM Screen reads:
  * armorClass, six abilities with computed saves + skill bonuses,
- * skillProficiencies, expertise, senses passives, hitPoints, speed).
+ * skillProficiencies, expertise, hitPoints, race speed).
  */
 export function makeStats(overrides = {}) {
     return {
@@ -21,17 +21,11 @@ export function makeStats(overrides = {}) {
         armorClass: 18,
         armorClassFormula: '18 (plate)',
         hitPoints: 30,
-        speed: 30,
+        race: { name: 'Human', speed: 30 },
         resistances: [],
         immunities: [],
         skillProficiencies: ['Athletics', 'Perception'],
         expertise: [],
-        senses: [
-            { name: 'Darkvision', value: '60 ft.' },
-            { name: 'Passive Perception', value: '14' },
-            { name: 'Passive Investigation', value: '10' },
-            { name: 'Passive Insight', value: '11' },
-        ],
         abilities: [
             { name: 'Strength', bonus: 3, save: 5, proficient: true, skills: [{ name: 'Athletics', ability: 'Strength', bonus: 5 }] },
             { name: 'Dexterity', bonus: 1, save: 1, proficient: false, skills: [{ name: 'Acrobatics', ability: 'Dexterity', bonus: 1 }, { name: 'Stealth', ability: 'Dexterity', bonus: 1 }] },

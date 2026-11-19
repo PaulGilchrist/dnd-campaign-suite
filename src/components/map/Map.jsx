@@ -147,7 +147,11 @@ function mergeNewlyRevealed(visible, revealed) {
     return Array.from(current);
 }
 
-function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, mapIsActive, onViewNewMap, onBack, backMapTarget, onEncounterCreated, onPoiEntered }) {
+// localCharacterName: this device's sidebar-selected character name
+// (App-level activeCharacter — per-client local state only, never synced).
+// Threaded to Players for the visitor ownership tint (roadmap Item 6);
+// undefined on the GM lane keeps every token neutral.
+function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, mapIsActive, localCharacterName, onViewNewMap, onBack, backMapTarget, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const svgRef = useRef(null);
@@ -715,6 +719,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     setSelectedPlayer={setSelectedPlayer}
                     campaignName={campaignName}
                     tokenOffsets={tokenStackOffsets.players}
+                    localCharacterName={localCharacterName}
                 />
 
                 <PlacedItems
@@ -728,6 +733,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     itemDragging={itemDragging}
                     handleItemPointerDown={handleItemPointerDownTracked}
                     tokenOffsets={tokenStackOffsets.items}
+                    campaignName={campaignName}
                 />
 
                 {/* Indoor POIs (labelled points of interest, same lane the
