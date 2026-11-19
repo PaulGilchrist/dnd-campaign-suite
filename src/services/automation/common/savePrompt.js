@@ -157,14 +157,77 @@ function logSaveOutcome(campaignName, config, detail) {
 // the previous page — write honest rows here".
 const liveSaveListenerIds = new Set();
 
+// Cross-tab liveness signal for the lapsed-copy branch (backlog 2026-11-18
+// NB: the two-tab answer face must not claim "after a page reload" when
+// nothing reloaded). liveSaveListenerIds above is PAGE-LOCAL — the resolving
+// page cannot see a peer tab's registry. The truthful cross-tab projection:
+// every createSaveListener arm stamps an owner-tab token onto its
+// pendingSavePrompts row (a per-page-load random token — a reload/closed page
+// can never re-present its dead token), and the owning page STRIPS its own
+// markers via a keepalive POST on `pagehide` (unload/navigation/close — the
+// only page-lifecycle event with no wall-clock component; no game timer).
+// So at lapse-row write time: a FOREIGN live token on the armed row ⇒ the
+// producer chain is parked on a LIVE peer page (honest "from another window"
+// copy); no token (pagehide-stripped by a reload/close, or an older book
+// producer that never stamps) ⇒ the chain genuinely died with its page
+// (the pre-existing reload copy, byte-unchanged). Residual edge: a hard
+// crash/kill skips pagehide, leaving a stale marker — an accepted lean-signal
+// limit, never a wall-clock guess.
+const OWNER_TAB_TOKEN = `tab-${Math.random().toString(36).slice(2, 10)}`;
+
+// promptId -> campaignName for the arms THIS page owns and has not yet
+// resolved/dismissed; drives the pagehide marker-strip sweep below.
+const ownedListenerPromptIds = new Map();
+let saveListenerLivenessEvictArmed = false;
+
+function armSaveListenerLivenessEviction() {
+    if (saveListenerLivenessEvictArmed) return;
+    saveListenerLivenessEvictArmed = true;
+    window.addEventListener('pagehide', evictOwnSaveListenerLivenessMarkers);
+}
+
+function evictOwnSaveListenerLivenessMarkers() {
+    if (ownedListenerPromptIds.size === 0) return;
+    for (const campaignName of new Set(ownedListenerPromptIds.values())) {
+        const pending = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
+        const next = {};
+        let stripped = false;
+        for (const [id, entry] of Object.entries(pending)) {
+            if (entry && entry.ownerTab === OWNER_TAB_TOKEN) {
+                const clone = { ...entry };
+                delete clone.ownerTab;
+                next[id] = clone;
+                stripped = true;
+            } else {
+                next[id] = entry;
+            }
+        }
+        if (!stripped) continue;
+        // Unload-resilient direct write: the page's store lane is dying with
+        // it, so this mirrors setRuntimeValue's campaign-key wildcard POST
+        // shape exactly (server cache update + SSE echo to every peer) but
+        // with keepalive so the strip survives navigation — a peer must see
+        // the marker GONE once this page is gone.
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/pendingSavePrompts`, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: next }),
+            keepalive: true,
+        }).catch((e) => { console.error('[savePrompt] Error stripping save-listener liveness marker on unload:', e); });
+    }
+}
+
 export function createSaveListener(campaignName, config) {
     const promptId = utils.guid();
     liveSaveListenerIds.add(promptId);
+    armSaveListenerLivenessEviction();
+    ownedListenerPromptIds.set(promptId, campaignName);
 
     const payload = buildPromptPayload(config);
 
     const pendingSaves = getRuntimeValue('campaign', 'pendingSavePrompts') || {};
-    pendingSaves[promptId] = { promptId, campaignName, ...payload };
+    pendingSaves[promptId] = { promptId, campaignName, ...payload, ownerTab: OWNER_TAB_TOKEN };
     setRuntimeValue('campaign', 'pendingSavePrompts', pendingSaves, campaignName);
 
     const listenerPrompts = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []; // fix#339 (#1520-family): read/write symmetric channel vocabulary per fix#153/#198 — reader is arity-2 (useRuntimeState.js:63), scope = SSE-mirrored active-campaign store until #1520
@@ -177,6 +240,7 @@ export function createSaveListener(campaignName, config) {
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
             liveSaveListenerIds.delete(promptId);
+            ownedListenerPromptIds.delete(promptId);
             window.removeEventListener('save-result', handler);
             window.removeEventListener('save-dismissed', onDismissed);
             // Spread before deleting (playbook §41): in-place mutation of the
@@ -197,6 +261,7 @@ export function createSaveListener(campaignName, config) {
         const onDismissed = (event) => {
             if (event.detail.promptId !== promptId) return;
             liveSaveListenerIds.delete(promptId);
+            ownedListenerPromptIds.delete(promptId);
             window.removeEventListener('save-dismissed', onDismissed);
             window.removeEventListener('save-result', handler);
         };
@@ -282,10 +347,18 @@ export function resolveConsumerlessSavePrompt(campaignName, prompt, detail) {
     if (liveSaveListenerIds.has(promptId)) return;
     const listenerIds = getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || [];
     if (!Array.isArray(listenerIds) || !listenerIds.includes(promptId)) return;
+    // Liveness branch of the lapse copy (backlog 2026-11-18 NB): the armed
+    // row's owner-tab marker (createSaveListener stamp, stripped by the
+    // owner's pagehide) says whether the producer page is a LIVE peer or
+    // died with its navigation. Read BEFORE any dropPendingSavePrompt sweep
+    // (both modal call sites resolve first, drop after).
+    const pendingSaves = getRuntimeValue('campaign', 'pendingSavePrompts', campaignName) || {};
+    const armedRow = pendingSaves[promptId];
+    const livePeerProducer = Boolean(armedRow && armedRow.ownerTab && armedRow.ownerTab !== OWNER_TAB_TOKEN);
     if (detail && prompt.suppressOutcomeLog !== true) {
         logSaveOutcome(campaignName, prompt, detail);
     }
-    logSaveLapsed(campaignName, prompt, detail != null);
+    logSaveLapsed(campaignName, prompt, detail != null, livePeerProducer);
     if (prompt.attackerName) {
         restoreBaseAttackAfterBash({ name: prompt.attackerName }, campaignName)
             .catch((e) => { console.error('[savePrompt] Error restoring lapsed-rider base attack:', e); });
@@ -295,16 +368,25 @@ export function resolveConsumerlessSavePrompt(campaignName, prompt, detail) {
 // Lapsed-resolution audit row (save_dismissed idiom, b0f315161 family): the
 // un-rolled branch mirrors the dismissal refusal copy; the rolled branch says
 // the roll was recorded (its `save_result` row rides above) but the waiting
-// effect lapsed with the lost page — never a silent void.
-function logSaveLapsed(campaignName, prompt, rolled) {
+// effect lapsed — never a silent void. Copy branches on the owner-tab
+// liveness signal (livePeerProducer, from resolveConsumerlessSavePrompt): a
+// FOREIGN live marker means the producer page is parked elsewhere (nothing
+// reloaded — the copy says "from another window" and asserts NEITHER "after
+// a page reload" NOR "with the lost page"); no marker means the chain died
+// with its page and the reload-worded copy stays byte-identical.
+function logSaveLapsed(campaignName, prompt, rolled, livePeerProducer) {
     const targetName = prompt.targetName || 'Unknown';
     const saveType = prompt.saveType || 'CON';
     const saveDc = prompt.saveDc ?? 0;
     const against = prompt.sourceName ? ` against ${prompt.sourceName}` : '';
     const awaiting = prompt.sourceName || 'pending effect';
-    const description = rolled
-        ? `${targetName}'s ${saveType} save (DC ${saveDc})${against} was resolved after a page reload — the ${awaiting} awaiting it lapsed with the lost page (effect not applied, no chooser available).`
-        : `${targetName}'s ${saveType} save (DC ${saveDc})${against} was dismissed after a page reload before rolling — the ${awaiting} lapsed with the lost page (no effect).`;
+    const description = livePeerProducer
+        ? (rolled
+            ? `${targetName}'s ${saveType} save (DC ${saveDc})${against} was resolved from another window — the ${awaiting} awaiting it lapsed (effect not applied, no chooser available).`
+            : `${targetName}'s ${saveType} save (DC ${saveDc})${against} was dismissed from another window before rolling — the ${awaiting} lapsed (no effect).`)
+        : (rolled
+            ? `${targetName}'s ${saveType} save (DC ${saveDc})${against} was resolved after a page reload — the ${awaiting} awaiting it lapsed with the lost page (effect not applied, no chooser available).`
+            : `${targetName}'s ${saveType} save (DC ${saveDc})${against} was dismissed after a page reload before rolling — the ${awaiting} lapsed with the lost page (no effect).`);
     return addEntry(campaignName, {
         type: 'automation',
         automationType: 'save_lapsed',
@@ -314,9 +396,13 @@ function logSaveLapsed(campaignName, prompt, rolled) {
         targetName,
         saveDc,
         saveType,
-        reason: rolled
-            ? 'save resolved after page reload — awaiting effect chain lost'
-            : 'save dismissed after page reload before rolling — awaiting effect chain lost',
+        reason: livePeerProducer
+            ? (rolled
+                ? 'save resolved from another live window — awaiting effect chain parked on that page'
+                : 'save dismissed from another live window before rolling — awaiting effect chain parked on that page')
+            : (rolled
+                ? 'save resolved after page reload — awaiting effect chain lost'
+                : 'save dismissed after page reload before rolling — awaiting effect chain lost'),
         description,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[savePrompt] Error logging lapsed save:', e); });

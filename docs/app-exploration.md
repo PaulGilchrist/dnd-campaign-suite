@@ -57,8 +57,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass he
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-18 NB — `save_lapsed` copy asserts "resolved after a page reload" even when nothing reloaded:** the two-tab residual (a live second tab answers a parked chain) lands the reload-worded lapse row verbatim — misleading to a GM reading the Log ("nobody reloaded"); branch the copy (e.g. "resolved from another window — the Shield Bash awaiting it lapsed") where the live-listener registry shows the producer is parked on a LIVE peer page rather than dead.
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (auto-encounter Accept resets round without eviction) — unchanged, owner decision open (clear-latch fix resolution explicitly declines the Load redesign); needs sandbox outdoor map + enforcement rig §97.
