@@ -18,6 +18,8 @@ import { getCreatureController } from '../../services/encounters/creatureControl
 import { sweepNewCombatClocks } from '../../services/rules/effects/zoneDurationClock.js'
 import { clearCombatLatches } from '../../services/automation/common/oncePerTurn.js'
 import { clearAllPendingOas, prunePendingOas } from '../../services/combat/pendingOpportunityAttacks.js'
+import { quickSpawnMonster } from '../../services/encounters/quickMonsterSpawn.js'
+import { getMonsterImageUrl } from '../../services/npcs/monsterUtils.js'
 
 /**
  * Player HP edits live in the runtime store (server-first); a revival across 0
@@ -654,6 +656,59 @@ export function createCreatureHandlers({
         return spawnNpc(0)
     }
 
+    // ── Quick monster spawn (roadmap Item 4) ────────────────────────────────
+    // The "+ Monster" picker's confirm leg. The spawn itself runs through the
+    // SHARED encounter-expansion lane (quickMonsterSpawn → addMonstersToInitiative:
+    // strict read, numbering continuation, real HP/AC/resistances/save bonuses,
+    // initiative roll + sort, ack-gated board write + cache publish, `joined`
+    // disclosure row). This handler only mirrors the ACKNOWLEDGED board into
+    // React state, resolves art for the freshly joined rows, and reports —
+    // same ack-then-publish order as spawnNpc above. Zero writes to npcs.json
+    // (AGENTS invariant: pre-made monsters join from monsters.json, never as
+    // NPC rows). Hosted behind the GM-only combat-controls row, matching the
+    // +NPC lane's UI gating.
+    const handleQuickSpawnMonster = async function handleQuickSpawnMonster(monster, qty) {
+        if (!combatSummary || !monster) return false
+        const count = Math.max(1, parseInt(qty, 10) || 1)
+        const namesBefore = new Set(combatSummary.creatures.map(c => c.name))
+        let summary
+        try {
+            summary = await quickSpawnMonster(monster, count, characters, campaignName)
+        } catch (e) {
+            console.error('[handleQuickSpawnMonster] quick monster spawn failed:', e)
+            showToast(`Failed to spawn ${count}× ${monster.name}`, true)
+            return false
+        }
+        setCombatSummary(cloneDeep(summary))
+        // The join lane re-anchored activeCreatureName to the top row server-side;
+        // mirror the pointer immediately so the local card highlight matches the
+        // board the server just accepted (the SSE echo converges other tabs).
+        const firstName = summary.creatures[0]?.name
+        if (firstName) setActiveCreatureName(firstName)
+        // Art census: the mount image loader runs once, so freshly joined rows
+        // resolve here (stripTrailingNumber inside getMonsterImageUrl makes
+        // 'Goblin 3' pull the Goblin bestiary art; a series-renumbered plain
+        // row ('Goblin' → 'Goblin 1') lands in this set too and re-keys clean).
+        const joinedRows = summary.creatures.filter(c => c.type !== 'player' && !namesBefore.has(c.name))
+        if (joinedRows.length > 0) {
+            try {
+                const urls = await Promise.all(joinedRows.map(async (row) => ({
+                    name: row.name,
+                    url: await getMonsterImageUrl(row.name, campaignNpcs, campaignName),
+                })))
+                setNpcImages(prev => {
+                    const next = { ...prev }
+                    for (const { name, url } of urls) next[name] = url
+                    return next
+                })
+            } catch (e) {
+                console.error('[handleQuickSpawnMonster] monster art resolution failed:', e)
+            }
+        }
+        showToast(`${count}× ${monster.name} joined initiative`)
+        return true
+    }
+
     return {
         handleCreatureHpChange,
         handleClear,
@@ -665,6 +720,7 @@ export function createCreatureHandlers({
         handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,
+        handleQuickSpawnMonster,
         handlePartyPresenceChange,
         handleToggleAway,
     }

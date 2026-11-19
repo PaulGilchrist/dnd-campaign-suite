@@ -46,6 +46,7 @@ import TvNextUpStrip from './TvNextUpStrip.jsx'
 import TvMusicTransport from './TvMusicTransport.jsx'
 import EvictFailureToast from './EvictFailureToast.jsx'
 import VictoryBanner from './VictoryBanner.jsx'
+import QuickMonsterSpawn from './QuickMonsterSpawn.jsx'
 import { createCreatureHandlers } from './createCreatureHandlers.js'
 import { createRollConditionSaveHandler } from './createRollConditionSaveHandler.js'
 import { createConcentrationHandlers } from './createConcentrationHandlers.js'
@@ -560,6 +561,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         handleControllerChange,
         handleRemoveNpc,
         handleAddNpc,
+        handleQuickSpawnMonster,
         handlePartyPresenceChange,
         handleToggleAway,
     } = React.useMemo(() => createCreatureHandlers({
@@ -1038,7 +1040,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
               {isLocalhost && (
               <div className='combat-controls'>
                   <button className='clear-button' onClick={handleClear} title='Clear Initiative Board' aria-label='Clear Initiative Board'>Clear</button>
-                  <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats'>+ NPC</button>
+                  <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — to bring in a published monster with its real stat block, use + Monster'>+ NPC</button>
+                  {/* Quick mob spawn (roadmap Item 4): bestiary picker → N
+                      initiative-ready cards with real stats/art via the shared
+                      encounter-join lane. The users-guide §20 "+ NPC auto-naming"
+                      gotcha promoted to a first-class control; works with NO
+                      active map (targets arm through the card's Target select). */}
+                  <QuickMonsterSpawn onSpawn={handleQuickSpawnMonster} />
                   <PartyPresenceButton
                       creatures={combatSummary.creatures}
                       onConfirm={handlePartyPresenceChange}

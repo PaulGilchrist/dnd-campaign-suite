@@ -183,7 +183,10 @@ describe('Initiative', () => {
         expect(clearButton).toHaveTextContent('Clear');
         expect(screen.getByText('← Prev')).toBeInTheDocument();
         expect(screen.getByText('Next →')).toBeInTheDocument();
-        expect(npcButton.getAttribute('title')).toBe('Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats');
+        expect(npcButton.getAttribute('title')).toBe('Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — to bring in a published monster with its real stat block, use + Monster');
+        // Quick mob spawn (roadmap Item 4): the + Monster picker rides the same
+        // GM-only control row and is present right beside + NPC.
+        expect(screen.getByRole('button', { name: '+ Monster' })).toBeInTheDocument();
         // Container push to parent: exactly the NPCs on the tracker, imageless until resolved.
         await waitFor(() => {
             expect(props.onNpcsChange).toHaveBeenCalledWith([{ name: 'Goblin', type: 'npc', imageUrl: null }]);
