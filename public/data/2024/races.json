@@ -778,6 +778,7 @@
                 "proficiency_choices": {
                     "choose": 1,
                     "from": [
+                        "Alert",
                         "Crafter",
                         "Fey Touched",
                         "Healer",
