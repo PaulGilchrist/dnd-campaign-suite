@@ -5,7 +5,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import DeathSavePromptModal from './DeathSavePromptModal.jsx';
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch } from '../../hooks/runtime/useRuntimeState.js';
 
 // ── Mock dependencies (service/network + rules boundaries only) ──
 
@@ -27,7 +27,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
   // Mount-side stale re-verdict's bucket subscription (no characters roster
   // is passed in this file, so the verdict stays gated off — the hook reads
   // the inert campaign fallback and never fires the evict lane).
@@ -235,12 +235,18 @@ describe('DeathSavePromptModal', () => {
     await renderWithPrompt('target1');
     await rollAndWaitForResult();
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'deathSaves', [true, false, false], CAMPAIGN);
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'deathFailures', [false, false, false], CAMPAIGN);
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch).toHaveBeenCalledWith('target1', {
+      deathSaves: [true, false, false],
+      deathFailures: [false, false, false],
+    }, CAMPAIGN);
     expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, 'target1');
     // a plain success must not kill or heal the target
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('target1', 'isDead', expect.anything(), CAMPAIGN);
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('target1', 'currentHitPoints', expect.anything(), CAMPAIGN);
+    const [, writes] = setRuntimeBatch.mock.calls[0];
+    expect(writes.deathSaves).toEqual([true, false, false]);
+    expect(writes.deathFailures).toEqual([false, false, false]);
+    expect(writes).not.toHaveProperty('isDead');
+    expect(writes).not.toHaveProperty('currentHitPoints');
   });
 
   it('reads saved death saves from the runtime store before rolling', async () => {
@@ -268,7 +274,14 @@ describe('DeathSavePromptModal', () => {
     }));
     await renderWithPrompt('target1');
     await rollAndWaitForResult();
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'isDead', 1, CAMPAIGN);
+    // One merged batch — isDead rides the SAME body as the fatal tracks
+    // (no intermediate 'dead beside stale track' snapshot).
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch.mock.calls[0][1]).toEqual({
+      deathSaves: [false, false, false],
+      deathFailures: [true, true, true],
+      isDead: 1,
+    });
   });
 
   it('restores current hit points when the roll restores HP', async () => {
@@ -277,7 +290,16 @@ describe('DeathSavePromptModal', () => {
     }));
     await renderWithPrompt('target1');
     await rollAndWaitForResult();
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'currentHitPoints', 1, CAMPAIGN);
+    // HP restore merged into the single batch, and the window event declares
+    // hpWritten so the CharHitPoints/Initiative listeners skip their own
+    // duplicate whole-bucket currentHitPoints POST (single-writer law).
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch.mock.calls[0][1]).toEqual({
+      deathSaves: [true, false, false],
+      deathFailures: [false, false, false],
+      currentHitPoints: 1,
+    });
+    expect(dispatchedResults[0]).toMatchObject({ restoredToHp: 1, hpWritten: true });
   });
 
   // ── Roll outcome display (label, roll value, HP line, broadcast flag) ──
@@ -364,14 +386,13 @@ describe('DeathSavePromptModal', () => {
       await renderWithPrompt('target1');
       await rollAndWaitForResult();
 
-      // Full-state complete writes at own write-time (#1348 shape):
-      const counterWrites = setRuntimeValue.mock.calls.filter(
-        c => c[1] === 'deathSaves' || c[1] === 'deathFailures'
-      );
-      expect(counterWrites).toEqual([
-        ['target1', 'deathSaves', [true, false, false], CAMPAIGN],
-        ['target1', 'deathFailures', [false, false, false], CAMPAIGN],
-      ]);
+      // One merged batch carrying both tracks at the roll's commit (#1348
+      // full-state write shape, single-POST per the sequential-bucket fix):
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+      expect(setRuntimeBatch.mock.calls[0][1]).toEqual({
+        deathSaves: [true, false, false],
+        deathFailures: [false, false, false],
+      });
       expect(sendDeathSaveResult).toHaveBeenCalledTimes(1);
     });
 
@@ -390,7 +411,7 @@ describe('DeathSavePromptModal', () => {
       // No roll is consumed and NOTHING is written to foreign-state keys:
       expect(deathSaveRules.rollDeathSave).not.toHaveBeenCalled();
       expect(sendDeathSaveResult).not.toHaveBeenCalled();
-      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(setRuntimeBatch).not.toHaveBeenCalled();
       // The stale prompt is cleared and the queue advances with no result view.
       expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, 'target1');
       // Queue advanced: the modal is gone and NO result view was rendered.
@@ -412,7 +433,7 @@ describe('DeathSavePromptModal', () => {
       await renderWithPrompt('target1');
       fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
 
-      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(setRuntimeBatch).not.toHaveBeenCalled();
       expect(screen.queryByText('DEAD')).not.toBeInTheDocument();
     });
   });

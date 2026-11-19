@@ -207,6 +207,34 @@ describe('Initiative window-event listeners', () => {
             expect(latestStoredSummary().creatures.find(c => c.name === 'Goblin 1').currentHp).toBe(3);
         });
 
+        // Single-writer law (fix bug-death-save-prompt-modal-roll-lane-
+        // sequential-bucket-posts): DeathSavePromptModal merges the NAT 20
+        // restore into its ONE char-bucket setRuntimeBatch and declares it on
+        // the event detail via hpWritten. This lane must then NOT POST a
+        // second whole-bucket currentHitPoints snapshot (pre-fix it shipped
+        // HP-restored beside pre-roll tracks and interleaved with the modal's
+        // own writes) — but the combatSummary mirror stamp is a SEPARATE lane
+        // (board row, not char bucket) and keeps running for monsters.
+        it('skips the char-bucket POST for an hpWritten player restore — the modal batch owns HP', async () => {
+            await renderWithSummary({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] }, 'Alice');
+
+            await dispatchEvent('death-save-result', { targetName: 'Alice', restoredToHp: 5, hpWritten: true });
+
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it('skips the char-bucket POST for an hpWritten NPC restore yet still stamps currentHp in combatSummary', async () => {
+            await renderWithSummary(
+                { round: 1, creatures: [{ name: 'Goblin 1', type: 'npc', currentHp: 10 }] },
+                'Goblin 1'
+            );
+
+            await dispatchEvent('death-save-result', { targetName: 'Goblin', restoredToHp: 3, hpWritten: true });
+
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(latestStoredSummary().creatures.find(c => c.name === 'Goblin 1').currentHp).toBe(3);
+        });
+
         it.each([
             ['no restoredToHp (save succeeded)', { targetName: 'Goblin 1' }],
             ['no creature matches the target', { targetName: 'Goblin Slayer', restoredToHp: 5 }],

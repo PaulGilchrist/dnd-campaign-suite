@@ -4,7 +4,7 @@ import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
 import { addEntry } from '../../services/ui/logService.js';
 import Subscriber from './Subscriber.jsx';
-import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { isGmHost } from '../../services/ui/gmHost.js';
 import './DeathSavePromptModal.css';
 
@@ -226,8 +226,21 @@ function DeathSavePromptModal({ campaignName, characters }) {
 
     sendDeathSaveResult(campaignName, current.targetName, sendPayload);
 
+    // hpWritten (fix bug-death-save-prompt-modal-roll-lane-sequential-bucket-
+    // posts 2026-11-19): the restore below rides THIS roll's merged batch, so
+    // the batch — not a listener — is the single HP writer. The event-detail
+    // flag lets the view-mounted HP listeners (CharHitPoints sheet lane,
+    // Initiative combat-board lane) skip their own second whole-bucket
+    // currentHitPoints write; every other consumer (page-singleton roll-row
+    // logger, chip face, promptId-matched slot machines) reads only the
+    // unchanged fields. Absent on non-restoring rolls — their detail stays
+    // byte-identical to the pre-fix shape.
     window.dispatchEvent(new CustomEvent('death-save-result', {
-      detail: { ...sendPayload, targetName },
+      detail: {
+        ...sendPayload,
+        targetName,
+        ...(result.restoredToHp !== null ? { hpWritten: true } : {}),
+      },
     }));
 
     // Finality summary row after the roll row (the dispatch above logs the
@@ -238,16 +251,29 @@ function DeathSavePromptModal({ campaignName, characters }) {
       logFinalityRow(campaignName, targetName, result);
     }
 
-    setRuntimeValue(current.targetName, 'deathSaves', result.newSaves, campaignName);
-    setRuntimeValue(current.targetName, 'deathFailures', result.newFailures, campaignName);
+    // Single merged write (fix bug-death-save-prompt-modal-roll-lane-
+    // sequential-bucket-posts 2026-11-19, mirroring the sheet-lane twin
+    // DeathSavingThrows.rollDeathSave + handleRemoveDead): this used to fire
+    // up to FOUR sequential setRuntimeValue calls (both tracks, isDead when
+    // fatal, currentHitPoints on a NAT 20 AFTER the prompt clear), each
+    // POSTing a whole-bucket snapshot whose arrival order HTTP/1.1 does not
+    // guarantee — live-witnessed pre-fix: the fatal roll shipped an
+    // intermediate body pairing third-failure tracks with isDead:0, and the
+    // NAT 20 shipped currentHitPoints:1 beside pre-roll tracks from the
+    // Initiative listener. One setRuntimeBatch body carries every mutated
+    // field: one commit = one POST = nothing to interleave.
+    const writes = {
+      deathSaves: result.newSaves,
+      deathFailures: result.newFailures,
+    };
     if (result.result === 'dead') {
-      setRuntimeValue(current.targetName, 'isDead', 1, campaignName);
+      writes.isDead = 1;
     }
-    clearDeathSavePrompt(campaignName, current.targetName);
-
     if (result.restoredToHp !== null) {
-      setRuntimeValue(current.targetName, 'currentHitPoints', result.restoredToHp, campaignName);
+      writes.currentHitPoints = result.restoredToHp;
     }
+    setRuntimeBatch(current.targetName, writes, campaignName);
+    clearDeathSavePrompt(campaignName, current.targetName);
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0

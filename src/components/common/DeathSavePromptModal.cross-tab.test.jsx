@@ -34,7 +34,7 @@ vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
   // Mount-side stale re-verdict's bucket subscription — roster absent here,
   // verdict gated off on the inert campaign fallback read.
   useRuntimeValue: vi.fn(() => null),

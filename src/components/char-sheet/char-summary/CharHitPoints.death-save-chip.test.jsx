@@ -143,6 +143,24 @@ describe('CharHitPoints — death-save result chip host', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith(NAME, 'currentHitPoints', 1, CAMPAIGN);
   });
 
+  it('skips its own HP write when the event declares hpWritten (modal merged-batch lane)', () => {
+    // Single-writer law (fix bug-death-save-prompt-modal-roll-lane-sequential-
+    // bucket-posts): DeathSavePromptModal carries currentHitPoints inside its
+    // ONE setRuntimeBatch and flags the dispatch with hpWritten — a second
+    // whole-bucket setRuntimeValue here would re-open the interleave window.
+    // The chip face must still paint.
+    renderCharHitPoints();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('death-save-result', {
+        detail: { targetName: NAME, roll: 20, success: true, isNat20: true, isNat1: false, restoredToHp: 1, hpWritten: true },
+      }));
+    });
+
+    expect(chip()).toHaveTextContent('(20)');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
   it('skips the chip for a bare restore event with no roll', () => {
     renderCharHitPoints();
 

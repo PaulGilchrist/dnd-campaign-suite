@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import DeathSavePromptModal from './DeathSavePromptModal.jsx';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
@@ -32,7 +32,7 @@ vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
   // Mount-side stale re-verdict's bucket subscription — roster absent here,
   // verdict gated off on the inert campaign fallback read.
   useRuntimeValue: vi.fn(() => null),
@@ -146,9 +146,15 @@ describe('DeathSavePromptModal finality rows', () => {
       newSaves: [true, true, true],
     });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('DyingAlly', 'deathSaves', [true, true, true], CAMPAIGN);
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('DyingAlly', 'currentHitPoints', expect.anything(), CAMPAIGN);
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('DyingAlly', 'isDead', expect.anything(), CAMPAIGN);
+    // One merged batch (sequential-bucket-POSTs fix): the terminal tracks and
+    // nothing else — RAW stabilization never writes HP, and a stable roll
+    // never stamps isDead.
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    const [target, writes] = setRuntimeBatch.mock.calls[0];
+    expect(target).toBe('DyingAlly');
+    expect(writes.deathSaves).toEqual([true, true, true]);
+    expect(writes).not.toHaveProperty('currentHitPoints');
+    expect(writes).not.toHaveProperty('isDead');
   });
 
   it('dying from the modal stamps isDead but never writes HP', async () => {
@@ -158,8 +164,13 @@ describe('DeathSavePromptModal finality rows', () => {
       newFailures: [true, true, true],
     });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('DyingAlly', 'isDead', 1, CAMPAIGN);
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('DyingAlly', 'currentHitPoints', expect.anything(), CAMPAIGN);
+    // isDead:1 rides the SAME body as the fatal tracks — no intermediate can
+    // pair a 2/3 track with the DEAD stamp.
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    const [, writes] = setRuntimeBatch.mock.calls[0];
+    expect(writes.isDead).toBe(1);
+    expect(writes.deathFailures).toEqual([true, true, true]);
+    expect(writes).not.toHaveProperty('currentHitPoints');
   });
 
   it('plain success and failure rolls write no finality summary row', async () => {
@@ -181,7 +192,13 @@ describe('DeathSavePromptModal finality rows', () => {
       restoredToHp: 1,
     });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('DyingAlly', 'currentHitPoints', 1, CAMPAIGN);
+    // The NAT 20 restore merges into the roll's single batch (hpWritten
+    // single-writer law) — HP and both cleared tracks in ONE body.
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    const [, writes] = setRuntimeBatch.mock.calls[0];
+    expect(writes.currentHitPoints).toBe(1);
+    expect(writes.deathSaves).toEqual([false, false, false]);
+    expect(writes.deathFailures).toEqual([false, false, false]);
     expect(addEntry).not.toHaveBeenCalled();
   });
 });

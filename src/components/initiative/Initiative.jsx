@@ -711,7 +711,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')
             )
             if (creature) {
-                setRuntimeValue(creature.name, 'currentHitPoints', e.detail.restoredToHp, campaignName)
+                // Single-writer law (fix bug-death-save-prompt-modal-roll-lane-
+                // sequential-bucket-posts 2026-11-19): when the acting producer
+                // already merged the restore into its one char-bucket batch
+                // (DeathSavePromptModal declares detail.hpWritten), this lane
+                // must NOT POST a second whole-bucket currentHitPoints snapshot
+                // — pre-fix it shipped HP-restored beside pre-roll tracks and
+                // interleaved with the modal's own writes. The combatSummary
+                // mirror stamp below is a SEPARATE lane (board row, not the
+                // char bucket) and keeps running for monsters.
+                if (!e.detail.hpWritten) {
+                    setRuntimeValue(creature.name, 'currentHitPoints', e.detail.restoredToHp, campaignName)
+                }
                 if (creature.type === 'npc') {
                     creature.currentHp = e.detail.restoredToHp
                 }

@@ -107,7 +107,15 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
                       isNat1: e.detail.isNat1,
                   });
               }
-              if (e.detail.restoredToHp) {
+              // Single-writer law (fix bug-death-save-prompt-modal-roll-lane-
+              // sequential-bucket-posts 2026-11-19): DeathSavePromptModal now
+              // merges the NAT 20 restore into its own one setRuntimeBatch and
+              // declares it via detail.hpWritten — this listener must NOT fire
+              // a second whole-bucket currentHitPoints POST beside it (the old
+              // pair reordered freely, leaving restored HP next to pre-roll
+              // tracks via the SSE echo). Bare restore events (relentless rage
+              // and similar producers without the flag) still land here.
+              if (e.detail.restoredToHp && !e.detail.hpWritten) {
                   setRuntimeValue(playerStats.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
               }
           };
