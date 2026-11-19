@@ -14,6 +14,10 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     runtimeStore.set(`${name}:${prop}`, value);
     runtimeListeners.forEach((fn) => fn());
   }),
+  setRuntimeBatch: vi.fn((name, properties) => {
+    Object.entries(properties).forEach(([prop, value]) => runtimeStore.set(`${name}:${prop}`, value));
+    runtimeListeners.forEach((fn) => fn());
+  }),
   useRuntimeValue: vi.fn((name, prop) => {
     const key = `${name}:${prop}`;
     const [value, setValue] = useState(() => runtimeStore.get(key) ?? null);
@@ -58,7 +62,7 @@ vi.mock('../../../services/ui/logService.js', () => ({
 }));
 
 import DeathSavingThrows from './DeathSavingThrows.jsx';
-import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js';
 import * as conditionEffects from '../../../services/combat/conditions/conditionEffects.js';
@@ -404,23 +408,38 @@ describe('DeathSavingThrows', () => {
   describe('clearing the death state of a dead character', () => {
     beforeEach(() => {
       runtimeStore.set(`${CHARACTER}:isDead`, 1);
+      runtimeStore.set(`${CHARACTER}:deathFailures`, [true, true, true]);
     });
 
-    it('clears isDead, resets both tracks, restores the panel, and logs the removal', async () => {
+    it('clears isDead + both tracks in ONE batched write, restores the panel, and logs the removal exactly once', async () => {
       const { container } = renderComponent({ isLocalhost: true });
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Clear death state', exact: true }));
       });
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'isDead', 0, CAMPAIGN);
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'deathSaves', EMPTY_TRACK, CAMPAIGN);
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'deathFailures', EMPTY_TRACK, CAMPAIGN);
+      // Single-write pin (improve-run 2026-11-19 whole-bucket write race): the
+      // clear is ONE setRuntimeBatch carrying all three fields — the wire shape
+      // (one whole-bucket POST) is pinned against the real store module in
+      // DeathSavingThrows.clear-single-write.test.jsx.
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
+        isDead: 0,
+        deathSaves: EMPTY_TRACK,
+        deathFailures: EMPTY_TRACK,
+      }, CAMPAIGN);
+      // Zero sequential per-key writes remain on this path — each would be its
+      // own whole-bucket snapshot POST that a stale body could resurrect.
+      expect(setRuntimeValue).not.toHaveBeenCalled();
 
       expect(screen.queryByText(/DEAD/)).not.toBeInTheDocument();
       expect(screen.getByText('Death Saves')).toBeInTheDocument();
       expect(getTracks(container).success).toHaveTextContent('Successes: ◯◯◯');
+      // HP is NOT restored — the clear only touches the dying track.
+      expect(runtimeStore.get(`${CHARACTER}:currentHitPoints`)).toBeUndefined();
 
-      expect(loggedEntries()).toContainEqual(expect.objectContaining({
+      const removedRows = loggedEntries().filter((entry) => entry.result === 'removed');
+      expect(removedRows).toHaveLength(1);
+      expect(removedRows[0]).toEqual(expect.objectContaining({
         type: 'death_save',
         characterName: CHARACTER,
         result: 'removed',

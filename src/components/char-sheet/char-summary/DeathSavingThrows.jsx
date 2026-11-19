@@ -1,4 +1,4 @@
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import { setRuntimeBatch, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js'
 import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js'
@@ -61,10 +61,22 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost, onRollResul
     // dying track — isDead + both save/failure counters — it never restores HP.
     // At 0 HP the character stays unconscious and the Roll area re-arms, so the
     // title must not claim resurrection.
+    //
+    // Single merged write (improve-run 2026-11-19, same family as the resolved
+    // bug-clear-latch-eviction-resurrects-stamps): this used to fire THREE
+    // sequential setRuntimeValue calls, each POSTing a whole-bucket snapshot.
+    // HTTP/1.1 socket fan-out gives same-origin POSTs no arrival-order
+    // guarantee, so a stale body still carrying isDead:1 could land LAST and
+    // RESURRECT the DEAD badge via the SSE echo (live-witnessed UI/server
+    // divergence). One setRuntimeBatch body ⇒ nothing to interleave — the
+    // single POST carries every cleared key at once, mirroring the merged
+    // sheet-revive batch in CharHitPoints.jsx.
     const handleRemoveDead = () => {
-        setRuntimeValue(name, 'isDead', 0, campaignName);
-        setRuntimeValue(name, 'deathSaves', EMPTY_TRACK, campaignName);
-        setRuntimeValue(name, 'deathFailures', EMPTY_TRACK, campaignName);
+        setRuntimeBatch(name, {
+            isDead: 0,
+            deathSaves: EMPTY_TRACK,
+            deathFailures: EMPTY_TRACK,
+        }, campaignName);
         logEntry({
             type: 'death_save',
             characterName: name,
