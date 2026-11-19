@@ -29,10 +29,12 @@ export const WIZARD_STEPS = [
     step: 1,
     title: 'Ruleset',
     component: WizardStepRules,
-    getProps: ({ ruleset, errors, onRulesetChange }) => ({
+    getProps: ({ ruleset, errors, onRulesetChange, buildMode, onBuildModeChange }) => ({
       ruleset,
       errors,
       onRulesetChange,
+      buildMode,
+      onBuildModeChange,
     }),
   },
   {

@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cloneDeep } from 'lodash';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
 import { DEFAULT_FORM_DATA } from '../../config/constants.js';
+import { generateQuickBuildDraft } from '../../services/character/quickBuildService.js';
 import { DUPLICATE_CHARACTER_NAME_ERROR, CHARACTER_NAME_REQUIRED_ERROR, RULESET_REQUIRED_ERROR } from '../../config/utils.js';
 
 // Data-load boundary only: fixed arrays with the same shape the wizard
@@ -44,9 +45,37 @@ vi.mock('../../hooks/wizard/useWizardData.js', () => {
   return { default: () => FIXTURE };
 });
 
+// Quick-build boundary: the service itself is unit-tested against the real
+// rules data (quickBuildService.test.js); here we pin only WHEN the wizard
+// calls it (quick mode, step 7, race+class chosen) and that its draft lands
+// in formData for the review steps.
+vi.mock('../../services/character/quickBuildService.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    generateQuickBuildDraft: vi.fn(async (formData) => ({
+      ...formData,
+      class: { ...formData.class, subclass: { name: 'Champion' }, fightingStyles: ['Defense'] },
+      abilities: ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'].map((name, i) => ({
+        name, baseScore: [15, 14, 13, 10, 12, 8][i], featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0,
+      })),
+      skillProficiencies: ['Athletics', 'Acrobatics', 'Arcana', 'Animal Handling'],
+      languages: ['Common', 'Dwarvish'],
+      spells: [],
+      feats: [],
+      resistances: [],
+      immunities: [],
+      toolProficiencies: [],
+      expertSkills: [],
+      inventory: { backpack: ["Dungeoneer's Pack"], equipped: ['Chain Mail', 'Longsword', 'Shield'], gold: 40, magicItems: [] },
+    })),
+  };
+});
+
 const jsonResponse = (body) => Promise.resolve({
   ok: true,
   status: 200,
+  headers: { get: () => 'application/json' },
   json: () => Promise.resolve(body),
 });
 
@@ -133,7 +162,10 @@ describe('CharacterCreationWizard - Integration', () => {
     renderWizard({ existingCharacters: ['Aragorn'] });
 
     fireEvent.click(screen.getByTestId('rules-option-5e'));
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Aragorn' } });
+    // The ruleset switch classifies the draft against the target ruleset's
+    // data first (Item 2 guard), so step 2 lands a tick later — await it.
+    const nameInput = await screen.findByRole('textbox');
+    fireEvent.change(nameInput, { target: { value: 'Aragorn' } });
 
     // Visible-text oracle: exact error from utils surfaces inline, and the
     // gate stays shut (assert disabled state — never click a disabled Next).
@@ -212,5 +244,66 @@ describe('CharacterCreationWizard - Integration', () => {
 
     fireEvent.change(nameInput, { target: { value: 'Aragorn' } });
     await waitFor(() => expect(screen.queryByText(CHARACTER_NAME_REQUIRED_ERROR)).not.toBeInTheDocument());
+  });
+});
+
+// Quick build wiring lane: mode toggle on the ruleset step, draft applied
+// ONCE on arrival at step 7 (race + class chosen), custom path never calls
+// the service. Draft contents themselves are pinned in quickBuildService.test.js.
+describe('CharacterCreationWizard - quick build wiring', () => {
+  async function walkToSubclassStep({ quick }) {
+    renderWizard();
+    if (quick) {
+      fireEvent.click(screen.getByTestId('build-mode-quick'));
+    }
+    fireEvent.click(screen.getByTestId('rules-option-5e'));
+    const nameInput = await screen.findByRole('textbox');
+    fireEvent.change(nameInput, { target: { value: 'Aragorn' } });
+
+    const next = () => screen.getByRole('button', { name: 'Next' });
+    await waitFor(() => expect(next()).toBeEnabled());
+    fireEvent.click(next()); // → Race
+
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'Human' } });
+    await waitFor(() => expect(next()).toBeEnabled());
+    fireEvent.click(next()); // → Subrace (Human has none in the fixture)
+    await waitFor(() => expect(next()).toBeEnabled());
+    fireEvent.click(next()); // → Class (fixture default is Fighter)
+    await waitFor(() => expect(next()).toBeEnabled());
+    fireEvent.click(next()); // → Subclass / Major (fixture Fighter has none)
+  }
+
+  beforeEach(() => {
+    generateQuickBuildDraft.mockClear();
+  });
+
+  it('quick mode applies the derived draft on the subclass step and the review steps show it', async () => {
+    await walkToSubclassStep({ quick: true });
+
+    await waitFor(() => expect(generateQuickBuildDraft).toHaveBeenCalledTimes(1));
+    // The draft arrives merged with the user's choices, not a blank form.
+    const seed = generateQuickBuildDraft.mock.calls[0][0];
+    expect(seed.name).toBe('Aragorn');
+    expect(seed.race.name).toBe('Human');
+    expect(seed.class.name).toBe('Fighter');
+
+    // Review mode: walk Feats → Ability Scores and see prefilled scores.
+    const next = () => screen.getByRole('button', { name: 'Next' });
+    fireEvent.click(next());
+    fireEvent.click(next());
+    await waitFor(() => expect(screen.getAllByDisplayValue('15').length).toBeGreaterThan(0));
+  });
+
+  it('custom mode never invokes the quick-build service', async () => {
+    await walkToSubclassStep({ quick: false });
+
+    expect(generateQuickBuildDraft).not.toHaveBeenCalled();
+
+    const next = () => screen.getByRole('button', { name: 'Next' });
+    fireEvent.click(next());
+    fireEvent.click(next());
+    // Untouched blank wizard: every base score still at the 8 default.
+    expect(await screen.findByText(/Ability Scores/)).toBeInTheDocument();
+    expect(screen.queryAllByDisplayValue('15')).toHaveLength(0);
   });
 });

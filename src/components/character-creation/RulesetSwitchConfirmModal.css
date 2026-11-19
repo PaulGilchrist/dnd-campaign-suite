@@ -1,0 +1,59 @@
+/* RulesetSwitchConfirmModal — scoped ledger copy inside the shared
+   .modal-shell DeleteConfirmModal tier (the shell chrome itself lives in
+   App.css; this file styles only the wizard-switch body). The modal renders
+   its body inside a <p>, so every line is a display:block <span>. */
+
+.ruleset-switch-intro {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.ruleset-switch-group {
+  display: block;
+  margin: 8px 0;
+}
+
+.ruleset-switch-group-title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.ruleset-switch-row {
+  display: block;
+  padding-left: 4px;
+  line-height: 1.5;
+}
+
+.ruleset-switch-row i {
+  width: 16px;
+  margin-right: 4px;
+}
+
+.ruleset-switch-row-kept i {
+  color: var(--color-success);
+}
+
+.ruleset-switch-row-dropped i {
+  color: var(--color-error-light);
+}
+
+.ruleset-switch-name {
+  font-weight: 500;
+}
+
+.ruleset-switch-reason {
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.ruleset-switch-reason::before {
+  content: ' — ';
+}
+
+.ruleset-switch-more {
+  display: block;
+  padding-left: 24px;
+  opacity: 0.75;
+  font-style: italic;
+}

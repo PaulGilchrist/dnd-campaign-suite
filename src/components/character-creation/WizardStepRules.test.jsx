@@ -121,4 +121,47 @@ describe('WizardStepRules', () => {
     expect(screen.getByText('Please select a ruleset')).toBeInTheDocument();
     expect(screen.queryByText('Select a ruleset to continue')).not.toBeInTheDocument();
   });
+
+  // ——— Quick build / Custom build entry affordance (Item 1, foundation plan) ———
+  it('renders both build-mode cards with custom selected by default', () => {
+    renderStep();
+
+    expect(screen.getByTestId('build-mode-custom')).toBeInTheDocument();
+    expect(screen.getByTestId('build-mode-quick')).toBeInTheDocument();
+    expect(screen.getByTestId('build-mode-custom')).toHaveClass('selected');
+    expect(screen.getByTestId('build-mode-quick')).not.toHaveClass('selected');
+  });
+
+  it('marks only the selected build-mode card when buildMode=quick', () => {
+    renderStep({ buildMode: 'quick' });
+
+    expect(screen.getByTestId('build-mode-quick')).toHaveClass('selected');
+    expect(screen.getByTestId('build-mode-custom')).not.toHaveClass('selected');
+  });
+
+  it('clicking build-mode-quick calls onBuildModeChange with quick and leaves the ruleset untouched', () => {
+    const onBuildModeChange = vi.fn();
+    const onRulesetChange = vi.fn();
+    renderStep({ onBuildModeChange, onRulesetChange });
+
+    fireEvent.click(screen.getByTestId('build-mode-quick'));
+
+    expect(onBuildModeChange).toHaveBeenCalledTimes(1);
+    expect(onBuildModeChange).toHaveBeenCalledWith('quick');
+    expect(onRulesetChange).not.toHaveBeenCalled();
+  });
+
+  it('clicking build-mode-custom calls onBuildModeChange with custom', () => {
+    const onBuildModeChange = vi.fn();
+    renderStep({ buildMode: 'quick', onBuildModeChange });
+
+    fireEvent.click(screen.getByTestId('build-mode-custom'));
+
+    expect(onBuildModeChange).toHaveBeenCalledWith('custom');
+  });
+
+  it('tolerates a missing onBuildModeChange prop (no throw on click)', () => {
+    renderStep();
+    expect(() => fireEvent.click(screen.getByTestId('build-mode-quick'))).not.toThrow();
+  });
 });

@@ -23,6 +23,9 @@ import useWizardBackgroundAbility from '../../hooks/wizard/useWizardBackgroundAb
 import useWizardAbilities from '../../hooks/wizard/useWizardAbilities.js';
 import useWizardArrayToggle from '../../hooks/wizard/useWizardArrayToggle.js';
 import useWizardFeatAbilityChoices from '../../hooks/wizard/useWizardFeatAbilityChoices.js';
+import { generateQuickBuildDraft, getDefaultQuickBackground } from '../../services/character/quickBuildService.js';
+import { buildRulesetSwitchPreview, applyRulesetSwitchToFormData } from '../../services/character/rulesetSwitchPreview.js';
+import RulesetSwitchConfirmModal from './RulesetSwitchConfirmModal.jsx';
 
 const WizardStepRenderer = React.memo(({
   currentStep,
@@ -63,6 +66,8 @@ const WizardStepRenderer = React.memo(({
   languageWarnings,
   resistanceWarnings,
   tempInventory,
+  buildMode,
+  onBuildModeChange,
   onRulesetChange,
   onInputChange,
   onArrayFieldChange,
@@ -99,6 +104,8 @@ const WizardStepRenderer = React.memo(({
     formData,
     campaignName,
     backgrounds,
+    buildMode,
+    onBuildModeChange,
     racesData,
     allRacesData,
     classSubtypes: classSubtypes,
@@ -201,6 +208,19 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
   // Ruleset state (needed by data hook)
   const [ruleset, setRuleset] = useState(characterData?.rules ?? null);
 
+  // Quick build: 'custom' keeps the blank 17-step wizard byte-identical.
+  // 'quick' prefills the 2024-only Background pick, then applies the full
+  // derived draft (abilities/skills/tools/languages/styles/spells/equip)
+  // once the user lands on step 7 with a race + class chosen. Everything
+  // downstream stays the existing steps in review mode — same validators.
+  const [buildMode, setBuildMode] = useState('custom');
+  const quickBuildAppliedRef = useRef(false);
+
+  useEffect(() => {
+    // Ruleset switches clear the rules-derived draft; allow a fresh apply.
+    quickBuildAppliedRef.current = false;
+  }, [ruleset]);
+
   // Load spells based on character's ruleset
   const [allSpells, setAllSpells] = useState([]);
   useEffect(() => {
@@ -271,6 +291,28 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     getStepEnabled,
     isSaveEnabled,
    } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, { classSubtypes, ruleset, allFeats: feats, existingNames });
+
+  // Quick build prefills (declared after navigation so currentStep exists):
+  // 2024 gates step 5 on a background before the class is known, so the walk
+  // prefills the generic default; the full draft lands on step 7 arrival.
+  useEffect(() => {
+    if (isEditing || buildMode !== 'quick' || ruleset !== '2024') return;
+    if (currentStep === 5 && !formData.background) {
+      updateField('background', getDefaultQuickBackground(ruleset));
+    }
+  }, [isEditing, buildMode, ruleset, currentStep, formData.background, updateField]);
+
+  useEffect(() => {
+    if (isEditing || buildMode !== 'quick' || currentStep !== 7) return;
+    if (quickBuildAppliedRef.current || !formData.race?.name || !formData.class?.name) return;
+    quickBuildAppliedRef.current = true;
+    generateQuickBuildDraft(formData)
+      .then(draft => setFormData(draft))
+      .catch(error => {
+        quickBuildAppliedRef.current = false;
+        console.error('Quick build draft failed:', error);
+      });
+  }, [isEditing, buildMode, currentStep, formData, setFormData]);
 
   // Skills
   const {
@@ -367,29 +409,30 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
    const abilitiesWithinCap = Object.keys(abilityCapErrors).length === 0;
 
    // Handlers
-  const handleRulesetChange = useCallback(async (newRuleset) => {
-    setRuleset(newRuleset);
+  // Ruleset switch (roadmap Item 2): never wipes silently. Every current
+  // spells/feats/background row is first classified against the TARGET
+  // ruleset's real data; when anything is selected the confirm modal names
+  // exactly what stays ticked vs what is removed (and why) before any state
+  // mutates. Cancel is inert. A draft with no rules-derived selections still
+  // switches immediately (nothing can be lost), and clicking the already
+  // selected card no longer resets the flow at all.
+  const [pendingRulesetSwitch, setPendingRulesetSwitch] = useState(null);
 
-    if (newRuleset === '2024') {
-      setFormData(prev => ({
-           ...prev,
-        rules: '2024',
-        spells: [],
-        feats: [],
-        background: ''
-         }));
-       } else {
-      setFormData(prev => ({
-           ...prev,
-        rules: '5e',
-        spells: [],
-        feats: [],
-        background: ''
-         }));
-       }
-
+  const commitRulesetSwitch = useCallback((preview) => {
+    setRuleset(preview.targetRuleset);
+    setFormData(prev => applyRulesetSwitchToFormData(prev, preview));
     goToStep(2);
-    }, [setFormData, goToStep]);
+  }, [setFormData, goToStep]);
+
+  const handleRulesetChange = useCallback(async (newRuleset) => {
+    if (newRuleset === ruleset) return;
+    const preview = await buildRulesetSwitchPreview(formData, newRuleset);
+    if (!preview.hasSelections) {
+      commitRulesetSwitch(preview);
+      return;
+    }
+    setPendingRulesetSwitch(preview);
+  }, [ruleset, formData, commitRulesetSwitch]);
 
     // Skills - Pattern A: preSelectedItems from closure
    const { toggleItem: handleSkillToggle } = useWizardArrayToggle(
@@ -507,6 +550,8 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
         languageWarnings={languageWarnings}
         resistanceWarnings={resistanceWarnings}
         tempInventory={tempInventory}
+        buildMode={buildMode}
+        onBuildModeChange={setBuildMode}
         onRulesetChange={handleRulesetChange}
         onInputChange={updateField}
         onArrayFieldChange={updateArrayField}
@@ -568,6 +613,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     languageWarnings,
     resistanceWarnings,
     tempInventory,
+    buildMode,
     handleRulesetChange,
     updateField,
     updateArrayField,
@@ -627,6 +673,17 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
           isNextDisabled={isNextDisabled}
           />
         </div>
+        {pendingRulesetSwitch && (
+          <RulesetSwitchConfirmModal
+            preview={pendingRulesetSwitch}
+            onCancel={() => setPendingRulesetSwitch(null)}
+            onConfirm={() => {
+              const preview = pendingRulesetSwitch;
+              setPendingRulesetSwitch(null);
+              commitRulesetSwitch(preview);
+            }}
+          />
+        )}
       </div>
      );
 }
