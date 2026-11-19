@@ -14,7 +14,13 @@ const RIDER_EFFECT_LABELS = [
     [opt => opt.noOpportunityAttacks && !opt.movement, () => 'Cannot make Opportunity Attacks'],
     [opt => opt.effect === 'next_attack_advantage', opt => `+${opt.value || '5'} to next attack`],
     [opt => opt.effect === 'push_15ft', () => 'Push 15 ft'],
-    [opt => opt.effect === 'push', opt => `Push ${opt.value || 10} ft`],
+    // Charger chooser rows must read `label — distinct explanation`: the
+    // 2026-11-18 backlog found "Push 10 ft— Push 10 ft" because this rule
+    // echoed the option name. Mirrors ShieldBashChoiceModal's "Push target
+    // 5 feet away from you" copy; the size clause derives from the Charger
+    // feat text ("push the target up to 10 feet away if it is no more than
+    // one size larger than you").
+    [opt => opt.effect === 'push', opt => `Push target ${opt.value || 10} feet away from you${opt.sizeLimit === 'one_size_larger' ? ' (no more than one size larger than you)' : ''}`],
     [opt => opt.effect === 'speed_reduction', () => 'Speed reduced by 15 ft'],
     [opt => opt.effect === 'sudden_strike', () => 'Make another attack vs. different creature within 5 ft'],
     [opt => opt.effect === 'mass_fear', () => 'Target + creatures within 10 ft make WIS save or be Frightened'],

@@ -54,7 +54,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass he
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- *(MA 2026-11-18)* Charger chooser rows repeat their label in the description — "Push 10 ft— Push 10 ft" (the Damage Bonus row reads fine) — and the rider's own footer row reads "Damage Bonus— 1d8 damage": make each row `label — distinct explanation` (or drop the dup). `CharClassFeatures`/charger modal props from `attackRollRiders.js`.
 - *(MA 2026-11-18)* Sidebar view headers render as `<button class="sidebar-section-header">` OR `<div class="sidebar-section-header sidebar-section-header-stat">` depending on expandable state — keyboard users can't reach the div face at all (no role/tabindex) and automation must class-anchor around the inconsistency; unify on `<button>` (or add the button tier to the stat variant). `Sidebar` component family.
 
 ## Blocked / Not Verified (fold-gate ledger)

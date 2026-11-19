@@ -88,8 +88,8 @@ describe('AttackRiderModal', () => {
     expect(body).toContain('Speed reduced by 15 ft');
     expect(body).toContain('+10 to next attack');
     expect(body).toContain('+5 to next attack');
-    expect(body).toContain('Push 15 ft');
-    expect(body).toContain('Push 10 ft');
+    expect(body).toContain('Push target 15 feet away from you');
+    expect(body).toContain('Push target 10 feet away from you');
     expect(body).toContain('Make another attack vs. different creature within 5 ft');
     expect(body).toContain('Target + creatures within 10 ft make WIS save or be Frightened');
     expect(body).toContain('Target makes DEX save or gains Prone condition');
