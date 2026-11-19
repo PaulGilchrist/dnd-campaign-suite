@@ -6,6 +6,24 @@ import { addEntry } from '../../../services/ui/logService.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 import DeathSavingThrows from './DeathSavingThrows.jsx'
 
+// Per-roll death-save result chip (2 s dwell), hosted HERE rather than inside
+// DeathSavingThrows (bug-death-save-terminal-roll-chip-never-renders): a
+// life-ending sheet roll writes isDead / currentHitPoints in the same React
+// batch as the chip state, so the block's only commit already renders the
+// DEAD-badge branch or unmounts behind the `currentHitPoints <= 0` gate below
+// — the chip node would never be created there. CharHitPoints never unmounts,
+// so every roll (terminal or not) paints its dwell face outside the swap.
+function LastRollResult({ lastRoll }) {
+    return (
+        <div role="status" className={`death-saves-result ${lastRoll.success ? 'death-saves-result--success' : 'death-saves-result--failure'}`}>
+            <span className="death-saves-roll-value">({lastRoll.roll})</span>
+            {lastRoll.isNat1 && <span className="death-saves-nat death-saves-nat--1">NAT 1</span>}
+            {lastRoll.isNat20 && <span className="death-saves-nat death-saves-nat--20">NAT 20</span>}
+            <span className="death-saves-result-label">{lastRoll.success ? 'Success' : 'Failure'}</span>
+        </div>
+    )
+}
+
 function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
       const storedHp = useRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
       const aidIncrease = useRuntimeValue(playerStats.name, 'aidHpMaxIncrease', campaignName);
@@ -15,6 +33,15 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
 
        const currentHitPoints = storedHp != null ? storedHp : effectiveMaxHp;
      const [showInputCurrentHitPoints, setShowInputCurrentHitPoints] = React.useState(false);
+     // Death-save result chip state + dwell. The 2000 ms auto-hide is display-
+     // only feedback (benign UI category in the no-timers guard) — the terminal
+     // isDead/HP game-state writes land immediately and are NEVER delayed
+     // behind it; only the chip face outlives them.
+     const [lastRoll, setLastRoll] = React.useState(null);
+     const showDeathSaveResult = React.useCallback((result) => {
+         setLastRoll(result);
+         setTimeout(() => setLastRoll(null), 2000);
+     }, []);
      const handleInputToggleCurrentHitPoints = () => {
          setShowInputCurrentHitPoints((showInputCurrentHitPoints) => !showInputCurrentHitPoints);
      };
@@ -68,13 +95,25 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
       React.useEffect(() => {
           const handler = (e) => {
               if (!e.detail || e.detail.targetName !== playerStats.name) return;
+              // Rolls driven elsewhere (DeathSavePromptModal) paint the same chip
+              // face here — this listener used to live inside DeathSavingThrows,
+              // where the identical branch-swap/unmount race crushed terminal
+              // results. Bare restore events (no roll) only lift HP, no chip.
+              if (e.detail.roll != null) {
+                  showDeathSaveResult({
+                      roll: e.detail.roll,
+                      success: e.detail.success,
+                      isNat20: e.detail.isNat20,
+                      isNat1: e.detail.isNat1,
+                  });
+              }
               if (e.detail.restoredToHp) {
                   setRuntimeValue(playerStats.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
               }
           };
           window.addEventListener('death-save-result', handler);
           return () => window.removeEventListener('death-save-result', handler);
-      }, [playerStats.name, campaignName]);
+      }, [playerStats.name, campaignName, showDeathSaveResult]);
     return (
         <div>
             <div className="clickable" onClick={handleInputToggleCurrentHitPoints} onKeyDown={handleInputToggleCurrentHitPoints} tabIndex={0}>
@@ -86,8 +125,12 @@ function CharHitPoints({ playerStats, campaignName, isLocalhost }) {
                 </div>
             )}
             {currentHitPoints <= 0 && (
-                <DeathSavingThrows playerStats={playerStats} campaignName={campaignName} isLocalhost={isLocalhost} />
+                <DeathSavingThrows playerStats={playerStats} campaignName={campaignName} isLocalhost={isLocalhost} onRollResult={showDeathSaveResult} />
             )}
+            {/* Outside the `currentHitPoints <= 0` gate on purpose: terminal
+                rolls flip HP/isDead in the same commit, and the chip still has
+                its 2 s dwell to paint (role=status announces it to AT too). */}
+            {lastRoll && <LastRollResult lastRoll={lastRoll} />}
         </div>
     )
 }

@@ -1,4 +1,3 @@
-import React from 'react'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js'
@@ -38,40 +37,13 @@ function buildAdvantageTooltip(hasAdvantage, saveModifiers, beaconEffect) {
         : 'Advantage — no source recorded'
 }
 
-function LastRollResult({ lastRoll }) {
-    return (
-        <div className={`death-saves-result ${lastRoll.success ? 'death-saves-result--success' : 'death-saves-result--failure'}`}>
-            <span className="death-saves-roll-value">({lastRoll.roll})</span>
-            {lastRoll.isNat1 && <span className="death-saves-nat death-saves-nat--1">NAT 1</span>}
-            {lastRoll.isNat20 && <span className="death-saves-nat death-saves-nat--20">NAT 20</span>}
-            <span className="death-saves-result-label">{lastRoll.success ? 'Success' : 'Failure'}</span>
-        </div>
-    )
-}
-
-function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
+function DeathSavingThrows({ playerStats, campaignName, isLocalhost, onRollResult }) {
     const name = playerStats.name
     const storedSaves = useRuntimeValue(name, 'deathSaves', campaignName)
     const storedFailures = useRuntimeValue(name, 'deathFailures', campaignName)
     const saves = storedSaves ?? EMPTY_TRACK
     const failures = storedFailures ?? EMPTY_TRACK
     const isDead = !!useRuntimeValue(name, 'isDead', campaignName)
-    const [lastRoll, setLastRoll] = React.useState(null)
-
-    React.useEffect(() => {
-        const handler = (e) => {
-            if (!e.detail || e.detail.targetName !== name) return;
-            setLastRoll({
-                roll: e.detail.roll,
-                success: e.detail.success,
-                isNat20: e.detail.isNat20,
-                isNat1: e.detail.isNat1,
-            });
-            setTimeout(() => setLastRoll(null), 2000);
-        };
-        window.addEventListener('death-save-result', handler);
-        return () => window.removeEventListener('death-save-result', handler);
-    }, [name])
 
     const isStable = deathSaveRules.isStable(saves)
     const isDeadState = deathSaveRules.isDead(failures)
@@ -116,8 +88,11 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
         const totalFailures = result.newFailures.filter(Boolean).length;
         const isSuccess = result.result === 'success' || result.result === 'nat20' || result.result === 'stable';
 
-        setLastRoll({ roll: result.roll, success: isSuccess, isNat20: result.isNat20, isNat1: result.isNat1 });
-        setTimeout(() => setLastRoll(null), 2000);
+        // The chip is hosted by CharHitPoints (outside the DEAD-badge branch
+        // swap and the currentHitPoints <= 0 unmount gate) so terminal rolls
+        // still paint their dwell face — see bug-death-save-terminal-roll-chip-
+        // never-renders. Report it BEFORE the runtime writes below.
+        onRollResult({ roll: result.roll, success: isSuccess, isNat20: result.isNat20, isNat1: result.isNat1 });
 
         logEntry({
             type: 'death_save',
@@ -201,7 +176,6 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
                     </div>
                 </div>
             )}
-            {lastRoll && <LastRollResult lastRoll={lastRoll} />}
             <div className="death-saves-track">
                 <span className="death-saves-label">Successes: </span>
                 {saves.map((s, i) => (

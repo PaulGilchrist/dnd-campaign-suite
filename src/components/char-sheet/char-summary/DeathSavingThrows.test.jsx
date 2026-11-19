@@ -69,6 +69,10 @@ const CAMPAIGN = 'test-campaign';
 const CHARACTER = 'Test Character';
 const EMPTY_TRACK = [false, false, false];
 
+// The result chip now lives in CharHitPoints (outside the DEAD-branch swap and
+// the HP<=0 unmount gate); this lane only reports through the callback.
+let onRollResult;
+
 function rollResult(overrides = {}) {
   return {
     roll: 15,
@@ -87,6 +91,7 @@ function renderComponent({ playerStats, ...props } = {}) {
     <DeathSavingThrows
       playerStats={{ name: CHARACTER, ...playerStats }}
       campaignName={CAMPAIGN}
+      onRollResult={onRollResult}
       {...props}
     />
   );
@@ -108,6 +113,7 @@ function loggedEntries() {
 describe('DeathSavingThrows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    onRollResult = vi.fn();
     vi.useRealTimers();
     runtimeStore.clear();
     runtimeListeners.clear();
@@ -183,13 +189,12 @@ describe('DeathSavingThrows', () => {
     it.each([
       ['success', rollResult({ roll: 14, newSaves: [true, false, false] }), 'Success', 'Successes: ⬤◯◯', 'Failures: ◯◯◯', true, 1, 0],
       ['failure', rollResult({ roll: 5, result: 'failure', newSaves: EMPTY_TRACK, newFailures: [true, false, false] }), 'Failure', 'Successes: ◯◯◯', 'Failures: ⬤◯◯', false, 0, 1],
-    ])('rolls a %s: shows feedback, updates the tracks, persists state, and logs it without touching HP', (_label, result, expectedLabel, expectedSuccess, expectedFailure, expectedSuccessFlag, totalSuccesses, totalFailures) => {
+    ])('rolls a %s: reports feedback, updates the tracks, persists state, and logs it without touching HP', (_label, result, _expectedLabel, expectedSuccess, expectedFailure, expectedSuccessFlag, totalSuccesses, totalFailures) => {
       deathSaveRules.rollDeathSave.mockReturnValue(result);
       const { container } = renderComponent();
       clickRollButton();
 
-      expect(screen.getByText(`(${result.roll})`)).toBeInTheDocument();
-      expect(screen.getByText(expectedLabel)).toBeInTheDocument();
+      expect(onRollResult).toHaveBeenCalledWith({ roll: result.roll, success: expectedSuccessFlag, isNat20: false, isNat1: false });
       const tracks = getTracks(container);
       expect(tracks.success).toHaveTextContent(expectedSuccess);
       expect(tracks.failure).toHaveTextContent(expectedFailure);
@@ -210,7 +215,7 @@ describe('DeathSavingThrows', () => {
       }));
     });
 
-    it('restores 1 HP and shows NAT 20 on a natural 20', () => {
+    it('restores 1 HP and reports the NAT 20 result on a natural 20', () => {
       deathSaveRules.rollDeathSave.mockReturnValue(rollResult({
         roll: 20,
         result: 'nat20',
@@ -221,11 +226,11 @@ describe('DeathSavingThrows', () => {
       renderComponent();
       clickRollButton();
 
-      expect(screen.getByText('NAT 20')).toBeInTheDocument();
+      expect(onRollResult).toHaveBeenCalledWith({ roll: 20, success: true, isNat20: true, isNat1: false });
       expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', 1, CAMPAIGN);
     });
 
-    it('shows NAT 1 and applies a double failure on a natural 1', () => {
+    it('reports the NAT 1 result and applies a double failure on a natural 1', () => {
       deathSaveRules.rollDeathSave.mockReturnValue(rollResult({
         roll: 1,
         result: 'failure',
@@ -236,7 +241,7 @@ describe('DeathSavingThrows', () => {
       const { container } = renderComponent();
       clickRollButton();
 
-      expect(screen.getByText('NAT 1')).toBeInTheDocument();
+      expect(onRollResult).toHaveBeenCalledWith({ roll: 1, success: false, isNat20: false, isNat1: true });
       expect(getTracks(container).failure).toHaveTextContent('Failures: ⬤⬤◯');
       expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'deathFailures', [true, true, false], CAMPAIGN);
     });
@@ -273,6 +278,9 @@ describe('DeathSavingThrows', () => {
       renderComponent();
       clickRollButton();
 
+      // The fatal roll reports its face before (and independent of) the isDead
+      // write that swaps the panel to the DEAD badge.
+      expect(onRollResult).toHaveBeenCalledWith({ roll: 5, success: false, isNat20: false, isNat1: false });
       expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'isDead', 1, CAMPAIGN);
       // A dead outcome never writes HP (unchanged contract).
       expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', expect.anything(), CAMPAIGN);
@@ -419,50 +427,6 @@ describe('DeathSavingThrows', () => {
         totalSuccesses: 0,
         totalFailures: 0,
       }));
-    });
-  });
-
-  describe('death-save-result events (rolls driven elsewhere)', () => {
-    it('shows feedback for an event targeting this character without mutating the synced tracks', () => {
-      const { container } = renderComponent();
-
-      act(() => {
-        window.dispatchEvent(new CustomEvent('death-save-result', {
-          detail: { targetName: CHARACTER, roll: 18, success: true, isNat20: false, isNat1: false },
-        }));
-      });
-
-      expect(screen.getByText('(18)')).toBeInTheDocument();
-      expect(screen.getByText('Success')).toBeInTheDocument();
-      // The event only drives feedback — tracks come from synced state.
-      expect(getTracks(container).success).toHaveTextContent('Successes: ◯◯◯');
-    });
-
-    it('ignores a death-save-result for a different character', () => {
-      renderComponent();
-
-      act(() => {
-        window.dispatchEvent(new CustomEvent('death-save-result', {
-          detail: { targetName: 'Other Character', roll: 20, success: true, isNat20: true, isNat1: false },
-        }));
-      });
-
-      expect(screen.queryByText('Success')).not.toBeInTheDocument();
-      expect(screen.queryByText('NAT 20')).not.toBeInTheDocument();
-    });
-
-    it('auto-hides the roll feedback after a moment (benign UI timer only)', () => {
-      vi.useFakeTimers();
-      renderComponent();
-      clickRollButton();
-
-      expect(screen.getByText('Success')).toBeInTheDocument();
-
-      act(() => {
-        vi.advanceTimersByTime(2000);
-      });
-
-      expect(screen.queryByText('Success')).not.toBeInTheDocument();
     });
   });
 });
