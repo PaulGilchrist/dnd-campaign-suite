@@ -203,10 +203,17 @@ describe('DeathSavingThrows', () => {
       expect(tracks.success).toHaveTextContent(expectedSuccess);
       expect(tracks.failure).toHaveTextContent(expectedFailure);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'deathSaves', result.newSaves, CAMPAIGN);
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'deathFailures', result.newFailures, CAMPAIGN);
+      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
+        deathSaves: result.newSaves,
+        deathFailures: result.newFailures,
+      }, CAMPAIGN);
       expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, CHARACTER);
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', expect.anything(), CAMPAIGN);
+      expect(setRuntimeBatch).not.toHaveBeenCalledWith(CHARACTER,
+        expect.objectContaining({ currentHitPoints: expect.anything() }), CAMPAIGN);
+      // Single merged write (roll-lane race fix): no sequential per-key POSTs
+      // survive on the roll path — each would be a whole-bucket snapshot a
+      // stale body could land last (see DeathSavingThrows.roll-single-write).
+      expect(setRuntimeValue).not.toHaveBeenCalled();
 
       expect(loggedEntries()).toContainEqual(expect.objectContaining({
         type: 'death_save',
@@ -231,7 +238,15 @@ describe('DeathSavingThrows', () => {
       clickRollButton();
 
       expect(onRollResult).toHaveBeenCalledWith({ roll: 20, success: true, isNat20: true, isNat1: false });
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', 1, CAMPAIGN);
+      // One merged POST: restored HP AND both reset tracks in the same body —
+      // a split (HP first, tracks later) is exactly what could interleave into
+      // a standing creature still carrying pre-roll failures.
+      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
+        deathSaves: EMPTY_TRACK,
+        deathFailures: EMPTY_TRACK,
+        currentHitPoints: 1,
+      }, CAMPAIGN);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('reports the NAT 1 result and applies a double failure on a natural 1', () => {
@@ -247,7 +262,10 @@ describe('DeathSavingThrows', () => {
 
       expect(onRollResult).toHaveBeenCalledWith({ roll: 1, success: false, isNat20: false, isNat1: true });
       expect(getTracks(container).failure).toHaveTextContent('Failures: ⬤⬤◯');
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'deathFailures', [true, true, false], CAMPAIGN);
+      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
+        deathSaves: EMPTY_TRACK,
+        deathFailures: [true, true, false],
+      }, CAMPAIGN);
     });
 
     it('leaves HP at 0 (RAW stabilization) and logs the stable summary row', () => {
@@ -263,7 +281,11 @@ describe('DeathSavingThrows', () => {
       // Owner decision 2026-10-29: stabilization leaves the creature at 0 HP —
       // the old HP=1 write is removed (modal lane never wrote it). Row stays
       // synchronous — never deferred behind a timer.
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', expect.anything(), CAMPAIGN);
+      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
+        deathSaves: [true, true, true],
+        deathFailures: [true, false, false],
+      }, CAMPAIGN);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(loggedEntries()).toContainEqual(expect.objectContaining({
         type: 'death_save',
         result: 'stable',
@@ -285,9 +307,17 @@ describe('DeathSavingThrows', () => {
       // The fatal roll reports its face before (and independent of) the isDead
       // write that swaps the panel to the DEAD badge.
       expect(onRollResult).toHaveBeenCalledWith({ roll: 5, success: false, isNat20: false, isNat1: false });
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'isDead', 1, CAMPAIGN);
+      // ONE merged POST carries isDead together with both final tracks — no
+      // intermediate body on the wire can pair DEAD with a stale 2/3 track.
+      expect(setRuntimeBatch).toHaveBeenCalledWith(CHARACTER, {
+        deathSaves: EMPTY_TRACK,
+        deathFailures: [true, true, true],
+        isDead: 1,
+      }, CAMPAIGN);
       // A dead outcome never writes HP (unchanged contract).
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(CHARACTER, 'currentHitPoints', expect.anything(), CAMPAIGN);
+      expect(setRuntimeBatch).not.toHaveBeenCalledWith(CHARACTER,
+        expect.objectContaining({ currentHitPoints: expect.anything() }), CAMPAIGN);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(loggedEntries()).toContainEqual(expect.objectContaining({
         type: 'death_save',
         result: 'dead',

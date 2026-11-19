@@ -1,4 +1,4 @@
-import { setRuntimeBatch, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import { setRuntimeBatch, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js'
 import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js'
@@ -119,10 +119,6 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost, onRollResul
             totalFailures,
         });
 
-        if (result.restoredToHp !== null) {
-            setRuntimeValue(name, 'currentHitPoints', result.restoredToHp, campaignName);
-        }
-
         if (result.result === 'stable') {
             // RAW semantics (owner decision 2026-10-29): stabilization leaves
             // the creature at 0 HP — NO HP write here (the old immediate
@@ -140,7 +136,6 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost, onRollResul
         }
 
         if (result.result === 'dead') {
-            setRuntimeValue(name, 'isDead', 1, campaignName);
             logEntry({
                 type: 'death_save',
                 characterName: name,
@@ -150,8 +145,27 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost, onRollResul
             });
         }
 
-        setRuntimeValue(name, 'deathSaves', result.newSaves, campaignName);
-        setRuntimeValue(name, 'deathFailures', result.newFailures, campaignName);
+        // Single merged write (fix bug-death-save-roll-lane-sequential-bucket-
+        // posts 2026-11-19, same family as handleRemoveDead above and the
+        // merged sheet-revive batch in CharHitPoints.jsx): this used to fire
+        // up to FOUR sequential setRuntimeValue calls (currentHitPoints on a
+        // NAT 20, isDead when fatal, then both tracks), each POSTing a whole-
+        // bucket snapshot whose arrival order HTTP/1.1 does not guarantee —
+        // a stale intermediate (e.g. isDead:1 with a 2/3 failures track, or
+        // restored HP with pre-roll tracks) landing LAST leaves the server
+        // bucket divergent via the SSE echo. One setRuntimeBatch body carries
+        // every mutated field: one commit = one POST = nothing to interleave.
+        const writes = {
+            deathSaves: result.newSaves,
+            deathFailures: result.newFailures,
+        };
+        if (result.result === 'dead') {
+            writes.isDead = 1;
+        }
+        if (result.restoredToHp !== null) {
+            writes.currentHitPoints = result.restoredToHp;
+        }
+        setRuntimeBatch(name, writes, campaignName);
         clearDeathSavePrompt(campaignName, name);
     }
 
