@@ -37,6 +37,7 @@ import React from 'react';
 import './LevelUpCelebration.css';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { impliedLevelFromXp } from '../../services/character/levelProgression.js';
+import { playCue } from '../../services/ui/audioCues.js';
 
 const XP_MODE_EXPERIENCE = 'experience';
 
@@ -99,6 +100,15 @@ export default function LevelUpCelebration({ campaignName, characters, armed, on
 
     const dismissAll = () => setCrossings([]);
     const dismissOne = (name) => setCrossings((prev) => prev.filter((c) => c.name !== name));
+
+    // Level-up flourish (roadmap Item 10 audio seam): one cue at the moment
+    // the banner APPEARS — a boolean edge, so multi-character merges and
+    // later crossings under the same banner never re-chime; dismissal is the
+    // only thing that re-arms it.
+    const bannerVisible = crossings.length > 0;
+    React.useEffect(() => {
+        if (bannerVisible) playCue('levelup');
+    }, [bannerVisible]);
 
     const openWizard = (name) => {
         const character = (characters || []).find((c) => c.name === name);

@@ -7,6 +7,7 @@ import { DEFAULT_MUSIC, normalizeMusic, pauseCommit, pauseLogEntry, stopCommit, 
 import { saveMusicOverrides, saveMusicCategories } from '../../services/ui/musicService.js';
 import { useReloadGuard } from '../../hooks/management/useReloadGuard.js';
 import DeleteConfirmModal from '../common/DeleteConfirmModal.jsx';
+import MusicSfxControls from './MusicSfxControls.jsx';
 import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
 import './MusicPlayer.css';
 
@@ -776,6 +777,10 @@ function MusicPlayer({ campaignName, visible = true }) {
           onChange={handleVolume}
           title="Volume"
         />
+        {/* Per-client combat/UI sound cues (roadmap Item 10): sits on the
+            same audio-settings row because it IS audio — but a localStorage
+            pref, not the shared 'music' store key beside it. */}
+        <MusicSfxControls />
         {/* aria-label (backlog 2026-11-01, a11y parity with the 7c547abdc mood
             select): icon-only button, so expose its name explicitly; title is
             kept for the hover tooltip and existing getByTitle test locators. */}

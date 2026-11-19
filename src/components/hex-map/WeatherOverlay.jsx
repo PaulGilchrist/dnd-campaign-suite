@@ -1,15 +1,5 @@
 
-const OVERLAY_CONFIG = {
-  clear: null,
-  cloudy: { className: 'weather-cloudy', particles: 'cloud' },
-  rain: { className: 'weather-rain', particles: 'rain' },
-  storm: { className: 'weather-storm', particles: 'rain' },
-  fog: { className: 'weather-fog', particles: 'fog' },
-  mist: { className: 'weather-mist', particles: 'fog' },
-  snow: { className: 'weather-snow', particles: 'snow' },
-  wind: { className: 'weather-wind', particles: 'wind' },
-  extreme: { className: 'weather-extreme', particles: null },
-};
+import { OVERLAY_CONFIG } from './weatherConditions.js';
 
 function WeatherOverlay({ weather }) {
   if (!weather) return null;

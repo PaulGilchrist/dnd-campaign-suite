@@ -41,6 +41,25 @@ InertEventSource.OPEN = 1;
 InertEventSource.CLOSED = 2;
 vi.stubGlobal('EventSource', InertEventSource);
 
+// Inert Audio mock for the audio-cue lane (Item 10): jsdom's HTMLAudioElement
+// play() is "not implemented" noise. Every constructed element is recorded on
+// Audio.instances so cue tests can inspect src/play/pause without each suite
+// re-stubbing; suites that want a clean census clear the array themselves.
+class MockAudio {
+  constructor(src) {
+    this.src = src || '';
+    this.volume = 1;
+    this.loop = false;
+    this.paused = true;
+    this.currentTime = 0;
+    this.play = vi.fn(() => { this.paused = false; this.currentTime = 0; return Promise.resolve(); });
+    this.pause = vi.fn(() => { this.paused = true; });
+    MockAudio.instances.push(this);
+  }
+}
+MockAudio.instances = [];
+vi.stubGlobal('Audio', MockAudio);
+
 // Mock localStorage for all tests
 const localStorageMock = (() => {
   let store = {};

@@ -44,6 +44,7 @@ import ClearCombatConfirmModal from './ClearCombatConfirmModal.jsx'
 import TvToggleButton from './TvToggleButton.jsx'
 import TvNextUpStrip from './TvNextUpStrip.jsx'
 import TvRollPanel from './TvRollPanel.jsx'
+import CombatCues from './CombatCues.jsx'
 import TvMusicTransport from './TvMusicTransport.jsx'
 import EvictFailureToast from './EvictFailureToast.jsx'
 import VictoryBanner from './VictoryBanner.jsx'
@@ -926,6 +927,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     return (
         <div className={`initiative${tvMode ? ' initiative--tv' : ''}`}>
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
+            {/* Sensory cues (roadmap Item 10): attack crit/hit/miss/fumble audio
+                off the shared SSE log lane — the floaters' audio twin, every
+                client, live appends only (no backlog blast). The heal twin
+                fires at HpFeedback itself. Renders nothing; zero traffic while
+                the tracker is unmounted. */}
+            <CombatCues campaignName={campaignName} />
             {toast && (
                 <div className={`initiative-toast${toast.isError ? ' initiative-toast-error' : ''}`} role='status'>
                     {toast.message}

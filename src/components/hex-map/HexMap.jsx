@@ -41,6 +41,7 @@ import TravelToast from './TravelToast.jsx';
 import TravelPathLayer from './TravelPathLayer.jsx';
 import useLog from '../../hooks/runtime/useLog.js';
 import WeatherOverlay from './WeatherOverlay.jsx';
+import WeatherAmbience from './WeatherAmbience.jsx';
 import EventDialog from './EventDialog.jsx';
 import useZoomPan from './hooks/useZoomPan.js';
 import useHexHover from './hooks/useHexHover.js';
@@ -921,7 +922,7 @@ function HexMap({ campaignName, mapName, onBack, backMapTarget, characters = [],
                         </div>
                     </div>
 
-                    <div className="no-print"><WeatherOverlay weather={weather} /></div>
+                    <div className="no-print"><WeatherOverlay weather={weather} /><WeatherAmbience weather={weather} /></div>
                 </div>
             )}
 

@@ -24,11 +24,19 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LevelUpCelebration from './LevelUpCelebration.jsx';
+import { playCue } from '../../services/ui/audioCues.js';
 import {
     clearRuntimeState,
     replaceRuntimeObject,
     setRuntimeValue,
 } from '../../hooks/runtime/useRuntimeState.js';
+
+// Item 10 audio seam: the banner's appearance chimes once — every other lane
+// in this file is visual and unaffected by a no-op cue.
+vi.mock('../../services/ui/audioCues.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return { ...actual, playCue: vi.fn() };
+});
 
 const CAMPAIGN = 'test-campaign';
 
@@ -54,6 +62,7 @@ function setup(characters, { armed = true, onOpenWizard = vi.fn() } = {}) {
 beforeEach(() => {
     clearRuntimeState('Alice');
     clearRuntimeState('Bob');
+    playCue.mockClear();
     global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({}) }));
 });
 
@@ -220,5 +229,26 @@ describe('dismissal and wizard handoff (click only — no timers)', () => {
         fireEvent.click(screen.getByText('Continue'));
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
         expect(onOpenWizard).not.toHaveBeenCalled();
+    });
+});
+
+describe('level-up flourish (Item 10 audio seam)', () => {
+    it('chimes once at banner appearance, never re-chimes under the same banner, and re-arms after dismissal', () => {
+        setup([alice()]);
+        expect(playCue).not.toHaveBeenCalled();
+
+        act(() => { setRuntimeValue('Alice', 'xp', 350, CAMPAIGN); });
+        expect(playCue).toHaveBeenCalledTimes(1);
+        expect(playCue).toHaveBeenCalledWith('levelup');
+
+        // No threshold crossed, watcher re-renders — boolean banner edge holds.
+        act(() => { setRuntimeValue('Alice', 'xp', 360, CAMPAIGN); });
+        expect(playCue).toHaveBeenCalledTimes(1);
+
+        // Dismiss, then a fresh crossing re-arms the flourish.
+        fireEvent.click(screen.getByText('Continue'));
+        act(() => { setRuntimeValue('Alice', 'xp', 950, CAMPAIGN); });
+        expect(screen.getByRole('status')).toHaveTextContent('Level 2 → 3');
+        expect(playCue).toHaveBeenCalledTimes(2);
     });
 });

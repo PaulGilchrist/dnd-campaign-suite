@@ -82,7 +82,11 @@ describe('MusicPlayer stop-retires-chrome law', () => {
     const { container } = renderPlayer();
 
     expect(controls(container)).not.toBeNull();
-    expect(transportButtons(container)).toEqual(['Edit tracks for this mood']);
+    // Census note (Item 10 audio cues): the SFX mute toggle (title flips with
+    // its pressed pref — default ON here reads 'Mute sound effects') joins
+    // the row between the volume sliders; the transport stop-law itself is
+    // unchanged — only this per-client chrome was added.
+    expect(transportButtons(container)).toEqual(['Mute sound effects', 'Edit tracks for this mood']);
     expect(screen.queryByTitle('Pause')).toBeNull();
     expect(screen.queryByTitle('Stop')).toBeNull();
     expect(screen.queryByTitle('Play')).toBeNull();
@@ -99,7 +103,7 @@ describe('MusicPlayer stop-retires-chrome law', () => {
 
     remoteMusic({ mood: null, playing: false, volume: 0.6, overrides: {} }); // remote stop
 
-    expect(transportButtons(container)).toEqual(['Edit tracks for this mood']);
+    expect(transportButtons(container)).toEqual(['Mute sound effects', 'Edit tracks for this mood']);
     expect(screen.queryByTitle('Pause')).toBeNull();
     expect(screen.queryByTitle('Stop')).toBeNull();
   });
@@ -109,7 +113,7 @@ describe('MusicPlayer stop-retires-chrome law', () => {
     const { container } = renderPlayer();
     fireEvent.click(townButton());
 
-    expect(transportButtons(container)).toEqual(['Pause', 'Stop', 'Edit tracks for this mood']);
+    expect(transportButtons(container)).toEqual(['Pause', 'Stop', 'Mute sound effects', 'Edit tracks for this mood']);
     expect(screen.getByTitle('Pause').querySelector('i')).toHaveClass('fa-pause');
     expect(screen.getByTitle('Stop').querySelector('i')).toHaveClass('fa-stop');
     expect(screen.getByTitle('Pause')).toBeEnabled();
@@ -122,7 +126,7 @@ describe('MusicPlayer stop-retires-chrome law', () => {
     fireEvent.click(townButton());
     fireEvent.click(screen.getByTitle('Pause')); // pause keeps the mood armed
 
-    expect(transportButtons(container)).toEqual(['Play', 'Stop', 'Edit tracks for this mood']);
+    expect(transportButtons(container)).toEqual(['Play', 'Stop', 'Mute sound effects', 'Edit tracks for this mood']);
     expect(screen.getByTitle('Play').querySelector('i')).toHaveClass('fa-play');
     expect(screen.getByTitle('Stop')).toBeInTheDocument();
   });
@@ -137,7 +141,7 @@ describe('MusicPlayer stop-retires-chrome law', () => {
 
     expect(screen.queryByTitle('Stop')).toBeNull(); // live collapse — no reload
     expect(screen.queryByTitle('Pause')).toBeNull();
-    expect(transportButtons(container)).toEqual(['Edit tracks for this mood']);
+    expect(transportButtons(container)).toEqual(['Mute sound effects', 'Edit tracks for this mood']);
 
     // Unchanged music bucket + audit bytes (the law is chrome-only).
     await vi.waitFor(() => expect(stub.server()).toMatchObject({ mood: null, playing: false }));
