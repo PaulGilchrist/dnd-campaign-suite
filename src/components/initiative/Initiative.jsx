@@ -43,6 +43,7 @@ import FriendlyFireConfirmModal from './FriendlyFireConfirmModal.jsx'
 import ClearCombatConfirmModal from './ClearCombatConfirmModal.jsx'
 import TvToggleButton from './TvToggleButton.jsx'
 import TvNextUpStrip from './TvNextUpStrip.jsx'
+import TvRollPanel from './TvRollPanel.jsx'
 import TvMusicTransport from './TvMusicTransport.jsx'
 import EvictFailureToast from './EvictFailureToast.jsx'
 import VictoryBanner from './VictoryBanner.jsx'
@@ -940,6 +941,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  <TvToggleButton tvMode={tvMode} onToggle={toggleTvMode} />
              </div>
              <TvNextUpStrip creatures={nextUpCreatures} />
+             {/* Shared dice on the TV layer (roadmap Item 5): last few roll
+                 results projected big, read-only off the synced log lane.
+                 The TV-only gate lives inside TvRollPanel (off-TV the live
+                 child never mounts); non-TV screens keep floaters as-is. */}
+             <TvRollPanel tvMode={tvMode} campaignName={campaignName} />
              <TurnEconomyStrip
                  creatureName={activeCreatureName}
                  // CLA-360 display parity: the header strip is anchored to the ACTIVE

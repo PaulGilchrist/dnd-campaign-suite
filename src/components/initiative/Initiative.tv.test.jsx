@@ -152,6 +152,10 @@ vi.mock('./CreatureCard.jsx', () => ({
     ),
 }));
 vi.mock('./EffectAdder.jsx', () => ({ default: ({ targetName }) => <div data-testid="effect-adder"><span>{targetName}</span></div> }));
+// Shared dice panel (roadmap Item 5): its own file tests the decode/replacement
+// lanes; the container lanes here pin only the TV-only mount gating, and keep
+// the real useLog (log GET) off the container tests.
+vi.mock('./TvRollPanel.jsx', () => ({ default: ({ tvMode }) => (tvMode ? <div data-testid="tv-roll-panel" /> : null) }));
 
 const ROSTER_WITH_FOE = { round: 3, creatures: [
     { name: 'Alice', type: 'player', initiative: '18', targetName: null, concentration: null },
@@ -267,6 +271,20 @@ describe('Initiative TV mode', () => {
         expect(document.querySelector('.initiative').className).toContain('initiative--tv');
         expect(localStorage.getItem('initiative-tv')).toBe('1');
         expect(screen.getByRole('button', { name: 'Exit TV mode' })).toBeInTheDocument();
+    });
+
+    it('shared dice panel mounts only on the TV presentation screen', async () => {
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
+        expect(screen.queryByTestId('tv-roll-panel')).not.toBeInTheDocument();
+
+        const button = screen.getByRole('button', { name: /TV/i });
+        fireEvent.click(button);
+        expect(screen.getByTestId('tv-roll-panel')).toBeInTheDocument();
+
+        // Leaving TV mode retires the panel (non-TV screens keep floaters only).
+        fireEvent.click(button);
+        expect(screen.queryByTestId('tv-roll-panel')).not.toBeInTheDocument();
     });
 
     it('up-next strip lists the following creatures in turn order (wraparound), never the active one', async () => {

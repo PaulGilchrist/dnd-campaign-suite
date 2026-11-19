@@ -1,0 +1,62 @@
+/* TvRollPanel (roadmap Item 5 — TV shared dice). All rules scoped under
+   .tv-roll-panel (component-scoped, no global bleed). Colors/badges come from
+   the reused log skin (Log.css, theme-aware via the global data-theme CSS
+   variables); this file only handles the TV presentation lever: magnification
+   via `zoom` — the same lever .initiative--tv .creature-card uses — the
+   bounded newest-first row, and the recency dim. No !important anywhere. */
+
+.tv-roll-panel {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    /* Across-the-room magnifier: scales the whole reused log skin (rem-sized
+       internals included) without re-declaring a single font size. */
+    zoom: 1.4;
+    /* Bounded height: rapid rolls replace slots, they never grow the panel or
+       scroll the fight off-screen. */
+    max-height: 34vh;
+    overflow: hidden;
+}
+
+.tv-roll-slot {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Recency language: newest slot (leftmost) reads at full strength, pushed-
+   older slots dim — replacement, not stacking. */
+.tv-roll-panel .tv-roll-slot:nth-child(2) {
+    opacity: 0.75;
+}
+
+.tv-roll-panel .tv-roll-slot:nth-child(3) {
+    opacity: 0.55;
+}
+
+/* The roll total is the number the room actually needs — push it past the
+   log skin's inline emphasis. */
+.tv-roll-panel .log-total b {
+    font-size: 1.5em;
+}
+
+/* Crit/fumble flair: green/red glow in the log skin's own crit palette
+   (.log-nat20 / .log-nat1 border colors in Log.css), amplified for distance. */
+.tv-roll-panel .log-entry.log-nat20 {
+    box-shadow: 0 0 18px rgba(76, 175, 80, 0.55);
+}
+
+.tv-roll-panel .log-entry.log-nat1 {
+    box-shadow: 0 0 18px rgba(244, 67, 54, 0.55);
+}
+
+/* Short screens (720p TVs, laptops): dial the magnifier back so the panel and
+   the carousel share the viewport — the SAME breakpoint + direction as the
+   .initiative--tv card query (Initiative.css). */
+@media (max-height: 900px) {
+    .tv-roll-panel {
+        zoom: 1.1;
+    }
+}
