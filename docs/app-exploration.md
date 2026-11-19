@@ -16,6 +16,8 @@
 
 ## Priority Targets (next descent)
 
+> **Roadmap discovery funnel:** before triaging the numbered targets below, run the `e2e-explore` command's step-4 check against `~/.opencode/plan/foundation-levels-improvements.md` — any shipped-but-unexplored plan item outranks everything here. Planned (unchecked) items are NOT bugs.
+
 1. **Load-seam live face** (unchanged, owner decision still open): enforcement `{mode:'on',autoEncounters:true}` + synthetic `travel-pendingEvent` on a mounted HexMap tab → Accept replaces board `{round:1}` with NO latch eviction → pre-seeded stamp silently drops the rider. Needs sandbox outdoor map + enforcement rig; decide first whether Load becomes an eviction seam.
 2. **DeathSavePromptModal (the .sp-overlay PROMPT face) resolved-id-guard RACE** — carried, deterministic rig unknown, unit-pinned. The SHEET block is now fully deep incl. both post-fix terminal faces (QE). The monster-prompt-modal race remains.
 3. **`hpPending` PLACEHOLDER positive face + Space-preventDefault scroll face** — carried, unit-pinned weakly-lived.
@@ -48,6 +50,9 @@
 | Maps lanes, planner CRUD, currency/inventory, AI lanes | carried — event-clear (not entered; WK/CD/AB-era deep pins) | per prior tags |
 | Clear-seam latch eviction | carried — event-clear | `oncePerTurn.js`, `createCreatureHandlers.js` |
 | Sidebar header tier, pipeline ghost-key removal | carried — event-clear (NB same-day deep; headers re-used QE) | `Sidebar.jsx` |
+| Quick build wizard path (prefill → review → save) | shipped — not explored (first descent pending) | 2026-11-19 · `src/services/character/quickBuildService.js`, `src/config/quickBuildDefaults.js`, `src/components/character-creation/WizardStepRules.jsx`, `CharacterCreationWizard.jsx`, `src/config/steps-config.js` |
+| Ruleset-switch confirm modal + keep/drop prefill | shipped — not explored (first descent pending) | 2026-11-19 · `src/services/character/rulesetSwitchPreview.js`, `src/components/character-creation/RulesetSwitchConfirmModal.jsx`, `CharacterCreationWizard.jsx` (handleRulesetChange). Rig: test-campaign → Add Character → pick a ruleset, tick 2–3 feats (e.g. Actor/Alert) on step 8, walk Previous back to the Ruleset step, click the other card → dialog must name kept vs removed rows with data-derived reasons; Cancel = nothing moves |
+| GM Screen view (party lookup + quick ref) | shipped — not explored (first descent pending) | 2026-11-19 · `src/components/gm-screen/GMScreen.jsx`, `GMScreenPartyTable.jsx`, `GMScreenInPlay.jsx`, `src/services/ui/dataLoader.js` (loadConditions/loadActions), `src/routes/config.js`, `src/components/sidebar/Sidebar.jsx`. Rig: open test-campaign on localhost → sidebar GM Screen (between Factions and Initiative; entry must be ABSENT for a LAN visitor) → expect a party row per computed character (AC/six saves/skills/passives/cur-max HP), seeding an EffectAdder condition or a campaign `targetEffects` row paints In Play badges live, quick-ref sections fetch `/data/conditions.json` + `/data/actions.json` exactly once (fetch spy: 2 GETs, zero writes) |
 
 ## Baseline Fingerprints (canonical test-campaign state at QE exit — verified 2026-11-19)
 

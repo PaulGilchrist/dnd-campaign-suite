@@ -34,6 +34,10 @@ If a bounded attempt times out, treat it as missing information, not a failure t
    - `docs/test-character-registry.json` — existing test characters/NPCs in "test-campaign"; reuse via lookup, record new ones.
    - `docs/test-monster-registry.json` — monsters already in `test-campaign` initiative; reuse rather than rebuild.
    (If a file doesn't exist, create a minimal version.)
+4. **Roadmap discovery funnel (MANDATORY):** read `~/.opencode/plan/foundation-levels-improvements.md` (and any other active roadmap files under `~/.opencode/plan/`). Each item carries a checkbox + `Status:` line:
+   - **Checked item with a Status line whose feature has NO row in this map's Coverage table** → it just shipped and has never been explored: treat it as the **top Priority Target** for this run, descend it deep (happy path + edge cases + SSE/other-client behavior), then add a Coverage row tagged with the date and the source paths named in the Status line.
+   - **Unchecked item** → the feature is PLANNED, not broken. Report findings about planned features only as context, never as a `bug-*.md` file ("an unimplemented control IS a bug" applies to shipped UI, not to unbuilt roadmap items).
+   - When a shipped feature's exploration completes and its Coverage row exists, the roadmap stays untouched — the plan file is edited only by the implement-workflow, not by explore runs.
 
 Pay special attention to the "Coverage" section (see below). Prioritize areas marked "not explored" or "shallow" over areas already marked "deep" — your job this run is to extend coverage, not repeat what a prior run already did thoroughly. If everything is already marked "deep," pick the area most likely to have edge cases you haven't tried
 yet (unusual input combinations, concurrent SSE updates, boundary conditions) rather than re-walking the same happy path.
