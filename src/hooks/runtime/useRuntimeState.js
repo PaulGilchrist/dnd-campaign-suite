@@ -159,21 +159,29 @@ export function deleteRuntimeKey(characterKey, propertyName, campaignName) {
         return;
     }
     // Fail loudly (bug-visitor-oa-resolution-strands-marker-double-resolve,
-    // owner ruling 2026-11-10): a REFUSED eviction (4xx) previously failed
-    // silently — the local mirror evicted while the server kept the shared
-    // marker, which then replayed (the OA double-resolve strand). Network
-    // errors reach the .catch; gate refusals carry an OK transport, so check
-    // res.ok explicitly, console.error, and broadcast for a visible toast
-    // (Initiative.jsx listens) so no future split gate can strand a marker
-    // silently again.
+    // owner ruling 2026-11-10): a REFUSED eviction previously failed silently —
+    // the local mirror evicted while the server kept the shared marker, which
+    // then replayed (the OA double-resolve strand). Network errors reach the
+    // .catch; gate refusals carry an OK transport, so check res.ok explicitly,
+    // console.error, and broadcast for a visible toast (Initiative.jsx listens)
+    // so no future split gate can strand a marker silently again.
     fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(propertyName)}`, {
         method: 'DELETE',
     }).then((res) => {
-        if (res.ok) return;
+        // A 404 is the server CONFIRMING the key is gone — the honest answer
+        // when a concurrent tab won the evict (documented cross-tab save-prompt
+        // rescue residual: the answering tab already emptied the book, so this
+        // lane's drain-to-evict 404s). Nothing is stranded and the local mirror
+        // was evicted before the fetch, so stay fully SILENT (owner fail-loudly
+        // ruling: "a 404 honestly means a concurrent tab won the evict —
+        // silent"), same 2xx/404-confirm doctrine as clearDeathSavePrompt
+        // (savePromptService.js, death-save-prompt-evict-404-noise). Claiming
+        // "the shared key survives" here was the false positive filed as
+        // bug-cross-tab-evict-404-false-survives-console-error.
+        if (res.ok || res.status === 404) return;
         console.error(`deleteRuntimeKey: server refused eviction of "${propertyName}" (HTTP ${res.status}) — the shared key survives server-side`, { campaignName });
-        // Visible feedback only for AUTHORITY refusals: a 404 honestly means
-        // the key is already gone (a concurrent tab won the evict) — nothing
-        // is stranded, so no toast.
+        // Visible feedback only for AUTHORITY refusals (403 splits the mirror
+        // from the shared marker, which would replay).
         if (res.status === 403) {
             window.dispatchEvent(new CustomEvent('runtime-evict-failed', {
                 detail: { key: propertyName, campaignName, status: res.status },

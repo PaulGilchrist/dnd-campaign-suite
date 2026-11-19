@@ -45,3 +45,25 @@ Optionally keep a `console.warn`-tier line for 404 to preserve observability wit
 ## Severity
 
 Minor UX issue (diagnostic accuracy). No data-integrity risk — server state converges correctly and the restore is idempotent (both GET-proved live). But it turns every by-design cross-tab resolution into 2 bogus console errors, poisoning the console-error census that every exploration/verify run uses as an app-health gate, and the message text actively misinforms a debugging GM ("the shared key survives server-side" when it does not).
+
+## Resolution
+
+FIXED (NB 2026-11-18 fix run). The filed diagnosis was exact.
+
+**What was actually wrong:** `deleteRuntimeKey` (`src/hooks/runtime/useRuntimeState.js`) checked `if (res.ok) return;` then fired the `console.error … the shared key survives server-side` UNCONDITIONALLY for every non-OK status, gating only the TOAST on 403 — even though its own adjacent comment (and the owner fail-loudly ruling recorded in the playbook) acknowledged that a 404 on the wildcard DELETE (`server/routes/campaigns-changedata.js` 404s vanished keys honestly) means the key is already gone (a concurrent tab won the evict — the documented cross-tab save-prompt rescue residual). The claim was false on exactly that lane.
+
+**Fix:** the response leg now reads `if (res.ok || res.status === 404) return;` — a 404 is server-CONFIRMED absence, fully SILENT (no console.error, no toast; the local mirror was already evicted before the fetch, so nothing strands). This mirrors the established sibling doctrine `clearDeathSavePrompt` (`src/services/combat/conditions/savePromptService.js:151`, `death-save-prompt-evict-404-noise`: evict-confirm on 2xx/404, keep loud only for non-confirming answers) — no new abstraction, no warn-tier line (the sibling is fully silent; the harness console-error census is the stated victim). 403 keeps BOTH loud lanes (console claim + `runtime-evict-failed` → `EvictFailureToast`); other non-OK (5xx) keeps console-only loud, where "survives" is honestly TRUE. Comment block rewritten to state the branch doctrine. Dual-ruleset: N/A — this is the generic runtime store hook shared by both 5e and 2024 lanes; no twin module. Not an automation trigger, so no campaign-log row obligation (the existing `save_result`/`save_lapsed` audit rows are untouched).
+
+**Files changed:**
+- `src/hooks/runtime/useRuntimeState.js` — 404 branch + comments
+- `src/hooks/runtime/useRuntimeState.deleteRuntimeKey.test.js` — NEW regression pin (7 tests: DELETE wire shape; has()-guard silence; 404 fully silent + mirror evicted + no event; 2xx silent; 403 console+event with byte-exact detail `{key, campaignName, status:403}`; 5xx console-only; undefined-campaignName guard)
+- `docs/test-setup-playbook.md` — in-place corrections to the fail-loudly law (§2 visitor-DELETE bullet) and the consumerless-rescue bullet
+- this bug file
+
+**Verification (live, real two-tab rig in test-campaign, both before and after the fix):**
+- PRE-FIX repro: cleared baseline → EB-join bare Goblin (7/7) → armed `select[aria-label="EvasiveFighter target"]` → sheet Glaive (MISS, retry, HIT 19 vs AC 15) → Done → Charge chooser Cancel → Shield Bash STR prompt `[data-testid=active-save-prompt]` parked; books server-side (`pendingSavePrompts{uuid}` + `pendingSaveListenerPrompts:[uuid]` + `savePrompt-Goblin-<uuid>`); tab B (same context, re-select) replayed the prompt → Roll Save (fail 8 vs DC 17) → Done → tab A’s in-page console.error witness captured BOTH verbatim bogus lines (…404… survives server-side) plus the browser’s own 2 network-resource 404 lines; GET proved both books ABSENT — the claim contradicted by the same breath.
+- POST-FIX re-ride (full rig re-run from cleared baseline, HIT 25, save fail 11): tab A app-level witness = **zero console.error entries**, zero `runtime-evict-failed` events; error-level console census shows ONLY the 2 browser-own `Failed to load resource: 404` lines (the browser, not the app — expected per the brief). Server ground truth unchanged: both books ABSENT, no `savePrompt-*` keys, `_shieldBashBaseAttack: null`, documented dup-`save_result` pair + `save_lapsed` residual intact (no behavior change outside the diagnostic). Adjacent-flow sanity: the fail chooser still re-arms on the producer tab and Skip drains it clean (overlays 0).
+- 403 lane re-proved loud on both lanes: phantom key `zz-evict-403-probe` mirrored, its DELETE route-mocked to 403 → console.error fires AND the claim is TRUE this time (GET shows `serverKeySurvived: true`) + `runtime-evict-failed` dispatched with byte-correct detail.
+- Tests: `npx vitest run src/hooks/runtime/useRuntimeState.deleteRuntimeKey.test.js` 7/7; touched-folder `src/hooks/runtime/` 11 files/178 tests green; consumer sweep (savePrompt drain-evict/drop-pending/dismiss-detach + `src/services/combat/conditions/` + `Initiative.effectAdder-evict`) 23 files/882 tests green; `npm run lint` clean (zero warnings); `no-timers-guard` OK.
+- Exit hygiene: all harness tabs closed → headless Admin clears GET-verified `change-data {}` + `log []`, overlays `{"overlays":[]}`; dev pair left running under `CAMPAIGN_LOCK=test-campaign`.
+
