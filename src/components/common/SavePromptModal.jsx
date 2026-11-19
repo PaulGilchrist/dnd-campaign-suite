@@ -5,7 +5,7 @@ import { sendSaveResult, clearSavePrompt } from '../../services/combat/condition
 import { dropPendingSavePrompt, resolveConsumerlessSavePrompt } from '../../services/automation/common/savePrompt.js';
 import Subscriber from './Subscriber.jsx';
 import CreatureBadge from './CreatureBadge.jsx';
-import { getSaveDisadvantage, getHolyAuraSaveAdvantage, getHolyNimbusSaveAdvantage } from './savePromptUtils.js';
+import { getSaveDisadvantage, getHolyAuraSaveAdvantage, getHolyNimbusSaveAdvantage, promptQueueCounterText } from './savePromptUtils.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -882,6 +882,7 @@ function SavePromptDialog({
   useOverlayEntranceFocus(overlayRef);
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = display;
   const queueCount = prompts.length;
+  const counterText = promptQueueCounterText(prompts, current, hasResult);
   return (
     <div className={`sp-overlay${dimmed ? ' sp-overlay--dimmed' : ''}`} ref={overlayRef}>
       {/* Stable probe anchor (backlog 2026-11-11 IE): after an AoE picker confirm the
@@ -891,10 +892,8 @@ function SavePromptDialog({
           → Done) render through this one element — and never on picker overlays. */}
       <div className="sp-modal" data-testid="active-save-prompt">
         <div className="sp-header">
-          <i className="fa-solid fa-shield-halved"></i> Saving Throw Required
-          {queueCount > 1 && (
-            <span className="sp-queue-info"> ({prompts.findIndex(p => p.promptId === current.promptId) + 1} of {queueCount})</span>
-          )}
+          <i className="fa-solid fa-shield-halved"></i> {hasResult ? 'Saving Throw' : 'Saving Throw Required'}
+          {counterText && <span className="sp-queue-info">{counterText}</span>}
         </div>
         <div className="sp-body">
           <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.{promptHasAdvantage ? <span className="sp-advantage-badge"> (Advantage)</span> : ''}{promptHasDisadvantage ? <span className="sp-disadvantage-badge"> (Disadvantage)</span> : ''}</p>

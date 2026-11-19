@@ -57,8 +57,6 @@ change-data `{}` + log `[]` + overlays GET `{"overlays":[]}` (CLOSED-TAB two-pas
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **(QE 2026-11-19)** Save-prompt result/queue head keeps the stale header copy `Saving Throw Required (1 of 2)` even on the resolved (SAVE SUCCESS) face — header should reflect state (e.g. drop "Required"/counter once the head is answered). Cosmetic; resolves partially if the double-arm bug fix removes the counter. `src/components/char-sheet/modals/` (DeathSavePromptModal chrome family / `SavePromptModal`-tier header).
-
 ## Blocked / Not Verified (fold-gate ledger)
 
 - Load-seam live face (auto-encounter Accept resets round without eviction) — unchanged, owner decision open; needs sandbox outdoor map + enforcement rig.

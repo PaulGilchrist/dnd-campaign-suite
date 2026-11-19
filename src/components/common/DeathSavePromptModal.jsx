@@ -4,6 +4,7 @@ import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
 import { addEntry } from '../../services/ui/logService.js';
 import Subscriber from './Subscriber.jsx';
+import { promptQueueCounterText } from './savePromptUtils.js';
 import { getRuntimeValue, setRuntimeBatch, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { isGmHost } from '../../services/ui/gmHost.js';
 import './DeathSavePromptModal.css';
@@ -308,6 +309,9 @@ function DeathSavePromptModal({ campaignName, characters }) {
 
   const queueCount = prompts.length;
   const hasResult = current?.result != null;
+  // Family-wide resolved-face counter honesty (QE 2026-11-19 backlog) via the
+  // shared promptQueueCounterText helper.
+  const counterText = promptQueueCounterText(prompts, current, hasResult);
 
   return (
     <>
@@ -324,9 +328,7 @@ function DeathSavePromptModal({ campaignName, characters }) {
           <div className="dsp-modal">
             <div className="dsp-header">
               <i className="fas fa-skull-crossbones"></i> Death Saving Throw
-              {queueCount > 1 && (
-                <span className="dsp-queue-info"> ({prompts.findIndex(p => p.promptId === current.promptId) + 1} of {queueCount})</span>
-              )}
+              {counterText && <span className="dsp-queue-info">{counterText}</span>}
             </div>
             <div className="dsp-body">
               <p><strong>{current.targetName}</strong> must make a <strong>Death Saving Throw</strong>.</p>

@@ -4,6 +4,22 @@ import { getAllyList } from '../../hooks/useAllySelection.js';
 import utils from '../../services/ui/utils.js';
 import { abilitySaveDisadvantageActive } from '../../services/combat/conditions/targetEffectDefinitions.js';
 
+// Queue-counter copy shared by the save-prompt modal family (SavePromptModal /
+// DeathSavePromptModal / ConcentrationPromptModal). Resolved-face counter
+// honesty (QE 2026-11-19 backlog): once the head is answered its result rides
+// prompts[0], so the resolved face counts ONLY still-pending heads
+// " (N remaining)" (nothing once the answered head is the last one), while the
+// armed face keeps the position counter " (x of N)". Returns null when no
+// counter should render.
+export function promptQueueCounterText(prompts, current, hasResult) {
+  if (hasResult) {
+    const pending = prompts.filter(p => !p.result).length;
+    return pending > 0 ? ` (${pending} remaining)` : null;
+  }
+  if (prompts.length <= 1) return null;
+  return ` (${prompts.findIndex(p => p.promptId === current.promptId) + 1} of ${prompts.length})`;
+}
+
 export function getSaveDisadvantage(current, campaignName) {
   if (!current) return false;
   if (current.disadvantage) return true;

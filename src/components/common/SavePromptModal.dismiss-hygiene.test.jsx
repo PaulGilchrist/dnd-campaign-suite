@@ -302,8 +302,10 @@ describe('SavePromptModal — dismiss hygiene', () => {
 
     await rollAndWaitForResult();
     fireEvent.click(screen.getByTestId('trigger-p2'));
+    // The rolled head is answered, so the resolved-face counter counts only
+    // the still-pending sibling (resolved-face counter honesty, QE 2026-11-19).
     await waitFor(() => {
-      expect(screen.getByText('(1 of 2)')).toBeInTheDocument();
+      expect(screen.getByText('(1 remaining)')).toBeInTheDocument();
     });
 
     await clickTestId('trigger-null-bare');

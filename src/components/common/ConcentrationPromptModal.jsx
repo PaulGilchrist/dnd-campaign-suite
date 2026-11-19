@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { sendConcentrationResult, clearConcentrationPrompt } from '../../services/combat/conditions/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
+import { promptQueueCounterText } from './savePromptUtils.js';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { resolveConcentrationRoll } from './concentrationPromptRoll.js';
@@ -203,6 +204,9 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
 
   const queueCount = prompts.length;
   const hasResult = current?.result != null;
+  // Family-wide resolved-face counter honesty (QE 2026-11-19 backlog) via the
+  // shared promptQueueCounterText helper.
+  const counterText = promptQueueCounterText(prompts, current, hasResult);
 
   return (
     <>
@@ -220,9 +224,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
           <div className="cnp-modal">
             <div className="cnp-header">
               <i className="fa-solid fa-spinner"></i> Concentration Check
-              {queueCount > 1 && (
-                <span className="cnp-queue-info"> ({prompts.findIndex(p => p.promptId === current.promptId) + 1} of {queueCount})</span>
-              )}
+              {counterText && <span className="cnp-queue-info">{counterText}</span>}
             </div>
             <div className="cnp-body">
               <p><strong>{current.targetName}</strong> must make a <strong>CONSTITUTION</strong> saving throw to maintain concentration on <strong>{current.spellName}</strong>.</p>

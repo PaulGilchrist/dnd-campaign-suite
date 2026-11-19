@@ -184,6 +184,19 @@ describe('ConcentrationPromptModal', () => {
     expect(rollD20).not.toHaveBeenCalled();
   });
 
+  it('resolved head with a waiting sibling reads "(1 remaining)" — never the frozen "(1 of 2)"', async () => {
+    // Resolved-face counter honesty (QE 2026-11-19 backlog), same pattern as
+    // SavePromptModal: the answered head leaves the pending tally.
+    await openPrompt();
+    fireEvent.click(screen.getByTestId('subscriber-trigger-second'));
+    await waitFor(() => { expect(screen.getByText('(1 of 2)')).toBeInTheDocument(); });
+
+    await rollAndSeeResult();
+
+    expect(document.querySelector('.cnp-header').textContent.trim()).toBe('Concentration Check (1 remaining)');
+    expect(screen.queryByText(/\d+ of \d+/)).not.toBeInTheDocument();
+  });
+
   it('dismiss advances to the next queued prompt', async () => {
     await openPrompt();
     fireEvent.click(screen.getByTestId('subscriber-trigger-second'));
