@@ -23,8 +23,10 @@ import { resetForTurn, openTurn, closeTurn, rearmReactions } from '../../service
 import { clearPendingOa, prunePendingOas } from '../../services/combat/pendingOpportunityAttacks.js'
 import { drainRoundWrapClocks } from '../../services/rules/effects/zoneDurationClock.js'
 
-// Turn-start effects must re-apply each round, so the dedupe key is round-scoped.
-function turnStartGateKey(round, creatureName) {
+// Round-scoped turn-seam dedupe key. The turn START pass (applyTurnStartGate) and
+// the turn-start EXPIRY sweep (expireStaleEffects) are separate passes but share one
+// seam per step, so both gates key identically and re-arm each new round.
+function turnSeamGateKey(round, creatureName) {
     return `${round}:${creatureName}`
 }
 
@@ -299,6 +301,7 @@ export function createNextCreatureHandler({
     characters,
     roundRef,
     lastAppliedTurnStartCreatureRef,
+    lastExpirySweepCreatureRef = { current: null },
     setCombatSummary,
     setActiveCreatureName,
     setRuntimeStateTick,
@@ -333,18 +336,25 @@ export function createNextCreatureHandler({
         if (activeCreatureName && !isSecondTurnEntry(activeEntry)) {
             applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters)
         }
+        const gateKey = turnSeamGateKey(roundToSet, newActiveName)
         // CLA-360 double-tick guard mirrored on the expiry seam: a twin row never
         // receives a turn-start pass, so expireStaleEffects must not run under the
         // synthetic label either — its expireForCreature mirror read would seed a
         // phantom `<Holder> (Second Turn)` char bucket ({pendingExpirations:[]}).
+        // Double-arm guard (bug-turn-start-zone-saves-double-arm-via-echo-mirror):
+        // stamp the round-scoped expiry gate SYNCHRONOUSLY before running the sweep,
+        // so the POSTed activeCreatureName echoing back into this same tab finds the
+        // gate matched in sseHandlers.applyEchoBoundaryPasses and skips its mirror
+        // sweep — one zone-save arm per seam (same dedupe doctrine as the
+        // applyTurnStartPass gate below).
         if (!isSecondTurnEntry(newActiveEntry)) {
+            lastExpirySweepCreatureRef.current = gateKey
             expireStaleEffects(campaignName, newActiveName)
         }
         // BUG CLA-198: turn-start effects must run for EVERY newly active creature, not just
         // the round-wrap creature at index 0 — owner-centric auras (Inner Radiance) tick on the
         // owner's own turn boundary. The round-scoped gate key keeps this to one application
         // per creature per round (mirrors the SSE echo path in sseHandlers.js).
-        const gateKey = turnStartGateKey(roundToSet, newActiveName)
         const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey && !isSecondTurnEntry(newActiveEntry)
         let finalSummary = updatedSummary
         if (shouldApply) {
@@ -379,6 +389,7 @@ export function createPreviousCreatureHandler({
     characters,
     roundRef,
     lastAppliedTurnStartCreatureRef,
+    lastExpirySweepCreatureRef = { current: null },
     setCombatSummary,
     setActiveCreatureName,
     setRuntimeStateTick,
@@ -419,11 +430,17 @@ export function createPreviousCreatureHandler({
             updatedSummary.round = roundToSet
             setCombatSummary(updatedSummary)
         }
+        const gateKey = turnSeamGateKey(roundToSet, newActiveName)
         // CLA-360: structural second-turn entries never receive turn-start effect
         // passes — hoisted above the expiry seam so it shares the same guard (a twin
         // rewind must not seed a phantom char bucket under the synthetic label).
+        // Double-arm guard (bug-turn-start-zone-saves-double-arm-via-echo-mirror):
+        // stamp the round-scoped expiry gate synchronously before the sweep, exactly
+        // like the next-handler — the rewound activeCreatureName echo must not
+        // re-sweep this seam in the same tab.
         const secondTurnTarget = isSecondTurnEntry(cs.creatures.find(c => c.name === newActiveName))
         if (!secondTurnTarget) {
+            lastExpirySweepCreatureRef.current = gateKey
             expireStaleEffects(campaignName, newActiveName)
         }
         // BUG CLA-307: no turn-END pass here — rewinding is not a real turn end.
@@ -431,7 +448,6 @@ export function createPreviousCreatureHandler({
         // that passed this boundary; running it again on rewind would double-log.
         // BUG CLA-198: mirror the next-handler — turn-start effects run on every
         // turn step, deduped by the round-scoped gate key.
-        const gateKey = turnStartGateKey(roundToSet, newActiveName)
         const shouldApply = lastAppliedTurnStartCreatureRef.current !== gateKey && !secondTurnTarget
         let finalSummary = updatedSummary
         if (shouldApply) {

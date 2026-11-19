@@ -335,7 +335,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
     const [activeCreatureName, setActiveCreatureName] = React.useState(null)
     const activeCreatureNameRef = React.useRef(null)
-    const lastAppliedTurnStartCreatureRef = React.useRef(null)
+    // bug-turn-start-zone-saves-double-arm-via-echo-mirror: lastExpirySweepCreatureRef
+    // is the page-local stamp of the last turn seam the expiry sweep ran in THIS tab.
+    // The Next/Prev handlers stamp it before POSTing the new activeCreatureName so the
+    // GM tab's own SSE echo skips its mirror sweep in sseHandlers
+    // .applyEchoBoundaryPasses (one zone-save arm per seam). Intentionally NOT
+    // persisted/hydrated like the turn-start gate: visitors must keep mirroring the
+    // sweep with a fresh gate (CLA doctrine, bug-turn-start-automation-double-fires-
+    // with-second-client kept their expiry mirror lane untouched). Single multi-
+    // declarator const: the container sits AT the max-statements cap.
+    const lastAppliedTurnStartCreatureRef = React.useRef(null), lastExpirySweepCreatureRef = React.useRef(null)
 
     // Restore last-applied turn-start creature from runtime store so it survives remount
     React.useEffect(() => {
@@ -466,6 +475,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         combatSummaryRef,
         activeCreatureNameRef,
         lastAppliedTurnStartCreatureRef,
+        lastExpirySweepCreatureRef,
         setCombatSummary,
         setCombatSummaryG,
         setActiveCreatureNameG,
@@ -514,6 +524,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             characters,
             roundRef,
             lastAppliedTurnStartCreatureRef,
+            lastExpirySweepCreatureRef,
             setCombatSummary,
             setActiveCreatureName,
             setRuntimeStateTick,
@@ -529,6 +540,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             characters,
             roundRef,
             lastAppliedTurnStartCreatureRef,
+            lastExpirySweepCreatureRef,
             setCombatSummary,
             setActiveCreatureName,
             setRuntimeStateTick,

@@ -56,6 +56,7 @@ export function createSseEventHandler({
     combatSummaryRef,
     activeCreatureNameRef,
     lastAppliedTurnStartCreatureRef,
+    lastExpirySweepCreatureRef = { current: null },
     setCombatSummary,
     setCombatSummaryG,
     setActiveCreatureNameG,
@@ -93,9 +94,14 @@ export function createSseEventHandler({
         combatSummaryRef.current = merged
         setCombatSummaryCache(merged, campaignName)
         setCombatSummaryG(merged)
-        if (merged.round !== (combatSummaryRef.current?.round ?? 1)) {
-            expireStaleEffects(campaignName, merged.activeCreatureName || null)
-        }
+        // No expiry sweep on the combatSummary echo (bug-turn-start-zone-saves-
+        // double-arm-via-echo-mirror): the branch that used to live here compared
+        // merged.round against combatSummaryRef.current AFTER :94 overwrote the ref
+        // with merged — provably dead, it could never fire. The echo-side expiry
+        // sweep is owned DELIBERATELY by the activeCreatureName echo lane in
+        // applyEchoBoundaryPasses, deduped against the GM tab's own local sweep by
+        // the round-scoped lastExpirySweepCreatureRef gate. A round wrap always
+        // walks the turn onto a new creature, so its sweep rides that lane.
     }
 
     // Only apply turn-start effects when the active creature actually changes.
@@ -158,11 +164,24 @@ export function createSseEventHandler({
             applyCommanderStrikeTurnEnd(campaignName, prevActive, true)
                 .catch((e) => { console.error('[sseHandlers] MN-003 commander strike turn-end lapse failed:', e) })
         }
-        if (!secondTurnEcho) {
-            expireStaleEffects(campaignName, newActive)
-        }
+        // Expiry-sweep dedupe (bug-turn-start-zone-saves-double-arm-via-echo-mirror):
+        // the GM tab's OWN activeCreatureName echo re-enters this seam right after
+        // handleNextCreature already ran expireStaleEffects synchronously — every
+        // zone carrier (Grease/Sleet/Stinking Cloud/Web, Phases 3–6) then armed its
+        // recurring turn-start save a second time per Next press. Same round-scoped
+        // dedupe doctrine as the turn-start pass below: the local Next/Prev handlers
+        // stamp lastExpirySweepCreatureRef before POSTing the name, so only the first
+        // client to reach a seam this round sweeps. The stamp is written SYNCHRONOUSLY
+        // before the async sweep so the echo can never slip past mid-flight. Visitors
+        // keep mirroring the sweep: the ref is page-local (never persisted/hydrated),
+        // so their fresh gate always differs — byte-identical to the CLA doctrine that
+        // kept visitor mirror lanes untouched.
         const gateRound = (combatSummaryRef.current || getCombatSummary(campaignName))?.round ?? 1
         const gateKey = `${gateRound}:${newActive}`
+        if (!secondTurnEcho && lastExpirySweepCreatureRef.current !== gateKey) {
+            lastExpirySweepCreatureRef.current = gateKey
+            expireStaleEffects(campaignName, newActive)
+        }
         if (prevActive !== newActive && !secondTurnEcho && lastAppliedTurnStartCreatureRef.current !== gateKey) {
             await applyTurnStartPass(newActive, gateKey)
         }
