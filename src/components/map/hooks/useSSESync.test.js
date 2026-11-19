@@ -153,6 +153,26 @@ describe('useSSESync', () => {
             .toEqual({ players: [], walls: new Set(), revealed: [] });
     });
 
+    it('lands a present lastKnownMode flag (strict boolean); absence preserves the prev rule', () => {
+        const { args, result } = renderSync();
+        const prev = { players: [], walls: new Set(), revealed: [], lastKnownMode: true };
+
+        act(() => { result.current.handleSSEEvent(mapEvent({ lastKnownMode: false })); });
+        expect(args.setMapData.mock.calls[0][0](prev).lastKnownMode).toBe(false);
+
+        // Non-boolean document bytes normalize to a strict boolean.
+        act(() => { result.current.handleSSEEvent(mapEvent({ lastKnownMode: 1 })); });
+        expect(args.setMapData.mock.calls[1][0](prev).lastKnownMode).toBe(true);
+
+        // Snapshot without the key (e.g. an outdoor doc or a pre-toggle-era
+        // broadcast) → the client keeps its current rule untouched.
+        act(() => { result.current.handleSSEEvent(mapEvent({ gridSize: 5 })); });
+        expect(args.setMapData.mock.calls[2][0](prev)).toEqual(prev);
+        act(() => { result.current.handleSSEEvent(mapEvent({ gridSize: 6 })); });
+        expect(args.setMapData.mock.calls[3][0]({ players: [], walls: new Set(), revealed: [] }))
+            .toEqual({ players: [], walls: new Set(), revealed: [] });
+    });
+
     it.each([
         {
             title: 'converts walls array to a Set',

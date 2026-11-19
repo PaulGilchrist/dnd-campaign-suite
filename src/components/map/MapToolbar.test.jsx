@@ -486,4 +486,39 @@ describe('MapToolbar', () => {
             expect(setGridSize).toHaveBeenCalledWith(20);
         });
     });
+
+    // Last-known-position mode (roadmap Item 7): the GM-only toolbar door into
+    // the map-document flag. Exact-order button census with the toggle armed:
+    // it sits after Items, before the zoom pair (the view-control tail keeps
+    // its relative bytes in every census above — the flag defaults to a no-
+    // handler shell, so those pins prove the no-button face too).
+    describe('last-known-position toggle', () => {
+        it('GM + handler: renders after Items with the pinned icon, aria-pressed mirroring the flag, one flip per press', () => {
+            const onToggleLastKnown = vi.fn();
+            const { container } = renderMapToolbar({ onToggleLastKnown, lastKnownMode: false, onEnter3D: vi.fn() });
+            const buttons = [...container.querySelectorAll('.toolbar button')];
+            expect(buttons.map(b => b.textContent.trim())).toEqual([
+                'Paint', 'Erase', 'Select', 'Spell', 'Ruler', '3D', 'Items', 'Last Seen', '', '', 'Reset Fog',
+            ]);
+            const toggle = screen.getByRole('button', { name: 'Last Seen Ghosts' });
+            expect(toggle.querySelector('i')).toHaveClass('fa-solid', 'fa-ghost');
+            expect(toggle).not.toHaveClass('active');
+            expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+            fireEvent.click(toggle);
+            expect(onToggleLastKnown).toHaveBeenCalledTimes(1);
+
+            const armed = renderMapToolbar({ onToggleLastKnown, lastKnownMode: true });
+            const armedToggle = armed.container.querySelector('[aria-label="Last Seen Ghosts"]');
+            expect(armedToggle).toHaveClass('active');
+            expect(armedToggle).toHaveAttribute('aria-pressed', 'true');
+        });
+
+        it('renders nothing for visitors and for hosts without the lane (pinned censuses unchanged)', () => {
+            renderMapToolbar({ isLocalhost: false, onToggleLastKnown: vi.fn() });
+            expect(screen.queryByRole('button', { name: 'Last Seen Ghosts' })).not.toBeInTheDocument();
+            renderMapToolbar({ isLocalhost: true });
+            expect(screen.queryByRole('button', { name: 'Last Seen Ghosts' })).not.toBeInTheDocument();
+        });
+    });
 });

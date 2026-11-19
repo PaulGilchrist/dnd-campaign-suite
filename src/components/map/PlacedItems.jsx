@@ -10,6 +10,7 @@ import { itemSpriteHref } from '../../services/maps/itemSprites';
 import { placedItemLabel } from './hooks/usePlacedItems.js';
 import { tokenStackTransform, isStackedToken } from '../../services/maps/tokenStackOffsets.js';
 import TokenStatusIndicators from './TokenStatusIndicators.jsx';
+import useLastKnownPositions from './hooks/useLastKnownPositions.js';
 const RADIUS = 20;
 const SPRITE = 36;      // single-cell sprite edge (SVG units)
 const WIDE_SPRITE = 72; // two-cell sprite long edge at rotation 0
@@ -32,6 +33,21 @@ function propGeometry(item, opts, gridCenterX, gridCenterY) {
     };
 }
 
+// Last-known-position mode (roadmap Item 7) chrome hoists, keeping
+// renderCreature under the complexity cap: the ghost lookup (null on the GM
+// lane / toggle OFF, where useLastKnownPositions returns null) and the stale-
+// marked group classes + honest title. A ghost rides .token-ghost (Map.css:
+// dimmed, muted, dashed ring) and never the buried-stack fade.
+const creatureGhostCell = (ghostCells, item) =>
+    (ghostCells ? ghostCells.get(item.id) || null : null);
+
+const creatureGroupChrome = (ghost, item, stack) => ({
+    className: `npc-group${stack ? ' token-buried' : ''}${ghost ? ' token-ghost' : ''}`,
+    title: ghost
+        ? `${placedItemLabel(item)} — last seen here`
+        : placedItemLabel(item),
+});
+
 function PlacedItems({
     placedItems,
     isLocalhost,
@@ -44,7 +60,17 @@ function PlacedItems({
     handleItemPointerDown,
     tokenOffsets,
     campaignName,
+    // Last-known-position mode (roadmap Item 7): a map-document flag the GM
+    // toggles (persisted via the autosave lane, received over the map-data
+    // SSE echo). Players' clients freeze creature tokens that sit in fogged
+    // (never-revealed) cells at their last-seen cell; undefined/OFF renders
+    // byte-identically to before.
+    lastKnownMode,
 }) {
+    // null on the GM lane and while OFF (see useLastKnownPositions); a Map of
+    // itemId -> last-seen {gridX, gridY} for fogged creature tokens otherwise.
+    const ghostCells = useLastKnownPositions(placedItems, fog, lastKnownMode, isLocalhost);
+
     const isVisible = (item) => {
         // A secret door is never shown as an icon to players: hidden it is a
         // wall (rendered by GridAndWalls), discovered it is an empty cell. The
@@ -226,21 +252,38 @@ function PlacedItems({
     // fog dim, image slot, drag + right-click hit areas). Monsters read
     // distinct: purple ring (.monster-circle) + skull glyph instead of the
     // name initial.
+    //
+    // Last-known-position ghost (roadmap Item 7, player lane only): when the
+    // toggle is ON and this creature sits in a FOGGED (never-revealed) cell,
+    // `ghostCells` carries the last cell THIS client saw it on, and the exact
+    // same marker paints there — dimmed/muted via .token-ghost (Map.css), the
+    // title honest about its age. A live fogged token with no memory paints
+    // nothing (unchanged cull), the GM lane has ghostCells === null, and the
+    // token snaps to truth the moment its current cell leaves the fog set
+    // (re-reveal or re-entry). The ghost is inert: no drag chrome exists off
+    // localhost anyway, stacking fan and live status chips are deliberately
+    // NOT cloned onto stale ground (a ghost leaks no current conditions).
+    // Resolution/chrome bytes hoisted (creatureGhostCell / creatureGroupChrome)
+    // to keep this renderer under the complexity cap.
     const renderCreature = (item, isMonster) => {
-        const cx = gridCenterX(item.gridX);
-        const cy = gridCenterY(item.gridY);
-        if (!isVisible(item)) return null;
+        const ghost = creatureGhostCell(ghostCells, item);
+        if (!isVisible(item) && !ghost) return null;
+        const cell = ghost || item;
+        const cx = gridCenterX(cell.gridX);
+        const cy = gridCenterY(cell.gridY);
         const npcOpacity = itemOpacity(item);
         const npcImage = npcImages[item.name] || item.imageUrl;
         // Same-cell stacking offset (GA 2026-11-10): undefined for single
         // tokens and stack tops (byte-unchanged), a translate for buried ones.
-        const stack = tokenStackTransform(tokenOffsets, item.id);
+        // Ghosts skip the fan — the offset belongs to the real (hidden) cell.
+        const stack = ghost ? null : tokenStackTransform(tokenOffsets, item.id);
         const stacked = isStackedToken(tokenOffsets, item.id);
+        const chrome = creatureGroupChrome(ghost, item, stack);
 
         return (
             <g key={item.id}
-                className={stack ? 'npc-group token-buried' : 'npc-group'}
-                title={placedItemLabel(item)}
+                className={chrome.className}
+                title={chrome.title}
                 transform={stack}>
                 <defs>
                     <clipPath id={`npc-clip-${item.id}`}>
@@ -287,12 +330,14 @@ function PlacedItems({
                 >
                     {item.name}
                 </text>
-                <TokenStatusIndicators
-                    campaignName={campaignName}
-                    creatureName={item.name}
-                    cx={cx}
-                    cy={cy}
-                />
+                {!ghost && (
+                    <TokenStatusIndicators
+                        campaignName={campaignName}
+                        creatureName={item.name}
+                        cx={cx}
+                        cy={cy}
+                    />
+                )}
                 {isHidden(item) && hiddenRing(cx, cy, 48, 48, true)}
                 {isLocalhost && (
                     <>

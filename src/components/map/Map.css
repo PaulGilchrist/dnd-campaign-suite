@@ -637,6 +637,24 @@
     opacity: 0.55;
 }
 
+/* Last-known-position ghost (roadmap Item 7): a creature token frozen at its
+   last-seen cell while it actually sits in unrevealed fog (player clients,
+   toggle ON — see hooks/useLastKnownPositions.js). Same marker as the live
+   token, unmistakably STALE: heavily dimmed (mirrors the HIDDEN_MARKER_OPACITY
+   language), desaturated so the red/purple faction ring reads muted, a dashed
+   circle marking the ground as memory rather than presence, and pointer-
+   transparent. The theme border var keeps the ring legible on both skins. */
+.map .npc-group.token-ghost {
+    opacity: 0.35;
+    filter: grayscale(0.85);
+    pointer-events: none;
+}
+
+.map .npc-group.token-ghost .npc-circle {
+    stroke-dasharray: 6 4;
+    stroke: var(--border-color-light);
+}
+
 /* Fog of war cells — the GM sees through a translucent veil; the player sees
    an opaque grey covering (grey, not black, so it reads as "covered" rather
    than blending into the dark floor) */

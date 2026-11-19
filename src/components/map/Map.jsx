@@ -627,6 +627,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                 rulerMode={rulerMode}
                 setRulerMode={handleSetRulerMode}
                 onEnter3D={() => setViewMode('3d')}
+                // Last-known-position mode (roadmap Item 7): the flag lives ON
+                // THE MAP DOCUMENT (default absent = OFF), so every client
+                // renders the same rule — the GM press rides setMapData's
+                // ~1s autosave PUT, players receive it on the map-data SSE
+                // echo (useSSESync). GM-only control (toolbar gates it);
+                // outdoor maps never reach this branch (HexMap above).
+                lastKnownMode={!!mapData.lastKnownMode}
+                onToggleLastKnown={() => setMapData(prev => ({ ...prev, lastKnownMode: !prev.lastKnownMode }))}
                 spellOverlayState={{
                     spellMode,
                     setSpellMode,
@@ -734,6 +742,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, mapDisplayName, m
                     handleItemPointerDown={handleItemPointerDownTracked}
                     tokenOffsets={tokenStackOffsets.items}
                     campaignName={campaignName}
+                    lastKnownMode={mapData.lastKnownMode}
                 />
 
                 {/* Indoor POIs (labelled points of interest, same lane the

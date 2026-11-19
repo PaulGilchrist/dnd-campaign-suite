@@ -54,6 +54,12 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
             // carried, so documents without those lanes keep their shape.
             ...(data.items !== undefined ? { items: data.items ?? [] } : {}),
             ...(data.pois !== undefined ? { pois: data.pois ?? [] } : {}),
+            // Last-known-position mode (roadmap Item 7): a GM-authored boolean
+            // flag on the document — same present-lands law, normalized to a
+            // strict boolean; an absent key preserves the client's current
+            // rule (documents predating a toggle press are honestly OFF via
+            // the mapData default).
+            ...(data.lastKnownMode !== undefined ? { lastKnownMode: !!data.lastKnownMode } : {}),
           }));
         if (data.placedItems !== undefined) {
             setPlacedItemsGuarded(data.placedItems);

@@ -91,6 +91,8 @@ const handlers = {
 const mockState = {
     mapData: null,
     placedItems: [],
+    fog: new Set(),
+    visible: new Set(),
     zoom: 1,
     panX: 0,
     panY: 0,
@@ -273,7 +275,7 @@ vi.mock('./hooks/useSSESync.js', () => ({
 }));
 
 vi.mock('./hooks/useFogOfWar.js', () => ({
-    default: vi.fn(() => ({ fog: new Set(), visible: new Set() })),
+    default: vi.fn(() => ({ fog: mockState.fog, visible: mockState.visible })),
 }));
 
 vi.mock('./hooks/useMapDrops.js', () => ({
@@ -606,5 +608,102 @@ describe('Map container - selection preview bytes', () => {
         expect(preview.getAttribute('y')).toBe('120');  // minY 3 * 40
         expect(preview.getAttribute('width')).toBe('120');  // (4-2+1) * 40
         expect(preview.getAttribute('height')).toBe('120'); // (5-3+1) * 40
+    });
+});
+
+// ─── Last-known-position mode wiring (roadmap Item 7) ───
+// OWNED here: the container's two threads — (a) the GM toolbar press flips
+// the flag THROUGH the map document (setMapData updater → autosave PUT lane,
+// never a new store key/route), and (b) mapData.lastKnownMode threads to the
+// token layer so player clients ghost fogged creature tokens while the GM
+// lane paints truth. Ghost marker bytes themselves → PlacedItems.last-known.
+// test.jsx; flag-over-SSE merge → useSSESync.test.js.
+describe('Map container - last-known-position wiring', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        clearRuntimeState('test-campaign');
+        clearRuntimeState('campaign');
+        MockEventSource.instances.length = 0;
+        Object.assign(mockState, {
+            mapData: createMockMapData(),
+            placedItems: [],
+            fog: new Set(),
+            visible: new Set(),
+            zoom: 1,
+            panX: 0,
+            panY: 0,
+            panning: false,
+            rulerMode: false,
+            spellDraft: null,
+            dragOverlay: null,
+            rotateOverlay: null,
+            overlays: [],
+            selectedWalls: new Set(),
+            selectedItems: new Set(),
+            selectionRect: null,
+            moveOffset: null,
+            painting: false,
+            dragging: null,
+            itemDragging: null,
+            npcImages: {},
+            rulerStart: null,
+            rulerEnd: null,
+            rulerPreview: null,
+            spellDragActiveRef: { current: false },
+        });
+        mockState.selectStart.current = null;
+        mockState.moveStartGrid.current = null;
+        mockLoadMonsters.mockReset();
+        mockLoadMonsters.mockImplementation(() => Promise.resolve([]));
+    });
+
+    const monsterToken = (over = {}) => ({
+        id: 'gob-1', type: 'monster', name: 'Goblin 1',
+        gridX: 0, gridY: 0, visible: true, ...over,
+    });
+
+    it('GM press flips the flag on the map document via setMapData (both directions), nothing else writes', async () => {
+        const { container } = await act(async () => renderMap());
+        const toggle = container.querySelector('[aria-label="Last Seen Ghosts"]');
+        expect(toggle).toBeInTheDocument();
+        expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+        fireEvent.click(toggle);
+        expect(handlers.setMapData).toHaveBeenCalledTimes(1);
+        const updater = handlers.setMapData.mock.calls[0][0];
+        expect(updater(createMockMapData()).lastKnownMode).toBe(true);
+        expect(updater(createMockMapData({ lastKnownMode: true })).lastKnownMode).toBe(false);
+        // Persistence rides the existing document autosave seam unchanged.
+        expect(handlers.setPlacedItems).not.toHaveBeenCalled();
+    });
+
+    it('player lane: the document flag reaches the token layer — fogged monster ghosts at the last-seen cell (mock grid 40px: centers 20/220)', async () => {
+        mockState.mapData = createMockMapData({ lastKnownMode: true });
+        mockState.placedItems = [monsterToken({ gridX: 0, gridY: 0 })];
+        const view = await act(async () => renderMap({ isLocalhost: false }));
+        expect(view.container.querySelector('g.npc-group .npc-circle'))
+            .toHaveAttribute('cx', '20'); // live at (0,0)
+
+        mockState.placedItems = [monsterToken({ gridX: 5, gridY: 5 })];
+        mockState.fog = new Set(['5,5']);
+        await act(async () => {
+            view.rerender(<Map campaignName="test-campaign" characters={[]} isLocalhost={false}
+                mapName="test-map.json" onBack={vi.fn()} onEncounterCreated={vi.fn()}
+                onPoiEntered={vi.fn()} />);
+        });
+        const ghost = view.container.querySelector('g.npc-group.token-ghost');
+        expect(ghost).toBeInTheDocument();
+        expect(ghost.querySelector('circle.npc-circle')).toHaveAttribute('cx', '20'); // frozen at (0,0)
+        expect(view.container.querySelectorAll('g.npc-group')).toHaveLength(1);
+    });
+
+    it('GM lane never ghosts: same fog + flag, the monster paints at its true cell with no ghost chrome', async () => {
+        mockState.mapData = createMockMapData({ lastKnownMode: true });
+        mockState.placedItems = [monsterToken({ gridX: 5, gridY: 5 })];
+        mockState.fog = new Set(['5,5']);
+        const view = await act(async () => renderMap({ isLocalhost: true }));
+        expect(view.container.querySelector('.token-ghost')).toBeNull();
+        expect(view.container.querySelector('g.npc-group .npc-circle'))
+            .toHaveAttribute('cx', '220'); // truth
     });
 });

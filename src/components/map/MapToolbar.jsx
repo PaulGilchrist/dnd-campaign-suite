@@ -44,6 +44,27 @@ const MapDeactivatedHint = ({ mapIsActive = true, onViewNewMap }) =>
         </span>
     );
 
+// Last-known-position mode toggle (roadmap Item 7): a binary button in the
+// Spell/Ruler idiom (aria-pressed mirrors the .active class). Hoisted like
+// MapDeactivatedHint — the toolbar body sits one branch under its complexity
+// cap, so the GM gate and the no-handler mount decision live INSIDE this
+// shell (the visitor/outdoor lanes pass nothing meaningful → renders null →
+// the pinned GM/visitor button censuses stay byte-exact). The flag itself
+// lives ON the map document (see Map.jsx): the press flips it through the
+// autosave lane and every client adopts it over the SSE echo.
+const LastKnownModeToggle = ({ isLocalhost, active, onToggle }) =>
+    (isLocalhost && onToggle) ? (
+        <button
+            className={active ? 'active' : ''}
+            aria-label="Last Seen Ghosts"
+            aria-pressed={active}
+            title="Last-known-position mode: creatures in unrevealed fog stop moving live on player boards (dimmed ghost at the last-seen cell). The GM always sees the true position."
+            onClick={onToggle}
+        >
+            <i className="fa-solid fa-ghost"></i> Last Seen
+        </button>
+    ) : null;
+
 const MapToolbar = ({
     mapName,
     displayName,
@@ -70,6 +91,11 @@ const MapToolbar = ({
     onEnter3D,
     spellOverlayState,
     dressButton,
+    // Last-known-position mode (roadmap Item 7): { lastKnownMode,
+    // onToggleLastKnown } come from the indoor Map.jsx GM lane only — no
+    // handler means no button (visitor + outdoor lanes render untouched).
+    lastKnownMode,
+    onToggleLastKnown,
 }) => {
     const {
         spellMode,
@@ -195,6 +221,7 @@ const MapToolbar = ({
                             <i className="fa-solid fa-box"></i> Items
                         </button>
                     )}
+                    <LastKnownModeToggle isLocalhost={isLocalhost} active={!!lastKnownMode} onToggle={onToggleLastKnown} />
                     <button onClick={zoomIn} aria-label="Zoom in">
                         <i className="fa-solid fa-magnifying-glass-plus"></i>
                     </button>
