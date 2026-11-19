@@ -22,7 +22,8 @@
 //   :158 → 158  _cunningStrikeCostUsed NOT reset on non-wrap steps
 //   :163 → 163  applyTurnStartEffects invocation seam
 //   :203 → 191  clearPerRoundMajestyTrackers round-wrap seam
-//   :235 → 211  __initiative__ lastAppliedTurnStartCreature gate-key persist
+//   :235 → 210  __initiative__ lastAppliedTurnStartCreature gate-key persist (sole home —
+//               2026-11-19 RF sweep deleted the loose top-level key's writer, see applyTurnStartGate)
 //
 // Trims this pass (14 → 11): prev's separate gate-match test folded into the CLA-198 prev lane
 // as a natural double-step dedupe (mirrors the next lane's re-advance guard); prev's
@@ -170,6 +171,8 @@ describe('navigationHandlers.js', () => {
             expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
             expect(lastAppliedTurnStartCreatureRef.current).toBe('1:Bob');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '1:Bob', campaignName);
+            // Single-home law (2026-11-19 RF sweep): NO loose top-level lastAppliedTurnStartCreature write — the __initiative__ bucket above is the ONLY persisted gate.
+            expect(storage.set).not.toHaveBeenCalledWith('lastAppliedTurnStartCreature', '1:Bob', campaignName);
             expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Bob', expect.any(Object), campaignName, baseCharacters);
             expect(setRuntimeStateTick).toHaveBeenCalled();
 
@@ -219,7 +222,8 @@ describe('navigationHandlers.js', () => {
             expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
             expect(lastAppliedTurnStartCreatureRef.current).toBe('2:Bob');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '2:Bob', campaignName);
-            expect(storage.set).toHaveBeenCalledWith('lastAppliedTurnStartCreature', '2:Bob', campaignName);
+            // Single-home law: the loose-key writer is deleted (2026-11-19 RF sweep) — round-wrap seams never POST a top-level lastAppliedTurnStartCreature.
+            expect(storage.set).not.toHaveBeenCalledWith('lastAppliedTurnStartCreature', '2:Bob', campaignName);
             expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Bob', expect.any(Object), campaignName, baseCharacters);
             expect(setRuntimeStateTick).toHaveBeenCalled();
 
@@ -337,6 +341,8 @@ describe('navigationHandlers.js', () => {
             expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Alice');
             expect(lastAppliedTurnStartCreatureRef.current).toBe('1:Alice');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '1:Alice', campaignName);
+            // Single-home law (Prev seam): bucket write only — never the deleted loose top-level key.
+            expect(storage.set).not.toHaveBeenCalledWith('lastAppliedTurnStartCreature', '1:Alice', campaignName);
             expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Alice', expect.any(Object), campaignName, baseCharacters);
             expect(setRuntimeStateTick).toHaveBeenCalled();
             // Previous-lane quirk: rewind re-arms majesty trackers on EVERY step,

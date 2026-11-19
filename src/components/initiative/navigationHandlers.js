@@ -206,10 +206,17 @@ function dropPendingOasAtTurnSeam({ campaignName, summary, outgoingName, newActi
 // Shared turn-start gate: arm the round-scoped gate key, persist it, and run
 // turn-start effects for the newly active creature (BUG CLA-198). Returns the
 // summary to persist — turn-start effects may have cached a damaged copy.
+// Single-home law (2026-11-19 RF double-writer sweep): the persisted gate lives
+// ONLY in the __initiative__ bucket — every reader goes through
+// getRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature') (Initiative.jsx
+// hydration + the MN-007 turn-walk authorities). The combatSummary field below is
+// not a second home: it rides the stamped summary as the remount-seed copy that
+// Initiative.jsx adopts (bucket wins). The old loose top-level
+// `lastAppliedTurnStartCreature` change-data key had ZERO readers; its writer is
+// deleted here — do not resurrect it.
 async function applyTurnStartGate({ gateKey, newActiveName, characters, campaignName, lastAppliedTurnStartCreatureRef, updatedSummary }) {
     lastAppliedTurnStartCreatureRef.current = gateKey
     setRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature', gateKey, campaignName)
-    storage.set('lastAppliedTurnStartCreature', gateKey, campaignName)
     updatedSummary.lastAppliedTurnStartCreature = gateKey
     const newActiveChar = characters.find(ch => ch.name === newActiveName || ch.name.startsWith(newActiveName + ' '))
     await applyTurnStartEffects(newActiveName, newActiveChar?.computedStats || newActiveChar, campaignName, characters)
