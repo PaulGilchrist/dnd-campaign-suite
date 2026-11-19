@@ -9,6 +9,7 @@ import Sidebar from './Sidebar.jsx';
 const NAV_BUTTONS = [
   { label: 'Encounters', view: 'encounter', handler: 'onEncounterClick', localhostOnly: true },
   { label: 'Factions', view: 'factions', handler: 'onFactionsClick', localhostOnly: true },
+  { label: 'GM Screen', view: 'gmScreen', handler: 'onGMScreenClick', localhostOnly: true },
   { label: 'Initiative', view: 'initiative', handler: 'onInitiativeClick' },
   { label: 'Inventory', view: 'partyInventory', handler: 'onInventoryClick' },
   { label: 'Log', view: 'campaignLog', handler: 'onLogClick' },

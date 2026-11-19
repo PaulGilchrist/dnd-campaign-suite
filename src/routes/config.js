@@ -103,6 +103,13 @@ export const VIEWS = {
     component: 'Log',
     description: 'Campaign dice roll and activity log'
    },
+  GM_SCREEN: {
+    name: 'gmScreen',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'GMScreen',
+    description: 'GM screen — party AC/saves/skills/passives lookup, in-play summary, conditions/actions quick reference'
+  },
   MUSIC: {
     name: 'music',
     stateVar: 'activeView',
@@ -159,6 +166,7 @@ export const SIDEBAR_BUTTONS = [
   { label: 'Character', icon: 'fa-user', view: 'charSheet' },
   { label: 'Encounter', icon: 'fa-skull-crossbones', view: 'encounter' },
   { label: 'Factions', icon: 'fa-handshake', view: 'factions' },
+  { label: 'GM Screen', icon: 'fa-eye', view: 'gmScreen' },
   { label: 'Initiative', icon: 'fa-gavel', view: 'initiative' },
   { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
   { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
@@ -176,4 +184,4 @@ export const SIDEBAR_BUTTONS = [
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'music', 'campaignRepair'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignBuilder', 'campaignLog', 'gmScreen', 'music', 'campaignRepair'];

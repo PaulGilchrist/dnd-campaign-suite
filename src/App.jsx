@@ -42,6 +42,7 @@ import Sessions from './components/sessions/Sessions.jsx';
 import Factions from './components/factions/Factions.jsx';
 import PartyInventory from './components/party-inventory/PartyInventory.jsx';
 import Log from './components/log/Log.jsx';
+import GMScreen from './components/gm-screen/GMScreen.jsx';
 import MusicPlayer from './components/music/MusicPlayer.jsx';
 import CampaignAdmin from './components/campaign-admin/CampaignAdmin.jsx';
 import SavePromptModal from './components/common/SavePromptModal.jsx';
@@ -875,8 +876,9 @@ function App() {
            onSessionsClick={() => setActiveView('sessions')}
            onSettlementsClick={handleSettlementsClick}
            onCampaignBuilderClick={() => setActiveView('campaignBuilder')}
-           onFactionsClick={handleFactionsClick}
-          onLogClick={handleLogClick}
+            onFactionsClick={handleFactionsClick}
+           onGMScreenClick={() => setActiveView('gmScreen')}
+           onLogClick={handleLogClick}
           onRepairClick={() => setActiveView('campaignRepair')}
           activeView={activeView}
           campaignType={campaignType}
@@ -909,6 +911,10 @@ function App() {
            />
         )}
         {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} onViewCharacter={handleCharacterClick} onOpenEncounters={() => setActiveView('encounter')} />}
+        {/* GM Screen: pure-read lookup over computedCharacters + the runtime
+            store (no writes, no mutation affordances). Sidebar entry is
+            localhostOnly — same gate as the other GM views. */}
+        {activeView === 'gmScreen' && <GMScreen characters={computedCharacters} campaignName={campaignName} />}
         {activeView === 'mapsManager' && (
           <MapsAreaView
             campaignName={campaignName}

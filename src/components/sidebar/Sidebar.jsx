@@ -8,6 +8,7 @@ const VIEW_LABELS = {
     charSheet: { label: 'Character', icon: 'fa-user' },
     encounter: { label: 'Encounters', icon: 'fa-dragon' },
     factions: { label: 'Factions', icon: 'fa-handshake' },
+    gmScreen: { label: 'GM Screen', icon: 'fa-eye' },
     initiative: { label: 'Initiative', icon: 'fa-shield-alt' },
     partyInventory: { label: 'Inventory', icon: 'fa-boxes-stacked' },
     campaignLog: { label: 'Log', icon: 'fa-book-journal-whills' },
@@ -44,6 +45,10 @@ const NAV_ITEMS = [
     { view: 'campaignBuilder', onClick: 'onCampaignBuilderClick', localhostOnly: true, arenaHidden: true },
     { view: 'encounter', onClick: 'onEncounterClick', localhostOnly: true },
     { view: 'factions', onClick: 'onFactionsClick', localhostOnly: true, arenaHidden: true },
+    // Pure-read GM lookup panel — localhost-only like the other GM views. NOT
+    // arenaHidden: it is an in-combat lookup (party saves/status/quick ref),
+    // not a campaign planning view, so an arena battle keeps it.
+    { view: 'gmScreen', onClick: 'onGMScreenClick', localhostOnly: true },
     { view: 'initiative', onClick: 'onInitiativeClick' },
     { view: 'partyInventory', onClick: 'onInventoryClick', arenaHidden: true },
     { view: 'campaignLog', onClick: 'onLogClick' },
@@ -166,7 +171,7 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
     );
 }
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onGMScreenClick, onMapsClick, onMusicClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView, deleteErrorName, onDismissDeleteError, campaignType = 'standard' }) {
     const [diceResult, setDiceResult] = useState(null);
     // Display-only Rules-launchpad feedback (popup blocked) — mirrors the
     // sessions/encounter/music toast idiom (auto-hide timer is a benign UI
@@ -200,7 +205,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
       };
 
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
-    const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
+    const navHandlers = { onEncounterClick, onFactionsClick, onGMScreenClick, onInitiativeClick, onLogClick, onMapsClick, onMusicClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onCampaignBuilderClick };
     const typeBadge = CAMPAIGN_TYPE_BADGES[campaignType];
     const navItems = campaignType === 'arena'
         ? NAV_ITEMS.filter(item => !item.arenaHidden)

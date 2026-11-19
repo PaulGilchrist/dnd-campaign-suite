@@ -91,7 +91,7 @@ describe('dataLoader', () => {
         vi.restoreAllMocks();
     });
 
-    it('exports exactly the 24 loader/cache functions this service owns', () => {
+    it('exports exactly the 26 loader/cache functions this service owns', () => {
         expect(Object.keys(dataLoader).sort()).toStrictEqual([
             'clearDataCache',
             'fetchBackgroundData',
@@ -103,8 +103,10 @@ describe('dataLoader', () => {
             'getCachedPointBuyCosts',
             'getCacheState',
             'loadAbilityScores',
+            'loadActions',
             'loadBackgroundData',
             'loadClassData',
+            'loadConditions',
             'loadEquipment',
             'loadFightingStyles',
             'loadFeatData',

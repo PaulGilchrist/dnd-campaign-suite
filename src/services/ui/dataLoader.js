@@ -38,7 +38,9 @@
       monsters: null,
       magicItems: null,
       fightingStyles: null,
-      wildMagicSurgeTable: null
+      wildMagicSurgeTable: null,
+       conditions: null,
+       actions: null
       };
 
 /**
@@ -647,6 +649,74 @@ export async function loadWildMagicSurgeTable() {
 }
 
 /**
+ * Fetches conditions data (with caching) - version agnostic
+ * @returns {Promise<object[]>} - Array of {index, name, description} from /data/conditions.json
+ */
+let conditionsPromise = null;
+
+export async function loadConditions() {
+    if (sharedDataCache.conditions) {
+        return sharedDataCache.conditions;
+    }
+    if (conditionsPromise) {
+        return conditionsPromise;
+    }
+    conditionsPromise = (async () => {
+        try {
+            const response = await fetch('/data/conditions.json');
+            if (response.ok) {
+                const data = await response.json();
+                sharedDataCache.conditions = data;
+                return data;
+            }
+        } catch (error) {
+            console.error('Error loading conditions:', error);
+        }
+        return [];
+    })();
+    try {
+        const result = await conditionsPromise;
+        return result;
+    } finally {
+        conditionsPromise = null;
+    }
+}
+
+let actionsPromise = null;
+
+/**
+ * Fetches base actions list (with caching) - version agnostic
+ * @returns {Promise<string[]>} - Base action names from /data/actions.json
+ */
+export async function loadActions() {
+    if (sharedDataCache.actions) {
+        return sharedDataCache.actions;
+    }
+    if (actionsPromise) {
+        return actionsPromise;
+    }
+    actionsPromise = (async () => {
+        try {
+            const response = await fetch('/data/actions.json');
+            if (response.ok) {
+                const data = await response.json();
+                sharedDataCache.actions = data;
+                return data;
+            }
+        } catch (error) {
+            console.error('Error loading actions:', error);
+        }
+        return [];
+    })();
+    try {
+        const result = await actionsPromise;
+        return result;
+    } finally {
+        actionsPromise = null;
+    }
+}
+
+/**
    * Clears the data cache (useful for testing or data refresh)
    */
 export function clearDataCache() {
@@ -676,6 +746,8 @@ export function clearDataCache() {
  sharedDataCache.magicItems = null;
 sharedDataCache.fightingStyles = null;
     sharedDataCache.wildMagicSurgeTable = null;
+    sharedDataCache.conditions = null;
+    sharedDataCache.actions = null;
   }
 
 

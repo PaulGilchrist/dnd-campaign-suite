@@ -1,0 +1,262 @@
+/* GM Screen — dark/light via the global data-theme CSS variables (index.css
+   :root + [data-theme="light"]); nothing here hardcodes a color. Type is
+   deliberately a step larger than the sheets: this panel is read across a
+   room. */
+
+.gm-screen-view {
+    flex: 1;
+    padding: 20px 32px 20px 20px;
+    width: 100%;
+    min-width: 0;
+}
+
+.gm-toolbar h2 {
+    margin: 0 0 16px 0;
+    color: var(--color-header);
+    font-size: 1.4em;
+}
+
+.gm-toolbar h2 i {
+    margin-right: 8px;
+    color: var(--color-primary);
+}
+
+.gm-section {
+    margin-bottom: 24px;
+}
+
+.gm-section-title {
+    margin: 0 0 10px 0;
+    color: var(--color-header);
+    font-size: 1.15em;
+}
+
+.gm-section-title i {
+    margin-right: 6px;
+    color: var(--color-primary);
+}
+
+.gm-empty {
+    margin: 4px 0;
+    font-style: italic;
+}
+
+/* Wide tables scroll horizontally on the laptop profile instead of
+   squashing columns (no fragile absolute layout anywhere). */
+.gm-table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.gm-party-table {
+    width: 100%;
+    min-width: 1080px;
+    border-collapse: collapse;
+    font-size: 1rem;
+}
+
+.gm-party-table th {
+    position: sticky;
+    top: 0;
+    background: var(--background-color-table-header);
+    color: var(--color-header-inner);
+    text-align: left;
+    padding: 8px 10px;
+    white-space: nowrap;
+}
+
+.gm-party-table td {
+    padding: 8px 10px;
+    border-top: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.gm-cell-name {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.gm-cell-ac {
+    font-weight: 700;
+    text-align: center;
+}
+
+/* Saving throws: proficient ones carry the primary-green status color so the
+   eye catches them across the table. */
+.gm-cell-saves {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    white-space: nowrap;
+}
+
+.gm-save {
+    display: inline-block;
+    min-width: 52px;
+}
+
+.gm-save-proficient {
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.gm-cell-skills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+
+.gm-skill {
+    white-space: nowrap;
+}
+
+.gm-skill-expert {
+    font-weight: 700;
+    color: var(--color-info-hover);
+}
+
+.gm-cell-passives {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    white-space: nowrap;
+}
+
+.gm-cell-hp {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.gm-hp-down {
+    color: var(--color-error-light);
+}
+
+.gm-hp-bloodied {
+    color: var(--color-warning);
+}
+
+.gm-temp-hp {
+    margin-left: 4px;
+    color: var(--color-info);
+    font-weight: 600;
+}
+
+.gm-cell-defense {
+    max-width: 220px;
+}
+
+.gm-defense-line {
+    font-size: 0.85em;
+    color: var(--color-text-secondary);
+}
+
+.gm-status-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* The table font is one step up from the sheet's; CreatureBadge sizes with
+   0.55em, so lift its floor here to keep badges readable across the room. */
+.gm-status-badges .creature-badge {
+    font-size: 0.8rem;
+}
+
+/* ---- In Play strip ---- */
+
+.gm-inplay-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 3px 0;
+}
+
+.gm-inplay-name {
+    font-weight: 700;
+    min-width: 140px;
+}
+
+.gm-combat {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: var(--background-color-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.gm-combat-header {
+    color: var(--color-header);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.gm-combat-active {
+    margin-left: 10px;
+    color: var(--color-text-secondary);
+    font-weight: 400;
+}
+
+.gm-combat-hp {
+    font-weight: 700;
+    min-width: 70px;
+}
+
+/* ---- Quick reference ---- */
+
+.gm-ref-columns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.gm-ref-group {
+    flex: 1 1 420px;
+    background: var(--background-color-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.gm-ref-group > summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--color-header);
+    font-size: 1.05em;
+}
+
+.gm-ref-group > summary i {
+    color: var(--color-primary);
+    margin-right: 4px;
+}
+
+.gm-ref-item {
+    border-top: 1px solid var(--border-color);
+    padding: 4px 0 4px 8px;
+}
+
+.gm-ref-item > summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.gm-ref-item-body {
+    padding: 4px 8px 6px 12px;
+    color: var(--color-text-secondary);
+}
+
+.gm-ref-actions {
+    margin: 6px 0 4px 0;
+    padding-left: 20px;
+    list-style: none;
+}
+
+.gm-ref-actions li {
+    padding: 3px 0;
+}
+
+.gm-ref-action-desc {
+    color: var(--color-text-secondary);
+}
