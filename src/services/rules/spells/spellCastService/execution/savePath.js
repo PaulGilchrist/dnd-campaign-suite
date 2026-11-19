@@ -185,7 +185,12 @@ async function handleAoE({ spell, fullSpell, metaCtx, playerStats, campaignName,
     const slotLevel = metaCtx?.slotLevel || spell.level;
     const { hasDamage, payloadDamage, empoweredEvocationIntMod } = resolveAoeDamageInfo(playerStats, fullSpell, spell, slotLevel, overchannelActive);
 
-    const automationEffects = fullSpell.automation?.effects;
+    // Condition-carrying automation entry: object form, or the half of a
+    // multi-entry array that owns the fail-grant (Grease ships
+    // [save_only, grease_area_save] on both rulesets — the area_save half
+    // carries the recurring lane, this half the cast-time Prone grant).
+    const automationEffects = (Array.isArray(fullSpell.automation) ? fullSpell.automation : [fullSpell.automation])
+        .find(a => a && a.effects)?.effects;
     const isConditionOnlyAoe = !hasDamage && automationEffects?.fail?.length > 0;
 
     const radiantSoulChaMod = hasDamage ? resolveRadiantSoulChaMod(playerStats, effectiveDamageType, getRuntimeValue, campaignName) : 0;

@@ -580,6 +580,25 @@ const EXPIRATION_HANDLERS = {
     'clear_runtime_value': (effect, _targetName, _attackerName, campaignName) => setRuntimeValue(effect.creatureName, effect.key, null, campaignName),
     'remove_smite_of_protection': handleRemoveSmiteOfProtection,
     'clear_silence_zone': handleClearSilenceZone,
+    // SP-056 WIRE IT (owner decision 2026-11-19): the Grease/Sleet Storm zone
+    // clocks are consumed here. Nulling the caster's zone tracking key ends the
+    // expireStaleEffects recurring turn-start sweeps (both lanes gate on its
+    // saveDc). Grease additionally sweeps the `grease` zone tes written at cast
+    // so no ghost badges stand after expiry (clear_silence_zone precedent —
+    // one type sweeps its own lane's tes); the `sleet_storm` tes keep their
+    // existing concentration-break sweep lane.
+    'remove_grease_area': (effect, targetName, _attackerName, campaignName) => {
+        setRuntimeValue(targetName, effect.greaseKey, null, campaignName);
+        const zoneEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+        if (!Array.isArray(zoneEffects)) return;
+        const cleaned = zoneEffects.filter(te => !(te.effect === 'grease' && te.source === targetName));
+        if (cleaned.length !== zoneEffects.length) {
+            setRuntimeValue('campaign', 'targetEffects', cleaned, campaignName);
+        }
+    },
+    'remove_sleet_storm_area': (effect, targetName, _attackerName, campaignName) => {
+        setRuntimeValue(targetName, effect.sleetKey, null, campaignName);
+    },
     // MA-0048: Frightful Presence effect-end (1-minute clock expiry) grants
     // 24h immunity to this attacker's FP. Written inline (no nested
     // addExpiration — clocks registered mid-expiry-processing race the

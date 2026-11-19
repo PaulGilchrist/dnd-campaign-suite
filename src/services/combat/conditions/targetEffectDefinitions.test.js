@@ -136,6 +136,7 @@ const CENSUS = [
   ['prismatic_spray_indigo', 'Prismatic Spray (Indigo)', 'fa-eye', 'effect-debuff', 'Spells', ['source', 'dc']],
   ['prismatic_spray_violet', 'Prismatic Spray (Violet)', 'fa-door-open', 'effect-debuff', 'Spells', ['source', 'dc']],
   ['sanctuary', 'Sanctuary', 'fa-shield-halved', 'effect-buff', 'Spells', ['source', 'dc']],
+  ['grease', 'Grease (Zone)', 'fa-oil-can', 'effect-debuff', 'Spells', ['source', 'dc']],
   ['sleet_storm', 'Sleet Storm', 'fa-snowflake', 'effect-debuff', 'Spells', ['source', 'dc']],
   ['stinking_cloud', 'Stinking Cloud', 'fa-smog', 'effect-debuff', 'Spells', ['source', 'dc']],
   ['warding_bond', 'Warding Bond', 'fa-ring', 'effect-buff', 'Spells', ['source']],

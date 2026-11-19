@@ -6440,18 +6440,28 @@
             "dc_type": "DEX",
             "dc_success": "none"
         },
-        "automation": {
-            "type": "save_only",
-            "saveType": "DEX",
-            "effects": {
-                "fail": [
-                    {
-                        "type": "prone",
-                        "condition": "prone"
-                    }
-                ]
+        "automation": [
+            {
+                "type": "save_only",
+                "saveType": "DEX",
+                "effects": {
+                    "fail": [
+                        {
+                            "type": "prone",
+                            "condition": "prone"
+                        }
+                    ]
+                }
+            },
+            {
+                "type": "grease_area_save",
+                "saveType": "DEX",
+                "shape": "square",
+                "size": "10-foot",
+                "conditionInflicted": "Prone",
+                "duration": "1 minute"
             }
-        }
+        ]
     },
     {
         "index": "greater-invisibility",

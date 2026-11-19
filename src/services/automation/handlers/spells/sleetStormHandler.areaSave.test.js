@@ -3,7 +3,8 @@
 // lane (this) — .areaSave: processSleetStormAreaSave ONLY — the recurring
 //   per-creature DEX-save lane, fired at the caster-turn initiative seam by
 //   expireStaleEffects.js:45 (Phase 3). LIVE-wired — SP-111 precedent,
-//   contrast grease's pending-wired tracking-store. In-area enumeration
+//   grease's tracking-store lane joined it 2026-11-19 (Phase 6,
+//   expireStaleEffects.grease.test.js). In-area enumeration
 //   itself lives in expireStaleEffects (targetEffects filter
 //   effect==='sleet_storm' && source===caster → per-target re-force);
 //   pinned over there in expirations_expireStaleEffects.test.js.
@@ -39,10 +40,11 @@
 //     branch is UNREACHABLE in prod. The player-immunity test below pins the
 //     branch logic via sync-mock shape (what the un-awaited read expects);
 //     it documents reachable intent, not current prod behavior.
-//   • PENDING-WIRING: remove_sleet_storm_area expiration effect (rounds:10)
-//     is PRODUCED at sleetStormHandler.js:73-76 (handle lane) but consumed
-//     NOWHERE in src (grep-verified) — tracking key never cleared by that
-//     expiration; same category as grease tracking-store pending-wiring.
+//   • WIRED 2026-11-19 (owner "WIRE IT"): remove_sleet_storm_area expiration
+//     effect (rounds:10) is PRODUCED at sleetStormHandler.js:73-76 (handle
+//     lane) and consumed by clearExpirationEffects.js EXPIRATION_HANDLERS —
+//     the clock nulls the tracking key (pin:
+//     clearExpirationEffects.grease-sleet-zone-expiry.test.js).
 //     The recurring-save consumption itself IS live (expireStaleEffects:45).
 //   • registry note: automation/index.js dispatches BOTH 'sleet_storm' and
 //     'sleet_storm_area_save' to handle() (558/585) — not to this export.

@@ -75,11 +75,21 @@ const DISK_GREASE_2024 = {
   dc: { dc_type: 'DEX', dc_success: 'none' },
   area_of_effect: { shape: 'square', size: '10-foot' },
   status_effects: ['Prone'],
-  automation: {
-    type: 'save_only',
-    saveType: 'DEX',
-    effects: { fail: [{ type: 'prone', condition: 'prone' }] },
-  },
+  automation: [
+    {
+      type: 'save_only',
+      saveType: 'DEX',
+      effects: { fail: [{ type: 'prone', condition: 'prone' }] },
+    },
+    {
+      type: 'grease_area_save',
+      saveType: 'DEX',
+      shape: 'square',
+      size: '10-foot',
+      conditionInflicted: 'Prone',
+      duration: '1 minute',
+    },
+  ],
 };
 
 const DISK_ENTANGLE_2024 = {
@@ -166,7 +176,7 @@ describe('savePath.js — condition-only AoE save path → aoeCondition modal pa
     vi.clearAllMocks();
   });
 
-  it('ships the full aoeCondition popup for the live disk Grease row: CLA-321 soulstitch tuple first, disk shape/range/uppercase saveType bytes, SP-024 text duration, innate-sorcery +1, grease-only includeCaster, raw fail-array identity, and no dice rolled', async () => {
+  it('ships the full aoeCondition popup for the live disk Grease row: CLA-321 soulstitch tuple first, disk shape/range/uppercase saveType bytes, SP-024 text duration, innate-sorcery +1, grease-only includeCaster, raw fail-array identity through the two-entry array automation (save_only half owns the grant, grease_area_save half the recurring lane), and no dice rolled', async () => {
     const args = makeSavePathArgs({
       innateSorceryActive: true,
       hasInvisible: true,
@@ -191,7 +201,7 @@ describe('savePath.js — condition-only AoE save path → aoeCondition modal pa
           duration: '1 minute',
           saveType: 'DEX',
           saveDc: 18,
-          effects: DISK_GREASE_2024.automation.effects.fail,
+          effects: DISK_GREASE_2024.automation[0].effects.fail,
           conditionLabel: 'prone',
           activeOverlay: null,
           metamagicCareful: false,
@@ -203,7 +213,7 @@ describe('savePath.js — condition-only AoE save path → aoeCondition modal pa
 
     // References ride through unwrapped (identity, not copies).
     expect(result.automationPopup.payload.playerStats).toBe(args.playerStats);
-    expect(result.automationPopup.payload.effects).toBe(DISK_GREASE_2024.automation.effects.fail);
+    expect(result.automationPopup.payload.effects).toBe(DISK_GREASE_2024.automation[0].effects.fail);
 
     // CLA-321: soulstitch fires exactly once, 5-arg positional tuple by
     // identity, BEFORE the combat-context read that precedes the modal.

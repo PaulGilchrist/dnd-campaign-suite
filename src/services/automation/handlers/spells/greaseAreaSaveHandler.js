@@ -8,6 +8,8 @@ import * as mapsService from '../../../maps/mapsService.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 import { addTargetResult } from '../../common/damageRollback.js';
 import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
+import { getEffectDefinition } from '../../../combat/conditions/targetEffectDefinitions.js';
+import { resolveSelectedSpellTargets } from './areaSpellUtils.js';
 
 function getAreaRadius(auto) {
     const size = auto.size || '10-foot';
@@ -17,6 +19,33 @@ function getAreaRadius(auto) {
 
 function getGreaseTrackingKey(casterName) {
     return `_grease_${casterName.replace(/\s+/g, '_')}`;
+}
+
+// Zone marker te for every creature in the area (SP-126 web
+// stampWebZoneEffects pattern) — expireStaleEffects Phase 6 re-forces a DEX
+// save for each carrier at ITS turn start while the caster's `_grease_`
+// zone tracking stands; the remove_grease_area clock expiry sweeps both.
+function stampGreaseZoneEffects(campaignName, casterName, targets, dc, duration) {
+    const storedZoneEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const zoneEffects = Array.isArray(storedZoneEffects) ? [...storedZoneEffects] : [];
+    for (const zoneTarget of targets) {
+        const greaseEffect = {
+            target: zoneTarget.name,
+            effect: 'grease',
+            source: casterName,
+            dc: dc,
+            duration: duration,
+        };
+        const existingIdx = zoneEffects.findIndex(
+            te => te.target === zoneTarget.name && te.effect === 'grease' && te.source === casterName
+        );
+        if (existingIdx >= 0) {
+            zoneEffects[existingIdx] = greaseEffect;
+        } else {
+            zoneEffects.push(greaseEffect);
+        }
+    }
+    setRuntimeValue('campaign', 'targetEffects', zoneEffects, campaignName);
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -61,6 +90,17 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         timestamp: Date.now(),
         duration: auto.duration || '1 minute',
     }, campaignName);
+
+    // Zone marker te for every creature in the area — the expireStaleEffects
+    // Phase 6 seam re-forces a save for each carrier at its turn start while
+    // the caster's zone tracking stands (real in-area/prone/immunity filtering
+    // happens per-sweep inside processGreaseAreaSave).
+    if (!getEffectDefinition('grease')) {
+        console.error('[greaseAreaSaveHandler] "grease" missing from targetEffectDefinitions registry');
+    }
+    if (cs?.creatures?.length) {
+        stampGreaseZoneEffects(campaignName, playerStats.name, resolveSelectedSpellTargets(cs, action), saveDc, auto.duration || '1 minute');
+    }
 
     // Set expiration for the grease area
     const durationRounds = (() => {

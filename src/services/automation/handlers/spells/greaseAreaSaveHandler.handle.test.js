@@ -11,21 +11,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   content + reader-side tracking guards: do NOT re-pin process* internals here.
 // Liveness (verified 2026-10-16, own greps):
 //   LIVE: handle() registered index.js:556 — 'grease_area_save' (5e spells.json
-//     grease automation[1]). Its setCondition modal is consumed live:
+//     grease automation[1]; 2024 parity entry added 2026-11-19 — both rulesets
+//     now route the recurring lane). Its setCondition modal is consumed live:
 //     useCharActionsAutomation.js:287 modalMap → CharActionModals.jsx renders
 //     SetConditionModal.jsx whose props destructure every pinned payload field
 //     (combatSummary/attackerName/attackerPos/saveDc/campaignName/mapData/
 //     featureName/conditionName/saveType/rangeFeet/durationRounds).
-//   ⚠ CRITICAL FLAG (re-verified, documented — do NOT fix here): the tracking
-//     store's ONLY reader is processGreaseAreaSave, which has ZERO production
-//     callers — expireStaleEffects.js wires sleet (Phase 3), stinking_cloud
-//     (SP-111) and web (SP-126) recurring turn-start lanes but NOT grease — and
-//     'remove_grease_area' is absent from clearExpirationEffects.js
-//     EXPIRATION_HANDLERS; unknown types are silently skipped (:520-524, no
-//     console), so the expiration entry drains at rounds:10 with zero grease
-//     cleanup. Tracking STORE + addExpiration writes below are PENDING-WIRING
-//     (SP-126 web precedent), kept as contract-preservation for when the lane
-//     is wired or retired; the modal-payload and log pins above are LIVE.
+//   WIRED (2026-11-19, owner decision "WIRE IT" — SP-126 pattern copied):
+//     the tracking store's reader processGreaseAreaSave is now dispatched by
+//     expireStaleEffects.js Phase 6 (SP-111/SP-126 processZoneTurnStartSaves
+//     seam, effectKey 'grease', trackingPrefix 'grease'), pinned by
+//     expireStaleEffects.grease.test.js; handle() additionally stamps a
+//     `grease` zone marker te per area creature (pinned below) so the
+//     carrier-side sweep has a carrier list. 'remove_grease_area' now has an
+//     EXPIRATION_HANDLERS consumer in clearExpirationEffects.js: nulls this
+//     tracking key and strips the caster's grease tes (pin:
+//     clearExpirationEffects.grease-sleet-zone-expiry.test.js). No ghost keys.
 //   Spell-shape caveat (flagged, not fixed): spells.json automation[1].duration
 //     is '1 minute' (space). The handler's parser reads snake_case only
 //     ('1_minute' prefix, N_round), so a raw-JSON passthrough yields
@@ -279,7 +280,7 @@ describe('greaseAreaSaveHandler.handle', () => {
     });
   });
 
-  describe('tracking data storage (PENDING-WIRING — sole reader processGreaseAreaSave has zero production callers)', () => {
+  describe('tracking data storage (WIRED — read by the expireStaleEffects Phase 6 turn-start sweep)', () => {
     it('stores the exact-key tracking shape once when caster found on map', async () => {
       await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
@@ -336,6 +337,65 @@ describe('greaseAreaSaveHandler.handle', () => {
       await handle(makeAction({ saveType: 'CON' }), makePlayerStats(), campaignName, mapName);
       expect(greaseStoreCalls()[0][2].saveType).toBe('CON');
       expect(greaseStoreCalls()[0][2].saveDc).toBe(14);
+    });
+  });
+
+  describe('zone marker te stamp (expireStaleEffects Phase 6 carrier list)', () => {
+    // Helper — the campaign targetEffects write, if any.
+    const teWrites = () => useRuntimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
+
+    it('stamps a grease te per combat creature (cast-time default: every creature incl. the caster) with exact shape, once, in target order', async () => {
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(teWrites()).toHaveLength(1);
+      const [scope, key, value, campaign] = teWrites()[0];
+      expect(scope).toBe('campaign');
+      expect(key).toBe('targetEffects');
+      expect(campaign).toBe(campaignName);
+      expect(value).toEqual([
+        { target: 'Goblin', effect: 'grease', source: casterName, dc: 13, duration: '1_minute' },
+        { target: casterName, effect: 'grease', source: casterName, dc: 13, duration: '1_minute' },
+      ]);
+    });
+
+    it('stamps only the metaCtx selection when present', async () => {
+      const action = { ...makeAction(), metaCtx: { targets: ['Goblin'] } };
+      await handle(action, makePlayerStats(), campaignName, mapName);
+
+      expect(teWrites()[0][2]).toEqual([
+        { target: 'Goblin', effect: 'grease', source: casterName, dc: 13, duration: '1_minute' },
+      ]);
+    });
+
+    it('merges into stored zone effects and replaces this caster\'s own grease te (foreign tes survive)', async () => {
+      const stored = [
+        { target: 'Thug', effect: 'stinking_cloud', source: 'Other', dc: 18, duration: 'concentration' },
+        { target: 'Goblin', effect: 'grease', source: casterName, dc: 11, duration: '1_minute' },
+      ];
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) =>
+        (name === 'campaign' && key === 'targetEffects') ? stored : null);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(teWrites()).toHaveLength(1);
+      const [scope, , value] = teWrites()[0];
+      expect(scope).toBe('campaign');
+      expect(value).toEqual([
+        { target: 'Thug', effect: 'stinking_cloud', source: 'Other', dc: 18, duration: 'concentration' },
+        { target: 'Goblin', effect: 'grease', source: casterName, dc: 13, duration: '1_minute' },
+        { target: casterName, effect: 'grease', source: casterName, dc: 13, duration: '1_minute' },
+      ]);
+      // the stored array was copied, not mutated in place
+      expect(stored).toHaveLength(2);
+    });
+
+    it('skips the te stamp with no combat context and stamps nothing outside combat', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(null);
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(teWrites()).toHaveLength(0);
+      // the cast itself (tracking store + modal) still lands outside combat
+      expect(greaseStoreCalls()).toHaveLength(1);
     });
   });
 

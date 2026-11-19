@@ -1,7 +1,8 @@
 // @maintained-by-ai
 // Lane: Phase 5 WEB consumer routing of expireStaleEffects (SP-126) — the
 // dispatch seam from a carrier's turn-start sweep to processWebAreaSave.
-// Web is WIRED here (vs the grease-pair pending wiring); the SP-126 bug
+// Web is WIRED here (grease joined the wired family 2026-11-19 with
+// Phase 6 — expireStaleEffects.grease.test.js); the SP-126 bug
 // was processWebAreaSave having ZERO callers and `_web_<caster>` ZERO
 // producers. This lane owns only the web-visible consequence: the exact
 // 4-arg dispatch (caster, carrier, campaign, tracking mapName), the

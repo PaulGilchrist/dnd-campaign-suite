@@ -14,9 +14,9 @@
 //   mapName). In-area enumeration is consumer-side (targetEffects te.target ===
 //   active creature + te.effect === 'web'); consumer routing pinned in
 //   expireStaleEffects.web.test.js:76 (exact 4-arg call + negative legs).
-//   CONTRAST grease pair: processGreaseAreaSave has ZERO production callers
-//   (pending-wiring, flagged in its closed pair) — web is WIRED, like sleet
-//   (expireStaleEffects.js:45 Phase 3) and stinkingCloud (:106 Phase 4).
+//   grease joined the wired family 2026-11-19 (owner "WIRE IT", Phase 6) —
+//   web is WIRED, like sleet (expireStaleEffects.js:45 Phase 3),
+//   stinkingCloud (Phase 4) and grease (Phase 6).
 // RAW check (verified honestly at webAreaSaveHandler.js source):
 //   2024 Essentials Web — 60-ft range, 20-ft cube, Concentration ≤ 1 hour.
 //   Cast-time: DEX save per creature in area (:213-236), Restrained on fail

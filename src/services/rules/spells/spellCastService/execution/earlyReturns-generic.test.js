@@ -294,7 +294,13 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
     // :710 dispatch (HANDLER_MAP registers 'regenerate', never the disk
     // type 'healing_start_of_turn') to the live chain arm applyRegenerateSpell.
     const DECLINED_5E = ['Color Spray', 'Dominate Monster', 'Entangle', "Irresistible Dance", 'Regenerate', "Resilient Sphere", 'Sleep'].sort();
-    const DECLINED_2024 = ['Arms of Hadar', 'Color Spray', 'Entangle', 'Grease', "Otiluke's Resilient Sphere", "Otto's Irresistible Dance", 'Regenerate', 'Sleep'].sort();
+    // 2026-11-19 WIRE IT: 2024 'Grease' left this census — its disk row is now
+    // the two-entry array [save_only, grease_area_save]; the loop's
+    // `!row.automation.type` screen skips array rows (no top-level type), the
+    // cast face rides the savePath condition-only lane (array-aware, pinned by
+    // savePath-aoe-condition.test.js) and the recurring lane by the
+    // grease_area_save special-action row.
+    const DECLINED_2024 = ['Arms of Hadar', 'Color Spray', 'Entangle', "Otiluke's Resilient Sphere", "Otto's Irresistible Dance", 'Regenerate', 'Sleep'].sort();
     const EXPECTED = [
       { rules: undefined, rows: spells5e, consumed: 43, declined: DECLINED_5E },
       { rules: '2024', rows: spells2024, consumed: 77, declined: DECLINED_2024 },

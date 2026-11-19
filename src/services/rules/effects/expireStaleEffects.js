@@ -5,6 +5,7 @@ import { expireForCreature, expireForTarget } from './expirationQueue.js';
 import { processSleetStormAreaSave } from '../../automation/handlers/spells/sleetStormHandler.js';
 import { processStinkingCloudAreaSave } from '../../automation/handlers/spells/stinkingCloudHandler.js';
 import { processWebAreaSave } from '../../automation/handlers/spells/webAreaSaveHandler.js';
+import { processGreaseAreaSave } from '../../automation/handlers/spells/greaseAreaSaveHandler.js';
 
 // Wild Magic Surge: expire effects with "end of your current turn" duration
 function expireTurnEndSurgeEffects(attackerName, campaignName) {
@@ -110,5 +111,9 @@ export async function expireStaleEffects(campaignName, overrideActiveName) {
         // STR (Athletics) action is a GM-adjudicated residual with no modal
         // consumer in this engine.
         await processZoneTurnStartSaves({ activeName, campaignName, effectKey: 'web', trackingPrefix: 'web', processSave: processWebAreaSave, logLabel: 'Web turn-start save' });
+
+        // Phase 6: Grease recurring turn-start DEX saves. Prone on a failed
+        // save; already-Prone creatures skip (standing is a movement action).
+        await processZoneTurnStartSaves({ activeName, campaignName, effectKey: 'grease', trackingPrefix: 'grease', processSave: processGreaseAreaSave, logLabel: 'Grease turn-start save' });
     } catch (_e) { console.error('[expireStaleEffects] Zone save expiration processing failed:', _e); }
 }

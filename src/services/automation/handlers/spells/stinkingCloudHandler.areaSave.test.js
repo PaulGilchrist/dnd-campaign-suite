@@ -36,9 +36,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   lives behind isWithinRange here. Consumer-side routing pinned in
 //   expireStaleEffects.test.js:344-386. applyStinkingCloudTurnEnd LIVE at
 //   navigationHandlers.js:191 (own-turn-end seam); handle() LIVE via automation
-//   index.js:584 'stinking_cloud' dispatch. Contrast: grease processGreaseAreaSave has
-//   ZERO production callers (pending-wiring, flagged in its closed pair); sleet Phase 3
-//   and web Phase 5 share this wired pattern (sleet quartet closed 28/24/11/10).
+//   index.js:584 'stinking_cloud' dispatch. grease processGreaseAreaSave joined
+//   this wired family 2026-11-19 (owner "WIRE IT", Phase 6 —
+//   expireStaleEffects.grease.test.js); sleet Phase 3 and web Phase 5 share
+//   this wired pattern (sleet quartet closed 28/24/11/10).
 // PROD DEFECT grep (sleetStorm un-awaited getCombatContext :286 contrast): CLEAN — both
 //   getCombatContext sites in this handler are awaited (:111 area save, :254 handle).
 // Lane notes: createSaveListener opts here OMIT the `disadvantage` key (cast-time handle()

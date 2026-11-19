@@ -34,13 +34,16 @@
 //     {type:'condition'} expiration consumed by clearExpirationEffects.js:447
 //     removeConditionEverywhere; no-rounds entry → expiryRounds Infinity
 //     (expirationQueue.js:23) — prone clears only via that seam, never a clock.
+//   WIRED (2026-11-19, owner "WIRE IT"): remove_sleet_storm_area (rounds:10)
+//     PRODUCED L73-76 → consumed by clearExpirationEffects.js EXPIRATION_HANDLERS
+//     (nulls the `_sleetStorm_<caster>` zone tracking; pinned by
+//     clearExpirationEffects.grease-sleet-zone-expiry.test.js).
 //   PENDING-WIRING (pin contract-preservation, honest):
-//     • remove_sleet_storm_area (rounds:10) PRODUCED L73-76, consumed NOWHERE.
 //     • _sleetStorm_concentration_<caster> loss-list PRODUCED L219-225/L320-326,
-//       consumed NOWHERE (same category as grease tracking-store).
+//       consumed NOWHERE (unchanged by the zone-clock wiring).
 //   DURATION-POLICY FLAG: '1_minute'→rounds:10 is the retired minutes×10
 //     recipe (AGENTS.md: ≥1-minute should be combat-scoped). Pinned as-is —
-//     contract preservation, not re-specification; moot while pending-wired.
+//     contract preservation, not re-specification.
 // ──────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -530,7 +533,7 @@ describe('sleetStormHandler.handle — cast time (#1961)', () => {
   });
 
   describe('duration parsing and expiration', () => {
-    it('parses 1_minute → rounds:10, remove_sleet_storm_area exact shape (PENDING-WIRING)', async () => {
+    it('parses 1_minute → rounds:10, remove_sleet_storm_area exact shape (WIRED: cleared by the expiry consumer)', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       combatData.getCombatSummary.mockReturnValue({});
@@ -538,9 +541,11 @@ describe('sleetStormHandler.handle — cast time (#1961)', () => {
 
       await castOnGoblin({ duration: '1_minute' });
 
-      // FLAG: minutes×10 is the retired recipe (header) AND this effect type
-      // is produced-only — no consumer in src/server (grep-verified). Pinning
-      // the produced contract honestly; sleetKey ties to the tracking write.
+      // FLAG: minutes×10 is the retired recipe (header). The effect type is
+      // consumed since the 2026-11-19 WIRE IT pass —
+      // clearExpirationEffects.js 'remove_sleet_storm_area' nulls the key
+      // (clearExpirationEffects.grease-sleet-zone-expiry.test.js). sleetKey
+      // ties to the tracking write.
       expect(expirations.addExpiration).toHaveBeenCalledWith({
         attackerName: casterName,
         targetName: casterName,

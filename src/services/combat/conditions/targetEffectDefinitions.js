@@ -1172,6 +1172,15 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source', 'dc'],
   },
   {
+    effect: 'grease',
+    label: 'Grease (Zone)',
+    description: 'Inside a 10-foot Grease square: Difficult Terrain. A creature standing in the area that starts its turn there must make a DEX save (DC indicated) or have the Prone condition. The spell lasts 1 minute.',
+    icon: 'fa-oil-can',
+    cls: 'effect-debuff',
+    group: 'Spells',
+    fields: ['source', 'dc'],
+  },
+  {
     effect: 'sleet_storm',
     label: 'Sleet Storm',
     description: 'Area is Heavily Obscured with Difficult Terrain. Creatures entering or starting turn in area must make DEX save or become Prone and lose Concentration. Concentration spell, up to 1 minute.',

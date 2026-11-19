@@ -382,11 +382,13 @@ describe('executeSpellCast — hub AoE modal routing & generic-heal branches (di
 
   // ------------------------------------------------------------------
   // aoeCondition — hub picker payload, 2024 disk Grease. REAL
-  // producer census: 5e disk Grease automation is an ARRAY and
-  // reads NON-condition-only at :187 (routes to saveAttackAoe);
-  // the condition-only branch is fed by 2024 disk rows
-  // (Grease/Color Spray/Entangle). Module-direct condition bytes:
-  // savePath-aoe-condition.test.js:120/:144 (cited).
+  // producer census (updated 2026-11-19): BOTH rulesets' Grease rows are
+  // now multi-entry arrays; savePath resolves the condition-carrying half
+  // (2024 save_only effects.fail -> aoeCondition; the 5e array's halves
+  // carry no effects -> reads NON-condition-only at the :187 census and
+  // routes to saveAttackAoe). Other condition-only 2024 disk rows
+  // (Color Spray/Entangle) keep the object shape. Module-direct condition
+  // bytes: savePath-aoe-condition.test.js:120/:144 (cited).
   // ------------------------------------------------------------------
   it('routes the REAL 2024 disk Grease (no damage, automation.effects.fail) into the aoeCondition modal with the complete payload envelope and zero hub dice (#1365 both-rulesets face)', async () => {
     const spell = disk('Grease', '2024')
@@ -417,7 +419,7 @@ describe('executeSpellCast — hub AoE modal routing & generic-heal branches (di
         includeCaster: true,
       },
     })
-    expect(payload.effects).toBe(spell.automation.effects.fail)
+    expect(payload.effects).toBe(spell.automation[0].effects.fail)
     expect(payload.metamagicHeighten).toBe(false) // metaCtx pre-stamped at :680
     expect(services.rollDamage.mock.calls).toEqual([])
     expect(services.rollAttack.mock.calls).toEqual([])

@@ -12,14 +12,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   orchestration: buildSaveDc, caster map position (loadMapData), cast log,
 //   _grease_<caster> tracking STORE, addExpiration(remove_grease_area),
 //   setCondition modal payload.
-// Liveness (verified 2026-10-16): handle() is LIVE — index.js:556 registers
-//   'grease_area_save' (5e spells.json grease automation[1]). processGreaseAreaSave
-//   has ZERO production callers: expireStaleEffects.js wires sleet (Phase 3),
-//   stinking_cloud (SP-111) and web (SP-126) recurring turn-start lanes but NOT
-//   grease, and 'remove_grease_area' has no consumer in the expiration-clearing
-//   lane (grep-zero). RAW SP-056 expects enter/turn-end re-saves — flag this
-//   unwired recurring lane (SP-126 precedent) rather than deleting the contract;
-//   these tests pin it honest until it is wired or retired.
+// Liveness (verified 2026-10-16; WIRED 2026-11-19 per owner "WIRE IT"):
+//   handle() is LIVE — index.js:556 registers 'grease_area_save' (both
+//   rulesets' spells.json after the 2024 parity entry). processGreaseAreaSave
+//   is no longer a zero-caller lane: expireStaleEffects.js Phase 6 dispatches
+//   it at each grease-te carrier's turn start (SP-111/SP-126 zone pattern,
+//   pinned by expireStaleEffects.grease.test.js), and 'remove_grease_area'
+//   now has a clearExpirationEffects.js EXPIRATION_HANDLERS consumer that
+//   nulls the tracking key and strips the caster's grease tes (pinned by
+//   clearExpirationEffects.grease-sleet-zone-expiry.test.js). RAW SP-056
+//   enter/turn re-saves are served by the turn-start seam; these tests own
+//   the recurring-save CONTENT behind that seam.
 // Notes: processGreaseAreaSave never touches placedItems/players or loadMapData
 //   (position lives behind isWithinRange); the mapsService mock remains only to
 //   isolate module-import side effects of the paired handle() module graph.

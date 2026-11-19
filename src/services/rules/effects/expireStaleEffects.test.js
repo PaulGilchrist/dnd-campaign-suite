@@ -13,6 +13,7 @@
 // range shifted to :292-334 after this pass), clearExpirationEffects.test.js
 // (real-clear consequence face), naturesVeilHandler.test.js (self-targeted
 // Phase 2 face — the :251-280 real invisible-clear owner, preserved).
+// Phase 6 grease: expireStaleEffects.grease.test.js.
 // No-timers policy: the round is read ONLY through the getCurrentCombatRound
 // seam; store fixtures use the exact-payload seedStore pattern (#1294).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
