@@ -23,6 +23,13 @@
 // fires. Multi-level jumps display honestly ("Level 1 → 3"); the ladder caps
 // at 20, so past-max XP never celebrates.
 //
+// The XP lane floors every award at the character's ACTUAL roster level, the
+// same ground truth the milestone lane compares: an implied level that does
+// not exceed `character.level` is XP-lane catch-up (e.g. a milestone
+// character's first-ever XP write under a Level-8 roster), never an award —
+// it adopts silently, and the banner's starting level is the roster truth,
+// never the implied-from-0 "Level 1" a character never had.
+//
 // Celebration state is per-client ephemeral UI state (like showModal) — never
 // the runtime store. Dismissal is by click only: the × / Continue buttons or
 // the wizard handoff; no timers (AGENTS no-game-timers law).
@@ -65,9 +72,13 @@ function CharacterLevelWatcher({ character, campaignName, armed, onCrossing }) {
         // runtime buckets from change-data, so pre-arm moves are invisible.
         if (!armed || !previous) return;
         if (previous.inXpMode && snapshot.inXpMode) {
-            const from = impliedLevelFromXp(previous.xp);
+            // Floor at the character's actual roster level: an implied level
+            // that never exceeds it is the XP lane catching up (sync import),
+            // not a level-up — silent adopt, and never advertise a starting
+            // level the character never had.
+            const floor = Math.max(impliedLevelFromXp(previous.xp), snapshot.level ?? 1);
             const to = impliedLevelFromXp(snapshot.xp);
-            if (to > from) onCrossing({ name: character.name, from, to });
+            if (to > floor) onCrossing({ name: character.name, from: floor, to });
         }
         if (!previous.inXpMode && !snapshot.inXpMode
             && previous.level != null && snapshot.level != null && snapshot.level > previous.level) {

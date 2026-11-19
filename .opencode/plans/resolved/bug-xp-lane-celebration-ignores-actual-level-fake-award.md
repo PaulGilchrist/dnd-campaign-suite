@@ -33,3 +33,25 @@ Clamp the XP-lane award to reality before calling `onCrossing`: require `to > Ma
 
 ## Severity
 Broken feature (moderate). Nothing corrupts stored data, but a shipped celebration announces a level-up that did not happen — with a fabricated Level-1 origin — to every client at the table, and offers a wizard handoff for features the character already has. Honest-feedback violation in a player-facing moment.
+
+## Resolution
+FIXED 2026-11-19 (fix subagent). The "Likely location" diagnosis was verified exactly: `CharacterLevelWatcher`'s XP lane compared only `impliedLevelFromXp(previous.xp)` vs `impliedLevelFromXp(snapshot.xp)`, and `impliedLevelFromXp(0)` = 1, so a milestone character's first-ever XP write always read `from = 1`.
+
+**Live repro pre-fix (test-campaign, two mounted GM tabs):** War_Cleric sheet → untick Milestone (runtime-only write confirmed: change-data `War_Cleric.xpMode = 'experience'`, char file untouched) → apply 26,500 XP → `.level-up-banner` `LEVEL UP! War_Cleric | Level 1 → 7` rendered on the awarding tab AND on the second tab via the full-bucket SSE echo (both tabs' `test-campaign` SSE connections confirmed live in the server log before judging).
+
+**Fix (minimal, mirrors the milestone lane's roster-ground-truth pattern):** in `src/components/level-up/LevelUpCelebration.jsx` the XP lane now floors at the character's actual roster level —
+`const floor = Math.max(impliedLevelFromXp(previous.xp), snapshot.level ?? 1); … if (to > floor) onCrossing({ name, from: floor, to });`
+An implied level that does not exceed the real level is XP-lane catch-up (sync import) and adopts silently; a genuine award above the real level celebrates with the true starting level (never a fabricated Level-1). No XP-modal or award-lane writes were touched (the milestone-toggle double-POST stays as its own backlog item); `levelProgression.js` unchanged; single ruleset-agnostic ladder, so no 5e/2024 twin needed.
+
+**Live re-verify post-fix (same two-tab rig, fresh reload onto fixed source):**
+- Cold-boot anti-replay with 26,500 XP persisted → no banner (law still holds).
+- XP zeroed to 0, Milestone unticked again, apply 26,500 (implies 7 < actual 8) → **zero banner on tab A and tab B** — the exact bug face is dead.
+- Parity award 34,000 XP (implies exactly 8) → silent (catch-up adopts, not celebrated).
+- Genuine award 48,000 XP (implies 9 > actual 8) → `LEVEL UP! War_Cleric | Level 8 → 9` on tab A **and** tab B via SSE echo — happy path intact with the honest roster starting level (this positive control also proves the earlier silences were the fix, not a dead echo lane).
+- Console: zero errors/warnings on both tabs.
+
+**Tests/lint:** new `src/components/level-up/LevelUpCelebration.actual-level-clamp.test.jsx` (6 tests, co-located, mirrors the sibling file's real-runtime-module rig: writer `setRuntimeValue` + echo `replaceRuntimeObject` lanes; pins "level-8 milestone char, untick + first award 26,500 XP → zero celebration" both lanes, parity silence, `Level 8 → 9` / `Level 8 → 11` honest spans, implied-higher floor). `npx vitest run src/components/level-up/ src/services/character/levelProgression.test.js src/App.level-up-celebration.test.jsx` → 4 files, 38/38 pass. `npm run lint` → clean (zero warnings).
+
+**Restore/hygiene:** War_Cleric runtime `xp`/`xpMode` evicted by closed-tab two-pass campaign-scoped admin clears (`change-data {}`, `log []`, disk `character-change-data.json`/`campaign-log.json` ABSENT); `War_Cleric.json` byte-untouched at exit (md5 `1a4c9643…` = entry pin). Dev pair killed by PID, ports dark.
+
+**Files changed:** `src/components/level-up/LevelUpCelebration.jsx` (fix + header comment), `src/components/level-up/LevelUpCelebration.actual-level-clamp.test.jsx` (new).
