@@ -52,6 +52,7 @@ import ConditionChoiceModal from './components/common/ConditionChoiceModal.jsx';
 import ErrorBoundary from './components/error-boundary/ErrorBoundary.jsx';
 import FirstSessionChecklist from './components/campaign-starter/FirstSessionChecklist.jsx';
 import TvExitButton from './components/common/TvExitButton/TvExitButton.jsx';
+import LevelUpCelebration from './components/level-up/LevelUpCelebration.jsx';
 
 function handleCharacterKeyEvent(event, { setCharacters, activeCharacter, setActiveCharacter }) {
   if (event.key.startsWith('character-delete-')) {
@@ -235,6 +236,17 @@ function isMountedMapActive(activeMapName, mountedMapName) {
   return activeMapName != null
     && mapSlug(activeMapName) !== ''
     && mapSlug(activeMapName) === mapSlug(mountedMapName);
+}
+
+// Level-up celebration handoff (roadmap Item 8): opens the EXISTING edit
+// wizard for the crossing character — the same lane the sheet's "Edit"
+// button uses (the edit wizard's first visible step is Basic Information,
+// which owns the Level field: the level-up editing entry). The edit wizard
+// renders from activeCharacter, so arm that first (cloneDeep, mirroring
+// handleCharacterClick). No new wizard flow.
+function openLevelUpWizard(character, { setActiveCharacter, handleEditCharacter }) {
+  setActiveCharacter(cloneDeep(character));
+  handleEditCharacter(character);
 }
 
 async function fetchCampaignChangeData(campaignName) {
@@ -527,10 +539,17 @@ function App() {
 
    // Seed runtime store with computed tracked resources, then apply server overrides
     const seededCampaignRef = useRef('');
+    // Level-up celebration arming (roadmap Item 8): stays FALSE until the
+    // change-data seed above has landed, so the seed itself (character JSON
+    // `xp` → runtime `xp` jump on cold boot) can never read as an XP award.
+    // The celebration watches runtime values only once armed (per-client UI
+    // gate — no game state).
+    const [runtimeSeeded, setRuntimeSeeded] = useState(false);
     useEffect(() => {
       if (!computedCharacters.length || !campaignName) return;
       if (seededCampaignRef.current === campaignName && computedCharacters.length > 0) return;
       seededCampaignRef.current = campaignName;
+      setRuntimeSeeded(false);
       (async () => {
         const serverData = await fetchCampaignChangeData(campaignName);
         // Also seed arbitrary runtime keys (weapon mastery choices, etc.) from server data,
@@ -540,6 +559,7 @@ function App() {
         }
         // Seed campaign-level runtime data (targetEffects, etc.)
         seedCampaignRuntimeData(serverData);
+        setRuntimeSeeded(true);
       })();
     }, [computedCharacters, campaignName]);
 
@@ -974,6 +994,16 @@ function App() {
         <DeathSavePromptModal campaignName={campaignName} characters={computedCharacters} />
         <ConcentrationPromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
         <ConditionChoiceModal />
+        {/* LEVEL UP celebration (roadmap Item 8): every screen, every client —
+            mounted OUTSIDE the view outlet so it survives view navigation,
+            exactly like the adjudication prompts. Pure presentation over the
+            shared runtime/roster lanes. */}
+        <LevelUpCelebration
+          campaignName={campaignName}
+          characters={characters}
+          armed={runtimeSeeded}
+          onOpenWizard={(character) => openLevelUpWizard(character, { setActiveCharacter, handleEditCharacter })}
+        />
         <Subscriber campaignName={campaignName} handleEvent={handleRuntimeEvent} />
         <CampaignReloadNotice campaignName={campaignName} />
         <MapContextSync campaignName={campaignName} activeMapName={activeMapName} isLocalhost={isLocalhost} />
