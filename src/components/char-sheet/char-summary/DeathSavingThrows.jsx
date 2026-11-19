@@ -85,6 +85,10 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
         addEntry(campaignName, entry).catch((e) => { console.error("[DeathSavingThrows] Error:", e); })
     }
 
+    // "Clear death state" (owner decision 2026-11-19): this ONLY clears the
+    // dying track — isDead + both save/failure counters — it never restores HP.
+    // At 0 HP the character stays unconscious and the Roll area re-arms, so the
+    // title must not claim resurrection.
     const handleRemoveDead = () => {
         setRuntimeValue(name, 'isDead', 0, campaignName);
         setRuntimeValue(name, 'deathSaves', EMPTY_TRACK, campaignName);
@@ -174,7 +178,7 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
                             className="death-saves-dead-remove"
                             onClick={handleRemoveDead}
                             type="button"
-                            title="Resurrect character"
+                            title="Clear death state"
                         >
                             <i className="fa-solid fa-xmark"></i>
                         </button>

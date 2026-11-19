@@ -160,7 +160,7 @@ describe('DeathSavingThrows', () => {
     it.each([
       [true, true],
       [false, false],
-    ])('replaces the panel with the DEAD badge and offers the resurrect button on localhost=%s only', (localhost, showsRemove) => {
+    ])('replaces the panel with the DEAD badge and offers the clear-death-state button on localhost=%s only', (localhost, showsRemove) => {
       runtimeStore.set(`${CHARACTER}:isDead`, 1);
       renderComponent({ isLocalhost: localhost });
 
@@ -168,9 +168,13 @@ describe('DeathSavingThrows', () => {
       expect(screen.queryByText('Death Saves')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /roll/i })).not.toBeInTheDocument();
       if (showsRemove) {
-        expect(screen.getByRole('button', { name: /resurrect character/i })).toBeInTheDocument();
+        // Verbatim title pin: the button only clears the death state (isDead +
+        // tracks) at 0 HP — it never resurrects, so the copy must not claim it.
+        const removeBtn = screen.getByRole('button', { name: 'Clear death state', exact: true });
+        expect(removeBtn).toBeInTheDocument();
+        expect(removeBtn).toHaveAttribute('title', 'Clear death state');
       } else {
-        expect(screen.queryByRole('button', { name: /resurrect character/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Clear death state', exact: true })).not.toBeInTheDocument();
       }
     });
   });
@@ -389,15 +393,15 @@ describe('DeathSavingThrows', () => {
     });
   });
 
-  describe('resurrecting a dead character', () => {
+  describe('clearing the death state of a dead character', () => {
     beforeEach(() => {
       runtimeStore.set(`${CHARACTER}:isDead`, 1);
     });
 
-    it('clears isDead, resets both tracks, restores the panel, and logs the resurrection', async () => {
+    it('clears isDead, resets both tracks, restores the panel, and logs the removal', async () => {
       const { container } = renderComponent({ isLocalhost: true });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /resurrect character/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Clear death state', exact: true }));
       });
 
       expect(setRuntimeValue).toHaveBeenCalledWith(CHARACTER, 'isDead', 0, CAMPAIGN);

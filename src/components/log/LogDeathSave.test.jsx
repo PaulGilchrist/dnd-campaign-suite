@@ -63,16 +63,17 @@ describe('Log > DeathSaveEntry', () => {
 
   // Finality entries mirror real producer payloads (DeathSavingThrows.jsx):
   // #877: stable/dead/removed carry explicit honest tones from the presentation
-  // map — stable and removed (revive) render green, dead red; none inherit a
-  // class from truthiness on the absent `success` field. 'removed'
+  // map — stable and removed (death-state clear) render green, dead red; none
+  // inherit a class from truthiness on the absent `success` field. 'removed'
   // (DeathSavingThrows.jsx:61, GM clears the dying track via the
-  // "Resurrect character" button) is a rescue, so it labels honestly and
-  // renders NO die node (pre-fix pins 'Death Save Failure' + '()' — flipped).
+  // "Clear death state" button) removes the dying condition (HP stays 0), so
+  // it labels honestly and renders NO die node (pre-fix pins 'Death Save
+  // Failure' + '()' — flipped).
   it.each([
     ['stable', { result: 'stable', success: undefined, totalSuccesses: 3, totalFailures: 1 }, 'Stabilized!', 'log-death-save-success', 'fa-skull-crossbones', null, ['✓ 3', '✗ 1'], []],
     ['dead', { result: 'dead', success: undefined, totalSuccesses: 1, totalFailures: 3 }, 'Has Perished!', 'log-death-save-failure', 'fa-skull', null, ['✓ 1', '✗ 3'], []],
     ['stable beats nat20 title', { result: 'stable', success: undefined, isNatural20: true, totalSuccesses: 3, totalFailures: 0 }, 'Stabilized!', 'log-death-save-success', 'fa-skull-crossbones', 'NAT 20', ['✓ 3', '✗ 0'], []],
-    ['removed (revive reset)', { result: 'removed', success: undefined, roll: undefined, totalSuccesses: 0, totalFailures: 0 }, 'Dying Condition Removed', 'log-death-save-success', 'fa-skull-crossbones', null, ['✓ 0', '✗ 0'], []],
+    ['removed (death-state clear)', { result: 'removed', success: undefined, roll: undefined, totalSuccesses: 0, totalFailures: 0 }, 'Dying Condition Removed', 'log-death-save-success', 'fa-skull-crossbones', null, ['✓ 0', '✗ 0'], []],
   ])('renders %s finality bytes', (_label, overrides, title, polarityCls, iconCls, natBadge, totals, dieTexts) => {
     setup(Log, [ds(overrides)]);
     expect(q('.log-entry')).toHaveClass('log-death-save', polarityCls);
