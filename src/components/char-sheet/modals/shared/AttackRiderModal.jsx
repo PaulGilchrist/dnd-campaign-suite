@@ -61,6 +61,17 @@ function riderCanApply(multiSelect, selectedMulti, selected) {
     return !!selected;
 }
 
+// Explicit accessible name for every option input (backlog 2026-11-18 charger
+// chooser a11y parity): mirrors ShieldBashChoiceModal's `<Option> <target>`
+// convention (7357a6689, SecondaryTargetModal `Select <Name>` idiom) so
+// role/accessible-name locators resolve each row in one try. Unlike Shield
+// Bash, this chooser legitimately mounts without a target — the instruction
+// line already drops " against <T>" then (buildRiderLabelText), so the aria
+// drops the target segment the same way and the row resolves by option name.
+function riderOptionAriaLabel(opt, targetName) {
+    return targetName ? `${opt.name} ${targetName}` : opt.name;
+}
+
 function RiderResultOverlay({ title, description, onClose }) {
     // Entrance focus + stranded-close restore (backlog 2026-11-17 sp-overlay adoption).
     const overlayRef = useRef(null);
@@ -306,6 +317,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
                                     <input
                                         type={inputType}
                                         name={multiSelect ? `riderOption_${i}` : 'riderOption'}
+                                        aria-label={riderOptionAriaLabel(opt, targetName)}
                                         checked={inputChecked}
                                         onChange={handleChange}
                                         style={{ marginRight: '8px' }}
