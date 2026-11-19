@@ -34,11 +34,17 @@ function buildEffectEntry(data) {
     const effectEntry = { target: data.target, effect: data.effectKey }
     if (data.source) effectEntry.source = data.source
     if (data.value !== undefined) effectEntry.value = data.value
-    if (data.ability) effectEntry.ability = data.ability
-    if (data.dc !== undefined) {
-        effectEntry.saveDc = data.dc
-        effectEntry.saveAbility = data.ability || 'wis'
+    // improve leaked-saveAbility (2026-11-19): saveAbility rides the entry ONLY
+    // when the chosen definition actually asked for an ability (EffectAdder sends
+    // ability as undefined unless fields includes 'ability'). The old `|| 'wis'`
+    // fallback fabricated a lying key on fixed-DC lane definitions like
+    // Grease (Zone) — whose adjudication reads the caster key's saveType, never
+    // te.saveAbility. Mirror of the data.ability conditional-stamp idiom above.
+    if (data.ability) {
+        effectEntry.ability = data.ability
+        effectEntry.saveAbility = data.ability
     }
+    if (data.dc !== undefined) effectEntry.saveDc = data.dc
     if (data.notes) effectEntry.notes = data.notes
     return effectEntry
 }

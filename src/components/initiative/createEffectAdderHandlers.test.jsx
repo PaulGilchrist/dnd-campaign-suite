@@ -23,7 +23,7 @@
 //   :198 unknown condition key rejected                    → "unknown condition key ... zero side effects"
 //   (new) CLA-019 suppressed addCondition: aura args threaded, no writes, modal stays
 //          open, refusal detail (label + immunitySource) returned to EffectAdder
-//   :233 effects all optional fields + :303 log shape    → it.each "exact te entry bytes" (full + wis default)
+//   :233 effects all optional fields + :303 log shape    → it.each "exact te entry bytes" (full + honest saves)
 //   :272 effects minimal fields                           → CUT, covered by falling.test.js :89-98
 //   :285 dedupe/re-append existing te                     → "replaces the matching te" (exact array bytes)
 //   :331 concentration success + :371 non-Rage buffs + :385 null/[] buffs + :399 default dc → it.each "starts concentration"
@@ -260,9 +260,19 @@ describe('createEffectAdderHandlers', () => {
                 entry: { target: 'Alice', effect: 'goad', source: 'Bob', value: 5, ability: 'str', saveDc: 15, saveAbility: 'str', notes: 'GM note' },
             },
             {
-                name: 'dc without ability defaults saveAbility to wis',
+                // improve leaked-saveAbility (2026-11-19): the old `|| 'wis'`
+                // fabrication is retired — a dc with no chosen ability persists
+                // saveDc ONLY (definitions like Grease (Zone) never ask for one).
+                name: 'dc without ability persists no saveAbility',
                 data: { target: 'Alice', effectKey: 'goad', dc: 12 },
-                entry: { target: 'Alice', effect: 'goad', saveDc: 12, saveAbility: 'wis' },
+                entry: { target: 'Alice', effect: 'goad', saveDc: 12 },
+            },
+            {
+                // Ability-bearing payloads stamp ability AND saveAbility with the
+                // chosen value (and keep working without a dc).
+                name: 'ability stamps ability + saveAbility, dc optional',
+                data: { target: 'Alice', effectKey: 'goad', ability: 'dex' },
+                entry: { target: 'Alice', effect: 'goad', ability: 'dex', saveAbility: 'dex' },
             },
         ])('appends the exact te entry bytes — $name', ({ data, entry }) => {
             handlers.handleApplyEffect('effects', data);
