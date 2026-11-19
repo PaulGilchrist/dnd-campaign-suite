@@ -23,7 +23,7 @@ import useWizardBackgroundAbility from '../../hooks/wizard/useWizardBackgroundAb
 import useWizardAbilities from '../../hooks/wizard/useWizardAbilities.js';
 import useWizardArrayToggle from '../../hooks/wizard/useWizardArrayToggle.js';
 import useWizardFeatAbilityChoices from '../../hooks/wizard/useWizardFeatAbilityChoices.js';
-import { generateQuickBuildDraft, getDefaultQuickBackground } from '../../services/character/quickBuildService.js';
+import { generateQuickBuildDraft, deriveQuickBackground } from '../../services/character/quickBuildService.js';
 import { buildRulesetSwitchPreview, applyRulesetSwitchToFormData } from '../../services/character/rulesetSwitchPreview.js';
 import RulesetSwitchConfirmModal from './RulesetSwitchConfirmModal.jsx';
 
@@ -294,13 +294,14 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
 
   // Quick build prefills (declared after navigation so currentStep exists):
   // 2024 gates step 5 on a background before the class is known, so the walk
-  // prefills the generic default; the full draft lands on step 7 arrival.
+  // prefills the class-less resolution of the service's ONE background
+  // derivation; the draft lands on step 7 arrival and never overwrites it.
   useEffect(() => {
     if (isEditing || buildMode !== 'quick' || ruleset !== '2024') return;
     if (currentStep === 5 && !formData.background) {
-      updateField('background', getDefaultQuickBackground(ruleset));
+      updateField('background', deriveQuickBackground({ ruleset, className: formData.class?.name }));
     }
-  }, [isEditing, buildMode, ruleset, currentStep, formData.background, updateField]);
+  }, [isEditing, buildMode, ruleset, currentStep, formData.background, formData.class?.name, updateField]);
 
   useEffect(() => {
     if (isEditing || buildMode !== 'quick' || currentStep !== 7) return;

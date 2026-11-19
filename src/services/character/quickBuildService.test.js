@@ -8,7 +8,7 @@
  * a fabricated default that the wizard would reject can never pass here.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateQuickBuildDraft, getDefaultQuickBackground } from './quickBuildService.js';
+import { generateQuickBuildDraft, deriveQuickBackground } from './quickBuildService.js';
 import { getPointBuyCosts, validateAbilityTotals, validateStep } from '../../config/utils.js';
 import { loadValidationRules } from '../ui/dataLoader.js';
 import { getSkillLimits } from './skillValidation.js';
@@ -289,9 +289,43 @@ describe('quickBuildService', () => {
   });
 
   describe('wizard entry affordance + determinism', () => {
-    it('getDefaultQuickBackground only answers for 2024 (5e hides the Background step)', () => {
-      expect(getDefaultQuickBackground('2024')).toBe('Guard');
-      expect(getDefaultQuickBackground('5e')).toBe('');
+    it('deriveQuickBackground only answers for 2024 (5e hides the Background step)', () => {
+      expect(deriveQuickBackground({ ruleset: '2024' })).toBe('Guard');
+      expect(deriveQuickBackground({ ruleset: '5e', className: 'Rogue' })).toBe('');
+    });
+
+    // RF 2026-11-19: the step-5 prefill and the step-7 draft must agree —
+    // walk both lanes from the same seed and pin the observed values equal.
+    it.each([
+      { className: 'Rogue', classDefault: 'Criminal' },
+      { className: 'Cleric', classDefault: 'Hermit' },
+    ])('2024 quick-build $className: prefilled background equals the applied draft background',
+      async ({ className, classDefault }) => {
+        // Lane 1 — Background step (5) prefill: class not yet chosen.
+        const prefill = deriveQuickBackground({ ruleset: '2024' });
+        expect(prefill).toBe('Guard');
+
+        // Lane 2 — the user walks past the prefill; step-7 draft applies.
+        const walked = await generateQuickBuildDraft(
+          seedForm({ ruleset: '2024', className, background: prefill })
+        );
+        expect(walked.background).toBe(prefill);
+
+        // Same class with a skipped (empty) Background step resolves through
+        // the same function to the class default — one derivation, one table.
+        const skipped = await generateQuickBuildDraft(
+          seedForm({ ruleset: '2024', className, background: '' })
+        );
+        expect(skipped.background).toBe(classDefault);
+        expect(skipped.background).toBe(
+          deriveQuickBackground({ ruleset: '2024', className })
+        );
+      });
+
+    it('the derivation is deterministic: same inputs, same background', () => {
+      const runs = Array.from({ length: 5 }, () =>
+        deriveQuickBackground({ ruleset: '2024', className: 'Rogue' }));
+      runs.forEach(bg => expect(bg).toBe(runs[0]));
     });
 
     it('produces the identical draft on repeated runs', async () => {

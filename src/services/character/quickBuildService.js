@@ -49,12 +49,19 @@ import {
 const ABILITY_ORDER = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
 
 /**
- * The background prefilled on the (2024) Background step before a class is
- * known; generateQuickBuildDraft refines it to the class default when the
- * user has not edited it.
+ * THE one background derivation for the quick-build lane — both the wizard's
+ * Background-step prefill and generateQuickBuildDraft call this, so the two
+ * lanes can never disagree. Deterministic table lookup on the same inputs
+ * (ruleset + class). Race is not a key: public/data/2024/backgrounds.json
+ * carries no race-keyed rows, so class is the only discriminator the authored
+ * data supports. Before the class is known (the Background step runs before
+ * the Class step) the same call with no className resolves to the generic
+ * default — which is also exactly what the draft leaves standing when the user
+ * already walked past that prefill (see generateQuickBuildDraft).
  */
-export function getDefaultQuickBackground(ruleset) {
-  return ruleset === '2024' ? QUICK_BUILD_GENERIC_BACKGROUND_2024 : '';
+export function deriveQuickBackground({ ruleset, className } = {}) {
+  if (ruleset !== '2024') return '';
+  return QUICK_BUILD_BACKGROUNDS_2024[className] || QUICK_BUILD_GENERIC_BACKGROUND_2024;
 }
 
 // ————— Ability scores —————
@@ -437,12 +444,13 @@ export async function generateQuickBuildDraft(formData) {
   const draft = cloneDeep(formData);
   draft.rules = ruleset;
   draft.level = parseInt(draft.level, 10) || 1;
-  if (ruleset === '2024') {
-    const classBackground = QUICK_BUILD_BACKGROUNDS_2024[draft.class.name] || QUICK_BUILD_GENERIC_BACKGROUND_2024;
-    // Only refine the prefilled default — respect a hand-picked background.
-    if (!draft.background || draft.background === QUICK_BUILD_GENERIC_BACKGROUND_2024) {
-      draft.background = classBackground;
-    }
+  if (ruleset === '2024' && !draft.background) {
+    // Fill only an empty background (e.g. the user jumped straight to the
+    // draft step). A prefill the user already reviewed on the Background step
+    // is honoured verbatim — never silently re-derived — and both lanes run
+    // through deriveQuickBackground, so a class-less prefill and a fresh
+    // fill of the same form can never diverge.
+    draft.background = deriveQuickBackground({ ruleset, className: draft.class.name });
   }
   await applySubclassDefault(draft);
   await buildAbilities(draft);

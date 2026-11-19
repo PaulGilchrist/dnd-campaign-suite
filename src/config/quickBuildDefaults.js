@@ -7,7 +7,8 @@
  *    the cap rules-validation.json declares for both rulesets);
  *  - each class's primary ability (used to bias skill/top-up picks);
  *  - 2024 background defaults (the Background step needs one before the
- *    class is even picked, so the wizard prefills and the draft refines);
+ *    class is even picked; both the wizard prefill and the quick-build draft
+ *    resolve through quickBuildService.deriveQuickBackground);
  *  - 5e starting equipment (public/data/classes.json carries no
  *    starting_equipment field; 2024 classes DO and the service parses
  *    that instead of using this table).
@@ -50,8 +51,10 @@ export const QUICK_BUILD_PRIMARY_ABILITY = {
 };
 
 // 2024-only: the Background step (5) gates Next before the Class step (6)
-// runs, so the wizard prefills QUICK_BUILD_GENERIC_BACKGROUND_2024 and the
-// draft refines to the class-appropriate pick once the class is known.
+// runs, so the wizard prefills deriveQuickBackground's class-less resolution
+// (QUICK_BUILD_GENERIC_BACKGROUND_2024) and the draft only fills a still-empty
+// background with the class-appropriate pick — a reviewed prefill is never
+// silently overwritten. Both lanes resolve through that one function.
 // Chosen to avoid config-modal feats (Magic Initiate / Fey Touched).
 export const QUICK_BUILD_BACKGROUNDS_2024 = {
   Barbarian: 'Soldier',
