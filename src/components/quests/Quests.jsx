@@ -113,6 +113,7 @@ function QuestFormModal({ editingQuest, formData, setFormData, campaignName, sav
           </label>
           <select
             id="quest-status"
+            aria-label="Quest status"
             className="ct-select"
             value={formData.status}
             onChange={(e) => onChange('status', e.target.value)}

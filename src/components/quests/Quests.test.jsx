@@ -41,7 +41,7 @@ const quest = (overrides = {}) => ({
 // Map form fields to their queries in the quest modal.
 const field = {
   name: () => screen.getByRole('textbox', { name: /Name/ }),
-  status: () => screen.getByLabelText('Status'),
+  status: () => screen.getByRole('combobox', { name: 'Quest status' }),
   description: () => screen.getByTestId('field-quest-description'),
   rewards: () => screen.getByTestId('field-quest-rewards'),
   notes: () => screen.getByTestId('field-quest-notes'),
@@ -172,6 +172,15 @@ describe('Quests', () => {
       };
       fillQuestForm(values);
       expectFormValues(values);
+    });
+
+    it('exposes the status select by its accessible name "Quest status"', () => {
+      renderWithQuests([]);
+      openNewModal();
+
+      const status = screen.getByRole('combobox', { name: 'Quest status' });
+      expect(status).toHaveAttribute('id', 'quest-status');
+      expect(status).toBeVisible();
     });
 
     it('disables the save button until the name is non-blank', () => {
