@@ -68,7 +68,6 @@ change-data `{}` + log `[]` + overlays `{"overlays":[]}` (closed-tab two-pass ca
 
 <!-- Open items only. e2e-explore appends dated bullets here; e2e-improve consumes and REMOVES them. -->
 
-- **2026-11-19 RF — XP modal Milestone-toggle double-write:** unticking Milestone Leveling fires TWO identical whole-bucket POSTs to the char key (mirror + store, ~ms apart) — same mechanism the death-save saves retired (`4a291a1ec`/`9b0e54a71` idiom): collapse to one `setRuntimeBatch`; low-risk hygiene.
 - **2026-11-19 RF — Quest planner status select unlabeled:** the Quests editor's status `select` is `#quest-status` but has no `aria-label` (probes must index `[...modal select][0]`); sibling ct-modals are getting named a11y labels — add `aria-label="Quest status"` for test stability.
 - **2026-11-19 RF — top-level `lastAppliedTurnStartCreature` duplicating `__initiative__`:** the turn-start gate lands BOTH in the `__initiative__` object and as a separate top-level change-data key (both witnessed in the RF census with the same `2:FeyRanger` value); looks like a double-writer — pick one home (the `__initiative__` bucket is the established carrier) and drop the loose key, or pin why both are load-bearing.
 
